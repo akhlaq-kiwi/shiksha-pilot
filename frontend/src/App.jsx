@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   BookOpen, 
   Users, 
@@ -43,7 +43,9 @@ import {
   Info,
   Sliders,
   LogOut,
-  Briefcase
+  Briefcase,
+  CreditCard,
+  WifiOff
 } from 'lucide-react';
 
 const LOCATION_DATA = {
@@ -139,6 +141,93 @@ const LOCATION_DATA = {
   }
 };
 
+const sha256Sync = (ascii) => {
+  function rightRotate(value, amount) {
+    return (value >>> amount) | (value << (32 - amount));
+  }
+  
+  const words = [];
+  const asciiLength = ascii.length;
+  for (let i = 0; i < asciiLength; i++) {
+    words[i >> 2] |= (ascii.charCodeAt(i) & 0xff) << (24 - (i % 4) * 8);
+  }
+  
+  const totalBitLength = asciiLength * 8;
+  const wordCount = ((totalBitLength + 64) >> 9) * 16 + 16;
+  words[asciiLength >> 2] |= 0x80 << (24 - (asciiLength % 4) * 8);
+  words[wordCount - 1] = totalBitLength;
+  
+  let h0 = 0x6a09e667, h1 = 0xbb67ae85, h2 = 0x3c6ef372, h3 = 0xa54ff53a,
+      h4 = 0x510e527f, h5 = 0x9b05688c, h6 = 0x1f83d9ab, h7 = 0x5be0cd19;
+      
+  const k = [
+    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+  ];
+
+  for (let j = 0; j < words.length; j += 16) {
+    const w = new Array(64);
+    for (let i = 0; i < 16; i++) {
+      w[i] = words[j + i] || 0;
+    }
+    for (let i = 16; i < 64; i++) {
+      const s0 = rightRotate(w[i - 15], 7) ^ rightRotate(w[i - 15], 18) ^ (w[i - 15] >>> 3);
+      const s1 = rightRotate(w[i - 2], 17) ^ rightRotate(w[i - 2], 19) ^ (w[i - 2] >>> 10);
+      w[i] = (w[i - 16] + s0 + w[i - 7] + s1) | 0;
+    }
+
+    let a = h0, b = h1, c = h2, d = h3, e = h4, f = h5, g = h6, h = h7;
+
+    for (let i = 0; i < 64; i++) {
+      const S1 = rightRotate(e, 6) ^ rightRotate(e, 11) ^ rightRotate(e, 25);
+      const ch = (e & f) ^ (~e & g);
+      const temp1 = (h + S1 + ch + k[i] + w[i]) | 0;
+      const S0 = rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22);
+      const maj = (a & b) ^ (a & c) ^ (b & c);
+      const temp2 = (S0 + maj) | 0;
+
+      h = g;
+      g = f;
+      f = e;
+      e = (d + temp1) | 0;
+      d = c;
+      c = b;
+      b = a;
+      a = (temp1 + temp2) | 0;
+    }
+
+    h0 = (h0 + a) | 0;
+    h1 = (h1 + b) | 0;
+    h2 = (h2 + c) | 0;
+    h3 = (h3 + d) | 0;
+    h4 = (h4 + e) | 0;
+    h5 = (h5 + f) | 0;
+    h6 = (h6 + g) | 0;
+    h7 = (h7 + h) | 0;
+  }
+
+  const hash = [h0, h1, h2, h3, h4, h5, h6, h7].map(val => {
+    const hex = (val >>> 0).toString(16);
+    return '00000000'.substring(hex.length) + hex;
+  }).join('');
+
+  return hash;
+};
+
+const verifyLocalPassword = (inputPass, storedPass) => {
+  if (!storedPass) return false;
+  if (storedPass.length === 64 && /^[0-9a-f]{64}$/i.test(storedPass)) {
+    return sha256Sync(inputPass) === storedPass;
+  }
+  return storedPass === inputPass;
+};
+
 const getStudentAvatar = (student) => {
   if (student.profile_image && student.profile_image.trim() !== '') {
     return student.profile_image;
@@ -173,11 +262,52 @@ const formatDate = (dateStr) => {
   return dateStr;
 };
 
+const formatReportDateStr = (dateStr) => {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    const year = parts[0];
+    const monthIndex = parseInt(parts[1], 10) - 1;
+    const day = parts[2].padStart(2, '0');
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const month = monthNames[monthIndex];
+    if (month) {
+      return `${day}-${month}-${year}`;
+    }
+  }
+  const date = new Date(dateStr);
+  const day = String(date.getDate()).padStart(2, '0');
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const month = monthNames[date.getMonth()];
+  const year = date.getFullYear();
+  return `${day}-${month}-${year}`;
+};
+
+
+const decodeJwt = (token) => {
+  try {
+    if (!token) return null;
+    const base64Url = token.split('.')[1];
+    if (!base64Url) return null;
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(c => {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    console.error("JWT decoding failed:", e);
+    return null;
+  }
+};
+
 export default function App() {
   // Theme & Navigation
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard'); // Super Admin: schools, stats, invites. School Admin: dashboard, faculty, students, fees, reports, settings
-  const [activeYearId, setActiveYearId] = useState(2); // Default to 2 (2025-2026)
+  const [activeYearId, setActiveYearId] = useState(() => {
+    const stored = localStorage.getItem('bn_active_year_id');
+    return stored ? parseInt(stored) : 2;
+  });
   
   // Academic Years Management States
   const [showCreateYearModal, setShowCreateYearModal] = useState(false);
@@ -188,9 +318,14 @@ export default function App() {
     description: ''
   });
   const [unpayConfirm, setUnpayConfirm] = useState(null);
+  const [unpayExtraFeeConfirm, setUnpayExtraFeeConfirm] = useState(null);
   const [selectedFeeClassId, setSelectedFeeClassId] = useState('');
   const [selectedFeesClassId, setSelectedFeesClassId] = useState(null);
+  const [feesSortField, setFeesSortField] = useState('dues_desc');
   const [classFeeStructure, setClassFeeStructure] = useState(null);
+  const [feeStructureMode, setFeeStructureMode] = useState('same'); // 'same' or 'custom'
+  const [sameMonthlyFee, setSameMonthlyFee] = useState(0);
+  const [showConfirmLockModal, setShowConfirmLockModal] = useState(false);
   const [yearError, setYearError] = useState('');
   const [isSavingYear, setIsSavingYear] = useState(false);
   const [showTransitionWizard, setShowTransitionWizard] = useState(false);
@@ -203,11 +338,138 @@ export default function App() {
   const [crossYearReports, setCrossYearReports] = useState([]);
   const [isFetchingCrossYear, setIsFetchingCrossYear] = useState(false);
   const [reportSubTab, setReportSubTab] = useState('session'); // 'session' or 'cross-year'
-  const [schoolCurrency, setSchoolCurrency] = useState('USD');
+  const [schoolCurrency, setSchoolCurrency] = useState('INR');
   const [feesStatusFilter, setFeesStatusFilter] = useState('All');
   const [ledgerBackSource, setLedgerBackSource] = useState('students');
   const [showExperienceLetter, setShowExperienceLetter] = useState(false);
-  const [studentDetailTab, setStudentDetailTab] = useState('fees'); // 'fees' or 'documents'
+  const [studentDetailTab, setStudentDetailTab] = useState('fees'); // 'fees', 'documents', or 'performance'
+  const [studentPerformanceSummary, setStudentPerformanceSummary] = useState(null);
+  const [profileStudentExamId, setProfileStudentExamId] = useState('overall');
+
+  // Student Performance States
+  const [performanceSubTab, setPerformanceSubTab] = useState('attendance'); // 'attendance', 'exams', 'report_cards'
+  const [attendanceClassId, setAttendanceClassId] = useState('');
+  const [attendanceGroupName, setAttendanceGroupName] = useState('all');
+  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
+  const [attendanceStudents, setAttendanceStudents] = useState([]);
+  const [attendanceReportMonth, setAttendanceReportMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [attendanceReportData, setAttendanceReportData] = useState([]);
+  const [isFetchingAttendance, setIsFetchingAttendance] = useState(false);
+  const [isSavingAttendance, setIsSavingAttendance] = useState(false);
+  const [attendanceAnalytics, setAttendanceAnalytics] = useState({});
+  const [attendanceMode, setAttendanceMode] = useState('mark'); // 'mark' or 'report'
+  const [markedAttendance, setMarkedAttendance] = useState({}); // student_id -> status
+
+  const [examsList, setExamsList] = useState([]);
+  const [selectedExam, setSelectedExam] = useState(null);
+  const [isFetchingExams, setIsFetchingExams] = useState(false);
+  const [isSavingExam, setIsSavingExam] = useState(false);
+  const [showCreateExamModal, setShowCreateExamModal] = useState(false);
+  const [newExamForm, setNewExamForm] = useState({
+    name: '',
+    class_id: '',
+    group_name: '',
+    start_date: '',
+    end_date: '',
+    subjects: [{ subject_name: '', max_marks: 100 }]
+  });
+  const [examMarks, setExamMarks] = useState([]);
+  const [examMarksMode, setExamMarksMode] = useState('list'); // 'list', 'entry', 'remarks'
+  const [marksSubjectFilter, setMarksSubjectFilter] = useState('');
+  const [isSavingMarks, setIsSavingMarks] = useState(false);
+  const [marksSaveStatus, setMarksSaveStatus] = useState(''); // 'saving', 'saved', ''
+  
+  const [reportCardClassId, setReportCardClassId] = useState('');
+  const [reportCardGroupName, setReportCardGroupName] = useState('all');
+  const [reportCardStudentId, setReportCardStudentId] = useState('');
+  const [reportCardExamId, setReportCardExamId] = useState('overall');
+  const [reportCardRemarks, setReportCardRemarks] = useState({}); // student_id -> remark text
+  const [schoolSignatures, setSchoolSignatures] = useState({
+    teacher_signature: null,
+    class_teacher_signature: null,
+    principal_signature: null
+  });
+  const [showSignatureSettings, setShowSignatureSettings] = useState(false);
+  const [gradingScales, setGradingScales] = useState([
+    { grade_name: 'A+', min_percentage: 90.00, max_percentage: 100.00 },
+    { grade_name: 'A',  min_percentage: 80.00, max_percentage: 89.99 },
+    { grade_name: 'B',  min_percentage: 70.00, max_percentage: 79.99 },
+    { grade_name: 'C',  min_percentage: 60.00, max_percentage: 69.99 },
+    { grade_name: 'D',  min_percentage: 40.00, max_percentage: 59.99 },
+    { grade_name: 'F',  min_percentage: 0.00,  max_percentage: 39.99 }
+  ]);
+
+  // Financial Reports States
+  const [financialReports, setFinancialReports] = useState([]);
+  const [reportFromDate, setReportFromDate] = useState('');
+  const [reportToDate, setReportToDate] = useState('');
+  const [reportPreview, setReportPreview] = useState(null);
+  const [isReportPreviewing, setIsReportPreviewing] = useState(false);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [exportingReportId, setExportingReportId] = useState(null);
+  const [reportStatusConfirm, setReportStatusConfirm] = useState(null);
+  const [settlingReportId, setSettlingReportId] = useState(null);
+  const [showGenerateConfirm, setShowGenerateConfirm] = useState(false);
+  const [financialSubTab, setFinancialSubTab] = useState('statements'); // 'statements', 'expenses', 'fees'
+  const [financeManagementSubTab, setFinanceManagementSubTab] = useState('fees'); // 'fees', 'expenses', 'promises'
+  const [paymentPromises, setPaymentPromises] = useState([]);
+  const [studentCarryForwardDues, setStudentCarryForwardDues] = useState([]);
+  const [previousDues, setPreviousDues] = useState([]);
+  const [isFetchingPreviousDues, setIsFetchingPreviousDues] = useState(false);
+  const [previousYearRecoveries, setPreviousYearRecoveries] = useState([]);
+  const [isFetchingCarryForwardDues, setIsFetchingCarryForwardDues] = useState(false);
+  const [selectedCarryForwardDue, setSelectedCarryForwardDue] = useState(null);
+  const [showPayRecoveryModal, setShowPayRecoveryModal] = useState(false);
+  const [showRecoveryReceiptModal, setShowRecoveryReceiptModal] = useState(false);
+  const [selectedRecoveryReceiptDue, setSelectedRecoveryReceiptDue] = useState(null);
+  const [selectedRecoveryReceiptRec, setSelectedRecoveryReceiptRec] = useState(null);
+  const [recoveryAmount, setRecoveryAmount] = useState('');
+  const [recoveryDate, setRecoveryDate] = useState(new Date().toISOString().split('T')[0]);
+  const [isRecordingRecovery, setIsRecordingRecovery] = useState(false);
+  const [recoverySearchQuery, setRecoverySearchQuery] = useState('');
+  const [recoveryYearFilter, setRecoveryYearFilter] = useState('All');
+  const [isSavingPromise, setIsSavingPromise] = useState(false);
+  const [promiseSearch, setPromiseSearch] = useState('');
+  const [promiseClassFilter, setPromiseClassFilter] = useState('All');
+  const [promiseModalOpen, setPromiseModalOpen] = useState(false);
+  const [editingPromise, setEditingPromise] = useState(null);
+  const [promiseStudentId, setPromiseStudentId] = useState('');
+  const [promiseDate, setPromiseDate] = useState('');
+  const [promiseDescription, setPromiseDescription] = useState('');
+  const [promiseStatus, setPromiseStatus] = useState('Pending');
+  const [promiseStudentSearchQuery, setPromiseStudentSearchQuery] = useState('');
+  const [activePromiseMenuId, setActivePromiseMenuId] = useState(null);
+  const [expenses, setExpenses] = useState([]);
+  const [expenseDesc, setExpenseDesc] = useState('');
+  const [expenseAmount, setExpenseAmount] = useState('');
+  const [extraFeeTypes, setExtraFeeTypes] = useState([]);
+  const [newTypeName, setNewTypeName] = useState('');
+  const [newTypeAmount, setNewTypeAmount] = useState('');
+  const [studentExtraFees, setStudentExtraFees] = useState([]);
+  const [extraFeeSearch, setExtraFeeSearch] = useState('');
+  const [extraFeeStatusFilter, setExtraFeeStatusFilter] = useState('All');
+  const [extraFeeClassFilter, setExtraFeeClassFilter] = useState('All');
+  const [extraFeeTypeFilter, setExtraFeeTypeFilter] = useState('All');
+  const [visibleAdditionalFeeStudentsCount, setVisibleAdditionalFeeStudentsCount] = useState(10);
+  const [isFetchingMoreAdditionalFeeStudents, setIsFetchingMoreAdditionalFeeStudents] = useState(false);
+  const [editingExtraFeeType, setEditingExtraFeeType] = useState(null);
+  const [editExtraFeeTypeName, setEditExtraFeeTypeName] = useState('');
+  const [editExtraFeeTypeAmount, setEditExtraFeeTypeAmount] = useState('');
+
+  // Modal state for Replace/Backup Teacher actions
+  const [teacherActionModal, setTeacherActionModal] = useState({
+    show: false,
+    type: '', // 'Replace' or 'Backup'
+    day: '',
+    periodIndex: null,
+    subject: '',
+    currentTeacherId: null
+  });
+
+  // Keep track of which period's dropdown menu is currently open
+  const [activeDropdownKey, setActiveDropdownKey] = useState(null); // e.g. "Monday-0"
+
+  const [selectedModalTeacherId, setSelectedModalTeacherId] = useState('');
 
   // Admin Profile States
   const [adminProfile, setAdminProfile] = useState(null);
@@ -248,9 +510,9 @@ export default function App() {
   };
 
   const formatMoney = (amount) => {
-    const numericAmount = parseFloat(amount) || 0;
-    const currencyInfo = currencyMap[schoolCurrency] || currencyMap['USD'];
-    return `${currencyInfo.symbol}${numericAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const numericAmount = Math.round(parseFloat(amount)) || 0;
+    const currencyInfo = currencyMap[schoolCurrency] || currencyMap['INR'];
+    return `${currencyInfo.symbol}${numericAmount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
   };
   
   // Synchronize dark-theme class with document.body to ensure correct CSS variables resolution globally
@@ -268,11 +530,154 @@ export default function App() {
   const [role, setRole] = useState(localStorage.getItem('admin_role') || ''); // 'Super Admin' or 'School Admin'
   const [schoolId, setSchoolId] = useState(localStorage.getItem('admin_school_id') || '');
   const [setupCompleted, setSetupCompleted] = useState(parseInt(localStorage.getItem('admin_setup_completed') || '1'));
+  const [permissions, setPermissions] = useState(() => {
+    const saved = localStorage.getItem('admin_permissions');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [linkedStudentIds, setLinkedStudentIds] = useState(() => {
+    const saved = localStorage.getItem('admin_linked_student_ids');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [expiredModalInfo, setExpiredModalInfo] = useState(null);
   
+  // Parent Portal States
+  const [parentStudents, setParentStudents] = useState([]);
+  const [selectedParentStudentId, setSelectedParentStudentId] = useState(null);
+  const [parentDashboardData, setParentDashboardData] = useState(null);
+  const [isParentDashboardLoading, setIsParentDashboardLoading] = useState(false);
+
+  // User Management & Roles States
+  const [dbRoles, setDbRoles] = useState([]);
+  const [dbUsers, setDbUsers] = useState([]);
+  const [isRolesLoading, setIsRolesLoading] = useState(false);
+
+  // Form states for Roles & Users management
+  const [roleFormName, setRoleFormName] = useState('');
+  const [roleFormPerms, setRoleFormPerms] = useState([]);
+  const [userFormEmail, setUserFormEmail] = useState('');
+  const [userFormPass, setUserFormPass] = useState('');
+  const [userFormRole, setUserFormRole] = useState('Teacher');
+  const [userFormClassId, setUserFormClassId] = useState('');
+  const [userFormChildIds, setUserFormChildIds] = useState([]);
+  const [rolesSubTab, setRolesSubTab] = useState('roles'); // 'roles' or 'users'
+  const [editingUser, setEditingUser] = useState(null);
+
+  // Load Parent Dashboard Details
+  useEffect(() => {
+    const loadParentDashboard = async () => {
+      if (role !== 'Parent' || !selectedParentStudentId) return;
+      setIsParentDashboardLoading(true);
+      try {
+        if (!token) {
+          // Mock mode fallback
+          const childObj = parentStudents.find(s => s.id === selectedParentStudentId) || {
+            id: selectedParentStudentId,
+            first_name: 'Yusuf',
+            last_name: 'Ali',
+            class_name: 'Class 11',
+            gr_no: 'GR1004',
+            status: 'Active',
+            group_name: 'Science'
+          };
+          setParentDashboardData({
+            student: childObj,
+            attendance_stats: { present_days: 18, absent_days: 2, leave_days: 1, total_days: 21 },
+            recent_attendance: [
+              { attendance_date: '2026-06-20', status: 'Present' },
+              { attendance_date: '2026-06-19', status: 'Present' },
+              { attendance_date: '2026-06-18', status: 'Absent' },
+              { attendance_date: '2026-06-17', status: 'Present' },
+              { attendance_date: '2026-06-16', status: 'Present' }
+            ],
+            fees: [
+              { due_date: '2026-07-01', title: 'July 2026 Tuition Fee', amount: 2000, status: 'Unpaid' },
+              { due_date: '2026-06-01', title: 'June 2026 Tuition Fee', amount: 2000, status: 'Paid', paid_at: '2026-06-05', payment_mode: 'Cash' }
+            ],
+            carry_forward: [],
+            exam_marks: [
+              { exam_name: 'First Term Exams', subject_name: 'Physics', marks_obtained: 85, max_marks: 100 },
+              { exam_name: 'First Term Exams', subject_name: 'Chemistry', marks_obtained: 90, max_marks: 100 },
+              { exam_name: 'First Term Exams', subject_name: 'Mathematics', marks_obtained: 78, max_marks: 100 }
+            ]
+          });
+          setIsParentDashboardLoading(false);
+          return;
+        }
+
+        const headers = getHeaders(token);
+        const res = await fetch(`/api/parent/student/${selectedParentStudentId}/dashboard`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          setParentDashboardData(data);
+        }
+      } catch (err) {
+        console.error("Error loading parent dashboard", err);
+      } finally {
+        setIsParentDashboardLoading(false);
+      }
+    };
+    loadParentDashboard();
+  }, [selectedParentStudentId, role, token, parentStudents]);
+
+  // Load Teacher Today's Attendance & Scheme
+  useEffect(() => {
+    const loadTeacherTodayAttendance = async () => {
+      if (role !== 'Teacher') return;
+      const currentTeacher = teachers.find(t => t.phone === username || t.email === username);
+      const assignedClass = classes.find(c => Number(c.class_teacher_id) === Number(currentTeacher?.id));
+      if (!assignedClass) return;
+      
+      const keySuffix = schoolId || 'default';
+      const todayDate = new Date().toISOString().slice(0, 10);
+      try {
+        if (token.includes('mock') || !isConnected) {
+          // Attendance
+          const storedAtt = JSON.parse(localStorage.getItem(`bn_sandbox_attendance_${keySuffix}_${activeYearId}`) || '[]');
+          const classStudents = students.filter(s => s.class_id === assignedClass.id);
+          const studentIds = classStudents.map(s => s.id);
+          const filtered = storedAtt.filter(r => r.attendance_date === todayDate && studentIds.includes(Number(r.student_id)));
+          setTeacherTodayAttendance(filtered);
+
+          // Scheme / Class Fee structure
+          const storedCfg = localStorage.getItem(`bn_sandbox_class_fees_${keySuffix}_${assignedClass.id}_${activeYearId}`);
+          if (storedCfg) {
+            setTeacherClassFeeStructure(JSON.parse(storedCfg));
+          } else {
+            setTeacherClassFeeStructure(null);
+          }
+        } else {
+          // Attendance
+          const res = await fetch(`/api/attendance?class_id=${assignedClass.id}&academic_year_id=${activeYearId}&date=${todayDate}`, { headers: getHeaders() });
+          if (res.ok) {
+            const data = await res.json();
+            const mapped = data.filter(s => s.status).map(s => ({ student_id: s.id, status: s.status }));
+            setTeacherTodayAttendance(mapped);
+          }
+
+          // Scheme / Class Fee structure
+          const resCfg = await fetch(`/api/class-fees?class_id=${assignedClass.id}&academic_year_id=${activeYearId}`, { headers: getHeaders() });
+          if (resCfg.ok) {
+            setTeacherClassFeeStructure(await resCfg.json());
+          }
+        }
+      } catch (err) {
+        console.error("Error loading today teacher data", err);
+      }
+    };
+    
+    loadTeacherTodayAttendance();
+  }, [role, token, classes, teachers, username, activeYearId, isConnected, students]);
+
   // Form credentials
   const [loginUser, setLoginUser] = useState('');
   const [loginPass, setLoginPass] = useState('');
   const [loginError, setLoginError] = useState('');
+  const [loginTab, setLoginTab] = useState('admin'); // 'admin', 'teacher', 'parent'
+  const [otpPhone, setOtpPhone] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [otpStep, setOtpStep] = useState(0); // 0 = enter phone, 1 = enter OTP
+  const [teacherTodayAttendance, setTeacherTodayAttendance] = useState([]);
+  const [teacherClassFeeStructure, setTeacherClassFeeStructure] = useState(null);
   const [forgotPasswordStep, setForgotPasswordStep] = useState(0); // 0 = off, 1 = enter email, 2 = verify OTP, 3 = reset password
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotOtp, setForgotOtp] = useState('');
@@ -290,14 +695,21 @@ export default function App() {
   const [toast, setToast] = useState(null); // { message: string, type: 'success' | 'error' }
   const [isInitializing, setIsInitializing] = useState(!!localStorage.getItem('admin_token'));
 
+  const hasPermission = (perm) => {
+    if (role === 'Super Admin' || role === 'School Admin') return true;
+    return permissions.includes(perm);
+  };
+
   // Multi-Tenant URL Detection (on mount / history changes)
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
+  
+
 
   // Super Admin Specific States
   const [schools, setSchools] = useState([]);
   const [superStats, setSuperStats] = useState(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [inviteForm, setInviteForm] = useState({ name: '', email: '', contact_person: '', phone: '' });
+  const [inviteForm, setInviteForm] = useState({ name: '', email: '', contact_person: '', phone: '', plan_id: '' });
   const [isSendingInvite, setIsSendingInvite] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
@@ -307,12 +719,26 @@ export default function App() {
   const [generatedCredentials, setGeneratedCredentials] = useState(null);
   const [showExtendModal, setShowExtendModal] = useState(null); // holds school object to extend
   const [extendMonths, setExtendMonths] = useState(12);
+  
+  // Super Admin Subscription Management States
+  const [superPlans, setSuperPlans] = useState([]);
+  const [superSubscriptions, setSuperSubscriptions] = useState([]);
+  const [superAuditLogs, setSuperAuditLogs] = useState([]);
+  const [availablePlans, setAvailablePlans] = useState([]);
+  const activePlans = availablePlans.filter(p => Number(p.is_active) !== 0);
+  const [showAddPlanModal, setShowAddPlanModal] = useState(false);
+  const [showEditPlanModal, setShowEditPlanModal] = useState(null); // holds plan object
+  const [showManualSubModal, setShowManualSubModal] = useState(null); // holds subscription/school object
+  const [planForm, setPlanForm] = useState({ name: '', duration_days: '', price: '', is_active: 1, description: '' });
+  const [manualSubForm, setManualSubForm] = useState({ plan_id: '', action_type: 'Activate', start_date: '', expiry_date: '' });
+  const [isSavingPlan, setIsSavingPlan] = useState(false);
+  const [isSavingSub, setIsSavingSub] = useState(false);
 
   // School Admin Setup Wizard States
   const [wizardStep, setWizardStep] = useState(1); // 1 to 5
   const [wizardForm, setWizardForm] = useState({
     name: '',
-    logo_path: 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=150',
+    logo_path: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%234f46e5"/><path d="M50 25 L80 40 L50 55 L20 40 Z" fill="%23ffffff"/><path d="M35 47.5 L35 70 C35 75, 65 75, 65 70 L65 47.5" fill="%23ffffff" opacity="0.9"/><path d="M72 43 L72 65 L75 65 L75 43 Z" fill="%23f59e0b"/><circle cx="73.5" cy="67" r="3" fill="%23f59e0b"/></svg>',
     address: '',
     contact_person: '',
     contact_number: ''
@@ -320,8 +746,8 @@ export default function App() {
 
   // School Admin Database States (Isolated)
   const [years, setYears] = useState([
-    { id: 1, year_range: "2024-2025", is_active: false },
-    { id: 2, year_range: "2025-2026", is_active: true }
+    { id: 1, year_range: "2024-2025", start_date: "2024-04-01", end_date: "2025-03-31", description: "Past session", status: "Archived", is_active: false, created_at: "2024-04-01 00:00:00" },
+    { id: 2, year_range: "2025-2026", start_date: "2025-04-01", end_date: "2026-03-31", description: "Active session", status: "Active", is_active: true, created_at: "2025-04-01 00:00:00" }
   ]);
   const [classes, setClasses] = useState([]);
   const [teachers, setTeachers] = useState([]);
@@ -337,12 +763,26 @@ export default function App() {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [teacherSalaries, setTeacherSalaries] = useState([]);
   const [studentFees, setStudentFees] = useState([]);
+  const [selectedMonthsForPayment, setSelectedMonthsForPayment] = useState([]);
+  const [isFeeStructureConfigured, setIsFeeStructureConfigured] = useState(true);
+  const [showFeeConfigRequiredModal, setShowFeeConfigRequiredModal] = useState(false);
+
+  const [selectedMemberClass, setSelectedMemberClass] = useState(null);
+  const [selectedMemberStudent, setSelectedMemberStudent] = useState(null);
+  const [selectedMemberTeacher, setSelectedMemberTeacher] = useState(null);
+  const [memberStudentFees, setMemberStudentFees] = useState([]);
+  const [memberTeacherSalaries, setMemberTeacherSalaries] = useState([]);
+  const [memberDetailTab, setMemberDetailTab] = useState('fees');
+  const [isLoadingMemberDetails, setIsLoadingMemberDetails] = useState(false);
 
   // Groups and Custom Classroom states
   const [selectedGroupId, setSelectedGroupId] = useState(null);
   const [editingStudent, setEditingStudent] = useState(null);
   const [showCreateClassModal, setShowCreateClassModal] = useState(false);
   const [newClassForm, setNewClassForm] = useState({ name: '', room: '', groups: [] });
+  const [showEditClassModal, setShowEditClassModal] = useState(false);
+  const [editingClass, setEditingClass] = useState(null);
+  const [editClassForm, setEditClassForm] = useState({ name: '' });
   const [groupFilter, setGroupFilter] = useState('all');
   
   // Receipt Modal state
@@ -353,21 +793,47 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [subjectFilter, setSubjectFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [studentStatusFilter, setStudentStatusFilter] = useState('All');
+  const [teacherSearchQuery, setTeacherSearchQuery] = useState('');
+  const [visibleTeachersCount, setVisibleTeachersCount] = useState(9);
+  const [isFetchingMoreTeachers, setIsFetchingMoreTeachers] = useState(false);
   
   // Modals state
   const [showAddTeacherModal, setShowAddTeacherModal] = useState(false);
   const [showAddStudentModal, setShowAddStudentModal] = useState(false);
   const [showNotificationDrawer, setShowNotificationDrawer] = useState(false);
+  const [showAllNotificationsModal, setShowAllNotificationsModal] = useState(false);
+  const [showSalaryDrilldown, setShowSalaryDrilldown] = useState(null);
+  const [salaryDrilldownData, setSalaryDrilldownData] = useState([]);
+  const [isDrilldownLoading, setIsDrilldownLoading] = useState(false);
+  const [teacherProfileBackTab, setTeacherProfileBackTab] = useState(null);
+  const skipERPFetchRef = useRef(false);
+  const autoSaveTimerRef = useRef(null);
   const [activeTeacherMenuId, setActiveTeacherMenuId] = useState(null);
+  const [activeClassMenuId, setActiveClassMenuId] = useState(null);
+  const [activeStudentMenuId, setActiveStudentMenuId] = useState(null);
   
   // Connection states
   const [isConnected, setIsConnected] = useState(false);
+  const [isApiUnavailable, setIsApiUnavailable] = useState(false);
+  const [apiConnectionError, setApiConnectionError] = useState('');
+  const [isRetrying, setIsRetrying] = useState(false);
   const [loading, setLoading] = useState(false);
   const [actionError, setActionError] = useState('');
   const [sErrors, setSErrors] = useState({});
   const [isSavingStudent, setIsSavingStudent] = useState(false);
   const [visibleCount, setVisibleCount] = useState(6);
   const [isFetchingMoreStudents, setIsFetchingMoreStudents] = useState(false);
+  const [visibleFeesStudentsCount, setVisibleFeesStudentsCount] = useState(10);
+  const [isFetchingMoreFeesStudents, setIsFetchingMoreFeesStudents] = useState(false);
+  const [selectedViewSchool, setSelectedViewSchool] = useState(null);
+  const [activeSchoolMenuId, setActiveSchoolMenuId] = useState(null);
+  const [showEditSchoolModal, setShowEditSchoolModal] = useState(null);
+  const [editSchoolForm, setEditSchoolForm] = useState({ name: '', status: '', subscription_end: '', contact_person: '', contact_number: '' });
+  const [isSavingSchool, setIsSavingSchool] = useState(false);
+  const [schoolDetailsData, setSchoolDetailsData] = useState(null);
+  const [isLoadingSchoolDetails, setIsLoadingSchoolDetails] = useState(false);
+  const [schoolDetailsTab, setSchoolDetailsTab] = useState('overview');
 
   // Academic Planner & Subject/Schedules States
   const [subjects, setSubjects] = useState([]);
@@ -422,10 +888,128 @@ export default function App() {
     const dd = String(today.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   };
+  const parseTimeToMinutes = (timeStr) => {
+    if (!timeStr) return 480;
+    const matchAmPm = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+    if (matchAmPm) {
+      let hours = parseInt(matchAmPm[1]);
+      const minutes = parseInt(matchAmPm[2]);
+      const ampm = matchAmPm[3].toUpperCase();
+      if (ampm === 'PM' && hours < 12) hours += 12;
+      if (ampm === 'AM' && hours === 12) hours = 0;
+      return hours * 60 + minutes;
+    }
+    const match24 = timeStr.match(/(\d+):(\d+)/);
+    if (match24) {
+      const hours = parseInt(match24[1]);
+      const minutes = parseInt(match24[2]);
+      return hours * 60 + minutes;
+    }
+    return 480;
+  };
+
+  const formatMinutesToTime = (minutes) => {
+    const hours24 = Math.floor(minutes / 60) % 24;
+    const mins = minutes % 60;
+    const ampm = hours24 >= 12 ? 'PM' : 'AM';
+    let hours12 = hours24 % 12;
+    if (hours12 === 0) hours12 = 12;
+    const padMins = String(mins).padStart(2, '0');
+    const padHours = String(hours12).padStart(2, '0');
+    return `${padHours}:${padMins} ${ampm}`;
+  };
+
+  const [schoolStartTime, setSchoolStartTime] = useState(() => {
+    return localStorage.getItem('bn_settings_school_start_time') || '08:00 AM';
+  });
+  const [periodDuration, setPeriodDuration] = useState(() => {
+    const stored = localStorage.getItem('bn_settings_period_duration');
+    return stored ? parseInt(stored) : 40;
+  });
+  const [intervalDuration, setIntervalDuration] = useState(() => {
+    const stored = localStorage.getItem('bn_settings_interval_duration');
+    return stored ? parseInt(stored) : 20;
+  });
+  const [intervalAfterPeriod, setIntervalAfterPeriod] = useState(() => {
+    const stored = localStorage.getItem('bn_settings_interval_after_period');
+    return stored ? parseInt(stored) : 4;
+  });
   const [totalPeriodsPerDay, setTotalPeriodsPerDay] = useState(() => {
     const stored = localStorage.getItem('bn_settings_total_periods');
     return stored ? parseInt(stored) : 8;
   });
+
+  const [draftSchoolStartTime, setDraftSchoolStartTime] = useState(() => {
+    return localStorage.getItem('bn_settings_school_start_time') || '08:00 AM';
+  });
+  const [draftPeriodDuration, setDraftPeriodDuration] = useState(() => {
+    const stored = localStorage.getItem('bn_settings_period_duration');
+    return stored ? parseInt(stored) : 40;
+  });
+  const [draftIntervalDuration, setDraftIntervalDuration] = useState(() => {
+    const stored = localStorage.getItem('bn_settings_interval_duration');
+    return stored ? parseInt(stored) : 20;
+  });
+  const [draftIntervalAfterPeriod, setDraftIntervalAfterPeriod] = useState(() => {
+    const stored = localStorage.getItem('bn_settings_interval_after_period');
+    return stored ? parseInt(stored) : 4;
+  });
+  const [draftTotalPeriods, setDraftTotalPeriods] = useState(() => {
+    const stored = localStorage.getItem('bn_settings_total_periods');
+    return stored ? parseInt(stored) : 8;
+  });
+
+  const [previousTab, setPreviousTab] = useState('dashboard');
+  const [pendingTabChange, setPendingTabChange] = useState(null);
+  const [showUnsavedConfirmModal, setShowUnsavedConfirmModal] = useState(false);
+
+  const getPeriodTimingString = (periodNumber) => {
+    const startMinutes = parseTimeToMinutes(schoolStartTime);
+    const p = parseInt(periodNumber) || 1;
+    const pDur = parseInt(periodDuration) || 40;
+    const iDur = parseInt(intervalDuration) || 20;
+    const iAfter = parseInt(intervalAfterPeriod) || 4;
+    
+    const startTimeMinutes = startMinutes + (p - 1) * pDur + (p - 1 >= iAfter ? iDur : 0);
+    const endTimeMinutes = startTimeMinutes + pDur;
+    
+    return `${formatMinutesToTime(startTimeMinutes)} - ${formatMinutesToTime(endTimeMinutes)}`;
+  };
+
+  const getDraftPeriodTimingString = (periodNumber) => {
+    const startMinutes = parseTimeToMinutes(draftSchoolStartTime);
+    const p = parseInt(periodNumber) || 1;
+    const pDur = parseInt(draftPeriodDuration) || 40;
+    const iDur = parseInt(draftIntervalDuration) || 20;
+    const iAfter = parseInt(draftIntervalAfterPeriod) || 4;
+    
+    const startTimeMinutes = startMinutes + (p - 1) * pDur + (p - 1 >= iAfter ? iDur : 0);
+    const endTimeMinutes = startTimeMinutes + pDur;
+    
+    return `${formatMinutesToTime(startTimeMinutes)} - ${formatMinutesToTime(endTimeMinutes)}`;
+  };
+
+  const convertTimeTo24h = (timeStr) => {
+    if (!timeStr) return "08:00";
+    const minutes = parseTimeToMinutes(timeStr);
+    const hours = Math.floor(minutes / 60) % 24;
+    const mins = minutes % 60;
+    return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+  };
+
+  const periodDurationError = draftPeriodDuration <= 0 ? 'Period duration must be greater than 0.' : null;
+  const totalPeriodsError = draftTotalPeriods <= 0 ? 'Total periods must be greater than 0.' : null;
+  const intervalDurationError = draftIntervalDuration < 0 ? 'Interval duration cannot be negative.' : null;
+  const intervalAfterPeriodError = (draftIntervalAfterPeriod < 0 || draftIntervalAfterPeriod > draftTotalPeriods) ? 'Interval after period cannot exceed total periods.' : null;
+
+  const hasValidationErrors = !!(periodDurationError || totalPeriodsError || intervalDurationError || intervalAfterPeriodError);
+
+  const hasUnsavedChanges = 
+    draftSchoolStartTime !== schoolStartTime ||
+    draftPeriodDuration !== periodDuration ||
+    draftIntervalDuration !== intervalDuration ||
+    draftIntervalAfterPeriod !== intervalAfterPeriod ||
+    draftTotalPeriods !== totalPeriodsPerDay;
 
   // WhatsApp Reminders States
   const [whatsappQueue, setWhatsappQueue] = useState([]);
@@ -482,15 +1066,16 @@ export default function App() {
     nationality: 'Indian',
     caste: '',
     profile_image: '',
+    exit_date: '',
     documents: []
   });
 
   // Predefined logo choices for the Setup Wizard
   const logoChoices = [
-    { name: 'Classic Graduation Cap', url: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=150' },
-    { name: 'Traditional Academy Shield', url: 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=150' },
-    { name: 'Library & Quill', url: 'https://images.unsplash.com/photo-1506880018603-83d5b814b5a6?w=150' },
-    { name: 'Modern Campus Crest', url: 'https://images.unsplash.com/photo-1592280771190-3e2e4d571952?w=150' }
+    { name: 'Classic Graduation Cap', url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%234f46e5"/><path d="M50 25 L80 40 L50 55 L20 40 Z" fill="%23ffffff"/><path d="M35 47.5 L35 70 C35 75, 65 75, 65 70 L65 47.5" fill="%23ffffff" opacity="0.9"/><path d="M72 43 L72 65 L75 65 L75 43 Z" fill="%23f59e0b"/><circle cx="73.5" cy="67" r="3" fill="%23f59e0b"/></svg>' },
+    { name: 'Traditional Academy Shield', url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%230f172a"/><path d="M30 25 C30 25, 50 20, 50 20 C50 20, 70 25, 70 25 C70 45, 70 65, 50 80 C30 65, 30 45, 30 25 Z" fill="%231e3a8a" stroke="%233b82f6" stroke-width="4"/><path d="M50 20 L50 80" stroke="%233b82f6" stroke-width="2"/><path d="M30 45 L70 45" stroke="%233b82f6" stroke-width="2"/><circle cx="40" cy="35" r="4" fill="%23f59e0b"/><circle cx="60" cy="35" r="4" fill="%23f59e0b"/><path d="M50 52 L57 58 L54 66 L50 60 L46 66 L43 58 Z" fill="%23f59e0b"/></svg>' },
+    { name: 'Library & Quill', url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%230d9488"/><path d="M25 65 C35 60, 50 62, 50 65 C50 62, 65 60, 75 65 L75 35 C65 30, 50 32, 50 35 C50 32, 35 30, 25 35 Z" fill="%23ffffff"/><path d="M50 35 L50 65" stroke="%230d9488" stroke-width="2"/><path d="M68 22 C64 26, 52 42, 48 48 L46 54 L52 52 C58 48, 74 36, 78 32 C82 28, 80 20, 78 20 C76 20, 72 18, 68 22 Z" fill="%23f59e0b"/><path d="M48 48 L52 52" stroke="%23000000" stroke-width="1"/></svg>' },
+    { name: 'Modern Campus Crest', url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%23ea580c"/><path d="M25 70 L75 70 L75 75 L25 75 Z" fill="%23ffffff"/><path d="M30 45 L35 45 L35 70 L30 70 Z" fill="%23ffffff"/><path d="M42 45 L47 45 L47 70 L42 70 Z" fill="%23ffffff"/><path d="M53 45 L58 45 L58 70 L53 70 Z" fill="%23ffffff"/><path d="M65 45 L70 45 L70 70 L65 70 Z" fill="%23ffffff"/><path d="M22 45 L78 45 L50 25 Z" fill="%23ffffff"/></svg>' }
   ];
 
   // API Config Helper
@@ -499,29 +1084,85 @@ export default function App() {
     'Authorization': `Bearer ${customToken || token}`
   });
 
+  // Toast Timer Refs
+  const toastTimeoutRef = useRef(null);
+  const toastRemainingRef = useRef(4000);
+  const toastStartTimeRef = useRef(0);
+
+  const startToastTimer = () => {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+    toastStartTimeRef.current = Date.now();
+    toastTimeoutRef.current = setTimeout(() => {
+      setToast(null);
+      toastTimeoutRef.current = null;
+    }, toastRemainingRef.current);
+  };
+
+  const pauseToastTimer = () => {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+      toastTimeoutRef.current = null;
+      const elapsed = Date.now() - toastStartTimeRef.current;
+      toastRemainingRef.current = Math.max(500, toastRemainingRef.current - elapsed);
+    }
+  };
+
+  const resumeToastTimer = () => {
+    if (toast && !toastTimeoutRef.current) {
+      startToastTimer();
+    }
+  };
+
   // Toast Helper
   const showToast = (message, type = 'success') => {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+      toastTimeoutRef.current = null;
+    }
     setToast({ message, type });
+    toastRemainingRef.current = 4000;
   };
 
   // Toast Timer Hook
   useEffect(() => {
     if (toast) {
-      const timer = setTimeout(() => {
-        setToast(null);
-      }, 3500);
-      return () => clearTimeout(timer);
+      startToastTimer();
     }
+    return () => {
+      if (toastTimeoutRef.current) {
+        clearTimeout(toastTimeoutRef.current);
+        toastTimeoutRef.current = null;
+      }
+    };
   }, [toast]);
+
+  // Document Click Listener to Close Planner Card Dropdowns
+  useEffect(() => {
+    const handleDocumentClick = (e) => {
+      if (activeDropdownKey) {
+        const isTrigger = e.target.closest('.period-menu-trigger');
+        const isDropdown = e.target.closest('.period-menu-dropdown');
+        if (!isTrigger && !isDropdown) {
+          setActiveDropdownKey(null);
+        }
+      }
+    };
+    document.addEventListener('mousedown', handleDocumentClick);
+    return () => document.removeEventListener('mousedown', handleDocumentClick);
+  }, [activeDropdownKey]);
 
   // Reset Student Form Validation Errors on Modal open/close
   useEffect(() => {
     setSErrors({});
   }, [showAddStudentModal]);
 
-  // Reset student lazy loading visibleCount when view context changes
+  // Reset student & teacher lazy loading/search state when view context changes
   useEffect(() => {
     setVisibleCount(6);
+    setVisibleTeachersCount(9);
+    setTeacherSearchQuery('');
   }, [selectedClassId, searchQuery, groupFilter, activeTab]);
 
   // If container does not have a scrollbar but we have more records, load more to enable scrollbar
@@ -548,6 +1189,76 @@ export default function App() {
       setVisibleCount(prev => prev + 6);
     }
   }, [visibleCount, students, selectedClassId, searchQuery, groupFilter]);
+
+  // Reset teacher lazy loading visible count when filters change
+  useEffect(() => {
+    setVisibleTeachersCount(9);
+  }, [teacherSearchQuery, subjectFilter, statusFilter, facultySelectedDate]);
+
+  // Handle infinite scroll / lazy loading for Teachers
+  useEffect(() => {
+    if (activeTab !== 'faculty') return;
+
+    const handleScroll = (e) => {
+      const container = e.target;
+      if (!container) return;
+
+      // Check if user has scrolled close to the bottom of the container
+      const threshold = 100; // px from bottom
+      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < threshold;
+
+      const filteredLength = teachers.filter(t => {
+        const matchesSubject = subjectFilter === 'all' || t.subject.toLowerCase() === subjectFilter.toLowerCase();
+        const matchesStatus = statusFilter === 'all' || t.status.toLowerCase() === statusFilter.toLowerCase();
+        const matchesSearch = t.name.toLowerCase().includes(teacherSearchQuery.toLowerCase()) || 
+                              t.subject.toLowerCase().includes(teacherSearchQuery.toLowerCase()) ||
+                              (t.phone && t.phone.includes(teacherSearchQuery));
+        return matchesSubject && matchesStatus && matchesSearch;
+      }).length;
+
+      if (isNearBottom && visibleTeachersCount < filteredLength && !isFetchingMoreTeachers) {
+        setIsFetchingMoreTeachers(true);
+        setTimeout(() => {
+          setVisibleTeachersCount(prev => prev + 6);
+          setIsFetchingMoreTeachers(false);
+        }, 300);
+      }
+    };
+
+    const mainWrapper = document.querySelector('.main-wrapper');
+    if (mainWrapper) {
+      mainWrapper.addEventListener('scroll', handleScroll);
+    }
+    return () => {
+      if (mainWrapper) {
+        mainWrapper.removeEventListener('scroll', handleScroll);
+      }
+    };
+  }, [activeTab, visibleTeachersCount, teachers, subjectFilter, statusFilter, teacherSearchQuery, isFetchingMoreTeachers]);
+
+  // If main-wrapper does not have a scrollbar but we have more teacher records, load more to enable scrollbar
+  useEffect(() => {
+    if (activeTab !== 'faculty') return;
+    const container = document.querySelector('.main-wrapper');
+    if (!container) return;
+
+    const filteredLength = teachers.filter(t => {
+      const matchesSubject = subjectFilter === 'all' || t.subject.toLowerCase() === subjectFilter.toLowerCase();
+      const matchesStatus = statusFilter === 'all' || t.status.toLowerCase() === statusFilter.toLowerCase();
+      const matchesSearch = t.name.toLowerCase().includes(teacherSearchQuery.toLowerCase()) || 
+                            t.subject.toLowerCase().includes(teacherSearchQuery.toLowerCase()) ||
+                            (t.phone && t.phone.includes(teacherSearchQuery));
+      return matchesSubject && matchesStatus && matchesSearch;
+    }).length;
+
+    const hasMore = visibleTeachersCount < filteredLength;
+    const noScrollbar = container.scrollHeight <= container.clientHeight;
+
+    if (hasMore && noScrollbar) {
+      setVisibleTeachersCount(prev => prev + 6);
+    }
+  }, [visibleTeachersCount, teachers, subjectFilter, statusFilter, teacherSearchQuery, activeTab]);
+
 
   // Synchronize dashboard student count automatically
   useEffect(() => {
@@ -602,6 +1313,188 @@ export default function App() {
     return () => window.removeEventListener('popstate', handleLocationChange);
   }, []);
 
+  // Reset fees student lazy loading visible count when filters change
+  useEffect(() => {
+    setVisibleFeesStudentsCount(10);
+  }, [selectedFeesClassId, feesStatusFilter, searchQuery, feesSortField, activeTab, activeYearId]);
+
+  // If main-wrapper does not have a scrollbar but we have more fees records, load more to enable scrollbar
+  useEffect(() => {
+    if (activeTab !== 'fees' || selectedStudent) return;
+    const container = document.querySelector('.main-wrapper');
+    if (!container) return;
+
+    const filteredLength = students
+      .filter(s => {
+        if (selectedFeesClassId !== 'all' && s.class_id !== selectedFeesClassId) {
+          return false;
+        }
+        
+        const statusStr = getStudentFeeStatus(s);
+        if (feesStatusFilter !== 'All') {
+          const mappedStatus = feesStatusFilter === 'NO DUES' ? 'PAID' : feesStatusFilter;
+          if (mappedStatus === 'DUES PENDING') {
+            if (statusStr !== 'DUES PENDING' && statusStr !== 'PAYMENT OVERDUE') {
+              return false;
+            }
+          } else {
+            if (statusStr !== mappedStatus) {
+              return false;
+            }
+          }
+        }
+        
+        if (searchQuery) {
+          const q = searchQuery.toLowerCase();
+          const contact = (s.emergency_contact || s.phone || '').toLowerCase();
+          return s.name.toLowerCase().includes(q) || s.roll_number.toLowerCase().includes(q) || contact.includes(q);
+        }
+        return true;
+      }).length;
+
+    const hasMore = visibleFeesStudentsCount < filteredLength;
+    const noScrollbar = container.scrollHeight <= container.clientHeight;
+
+    if (hasMore && noScrollbar) {
+      setVisibleFeesStudentsCount(prev => prev + 10);
+    }
+  }, [visibleFeesStudentsCount, students, selectedFeesClassId, feesStatusFilter, searchQuery, activeTab, selectedStudent]);
+
+  // Handle infinite scroll / lazy loading for Fees Student List
+  useEffect(() => {
+    if (activeTab !== 'fees' || selectedStudent) return;
+
+    const handleScroll = (e) => {
+      const container = e.target;
+      if (!container) return;
+
+      const threshold = 100;
+      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < threshold;
+
+      const filteredLength = students
+        .filter(s => {
+          if (selectedFeesClassId !== 'all' && s.class_id !== selectedFeesClassId) {
+            return false;
+          }
+          
+          const statusStr = getStudentFeeStatus(s);
+          if (feesStatusFilter !== 'All') {
+            const mappedStatus = feesStatusFilter === 'NO DUES' ? 'PAID' : feesStatusFilter;
+            if (mappedStatus === 'DUES PENDING') {
+              if (statusStr !== 'DUES PENDING' && statusStr !== 'PAYMENT OVERDUE') {
+                return false;
+              }
+            } else {
+              if (statusStr !== mappedStatus) {
+                return false;
+              }
+            }
+          }
+          
+          if (searchQuery) {
+            const q = searchQuery.toLowerCase();
+            const contact = (s.emergency_contact || s.phone || '').toLowerCase();
+            return s.name.toLowerCase().includes(q) || s.roll_number.toLowerCase().includes(q) || contact.includes(q);
+          }
+          return true;
+        }).length;
+
+      if (isNearBottom && visibleFeesStudentsCount < filteredLength && !isFetchingMoreFeesStudents) {
+        setIsFetchingMoreFeesStudents(true);
+        setTimeout(() => {
+          setVisibleFeesStudentsCount(prev => prev + 10);
+          setIsFetchingMoreFeesStudents(false);
+        }, 500);
+      }
+    };
+
+    const mainWrapper = document.querySelector('.main-wrapper');
+    if (mainWrapper) {
+      mainWrapper.addEventListener('scroll', handleScroll);
+    }
+    return () => {
+      if (mainWrapper) {
+        mainWrapper.removeEventListener('scroll', handleScroll);
+      }
+    };
+  }, [
+    activeTab,
+    selectedStudent,
+    visibleFeesStudentsCount,
+    students,
+    selectedFeesClassId,
+    feesStatusFilter,
+    searchQuery,
+    isFetchingMoreFeesStudents
+  ]);
+
+  // Automatically reset scroll position when navigating to student ledger
+  useEffect(() => {
+    if (selectedStudent) {
+      window.scrollTo(0, 0);
+      const wrapper = document.querySelector('.main-wrapper');
+      if (wrapper) {
+        wrapper.scrollTop = 0;
+      }
+      fetchStudentExtraFees();
+    }
+  }, [selectedStudent]);
+
+  // Reset scroll count when Additional Fee filters change
+  useEffect(() => {
+    setVisibleAdditionalFeeStudentsCount(10);
+  }, [extraFeeSearch, extraFeeClassFilter, extraFeeTypeFilter, extraFeeStatusFilter]);
+
+  // Lazy Loading for Additional Fee Ledger
+  useEffect(() => {
+    if (activeTab !== 'finance_management' || financeManagementSubTab !== 'fees') return;
+
+    const handleScroll = () => {
+      const container = document.querySelector('.main-wrapper');
+      if (!container) return;
+
+      const threshold = 100;
+      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < threshold;
+
+      const filteredLength = studentExtraFees
+        .filter(sef => {
+          const matchesSearch = sef.student_name.toLowerCase().includes(extraFeeSearch.toLowerCase());
+          const matchesClass = extraFeeClassFilter === 'All' || String(sef.class_id) === String(extraFeeClassFilter);
+          const matchesType = extraFeeTypeFilter === 'All' || sef.fee_name === extraFeeTypeFilter;
+          const matchesStatus = extraFeeStatusFilter === 'All' || sef.status === extraFeeStatusFilter;
+          return matchesSearch && matchesClass && matchesType && matchesStatus;
+        }).length;
+
+      if (isNearBottom && visibleAdditionalFeeStudentsCount < filteredLength && !isFetchingMoreAdditionalFeeStudents) {
+        setIsFetchingMoreAdditionalFeeStudents(true);
+        setTimeout(() => {
+          setVisibleAdditionalFeeStudentsCount(prev => prev + 10);
+          setIsFetchingMoreAdditionalFeeStudents(false);
+        }, 500);
+      }
+    };
+
+    const mainWrapper = document.querySelector('.main-wrapper');
+    if (mainWrapper) {
+      mainWrapper.addEventListener('scroll', handleScroll);
+    }
+    return () => {
+      if (mainWrapper) {
+        mainWrapper.removeEventListener('scroll', handleScroll);
+      }
+    };
+  }, [
+    activeTab,
+    financeManagementSubTab,
+    visibleAdditionalFeeStudentsCount,
+    studentExtraFees,
+    extraFeeClassFilter,
+    extraFeeTypeFilter,
+    extraFeeStatusFilter,
+    extraFeeSearch,
+    isFetchingMoreAdditionalFeeStudents
+  ]);
+
   // --- ACADEMIC PLANNER METHODS ---
   const fetchSubjects = async () => {
     const keySuffix = schoolId || 'default';
@@ -637,7 +1530,54 @@ export default function App() {
       const stored = localStorage.getItem(storedKey);
       const list = stored ? JSON.parse(stored) : [];
       const filtered = list.filter(s => s.week_start_date === weekStartDate);
-      setSchedules(filtered);
+      
+      const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const results = [...filtered];
+      const existingDays = results.map(r => r.day_of_week);
+      
+      days.forEach((dayName, dayIndex) => {
+        if (!existingDays.includes(dayName)) {
+          const refMonday = new Date(weekStartDate);
+          const d = new Date(refMonday);
+          d.setDate(refMonday.getDate() + dayIndex);
+          const yyyy = d.getFullYear();
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
+          const targetDate = `${yyyy}-${mm}-${dd}`;
+          
+          let priorRecord = null;
+          list.forEach(s => {
+            if (s.day_of_week === dayName && s.schedule_date < targetDate) {
+              if (!priorRecord || s.schedule_date > priorRecord.schedule_date) {
+                priorRecord = s;
+              }
+            }
+          });
+          
+          if (priorRecord) {
+            const inheritedSubjects = (priorRecord.subjects || []).map(sub => ({
+              ...sub,
+              backup_teacher_id: null,
+              backup_teacher_name: null
+            }));
+            
+            results.push({
+              id: Date.now() + Math.random(),
+              school_id: keySuffix,
+              academic_year_id: activeYearId,
+              class_id: classId,
+              day_of_week: dayName,
+              schedule_date: targetDate,
+              week_start_date: weekStartDate,
+              subjects: inheritedSubjects,
+              status: 'Draft'
+            });
+          }
+        }
+      });
+      
+      results.sort((a, b) => a.schedule_date.localeCompare(b.schedule_date));
+      setSchedules(results);
       return;
     }
     try {
@@ -653,6 +1593,11 @@ export default function App() {
 
   const handleSaveFullSchedule = async (statusVal = 'Draft') => {
     if (!plannerClassId) return;
+    const hasPeriods = Object.values(scheduleForm).some(periods => Array.isArray(periods) && periods.length > 0);
+    if (!hasPeriods) {
+      showToast("No periods are assigned. Please assign at least one period before saving.", "error");
+      return;
+    }
     setIsSavingSchedule(true);
     setActionError('');
     
@@ -756,6 +1701,11 @@ export default function App() {
 
   const handleSaveDaySchedule = async (day, statusVal = 'Draft') => {
     if (!plannerClassId) return;
+    const daySubjects = scheduleForm[day] || [];
+    if (daySubjects.length === 0) {
+      showToast("No periods assigned for this day.", "error");
+      return;
+    }
     setIsSavingSchedule(true);
     setActionError('');
     
@@ -773,8 +1723,6 @@ export default function App() {
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
     const schedDate = `${yyyy}-${mm}-${dd}`;
-    
-    const daySubjects = scheduleForm[day] || [];
     
     try {
       const keySuffix = schoolId || 'default';
@@ -853,7 +1801,7 @@ export default function App() {
     }
   };
 
-  const autoSaveDaySchedule = async (day, daySubjects, statusVal = 'Draft') => {
+  const autoSaveDaySchedule = async (day, daySubjects, statusVal = 'Draft', propagate = false, propagateType = '', targetIndex = -1) => {
     if (!plannerClassId) return;
     
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -894,6 +1842,47 @@ export default function App() {
           list.push(scheduleObj);
         }
         
+        // Sandbox future weeks propagation
+        if (propagate && propagateType) {
+          list.forEach(s => {
+            if (s.day_of_week === day && s.schedule_date > schedDate) {
+              const futSubjects = Array.isArray(s.subjects) ? [...s.subjects] : [];
+              let modified = false;
+              
+              if (propagateType === 'add') {
+                if (daySubjects.length > 0) {
+                  const newPeriod = { ...daySubjects[daySubjects.length - 1] };
+                  newPeriod.backup_teacher_id = null;
+                  newPeriod.backup_teacher_name = null;
+                  futSubjects.push(newPeriod);
+                  modified = true;
+                }
+              } else if (propagateType === 'remove') {
+                if (targetIndex >= 0 && targetIndex < futSubjects.length) {
+                  futSubjects.splice(targetIndex, 1);
+                  modified = true;
+                }
+              } else if (propagateType === 'replace') {
+                if (targetIndex >= 0 && targetIndex < daySubjects.length && targetIndex < futSubjects.length) {
+                  const currentPeriod = daySubjects[targetIndex];
+                  futSubjects[targetIndex] = {
+                    ...futSubjects[targetIndex],
+                    teacher_id: currentPeriod.teacher_id,
+                    teacher_name: currentPeriod.teacher_name,
+                    backup_teacher_id: null,
+                    backup_teacher_name: null
+                  };
+                  modified = true;
+                }
+              }
+              
+              if (modified) {
+                s.subjects = futSubjects;
+              }
+            }
+          });
+        }
+        
         localStorage.setItem(storedKey, JSON.stringify(list));
         setSchedules(list.filter(s => s.week_start_date === weekStartDate));
         fetchAllWeeklySchedules();
@@ -911,7 +1900,10 @@ export default function App() {
           schedule_date: schedDate,
           week_start_date: weekStartDate,
           subjects: daySubjects,
-          status: statusVal
+          status: statusVal,
+          propagate,
+          propagate_type: propagateType,
+          target_index: targetIndex
         })
       });
       await fetchSchedules(plannerClassId);
@@ -966,56 +1958,6 @@ export default function App() {
     setWeekStartDate(`${yyyy}-${mm}-${dd}`);
   };
 
-  const handleCopyLastWeekSchedule = async () => {
-    if (!plannerClassId) return;
-    
-    // Calculate last week's start date
-    const currentMonday = new Date(weekStartDate);
-    const prevMonday = new Date(currentMonday);
-    prevMonday.setDate(currentMonday.getDate() - 7);
-    const yyyy = prevMonday.getFullYear();
-    const mm = String(prevMonday.getMonth() + 1).padStart(2, '0');
-    const dd = String(prevMonday.getDate()).padStart(2, '0');
-    const prevWeekStart = `${yyyy}-${mm}-${dd}`;
-    
-    const keySuffix = schoolId || 'default';
-    let prevSchedules = [];
-    
-    try {
-      if (token.includes('mock') || !isConnected) {
-        const storedKey = `bn_sandbox_schedules_${keySuffix}_${activeYearId}_${plannerClassId}`;
-        const stored = localStorage.getItem(storedKey);
-        const list = stored ? JSON.parse(stored) : [];
-        prevSchedules = list.filter(s => s.week_start_date === prevWeekStart);
-      } else {
-        const res = await fetch(`/api/schedules?class_id=${plannerClassId}&academic_year_id=${activeYearId}&week_start_date=${prevWeekStart}`, { headers: getHeaders() });
-        if (res.ok) {
-          prevSchedules = await res.json();
-        }
-      }
-      
-      if (prevSchedules.length === 0) {
-        showToast("No schedule found for last week to copy.", "warning");
-        return;
-      }
-      
-      const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      const copiedForm = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [], Saturday: [] };
-      
-      prevSchedules.forEach(s => {
-        const dayName = days.find(d => d.toLowerCase() === s.day_of_week.toLowerCase());
-        if (dayName) {
-          copiedForm[dayName] = Array.isArray(s.subjects) ? s.subjects : [];
-        }
-      });
-      
-      setScheduleForm(copiedForm);
-      showToast("Copied last week's schedule! Review the periods and click Save Draft or Publish to save.", "success");
-    } catch (err) {
-      console.error("Failed to copy last week's schedule", err);
-      showToast("Failed to copy last week's schedule", "error");
-    }
-  };
 
   const handleAddSubject = async (e) => {
     e.preventDefault();
@@ -1319,8 +2261,12 @@ export default function App() {
     if (!classId) return;
     setIsFetchingDashboardSchedule(true);
     const keySuffix = schoolId || 'default';
-    const todayDate = new Date().toISOString().split('T')[0];
-    const dayOfWeek = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const todayDate = `${yyyy}-${mm}-${dd}`;
+    const dayOfWeek = d.toLocaleDateString('en-US', { weekday: 'long' });
     
     if (token.includes('mock') || !isConnected) {
       const storedKey = `bn_sandbox_schedules_${keySuffix}_${activeYearId}_${classId}`;
@@ -1339,7 +2285,7 @@ export default function App() {
     }
     
     try {
-      const res = await fetch(`/api/schedules/today?class_id=${classId}`, { headers: getHeaders() });
+      const res = await fetch(`/api/schedules/today?class_id=${classId}&date=${todayDate}`, { headers: getHeaders() });
       if (res.ok) {
         setDashboardTodaySchedule(await res.json());
       }
@@ -1393,6 +2339,95 @@ export default function App() {
     }
   }, [activeTab, classes, activeYearId, facultySelectedDate]);
 
+  useEffect(() => {
+    if (skipERPFetchRef.current) {
+      skipERPFetchRef.current = false;
+      return;
+    }
+    if (activeTab === 'students') {
+      fetchERPData();
+    } else if (activeTab === 'dashboard') {
+      if (role === 'Super Admin') {
+        fetchSuperAdminData(null, false);
+      } else {
+        fetchERPData();
+      }
+    } else if (activeTab === 'settings') {
+      fetchRolesAndUsers();
+    }
+  }, [activeTab, role]);
+
+  useEffect(() => {
+    if (activeTab === 'performance') {
+      fetchExams(activeYearId);
+      fetchSchoolSignatures();
+      fetchGradingScales();
+      if (classes.length > 0) {
+        if (!attendanceClassId) setAttendanceClassId(String(classes[0].id));
+        if (!reportCardClassId) setReportCardClassId(String(classes[0].id));
+      }
+    }
+  }, [activeTab, activeYearId, classes]);
+
+  useEffect(() => {
+    if (selectedStudent && studentDetailTab === 'performance') {
+      fetchStudentAttendanceAnalytics(selectedStudent.id, activeYearId);
+      fetchStudentPerformanceSummary(selectedStudent.id, activeYearId);
+      fetchExams(activeYearId);
+    }
+  }, [selectedStudent, studentDetailTab, activeYearId]);
+
+  useEffect(() => {
+    if (reportCardStudentId) {
+      fetchStudentPerformanceSummary(reportCardStudentId, activeYearId);
+    }
+  }, [reportCardStudentId, activeYearId]);
+
+  // Automatically reset scroll position when navigating to dashboard
+  useEffect(() => {
+    if (activeTab === 'dashboard') {
+      window.scrollTo(0, 0);
+      const wrapper = document.querySelector('.main-wrapper');
+      if (wrapper) {
+        wrapper.scrollTop = 0;
+      }
+    }
+  }, [activeTab]);
+
+  // Reset search queries, filters, and report preview on tab navigation
+  useEffect(() => {
+    setSearchQuery('');
+    setTeacherSearchQuery('');
+    setFeesStatusFilter('All');
+    setGroupFilter('all');
+    setStatusFilter('all');
+    setStudentStatusFilter('All');
+    setExtraFeeSearch('');
+    setExtraFeeClassFilter('All');
+    setExtraFeeTypeFilter('All');
+    setExtraFeeStatusFilter('All');
+    setPromiseSearch('');
+    setPromiseClassFilter('All');
+    setPromiseStudentSearchQuery('');
+    if (activeTab !== 'financial') {
+      setReportPreview(null);
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'financial') {
+      fetchFinancialReports();
+    }
+    if (activeTab === 'finance_management') {
+      fetchExpenses();
+      fetchExtraFeeTypes();
+      fetchStudentExtraFees();
+      fetchPaymentPromises();
+      fetchPreviousYearRecoveries();
+      fetchPreviousDues();
+    }
+  }, [activeTab, activeYearId]);
+
   // --- ACADEMIC PLANNER SYNC EFFECTS ---
   useEffect(() => {
     if (activeTab === 'planner') {
@@ -1432,6 +2467,55 @@ export default function App() {
   }, [dashboardPlannerClassId, activeTab, activeYearId]);
 
 
+  // Click outside handler for notification drawer
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      const triggers = document.querySelectorAll('#notification-trigger');
+      const drawers = document.querySelectorAll('.notification-drawer-content');
+      
+      let clickedInside = false;
+      triggers.forEach(t => {
+        if (t && t.contains(e.target)) clickedInside = true;
+      });
+      drawers.forEach(d => {
+        if (d && d.contains(e.target)) clickedInside = true;
+      });
+      
+      if (!clickedInside && showNotificationDrawer) {
+        setShowNotificationDrawer(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, [showNotificationDrawer]);
+
+  const formatNotificationTime = (dateStr) => {
+    if (!dateStr) return '';
+    try {
+      // Handle SQL space separator if present
+      const cleanStr = dateStr.replace(' ', 'T');
+      const d = new Date(cleanStr);
+      if (isNaN(d.getTime())) return dateStr;
+      
+      const optionsDate = { month: 'short', day: 'numeric', year: 'numeric' };
+      const formattedDate = d.toLocaleDateString('en-US', optionsDate);
+      
+      let hours = d.getHours();
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12;
+      hours = hours ? hours : 12;
+      const formattedTime = `${hours}:${minutes} ${ampm}`;
+      
+      return `${formattedDate} • ${formattedTime}`;
+    } catch (e) {
+      return dateStr;
+    }
+  };
+
   // Fetch Super Admin Data
   const fetchSuperAdminData = async (customToken, showLoader = false) => {
     const activeToken = customToken || token;
@@ -1446,11 +2530,31 @@ export default function App() {
       if (!schoolRes.ok) throw new Error("Failed to fetch schools");
       setSchools(await schoolRes.json());
       
+      // Fetch subscription plans
+      const plansRes = await fetch('/api/super-admin/plans', { headers: getHeaders(activeToken) });
+      if (plansRes.ok) setSuperPlans(await plansRes.json());
+      
+      // Fetch school subscriptions
+      const subsRes = await fetch('/api/super-admin/subscriptions', { headers: getHeaders(activeToken) });
+      if (subsRes.ok) setSuperSubscriptions(await subsRes.json());
+      
+      // Fetch subscription audit logs
+      const logsRes = await fetch('/api/super-admin/subscription/audit-logs', { headers: getHeaders(activeToken) });
+      if (logsRes.ok) setSuperAuditLogs(await logsRes.json());
+      
       setIsConnected(true);
+      setIsApiUnavailable(false);
+      setApiConnectionError('');
     } catch (err) {
       console.warn("Backend offline. Seeding Super Admin mock sandbox.");
       setIsConnected(false);
-      loadMockSuperAdminData();
+      const isMock = activeToken && activeToken.includes('mock');
+      if (isMock) {
+        loadMockSuperAdminData();
+      } else {
+        setIsApiUnavailable(true);
+        setApiConnectionError(err.message || 'API connection failed');
+      }
     } finally {
       if (showLoader) setLoading(false);
     }
@@ -1491,6 +2595,291 @@ export default function App() {
         created_at: s.subscription_start ? (s.subscription_start + " 10:00:00") : "2026-06-01 10:00:00"
       })).slice(0, 5)
     });
+
+    setSuperPlans([
+      { id: 1, name: 'Free Trial', duration_days: 30, price: 0.00, is_active: 1, description: '30 Days Free Trial access to all features.' },
+      { id: 2, name: '1 Year Plan', duration_days: 365, price: 12000.00, is_active: 1, description: '1 Year full platform access.' },
+      { id: 3, name: '2 Year Plan', duration_days: 730, price: 22000.00, is_active: 1, description: '2 Years full platform access.' },
+      { id: 4, name: '3 Year Plan', duration_days: 1095, price: 30000.00, is_active: 1, description: '3 Years full platform access. Best value.' }
+    ]);
+
+    const mockSubs = updatedSchools.map(s => {
+      const isTrial = s.days_remaining <= 30;
+      return {
+        school_id: s.id,
+        school_name: s.name,
+        school_email: s.email,
+        subscription_id: s.id,
+        plan_id: isTrial ? 1 : 2,
+        start_date: s.subscription_start || '2026-04-01',
+        expiry_date: s.subscription_end || '2027-03-31',
+        remaining_days: s.days_remaining,
+        status: s.days_remaining <= 0 ? (isTrial ? 'Trial Expired' : 'Expired') : (s.days_remaining < 15 ? 'Expiring Soon' : (isTrial ? 'Trial Active' : 'Active')),
+        plan_name: isTrial ? 'Free Trial' : '1 Year Plan',
+        price: isTrial ? 0.00 : 12000.00,
+        duration_days: isTrial ? 30 : 365
+      };
+    });
+    setSuperSubscriptions(mockSubs);
+    setSuperAuditLogs([
+      { id: 1, action: 'Trial Activated', performed_by: 'System', school_name: "St. Xavier's International School", plan_name: 'Free Trial', created_at: '2026-04-01 10:00:00' }
+    ]);
+  };
+
+  const isSandboxTransactionLocked = (timestamp) => {
+    if (!timestamp) return false;
+    const txTime = new Date(timestamp);
+    const keySuffix = schoolId || 'default';
+    const reportsKey = `bn_sandbox_financial_reports_${keySuffix}_${activeYearId}`;
+    const stored = localStorage.getItem(reportsKey);
+    const reports = stored ? JSON.parse(stored) : [];
+    return reports.some(r => {
+      const start = new Date(r.from_timestamp || (r.from_date + 'T00:00:00'));
+      const end = new Date(r.to_timestamp || (r.to_date + 'T23:59:59'));
+      return txTime >= start && txTime <= end;
+    });
+  };
+
+  const isSandboxExtraFeeTypeLocked = (typeId) => {
+    const keySuffix = schoolId || 'default';
+    const ledgerKey = `bn_sandbox_student_extra_fees_${keySuffix}_${activeYearId}`;
+    const storedLedger = localStorage.getItem(ledgerKey);
+    const ledger = storedLedger ? JSON.parse(storedLedger) : [];
+    
+    const reportsKey = `bn_sandbox_financial_reports_${keySuffix}_${activeYearId}`;
+    const storedReports = localStorage.getItem(reportsKey);
+    const reports = storedReports ? JSON.parse(storedReports) : [];
+    
+    return ledger.some(item => {
+      if (item.extra_fee_type_id === typeId && item.status === 'Paid' && item.paid_at) {
+        const txTime = new Date(item.paid_at);
+        return reports.some(r => {
+          const start = new Date(r.from_timestamp || (r.from_date + 'T00:00:00'));
+          const end = new Date(r.to_timestamp || (r.to_date + 'T23:59:59'));
+          return txTime >= start && txTime <= end;
+        });
+      }
+      return false;
+    });
+  };
+
+  const fetchRolesAndUsers = async () => {
+    if (!token) {
+      const mockRoles = JSON.parse(localStorage.getItem('bn_mock_roles') || '[]');
+      if (mockRoles.length === 0) {
+        const initialRoles = [
+          { id: 1, name: 'School Admin', permissions: ['attendance', 'performance', 'planner', 'finance', 'reports', 'administration', 'parent_portal'] },
+          { id: 2, name: 'Teacher', permissions: ['attendance', 'performance'] },
+          { id: 3, name: 'Parent', permissions: [] }
+        ];
+        localStorage.setItem('bn_mock_roles', JSON.stringify(initialRoles));
+        setDbRoles(initialRoles);
+      } else {
+        setDbRoles(mockRoles);
+      }
+
+      const mockUsers = JSON.parse(localStorage.getItem('bn_mock_users') || '[]');
+      if (mockUsers.length === 0) {
+        const initialUsers = [
+          { id: 1, email: 'Admin@yopmail.com', role: 'School Admin', permissions: ['attendance', 'performance', 'planner', 'finance', 'reports', 'administration', 'parent_portal'], school_id: '1', setup_completed: 1, school_name: "St. Xavier's International School" },
+          { id: 2, email: 'dd@yopmail.com', role: 'School Admin', permissions: ['attendance', 'performance', 'planner', 'finance', 'reports', 'administration', 'parent_portal'], school_id: '1', setup_completed: 1, school_name: "St. Xavier's International School" },
+          { id: 3, email: 'parent@yopmail.com', role: 'Parent', permissions: [], school_id: '1', setup_completed: 1, school_name: "St. Xavier's International School", linked_student_ids: [4, 5] },
+          { id: 4, email: 'kk@yopmail.com', role: 'Teacher', permissions: ['attendance', 'performance'], school_id: '1', setup_completed: 1, school_name: "St. Xavier's International School", classroom_id: 1 }
+        ];
+        localStorage.setItem('bn_mock_users', JSON.stringify(initialUsers));
+        setDbUsers(initialUsers);
+      } else {
+        setDbUsers(mockUsers);
+      }
+      return;
+    }
+
+    setIsRolesLoading(true);
+    try {
+      const headers = getHeaders(token);
+      const resRoles = await fetch('/api/roles', { headers });
+      if (resRoles.ok) setDbRoles(await resRoles.json());
+      const resUsers = await fetch('/api/users', { headers });
+      if (resUsers.ok) setDbUsers(await resUsers.json());
+    } catch (err) {
+      console.error("Error fetching roles and users", err);
+    } finally {
+      setIsRolesLoading(false);
+    }
+  };
+
+  const handleAddRole = async (name, perms) => {
+    if (!token) {
+      const current = JSON.parse(localStorage.getItem('bn_mock_roles') || '[]');
+      const newRole = { id: Date.now(), name, permissions: perms };
+      const updated = [...current, newRole];
+      localStorage.setItem('bn_mock_roles', JSON.stringify(updated));
+      setDbRoles(updated);
+      showToast('Role created successfully', 'success');
+      return;
+    }
+
+    try {
+      const headers = getHeaders(token);
+      const res = await fetch('/api/roles', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ name, permissions: perms })
+      });
+      if (res.ok) {
+        showToast('Role created successfully', 'success');
+        fetchRolesAndUsers();
+      } else {
+        const err = await res.json();
+        showToast(err.detail || 'Failed to create role', 'error');
+      }
+    } catch (err) {
+      showToast('Error creating role', 'error');
+    }
+  };
+
+  const handleDeleteRole = async (roleId) => {
+    if (!token) {
+      const current = JSON.parse(localStorage.getItem('bn_mock_roles') || '[]');
+      const updated = current.filter(r => r.id !== roleId);
+      localStorage.setItem('bn_mock_roles', JSON.stringify(updated));
+      setDbRoles(updated);
+      showToast('Role deleted successfully', 'success');
+      return;
+    }
+
+    try {
+      const headers = getHeaders(token);
+      const res = await fetch(`/api/roles/${roleId}`, {
+        method: 'DELETE',
+        headers
+      });
+      if (res.ok) {
+        showToast('Role deleted successfully', 'success');
+        fetchRolesAndUsers();
+      } else {
+        const err = await res.json();
+        showToast(err.detail || 'Failed to delete role', 'error');
+      }
+    } catch (err) {
+      showToast('Error deleting role', 'error');
+    }
+  };
+
+  const handleSaveUser = async (userId, emailOrPhone, password, roleName, classroomId, parentStudentsArray) => {
+    const isEmail = emailOrPhone.includes('@');
+    const emailVal = isEmail ? emailOrPhone.trim() : '';
+    const phoneVal = !isEmail ? emailOrPhone.trim() : '';
+    
+    const matchedRoleObj = dbRoles.find(r => r.name === roleName);
+    const roleIdVal = matchedRoleObj ? matchedRoleObj.id : null;
+    const permissionsArray = matchedRoleObj ? (matchedRoleObj.permissions || []) : [];
+
+    if (!token) {
+      const current = JSON.parse(localStorage.getItem('bn_mock_users') || '[]');
+      if (userId) {
+        const updated = current.map(u => {
+          if (u.id === userId) {
+            return {
+              ...u,
+              email: isEmail ? emailVal : u.email,
+              phone: !isEmail ? phoneVal : u.phone,
+              password: password ? sha256Sync(password) : u.password,
+              role: roleName,
+              role_id: roleIdVal,
+              permissions: permissionsArray,
+              classroom_id: classroomId ? Number(classroomId) : null,
+              linked_student_ids: parentStudentsArray || []
+            };
+          }
+          return u;
+        });
+        localStorage.setItem('bn_mock_users', JSON.stringify(updated));
+        setDbUsers(updated);
+        showToast('User updated successfully', 'success');
+      } else {
+        const newUser = {
+          id: Date.now(),
+          email: emailVal,
+          phone: phoneVal,
+          password: sha256Sync(password || 'Test@123'),
+          role: roleName,
+          role_id: roleIdVal,
+          permissions: permissionsArray,
+          classroom_id: classroomId ? Number(classroomId) : null,
+          linked_student_ids: parentStudentsArray || [],
+          school_id: '1',
+          setup_completed: 1,
+          school_name: "St. Xavier's International School"
+        };
+        const updated = [...current, newUser];
+        localStorage.setItem('bn_mock_users', JSON.stringify(updated));
+        setDbUsers(updated);
+        showToast('User created successfully', 'success');
+      }
+      setEditingUser(null);
+      return;
+    }
+
+    try {
+      const headers = getHeaders(token);
+      const payload = {
+        email: emailVal,
+        phone: phoneVal,
+        role: roleName,
+        role_id: roleIdVal,
+        linked_student_ids: parentStudentsArray || []
+      };
+      if (userId) {
+        payload.id = userId;
+      }
+      if (password) {
+        payload.password = password;
+      }
+      const res = await fetch('/api/users', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        showToast(userId ? 'User updated successfully' : 'User created successfully', 'success');
+        setEditingUser(null);
+        fetchRolesAndUsers();
+      } else {
+        const err = await res.json();
+        showToast(err.detail || 'Failed to save user', 'error');
+      }
+    } catch (err) {
+      showToast('Error saving user', 'error');
+    }
+  };
+
+  const handleDeleteUser = async (userId) => {
+    if (!token) {
+      const current = JSON.parse(localStorage.getItem('bn_mock_users') || '[]');
+      const updated = current.filter(u => u.id !== userId);
+      localStorage.setItem('bn_mock_users', JSON.stringify(updated));
+      setDbUsers(updated);
+      showToast('User deleted successfully', 'success');
+      return;
+    }
+
+    try {
+      const headers = getHeaders(token);
+      const res = await fetch(`/api/users/${userId}`, {
+        method: 'DELETE',
+        headers
+      });
+      if (res.ok) {
+        showToast('User deleted successfully', 'success');
+        fetchRolesAndUsers();
+      } else {
+        const err = await res.json();
+        showToast(err.detail || 'Failed to delete user', 'error');
+      }
+    } catch (err) {
+      showToast('Error deleting user', 'error');
+    }
   };
 
   // Fetch School Admin Data
@@ -1501,13 +2890,36 @@ export default function App() {
     try {
       const headers = getHeaders(activeToken);
       
+      const userRole = role || localStorage.getItem('admin_role');
+      if (userRole === 'Parent') {
+        const parentRes = await fetch('/api/parent/students', { headers });
+        if (parentRes.ok) {
+          const studs = await parentRes.json();
+          setParentStudents(studs);
+          if (studs.length > 0) {
+            setSelectedParentStudentId(studs[0].id);
+          }
+        }
+        setLoading(false);
+        return;
+      }
+      
       const resYears = await fetch('/api/academic-years', { headers });
       if (!resYears.ok) throw new Error("Failed to fetch academic years");
       const fetchedYears = await resYears.json();
       setYears(fetchedYears);
       const activeYear = fetchedYears.find(y => y.is_active === 1 || y.is_active === true || y.is_active === '1');
-      if (activeYear && activeYear.id !== activeYearId) {
-        setActiveYearId(activeYear.id);
+      let targetYearId = activeYearId;
+      if (!targetYearId || !fetchedYears.some(y => y.id === targetYearId)) {
+        if (activeYear) {
+          targetYearId = activeYear.id;
+          setActiveYearId(activeYear.id);
+          localStorage.setItem('bn_active_year_id', activeYear.id);
+        } else if (fetchedYears.length > 0) {
+          targetYearId = fetchedYears[0].id;
+          setActiveYearId(fetchedYears[0].id);
+          localStorage.setItem('bn_active_year_id', fetchedYears[0].id);
+        }
       }
 
       const resCls = await fetch('/api/classes', { headers });
@@ -1518,7 +2930,7 @@ export default function App() {
       if (!resTeach.ok) throw new Error("Failed to fetch teachers");
       setTeachers(await resTeach.json());
 
-      const resStud = await fetch(`/api/students?academic_year_id=${activeYearId}`, { headers });
+      const resStud = await fetch(`/api/students?academic_year_id=${targetYearId}`, { headers });
       if (!resStud.ok) throw new Error("Failed to fetch students");
       setStudents(await resStud.json());
 
@@ -1528,20 +2940,53 @@ export default function App() {
       const resAudit = await fetch('/api/audit-logs', { headers });
       if (resAudit.ok) setAuditLogs(await resAudit.json());
 
-      const resStats = await fetch(`/api/dashboard/stats?academic_year_id=${activeYearId}`, { headers });
+      const resStats = await fetch(`/api/dashboard/stats?academic_year_id=${targetYearId}`, { headers });
       if (resStats.ok) setDashboardStats(await resStats.json());
 
       const resSchool = await fetch('/api/school', { headers });
       if (resSchool.ok) {
         const schInfo = await resSchool.json();
         if (schInfo.currency) setSchoolCurrency(schInfo.currency);
+        if (schInfo.school_start_time) {
+          setSchoolStartTime(schInfo.school_start_time);
+          setDraftSchoolStartTime(schInfo.school_start_time);
+          localStorage.setItem('bn_settings_school_start_time', schInfo.school_start_time);
+        }
+        if (schInfo.period_duration !== undefined && schInfo.period_duration !== null) {
+          setPeriodDuration(parseInt(schInfo.period_duration));
+          setDraftPeriodDuration(parseInt(schInfo.period_duration));
+          localStorage.setItem('bn_settings_period_duration', schInfo.period_duration);
+        }
+        if (schInfo.interval_duration !== undefined && schInfo.interval_duration !== null) {
+          setIntervalDuration(parseInt(schInfo.interval_duration));
+          setDraftIntervalDuration(parseInt(schInfo.interval_duration));
+          localStorage.setItem('bn_settings_interval_duration', schInfo.interval_duration);
+        }
+        if (schInfo.interval_after_period !== undefined && schInfo.interval_after_period !== null) {
+          setIntervalAfterPeriod(parseInt(schInfo.interval_after_period));
+          setDraftIntervalAfterPeriod(parseInt(schInfo.interval_after_period));
+          localStorage.setItem('bn_settings_interval_after_period', schInfo.interval_after_period);
+        }
+        if (schInfo.total_periods !== undefined && schInfo.total_periods !== null) {
+          setTotalPeriodsPerDay(parseInt(schInfo.total_periods));
+          setDraftTotalPeriods(parseInt(schInfo.total_periods));
+          localStorage.setItem('bn_settings_total_periods', schInfo.total_periods);
+        }
       }
 
       setIsConnected(true);
+      setIsApiUnavailable(false);
+      setApiConnectionError('');
     } catch (err) {
-      console.warn("School Admin API offline. Loading tenant mock seeds.");
+      console.warn("School Admin API offline:", err.message);
       setIsConnected(false);
-      loadMockSeeds(customSchoolId || schoolId);
+      const isMock = activeToken && activeToken.includes('mock');
+      if (isMock) {
+        loadMockSeeds(customSchoolId || schoolId);
+      } else {
+        setIsApiUnavailable(true);
+        setApiConnectionError(err.message || 'API connection failed');
+      }
     } finally {
       setLoading(false);
     }
@@ -1568,8 +3013,8 @@ export default function App() {
       end_date: `${startYear + 1}-03-31`,
       description: '',
       fee_structure: {
-        April: 150, May: 150, June: 150, July: 150, August: 150, September: 150,
-        October: 150, November: 150, December: 150, January: 150, February: 150, March: 150
+        April: 0, May: 0, June: 0, July: 0, August: 0, September: 0,
+        October: 0, November: 0, December: 0, January: 0, February: 0, March: 0
       }
     });
     setYearError('');
@@ -1593,7 +3038,8 @@ export default function App() {
           description: newYearForm.description,
           status: 'Draft',
           fee_structure: newYearForm.fee_structure,
-          is_active: false
+          is_active: false,
+          created_at: new Date().toISOString()
         };
         if (years.some(y => y.year_range === newYearForm.year_range)) {
           setYearError('Academic year range already exists');
@@ -1673,11 +3119,27 @@ export default function App() {
       setTimeout(() => {
         const mockReports = years.map(y => {
           const yearStudents = students.filter(s => s.academic_year_id === y.id && s.status === 'Active');
+          let calculatedRevenue = 0;
+          const kSuffix = schoolId || 'default';
+          students.forEach(s => {
+            if (s.status === 'Active') {
+              const storageKey = `bn_sandbox_fees_${kSuffix}_${s.id}_${y.id}`;
+              const stored = localStorage.getItem(storageKey);
+              if (stored) {
+                const records = JSON.parse(stored);
+                records.forEach(r => {
+                  if (r.status === 'Paid') {
+                    calculatedRevenue += parseFloat(r.amount) || 0;
+                  }
+                });
+              }
+            }
+          });
           return {
             year_range: y.year_range,
             student_count: yearStudents.length,
             status: y.status,
-            revenue: yearStudents.length * 150.00,
+            revenue: calculatedRevenue,
             salary_expense: teachers.length * 1200.00,
             performance_index: y.status === 'Archived' ? '84.2%' : '86.5%'
           };
@@ -1742,28 +3204,189 @@ export default function App() {
           return y;
         });
         
-        // 2. Clone active students to the new year based on mapping and selection
-        const updatedStudents = students.map(student => {
-          if (student.status === 'Active') {
-            const promotionStatus = wizardStudentStatus[student.id] || 'promote';
-            if (promotionStatus === 'promote') {
-              const nextClassId = wizardClassMappings[student.class_id];
-              if (nextClassId === 'Alumni') {
-                return { ...student, status: 'Alumni', academic_year_id: wizardTargetYear.id };
-              } else if (nextClassId) {
-                return { ...student, class_id: parseInt(nextClassId), academic_year_id: wizardTargetYear.id };
+        const currentActiveYear = years.find(y => y.status === 'Active' || y.is_active);
+        const oldAyId = currentActiveYear ? currentActiveYear.id : null;
+
+        // 2. Process students and carry forward dues
+        const updatedStudents = [...students];
+        const allCFDuesKey = `bn_sandbox_carry_forward_dues_${keySuffix}`;
+        const allCFDues = JSON.parse(localStorage.getItem(allCFDuesKey) || '[]');
+        
+        let maxStudId = Math.max(...students.map(s => parseInt(s.id)), 0);
+        if (isNaN(maxStudId) || maxStudId < 0) maxStudId = 0;
+        
+        let maxCFId = Math.max(...allCFDues.map(c => parseInt(c.id)), 0);
+        if (isNaN(maxCFId) || maxCFId < 0) maxCFId = 0;
+        
+        students.forEach(student => {
+          if (student.academic_year_id === oldAyId) {
+            const promotionChoice = wizardStudentStatus[student.id] || null;
+            let statusChoice = promotionChoice;
+            if (!statusChoice) {
+              const mappedClass = wizardClassMappings[student.class_id];
+              if (mappedClass === 'Alumni' || mappedClass === 'Alumni / Passed Out') {
+                statusChoice = 'graduate';
+              } else {
+                statusChoice = 'promote';
               }
-            } else {
-              return { ...student, academic_year_id: wizardTargetYear.id };
             }
+            
+            let newClassId = student.class_id;
+            let newStatus = 'Active';
+            
+            if (statusChoice === 'graduate') {
+              newStatus = 'Alumni';
+            } else if (statusChoice === 'repeat') {
+              newClassId = student.class_id;
+              newStatus = 'Active';
+            } else {
+              const mappedClass = wizardClassMappings[student.class_id];
+              if (mappedClass === 'Alumni' || mappedClass === 'Alumni / Passed Out' || !mappedClass) {
+                newStatus = 'Alumni';
+              } else {
+                newClassId = parseInt(mappedClass);
+                newStatus = 'Active';
+              }
+            }
+            
+            if (student.status === 'Inactive') {
+              newStatus = 'Inactive';
+            }
+            
+            if (newStatus === 'Alumni' || newStatus === 'Inactive') {
+              // 1. Update status in the old year record
+              const idx = updatedStudents.findIndex(s => s.id === student.id);
+              if (idx !== -1) {
+                updatedStudents[idx] = { ...updatedStudents[idx], status: newStatus };
+              }
+              
+              // 2. Calculate outstanding dues
+              let unpaidTuition = 0;
+              const studentFeesKey = `bn_sandbox_fees_${keySuffix}_${student.id}_${oldAyId}`;
+              const studentFees = JSON.parse(localStorage.getItem(studentFeesKey) || '[]');
+              studentFees.forEach(f => {
+                if (f.status === 'Pending') {
+                  unpaidTuition += parseFloat(f.amount) || 0;
+                }
+              });
+              
+              let unpaidExtra = 0;
+              const extraFeesKey = `bn_sandbox_student_extra_fees_${keySuffix}_${oldAyId}`;
+              const extraFees = JSON.parse(localStorage.getItem(extraFeesKey) || '[]');
+              const studentExtra = extraFees.filter(ef => parseInt(ef.student_id) === parseInt(student.id) && ef.status === 'Pending');
+              studentExtra.forEach(ef => {
+                unpaidExtra += parseFloat(ef.amount) || 0;
+              });
+              
+              const totalPrevDues = unpaidTuition + unpaidExtra;
+              if (totalPrevDues > 0) {
+                maxCFId++;
+                allCFDues.push({
+                  id: maxCFId,
+                  school_id: schoolId || 1,
+                  student_id: student.id,
+                  original_academic_year_id: oldAyId,
+                  amount: totalPrevDues,
+                  paid_amount: 0,
+                  status: 'Pending'
+                });
+              }
+              return;
+            }
+            
+            // For Promoted or Repeating students:
+            // 1. Keep old record as is (Active, oldAyId).
+            // 2. Create new student record copy for target year.
+            maxStudId++;
+            const newStudentId = maxStudId;
+            const newStudent = {
+              ...student,
+              id: newStudentId,
+              academic_year_id: wizardTargetYear.id,
+              class_id: newClassId,
+              status: 'Active'
+            };
+            updatedStudents.push(newStudent);
+            
+            // 3. Calculate and insert new carry forward due entry pointing to newStudentId
+            let unpaidTuition = 0;
+            const studentFeesKey = `bn_sandbox_fees_${keySuffix}_${student.id}_${oldAyId}`;
+            const studentFees = JSON.parse(localStorage.getItem(studentFeesKey) || '[]');
+            studentFees.forEach(f => {
+              if (f.status === 'Pending') {
+                unpaidTuition += parseFloat(f.amount) || 0;
+              }
+            });
+            
+            let unpaidExtra = 0;
+            const extraFeesKey = `bn_sandbox_student_extra_fees_${keySuffix}_${oldAyId}`;
+            const extraFees = JSON.parse(localStorage.getItem(extraFeesKey) || '[]');
+            const studentExtra = extraFees.filter(ef => parseInt(ef.student_id) === parseInt(student.id) && ef.status === 'Pending');
+            studentExtra.forEach(ef => {
+              unpaidExtra += parseFloat(ef.amount) || 0;
+            });
+            
+            const totalPrevDues = unpaidTuition + unpaidExtra;
+            if (totalPrevDues > 0) {
+              maxCFId++;
+              allCFDues.push({
+                id: maxCFId,
+                school_id: schoolId || 1,
+                student_id: newStudentId,
+                original_academic_year_id: oldAyId,
+                amount: totalPrevDues,
+                paid_amount: 0,
+                status: 'Pending'
+              });
+            }
+            
+            // 4. Retrieve and copy over existing older carry forward dues to the new student copy
+            const oldCFs = allCFDues.filter(c => parseInt(c.student_id) === parseInt(student.id) && c.status === 'Pending');
+            oldCFs.forEach(cf => {
+              maxCFId++;
+              allCFDues.push({
+                id: maxCFId,
+                school_id: schoolId || 1,
+                student_id: newStudentId,
+                original_academic_year_id: cf.original_academic_year_id,
+                amount: cf.amount,
+                paid_amount: cf.paid_amount,
+                status: 'Pending'
+              });
+            });
+            
+            // 5. Seed fee records for the target year in mock mode
+            const defaultStructure = {
+              April: 0, May: 0, June: 0, July: 0, August: 0, September: 0,
+              October: 0, November: 0, December: 0, January: 0, February: 0, March: 0
+            };
+            const structureStorageKey = `bn_sandbox_class_fees_${keySuffix}_${newClassId}_${wizardTargetYear.id}`;
+            const feeStructure = JSON.parse(localStorage.getItem(structureStorageKey) || JSON.stringify(defaultStructure));
+            
+            const newFeesKey = `bn_sandbox_fees_${keySuffix}_${newStudentId}_${wizardTargetYear.id}`;
+            const months = ["April", "May", "June", "July", "August", "September", "October", "November", "December", "January", "February", "March"];
+            const newFees = months.map((m, idx) => {
+              const mNum = (idx + 4 > 12) ? (idx - 8) : (idx + 4);
+              const rangeParts = wizardTargetYear.year_range.split('-');
+              let startYear = parseInt(rangeParts[0]) || new Date().getFullYear();
+              const mYear = (idx <= 8) ? startYear : (startYear + 1);
+              const dueDate = `${mYear}-${String(mNum).padStart(2, '0')}-15`;
+              return {
+                month: m,
+                amount: parseFloat(feeStructure[m]) || 0,
+                status: 'Pending',
+                due_date: dueDate
+              };
+            });
+            localStorage.setItem(newFeesKey, JSON.stringify(newFees));
           }
-          return student;
         });
         
         setYears(updatedYears);
         setStudents(updatedStudents);
         localStorage.setItem(`bn_sandbox_years_${keySuffix}`, JSON.stringify(updatedYears));
         localStorage.setItem(`bn_sandbox_students_${keySuffix}`, JSON.stringify(updatedStudents));
+        localStorage.setItem(allCFDuesKey, JSON.stringify(allCFDues));
         
         setActiveYearId(wizardTargetYear.id);
         
@@ -1826,12 +3449,12 @@ export default function App() {
       { id: 7, name: 'Computer' }
     ]);
     const defaultFeesStructure = {
-      April: 150, May: 150, June: 150, July: 150, August: 150, September: 150,
-      October: 150, November: 150, December: 150, January: 150, February: 150, March: 150
+      April: 0, May: 0, June: 0, July: 0, August: 0, September: 0,
+      October: 0, November: 0, December: 0, January: 0, February: 0, March: 0
     };
     const localYears = storedYears ? JSON.parse(storedYears) : (isNewTenant ? [] : [
-      { id: 1, year_range: "2024-2025", start_date: "2024-04-01", end_date: "2025-03-31", description: "Past session", status: "Archived", is_active: false, fee_structure: defaultFeesStructure },
-      { id: 2, year_range: "2025-2026", start_date: "2025-04-01", end_date: "2026-03-31", description: "Active session", status: "Active", is_active: true, fee_structure: defaultFeesStructure }
+      { id: 1, year_range: "2024-2025", start_date: "2024-04-01", end_date: "2025-03-31", description: "Past session", status: "Archived", is_active: false, fee_structure: defaultFeesStructure, created_at: "2024-04-01 00:00:00" },
+      { id: 2, year_range: "2025-2026", start_date: "2025-04-01", end_date: "2026-03-31", description: "Active session", status: "Active", is_active: true, fee_structure: defaultFeesStructure, created_at: "2025-04-01 00:00:00" }
     ]);
 
     setClasses(localClasses);
@@ -1840,20 +3463,41 @@ export default function App() {
     setSubjects(localSubjects);
     setYears(localYears);
     const storedCurr = localStorage.getItem(`bn_sandbox_school_currency_${keySuffix}`);
-    setSchoolCurrency(storedCurr || 'USD');
+    setSchoolCurrency(storedCurr || 'INR');
+    const storedStartTime = localStorage.getItem(`bn_sandbox_school_start_time_${keySuffix}`);
+    const storedDuration = localStorage.getItem(`bn_sandbox_period_duration_${keySuffix}`);
+    const storedInterval = localStorage.getItem(`bn_sandbox_interval_duration_${keySuffix}`);
+    const storedIntervalAfter = localStorage.getItem(`bn_sandbox_interval_after_period_${keySuffix}`);
+    const storedTotalPeriods = localStorage.getItem(`bn_sandbox_total_periods_${keySuffix}`);
+
+    setSchoolStartTime(storedStartTime || '08:00 AM');
+    setPeriodDuration(storedDuration ? parseInt(storedDuration) : 40);
+    setIntervalDuration(storedInterval ? parseInt(storedInterval) : 20);
+    setIntervalAfterPeriod(storedIntervalAfter ? parseInt(storedIntervalAfter) : 4);
+    setTotalPeriodsPerDay(storedTotalPeriods ? parseInt(storedTotalPeriods) : 8);
+
+    setDraftSchoolStartTime(storedStartTime || '08:00 AM');
+    setDraftPeriodDuration(storedDuration ? parseInt(storedDuration) : 40);
+    setDraftIntervalDuration(storedInterval ? parseInt(storedInterval) : 20);
+    setDraftIntervalAfterPeriod(storedIntervalAfter ? parseInt(storedIntervalAfter) : 4);
+    setDraftTotalPeriods(storedTotalPeriods ? parseInt(storedTotalPeriods) : 8);
     setNotifications(isNewTenant ? [] : MOCK_NOTIFS);
     setAuditLogs([
       { id: 1, operator: "System", action: "Tenant Sandbox Warning", timestamp: "2026-05-30 19:10:00", details: "Running in Offline Tenant Cache Mode." }
     ]);
 
     const act = localYears.find(y => y.status === 'Active' || y.is_active);
-    let targetYearId = 2;
-    if (act) {
-      targetYearId = act.id;
-      setActiveYearId(act.id);
-    } else if (localYears.length > 0) {
-      targetYearId = localYears[0].id;
-      setActiveYearId(localYears[0].id);
+    let targetYearId = activeYearId;
+    if (!targetYearId || !localYears.some(y => y.id === targetYearId)) {
+      if (act) {
+        targetYearId = act.id;
+        setActiveYearId(act.id);
+        localStorage.setItem('bn_active_year_id', act.id);
+      } else if (localYears.length > 0) {
+        targetYearId = localYears[0].id;
+        setActiveYearId(localYears[0].id);
+        localStorage.setItem('bn_active_year_id', localYears[0].id);
+      }
     }
 
     // Pre-initialize sandbox fee records for mock students if not already present
@@ -1872,10 +3516,11 @@ export default function App() {
         // Find class-wise fee structure
         const sandboxClassFeesKey = `bn_sandbox_class_fees_${keySuffix}_${s.class_id}_${targetYearId}`;
         const storedClassFees = localStorage.getItem(sandboxClassFeesKey);
-        const feeStructure = storedClassFees ? JSON.parse(storedClassFees) : {
-          April: 150, May: 150, June: 150, July: 150, August: 150, September: 150,
-          October: 150, November: 150, December: 150, January: 150, February: 150, March: 150
-        };
+        if (!storedClassFees) {
+          // If no fee structure is configured, do not generate monthly ledger entries
+          return;
+        }
+        const feeStructure = JSON.parse(storedClassFees);
 
         const now = new Date();
         const currentYear = now.getFullYear();
@@ -1896,7 +3541,7 @@ export default function App() {
             id: i + 1,
             student_id: s.id,
             month: m,
-            amount: parseFloat(feeStructure[m]) || 150.00,
+            amount: parseFloat(feeStructure[m]) || 0.00,
             status: status,
             due_date: `${year}-${String(monthNum).padStart(2, '0')}-15`,
             payment_date: payDate
@@ -1937,6 +3582,36 @@ export default function App() {
         });
       }
     });
+
+    let cfPendingAmount = 0;
+    let cfPendingStudentsCount = 0;
+    let pyRecoveryAmount = 0;
+
+    const storedCFDues = localStorage.getItem(`bn_sandbox_carry_forward_dues_${keySuffix}`) || '[]';
+    const allCFDues = JSON.parse(storedCFDues);
+    const storedPYRecs = localStorage.getItem(`bn_sandbox_previous_year_recoveries_${keySuffix}`) || '[]';
+    const allPYRecs = JSON.parse(storedPYRecs);
+
+    localStudents.forEach(s => {
+      const studentCFDues = allCFDues.filter(d => parseInt(d.student_id) === parseInt(s.id));
+      let hasPending = false;
+      studentCFDues.forEach(d => {
+        if (d.status === 'Pending') {
+          cfPendingAmount += parseFloat(d.amount) - parseFloat(d.paid_amount);
+          hasPending = true;
+        }
+      });
+      if (hasPending) {
+        cfPendingStudentsCount++;
+      }
+
+      const studentPYRecs = allPYRecs.filter(r => parseInt(r.student_id) === parseInt(s.id));
+      studentPYRecs.forEach(r => {
+        pyRecoveryAmount += parseFloat(r.amount_recovered) || 0;
+      });
+    });
+
+    calculatedRevenue += pyRecoveryAmount;
     
     setDashboardStats({
       total_students: localStudents.length,
@@ -1946,6 +3621,9 @@ export default function App() {
       monthly_revenue: isNewTenant ? 0.00 : calculatedRevenue,
       active_classes: localClasses.length,
       attendance_overview: isNewTenant ? "0.0% Avg" : "96.4% Avg",
+      carry_forward_pending_amount: isNewTenant ? 0.00 : cfPendingAmount,
+      carry_forward_pending_students: isNewTenant ? 0 : cfPendingStudentsCount,
+      previous_year_recovery_amount: isNewTenant ? 0.00 : pyRecoveryAmount,
       charts: {
         fee_collection: isNewTenant ? [
           { month: "April", amount: 0 }, { month: "May", amount: 0 }, { month: "June", amount: 0 },
@@ -1973,15 +3651,39 @@ export default function App() {
     }
   }, [deleteConfirm]);
 
-  // Verify session on mount
-  useEffect(() => {
-    const verifySession = async () => {
-      const storedToken = localStorage.getItem('admin_token');
-      const storedRole = localStorage.getItem('admin_role');
-      const storedSetup = parseInt(localStorage.getItem('admin_setup_completed') || '1');
-      const storedSchoolName = localStorage.getItem('admin_school_name') || 'BN School';
-      const storedSchoolId = localStorage.getItem('admin_school_id') || '1';
-      
+  // Verify session on mount / retry
+  // Verify session on mount / retry
+  const verifySession = async () => {
+    // Safety fallback: ensure "Verifying session..." screen is removed after 8 seconds under any circumstances
+    const safetyTimeout = setTimeout(() => {
+      console.warn("Session verification safety timeout fired.");
+      setIsInitializing(false);
+    }, 8000);
+
+    const storedToken = localStorage.getItem('admin_token');
+    const storedRole = localStorage.getItem('admin_role');
+    
+    let storedSetup = 1;
+    let storedSetupStr = localStorage.getItem('admin_setup_completed');
+    if (storedSetupStr !== null && storedSetupStr !== 'undefined') {
+      const parsed = parseInt(storedSetupStr);
+      if (!isNaN(parsed)) {
+        storedSetup = parsed;
+      }
+    }
+    
+    if (storedToken && storedRole === 'School Admin') {
+      const decoded = decodeJwt(storedToken);
+      if (decoded && decoded.setup_completed !== undefined) {
+        storedSetup = parseInt(decoded.setup_completed);
+        localStorage.setItem('admin_setup_completed', String(storedSetup));
+      }
+    }
+
+    const storedSchoolName = localStorage.getItem('admin_school_name') || 'BN School';
+    const storedSchoolId = localStorage.getItem('admin_school_id') || '1';
+    
+    try {
       if (storedToken) {
         try {
           if (storedRole === 'Super Admin') {
@@ -1999,7 +3701,17 @@ export default function App() {
               if (storedToken.includes('mock')) {
                 throw new Error('Mock token check failed on server. Restoring mock session.');
               }
-              clearSession();
+              if (res.status === 401 || res.status === 403) {
+                clearSession();
+              } else {
+                setToken(storedToken);
+                setRole('Super Admin');
+                setUsername(localStorage.getItem('admin_email') || 'Bilal@yopmail.com');
+                setIsApiUnavailable(true);
+                setApiConnectionError(`Server responded with status ${res.status}`);
+                window.history.replaceState({ loggedIn: true, role: 'Super Admin' }, '', '/super-admin');
+                setCurrentPath('/super-admin');
+              }
             }
           } else {
             // School Admin
@@ -2026,7 +3738,21 @@ export default function App() {
               if (storedToken.includes('mock')) {
                 throw new Error('Mock token check failed on server. Restoring mock session.');
               }
-              clearSession();
+              if (res.status === 401 || res.status === 403) {
+                clearSession();
+              } else {
+                setToken(storedToken);
+                setRole('School Admin');
+                setUsername(localStorage.getItem('admin_email') || 'Admin@yopmail.com');
+                setSchoolId(localStorage.getItem('admin_school_id') || '1');
+                setSetupCompleted(storedSetup);
+                setSchoolName(storedSchoolName);
+                setIsApiUnavailable(true);
+                setApiConnectionError(`Server responded with status ${res.status}`);
+                window.history.replaceState({ loggedIn: true, role: 'School Admin' }, '', '/dashboard');
+                setCurrentPath('/dashboard');
+                await fetchERPData(storedToken, storedSchoolId);
+              }
             }
           }
         } catch (err) {
@@ -2053,7 +3779,24 @@ export default function App() {
               }
             }
           } else {
-            clearSession();
+            // Real token, network exception
+            setToken(storedToken);
+            setRole(storedRole || 'School Admin');
+            setUsername(localStorage.getItem('admin_email') || 'Admin@yopmail.com');
+            setSchoolId(localStorage.getItem('admin_school_id') || '1');
+            setSetupCompleted(storedSetup);
+            setSchoolName(storedSchoolName);
+            setIsApiUnavailable(true);
+            setApiConnectionError(err.message || 'API connection failed');
+            
+            if (storedRole === 'Super Admin') {
+              window.history.replaceState({ loggedIn: true, role: 'Super Admin' }, '', '/super-admin');
+              setCurrentPath('/super-admin');
+            } else {
+              window.history.replaceState({ loggedIn: true, role: 'School Admin' }, '', '/dashboard');
+              setCurrentPath('/dashboard');
+              await fetchERPData(storedToken, storedSchoolId);
+            }
           }
         }
       } else {
@@ -2066,11 +3809,29 @@ export default function App() {
           setCurrentPath('/login');
         }
       }
+    } finally {
+      clearTimeout(safetyTimeout);
       setIsInitializing(false);
-    };
+    }
+  };
 
+  useEffect(() => {
     verifySession();
   }, []);
+
+  const handleTryReconnect = async () => {
+    setIsRetrying(true);
+    try {
+      setIsApiUnavailable(false);
+      setApiConnectionError('');
+      await verifySession();
+    } catch (err) {
+      setIsApiUnavailable(true);
+      setApiConnectionError(err.message || 'API connection failed');
+    } finally {
+      setIsRetrying(false);
+    }
+  };
 
   // Central Route Guard
   useEffect(() => {
@@ -2083,7 +3844,7 @@ export default function App() {
           setCurrentPath('/super-admin');
         }
       } else if (role === 'School Admin') {
-        if (setupCompleted === 0) {
+        if (Number(setupCompleted) === 0) {
           if (currentPath !== '/setup') {
             window.history.replaceState({ loggedIn: true, role: 'School Admin' }, '', '/setup');
             setCurrentPath('/setup');
@@ -2115,10 +3876,15 @@ export default function App() {
     localStorage.removeItem('admin_role');
     localStorage.removeItem('admin_school_id');
     localStorage.removeItem('admin_setup_completed');
+    localStorage.removeItem('bn_active_year_id');
+    localStorage.removeItem('admin_permissions');
+    localStorage.removeItem('admin_linked_student_ids');
     setToken('');
     setRole('');
     setSchoolId('');
     setSetupCompleted(1);
+    setPermissions([]);
+    setLinkedStudentIds([]);
 
     // Reset active view tab & selected states
     setActiveTab('dashboard');
@@ -2158,6 +3924,151 @@ export default function App() {
       window.history.replaceState({ loggedIn: false }, '', '/login');
       setCurrentPath('/login');
     }
+  };
+
+  // Intercept global window.alert to suppress auth-related alert popups
+  useEffect(() => {
+    const originalAlert = window.alert;
+    window.alert = (msg) => {
+      if (msg) {
+        const str = msg.toString().toLowerCase();
+        if (str.includes('unauthorized') || str.includes('session expired') || str.includes('not authenticated')) {
+          console.warn("Blocked auth-related alert popup:", msg);
+          return;
+        }
+      }
+      originalAlert(msg);
+    };
+    return () => {
+      window.alert = originalAlert;
+    };
+  }, []);
+
+  // Intercept global fetch to handle 402/401/403 responses
+  useEffect(() => {
+    const originalFetch = window.fetch;
+    window.fetch = async (...args) => {
+      const res = await originalFetch(...args);
+      
+      if (res.status === 402) {
+        try {
+          const clone = res.clone();
+          const data = await clone.json();
+          if (data.subscription_expired) {
+            clearSession();
+            setExpiredModalInfo({
+              message: data.detail || 'Your current plan is expired. Please upgrade your plan or contact to Admin.'
+            });
+          }
+        } catch (e) {
+          clearSession();
+          setExpiredModalInfo({
+            message: 'Your current plan is expired. Please upgrade your plan or contact to Admin.'
+          });
+        }
+      } else if (res.status === 401) {
+        const urlStr = args[0] || '';
+        if (token && !urlStr.includes('/api/auth/login')) {
+          clearSession();
+          showToast('Session expired. Please log in again.', 'error');
+        }
+      } else if (res.status === 403) {
+        try {
+          const clone = res.clone();
+          const data = await clone.json();
+          if (data && data.detail === 'Unauthorized Access.') {
+            if (token) {
+              clearSession();
+              showToast('Session expired. Please log in again.', 'error');
+            }
+          }
+        } catch (e) {}
+      }
+      
+      return res;
+    };
+    return () => {
+      window.fetch = originalFetch;
+    };
+  }, [token]);
+
+  // Verify subscription status whenever the tab changes
+  useEffect(() => {
+    if (token && role !== 'Super Admin' && activeTab !== 'profile') {
+      fetch('/api/school', { headers: getHeaders() }).catch(e => {});
+    }
+  }, [activeTab, token, role]);
+
+  // Throttled real-time subscription check on document clicks (max once every 3 seconds)
+  useEffect(() => {
+    if (!token || role === 'Super Admin') return;
+    
+    let lastCheckedTime = 0;
+    const handleDocumentClick = () => {
+      const now = Date.now();
+      if (now - lastCheckedTime > 3000) {
+        lastCheckedTime = now;
+        fetch('/api/school', { headers: getHeaders() }).catch(e => {});
+      }
+    };
+    
+    document.addEventListener('click', handleDocumentClick);
+    return () => {
+      document.removeEventListener('click', handleDocumentClick);
+    };
+  }, [token, role]);
+
+  // Close active dropdown menus on outside clicks
+  useEffect(() => {
+    const handleOutsideClick = () => {
+      setActiveClassMenuId(null);
+      setActiveTeacherMenuId(null);
+      setActiveStudentMenuId(null);
+      setActiveSchoolMenuId(null);
+    };
+    document.addEventListener('click', handleOutsideClick);
+    return () => {
+      document.removeEventListener('click', handleOutsideClick);
+    };
+  }, []);
+
+  const renderExpiredPopupModal = () => {
+    if (!expiredModalInfo) return null;
+    return (
+      <div className="modal-overlay" style={{ zIndex: 200000, position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setExpiredModalInfo(null)}>
+        <div className="modal-content fade-in" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px', width: '90%', textAlign: 'center', padding: '32px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
+          <div style={{
+            width: '64px',
+            height: '64px',
+            borderRadius: '50%',
+            background: 'rgba(239, 68, 68, 0.1)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#ef4444',
+            margin: '0 auto 20px auto'
+          }}>
+            <Lock size={32} />
+          </div>
+          <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: '0 0 12px 0', color: 'var(--text-primary)' }}>Subscription Expired</h3>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.6', margin: '0 0 24px 0' }}>
+            Your current plan is expired. Please upgrade your plan or contact to Admin.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <button 
+              onClick={() => setExpiredModalInfo(null)} 
+              className="btn-primary" 
+              style={{ justifyContent: 'center', padding: '12px 24px', width: '100%', fontWeight: 700 }}
+            >
+              Close
+            </button>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '8px' }}>
+              Support contact: bilalnashi6@gmail.com
+            </span>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   // Forgot Password: Request OTP
@@ -2269,13 +4180,13 @@ export default function App() {
       const res = await fetch('/api/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: forgotEmail, otp: forgotOtp, password: newPassword })
+        body: JSON.stringify({ email: forgotEmail, otp: forgotOtp, password: sha256Sync(newPassword) })
       });
       if (res.ok) {
         const savedUsers = JSON.parse(localStorage.getItem('bn_mock_users') || '[]');
         const updatedUsers = savedUsers.map(u => 
           u.email.trim().toLowerCase() === forgotEmail.trim().toLowerCase() 
-            ? { ...u, password: newPassword } 
+            ? { ...u, password: sha256Sync(newPassword) } 
             : u
         );
         localStorage.setItem('bn_mock_users', JSON.stringify(updatedUsers));
@@ -2294,7 +4205,7 @@ export default function App() {
       const savedUsers = JSON.parse(localStorage.getItem('bn_mock_users') || '[]');
       const updatedUsers = savedUsers.map(u => 
         u.email.trim().toLowerCase() === forgotEmail.trim().toLowerCase() 
-          ? { ...u, password: newPassword } 
+          ? { ...u, password: sha256Sync(newPassword) } 
           : u
       );
       localStorage.setItem('bn_mock_users', JSON.stringify(updatedUsers));
@@ -2321,24 +4232,42 @@ export default function App() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: loginUser, password: loginPass })
+        body: JSON.stringify({ email: loginUser, password: sha256Sync(loginPass) })
       });
       if (res.ok) {
         const data = await res.json();
         
+        let setupVal = data.setup_completed;
+        if (setupVal === undefined || setupVal === null) {
+          const decoded = decodeJwt(data.access_token);
+          if (decoded && decoded.setup_completed !== undefined) {
+            setupVal = decoded.setup_completed;
+          } else {
+            setupVal = 1; // Default fallback
+          }
+        }
+        setupVal = parseInt(setupVal);
+        if (isNaN(setupVal)) setupVal = 1;
+
+        const schoolNameVal = data.school_name || (data.access_token ? (decodeJwt(data.access_token)?.school_name) : null) || 'BN School';
+
         localStorage.setItem('admin_token', data.access_token);
         localStorage.setItem('admin_email', data.email);
         localStorage.setItem('admin_role', data.role);
         localStorage.setItem('admin_school_id', data.school_id || '');
-        localStorage.setItem('admin_setup_completed', data.setup_completed);
-        localStorage.setItem('admin_school_name', data.school_name || 'BN School');
+        localStorage.setItem('admin_setup_completed', String(setupVal));
+        localStorage.setItem('admin_school_name', schoolNameVal);
+        localStorage.setItem('admin_permissions', JSON.stringify(data.permissions || []));
+        localStorage.setItem('admin_linked_student_ids', JSON.stringify(data.linked_student_ids || []));
 
         setToken(data.access_token);
         setUsername(data.email);
         setRole(data.role);
         setSchoolId(data.school_id);
-        setSetupCompleted(data.setup_completed);
-        setSchoolName(data.school_name || 'BN School');
+        setSetupCompleted(setupVal);
+        setPermissions(data.permissions || []);
+        setLinkedStudentIds(data.linked_student_ids || []);
+        setSchoolName(schoolNameVal);
         
         setLoginUser(''); setLoginPass('');
         setLoginError('');
@@ -2350,7 +4279,7 @@ export default function App() {
           setCurrentPath('/super-admin');
           await fetchSuperAdminData(data.access_token, true);
         } else {
-          if (data.setup_completed === 0) {
+          if (setupVal === 0) {
             window.history.replaceState({ loggedIn: true, role: 'School Admin' }, '', '/setup');
             setCurrentPath('/setup');
           } else {
@@ -2365,7 +4294,7 @@ export default function App() {
         }
 
         const savedUsers = JSON.parse(localStorage.getItem('bn_mock_users') || '[]');
-        const matched = savedUsers.find(u => u.email.trim().toLowerCase() === loginUser.trim().toLowerCase() && u.password.trim() === loginPass.trim());
+        const matched = savedUsers.find(u => u.email.trim().toLowerCase() === loginUser.trim().toLowerCase() && verifyLocalPassword(loginPass, u.password));
         if (matched) {
           throw new Error('Dynamic mock user fallback.');
         }
@@ -2377,7 +4306,7 @@ export default function App() {
     } catch (err) {
       // Offline fallback login credentials
       const savedUsers = JSON.parse(localStorage.getItem('bn_mock_users') || '[]');
-      const matched = savedUsers.find(u => u.email.trim().toLowerCase() === loginUser.trim().toLowerCase() && u.password.trim() === loginPass.trim());
+      const matched = savedUsers.find(u => u.email.trim().toLowerCase() === loginUser.trim().toLowerCase() && verifyLocalPassword(loginPass, u.password));
 
       if (matched) {
         const mockTokenVal = 'mock-token-' + matched.school_id + '-' + btoa(loginUser.trim()).replace(/\//g, '_').replace(/=/g, '');
@@ -2428,7 +4357,7 @@ export default function App() {
         window.history.replaceState({ loggedIn: true, role: 'Super Admin' }, '', '/super-admin');
         setCurrentPath('/super-admin');
         loadMockSuperAdminData();
-      } else if (loginUser === 'Admin@yopmail.com' && loginPass === 'Admin@123') {
+      } else if ((loginUser === 'Admin@yopmail.com' && loginPass === 'Admin@123') || (loginUser === 'dd@yopmail.com' && loginPass === 'Test@123')) {
         setLoading(true);
         loadMockSeeds('1');
         localStorage.setItem('admin_token', 'mock-token');
@@ -2472,10 +4401,171 @@ export default function App() {
         showToast('Logged In Successfully', 'success');
         window.history.replaceState({ loggedIn: true, role: 'School Admin' }, '', '/setup');
         setCurrentPath('/setup');
+      } else if (loginUser === '9876543210' && loginPass === 'Test@123') {
+        localStorage.setItem('admin_token', 'mock-parent-token');
+        localStorage.setItem('admin_email', loginUser);
+        localStorage.setItem('admin_role', 'Parent');
+        localStorage.setItem('admin_school_id', '1');
+        localStorage.setItem('admin_setup_completed', '1');
+        localStorage.setItem('admin_school_name', "St. Xavier's International School");
+        localStorage.setItem('admin_permissions', JSON.stringify([]));
+        localStorage.setItem('admin_linked_student_ids', JSON.stringify([4, 5]));
+
+        setToken('mock-parent-token');
+        setUsername(loginUser);
+        setRole('Parent');
+        setSchoolId('1');
+        setSetupCompleted(1);
+        setPermissions([]);
+        setLinkedStudentIds([4, 5]);
+        setSchoolName("St. Xavier's International School");
+        
+        const mockParentStuds = [
+          { id: 4, first_name: 'Yusuf', last_name: 'Ali', gr_no: 'GR1004', class_name: 'Class 11' },
+          { id: 5, first_name: 'Ananya', last_name: 'Yadav', gr_no: 'GR1005', class_name: 'Class 11' }
+        ];
+        setParentStudents(mockParentStuds);
+        setSelectedParentStudentId(4);
+
+        setLoginUser(''); setLoginPass('');
+        setLoginError('');
+        setIsLoggingIn(false);
+        showToast('Logged In Successfully as Parent', 'success');
+        window.history.replaceState({ loggedIn: true, role: 'Parent' }, '', '/dashboard');
+        setCurrentPath('/dashboard');
       } else {
         setLoginError('Invalid email or password. Please verify your credentials.');
         setIsLoggingIn(false);
       }
+    }
+  };
+
+  const handleRequestOtp = (e) => {
+    e.preventDefault();
+    if (!otpPhone.trim()) {
+      setLoginError('Please enter a mobile number.');
+      return;
+    }
+    setLoginError('');
+    setOtpStep(1);
+    showToast('OTP sent (Use 1234)', 'success');
+  };
+
+  const handleOtpLogin = async (e) => {
+    e.preventDefault();
+    setLoginError('');
+    setIsLoggingIn(true);
+    
+    if (otpCode !== '1234') {
+      setLoginError('Invalid OTP. Please enter 1234.');
+      setIsLoggingIn(false);
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/auth/otp-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: otpPhone.trim(), otp: otpCode })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        
+        let setupVal = data.setup_completed;
+        setupVal = parseInt(setupVal);
+        if (isNaN(setupVal)) setupVal = 1;
+
+        const schoolNameVal = data.school_name || 'BN School';
+
+        localStorage.setItem('admin_token', data.access_token);
+        localStorage.setItem('admin_email', data.email || '');
+        localStorage.setItem('admin_phone', data.phone || '');
+        localStorage.setItem('admin_role', data.role);
+        localStorage.setItem('admin_school_id', data.school_id || '');
+        localStorage.setItem('admin_setup_completed', String(setupVal));
+        localStorage.setItem('admin_school_name', schoolNameVal);
+        localStorage.setItem('admin_permissions', JSON.stringify(data.permissions || []));
+        localStorage.setItem('admin_linked_student_ids', JSON.stringify(data.linked_student_ids || []));
+
+        setToken(data.access_token);
+        setUsername(data.email || '');
+        setRole(data.role);
+        setSchoolId(data.school_id);
+        setSetupCompleted(setupVal);
+        setPermissions(data.permissions || []);
+        setLinkedStudentIds(data.linked_student_ids || []);
+        setSchoolName(schoolNameVal);
+        
+        setOtpPhone(''); setOtpCode(''); setOtpStep(0);
+        setLoginError('');
+        setIsLoggingIn(false);
+        showToast('Logged In Successfully', 'success');
+        
+        window.history.replaceState({ loggedIn: true, role: data.role }, '', '/dashboard');
+        setCurrentPath('/dashboard');
+        await fetchERPData(data.access_token, data.school_id);
+      } else {
+        const err = await res.json();
+        setLoginError(err.detail || 'Failed to login via OTP.');
+        setIsLoggingIn(false);
+      }
+    } catch (err) {
+      // Offline fallback: simulate successful logins for recognized mock phones
+      let data = null;
+      if (loginTab === 'parent' && otpPhone.trim() === '9876543210') {
+        data = {
+          access_token: 'mock-parent-token',
+          phone: otpPhone.trim(),
+          role: 'Parent',
+          permissions: ['parent_portal'],
+          linked_student_ids: [4, 5],
+          school_id: 1,
+          setup_completed: 1,
+          school_name: "St. Xavier's International School"
+        };
+      } else if (loginTab === 'teacher') {
+        data = {
+          access_token: 'mock-teacher-token',
+          phone: otpPhone.trim(),
+          role: 'Teacher',
+          permissions: ['attendance', 'performance'],
+          school_id: 1,
+          setup_completed: 1,
+          school_name: "St. Xavier's International School"
+        };
+      } else {
+        setLoginError('Mobile number not found in records.');
+        setIsLoggingIn(false);
+        return;
+      }
+      
+      localStorage.setItem('admin_token', data.access_token);
+      localStorage.setItem('admin_phone', data.phone);
+      localStorage.setItem('admin_role', data.role);
+      localStorage.setItem('admin_school_id', String(data.school_id));
+      localStorage.setItem('admin_setup_completed', String(data.setup_completed));
+      localStorage.setItem('admin_school_name', data.school_name);
+      localStorage.setItem('admin_permissions', JSON.stringify(data.permissions));
+      localStorage.setItem('admin_linked_student_ids', JSON.stringify(data.linked_student_ids || []));
+
+      setToken(data.access_token);
+      setRole(data.role);
+      setSchoolId(data.school_id);
+      setSetupCompleted(data.setup_completed);
+      setPermissions(data.permissions);
+      setLinkedStudentIds(data.linked_student_ids || []);
+      setSchoolName(data.school_name);
+      
+      setOtpPhone(''); setOtpCode(''); setOtpStep(0);
+      setLoginError('');
+      setIsLoggingIn(false);
+      showToast('Logged In Successfully (Offline Mode)', 'success');
+      
+      setLoading(true);
+      loadMockSeeds(data.school_id);
+      window.history.replaceState({ loggedIn: true, role: data.role }, '', '/dashboard');
+      setCurrentPath('/dashboard');
+      setTimeout(() => setLoading(false), 300);
     }
   };
 
@@ -2520,6 +4610,244 @@ export default function App() {
     return array.join("");
   };
 
+  const handleViewSchoolDetails = async (schoolId) => {
+    const schoolObj = schools.find(s => s.id === schoolId) || superStats?.recent_schools?.find(s => s.id === schoolId);
+    if (!schoolObj) return;
+    
+    setSelectedViewSchool(schoolObj);
+    setIsLoadingSchoolDetails(true);
+    setSchoolDetailsData(null);
+    setSelectedMemberClass(null);
+    setSelectedMemberStudent(null);
+    setSelectedMemberTeacher(null);
+    setMemberStudentFees([]);
+    setMemberTeacherSalaries([]);
+    setMemberDetailTab('fees');
+    
+    try {
+      const res = await fetch(`/api/super-admin/schools/${schoolId}/details`, {
+        headers: getHeaders(token)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSchoolDetailsData(data);
+      } else {
+        throw new Error("Failed to fetch backend details");
+      }
+    } catch (err) {
+      console.warn("Details fetch failed, using sandbox fallback:", err);
+      
+      const keySuffix = schoolId;
+      const localStudents = JSON.parse(localStorage.getItem(`bn_sandbox_students_${keySuffix}`) || '[]');
+      const localClasses = JSON.parse(localStorage.getItem(`bn_sandbox_classes_${keySuffix}`) || '[]');
+      const localTeachers = JSON.parse(localStorage.getItem(`bn_sandbox_teachers_${keySuffix}`) || '[]');
+      
+      const mockHistory = [
+        {
+          id: 1,
+          action: 'Plan Activated',
+          performed_by: 'System',
+          school_name: schoolObj.name,
+          plan_name: schoolObj.plan_name || 'Free Trial',
+          created_at: (schoolObj.subscription_start || '2026-04-01') + ' 10:00:00'
+        }
+      ];
+      
+      const mockBilling = [
+        {
+          id: 1,
+          type: 'Subscription',
+          amount: schoolObj.plan_name === 'Free Trial' ? 0 : 12000,
+          status: 'Paid',
+          description: `Subscription: ${schoolObj.plan_name || 'Free Trial'}`,
+          date: schoolObj.subscription_start || '2026-04-01'
+        }
+      ];
+      
+      const mockAuditLogs = [
+        {
+          id: 1,
+          operator: 'System',
+          action: 'School Provisioned',
+          timestamp: (schoolObj.subscription_start || '2026-04-01') + ' 10:00:00',
+          details: 'School database schema created successfully.'
+        }
+      ];
+      
+      setSchoolDetailsData({
+        school: schoolObj,
+        subscription_history: mockHistory,
+        billing_history: mockBilling,
+        audit_logs: mockAuditLogs,
+        students_count: localStudents.length || 120,
+        classes_count: localClasses.length || 6,
+        teachers_count: localTeachers.length || 12,
+        students: localStudents.length > 0 ? localStudents : [
+          { id: 1, name: 'Mock Student A', roll_number: '101', status: 'Active', gender: 'Male', phone: '9876543210', email: 'mock_a@example.com', father_name: 'Father A', mother_name: 'Mother A', emergency_contact: '9876543211', blood_group: 'O+', aadhaar_number: '1234-5678-9012', nationality: 'Indian', class_id: 1 },
+          { id: 2, name: 'Mock Student B', roll_number: '102', status: 'Active', gender: 'Female', phone: '9876543215', email: 'mock_b@example.com', father_name: 'Father B', mother_name: 'Mother B', emergency_contact: '9876543216', blood_group: 'B+', aadhaar_number: '1234-5678-9013', nationality: 'Indian', class_id: 2 }
+        ],
+        classes: localClasses.length > 0 ? localClasses : [
+          { id: 1, name: 'Grade 1', room: '101' },
+          { id: 2, name: 'Grade 2', room: '102' }
+        ],
+        teachers: localTeachers.length > 0 ? localTeachers : [
+          { id: 1, name: 'Mock Teacher A', subject: 'Mathematics', status: 'Active', gender: 'Male', phone: '9876543220', email: 'teacher_a@example.com', qualification: 'M.Sc. Mathematics', experience: '5 Years', joining_date: '2022-04-01', salary_amount: 3500.0, assigned_classes: 'Grade 1' },
+          { id: 2, name: 'Mock Teacher B', subject: 'Science', status: 'Active', gender: 'Female', phone: '9876543225', email: 'teacher_b@example.com', qualification: 'B.Sc. B.Ed.', experience: '3 Years', joining_date: '2023-08-01', salary_amount: 3000.0, assigned_classes: 'Grade 2' }
+        ]
+      });
+    } finally {
+      setIsLoadingSchoolDetails(false);
+    }
+  };
+
+  const fetchMemberStudentFees = async (schoolId, studentId) => {
+    try {
+      const res = await fetch(`/api/super-admin/schools/${schoolId}/students/${studentId}/fees`, {
+        headers: getHeaders(token)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.length > 0) {
+          setMemberStudentFees(data);
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to fetch member student fees from backend:", err);
+    }
+
+    // Sandbox fallback
+    const localYears = JSON.parse(localStorage.getItem(`bn_sandbox_years_${schoolId}`) || '[]');
+    const activeYear = localYears.find(y => y.is_active || y.status === 'Active') || localYears[0] || { id: 2 };
+    const storageKey = `bn_sandbox_fees_${schoolId}_${studentId}_${activeYear.id}`;
+    const stored = localStorage.getItem(storageKey);
+    if (stored) {
+      setMemberStudentFees(JSON.parse(stored));
+    } else {
+      const months = ["April", "May", "June", "July", "August", "September", "October", "November", "December", "January", "February", "March"];
+      const baseFee = 2500;
+      const synthFees = months.map((m, i) => ({
+        id: i + 1,
+        student_id: studentId,
+        month: m,
+        amount: baseFee,
+        status: i < 8 ? "Paid" : "Pending",
+        due_date: `2025-${String(i < 9 ? i + 4 : i - 8).padStart(2, '0')}-15`,
+        payment_date: i < 8 ? `2025-${String(i < 9 ? i + 4 : i - 8).padStart(2, '0')}-05` : null
+      }));
+      setMemberStudentFees(synthFees);
+    }
+  };
+
+  const fetchMemberTeacherSalaries = async (schoolId, teacherId) => {
+    try {
+      const res = await fetch(`/api/super-admin/schools/${schoolId}/teachers/${teacherId}/salary`, {
+        headers: getHeaders(token)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.length > 0) {
+          setMemberTeacherSalaries(data);
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to fetch member teacher salaries from backend:", err);
+    }
+
+    // Sandbox fallback
+    const localYears = JSON.parse(localStorage.getItem(`bn_sandbox_years_${schoolId}`) || '[]');
+    const activeYear = localYears.find(y => y.is_active || y.status === 'Active') || localYears[0] || { id: 2 };
+    const storageKey = `bn_sandbox_salaries_${schoolId}_${teacherId}_${activeYear.id}`;
+    const stored = localStorage.getItem(storageKey);
+    if (stored) {
+      setMemberTeacherSalaries(JSON.parse(stored));
+    } else {
+      const months = ["April", "May", "June", "July", "August", "September", "October", "November", "December", "January", "February", "March"];
+      const baseSalary = 3500;
+      const synthSalaries = months.map((m, i) => ({
+        id: i + 1,
+        teacher_id: teacherId,
+        month: m,
+        amount: baseSalary,
+        status: i < 9 ? "Paid" : "Pending",
+        payment_date: i < 9 ? `2025-${String(i < 9 ? i + 4 : i - 8).padStart(2, '0')}-05` : null
+      }));
+      setMemberTeacherSalaries(synthSalaries);
+    }
+  };
+
+  const handleEditSchoolSubmit = async (e) => {
+    e.preventDefault();
+    if (!editSchoolForm.name || !editSchoolForm.contact_person || !editSchoolForm.contact_number || !editSchoolForm.subscription_end) {
+      alert("Please fill in all required fields.");
+      return;
+    }
+    
+    setIsSavingSchool(true);
+    const schoolId = showEditSchoolModal.id;
+    
+    try {
+      const res = await fetch(`/api/super-admin/schools/${schoolId}`, {
+        method: 'PUT',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          name: editSchoolForm.name,
+          contact_person: editSchoolForm.contact_person,
+          contact_number: editSchoolForm.contact_number,
+          subscription_end: editSchoolForm.subscription_end,
+          status: editSchoolForm.status
+        })
+      });
+      if (res.ok) {
+        setShowEditSchoolModal(null);
+        // Refresh school details modal if it's currently looking at this school
+        if (selectedViewSchool && selectedViewSchool.id === schoolId) {
+          handleViewSchoolDetails(schoolId);
+        }
+        await fetchSuperAdminData();
+        showToast('School profile updated successfully', 'success');
+      } else {
+        const err = await res.json();
+        alert(err.detail || 'Failed to update school profile.');
+      }
+    } catch (err) {
+      console.warn("Edit school API failed, updating in mock storage:", err);
+      const savedSchools = JSON.parse(localStorage.getItem('bn_mock_schools') || '[]');
+      const updated = savedSchools.map(s => {
+        if (s.id === schoolId) {
+          const today = new Date();
+          const end = new Date(editSchoolForm.subscription_end);
+          const diffTime = end - today;
+          const diffDays = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+          
+          const updatedObj = {
+            ...s,
+            name: editSchoolForm.name,
+            contact_person: editSchoolForm.contact_person,
+            contact_number: editSchoolForm.contact_number,
+            subscription_end: editSchoolForm.subscription_end,
+            status: editSchoolForm.status,
+            days_remaining: diffDays
+          };
+          
+          if (selectedViewSchool && selectedViewSchool.id === schoolId) {
+            setSelectedViewSchool(updatedObj);
+          }
+          return updatedObj;
+        }
+        return s;
+      });
+      
+      localStorage.setItem('bn_mock_schools', JSON.stringify(updated));
+      loadMockSuperAdminData();
+      setShowEditSchoolModal(null);
+      showToast('School updated successfully (Sandbox Mode)', 'success');
+    } finally {
+      setIsSavingSchool(false);
+    }
+  };
+
   // Super Admin: Onboard/Invite School
   const handleInviteSchoolSubmit = async (e) => {
     e.preventDefault();
@@ -2532,11 +4860,11 @@ export default function App() {
       const res = await fetch('/api/super-admin/invitations', {
         method: 'POST',
         headers: getHeaders(),
-        body: JSON.stringify({ email: inviteForm.email })
+        body: JSON.stringify({ email: inviteForm.email, plan_id: inviteForm.plan_id })
       });
       if (res.ok) {
         setShowInviteModal(false);
-        setInviteForm({ name: '', email: '', contact_person: '', phone: '' });
+        setInviteForm({ name: '', email: '', contact_person: '', phone: '', plan_id: '' });
         await fetchSuperAdminData();
         showToast('Invitation sent successfully', 'success');
       } else {
@@ -2561,6 +4889,23 @@ export default function App() {
         console.error("Sandbox SMTP email failed:", mailErr);
       }
       
+      let subStart = new Date().toISOString().split('T')[0];
+      let subEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      let schStatus = 'Active';
+      let remDays = 30;
+      
+      if (inviteForm.plan_id === 'without_plan') {
+        subEnd = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        schStatus = 'Inactive';
+        remDays = 0;
+      } else if (inviteForm.plan_id) {
+        const plan = superPlans.find(p => String(p.id) === String(inviteForm.plan_id));
+        const duration = plan ? Number(plan.duration_days) : 30;
+        subEnd = new Date(Date.now() + duration * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        schStatus = 'Active';
+        remDays = duration;
+      }
+      
       const newSchoolId = schools.length + 1;
       const newSchool = {
         id: newSchoolId,
@@ -2569,12 +4914,12 @@ export default function App() {
         contact_person: '-',
         contact_number: '-',
         email: inviteForm.email,
-        status: 'Active',
+        status: schStatus,
         logo_path: null,
-        subscription_start: new Date().toISOString().split('T')[0],
-        subscription_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        subscription_start: subStart,
+        subscription_end: subEnd,
         setup_completed: 0,
-        days_remaining: 30
+        days_remaining: remDays
       };
 
       const savedSchools = JSON.parse(localStorage.getItem('bn_mock_schools') || '[]');
@@ -2586,7 +4931,7 @@ export default function App() {
       const savedUsers = JSON.parse(localStorage.getItem('bn_mock_users') || '[]');
       savedUsers.push({
         email: inviteForm.email,
-        password: securePassword,
+        password: sha256Sync(securePassword),
         role: 'School Admin',
         school_id: String(newSchoolId),
         setup_completed: 0,
@@ -2595,7 +4940,7 @@ export default function App() {
       localStorage.setItem('bn_mock_users', JSON.stringify(savedUsers));
       
       setShowInviteModal(false);
-      setInviteForm({ name: '', email: '', contact_person: '', phone: '' });
+      setInviteForm({ name: '', email: '', contact_person: '', phone: '', plan_id: '' });
       showToast('Invitation sent successfully', 'success');
     } finally {
       setIsSendingInvite(false);
@@ -2625,12 +4970,197 @@ export default function App() {
           currentEnd.setMonth(currentEnd.getMonth() + parseInt(extendMonths));
           const newEnd = currentEnd.toISOString().split('T')[0];
           const diff = Math.ceil((currentEnd - new Date()) / (1000 * 60 * 60 * 24));
+          
+          const notifKey = `bn_sandbox_notifications_${showExtendModal.id}`;
+          const storedNotifs = localStorage.getItem(notifKey);
+          if (storedNotifs) {
+            let list = JSON.parse(storedNotifs);
+            list = list.filter(n => n.type !== 'Subscription');
+            localStorage.setItem(notifKey, JSON.stringify(list));
+          }
+          
           return { ...s, subscription_end: newEnd, days_remaining: diff };
         }
         return s;
       }));
       setShowExtendModal(null);
       showToast('Subscription Extended (Sandbox Mode)', 'success');
+    }
+  };
+
+  // Super Admin: Save / Edit Subscription Plan
+  const handleSavePlan = async (e) => {
+    e.preventDefault();
+    setIsSavingPlan(true);
+    try {
+      const method = showEditPlanModal ? 'PUT' : 'POST';
+      const url = showEditPlanModal ? `/api/super-admin/plans/${showEditPlanModal.id}` : '/api/super-admin/plans';
+      
+      if (!isConnected) {
+        if (showEditPlanModal) {
+          setSuperPlans(superPlans.map(p => p.id === showEditPlanModal.id ? { ...p, ...planForm } : p));
+          showToast('Plan updated successfully (Sandbox Mode)', 'success');
+        } else {
+          const nextId = superPlans.length > 0 ? Math.max(...superPlans.map(p => p.id)) + 1 : 1;
+          setSuperPlans([...superPlans, { id: nextId, ...planForm }]);
+          showToast('Plan created successfully (Sandbox Mode)', 'success');
+        }
+        setShowAddPlanModal(false);
+        setShowEditPlanModal(null);
+        setIsSavingPlan(false);
+        return;
+      }
+      
+      const res = await fetch(url, {
+        method,
+        headers: getHeaders(),
+        body: JSON.stringify(planForm)
+      });
+      
+      if (res.ok) {
+        showToast(showEditPlanModal ? 'Plan updated successfully.' : 'Plan created successfully.', 'success');
+        setShowAddPlanModal(false);
+        setShowEditPlanModal(null);
+        await fetchSuperAdminData();
+      } else {
+        const errData = await res.json();
+        showToast(errData.detail || 'Failed to save plan.', 'error');
+      }
+    } catch (err) {
+      showToast('Network error saving plan.', 'error');
+    } finally {
+      setIsSavingPlan(false);
+    }
+  };
+
+  // Super Admin: Delete Plan
+  const handleDeletePlan = async (id) => {
+    if (!window.confirm("Are you sure you want to delete/deactivate this plan?")) return;
+    try {
+      if (!isConnected) {
+        setSuperPlans(superPlans.filter(p => p.id !== id));
+        showToast('Plan deleted (Sandbox Mode)', 'success');
+        return;
+      }
+      
+      const res = await fetch(`/api/super-admin/plans/${id}`, {
+        method: 'DELETE',
+        headers: getHeaders()
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        showToast(data.message || 'Plan deleted successfully.', 'success');
+        await fetchSuperAdminData();
+      } else {
+        const errData = await res.json();
+        showToast(errData.detail || 'Failed to delete plan.', 'error');
+      }
+    } catch (err) {
+      showToast('Network error deleting plan.', 'error');
+    }
+  };
+
+  // Super Admin: Save Manual Subscription (Activate, Extend, Upgrade, Downgrade, Cancel)
+  const handleSaveManualSubscription = async (e) => {
+    e.preventDefault();
+    setIsSavingSub(true);
+    try {
+      if (!isConnected) {
+        const plan = superPlans.find(p => p.id === parseInt(manualSubForm.plan_id));
+        const planName = plan ? plan.name : 'Unknown Plan';
+        const duration = plan ? plan.duration_days : 365;
+        
+        const existingSub = superSubscriptions.find(s => s.school_id === showManualSubModal.school_id);
+        let start = manualSubForm.start_date || new Date().toISOString().substring(0, 10);
+        let end = manualSubForm.expiry_date;
+        if (!end) {
+          if (manualSubForm.action_type === 'Cancel') {
+            end = new Date().toISOString().substring(0, 10);
+          } else if (existingSub && new Date(existingSub.expiry_date) >= new Date()) {
+            start = existingSub.start_date;
+            end = new Date(new Date(existingSub.expiry_date).getTime() + duration * 24 * 3600 * 1000).toISOString().substring(0, 10);
+          } else {
+            start = new Date().toISOString().substring(0, 10);
+            end = new Date(new Date().getTime() + duration * 24 * 3600 * 1000).toISOString().substring(0, 10);
+          }
+        }
+        
+        const remDays = Math.ceil((new Date(end) - new Date()) / (1000 * 60 * 60 * 24));
+        const status = remDays <= 0 ? 'Expired' : (remDays < 15 ? 'Expiring Soon' : 'Active');
+
+        // Clear mock notification flags for this school if we are renewing/extending
+        const notifKey = `bn_sandbox_notifications_${showManualSubModal.school_id}`;
+        const storedNotifs = localStorage.getItem(notifKey);
+        if (storedNotifs) {
+          let list = JSON.parse(storedNotifs);
+          list = list.filter(n => n.type !== 'Subscription');
+          localStorage.setItem(notifKey, JSON.stringify(list));
+        }
+        
+        setSuperSubscriptions(superSubscriptions.map(s => s.school_id === showManualSubModal.school_id ? {
+          ...s,
+          plan_id: plan ? plan.id : s.plan_id,
+          plan_name: planName,
+          start_date: start,
+          expiry_date: end,
+          remaining_days: remDays,
+          status: status
+        } : s));
+        
+        // Also update schools
+        setSchools(schools.map(s => s.id === showManualSubModal.school_id ? {
+          ...s,
+          subscription_start: start,
+          subscription_end: end,
+          days_remaining: remDays,
+          status: status === 'Expired' ? 'Inactive' : 'Active'
+        } : s));
+        
+        setSuperAuditLogs([
+          {
+            id: Date.now(),
+            action: manualSubForm.action_type + (manualSubForm.action_type === 'Activate' ? 'd' : 'ed'),
+            performed_by: 'Super Admin',
+            school_name: showManualSubModal.school_name,
+            plan_name: planName,
+            created_at: new Date().toISOString().replace('T', ' ').substring(0, 19)
+          },
+          ...superAuditLogs
+        ]);
+        
+        showToast('Subscription manual update processed (Sandbox Mode)', 'success');
+        setShowManualSubModal(null);
+        setIsSavingSub(false);
+        return;
+      }
+      
+      const payload = {
+        school_id: showManualSubModal.school_id,
+        plan_id: manualSubForm.plan_id ? parseInt(manualSubForm.plan_id) : null,
+        action_type: manualSubForm.action_type,
+        start_date: manualSubForm.start_date || null,
+        expiry_date: manualSubForm.expiry_date || null
+      };
+      
+      const res = await fetch('/api/super-admin/subscriptions/activate', {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify(payload)
+      });
+      
+      if (res.ok) {
+        showToast('Subscription manually updated successfully.', 'success');
+        setShowManualSubModal(null);
+        await fetchSuperAdminData();
+      } else {
+        const errData = await res.json();
+        showToast(errData.detail || 'Failed to update subscription.', 'error');
+      }
+    } catch (err) {
+      showToast('Network error updating subscription.', 'error');
+    } finally {
+      setIsSavingSub(false);
     }
   };
 
@@ -2704,7 +5234,7 @@ export default function App() {
       const verifyRes = await fetch('/api/auth/verify-password', {
         method: 'POST',
         headers: getHeaders(),
-        body: JSON.stringify({ password: deletePassword })
+        body: JSON.stringify({ password: sha256Sync(deletePassword) })
       });
       if (verifyRes.ok) {
         verified = true;
@@ -2722,7 +5252,7 @@ export default function App() {
       } else {
         const savedUsers = JSON.parse(localStorage.getItem('bn_mock_users') || '[]');
         const matched = savedUsers.find(u => u.email.toLowerCase() === email);
-        verified = matched && matched.password === deletePassword;
+        verified = matched && verifyLocalPassword(deletePassword, matched.password);
       }
       
       if (!verified) {
@@ -2869,6 +5399,102 @@ export default function App() {
       setClasses(updated);
       localStorage.setItem(`bn_sandbox_classes_${keySuffix}`, JSON.stringify(updated));
       showToast('Classroom created (Sandbox Mode)', 'success');
+    }
+  };
+
+  const handleDeleteClass = async (classId) => {
+    if (!classId) return;
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      const updatedClasses = classes.filter(c => c.id !== classId);
+      setClasses(updatedClasses);
+      localStorage.setItem(`bn_sandbox_classes_${keySuffix}`, JSON.stringify(updatedClasses));
+      
+      const studentList = JSON.parse(localStorage.getItem(`bn_sandbox_students_${keySuffix}`) || '[]');
+      const remainingStudents = studentList.filter(s => s.class_id !== classId);
+      localStorage.setItem(`bn_sandbox_students_${keySuffix}`, JSON.stringify(remainingStudents));
+      
+      const studentsToDelete = studentList.filter(s => s.class_id === classId);
+      studentsToDelete.forEach(st => {
+        const studentFeesKey = `bn_sandbox_fees_${keySuffix}_${st.id}_${activeYearId}`;
+        localStorage.removeItem(studentFeesKey);
+      });
+      
+      const structureStorageKey = `bn_sandbox_class_fees_${keySuffix}_${classId}_${activeYearId}`;
+      localStorage.removeItem(structureStorageKey);
+
+      if (selectedClassId === classId) setSelectedClassId(null);
+      if (selectedFeesClassId === classId) setSelectedFeesClassId(null);
+      if (selectedFeeClassId === classId) {
+        setSelectedFeeClassId('');
+        setClassFeeStructure(null);
+      }
+
+      await fetchERPData();
+      showToast('Classroom and associated data deleted successfully (Sandbox Mode)', 'success');
+      return;
+    }
+    try {
+      const res = await fetch(`/api/classes/${classId}`, {
+        method: 'DELETE',
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        if (selectedClassId === classId) setSelectedClassId(null);
+        if (selectedFeesClassId === classId) setSelectedFeesClassId(null);
+        if (selectedFeeClassId === classId) {
+          setSelectedFeeClassId('');
+          setClassFeeStructure(null);
+        }
+        await fetchERPData();
+        showToast('Classroom and associated data deleted successfully', 'success');
+      } else {
+        const err = await res.json().catch(() => ({}));
+        showToast(err.detail || 'Failed to delete classroom', 'danger');
+      }
+    } catch (err) {
+      showToast('Failed to delete classroom', 'danger');
+    }
+  };
+
+  const handleUpdateClass = async (classId, name) => {
+    if (!name) return;
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      const updated = classes.map(c => {
+        if (c.id === classId) {
+          return { ...c, name };
+        }
+        return c;
+      });
+      setClasses(updated);
+      localStorage.setItem(`bn_sandbox_classes_${keySuffix}`, JSON.stringify(updated));
+      showToast('Classroom updated (Sandbox Mode)', 'success');
+      return;
+    }
+    try {
+      const res = await fetch(`/api/classes/${classId}`, {
+        method: 'PUT',
+        headers: getHeaders(),
+        body: JSON.stringify({ name })
+      });
+      if (res.ok) {
+        await fetchERPData();
+        showToast('Classroom updated successfully', 'success');
+      } else {
+        const err = await res.json();
+        showToast(err.detail || 'Failed to update classroom', 'danger');
+      }
+    } catch (err) {
+      const updated = classes.map(c => {
+        if (c.id === classId) {
+          return { ...c, name };
+        }
+        return c;
+      });
+      setClasses(updated);
+      localStorage.setItem(`bn_sandbox_classes_${keySuffix}`, JSON.stringify(updated));
+      showToast('Classroom updated (Sandbox Mode)', 'success');
     }
   };
 
@@ -3061,7 +5687,6 @@ export default function App() {
       return;
     }
     if (tForm.pan_number && !/^[A-Z]{5}\d{4}[A-Z]{1}$/.test(tForm.pan_number.toUpperCase())) {
-      alert("PAN Number must match standard format (e.g. ABCDE1234F).");
       return;
     }
 
@@ -3113,7 +5738,7 @@ export default function App() {
     }
 
     if (token.includes('mock') || !isConnected) {
-      const newT = { id: teachers.length + 1, ...finalForm, status: "Active", profile_image: finalForm.profile_image || "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150" };
+      const newT = { id: teachers.length + 1, ...finalForm, status: "Active", profile_image: finalForm.profile_image || '' };
       const updated = [...teachers, newT];
       setTeachers(updated);
       localStorage.setItem(`bn_sandbox_teachers_${keySuffix}`, JSON.stringify(updated));
@@ -3275,7 +5900,9 @@ export default function App() {
     }
     setSErrors({});
 
-    const payload = { ...sForm, academic_year_id: activeYearId };
+    const finalExitDate = sForm.exit_date && sForm.exit_date.trim() !== '' ? sForm.exit_date.trim() : null;
+    const finalStatus = finalExitDate ? 'Inactive' : 'Active';
+    const payload = { ...sForm, exit_date: finalExitDate, status: finalStatus, academic_year_id: activeYearId };
     const keySuffix = schoolId || 'default';
 
     setIsSavingStudent(true);
@@ -3287,7 +5914,7 @@ export default function App() {
       }
       setTimeout(() => {
         if (editingStudent) {
-          const updatedStud = { ...editingStudent, ...sForm };
+          const updatedStud = { ...editingStudent, ...sForm, exit_date: finalExitDate, status: finalStatus };
           const updated = students.map(s => s.id === editingStudent.id ? updatedStud : s);
           setStudents(updated);
           localStorage.setItem(`bn_sandbox_students_${keySuffix}`, JSON.stringify(updated));
@@ -3300,7 +5927,8 @@ export default function App() {
           const newS = { 
             id: students.length + 1, 
             ...sForm, 
-            status: "Active", 
+            exit_date: finalExitDate,
+            status: finalStatus,
             academic_year_id: activeYearId
           };
           const updated = [...students, newS];
@@ -3361,6 +5989,7 @@ export default function App() {
           nationality: 'Indian',
           caste: '',
           profile_image: '',
+          exit_date: '',
           documents: []
         });
         showToast(editingStudent ? 'Student Updated Successfully' : 'Student Added Successfully', 'success');
@@ -3381,7 +6010,7 @@ export default function App() {
       }
       setTimeout(() => {
         if (editingStudent) {
-          const updatedStud = { ...editingStudent, ...sForm };
+          const updatedStud = { ...editingStudent, ...sForm, exit_date: finalExitDate, status: finalStatus };
           const updated = students.map(s => s.id === editingStudent.id ? updatedStud : s);
           setStudents(updated);
           localStorage.setItem(`bn_sandbox_students_${keySuffix}`, JSON.stringify(updated));
@@ -3394,7 +6023,8 @@ export default function App() {
           const newS = { 
             id: students.length + 1, 
             ...sForm, 
-            status: "Active", 
+            exit_date: finalExitDate,
+            status: finalStatus,
             academic_year_id: activeYearId
           };
           const updated = [...students, newS];
@@ -3483,7 +6113,9 @@ export default function App() {
     }
   };
 
-  const fetchStudentFeesRecords = async (studentId) => {
+  const fetchStudentFeesRecords = async (studentId, studentClassId = null) => {
+    setSelectedMonthsForPayment([]);
+    fetchCarryForwardDues(studentId);
     const keySuffix = schoolId || 'default';
     const activeYear = years.find(y => y.id === activeYearId);
     const range = activeYear ? activeYear.year_range : '2025-2026';
@@ -3491,22 +6123,37 @@ export default function App() {
     const startYear = parseInt(startYearStr) || 2025;
     const endYear = parseInt(endYearStr) || 2026;
 
+    const stud = students.find(s => parseInt(s.id) === parseInt(studentId)) || selectedStudent;
+    const classId = studentClassId || stud?.class_id || selectedStudent?.class_id || '';
+
     if (token.includes('mock') || !isConnected) {
+      if (!classId) {
+        setIsFeeStructureConfigured(true);
+        setStudentFees([]);
+        return;
+      }
+      const sandboxClassFeesKey = `bn_sandbox_class_fees_${keySuffix}_${classId}_${activeYearId}`;
+      const storedClassFees = localStorage.getItem(sandboxClassFeesKey);
+      
+      const isConfig = !!storedClassFees;
+      setIsFeeStructureConfigured(isConfig);
+
       const storageKey = `bn_sandbox_fees_${keySuffix}_${studentId}_${activeYearId}`;
       const stored = localStorage.getItem(storageKey);
+      
+      const months = ["April", "May", "June", "July", "August", "September", "October", "November", "December", "January", "February", "March"];
+      
       if (stored) {
-        setStudentFees(JSON.parse(stored));
+        const parsed = JSON.parse(stored);
+        if (!isConfig) {
+          setStudentFees(parsed.map(fee => ({ ...fee, amount: 0.00 })));
+        } else {
+          setStudentFees(parsed);
+        }
         return;
       }
 
-      const months = ["April", "May", "June", "July", "August", "September", "October", "November", "December", "January", "February", "March"];
-      const classId = selectedStudent?.class_id || '';
-      const sandboxClassFeesKey = `bn_sandbox_class_fees_${keySuffix}_${classId}_${activeYearId}`;
-      const storedClassFees = localStorage.getItem(sandboxClassFeesKey);
-      const feeStructure = storedClassFees ? JSON.parse(storedClassFees) : {
-        April: 150, May: 150, June: 150, July: 150, August: 150, September: 150,
-        October: 150, November: 150, December: 150, January: 150, February: 150, March: 150
-      };
+      const feeStructure = isConfig ? JSON.parse(storedClassFees) : {};
       const defaultFees = months.map((m, i) => {
         const year = i < 9 ? startYear : endYear;
         const monthNum = i < 9 ? i + 4 : i - 8;
@@ -3514,7 +6161,7 @@ export default function App() {
           id: i + 1,
           student_id: studentId,
           month: m,
-          amount: parseFloat(feeStructure[m]) || 150.00,
+          amount: isConfig ? (parseFloat(feeStructure[m]) || 0.00) : 0.00,
           status: "Pending",
           due_date: `${year}-${String(monthNum).padStart(2, '0')}-15`,
           payment_date: null
@@ -3526,27 +6173,58 @@ export default function App() {
     }
 
     try {
+      let isConfig = true;
+      if (classId) {
+        const cfRes = await fetch(`/api/class-fees?class_id=${classId}&academic_year_id=${activeYearId}`, { headers: getHeaders() });
+        if (cfRes.ok) {
+          const cfData = await cfRes.json();
+          if (cfData.is_configured === false) {
+            isConfig = false;
+          }
+        }
+      }
+
+      setIsFeeStructureConfigured(isConfig);
       const res = await fetch(`/api/students/${studentId}/fees?academic_year_id=${activeYearId}`, { headers: getHeaders() });
       if (res.ok) {
-        setStudentFees(await res.json());
+        const data = await res.json();
+        if (!isConfig) {
+          setStudentFees(data.map(fee => ({ ...fee, amount: 0.00 })));
+        } else {
+          setStudentFees(data);
+        }
       } else {
         throw new Error("Failed to fetch fee records");
       }
     } catch (err) {
+      let isConfig = true;
+      if (classId) {
+        const sandboxClassFeesKey = `bn_sandbox_class_fees_${keySuffix}_${classId}_${activeYearId}`;
+        const storedClassFees = localStorage.getItem(sandboxClassFeesKey);
+        if (!storedClassFees) {
+          isConfig = false;
+        }
+      }
+      setIsFeeStructureConfigured(isConfig);
+      
       const storageKey = `bn_sandbox_fees_${keySuffix}_${studentId}_${activeYearId}`;
       const stored = localStorage.getItem(storageKey);
+      
+      const months = ["April", "May", "June", "July", "August", "September", "October", "November", "December", "January", "February", "March"];
+      
       if (stored) {
-        setStudentFees(JSON.parse(stored));
+        const parsed = JSON.parse(stored);
+        if (!isConfig) {
+          setStudentFees(parsed.map(fee => ({ ...fee, amount: 0.00 })));
+        } else {
+          setStudentFees(parsed);
+        }
         return;
       }
-      const months = ["April", "May", "June", "July", "August", "September", "October", "November", "December", "January", "February", "March"];
-      const classId = selectedStudent?.class_id || '';
-      const sandboxClassFeesKey = `bn_sandbox_class_fees_${keySuffix}_${classId}_${activeYearId}`;
-      const storedClassFees = localStorage.getItem(sandboxClassFeesKey);
-      const feeStructure = storedClassFees ? JSON.parse(storedClassFees) : {
-        April: 150, May: 150, June: 150, July: 150, August: 150, September: 150,
-        October: 150, November: 150, December: 150, January: 150, February: 150, March: 150
-      };
+      
+      const sandboxClassFeesKey = classId ? `bn_sandbox_class_fees_${keySuffix}_${classId}_${activeYearId}` : '';
+      const storedClassFees = sandboxClassFeesKey ? localStorage.getItem(sandboxClassFeesKey) : null;
+      const feeStructure = (isConfig && storedClassFees) ? JSON.parse(storedClassFees) : {};
       const defaultFees = months.map((m, i) => {
         const year = i < 9 ? startYear : endYear;
         const monthNum = i < 9 ? i + 4 : i - 8;
@@ -3554,7 +6232,7 @@ export default function App() {
           id: i + 1,
           student_id: studentId,
           month: m,
-          amount: parseFloat(feeStructure[m]) || 150.00,
+          amount: isConfig ? (parseFloat(feeStructure[m]) || 0.00) : 0.00,
           status: "Pending",
           due_date: `${year}-${String(monthNum).padStart(2, '0')}-15`,
           payment_date: null
@@ -3565,12 +6243,954 @@ export default function App() {
     }
   };
 
+  const fetchCarryForwardDues = async (studentId) => {
+    setIsFetchingCarryForwardDues(true);
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      const stored = localStorage.getItem(`bn_sandbox_carry_forward_dues_${keySuffix}`) || '[]';
+      const allDues = JSON.parse(stored);
+      const studentDues = allDues.filter(d => parseInt(d.student_id) === parseInt(studentId));
+      setStudentCarryForwardDues(studentDues);
+      setIsFetchingCarryForwardDues(false);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/students/${studentId}/carry-forward-dues`, { headers: getHeaders() });
+      if (res.ok) {
+        setStudentCarryForwardDues(await res.json());
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsFetchingCarryForwardDues(false);
+    }
+  };
+
+  const fetchPreviousYearRecoveries = async () => {
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      const stored = localStorage.getItem(`bn_sandbox_previous_year_recoveries_${keySuffix}`) || '[]';
+      const allRecs = JSON.parse(stored);
+      const activeYear = years.find(y => y.id === activeYearId);
+      
+      const storedDuesKey = `bn_sandbox_carry_forward_dues_${keySuffix}`;
+      const allDues = JSON.parse(localStorage.getItem(storedDuesKey) || '[]');
+      
+      const filtered = allRecs.filter(r => {
+        return parseInt(r.academic_year_id) === parseInt(activeYearId);
+      });
+      
+      const mapped = filtered.map(r => {
+        const stud = students.find(s => parseInt(s.id) === parseInt(r.student_id));
+        const due = allDues.find(d => parseInt(d.id) === parseInt(r.carry_forward_due_id));
+        
+        let origClassId = stud ? stud.class_id : null;
+        if (stud && due && parseInt(stud.academic_year_id) !== parseInt(due.original_academic_year_id)) {
+          const origStud = students.find(s => 
+            s.name === stud.name && 
+            s.roll_number === stud.roll_number && 
+            parseInt(s.academic_year_id) === parseInt(due.original_academic_year_id)
+          );
+          if (origStud) {
+            origClassId = origStud.class_id;
+          }
+        }
+        
+        return {
+          ...r,
+          class_name: origClassId ? getClassName(origClassId) : r.class_name
+        };
+      });
+      setPreviousYearRecoveries(mapped);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/finance/previous-dues-recoveries?academic_year_id=${activeYearId}`, { headers: getHeaders() });
+      if (res.ok) {
+        setPreviousYearRecoveries(await res.json());
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // --- Student Performance API / Mock Fetchers ---
+  
+  const fetchAttendance = async (classId, date, ayId, groupName) => {
+    if (!classId || !ayId) return;
+    setIsFetchingAttendance(true);
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      const storedStudents = localStorage.getItem(`bn_sandbox_students_${keySuffix}_${ayId}`) || '[]';
+      const allStuds = JSON.parse(storedStudents);
+      const filteredStuds = allStuds.filter(s => 
+        parseInt(s.class_id) === parseInt(classId) && 
+        s.status === 'Active' &&
+        (groupName === 'all' || !groupName || s.group_name === groupName)
+      );
+      
+      const storedAtt = localStorage.getItem(`bn_sandbox_attendance_${keySuffix}_${ayId}`) || '[]';
+      const attList = JSON.parse(storedAtt);
+      const attMap = {};
+      attList.forEach(a => {
+        if (a.attendance_date === date) {
+          attMap[parseInt(a.student_id)] = a.status;
+        }
+      });
+      
+      const result = filteredStuds.map(s => ({
+        id: s.id,
+        name: s.name,
+        roll_number: s.roll_number,
+        group_name: s.group_name,
+        status: attMap[parseInt(s.id)] ?? null
+      })).sort((a, b) => {
+        const rA = parseInt(a.roll_number) || 0;
+        const rB = parseInt(b.roll_number) || 0;
+        return rA - rB || a.name.localeCompare(b.name);
+      });
+      
+      setAttendanceStudents(result);
+      setIsFetchingAttendance(false);
+      return;
+    }
+    
+    try {
+      const res = await fetch(`/api/attendance?class_id=${classId}&date=${date}&academic_year_id=${ayId}&group_name=${groupName}`, {
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        setAttendanceStudents(await res.json());
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Error fetching attendance list.", "error");
+    } finally {
+      setIsFetchingAttendance(false);
+    }
+  };
+
+  const saveAttendanceBulk = async (classId, date, ayId, studentsList) => {
+    setIsSavingAttendance(true);
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      const storedAtt = localStorage.getItem(`bn_sandbox_attendance_${keySuffix}_${ayId}`) || '[]';
+      const attList = JSON.parse(storedAtt);
+      
+      studentsList.forEach(item => {
+        const idx = attList.findIndex(a => parseInt(a.student_id) === parseInt(item.student_id) && a.attendance_date === date);
+        if (idx !== -1) {
+          attList[idx].status = item.status;
+        } else {
+          attList.push({
+            id: attList.length + 1,
+            school_id: schoolId || 1,
+            academic_year_id: ayId,
+            class_id: classId,
+            student_id: item.student_id,
+            attendance_date: date,
+            status: item.status
+          });
+        }
+      });
+      
+      localStorage.setItem(`bn_sandbox_attendance_${keySuffix}_${ayId}`, JSON.stringify(attList));
+      setIsSavingAttendance(false);
+      showToast("Attendance saved successfully (Sandbox Mode)", "success");
+      fetchAttendance(classId, date, ayId, attendanceGroupName);
+      return;
+    }
+    
+    try {
+      const res = await fetch(`/api/attendance/bulk`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          class_id: classId,
+          academic_year_id: ayId,
+          date,
+          students: studentsList
+        })
+      });
+      if (res.ok) {
+        showToast("Attendance saved successfully.", "success");
+        fetchAttendance(classId, date, ayId, attendanceGroupName);
+      } else {
+        const d = await res.json();
+        showToast(d.detail || "Failed to save attendance.", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Network error saving attendance.", "error");
+    } finally {
+      setIsSavingAttendance(false);
+    }
+  };
+
+  const fetchAttendanceReport = async (classId, month, ayId, groupName) => {
+    if (!classId || !ayId) return;
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      const storedStudents = localStorage.getItem(`bn_sandbox_students_${keySuffix}_${ayId}`) || '[]';
+      const allStuds = JSON.parse(storedStudents);
+      const filteredStuds = allStuds.filter(s => 
+        parseInt(s.class_id) === parseInt(classId) && 
+        s.status === 'Active' &&
+        (groupName === 'all' || !groupName || s.group_name === groupName)
+      );
+      
+      const storedAtt = localStorage.getItem(`bn_sandbox_attendance_${keySuffix}_${ayId}`) || '[]';
+      const attList = JSON.parse(storedAtt);
+      
+      const result = filteredStuds.map(s => {
+        const studentAtt = attList.filter(a => 
+          parseInt(a.student_id) === parseInt(s.id) && 
+          a.attendance_date.startsWith(month)
+        );
+        const present = studentAtt.filter(a => a.status === 'Present').length;
+        const absent = studentAtt.filter(a => a.status === 'Absent').length;
+        const leave = studentAtt.filter(a => a.status === 'Leave').length;
+        const total = present + absent + leave;
+        const percentage = total > 0 ? roundDecimal((present / total) * 100, 1) : 0;
+        
+        return {
+          id: s.id,
+          name: s.name,
+          roll_number: s.roll_number,
+          group_name: s.group_name,
+          present,
+          absent,
+          leave,
+          percentage
+        };
+      }).sort((a, b) => (parseInt(a.roll_number) || 0) - (parseInt(b.roll_number) || 0) || a.name.localeCompare(b.name));
+      
+      setAttendanceReportData(result);
+      return;
+    }
+    
+    try {
+      const res = await fetch(`/api/attendance/report/monthly?class_id=${classId}&month=${month}&academic_year_id=${ayId}&group_name=${groupName}`, {
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        setAttendanceReportData(await res.json());
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchStudentAttendanceAnalytics = async (studentId, ayId) => {
+    if (!studentId || !ayId) return;
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      const storedAtt = localStorage.getItem(`bn_sandbox_attendance_${keySuffix}_${ayId}`) || '[]';
+      const attList = JSON.parse(storedAtt);
+      const studentAtt = attList.filter(a => parseInt(a.student_id) === parseInt(studentId));
+      const present = studentAtt.filter(a => a.status === 'Present').length;
+      const absent = studentAtt.filter(a => a.status === 'Absent').length;
+      const leave = studentAtt.filter(a => a.status === 'Leave').length;
+      const total = present + absent + leave;
+      const percentage = total > 0 ? roundDecimal((present / total) * 100, 1) : 0;
+      setAttendanceAnalytics({ present, absent, leave, total, percentage });
+      return;
+    }
+    
+    try {
+      const res = await fetch(`/api/attendance/analytics/student/${studentId}?academic_year_id=${ayId}`, {
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        setAttendanceAnalytics(await res.json());
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchExams = async (ayId, classId = 0) => {
+    if (!ayId) return;
+    setIsFetchingExams(true);
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      const storedExams = localStorage.getItem(`bn_sandbox_exams_${keySuffix}_${ayId}`) || '[]';
+      let list = JSON.parse(storedExams);
+      if (classId > 0) {
+        list = list.filter(e => parseInt(e.class_id) === parseInt(classId));
+      }
+      setExamsList(list);
+      setIsFetchingExams(false);
+      return;
+    }
+    
+    try {
+      const res = await fetch(`/api/exams?academic_year_id=${ayId}&class_id=${classId}`, {
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        setExamsList(await res.json());
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsFetchingExams(false);
+    }
+  };
+
+  const createExam = async (examData) => {
+    setIsSavingExam(true);
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      const storedExams = localStorage.getItem(`bn_sandbox_exams_${keySuffix}_${activeYearId}`) || '[]';
+      const list = JSON.parse(storedExams);
+      const newExam = {
+        id: list.length + 1,
+        school_id: schoolId || 1,
+        academic_year_id: activeYearId,
+        class_id: parseInt(examData.class_id),
+        class_name: getClassName(examData.class_id),
+        group_name: examData.group_name || null,
+        name: examData.name,
+        start_date: examData.start_date,
+        end_date: examData.end_date,
+        subjects: examData.subjects
+      };
+      list.push(newExam);
+      localStorage.setItem(`bn_sandbox_exams_${keySuffix}_${activeYearId}`, JSON.stringify(list));
+      setIsSavingExam(false);
+      showToast("Exam created successfully (Sandbox)", "success");
+      setShowCreateExamModal(false);
+      fetchExams(activeYearId);
+      return;
+    }
+    
+    try {
+      const res = await fetch(`/api/exams`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          ...examData,
+          academic_year_id: activeYearId
+        })
+      });
+      if (res.ok) {
+        showToast("Exam created successfully.", "success");
+        setShowCreateExamModal(false);
+        fetchExams(activeYearId);
+      } else {
+        const d = await res.json();
+        showToast(d.detail || "Failed to create exam.", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Network error creating exam.", "error");
+    } finally {
+      setIsSavingExam(false);
+    }
+  };
+
+  const deleteExam = async (examId) => {
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      const storedExams = localStorage.getItem(`bn_sandbox_exams_${keySuffix}_${activeYearId}`) || '[]';
+      let list = JSON.parse(storedExams);
+      list = list.filter(e => parseInt(e.id) !== parseInt(examId));
+      localStorage.setItem(`bn_sandbox_exams_${keySuffix}_${activeYearId}`, JSON.stringify(list));
+      showToast("Exam deleted (Sandbox)", "success");
+      if (selectedExam && parseInt(selectedExam.id) === parseInt(examId)) {
+        setSelectedExam(null);
+      }
+      fetchExams(activeYearId);
+      return;
+    }
+    
+    try {
+      const res = await fetch(`/api/exams/${examId}`, {
+        method: 'DELETE',
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        showToast("Exam deleted successfully.", "success");
+        if (selectedExam && parseInt(selectedExam.id) === parseInt(examId)) {
+          setSelectedExam(null);
+        }
+        fetchExams(activeYearId);
+      } else {
+        showToast("Failed to delete exam.", "error");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchExamMarks = async (exam) => {
+    if (!exam) return;
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      const storedStudents = localStorage.getItem(`bn_sandbox_students_${keySuffix}_${activeYearId}`) || '[]';
+      const allStuds = JSON.parse(storedStudents);
+      const studentsInClass = allStuds.filter(s => 
+        parseInt(s.class_id) === parseInt(exam.class_id) && 
+        s.status === 'Active' &&
+        (!exam.group_name || s.group_name === exam.group_name)
+      );
+      
+      const storedMarks = localStorage.getItem(`bn_sandbox_exam_marks_${keySuffix}_${activeYearId}`) || '[]';
+      const marksList = JSON.parse(storedMarks);
+      const marksMap = {};
+      marksList.forEach(m => {
+        if (parseInt(m.exam_id) === parseInt(exam.id)) {
+          const sid = parseInt(m.student_id);
+          if (!marksMap[sid]) marksMap[sid] = {};
+          marksMap[sid][m.subject_name] = parseFloat(m.marks_obtained);
+        }
+      });
+      
+      const result = studentsInClass.map(s => ({
+        student_id: s.id,
+        name: s.name,
+        roll_number: s.roll_number,
+        group_name: s.group_name,
+        marks: marksMap[parseInt(s.id)] ?? {}
+      })).sort((a, b) => (parseInt(a.roll_number) || 0) - (parseInt(b.roll_number) || 0) || a.name.localeCompare(b.name));
+      
+      setExamMarks(result);
+      return;
+    }
+    
+    try {
+      const res = await fetch(`/api/exams/${exam.id}/marks`, {
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        setExamMarks(await res.json());
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const saveExamMarksBulk = async (examId, marksPayload) => {
+    setMarksSaveStatus('saving');
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      const storedMarks = localStorage.getItem(`bn_sandbox_exam_marks_${keySuffix}_${activeYearId}`) || '[]';
+      const list = JSON.parse(storedMarks);
+      
+      marksPayload.forEach(item => {
+        const idx = list.findIndex(m => 
+          parseInt(m.exam_id) === parseInt(examId) && 
+          parseInt(m.student_id) === parseInt(item.student_id) && 
+          m.subject_name === item.subject_name
+        );
+        if (idx !== -1) {
+          list[idx].marks_obtained = parseFloat(item.marks_obtained);
+        } else {
+          list.push({
+            id: list.length + 1,
+            exam_id: examId,
+            student_id: item.student_id,
+            subject_name: item.subject_name,
+            marks_obtained: parseFloat(item.marks_obtained)
+          });
+        }
+      });
+      
+      localStorage.setItem(`bn_sandbox_exam_marks_${keySuffix}_${activeYearId}`, JSON.stringify(list));
+      setMarksSaveStatus('saved');
+      setTimeout(() => setMarksSaveStatus(''), 2000);
+      return;
+    }
+    
+    try {
+      const res = await fetch(`/api/exams/${examId}/marks`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ marks: marksPayload })
+      });
+      if (res.ok) {
+        setMarksSaveStatus('saved');
+        setTimeout(() => setMarksSaveStatus(''), 2000);
+      } else {
+        setMarksSaveStatus('');
+        showToast("Failed to auto-save marks.", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      setMarksSaveStatus('');
+    }
+  };
+
+  const fetchSchoolSignatures = async () => {
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      const stored = localStorage.getItem(`bn_sandbox_signatures_${keySuffix}`);
+      if (stored) {
+        setSchoolSignatures(JSON.parse(stored));
+      } else {
+        setSchoolSignatures({ teacher_signature: null, class_teacher_signature: null, principal_signature: null });
+      }
+      return;
+    }
+    
+    try {
+      const res = await fetch(`/api/school/signatures`, { headers: getHeaders() });
+      if (res.ok) {
+        setSchoolSignatures(await res.json());
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const saveSchoolSignatures = async (sigs) => {
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      localStorage.setItem(`bn_sandbox_signatures_${keySuffix}`, JSON.stringify(sigs));
+      setSchoolSignatures(sigs);
+      showToast("Signatures saved successfully (Sandbox)", "success");
+      return;
+    }
+    
+    try {
+      const res = await fetch(`/api/school/signatures`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify(sigs)
+      });
+      if (res.ok) {
+        showToast("Signatures saved successfully.", "success");
+        setSchoolSignatures(sigs);
+      } else {
+        showToast("Failed to save signatures.", "error");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchGradingScales = async () => {
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      const stored = localStorage.getItem(`bn_sandbox_grading_scales_${keySuffix}`);
+      if (stored) {
+        setGradingScales(JSON.parse(stored));
+      }
+      return;
+    }
+    
+    try {
+      const res = await fetch(`/api/school/grading-scales`, { headers: getHeaders() });
+      if (res.ok) {
+        setGradingScales(await res.json());
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const saveGradingScales = async (scales) => {
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      localStorage.setItem(`bn_sandbox_grading_scales_${keySuffix}`, JSON.stringify(scales));
+      setGradingScales(scales);
+      showToast("Grading scales updated (Sandbox)", "success");
+      return;
+    }
+    
+    try {
+      const res = await fetch(`/api/school/grading-scales`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ scales })
+      });
+      if (res.ok) {
+        showToast("Grading scales updated successfully.", "success");
+        setGradingScales(scales);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchReportCardRemarks = async (examId) => {
+    if (!examId) return;
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      const stored = localStorage.getItem(`bn_sandbox_remarks_${keySuffix}_${activeYearId}`) || '[]';
+      const list = JSON.parse(stored);
+      const remarksMap = {};
+      list.forEach(r => {
+        if (parseInt(r.exam_id) === parseInt(examId)) {
+          remarksMap[parseInt(r.student_id)] = r.remarks;
+        }
+      });
+      setReportCardRemarks(remarksMap);
+      return;
+    }
+    
+    try {
+      const res = await fetch(`/api/exams/${examId}/remarks`, { headers: getHeaders() });
+      if (res.ok) {
+        const rows = await res.json();
+        const remarksMap = {};
+        rows.forEach(r => {
+          remarksMap[parseInt(r.student_id)] = r.remarks;
+        });
+        setReportCardRemarks(remarksMap);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const saveStudentRemarks = async (examId, remarksPayload) => {
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      const stored = localStorage.getItem(`bn_sandbox_remarks_${keySuffix}_${activeYearId}`) || '[]';
+      const list = JSON.parse(stored);
+      
+      remarksPayload.forEach(item => {
+        const idx = list.findIndex(r => parseInt(r.exam_id) === parseInt(examId) && parseInt(r.student_id) === parseInt(item.student_id));
+        if (idx !== -1) {
+          list[idx].remarks = item.remarks;
+        } else {
+          list.push({
+            id: list.length + 1,
+            school_id: schoolId || 1,
+            academic_year_id: activeYearId,
+            exam_id: examId,
+            student_id: item.student_id,
+            remarks: item.remarks
+          });
+        }
+      });
+      
+      localStorage.setItem(`bn_sandbox_remarks_${keySuffix}_${activeYearId}`, JSON.stringify(list));
+      showToast("Remarks saved (Sandbox)", "success");
+      fetchReportCardRemarks(examId);
+      return;
+    }
+    
+    try {
+      const res = await fetch(`/api/exams/${examId}/remarks`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ remarks: remarksPayload })
+      });
+      if (res.ok) {
+        showToast("Remarks saved successfully.", "success");
+        fetchReportCardRemarks(examId);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const roundDecimal = (num, decimals) => {
+    const t = Math.pow(10, decimals);
+    return Math.round((num + Number.EPSILON) * t) / t;
+  };
+
+  const fetchStudentPerformanceSummary = async (studentId, ayId) => {
+    if (!studentId || !ayId) return;
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      const storedStudents = localStorage.getItem(`bn_sandbox_students_${keySuffix}_${ayId}`) || '[]';
+      const allStuds = JSON.parse(storedStudents);
+      const stud = allStuds.find(s => parseInt(s.id) === parseInt(studentId));
+      if (!stud) return;
+      
+      const storedAtt = localStorage.getItem(`bn_sandbox_attendance_${keySuffix}_${ayId}`) || '[]';
+      const attList = JSON.parse(storedAtt);
+      const studentAtt = attList.filter(a => parseInt(a.student_id) === parseInt(studentId));
+      const present = studentAtt.filter(a => a.status === 'Present').length;
+      const absent = studentAtt.filter(a => a.status === 'Absent').length;
+      const leave = studentAtt.filter(a => a.status === 'Leave').length;
+      const total = present + absent + leave;
+      const percentage = total > 0 ? roundDecimal((present / total) * 100, 1) : 0;
+      
+      const storedExams = localStorage.getItem(`bn_sandbox_exams_${keySuffix}_${ayId}`) || '[]';
+      const examsListLocal = JSON.parse(storedExams);
+      const studentExams = examsListLocal.filter(e => parseInt(e.class_id) === parseInt(stud.class_id));
+      
+      const storedMarks = localStorage.getItem(`bn_sandbox_exam_marks_${keySuffix}_${ayId}`) || '[]';
+      const marksList = JSON.parse(storedMarks);
+      
+      const examsData = studentExams.map(exam => {
+        const marksMap = {};
+        marksList.forEach(m => {
+          if (parseInt(m.exam_id) === parseInt(exam.id) && parseInt(m.student_id) === parseInt(studentId)) {
+            marksMap[m.subject_name] = parseFloat(m.marks_obtained);
+          }
+        });
+        
+        const storedRemarks = localStorage.getItem(`bn_sandbox_remarks_${keySuffix}_${ayId}`) || '[]';
+        const remarksList = JSON.parse(storedRemarks);
+        const remRecord = remarksList.find(r => parseInt(r.exam_id) === parseInt(exam.id) && parseInt(r.student_id) === parseInt(studentId));
+        
+        const examMarksForClass = allStuds.filter(s => parseInt(s.class_id) === parseInt(exam.class_id)).map(s => {
+          const sMarks = marksList.filter(m => parseInt(m.exam_id) === parseInt(exam.id) && parseInt(m.student_id) === parseInt(s.id));
+          const tot = sMarks.reduce((sum, m) => sum + parseFloat(m.marks_obtained), 0);
+          return { student_id: s.id, tot };
+        }).sort((a, b) => b.tot - a.tot);
+        const rankIdx = examMarksForClass.findIndex(x => parseInt(x.student_id) === parseInt(studentId));
+        const rank = rankIdx !== -1 ? rankIdx + 1 : '-';
+        
+        return {
+          id: exam.id,
+          name: exam.name,
+          start_date: exam.start_date,
+          end_date: exam.end_date,
+          subjects: exam.subjects,
+          marks: marksMap,
+          rank,
+          remarks: remRecord ? remRecord.remarks : ''
+        };
+      });
+      
+      const storedSigs = localStorage.getItem(`bn_sandbox_signatures_${keySuffix}`);
+      const signatures = storedSigs ? JSON.parse(storedSigs) : { teacher_signature: null, class_teacher_signature: null, principal_signature: null };
+      
+      const storedScales = localStorage.getItem(`bn_sandbox_grading_scales_${keySuffix}`);
+      const scales = storedScales ? JSON.parse(storedScales) : gradingScales;
+      
+      setStudentPerformanceSummary({
+        student_id: studentId,
+        name: stud.name,
+        roll_number: stud.roll_number,
+        class_id: stud.class_id,
+        group_name: stud.group_name,
+        attendance: { present, absent, leave, total, percentage },
+        exams: examsData,
+        signatures,
+        grading_scales: scales
+      });
+      return;
+    }
+    
+    try {
+      const res = await fetch(`/api/students/${studentId}/performance-summary?academic_year_id=${ayId}`, {
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        setStudentPerformanceSummary(await res.json());
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchPreviousDues = async () => {
+    setIsFetchingPreviousDues(true);
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      const storedCFDues = localStorage.getItem(`bn_sandbox_carry_forward_dues_${keySuffix}`) || '[]';
+      const allDues = JSON.parse(storedCFDues);
+      const filtered = allDues.filter(d => parseInt(d.original_academic_year_id) < parseInt(activeYearId));
+      const mapped = filtered.map(d => {
+        const stud = students.find(s => parseInt(s.id) === parseInt(d.student_id));
+        const activeYear = years.find(y => y.id === d.original_academic_year_id);
+        
+        let origClassId = stud ? stud.class_id : null;
+        if (stud && parseInt(stud.academic_year_id) !== parseInt(d.original_academic_year_id)) {
+          const origStud = students.find(s => 
+            s.name === stud.name && 
+            s.roll_number === stud.roll_number && 
+            parseInt(s.academic_year_id) === parseInt(d.original_academic_year_id)
+          );
+          if (origStud) {
+            origClassId = origStud.class_id;
+          }
+        }
+        
+        return {
+          ...d,
+          student_name: stud ? stud.name : 'Unknown Student',
+          class_name: origClassId ? getClassName(origClassId) : 'Unknown Class',
+          original_academic_year: activeYear ? activeYear.year_range : '2025-2026'
+        };
+      });
+      setPreviousDues(mapped);
+      setIsFetchingPreviousDues(false);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/finance/previous-dues?academic_year_id=${activeYearId}`, { headers: getHeaders() });
+      if (res.ok) {
+        setPreviousDues(await res.json());
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsFetchingPreviousDues(false);
+    }
+  };
+
+  const handlePayCarryForwardDue = async (studentId, dueId, amount, date) => {
+    setIsRecordingRecovery(true);
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      try {
+        const storedDuesKey = `bn_sandbox_carry_forward_dues_${keySuffix}`;
+        const allDues = JSON.parse(localStorage.getItem(storedDuesKey) || '[]');
+        const dueIndex = allDues.findIndex(d => parseInt(d.id) === parseInt(dueId));
+        if (dueIndex === -1) {
+          showToast("Due record not found.", "error");
+          return;
+        }
+        const due = allDues[dueIndex];
+        const pending = parseFloat(due.amount) - parseFloat(due.paid_amount);
+        if (amount > pending + 0.01) {
+          showToast("Payment amount exceeds outstanding due.", "error");
+          return;
+        }
+
+        const newPaidAmount = parseFloat(due.paid_amount) + amount;
+        allDues[dueIndex] = {
+          ...due,
+          paid_amount: newPaidAmount,
+          status: newPaidAmount >= parseFloat(due.amount) ? 'Paid' : 'Pending'
+        };
+        localStorage.setItem(storedDuesKey, JSON.stringify(allDues));
+
+        const storedRecsKey = `bn_sandbox_previous_year_recoveries_${keySuffix}`;
+        const allRecs = JSON.parse(localStorage.getItem(storedRecsKey) || '[]');
+        const newRec = {
+          id: allRecs.length + 1,
+          school_id: schoolId || 1,
+          student_id: studentId,
+          academic_year_id: activeYearId,
+          carry_forward_due_id: dueId,
+          amount_recovered: amount,
+          recovery_date: date,
+          paid_at: new Date().toISOString(),
+          collected_by: username || 'admin@sandbox.edu',
+          student_name: due.student_name || 'Ahmed',
+          class_name: due.class_name || 'Class 6',
+          original_academic_year: years.find(y => y.id === due.original_academic_year_id)?.year_range || '2025-2026',
+          is_locked: false
+        };
+        allRecs.unshift(newRec);
+        localStorage.setItem(storedRecsKey, JSON.stringify(allRecs));
+
+        await fetchCarryForwardDues(studentId);
+        await fetchPreviousYearRecoveries();
+        await fetchPreviousDues();
+        await fetchERPData();
+        showToast("Past year due payment recorded (Sandbox Mode)", "success");
+        setShowPayRecoveryModal(false);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsRecordingRecovery(false);
+      }
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/students/${studentId}/carry-forward-dues/${dueId}/pay`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ amount, date })
+      });
+      if (res.ok) {
+        await fetchCarryForwardDues(studentId);
+        await fetchPreviousYearRecoveries();
+        await fetchPreviousDues();
+        await fetchERPData();
+        showToast("Past year due payment recorded successfully.", "success");
+        setShowPayRecoveryModal(false);
+      } else {
+        const data = await res.json();
+        showToast(data.detail || "Failed to record payment.", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Network error recording payment.", "error");
+    } finally {
+      setIsRecordingRecovery(false);
+    }
+  };
+
+  const handleRevertRecovery = async (studentId, recoveryId) => {
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      const storedRecsKey = `bn_sandbox_previous_year_recoveries_${keySuffix}`;
+      const allRecs = JSON.parse(localStorage.getItem(storedRecsKey) || '[]');
+      const recIndex = allRecs.findIndex(r => parseInt(r.id) === parseInt(recoveryId));
+      if (recIndex === -1) {
+        showToast("Recovery record not found.", "error");
+        return;
+      }
+      const rec = allRecs[recIndex];
+      if (isSandboxTransactionLocked(rec.paid_at)) {
+        showToast("This recovery is part of a finalized Financial Report and cannot be reverted.", "error");
+        return;
+      }
+
+      const storedDuesKey = `bn_sandbox_carry_forward_dues_${keySuffix}`;
+      const allDues = JSON.parse(localStorage.getItem(storedDuesKey) || '[]');
+      const dueIndex = allDues.findIndex(d => parseInt(d.id) === parseInt(rec.carry_forward_due_id));
+      if (dueIndex !== -1) {
+        const due = allDues[dueIndex];
+        const newPaidAmount = Math.max(0, parseFloat(due.paid_amount) - parseFloat(rec.amount_recovered));
+        allDues[dueIndex] = {
+          ...due,
+          paid_amount: newPaidAmount,
+          status: newPaidAmount >= parseFloat(due.amount) ? 'Paid' : 'Pending'
+        };
+        localStorage.setItem(storedDuesKey, JSON.stringify(allDues));
+      }
+
+      allRecs.splice(recIndex, 1);
+      localStorage.setItem(storedRecsKey, JSON.stringify(allRecs));
+
+      if (studentId) {
+        await fetchCarryForwardDues(studentId);
+      }
+      await fetchPreviousYearRecoveries();
+      await fetchPreviousDues();
+      await fetchERPData();
+      showToast("Recovery reverted successfully (Sandbox Mode)", "success");
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/students/${studentId || 0}/carry-forward-dues/recoveries/${recoveryId}/unpay`, {
+        method: 'POST',
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        if (studentId) {
+          await fetchCarryForwardDues(studentId);
+        }
+        await fetchPreviousYearRecoveries();
+        await fetchPreviousDues();
+        await fetchERPData();
+        showToast("Recovery reverted successfully.", "success");
+      } else {
+        const data = await res.json();
+        showToast(data.detail || "Failed to revert recovery.", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Network error reverting recovery.", "error");
+    }
+  };
+
   const processSalary = async (teacherId, month) => {
     const keySuffix = schoolId || 'default';
     if (token.includes('mock') || !isConnected) {
       const storageKey = `bn_sandbox_salaries_${keySuffix}_${teacherId}_${activeYearId}`;
       const current = JSON.parse(localStorage.getItem(storageKey) || '[]');
-      const updated = current.map(s => s.month === month ? { ...s, status: "Paid", payment_date: new Date().toISOString().split('T')[0] } : s);
+      const existing = current.find(s => s.month === month);
+      if (existing && existing.status === 'Paid' && isSandboxTransactionLocked(existing.paid_at)) {
+        showToast("This salary payment is part of a finalized Financial Report and cannot be modified.", "error");
+        return;
+      }
+      const updated = current.map(s => s.month === month ? { ...s, status: "Paid", payment_date: new Date().toISOString().split('T')[0], paid_at: new Date().toISOString() } : s);
       setTeacherSalaries(updated);
       localStorage.setItem(storageKey, JSON.stringify(updated));
       await fetchERPData();
@@ -3588,25 +7208,162 @@ export default function App() {
         await fetchERPData();
         showToast('Salary disbursed successfully', 'success');
       } else {
-        throw new Error("Failed to disburse salary");
+        const data = await res.json();
+        showToast(data.detail || "Failed to disburse salary", "error");
       }
     } catch (err) {
-      const storageKey = `bn_sandbox_salaries_${keySuffix}_${teacherId}_${activeYearId}`;
-      const current = JSON.parse(localStorage.getItem(storageKey) || '[]');
-      const updated = current.map(s => s.month === month ? { ...s, status: "Paid", payment_date: new Date().toISOString().split('T')[0] } : s);
-      setTeacherSalaries(updated);
-      localStorage.setItem(storageKey, JSON.stringify(updated));
-      await fetchERPData();
-      showToast('Salary disbursed (Sandbox Mode)', 'success');
+      console.error(err);
+      showToast('Network error disbursing salary.', 'error');
     }
   };
 
-  const processFeePayment = async (studentId, month) => {
+  const handleMonthCheckboxChange = (month, checked) => {
+    const monthsOrder = ["April", "May", "June", "July", "August", "September", "October", "November", "December", "January", "February", "March"];
+    const unpaidMonths = studentFees
+      .filter(f => f.status !== 'Paid')
+      .map(f => f.month)
+      .sort((a, b) => monthsOrder.indexOf(a) - monthsOrder.indexOf(b));
+
+    const targetIndex = unpaidMonths.indexOf(month);
+    if (targetIndex === -1) return;
+
+    if (checked) {
+      const newSelection = unpaidMonths.slice(0, targetIndex + 1);
+      setSelectedMonthsForPayment(newSelection);
+    } else {
+      const newSelection = unpaidMonths.slice(0, targetIndex);
+      setSelectedMonthsForPayment(newSelection);
+    }
+  };
+
+  const processMultiMonthFeePayment = async (studentId, months) => {
+    if (!months || months.length === 0) return;
+    if (!isFeeStructureConfigured) {
+      setShowFeeConfigRequiredModal(true);
+      return;
+    }
+    
     const keySuffix = schoolId || 'default';
     if (token.includes('mock') || !isConnected) {
       const storageKey = `bn_sandbox_fees_${keySuffix}_${studentId}_${activeYearId}`;
       const current = JSON.parse(localStorage.getItem(storageKey) || '[]');
-      const updated = current.map(f => f.month === month ? { ...f, status: "Paid", payment_date: new Date().toISOString().split('T')[0] } : f);
+      
+      for (const month of months) {
+        const existing = current.find(f => f.month === month);
+        if (existing && existing.status === 'Paid' && isSandboxTransactionLocked(existing.paid_at)) {
+          showToast(`Fee payment for ${month} is part of a finalized Financial Report and cannot be modified.`, "error");
+          return;
+        }
+      }
+      
+      const paymentDate = new Date().toISOString().split('T')[0];
+      const paidAt = new Date().toISOString();
+      const updated = current.map(f => {
+        if (months.includes(f.month)) {
+          return {
+            ...f,
+            status: "Paid",
+            payment_date: paymentDate,
+            paid_at: paidAt
+          };
+        }
+        return f;
+      });
+      setStudentFees(updated);
+      localStorage.setItem(storageKey, JSON.stringify(updated));
+      await fetchERPData();
+      showToast('Tuition fee payments recorded (Sandbox Mode)', 'success');
+      
+      const paidRecords = updated.filter(f => months.includes(f.month));
+      const monthsOrder = ["April", "May", "June", "July", "August", "September", "October", "November", "December", "January", "February", "March"];
+      paidRecords.sort((a, b) => monthsOrder.indexOf(a.month) - monthsOrder.indexOf(b.month));
+
+      const multiMonthRecord = {
+        isMultiMonth: true,
+        months: months,
+        amount: paidRecords.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0),
+        payment_date: paymentDate,
+        paid_at: paidAt,
+        records: paidRecords,
+        id: paidRecords[paidRecords.length - 1]?.id || 999
+      };
+      
+      setSelectedMonthsForPayment([]);
+      handlePrintReceipt(activeStudent, multiMonthRecord);
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/students/${studentId}/fees/pay-multiple`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          months: months,
+          academic_year_id: activeYearId
+        })
+      });
+      if (res.ok) {
+        const resData = await res.json();
+        
+        await fetchStudentFeesRecords(studentId, selectedStudent?.class_id);
+        await fetchERPData();
+        showToast('Tuition fee payments recorded', 'success');
+
+        const paidRecords = resData.records || [];
+        const monthsOrder = ["April", "May", "June", "July", "August", "September", "October", "November", "December", "January", "February", "March"];
+        paidRecords.sort((a, b) => monthsOrder.indexOf(a.month) - monthsOrder.indexOf(b.month));
+
+        const multiMonthRecord = {
+          isMultiMonth: true,
+          months: months,
+          amount: paidRecords.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0),
+          payment_date: paidRecords[0]?.payment_date || new Date().toISOString().split('T')[0],
+          paid_at: paidRecords[0]?.paid_at || new Date().toISOString(),
+          records: paidRecords,
+          id: paidRecords[paidRecords.length - 1]?.id || 999
+        };
+        setSelectedMonthsForPayment([]);
+        handlePrintReceipt(activeStudent, multiMonthRecord);
+      } else {
+        const data = await res.json();
+        showToast(data.detail || "Failed to record fee payments", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('Network error recording fee payments.', 'error');
+    }
+  };
+
+  const processFeePayment = async (studentId, month) => {
+    if (!isFeeStructureConfigured) {
+      setShowFeeConfigRequiredModal(true);
+      return;
+    }
+    
+    // Validate chronological sequence of payments (April to March)
+    const monthsOrder = ["April", "May", "June", "July", "August", "September", "October", "November", "December", "January", "February", "March"];
+    const targetIdx = monthsOrder.indexOf(month);
+    if (targetIdx > 0) {
+      const priorPending = monthsOrder.slice(0, targetIdx).some(prevMonth => {
+        const prevFee = studentFees.find(f => f.month === prevMonth);
+        return !prevFee || prevFee.status !== 'Paid';
+      });
+      if (priorPending) {
+        showToast("Please clear previous pending dues first.", "error");
+        return;
+      }
+    }
+
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      const storageKey = `bn_sandbox_fees_${keySuffix}_${studentId}_${activeYearId}`;
+      const current = JSON.parse(localStorage.getItem(storageKey) || '[]');
+      const existing = current.find(f => f.month === month);
+      if (existing && existing.status === 'Paid' && isSandboxTransactionLocked(existing.paid_at)) {
+        showToast("This fee payment is part of a finalized Financial Report and cannot be modified.", "error");
+        return;
+      }
+      const updated = current.map(f => f.month === month ? { ...f, status: "Paid", payment_date: new Date().toISOString().split('T')[0], paid_at: new Date().toISOString() } : f);
       setStudentFees(updated);
       localStorage.setItem(storageKey, JSON.stringify(updated));
       await fetchERPData();
@@ -3620,20 +7377,16 @@ export default function App() {
         headers: getHeaders()
       });
       if (res.ok) {
-        await fetchStudentFeesRecords(studentId);
+        await fetchStudentFeesRecords(studentId, selectedStudent?.class_id);
         await fetchERPData();
         showToast('Tuition fee payment recorded', 'success');
       } else {
-        throw new Error("Failed to record fee payment");
+        const data = await res.json();
+        showToast(data.detail || "Failed to record fee payment", "error");
       }
     } catch (err) {
-      const storageKey = `bn_sandbox_fees_${keySuffix}_${studentId}_${activeYearId}`;
-      const current = JSON.parse(localStorage.getItem(storageKey) || '[]');
-      const updated = current.map(f => f.month === month ? { ...f, status: "Paid", payment_date: new Date().toISOString().split('T')[0] } : f);
-      setStudentFees(updated);
-      localStorage.setItem(storageKey, JSON.stringify(updated));
-      await fetchERPData();
-      showToast('Fee payment recorded (Sandbox Mode)', 'success');
+      console.error(err);
+      showToast('Network error recording fee payment.', 'error');
     }
   };
 
@@ -3642,11 +7395,35 @@ export default function App() {
   };
 
   const executeRevertFeePayment = async (studentId, month) => {
+    const monthsOrder = ["April", "May", "June", "July", "August", "September", "October", "November", "December", "January", "February", "March"];
+    const targetIdx = monthsOrder.indexOf(month);
     const keySuffix = schoolId || 'default';
+
+    let feesToCheck = studentFees || [];
+    if (feesToCheck.length === 0) {
+      const storageKey = `bn_sandbox_fees_${keySuffix}_${studentId}_${activeYearId}`;
+      feesToCheck = JSON.parse(localStorage.getItem(storageKey) || '[]');
+    }
+
+    const hasSubsequentPaid = feesToCheck.some(f => {
+      const idx = monthsOrder.indexOf(f.month);
+      return idx !== -1 && idx > targetIdx && f.status === 'Paid';
+    });
+
+    if (hasSubsequentPaid) {
+      showToast("Cannot mark this month as unpaid because subsequent months have already been paid.", "error");
+      return;
+    }
+
     if (token.includes('mock') || !isConnected) {
       const storageKey = `bn_sandbox_fees_${keySuffix}_${studentId}_${activeYearId}`;
       const current = JSON.parse(localStorage.getItem(storageKey) || '[]');
-      const updated = current.map(f => f.month === month ? { ...f, status: "Pending", payment_date: null } : f);
+      const fee = current.find(f => f.month === month);
+      if (fee && fee.status === 'Paid' && isSandboxTransactionLocked(fee.paid_at)) {
+        showToast("This fee payment is part of a finalized Financial Report and cannot be reverted.", "error");
+        return;
+      }
+      const updated = current.map(f => f.month === month ? { ...f, status: "Pending", payment_date: null, paid_at: null } : f);
       setStudentFees(updated);
       localStorage.setItem(storageKey, JSON.stringify(updated));
       await fetchERPData();
@@ -3660,36 +7437,1217 @@ export default function App() {
         headers: getHeaders()
       });
       if (res.ok) {
-        await fetchStudentFeesRecords(studentId);
+        await fetchStudentFeesRecords(studentId, selectedStudent?.class_id);
         await fetchERPData();
         showToast('Fee status reverted to Unpaid', 'success');
       } else {
-        throw new Error("Failed to revert payment");
+        const data = await res.json();
+        showToast(data.detail || "Failed to revert payment", "error");
       }
     } catch (err) {
-      const storageKey = `bn_sandbox_fees_${keySuffix}_${studentId}_${activeYearId}`;
-      const current = JSON.parse(localStorage.getItem(storageKey) || '[]');
-      const updated = current.map(f => f.month === month ? { ...f, status: "Pending", payment_date: null } : f);
-      setStudentFees(updated);
+      console.error(err);
+      showToast('Network error reverting payment.', 'error');
+    }
+  };
+
+  // --- FINANCIAL REPORTS HANDLERS ---
+  const suggestDates = (reportsList) => {
+    let suggestedStart = '';
+    
+    if (reportsList && reportsList.length > 0) {
+      const sorted = [...reportsList].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      const latestReport = sorted[0];
+      if (latestReport && latestReport.created_at) {
+        suggestedStart = latestReport.created_at.split('T')[0].split(' ')[0];
+      } else {
+        suggestedStart = latestReport.to_date;
+      }
+    } else {
+      const activeYear = years.find(y => y.id === activeYearId);
+      if (activeYear && activeYear.created_at) {
+        suggestedStart = activeYear.created_at.split('T')[0].split(' ')[0];
+      } else if (activeYear && activeYear.start_date) {
+        suggestedStart = activeYear.start_date;
+      } else {
+        suggestedStart = `${new Date().getFullYear()}-04-01`;
+      }
+    }
+    
+    setReportFromDate(suggestedStart);
+    setReportToDate(new Date().toISOString().split('T')[0]);
+  };
+
+  const fetchFinancialReports = async () => {
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      const storageKey = `bn_sandbox_financial_reports_${keySuffix}_${activeYearId}`;
+      const stored = localStorage.getItem(storageKey);
+      const list = stored ? JSON.parse(stored) : [];
+      setFinancialReports(list);
+      suggestDates(list);
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/financial-reports?academic_year_id=${activeYearId}`, {
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setFinancialReports(data);
+        suggestDates(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch financial reports", err);
+    }
+  };
+
+  const handlePreviewReport = async () => {
+    if (!reportFromDate || !reportToDate) {
+      showToast("Please select both From and To dates.", "error");
+      return;
+    }
+    if (new Date(reportFromDate) > new Date(reportToDate)) {
+      showToast("From Date cannot be after To Date.", "error");
+      return;
+    }
+
+    setIsReportPreviewing(true);
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      const storageKey = `bn_sandbox_financial_reports_${keySuffix}_${activeYearId}`;
+      const storedReports = localStorage.getItem(storageKey);
+      const reportsList = storedReports ? JSON.parse(storedReports) : [];
+      let last_report_end = null;
+      if (reportsList && reportsList.length > 0) {
+        const sorted = [...reportsList].sort((a, b) => new Date(b.to_timestamp || b.created_at) - new Date(a.to_timestamp || a.created_at));
+        last_report_end = sorted[0].to_timestamp || sorted[0].created_at;
+      }
+      
+      const selected_from_timestamp = new Date(reportFromDate + 'T00:00:00');
+      const selected_to_timestamp = new Date(reportToDate + 'T23:59:59');
+      const now = new Date();
+      const end_timestamp = selected_to_timestamp < now ? selected_to_timestamp : now;
+      
+      let start_timestamp = selected_from_timestamp;
+      let use_strict_greater = false;
+      if (last_report_end) {
+        const lastEnd = new Date(last_report_end);
+        if (lastEnd > selected_from_timestamp) {
+          start_timestamp = lastEnd;
+          use_strict_greater = true;
+        }
+      }
+
+      const isTxInWindow = (txDate, txPaidAt) => {
+        if (txPaidAt) {
+          const t = new Date(txPaidAt);
+          if (use_strict_greater) {
+            return t > start_timestamp && t <= end_timestamp;
+          } else {
+            return t >= start_timestamp && t <= end_timestamp;
+          }
+        }
+        const t = new Date(txDate + 'T12:00:00');
+        if (use_strict_greater) {
+          return t > start_timestamp && t <= end_timestamp;
+        } else {
+          return t >= start_timestamp && t <= end_timestamp;
+        }
+      };
+
+      let totalFees = 0;
+      let totalExtraFees = 0;
+      let totalSalaries = 0;
+      let totalExpenses = 0;
+
+      students.forEach(st => {
+        const studentFeesKey = `bn_sandbox_fees_${keySuffix}_${st.id}_${activeYearId}`;
+        const storedFees = localStorage.getItem(studentFeesKey);
+        if (storedFees) {
+          const feesList = JSON.parse(storedFees);
+          feesList.forEach(fee => {
+            if (fee.status === 'Paid' && fee.payment_date) {
+              if (isTxInWindow(fee.payment_date, fee.paid_at)) {
+                totalFees += parseFloat(fee.amount) || 0;
+              }
+            }
+          });
+        }
+      });
+
+      const extraFeesKey = `bn_sandbox_student_extra_fees_${keySuffix}_${activeYearId}`;
+      const storedExtraFees = localStorage.getItem(extraFeesKey);
+      if (storedExtraFees) {
+        const extraList = JSON.parse(storedExtraFees);
+        const extraTypesKey = `bn_sandbox_extra_fee_types_${keySuffix}_${activeYearId}`;
+        const storedTypes = localStorage.getItem(extraTypesKey);
+        const typesList = storedTypes ? JSON.parse(storedTypes) : [];
+        
+        extraList.forEach(sef => {
+          if (sef.status === 'Paid' && sef.payment_date) {
+            if (isTxInWindow(sef.payment_date, sef.paid_at)) {
+              const type = typesList.find(t => t.id === sef.extra_fee_type_id);
+              if (type) {
+                totalExtraFees += parseFloat(type.amount) || 0;
+              }
+            }
+          }
+        });
+      }
+
+      teachers.forEach(t => {
+        const salariesKey = `bn_sandbox_salaries_${keySuffix}_${t.id}_${activeYearId}`;
+        const storedSalaries = localStorage.getItem(salariesKey);
+        if (storedSalaries) {
+          const salariesList = JSON.parse(storedSalaries);
+          salariesList.forEach(sal => {
+            if (sal.status === 'Paid' && sal.payment_date) {
+              if (isTxInWindow(sal.payment_date, sal.paid_at)) {
+                totalSalaries += parseFloat(sal.amount) || 0;
+              }
+            }
+          });
+        }
+      });
+
+      const expensesKey = `bn_sandbox_expenses_${keySuffix}_${activeYearId}`;
+      const storedExpenses = localStorage.getItem(expensesKey);
+      if (storedExpenses) {
+        const expensesList = JSON.parse(storedExpenses);
+        expensesList.forEach(exp => {
+          if (exp.expense_date) {
+            const txDate = exp.expense_date;
+            const txTime = exp.expense_time || '12:00:00';
+            const txTimestamp = new Date(txDate + 'T' + txTime);
+            let inWin = false;
+            if (use_strict_greater) {
+              inWin = txTimestamp > start_timestamp && txTimestamp <= end_timestamp;
+            } else {
+              inWin = txTimestamp >= start_timestamp && txTimestamp <= end_timestamp;
+            }
+            if (inWin) {
+              totalExpenses += parseFloat(exp.amount) || 0;
+            }
+          }
+        });
+      }
+
+      let totalRecoveries = 0;
+      const storedRecoveries = localStorage.getItem(`bn_sandbox_previous_year_recoveries_${keySuffix}`) || '[]';
+      const recoveriesList = JSON.parse(storedRecoveries);
+      recoveriesList.forEach(rec => {
+        if (rec.recovery_date) {
+          if (isTxInWindow(rec.recovery_date, rec.paid_at)) {
+            totalRecoveries += parseFloat(rec.amount_recovered) || 0;
+          }
+        }
+      });
+
+      setReportPreview({
+        fees_collected: totalFees,
+        previous_year_recoveries: totalRecoveries,
+        extra_fees_collected: totalExtraFees,
+        total_income: totalFees + totalRecoveries + totalExtraFees,
+        salaries_paid: totalSalaries,
+        school_expenses: totalExpenses,
+        total_expenses: totalSalaries + totalExpenses,
+        net_profit: (totalFees + totalRecoveries + totalExtraFees) - (totalSalaries + totalExpenses),
+        from_timestamp: start_timestamp.toISOString(),
+        to_timestamp: end_timestamp.toISOString()
+      });
+      setIsReportPreviewing(false);
+      showToast("Preview loaded (Sandbox Mode)", "success");
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/financial-reports/preview?from_date=${reportFromDate}&to_date=${reportToDate}&academic_year_id=${activeYearId}`, {
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setReportPreview(data);
+        showToast("Preview loaded", "success");
+      } else {
+        const data = await res.json();
+        showToast(data.detail || "Failed to load preview", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to load preview", "error");
+    } finally {
+      setIsReportPreviewing(false);
+    }
+  };
+
+  const handleGenerateReport = async () => {
+    if (!reportFromDate || !reportToDate) {
+      showToast("Please select both From and To dates.", "error");
+      return;
+    }
+    if (!reportPreview) {
+      showToast("Please preview the report first.", "error");
+      return;
+    }
+
+    setIsGeneratingReport(true);
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      const storageKey = `bn_sandbox_financial_reports_${keySuffix}_${activeYearId}`;
+      const stored = localStorage.getItem(storageKey);
+      const list = stored ? JSON.parse(stored) : [];
+
+      const nextId = list.length > 0 ? Math.max(...list.map(r => r.id)) + 1 : 1;
+      const formattedReportId = `REP-${String(nextId).padStart(3, '0')}`;
+
+      const newReport = {
+        id: nextId,
+        report_id: formattedReportId,
+        school_id: keySuffix,
+        academic_year_id: activeYearId,
+        from_date: reportFromDate,
+        to_date: reportToDate,
+        from_timestamp: reportPreview.from_timestamp,
+        to_timestamp: reportPreview.to_timestamp,
+        fees_collected: reportPreview.fees_collected,
+        previous_year_recoveries: reportPreview.previous_year_recoveries || 0,
+        extra_fees_collected: reportPreview.extra_fees_collected,
+        total_income: reportPreview.total_income,
+        salaries_paid: reportPreview.salaries_paid,
+        school_expenses: reportPreview.school_expenses,
+        total_expenses: reportPreview.total_expenses,
+        net_profit: reportPreview.net_profit,
+        settlement_status: 'Pending',
+        created_at: new Date().toISOString()
+      };
+
+      const updated = [newReport, ...list];
       localStorage.setItem(storageKey, JSON.stringify(updated));
-      await fetchERPData();
-      showToast('Fee status reverted to Unpaid (Sandbox Mode)', 'success');
+      setFinancialReports(updated);
+      setReportPreview(null);
+      suggestDates(updated);
+      setIsGeneratingReport(false);
+      showToast("Report generated (Sandbox Mode)", "success");
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/financial-reports`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          from_date: reportFromDate,
+          to_date: reportToDate,
+          academic_year_id: activeYearId
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setFinancialReports(prev => [data, ...prev]);
+        setReportPreview(null);
+        suggestDates([data, ...financialReports]);
+        if (data.email_sent === false) {
+          showToast("Report generated successfully, but email delivery failed.", "warning");
+        } else {
+          showToast("Report generated successfully", "success");
+        }
+      } else {
+        const data = await res.json();
+        showToast(data.detail || "Failed to generate report", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to generate report", "error");
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
+  const handleToggleSettlement = async (reportId) => {
+    const keySuffix = schoolId || 'default';
+    setSettlingReportId(reportId);
+    try {
+      if (token.includes('mock') || !isConnected) {
+        // Simulate minor lag for visual confirmation of the loader in Sandbox
+        await new Promise(resolve => setTimeout(resolve, 800));
+        const storageKey = `bn_sandbox_financial_reports_${keySuffix}_${activeYearId}`;
+        const stored = localStorage.getItem(storageKey);
+        if (stored) {
+          const list = JSON.parse(stored);
+          let targetStatus = '';
+          const updated = list.map(r => {
+            if (r.id === reportId) {
+              const nextStatus = r.settlement_status === 'Settled' ? 'Pending' : 'Settled';
+              targetStatus = nextStatus;
+              return { ...r, settlement_status: nextStatus };
+            }
+            return r;
+          });
+          localStorage.setItem(storageKey, JSON.stringify(updated));
+          setFinancialReports(updated);
+          if (targetStatus === 'Settled') {
+            showToast("Financial statement settled successfully", "success");
+          } else {
+            showToast("Settlement status updated (Sandbox Mode)", "success");
+          }
+        }
+        return;
+      }
+
+      const res = await fetch(`/api/financial-reports/${reportId}/settle`, {
+        method: 'POST',
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setFinancialReports(prev => prev.map(r => r.id === reportId ? { ...r, settlement_status: data.settlement_status } : r));
+        if (data.settlement_status === 'Settled') {
+          showToast("Financial statement settled successfully", "success");
+        } else {
+          showToast("Settlement status updated", "success");
+        }
+      } else {
+        showToast("Failed to update settlement status", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to update settlement status", "error");
+    } finally {
+      setSettlingReportId(null);
+    }
+  };
+
+  const handleExportReport = async (report) => {
+    const reportId = report.id;
+    const fileName = `Financial_Report_${report.report_id || 'REP-' + String(reportId).padStart(3, '0')}.xlsx`;
+    
+    setExportingReportId(reportId);
+
+    if (token.includes('mock') || !isConnected) {
+      try {
+        // Simulate network delay for the download spinner
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        const dummyContent = "Sandbox Mode Mock Excel File Content";
+        const blob = new Blob([dummyContent], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+        showToast("Report downloaded successfully.", "success");
+      } catch (err) {
+        console.error(err);
+        showToast("Failed to download report. Please try again.", "error");
+      } finally {
+        setExportingReportId(null);
+      }
+      return;
+    }
+    
+    try {
+      const res = await fetch(`/api/financial-reports/${reportId}/export`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+        showToast("Report downloaded successfully.", "success");
+      } else {
+        showToast("Failed to download report. Please try again.", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to download report. Please try again.", "error");
+    } finally {
+      setExportingReportId(null);
+    }
+  };
+
+  const fetchExpenses = async () => {
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      const storageKey = `bn_sandbox_expenses_${keySuffix}_${activeYearId}`;
+      const stored = localStorage.getItem(storageKey);
+      setExpenses(stored ? JSON.parse(stored) : []);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/school-expenses?academic_year_id=${activeYearId}`, {
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        setExpenses(await res.json());
+      }
+    } catch (err) {
+      console.error("Failed to fetch expenses", err);
+    }
+  };
+
+  const handleAddExpense = async (e) => {
+    e.preventDefault();
+    if (!expenseDesc.trim() || !expenseAmount) {
+      showToast("Please fill in both Description and Amount.", "error");
+      return;
+    }
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      const storageKey = `bn_sandbox_expenses_${keySuffix}_${activeYearId}`;
+      const stored = localStorage.getItem(storageKey);
+      const list = stored ? JSON.parse(stored) : [];
+      
+      const nextId = list.length > 0 ? Math.max(...list.map(ex => ex.id)) + 1 : 1;
+      const now = new Date();
+      const newExp = {
+        id: nextId,
+        school_id: keySuffix,
+        academic_year_id: activeYearId,
+        description: expenseDesc.trim(),
+        amount: parseFloat(expenseAmount),
+        expense_date: now.toISOString().split('T')[0],
+        expense_time: now.toTimeString().split(' ')[0],
+        created_by: username || 'admin@sandbox.edu'
+      };
+      
+      const updated = [newExp, ...list];
+      localStorage.setItem(storageKey, JSON.stringify(updated));
+      setExpenses(updated);
+      setExpenseDesc('');
+      setExpenseAmount('');
+      showToast("Expense added (Sandbox Mode)", "success");
+      return;
+    }
+    try {
+      const res = await fetch('/api/school-expenses', {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          description: expenseDesc.trim(),
+          amount: parseFloat(expenseAmount),
+          academic_year_id: activeYearId
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setExpenses(prev => [data, ...prev]);
+        setExpenseDesc('');
+        setExpenseAmount('');
+        showToast("Expense added successfully", "success");
+      } else {
+        const data = await res.json();
+        showToast(data.detail || "Failed to add expense", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to add expense", "error");
+    }
+  };
+
+  const fetchExtraFeeTypes = async () => {
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      const storageKey = `bn_sandbox_extra_fee_types_${keySuffix}_${activeYearId}`;
+      const stored = localStorage.getItem(storageKey);
+      setExtraFeeTypes(stored ? JSON.parse(stored) : []);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/extra-fee-types?academic_year_id=${activeYearId}`, {
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        setExtraFeeTypes(await res.json());
+      }
+    } catch (err) {
+      console.error("Failed to fetch extra fee types", err);
+    }
+  };
+
+  const handleAddExtraFeeType = async (e) => {
+    e.preventDefault();
+    if (!newTypeName.trim() || !newTypeAmount) {
+      showToast("Please fill in both Fee Name and Amount.", "error");
+      return;
+    }
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      const typesKey = `bn_sandbox_extra_fee_types_${keySuffix}_${activeYearId}`;
+      const storedTypes = localStorage.getItem(typesKey);
+      const typesList = storedTypes ? JSON.parse(storedTypes) : [];
+      
+      const nextId = typesList.length > 0 ? Math.max(...typesList.map(t => t.id)) + 1 : 1;
+      const newType = {
+        id: nextId,
+        school_id: keySuffix,
+        academic_year_id: activeYearId,
+        name: newTypeName.trim(),
+        amount: parseFloat(newTypeAmount)
+      };
+      
+      const updatedTypes = [newType, ...typesList];
+      localStorage.setItem(typesKey, JSON.stringify(updatedTypes));
+      setExtraFeeTypes(updatedTypes);
+      
+      // Automatically assign to all active sandbox students
+      const studentsKey = `bn_sandbox_students_${keySuffix}`;
+      const storedStudents = localStorage.getItem(studentsKey);
+      const studentList = storedStudents ? JSON.parse(storedStudents) : [];
+      
+      const ledgerKey = `bn_sandbox_student_extra_fees_${keySuffix}_${activeYearId}`;
+      const storedLedger = localStorage.getItem(ledgerKey);
+      const ledgerList = storedLedger ? JSON.parse(storedLedger) : [];
+      
+      let lastLedgerId = ledgerList.length > 0 ? Math.max(...ledgerList.map(l => l.id)) : 0;
+      
+      const newLedgerEntries = [];
+      studentList.forEach(st => {
+        if (st.status === 'Active') {
+          lastLedgerId++;
+          newLedgerEntries.push({
+            id: lastLedgerId,
+            school_id: keySuffix,
+            academic_year_id: activeYearId,
+            student_id: st.id,
+            extra_fee_type_id: nextId,
+            status: 'Pending',
+            payment_date: null,
+            collected_by: null
+          });
+        }
+      });
+      
+      const updatedLedger = [...newLedgerEntries, ...ledgerList];
+      localStorage.setItem(ledgerKey, JSON.stringify(updatedLedger));
+      
+      setNewTypeName('');
+      setNewTypeAmount('');
+      showToast("Additional fee type added and assigned (Sandbox)", "success");
+      fetchStudentExtraFees();
+      return;
+    }
+    try {
+      const res = await fetch('/api/extra-fee-types', {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          name: newTypeName.trim(),
+          amount: parseFloat(newTypeAmount),
+          academic_year_id: activeYearId
+        })
+      });
+      if (res.ok) {
+        setNewTypeName('');
+        setNewTypeAmount('');
+        showToast("Additional fee type added and assigned", "success");
+        fetchExtraFeeTypes();
+        fetchStudentExtraFees();
+      } else {
+        const data = await res.json();
+        showToast(data.detail || "Failed to add additional fee type", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to add additional fee type", "error");
+    }
+  };
+
+  const handleUpdateExtraFeeType = async (e) => {
+    e.preventDefault();
+    if (!editingExtraFeeType) return;
+    if (!editExtraFeeTypeName.trim() || !editExtraFeeTypeAmount) {
+      showToast("Please fill in both Fee Name and Amount.", "error");
+      return;
+    }
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      if (isSandboxExtraFeeTypeLocked(editingExtraFeeType.id)) {
+        showToast("This fee type is used in a finalized Financial Report and cannot be modified.", "error");
+        return;
+      }
+      const typesKey = `bn_sandbox_extra_fee_types_${keySuffix}_${activeYearId}`;
+      const storedTypes = localStorage.getItem(typesKey);
+      if (storedTypes) {
+        const list = JSON.parse(storedTypes);
+        const updated = list.map(t => {
+          if (t.id === editingExtraFeeType.id) {
+            return {
+              ...t,
+              name: editExtraFeeTypeName.trim(),
+              amount: parseFloat(editExtraFeeTypeAmount)
+            };
+          }
+          return t;
+        });
+        localStorage.setItem(typesKey, JSON.stringify(updated));
+        setExtraFeeTypes(updated);
+        showToast("Additional fee type updated (Sandbox Mode)", "success");
+        setEditingExtraFeeType(null);
+        fetchStudentExtraFees();
+      }
+      return;
+    }
+    try {
+      const res = await fetch(`/api/extra-fee-types/${editingExtraFeeType.id}`, {
+        method: 'PUT',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          name: editExtraFeeTypeName.trim(),
+          amount: parseFloat(editExtraFeeTypeAmount)
+        })
+      });
+      if (res.ok) {
+        showToast("Additional fee type updated successfully", "success");
+        setEditingExtraFeeType(null);
+        fetchExtraFeeTypes();
+        fetchStudentExtraFees();
+      } else {
+        const data = await res.json();
+        showToast(data.detail || "Failed to update additional fee type", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to update additional fee type", "error");
+    }
+  };
+
+  const fetchStudentExtraFees = async () => {
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      const ledgerKey = `bn_sandbox_student_extra_fees_${keySuffix}_${activeYearId}`;
+      const storedLedger = localStorage.getItem(ledgerKey);
+      const ledgerList = storedLedger ? JSON.parse(storedLedger) : [];
+      
+      const studentsKey = `bn_sandbox_students_${keySuffix}`;
+      const storedStudents = localStorage.getItem(studentsKey);
+      const studentList = storedStudents ? JSON.parse(storedStudents) : [];
+      
+      const typesKey = `bn_sandbox_extra_fee_types_${keySuffix}_${activeYearId}`;
+      const storedTypes = localStorage.getItem(typesKey);
+      const typesList = storedTypes ? JSON.parse(storedTypes) : [];
+      
+      const formatted = ledgerList.map(item => {
+        const student = studentList.find(s => s.id === item.student_id);
+        const type = typesList.find(t => t.id === item.extra_fee_type_id);
+        const cls = classes.find(c => c.id === (student ? student.class_id : null));
+        return {
+          ...item,
+          student_name: student ? student.name : 'Unknown Student',
+          roll_number: student ? student.roll_number : 'N/A',
+          class_id: student ? student.class_id : null,
+          class_name: cls ? cls.name : 'N/A',
+          fee_name: type ? type.name : 'Unknown Fee',
+          amount: type ? parseFloat(type.amount) : 0.00
+        };
+      });
+      
+      setStudentExtraFees(formatted);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/student-extra-fees?academic_year_id=${activeYearId}`, {
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        setStudentExtraFees(await res.json());
+      }
+    } catch (err) {
+      console.error("Failed to fetch student extra fees ledger", err);
+    }
+  };
+
+  const handleDepositExtraFee = async (feeId) => {
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      const ledgerKey = `bn_sandbox_student_extra_fees_${keySuffix}_${activeYearId}`;
+      const storedLedger = localStorage.getItem(ledgerKey);
+      if (storedLedger) {
+        const list = JSON.parse(storedLedger);
+        const updated = list.map(item => {
+          if (item.id === feeId) {
+            return {
+              ...item,
+              status: 'Paid',
+              payment_date: new Date().toISOString().split('T')[0],
+              paid_at: new Date().toISOString(),
+              collected_by: username || 'admin@sandbox.edu'
+            };
+          }
+          return item;
+        });
+        localStorage.setItem(ledgerKey, JSON.stringify(updated));
+        showToast("Fee payment recorded (Sandbox Mode)", "success");
+        fetchStudentExtraFees();
+      }
+      return;
+    }
+    try {
+      const res = await fetch(`/api/student-extra-fees/${feeId}/pay`, {
+        method: 'POST',
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        showToast("Fee payment recorded successfully", "success");
+        fetchStudentExtraFees();
+      } else {
+        const data = await res.json();
+        showToast(data.detail || "Failed to record payment", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to record payment", "error");
+    }
+  };
+
+  const executeRevertExtraFee = async (feeId) => {
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      const ledgerKey = `bn_sandbox_student_extra_fees_${keySuffix}_${activeYearId}`;
+      const storedLedger = localStorage.getItem(ledgerKey);
+      if (storedLedger) {
+        const list = JSON.parse(storedLedger);
+        const record = list.find(item => item.id === feeId);
+        if (record && record.status === 'Paid' && isSandboxTransactionLocked(record.paid_at)) {
+          showToast("This extra fee payment is part of a finalized Financial Report and cannot be reverted.", "error");
+          return;
+        }
+        const updated = list.map(item => {
+          if (item.id === feeId) {
+            return {
+              ...item,
+              status: 'Pending',
+              payment_date: null,
+              paid_at: null,
+              collected_by: null
+            };
+          }
+          return item;
+        });
+        localStorage.setItem(ledgerKey, JSON.stringify(updated));
+        showToast("Fee payment reverted to Pending (Sandbox Mode)", "success");
+        fetchStudentExtraFees();
+      }
+      return;
+    }
+    try {
+      const res = await fetch(`/api/student-extra-fees/${feeId}/unpay`, {
+        method: 'POST',
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        showToast("Fee payment reverted successfully", "success");
+        fetchStudentExtraFees();
+      } else {
+        const data = await res.json();
+        showToast(data.detail || "Failed to revert payment", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to revert payment", "error");
+    }
+  };
+
+  const fetchNotifications = async () => {
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      const storageKey = `bn_sandbox_notifications_${keySuffix}`;
+      const stored = localStorage.getItem(storageKey);
+      let list = stored ? JSON.parse(stored) : [];
+      
+      if (username === 'dd@yopmail.com') {
+        const hasRenewed = list.some(n => n.title === "Subscription Renewed");
+        if (!hasRenewed) {
+          list = [
+            {
+              id: 101,
+              school_id: 1,
+              title: "Subscription Expiry Reminder",
+              content: "Your subscription will expire in 30 days.",
+              type: "Subscription",
+              is_read: 0,
+              timestamp: new Date(Date.now() - 5 * 24 * 3600 * 1000).toISOString(),
+              created_at: new Date(Date.now() - 5 * 24 * 3600 * 1000).toISOString()
+            },
+            {
+              id: 102,
+              school_id: 1,
+              title: "Subscription Expiry Reminder",
+              content: "Your subscription will expire in 7 days.",
+              type: "Subscription",
+              is_read: 0,
+              timestamp: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString(),
+              created_at: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString()
+            },
+            {
+              id: 103,
+              school_id: 1,
+              title: "Subscription Expiry Reminder",
+              content: "Your subscription will expire in 3 days.",
+              type: "Subscription",
+              is_read: 0,
+              timestamp: new Date(Date.now() - 1 * 24 * 3600 * 1000).toISOString(),
+              created_at: new Date(Date.now() - 1 * 24 * 3600 * 1000).toISOString()
+            },
+            {
+              id: 104,
+              school_id: 1,
+              title: "Subscription Expiry Reminder",
+              content: "Your subscription will expire tomorrow.",
+              type: "Subscription",
+              is_read: 0,
+              timestamp: new Date(Date.now() - 12 * 3600 * 1000).toISOString(),
+              created_at: new Date(Date.now() - 12 * 3600 * 1000).toISOString()
+            },
+            {
+              id: 105,
+              school_id: 1,
+              title: "Subscription Renewed",
+              content: "Subscription renewed successfully.",
+              type: "Subscription",
+              is_read: 0,
+              timestamp: new Date().toISOString(),
+              created_at: new Date().toISOString()
+            }
+          ];
+          localStorage.setItem(storageKey, JSON.stringify(list));
+        }
+      } else if (list.length === 0) {
+        list = [{
+          id: 1,
+          school_id: parseInt(schoolId) || 1,
+          title: 'Welcome to ERP Portal',
+          content: 'Complete school setup configuration to access rosters and ledgers.',
+          type: 'System',
+          is_read: 0,
+          timestamp: new Date().toISOString(),
+          created_at: new Date().toISOString()
+        }];
+        localStorage.setItem(storageKey, JSON.stringify(list));
+      }
+      
+      const mockSchool = schools.find(s => String(s.id) === String(schoolId));
+      if (mockSchool && mockSchool.days_remaining !== undefined && username !== 'dd@yopmail.com') {
+        const remaining = parseInt(mockSchool.days_remaining);
+        const daysToAlert = [30, 7, 3, 1];
+        if (daysToAlert.includes(remaining)) {
+          let content = "";
+          if (remaining === 30) content = "Your subscription will expire in 30 days.";
+          else if (remaining === 7) content = "Your subscription will expire in 7 days.";
+          else if (remaining === 3) content = "Your subscription will expire in 3 days.";
+          else if (remaining === 1) content = "Your subscription will expire tomorrow.";
+          
+          const title = "Subscription Expiry Reminder";
+          const exists = list.some(n => n.title === title && n.content === content);
+          if (!exists) {
+            const newId = list.length > 0 ? Math.max(...list.map(n => n.id)) + 1 : 1;
+            const newNotif = {
+              id: newId,
+              school_id: parseInt(schoolId) || 1,
+              title,
+              content,
+              type: 'Subscription',
+              is_read: 0,
+              timestamp: new Date().toISOString(),
+              created_at: new Date().toISOString()
+            };
+            list = [newNotif, ...list];
+            localStorage.setItem(storageKey, JSON.stringify(list));
+          }
+        }
+      }
+      
+      setNotifications(list);
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/notifications', { headers: getHeaders() });
+      if (res.ok) {
+        setNotifications(await res.json());
+      }
+    } catch (err) {
+      console.error("Failed to fetch notifications", err);
+    }
+  };
+
+  const markNotificationsAsRead = async () => {
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      const storageKey = `bn_sandbox_notifications_${keySuffix}`;
+      const stored = localStorage.getItem(storageKey);
+      const list = stored ? JSON.parse(stored) : [];
+      const updated = list.map(n => ({ ...n, is_read: 1 }));
+      setNotifications(updated);
+      localStorage.setItem(storageKey, JSON.stringify(updated));
+      return;
+    }
+    try {
+      setNotifications(notifications.map(n => ({ ...n, is_read: 1 })));
+      await fetch('/api/notifications/read', {
+        method: 'POST',
+        headers: getHeaders()
+      });
+    } catch (err) {
+      console.error("Failed to mark notifications as read", err);
+    }
+  };
+
+  const handleSalaryBarClick = async (month) => {
+    setShowSalaryDrilldown(month);
+    setIsDrilldownLoading(true);
+    
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      const activeTeachers = teachers.filter(t => t.status === 'Active');
+      const mockBreakdown = activeTeachers.map(t => {
+        const storageKey = `bn_sandbox_salaries_${keySuffix}_${t.id}_${activeYearId}`;
+        const stored = localStorage.getItem(storageKey);
+        let status = 'Pending';
+        let amount = parseFloat(t.salary_amount) || 3000.0;
+        
+        if (stored) {
+          const records = JSON.parse(stored);
+          const found = records.find(r => r.month === month);
+          if (found) {
+            status = found.status === 'Paid' ? 'Paid' : 'Pending';
+            amount = parseFloat(found.amount) || amount;
+          }
+        }
+        
+        return {
+          teacher_id: t.id,
+          name: t.name,
+          gender: t.gender || 'Male',
+          phone: t.phone || '9876543210',
+          profile_image: t.profile_image || null,
+          amount: amount,
+          status: status
+        };
+      });
+      
+      setSalaryDrilldownData(mockBreakdown);
+      setIsDrilldownLoading(false);
+      return;
+    }
+    
+    try {
+      const res = await fetch(`/api/salaries/month/${month}?academic_year_id=${activeYearId}`, {
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSalaryDrilldownData(data);
+      } else {
+        showToast('Failed to fetch salary details.', 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('Network error fetching salary details.', 'error');
+    } finally {
+      setIsDrilldownLoading(false);
+    }
+  };
+
+  const fetchPaymentPromises = async () => {
+    const keySuffix = schoolId || 'default';
+    if (token.includes('mock') || !isConnected) {
+      const storageKey = `bn_sandbox_payment_promises_${keySuffix}_${activeYearId}`;
+      const stored = localStorage.getItem(storageKey);
+      const studentList = JSON.parse(localStorage.getItem(`bn_sandbox_students_${keySuffix}`) || '[]');
+      const parsedPromises = stored ? JSON.parse(stored) : [];
+      const populatedPromises = parsedPromises.map(p => {
+        const st = studentList.find(s => s.id === p.student_id);
+        return {
+          ...p,
+          student_name: st ? st.name : 'Unknown Student',
+          roll_number: st ? st.roll_number : '',
+          class_name: st ? getClassName(st.class_id) : 'Unassigned',
+          class_id: st ? st.class_id : null
+        };
+      });
+      setPaymentPromises(populatedPromises);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/payment-promises?academic_year_id=${activeYearId}`, {
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        setPaymentPromises(await res.json());
+      }
+    } catch (err) {
+      console.error("Failed to fetch payment promises", err);
+    }
+  };
+
+  const handleSavePaymentPromise = async (e) => {
+    e.preventDefault();
+    if (!promiseStudentId || !promiseDate) {
+      showToast("Please fill in all required fields.", "error");
+      return;
+    }
+    setIsSavingPromise(true);
+    const keySuffix = schoolId || 'default';
+
+    if (token.includes('mock') || !isConnected) {
+      const storageKey = `bn_sandbox_payment_promises_${keySuffix}_${activeYearId}`;
+      const stored = localStorage.getItem(storageKey);
+      const list = stored ? JSON.parse(stored) : [];
+
+      if (editingPromise) {
+        // Edit mode
+        const updated = list.map(p => p.id === editingPromise.id ? {
+          ...p,
+          student_id: parseInt(promiseStudentId),
+          promise_date: promiseDate,
+          description: promiseDescription.trim(),
+          status: promiseStatus
+        } : p);
+        localStorage.setItem(storageKey, JSON.stringify(updated));
+        showToast("Payment promise updated (Sandbox Mode)", "success");
+      } else {
+        // Add mode
+        const nextId = list.length > 0 ? Math.max(...list.map(p => p.id)) + 1 : 1;
+        const newPromise = {
+          id: nextId,
+          school_id: parseInt(keySuffix) || 1,
+          academic_year_id: activeYearId,
+          student_id: parseInt(promiseStudentId),
+          promise_date: promiseDate,
+          description: promiseDescription.trim(),
+          status: promiseStatus
+        };
+        const updated = [...list, newPromise];
+        localStorage.setItem(storageKey, JSON.stringify(updated));
+        showToast("Payment promise added (Sandbox Mode)", "success");
+      }
+
+      setPromiseModalOpen(false);
+      setEditingPromise(null);
+      setPromiseStudentId('');
+      setPromiseStudentSearchQuery('');
+      setPromiseDate('');
+      setPromiseDescription('');
+      setPromiseStatus('Pending');
+      setIsSavingPromise(false);
+      fetchPaymentPromises();
+      return;
+    }
+
+    try {
+      const url = editingPromise ? `/api/payment-promises/${editingPromise.id}` : '/api/payment-promises';
+      const method = editingPromise ? 'PUT' : 'POST';
+      const body = {
+        student_id: parseInt(promiseStudentId),
+        promise_date: promiseDate,
+        description: promiseDescription.trim(),
+        status: promiseStatus,
+        academic_year_id: activeYearId
+      };
+
+      const res = await fetch(url, {
+        method,
+        headers: getHeaders(),
+        body: JSON.stringify(body)
+      });
+
+      if (res.ok) {
+        showToast(editingPromise ? "Payment promise updated successfully" : "Payment promise added successfully", "success");
+        setPromiseModalOpen(false);
+        setEditingPromise(null);
+        setPromiseStudentId('');
+        setPromiseStudentSearchQuery('');
+        setPromiseDate('');
+        setPromiseDescription('');
+        setPromiseStatus('Pending');
+        fetchPaymentPromises();
+      } else {
+        const data = await res.json();
+        showToast(data.detail || "Failed to save payment promise", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to save payment promise", "error");
+    } finally {
+      setIsSavingPromise(false);
+    }
+  };
+
+  const handleDeletePaymentPromise = async (promiseId) => {
+    const keySuffix = schoolId || 'default';
+
+    if (token.includes('mock') || !isConnected) {
+      const storageKey = `bn_sandbox_payment_promises_${keySuffix}_${activeYearId}`;
+      const stored = localStorage.getItem(storageKey);
+      const list = stored ? JSON.parse(stored) : [];
+      const updated = list.filter(p => p.id !== promiseId);
+      localStorage.setItem(storageKey, JSON.stringify(updated));
+      showToast("Payment promise deleted successfully.", "success");
+      fetchPaymentPromises();
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/payment-promises/${promiseId}`, {
+        method: 'DELETE',
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        showToast("Payment promise deleted successfully.", "success");
+        fetchPaymentPromises();
+      } else {
+        const data = await res.json();
+        showToast(data.detail || "Failed to delete payment promise", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to delete payment promise", "error");
     }
   };
 
   const fetchClassFeeStructure = async (classId) => {
     if (!classId) return;
     const keySuffix = schoolId || 'default';
+    const months = ["April", "May", "June", "July", "August", "September", "October", "November", "December", "January", "February", "March"];
+    
     if (token.includes('mock') || !isConnected) {
       const storageKey = `bn_sandbox_class_fees_${keySuffix}_${classId}_${activeYearId}`;
       const stored = localStorage.getItem(storageKey);
       if (stored) {
-        setClassFeeStructure(JSON.parse(stored));
+        const data = JSON.parse(stored);
+        setClassFeeStructure(data);
+        if (data.structure_mode) {
+          setFeeStructureMode(data.structure_mode);
+        } else {
+          const firstVal = data[months[0]] ?? 0;
+          const allSame = months.every(m => (data[m] ?? 0) === firstVal);
+          setFeeStructureMode(allSame ? 'same' : 'custom');
+        }
+        setSameMonthlyFee(data.April ?? 0);
       } else {
         setClassFeeStructure({
-          April: 150, May: 150, June: 150, July: 150, August: 150, September: 150,
-          October: 150, November: 150, December: 150, January: 150, February: 150, March: 150
+          April: 0, May: 0, June: 0, July: 0, August: 0, September: 0,
+          October: 0, November: 0, December: 0, January: 0, February: 0, March: 0,
+          structure_mode: 'same',
+          is_locked: 0
         });
+        setFeeStructureMode('same');
+        setSameMonthlyFee(0);
       }
       return;
     }
@@ -3699,28 +8657,89 @@ export default function App() {
         headers: getHeaders()
       });
       if (res.ok) {
-        setClassFeeStructure(await res.json());
+        const data = await res.json();
+        setClassFeeStructure(data);
+        if (data.structure_mode) {
+          setFeeStructureMode(data.structure_mode);
+        } else {
+          const firstVal = data[months[0]] ?? 0;
+          const allSame = months.every(m => (data[m] ?? 0) === firstVal);
+          setFeeStructureMode(allSame ? 'same' : 'custom');
+        }
+        setSameMonthlyFee(data.April ?? 0);
       } else {
         setClassFeeStructure({
-          April: 150, May: 150, June: 150, July: 150, August: 150, September: 150,
-          October: 150, November: 150, December: 150, January: 150, February: 150, March: 150
+          April: 0, May: 0, June: 0, July: 0, August: 0, September: 0,
+          October: 0, November: 0, December: 0, January: 0, February: 0, March: 0,
+          structure_mode: 'same',
+          is_locked: 0
         });
+        setFeeStructureMode('same');
+        setSameMonthlyFee(0);
       }
     } catch (err) {
       setClassFeeStructure({
-        April: 150, May: 150, June: 150, July: 150, August: 150, September: 150,
-        October: 150, November: 150, December: 150, January: 150, February: 150, March: 150
+        April: 0, May: 0, June: 0, July: 0, August: 0, September: 0,
+        October: 0, November: 0, December: 0, January: 0, February: 0, March: 0,
+        structure_mode: 'same',
+        is_locked: 0
       });
+      setFeeStructureMode('same');
+      setSameMonthlyFee(0);
     }
   };
 
   const saveClassFeeStructure = async () => {
     if (!selectedFeeClassId) return;
     const keySuffix = schoolId || 'default';
+    const months = ["April", "May", "June", "July", "August", "September", "October", "November", "December", "January", "February", "March"];
+    
+    // Construct fee structure based on mode
+    let structureToSave = { ...classFeeStructure };
+    if (feeStructureMode === 'same') {
+      months.forEach(m => {
+        structureToSave[m] = sameMonthlyFee;
+      });
+      structureToSave.structure_mode = 'same';
+    } else {
+      structureToSave.structure_mode = 'custom';
+    }
+    
+    // Always lock the record on save
+    structureToSave.is_locked = 1;
+
     if (token.includes('mock') || !isConnected) {
       const storageKey = `bn_sandbox_class_fees_${keySuffix}_${selectedFeeClassId}_${activeYearId}`;
-      localStorage.setItem(storageKey, JSON.stringify(classFeeStructure));
-      showToast('Class fee structure saved successfully (Sandbox Mode)', 'success');
+      localStorage.setItem(storageKey, JSON.stringify(structureToSave));
+      setClassFeeStructure(structureToSave);
+      
+      // Update all Pending student fee records for this class in sandbox mode
+      const studentsKey = `bn_sandbox_students_${keySuffix}`;
+      const storedStudents = localStorage.getItem(studentsKey);
+      if (storedStudents) {
+        const studentList = JSON.parse(storedStudents);
+        const classStudents = studentList.filter(s => parseInt(s.class_id) === parseInt(selectedFeeClassId));
+        classStudents.forEach(st => {
+          const studentFeesKey = `bn_sandbox_fees_${keySuffix}_${st.id}_${activeYearId}`;
+          const storedStudentFees = localStorage.getItem(studentFeesKey);
+          if (storedStudentFees) {
+            const feesList = JSON.parse(storedStudentFees);
+            const updatedFees = feesList.map(fee => {
+              if (fee.status === 'Pending') {
+                const mAmount = structureToSave[fee.month];
+                if (mAmount !== undefined) {
+                  fee.amount = mAmount;
+                }
+              }
+              return fee;
+            });
+            localStorage.setItem(studentFeesKey, JSON.stringify(updatedFees));
+          }
+        });
+      }
+      
+      await fetchERPData();
+      showToast('Fee Structure has been successfully locked and can no longer be modified.', 'success');
       return;
     }
 
@@ -3731,18 +8750,111 @@ export default function App() {
         body: JSON.stringify({
           class_id: selectedFeeClassId,
           academic_year_id: activeYearId,
-          fee_structure: classFeeStructure
+          fee_structure: structureToSave,
+          is_locked: 1
         })
       });
       if (res.ok) {
-        showToast('Class fee structure saved successfully', 'success');
+        setClassFeeStructure(structureToSave);
+        await fetchERPData();
+        showToast('Fee Structure has been successfully locked and can no longer be modified.', 'success');
       } else {
-        showToast('Failed to save fee structure', 'danger');
+        const errData = await res.json().catch(() => ({}));
+        showToast(errData.detail || 'Failed to save fee structure', 'danger');
       }
     } catch (err) {
       showToast('Failed to save fee structure', 'danger');
     }
   };
+
+  const handleSaveTimetableConfig = async () => {
+    if (draftPeriodDuration <= 0 || draftTotalPeriods <= 0 || draftIntervalDuration < 0 || draftIntervalAfterPeriod < 0 || draftIntervalAfterPeriod > draftTotalPeriods) {
+      showToast('Please correct validation errors before saving.', 'error');
+      return;
+    }
+
+    const payload = {
+      school_start_time: draftSchoolStartTime,
+      period_duration: draftPeriodDuration,
+      interval_duration: draftIntervalDuration,
+      interval_after_period: draftIntervalAfterPeriod,
+      total_periods: draftTotalPeriods
+    };
+
+    const keySuffix = schoolId || 'default';
+
+    localStorage.setItem('bn_settings_school_start_time', draftSchoolStartTime);
+    localStorage.setItem('bn_settings_period_duration', draftPeriodDuration.toString());
+    localStorage.setItem('bn_settings_interval_duration', draftIntervalDuration.toString());
+    localStorage.setItem('bn_settings_interval_after_period', draftIntervalAfterPeriod.toString());
+    localStorage.setItem('bn_settings_total_periods', draftTotalPeriods.toString());
+
+    localStorage.setItem(`bn_sandbox_school_start_time_${keySuffix}`, draftSchoolStartTime);
+    localStorage.setItem(`bn_sandbox_period_duration_${keySuffix}`, draftPeriodDuration.toString());
+    localStorage.setItem(`bn_sandbox_interval_duration_${keySuffix}`, draftIntervalDuration.toString());
+    localStorage.setItem(`bn_sandbox_interval_after_period_${keySuffix}`, draftIntervalAfterPeriod.toString());
+    localStorage.setItem(`bn_sandbox_total_periods_${keySuffix}`, draftTotalPeriods.toString());
+
+    if (token.includes('mock') || !isConnected) {
+      setSchoolStartTime(draftSchoolStartTime);
+      setPeriodDuration(draftPeriodDuration);
+      setIntervalDuration(draftIntervalDuration);
+      setIntervalAfterPeriod(draftIntervalAfterPeriod);
+      setTotalPeriodsPerDay(draftTotalPeriods);
+      showToast('Timetable configuration saved locally (Sandbox Mode)!', 'success');
+      return;
+    }
+
+    try {
+      const headers = getHeaders();
+      const res = await fetch('/api/school/timetable-config', {
+        method: 'PUT',
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.detail || 'Failed to save timetable configuration.');
+      }
+
+      setSchoolStartTime(draftSchoolStartTime);
+      setPeriodDuration(draftPeriodDuration);
+      setIntervalDuration(draftIntervalDuration);
+      setIntervalAfterPeriod(draftIntervalAfterPeriod);
+      setTotalPeriodsPerDay(draftTotalPeriods);
+
+      showToast('Timetable configuration saved successfully to database!', 'success');
+      
+      const resAudit = await fetch('/api/audit-logs', { headers });
+      if (resAudit.ok) setAuditLogs(await resAudit.json());
+
+    } catch (err) {
+      console.error(err);
+      showToast(err.message, 'error');
+    }
+  };
+
+  const resetDraftTimetableSettings = () => {
+    setDraftSchoolStartTime(schoolStartTime);
+    setDraftPeriodDuration(periodDuration);
+    setDraftIntervalDuration(intervalDuration);
+    setDraftIntervalAfterPeriod(intervalAfterPeriod);
+    setDraftTotalPeriods(totalPeriodsPerDay);
+  };
+
+  useEffect(() => {
+    if (activeTab !== 'settings' && hasUnsavedChanges && previousTab === 'settings') {
+      setPendingTabChange(activeTab);
+      setShowUnsavedConfirmModal(true);
+      setActiveTab('settings');
+    } else {
+      setPreviousTab(activeTab);
+    }
+  }, [activeTab, hasUnsavedChanges, previousTab]);
 
   useEffect(() => {
     if (selectedFeeClassId) {
@@ -3764,14 +8876,89 @@ export default function App() {
   };
 
   const getClassMonthlyFee = (classId) => {
+    if (isConnected) {
+      const matchStud = students.find(s => s.class_id === parseInt(classId));
+      if (matchStud && matchStud.monthly_fee !== undefined) {
+        return parseFloat(matchStud.monthly_fee) || 0.00;
+      }
+    }
     const keySuffix = schoolId || 'default';
     const sandboxClassFeesKey = `bn_sandbox_class_fees_${keySuffix}_${classId}_${activeYearId}`;
     const storedClassFees = localStorage.getItem(sandboxClassFeesKey);
-    const feeStructure = storedClassFees ? JSON.parse(storedClassFees) : {
-      April: 150, May: 150, June: 150, July: 150, August: 150, September: 150,
-      October: 150, November: 150, December: 150, January: 150, February: 150, March: 150
-    };
-    return parseFloat(feeStructure.April) || 150.00;
+    if (!storedClassFees) return 0.00;
+    const feeStructure = JSON.parse(storedClassFees);
+    return parseFloat(feeStructure.April) || 0.00;
+  };
+
+  const getStudentDuesAmount = (student) => {
+    if (!student) return 0;
+    let unpaidDues = 0;
+    if (isConnected) {
+      unpaidDues = parseFloat(student.total_dues) || 0.00;
+    } else {
+      const keySuffix = schoolId || 'default';
+      const storageKey = `bn_sandbox_fees_${keySuffix}_${student.id}_${activeYearId}`;
+      const stored = localStorage.getItem(storageKey);
+      
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth() + 1;
+      
+      if (stored) {
+        const records = JSON.parse(stored);
+        records.forEach(r => {
+          if (r.status !== 'Paid') {
+            const [dueY, dueM] = r.due_date.split('-').map(Number);
+            if (dueY < currentYear || (dueY === currentYear && dueM <= currentMonth)) {
+              unpaidDues += parseFloat(r.amount) || 0;
+            }
+          }
+        });
+      } else {
+        const activeYear = years.find(y => y.id === activeYearId);
+        const range = activeYear ? activeYear.year_range : '2025-2026';
+        const [startYearStr, endYearStr] = range.split('-');
+        const startYear = parseInt(startYearStr) || 2025;
+        const endYear = parseInt(endYearStr) || 2026;
+        
+        const sandboxClassFeesKey = `bn_sandbox_class_fees_${keySuffix}_${student.class_id}_${activeYearId}`;
+        const storedClassFees = localStorage.getItem(sandboxClassFeesKey);
+        const feeStructure = storedClassFees ? JSON.parse(storedClassFees) : {
+          April: 0, May: 0, June: 0, July: 0, August: 0, September: 0,
+          October: 0, November: 0, December: 0, January: 0, February: 0, March: 0
+        };
+        
+        const months = ["April", "May", "June", "July", "August", "September", "October", "November", "December", "January", "February", "March"];
+        
+        months.forEach((m, idx) => {
+          const mNum = idx < 9 ? idx + 4 : idx - 8;
+          const mYear = idx < 9 ? startYear : endYear;
+          if (mYear < currentYear || (mYear === currentYear && mNum <= currentMonth)) {
+            unpaidDues += parseFloat(feeStructure[m]) || 0.00;
+          }
+        });
+      }
+      
+      // Add pending extra fees in sandbox mode
+      const extraKey = `bn_sandbox_student_extra_fees_${keySuffix}_${activeYearId}`;
+      const storedExtra = localStorage.getItem(extraKey);
+      if (storedExtra) {
+        const extraRecords = JSON.parse(storedExtra);
+        const typesKey = `bn_sandbox_extra_fee_types_${keySuffix}_${activeYearId}`;
+        const storedTypes = localStorage.getItem(typesKey);
+        const types = storedTypes ? JSON.parse(storedTypes) : [];
+        
+        extraRecords.forEach(r => {
+          if (r.student_id === student.id && r.status !== 'Paid') {
+            const type = types.find(t => t.id === r.extra_fee_type_id);
+            if (type) {
+              unpaidDues += parseFloat(type.amount) || 0;
+            }
+          }
+        });
+      }
+    }
+    return Math.round(unpaidDues);
   };
 
   const getStudentFeeStatus = (student) => {
@@ -3797,10 +8984,10 @@ export default function App() {
       
       const sandboxClassFeesKey = `bn_sandbox_class_fees_${keySuffix}_${student.class_id}_${activeYearId}`;
       const storedClassFees = localStorage.getItem(sandboxClassFeesKey);
-      const feeStructure = storedClassFees ? JSON.parse(storedClassFees) : {
-        April: 150, May: 150, June: 150, July: 150, August: 150, September: 150,
-        October: 150, November: 150, December: 150, January: 150, February: 150, March: 150
-      };
+      if (!storedClassFees) {
+        return 'FEE NOT SET';
+      }
+      const feeStructure = JSON.parse(storedClassFees);
       records = months.map((m, i) => {
         const year = i < 9 ? startYear : endYear;
         const monthNum = i < 9 ? i + 4 : i - 8;
@@ -3816,33 +9003,36 @@ export default function App() {
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth() + 1;
     
+    let totalUnpaidUpToCurrent = 0;
     let pastUnpaidCount = 0;
     let isCurrentUnpaid = false;
-    let totalUnpaid = 0;
     
     records.forEach(f => {
       if (f.status !== 'Paid') {
-        totalUnpaid++;
         const [dueY, dueM] = f.due_date.split('-').map(Number);
-        if (dueY < currentYear || (dueY === currentYear && dueM < currentMonth)) {
-          pastUnpaidCount++;
-        } else if (dueY === currentYear && dueM === currentMonth) {
-          isCurrentUnpaid = true;
+        if (dueY < currentYear || (dueY === currentYear && dueM <= currentMonth)) {
+          totalUnpaidUpToCurrent++;
+          if (dueY < currentYear || (dueY === currentYear && dueM < currentMonth)) {
+            pastUnpaidCount++;
+          } else if (dueY === currentYear && dueM === currentMonth) {
+            isCurrentUnpaid = true;
+          }
         }
       }
     });
     
-    if (totalUnpaid === 0) return 'PAID';
-    if (pastUnpaidCount === 0) {
-      return isCurrentUnpaid ? 'DUES PENDING' : 'PAID';
+    if (totalUnpaidUpToCurrent === 0) return 'PAID';
+    if (totalUnpaidUpToCurrent === 1) {
+      return isCurrentUnpaid ? 'DUES PENDING' : 'PAYMENT OVERDUE';
     }
-    if (pastUnpaidCount === 1) return 'PAYMENT OVERDUE';
-    if (pastUnpaidCount === 2) return 'CRITICAL DUES';
-    return 'FEE DEFAULT ALERT';
+    if (totalUnpaidUpToCurrent === 2) return 'CRITICAL DUES';
+    return 'DEFAULT ALERT';
   };
 
   const getFeeStatusBadgeInfo = (statusStr) => {
     switch (statusStr) {
+      case 'FEE NOT SET':
+        return { class: 'badge-warning', label: 'FEE NOT SET' };
       case 'PAID':
         return { class: 'badge-success', label: 'PAID' };
       case 'DUES PENDING':
@@ -3851,69 +9041,67 @@ export default function App() {
         return { class: 'badge-overdue', label: 'PAYMENT OVERDUE' };
       case 'CRITICAL DUES':
         return { class: 'badge-critical', label: 'CRITICAL DUES' };
-      case 'FEE DEFAULT ALERT':
-        return { class: 'badge-default-alert', label: 'FEE DEFAULT ALERT' };
+      case 'DEFAULT ALERT':
+        return { class: 'badge-default-alert', label: 'DEFAULT ALERT' };
       default:
         return { class: 'badge-secondary', label: statusStr || 'UNKNOWN' };
     }
   };
 
+  const getTeacherAssignedCountOnDate = (teacherId, dateStr) => {
+    let count = 0;
+    allWeeklySchedules.forEach(sched => {
+      if (sched.schedule_date === dateStr && Array.isArray(sched.subjects)) {
+        sched.subjects.forEach(period => {
+          if (period && typeof period === 'object') {
+            const hasBackup = period.backup_teacher_id && period.backup_teacher_id !== 'null' && period.backup_teacher_id !== '';
+            const actualTeacherId = hasBackup ? period.backup_teacher_id : period.teacher_id;
+            if (parseInt(actualTeacherId) === parseInt(teacherId)) {
+              count++;
+            }
+          }
+        });
+      }
+    });
+    return count;
+  };
+
+  const getPlanDateFromDayName = (dayName) => {
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const idx = days.indexOf(dayName);
+    if (idx === -1) return '';
+    const refMonday = new Date(weekStartDate);
+    const cardDate = new Date(refMonday);
+    cardDate.setDate(refMonday.getDate() + idx);
+    const y = cardDate.getFullYear();
+    const m = String(cardDate.getMonth() + 1).padStart(2, '0');
+    const r = String(cardDate.getDate()).padStart(2, '0');
+    return `${y}-${m}-${r}`;
+  };
+
   const filteredTeachers = teachers.filter(t => {
     const matchesSubject = subjectFilter === 'all' || t.subject.toLowerCase() === subjectFilter.toLowerCase();
     const matchesStatus = statusFilter === 'all' || t.status.toLowerCase() === statusFilter.toLowerCase();
-    const matchesSearch = t.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          t.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          (t.phone && t.phone.includes(searchQuery));
+    const matchesSearch = t.name.toLowerCase().includes(teacherSearchQuery.toLowerCase()) || 
+                          t.subject.toLowerCase().includes(teacherSearchQuery.toLowerCase()) ||
+                          (t.phone && t.phone.includes(teacherSearchQuery));
     return matchesSubject && matchesStatus && matchesSearch;
+  }).sort((a, b) => {
+    const countA = getTeacherAssignedCountOnDate(a.id, facultySelectedDate);
+    const countB = getTeacherAssignedCountOnDate(b.id, facultySelectedDate);
+    if (countB !== countA) {
+      return countB - countA;
+    }
+    return String(a.name).localeCompare(String(b.name));
   });
 
   const getDuesReport = () => {
     return students.map(s => {
-      const keySuffix = schoolId || 'default';
-      const storageKey = `bn_sandbox_fees_${keySuffix}_${s.id}_${activeYearId}`;
-      const stored = localStorage.getItem(storageKey);
-      
-      let unpaidDues = 0;
-      if (stored) {
-        const records = JSON.parse(stored);
-        records.forEach(r => {
-          if (r.status !== 'Paid') {
-            unpaidDues += parseFloat(r.amount) || 0;
-          }
-        });
-      } else {
-        const activeYear = years.find(y => y.id === activeYearId);
-        const range = activeYear ? activeYear.year_range : '2025-2026';
-        const [startYearStr, endYearStr] = range.split('-');
-        const startYear = parseInt(startYearStr) || 2025;
-        const endYear = parseInt(endYearStr) || 2026;
-        
-        const sandboxClassFeesKey = `bn_sandbox_class_fees_${keySuffix}_${s.class_id}_${activeYearId}`;
-        const storedClassFees = localStorage.getItem(sandboxClassFeesKey);
-        const feeStructure = storedClassFees ? JSON.parse(storedClassFees) : {
-          April: 150, May: 150, June: 150, July: 150, August: 150, September: 150,
-          October: 150, November: 150, December: 150, January: 150, February: 150, March: 150
-        };
-        
-        const now = new Date();
-        const currentYear = now.getFullYear();
-        const currentMonth = now.getMonth() + 1;
-        const months = ["April", "May", "June", "July", "August", "September", "October", "November", "December", "January", "February", "March"];
-        
-        months.forEach((m, i) => {
-          const year = i < 9 ? startYear : endYear;
-          const monthNum = i < 9 ? i + 4 : i - 8;
-          if (year < currentYear || (year === currentYear && monthNum <= currentMonth)) {
-            unpaidDues += parseFloat(feeStructure[m]) || 150.00;
-          }
-        });
-      }
-      
       return {
         name: s.name,
         roll: s.roll_number,
         class: getClassName(s.class_id),
-        dues: unpaidDues
+        dues: getStudentDuesAmount(s)
       };
     }).filter(r => r.dues > 0);
   };
@@ -3937,12 +9125,29 @@ export default function App() {
         });
       }
     });
+
+    const extraKey = `bn_sandbox_student_extra_fees_${keySuffix}_${activeYearId}`;
+    const storedExtra = localStorage.getItem(extraKey);
+    if (storedExtra) {
+      const extraRecords = JSON.parse(storedExtra);
+      const typesKey = `bn_sandbox_extra_fee_types_${keySuffix}_${activeYearId}`;
+      const storedTypes = localStorage.getItem(typesKey);
+      const types = storedTypes ? JSON.parse(storedTypes) : [];
+      extraRecords.forEach(r => {
+        if (r.status === 'Paid') {
+          const type = types.find(t => t.id === r.extra_fee_type_id);
+          if (type) {
+            totalPaid += parseFloat(type.amount) || 0;
+          }
+        }
+      });
+    }
     return totalPaid;
   };
 
   const getDynamicFeeCollectionChartData = () => {
     const keySuffix = schoolId || 'default';
-    const months = ["April", "May", "June", "July", "August", "September"];
+    const months = ["April", "May", "June", "July", "August", "September", "October", "November", "December", "January", "February", "March"];
     const chartData = months.map(m => ({ month: m, amount: 0 }));
     
     students.forEach(s => {
@@ -3960,12 +9165,36 @@ export default function App() {
         });
       }
     });
+
+    const extraKey = `bn_sandbox_student_extra_fees_${keySuffix}_${activeYearId}`;
+    const storedExtra = localStorage.getItem(extraKey);
+    if (storedExtra) {
+      const extraRecords = JSON.parse(storedExtra);
+      const typesKey = `bn_sandbox_extra_fee_types_${keySuffix}_${activeYearId}`;
+      const storedTypes = localStorage.getItem(typesKey);
+      const types = storedTypes ? JSON.parse(storedTypes) : [];
+      const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      
+      extraRecords.forEach(r => {
+        if (r.status === 'Paid' && r.payment_date) {
+          const date = new Date(r.payment_date);
+          const monthName = monthNames[date.getMonth()];
+          const chartMonth = chartData.find(c => c.month === monthName);
+          if (chartMonth) {
+            const type = types.find(t => t.id === r.extra_fee_type_id);
+            if (type) {
+              chartMonth.amount += parseFloat(type.amount) || 0;
+            }
+          }
+        }
+      });
+    }
     return chartData;
   };
 
   const getDynamicSalaryChartData = () => {
     const keySuffix = schoolId || 'default';
-    const months = ["April", "May", "June", "July", "August", "September"];
+    const months = ["April", "May", "June", "July", "August", "September", "October", "November", "December", "January", "February", "March"];
     const chartData = months.map(m => ({ month: m, amount: 0 }));
     
     teachers.forEach(t => {
@@ -4093,12 +9322,32 @@ export default function App() {
       if (status === 'DUES PENDING') pending++;
       else if (status === 'PAYMENT OVERDUE') overdue++;
       else if (status === 'CRITICAL DUES') critical++;
-      else if (status === 'FEE DEFAULT ALERT') alert++;
+      else if (status === 'DEFAULT ALERT') alert++;
     });
     return { pending, overdue, critical, alert };
   };
 
   const handlePrintReceipt = (student, record) => {
+    if (record && record.status === 'Paid' && record.paid_at) {
+      const sameTimeRecords = studentFees.filter(f => f.status === 'Paid' && f.paid_at === record.paid_at);
+      if (sameTimeRecords.length > 1) {
+        const monthsOrder = ["April", "May", "June", "July", "August", "September", "October", "November", "December", "January", "February", "March"];
+        sameTimeRecords.sort((a, b) => monthsOrder.indexOf(a.month) - monthsOrder.indexOf(b.month));
+        
+        const multiMonthRecord = {
+          isMultiMonth: true,
+          months: sameTimeRecords.map(r => r.month),
+          amount: sameTimeRecords.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0),
+          payment_date: record.payment_date,
+          paid_at: record.paid_at,
+          records: sameTimeRecords,
+          id: sameTimeRecords[sameTimeRecords.length - 1].id
+        };
+        setReceiptStudent(student);
+        setReceiptRecord(multiMonthRecord);
+        return;
+      }
+    }
     setReceiptStudent(student);
     setReceiptRecord(record);
   };
@@ -4110,7 +9359,7 @@ export default function App() {
     
     const opt = {
       margin:       10,
-      filename:     `receipt-${receiptStudent.name.replace(/\s+/g, '_')}-${receiptRecord.month}.pdf`,
+      filename:     `receipt-${receiptStudent.name.replace(/\s+/g, '_')}-${receiptRecord.isMultiMonth ? 'multi-month' : receiptRecord.month}.pdf`,
       image:        { type: 'jpeg', quality: 0.98 },
       html2canvas:  { scale: 2, useCORS: true },
       jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
@@ -4122,6 +9371,166 @@ export default function App() {
       showToast('PDF download library loading, please try again in a moment', 'warning');
     }
   };
+
+  const handlePrintRecoveryReceipt = (due, rec) => {
+    setSelectedRecoveryReceiptDue(due);
+    setSelectedRecoveryReceiptRec(rec);
+    setShowRecoveryReceiptModal(true);
+  };
+
+  const handleDownloadRecoveryPDF = () => {
+    if (!selectedRecoveryReceiptDue || !selectedRecoveryReceiptRec) return;
+    const element = document.getElementById('recovery-receipt-print-area');
+    if (!element) return;
+    
+    const opt = {
+      margin:       10,
+      filename:     `recovery-receipt-${selectedRecoveryReceiptDue.student_name.replace(/\s+/g, '_')}-${selectedRecoveryReceiptDue.original_academic_year}.pdf`,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true },
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+    
+    if (window.html2pdf) {
+      window.html2pdf().from(element).set(opt).save();
+    } else {
+      showToast('PDF download library loading, please try again in a moment', 'warning');
+    }
+  };
+
+  const fetchProfileData = async () => {
+    if (!token) return;
+    
+    const keySuffix = schoolId || 'default';
+    
+    // If it's a mock token, load mock profile from localStorage/defaults
+    if (token.includes('mock')) {
+      const stored = localStorage.getItem(`bn_sandbox_profile_${keySuffix}`);
+      if (stored && stored !== 'null') {
+        try {
+          const prof = JSON.parse(stored);
+          if (prof && typeof prof === 'object') {
+            setAdminProfile(prof);
+            if (prof.school_name) {
+              setSchoolName(prof.school_name);
+              localStorage.setItem('admin_school_name', prof.school_name);
+            }
+            setAdminProfileForm(prof);
+            return;
+          }
+        } catch (e) {
+          console.error("Failed to parse stored sandbox profile", e);
+        }
+      }
+      
+      const schoolNameVal = role === 'Super Admin' ? 'Platform Administration' : (schoolName || 'St. Xavier\'s International School');
+      const emailVal = role === 'Super Admin' ? 'Bilal@yopmail.com' : 'Admin@yopmail.com';
+      const nameVal = role === 'Super Admin' ? 'Bilal Ahmed' : 'School Admin';
+      const defaultProf = {
+        id: 0,
+        name: nameVal,
+        email: emailVal,
+        phone: '8650302499',
+        address: '123 Main Street',
+        city: 'Lucknow',
+        state: 'Uttar Pradesh',
+        country: 'India',
+        timezone: 'Asia/Kolkata',
+        profile_image: null,
+        role: role,
+        created_at: new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString().replace('T', ' ').substring(0, 19),
+        last_login_at: new Date().toISOString().replace('T', ' ').substring(0, 19),
+        school_name: schoolNameVal,
+        school_email: role === 'Super Admin' ? 'support@bncollegeportal.com' : 'xavier.admin@xavier.edu',
+        school_phone: role === 'Super Admin' ? '9876543210' : '+1 (555) 019-8833',
+        school_address: role === 'Super Admin' ? '123 Main St' : '123 School Lane',
+        school_city: role === 'Super Admin' ? 'Lucknow' : 'Lucknow',
+        school_state: role === 'Super Admin' ? 'Uttar Pradesh' : 'Uttar Pradesh',
+        school_country: role === 'Super Admin' ? 'India' : 'India',
+        school_contact_person: role === 'Super Admin' ? 'Bilal Ahmed' : 'Principal John Doe',
+        school_logo_path: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%234f46e5"/><path d="M50 25 L80 40 L50 55 L20 40 Z" fill="%23ffffff"/><path d="M35 47.5 L35 70 C35 75, 65 75, 65 70 L65 47.5" fill="%23ffffff" opacity="0.9"/><path d="M72 43 L72 65 L75 65 L75 43 Z" fill="%23f59e0b"/><circle cx="73.5" cy="67" r="3" fill="%23f59e0b"/></svg>'
+      };
+      setAdminProfile(defaultProf);
+      setAdminProfileForm(defaultProf);
+      localStorage.setItem(`bn_sandbox_profile_${keySuffix}`, JSON.stringify(defaultProf));
+      return;
+    }
+    
+    // For real tokens, attempt to fetch from backend API first
+    try {
+      const res = await fetch('/api/profile', { headers: getHeaders() });
+      if (res.ok) {
+        const prof = await res.json();
+        if (prof && typeof prof === 'object') {
+          setAdminProfile(prof);
+          if (prof.school_name) {
+            setSchoolName(prof.school_name);
+            localStorage.setItem('admin_school_name', prof.school_name);
+          }
+          setAdminProfileForm({
+            name: prof.name || '',
+            email: prof.email || '',
+            phone: prof.phone || '',
+            address: prof.address || '',
+            city: prof.city || '',
+            state: prof.state || '',
+            country: prof.country || '',
+            timezone: prof.timezone || 'Asia/Kolkata',
+            profile_image: prof.profile_image || ''
+          });
+          // Cache the latest profile in local storage for offline use
+          localStorage.setItem(`bn_sandbox_profile_${keySuffix}`, JSON.stringify(prof));
+          return;
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch profile online, checking local cache:", err);
+    }
+
+    // Fallback to local storage if offline/API fails
+    const stored = localStorage.getItem(`bn_sandbox_profile_${keySuffix}`);
+    if (stored && stored !== 'null') {
+      try {
+        const prof = JSON.parse(stored);
+        if (prof && typeof prof === 'object') {
+          setAdminProfile(prof);
+          if (prof.school_name) {
+            setSchoolName(prof.school_name);
+            localStorage.setItem('admin_school_name', prof.school_name);
+          }
+          setAdminProfileForm(prof);
+        }
+      } catch (e) {
+        console.error("Failed to parse cached profile", e);
+      }
+    }
+  };
+
+  // Fetch available plans for expired subscription screen
+  const fetchAvailablePlans = async () => {
+    try {
+      const res = await fetch('/api/subscription/plans');
+      if (res.ok) {
+        setAvailablePlans(await res.json());
+      } else {
+        throw new Error("Failed to fetch");
+      }
+    } catch (err) {
+      setAvailablePlans([
+        { id: 2, name: '1 Year Plan', duration_days: 365, price: 12000.00, description: '1 Year full platform access.' },
+        { id: 3, name: '2 Year Plan', duration_days: 730, price: 22000.00, description: '2 Years full platform access.' },
+        { id: 4, name: '3 Year Plan', duration_days: 1095, price: 30000.00, description: '3 Years full platform access. Best value.' }
+      ]);
+    }
+  };
+
+  // Sync profile data on token verified
+  useEffect(() => {
+    if (token && !isInitializing) {
+      fetchProfileData();
+      fetchAvailablePlans();
+    }
+  }, [token, isInitializing]);
 
   // --- RENDERING LAYER ---
 
@@ -4137,6 +9546,188 @@ export default function App() {
     );
   }
 
+  // 2.5. Reconnecting / Offline View (when API is unavailable but user is logged in)
+  if (token && isApiUnavailable) {
+    return (
+      <div className={`app-layout ${isDarkMode ? 'dark-theme' : ''}`} style={{ background: 'var(--bg-app)', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', display: 'flex', padding: '24px' }}>
+        
+        {toast && (
+          <div className="toast-in-out" 
+            onMouseEnter={pauseToastTimer}
+            onMouseLeave={resumeToastTimer}
+            style={{
+              position: 'fixed',
+              top: '24px',
+              right: '24px',
+              zIndex: 100005,
+              padding: '16px 20px',
+              borderRadius: 'var(--radius-md)',
+              backgroundColor: toast.type === 'success' ? '#10b981' : '#ef4444',
+              color: '#ffffff',
+              boxShadow: 'var(--shadow-lg)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              fontSize: '0.9rem',
+              fontWeight: 600
+            }}
+          >
+            {toast.type === 'success' ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
+            <span>{toast.message}</span>
+          </div>
+        )}
+
+        <div className="erp-card fade-in" style={{ 
+          width: '100%', 
+          maxWidth: '500px', 
+          padding: '40px 32px', 
+          border: '1px solid var(--border-color)', 
+          borderRadius: 'var(--radius-lg)', 
+          textAlign: 'center',
+          boxShadow: 'var(--shadow-xl)',
+          position: 'relative',
+          overflow: 'hidden'
+        }}>
+          {/* Subtle background decorative gradient glow */}
+          <div style={{
+            position: 'absolute',
+            top: '-50px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: '200px',
+            height: '100px',
+            background: 'radial-gradient(ellipse, rgba(239, 68, 68, 0.15) 0%, rgba(239, 68, 68, 0) 70%)',
+            pointerEvents: 'none',
+            zIndex: 0
+          }} />
+
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            {/* Animated offline icon container */}
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid rgba(239, 68, 68, 0.25)',
+              padding: '20px',
+              borderRadius: '24px',
+              marginBottom: '28px',
+              boxShadow: '0 0 30px rgba(239, 68, 68, 0.15)'
+            }}>
+              <WifiOff size={44} style={{ color: '#ef4444' }} />
+            </div>
+
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '12px' }}>
+              Connection to Server Lost
+            </h2>
+            
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: '1.6', marginBottom: '24px' }}>
+              The system cannot establish a secure link with the school database server. 
+              Your session is saved locally, but live actions are temporarily suspended until the server is back online.
+            </p>
+
+            {/* Error Detail Display */}
+            {apiConnectionError && (
+              <div style={{
+                background: 'var(--bg-app)',
+                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-md)',
+                padding: '14px 16px',
+                textAlign: 'left',
+                marginBottom: '28px',
+                fontFamily: 'monospace',
+                fontSize: '0.8rem',
+                color: 'var(--text-muted)',
+                maxHeight: '120px',
+                overflowY: 'auto',
+                borderLeft: '4px solid #ef4444'
+              }}>
+                <div style={{ fontWeight: 600, color: '#ef4444', marginBottom: '4px', textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.05em' }}>
+                  Diagnostics Error Info
+                </div>
+                {apiConnectionError}
+              </div>
+            )}
+
+            {/* Live Connection Status Badge */}
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '6px 14px',
+              borderRadius: '20px',
+              background: isRetrying ? 'rgba(245, 158, 11, 0.1)' : 'rgba(239, 68, 68, 0.08)',
+              border: isRetrying ? '1px solid rgba(245, 158, 11, 0.2)' : '1px solid rgba(239, 68, 68, 0.15)',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              color: isRetrying ? '#f59e0b' : '#ef4444',
+              marginBottom: '32px'
+            }}>
+              <span style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor: isRetrying ? '#f59e0b' : '#ef4444',
+                animation: isRetrying ? 'spin 1s linear infinite' : 'pulse 1.5s infinite'
+              }} />
+              <span>{isRetrying ? 'Attempting Connection...' : 'Offline'}</span>
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <button
+                type="button"
+                onClick={handleTryReconnect}
+                disabled={isRetrying}
+                className="erp-button-primary"
+                style={{
+                  width: '100%',
+                  height: '46px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px',
+                  fontSize: '0.95rem',
+                  fontWeight: 700,
+                  cursor: isRetrying ? 'not-allowed' : 'pointer',
+                  opacity: isRetrying ? 0.8 : 1,
+                  background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%)',
+                  boxShadow: '0 4px 14px rgba(59, 130, 246, 0.25)'
+                }}
+              >
+                <RefreshCw size={18} className={isRetrying ? 'animate-spin' : ''} />
+                {isRetrying ? 'Verifying Link...' : 'Try Reconnecting'}
+              </button>
+
+              <button
+                type="button"
+                onClick={clearSession}
+                className="erp-button-secondary"
+                style={{
+                  width: '100%',
+                  height: '46px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  fontSize: '0.9rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  background: 'transparent',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-secondary)'
+                }}
+              >
+                <LogOut size={16} />
+                Switch Account / Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // 2. Unauthenticated Login Views
   if (!token) {
     const isSuperAdminLoginPage = currentPath === '/super-admin';
@@ -4144,22 +9735,26 @@ export default function App() {
       <div className={`app-layout ${isDarkMode ? 'dark-theme' : ''}`} style={{ background: 'var(--bg-app)', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', display: 'flex' }}>
         
         {toast && (
-          <div className="toast-in-out" style={{
-            position: 'fixed',
-            top: '24px',
-            right: '24px',
-            zIndex: 100005,
-            padding: '16px 20px',
-            borderRadius: 'var(--radius-md)',
-            backgroundColor: toast.type === 'success' ? '#10b981' : '#ef4444',
-            color: '#ffffff',
-            boxShadow: 'var(--shadow-lg)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            fontSize: '0.9rem',
-            fontWeight: 600
-          }}>
+          <div className="toast-in-out" 
+            onMouseEnter={pauseToastTimer}
+            onMouseLeave={resumeToastTimer}
+            style={{
+              position: 'fixed',
+              top: '24px',
+              right: '24px',
+              zIndex: 100005,
+              padding: '16px 20px',
+              borderRadius: 'var(--radius-md)',
+              backgroundColor: toast.type === 'success' ? '#10b981' : '#ef4444',
+              color: '#ffffff',
+              boxShadow: 'var(--shadow-lg)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              fontSize: '0.9rem',
+              fontWeight: 600
+            }}
+          >
             {toast.type === 'success' ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
             <span>{toast.message}</span>
           </div>
@@ -4226,88 +9821,194 @@ export default function App() {
             </div>
           )}
 
-          {/* Step 0: Login Form */}
+          {forgotPasswordStep === 0 && !isSuperAdminLoginPage && (
+            <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', marginBottom: '20px', gap: '4px' }}>
+              <button
+                type="button"
+                className={`btn-tab ${loginTab === 'admin' ? 'active' : ''}`}
+                onClick={() => { setLoginTab('admin'); setLoginError(''); setOtpStep(0); }}
+                style={{ flex: 1, padding: '10px 4px', fontSize: '0.8rem', background: loginTab === 'admin' ? 'rgba(59,130,246,0.1)' : 'transparent', border: 'none', borderBottom: loginTab === 'admin' ? '2px solid var(--color-primary)' : 'none', color: loginTab === 'admin' ? 'var(--text-primary)' : 'var(--text-muted)', cursor: 'pointer', fontWeight: 600 }}
+              >
+                School Admin
+              </button>
+              <button
+                type="button"
+                className={`btn-tab ${loginTab === 'teacher' ? 'active' : ''}`}
+                onClick={() => { setLoginTab('teacher'); setLoginError(''); setOtpStep(0); }}
+                style={{ flex: 1, padding: '10px 4px', fontSize: '0.8rem', background: loginTab === 'teacher' ? 'rgba(59,130,246,0.1)' : 'transparent', border: 'none', borderBottom: loginTab === 'teacher' ? '2px solid var(--color-primary)' : 'none', color: loginTab === 'teacher' ? 'var(--text-primary)' : 'var(--text-muted)', cursor: 'pointer', fontWeight: 600 }}
+              >
+                Class Teacher
+              </button>
+              <button
+                type="button"
+                className={`btn-tab ${loginTab === 'parent' ? 'active' : ''}`}
+                onClick={() => { setLoginTab('parent'); setLoginError(''); setOtpStep(0); }}
+                style={{ flex: 1, padding: '10px 4px', fontSize: '0.8rem', background: loginTab === 'parent' ? 'rgba(59,130,246,0.1)' : 'transparent', border: 'none', borderBottom: loginTab === 'parent' ? '2px solid var(--color-primary)' : 'none', color: loginTab === 'parent' ? 'var(--text-primary)' : 'var(--text-muted)', cursor: 'pointer', fontWeight: 600 }}
+              >
+                Parent
+              </button>
+            </div>
+          )}
+
+          {/* Step 0: Login Forms based on Active Tab */}
           {forgotPasswordStep === 0 && (
-            <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div>
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <Mail size={16} style={{ position: 'absolute', left: '14px', color: 'var(--text-muted)' }} />
-                  <input 
-                    id="login-email"
-                    type="email" 
-                    placeholder="Email Address" 
-                    value={loginUser}
-                    onChange={(e) => setLoginUser(e.target.value)}
-                    className="erp-input"
-                    style={{ paddingLeft: '40px' }}
-                    autoComplete="off"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <Lock size={16} style={{ position: 'absolute', left: '14px', color: 'var(--text-muted)' }} />
-                  <input 
-                    id="login-password"
-                    type={showPassword ? 'text' : 'password'} 
-                    placeholder="Password" 
-                    value={loginPass}
-                    onChange={(e) => setLoginPass(e.target.value)}
-                    className="erp-input"
-                    style={{ paddingLeft: '40px', paddingRight: '40px' }}
-                    autoComplete="new-password"
-                    required
-                  />
-                  <button
-                    type="button"
-                    id="password-visibility-toggle"
-                    onClick={() => setShowPassword(!showPassword)}
-                    style={{
-                      position: 'absolute', right: '12px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
-                    }}
-                  >
-                    {showPassword ? <Eye size={18} /> : <EyeOff size={18} />}
-                  </button>
+            loginTab === 'admin' ? (
+              <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <Mail size={16} style={{ position: 'absolute', left: '14px', color: 'var(--text-muted)' }} />
+                    <input 
+                      id="login-email"
+                      type="text" 
+                      placeholder="Email or Mobile Number" 
+                      value={loginUser}
+                      onChange={(e) => setLoginUser(e.target.value)}
+                      className="erp-input"
+                      style={{ paddingLeft: '40px' }}
+                      autoComplete="off"
+                      required
+                    />
+                  </div>
                 </div>
 
-                {!isSuperAdminLoginPage && (
-                  <div style={{ textAlign: 'right', marginTop: '8px' }}>
+                <div>
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <Lock size={16} style={{ position: 'absolute', left: '14px', color: 'var(--text-muted)' }} />
+                    <input 
+                      id="login-password"
+                      type={showPassword ? 'text' : 'password'} 
+                      placeholder="Password" 
+                      value={loginPass}
+                      onChange={(e) => setLoginPass(e.target.value)}
+                      className="erp-input"
+                      style={{ paddingLeft: '40px', paddingRight: '40px' }}
+                      autoComplete="new-password"
+                      required
+                    />
                     <button
                       type="button"
-                      onClick={() => {
-                        setForgotPasswordStep(1);
-                        setForgotError('');
-                        setForgotSuccess('');
-                        setForgotEmail('');
-                        setForgotOtp('');
+                      id="password-visibility-toggle"
+                      onClick={() => setShowPassword(!showPassword)}
+                      style={{
+                        position: 'absolute', right: '12px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
                       }}
-                      style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
                     >
-                      Forgot Password?
+                      {showPassword ? <Eye size={18} /> : <EyeOff size={18} />}
                     </button>
                   </div>
-                )}
-              </div>
 
-              <button 
-                id="btn-login-submit" 
-                type="submit" 
-                className="btn-primary" 
-                style={{ width: '100%', justifyContent: 'center', padding: '12px', marginTop: '10px', background: isSuperAdminLoginPage ? 'linear-gradient(135deg, var(--color-secondary) 0%, #ec4899 100%)' : 'var(--color-primary)' }}
-                disabled={isLoggingIn}
-              >
-                {isLoggingIn ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <RefreshCw className="animate-spin" size={18} />
-                    <span>Signing In...</span>
+                  {!isSuperAdminLoginPage && (
+                    <div style={{ textAlign: 'right', marginTop: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setForgotPasswordStep(1);
+                          setForgotError('');
+                          setForgotSuccess('');
+                          setForgotEmail('');
+                          setForgotOtp('');
+                        }}
+                        style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
+                      >
+                        Forgot Password?
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <button 
+                  id="btn-login-submit" 
+                  type="submit" 
+                  className="btn-primary" 
+                  style={{ width: '100%', justifyContent: 'center', padding: '12px', marginTop: '10px', background: isSuperAdminLoginPage ? 'linear-gradient(135deg, var(--color-secondary) 0%, #ec4899 100%)' : 'var(--color-primary)' }}
+                  disabled={isLoggingIn}
+                >
+                  {isLoggingIn ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <RefreshCw className="animate-spin" size={18} />
+                      <span>Signing In...</span>
+                    </div>
+                  ) : (
+                    'Sign In'
+                  )}
+                </button>
+              </form>
+            ) : (
+              /* OTP Verification Form for Teacher and Parent tabs */
+              otpStep === 0 ? (
+                <form onSubmit={handleRequestOtp} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div>
+                    <label className="erp-label" style={{ marginBottom: '8px', display: 'block' }}>Enter Registered Mobile Number</label>
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                      <Phone size={16} style={{ position: 'absolute', left: '14px', color: 'var(--text-muted)' }} />
+                      <input 
+                        id="otp-phone"
+                        type="tel" 
+                        placeholder={loginTab === 'teacher' ? 'e.g. 8888888888' : 'e.g. 9876543210'} 
+                        value={otpPhone}
+                        onChange={(e) => setOtpPhone(e.target.value)}
+                        className="erp-input"
+                        style={{ paddingLeft: '40px' }}
+                        autoComplete="off"
+                        required
+                      />
+                    </div>
                   </div>
-                ) : (
-                  'Sign In'
-                )}
-              </button>
-            </form>
+
+                  <button 
+                    id="btn-otp-request" 
+                    type="submit" 
+                    className="btn-primary" 
+                    style={{ width: '100%', justifyContent: 'center', padding: '12px', marginTop: '10px' }}
+                  >
+                    Get OTP
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={handleOtpLogin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                      Enter the 4-digit code sent to <strong>{otpPhone}</strong> (Use <strong>1234</strong>)
+                    </p>
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                      <Lock size={16} style={{ position: 'absolute', left: '14px', color: 'var(--text-muted)' }} />
+                      <input 
+                        id="otp-code"
+                        type="text" 
+                        maxLength={4}
+                        placeholder="Enter 4-Digit OTP" 
+                        value={otpCode}
+                        onChange={(e) => setOtpCode(e.target.value)}
+                        className="erp-input"
+                        style={{ paddingLeft: '40px' }}
+                        autoComplete="off"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button 
+                      type="button" 
+                      onClick={() => setOtpStep(0)} 
+                      className="btn-outline" 
+                      style={{ flex: 1, padding: '12px', justifyContent: 'center' }}
+                    >
+                      Back
+                    </button>
+                    <button 
+                      id="btn-otp-verify" 
+                      type="submit" 
+                      className="btn-primary" 
+                      style={{ flex: 2, justifyContent: 'center', padding: '12px' }}
+                      disabled={isLoggingIn}
+                    >
+                      {isLoggingIn ? 'Verifying...' : 'Verify & Login'}
+                    </button>
+                  </div>
+                </form>
+              )
+            )
           )}
 
           {/* Step 1: Forgot Password (Email submission) */}
@@ -4534,17 +10235,18 @@ export default function App() {
           )}
 
         </div>
+        {expiredModalInfo && renderExpiredPopupModal()}
       </div>
     );
   }
 
   // 3. School Admin First-Login Setup Wizard
-  if (role === 'School Admin' && setupCompleted === 0) {
+  if (role === 'School Admin' && Number(setupCompleted) === 0) {
     return (
       <div className={`app-layout ${isDarkMode ? 'dark-theme' : ''}`} style={{ background: 'var(--bg-app)', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', display: 'flex' }}>
         <div className="erp-card fade-in" style={{ width: '100%', maxWidth: '550px', padding: '40px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)' }}>
           
-          <div style={{ display: 'flex', alignItems: 'center', justifyBetween: 'space-between', marginBottom: '24px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <Sparkles className="animate-pulse" size={24} style={{ color: 'var(--color-primary)' }} />
               <h2 style={{ fontSize: '1.35rem', fontWeight: 800 }}>First-Login Setup Wizard</h2>
@@ -4736,78 +10438,6 @@ export default function App() {
 
   // --- ADMIN PROFILE ACTIONS ---
 
-  const fetchProfileData = async () => {
-    if (!token) return;
-    
-    const keySuffix = schoolId || 'default';
-    if (token.includes('mock') || !isConnected) {
-      const stored = localStorage.getItem(`bn_sandbox_profile_${keySuffix}`);
-      if (stored) {
-        const prof = JSON.parse(stored);
-        setAdminProfile(prof);
-        setAdminProfileForm(prof);
-        return;
-      } else {
-        const schoolNameVal = role === 'Super Admin' ? 'Platform Administration' : (schoolName || 'St. Xavier\'s International School');
-        const emailVal = role === 'Super Admin' ? 'Bilal@yopmail.com' : 'Admin@yopmail.com';
-        const nameVal = role === 'Super Admin' ? 'Bilal Ahmed' : 'School Admin';
-        const defaultProf = {
-          id: 0,
-          name: nameVal,
-          email: emailVal,
-          phone: '8650302499',
-          address: '123 Main Street',
-          city: 'Lucknow',
-          state: 'Uttar Pradesh',
-          country: 'India',
-          timezone: 'Asia/Kolkata',
-          profile_image: null,
-          role: role,
-          created_at: new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString().replace('T', ' ').substring(0, 19),
-          last_login_at: new Date().toISOString().replace('T', ' ').substring(0, 19),
-          school_name: schoolNameVal,
-          school_email: role === 'Super Admin' ? 'support@bncollegeportal.com' : 'xavier.admin@xavier.edu',
-          school_phone: role === 'Super Admin' ? '9876543210' : '+1 (555) 019-8833',
-          school_address: role === 'Super Admin' ? '123 Main St' : '123 School Lane',
-          school_city: role === 'Super Admin' ? 'Lucknow' : 'Lucknow',
-          school_state: role === 'Super Admin' ? 'Uttar Pradesh' : 'Uttar Pradesh',
-          school_country: role === 'Super Admin' ? 'India' : 'India'
-        };
-        setAdminProfile(defaultProf);
-        setAdminProfileForm(defaultProf);
-        localStorage.setItem(`bn_sandbox_profile_${keySuffix}`, JSON.stringify(defaultProf));
-        return;
-      }
-    }
-    
-    try {
-      const res = await fetch('/api/profile', { headers: getHeaders() });
-      if (res.ok) {
-        const prof = await res.json();
-        setAdminProfile(prof);
-        setAdminProfileForm({
-          name: prof.name || '',
-          email: prof.email || '',
-          phone: prof.phone || '',
-          address: prof.address || '',
-          city: prof.city || '',
-          state: prof.state || '',
-          country: prof.country || '',
-          timezone: prof.timezone || 'Asia/Kolkata',
-          profile_image: prof.profile_image || ''
-        });
-      }
-    } catch (err) {
-      console.error("Failed to fetch profile", err);
-    }
-  };
-
-  useEffect(() => {
-    if (token && !isInitializing) {
-      fetchProfileData();
-    }
-  }, [token, isInitializing]);
-
   const saveProfilePhoto = async (photoBase64) => {
     const keySuffix = schoolId || 'default';
     if (token.includes('mock') || !isConnected) {
@@ -4920,7 +10550,7 @@ export default function App() {
         if (resProf.ok) {
           const prof = await resProf.json();
           setAdminProfile(prof);
-          if (username === adminProfile.email) {
+          if (username === prof.email) {
             setUsername(prof.email);
           }
         }
@@ -4985,7 +10615,11 @@ export default function App() {
       const res = await fetch('/api/profile/password', {
         method: 'PUT',
         headers: getHeaders(),
-        body: JSON.stringify(passwordForm)
+        body: JSON.stringify({
+          current_password: sha256Sync(passwordForm.current_password),
+          new_password: sha256Sync(passwordForm.new_password),
+          confirm_password: sha256Sync(passwordForm.confirm_password)
+        })
       });
       if (res.ok) {
         showToast('Password changed successfully!', 'success');
@@ -5003,6 +10637,1236 @@ export default function App() {
     }
   };
 
+  // --- Student Performance Sub-modules Rendering ---
+
+  const renderAttendanceModule = () => {
+    const selectedClassStudents = students.filter(s => parseInt(s.class_id) === parseInt(attendanceClassId));
+    const sections = Array.from(new Set(selectedClassStudents.map(s => s.group_name).filter(Boolean)));
+    
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              onClick={() => {
+                setAttendanceMode('mark');
+                if (attendanceClassId) fetchAttendance(attendanceClassId, attendanceDate, activeYearId, attendanceGroupName);
+              }}
+              className={`btn-outline ${attendanceMode === 'mark' ? 'active' : ''}`}
+              style={{
+                padding: '6px 12px',
+                fontSize: '0.8rem',
+                borderRadius: '4px',
+                backgroundColor: attendanceMode === 'mark' ? 'rgba(255,255,255,0.05)' : 'transparent',
+                borderColor: attendanceMode === 'mark' ? 'var(--color-primary)' : 'var(--border-color)'
+              }}
+            >
+              Mark Attendance
+            </button>
+            <button
+              onClick={() => {
+                setAttendanceMode('report');
+                if (attendanceClassId) fetchAttendanceReport(attendanceClassId, attendanceReportMonth, activeYearId, attendanceGroupName);
+              }}
+              className={`btn-outline ${attendanceMode === 'report' ? 'active' : ''}`}
+              style={{
+                padding: '6px 12px',
+                fontSize: '0.8rem',
+                borderRadius: '4px',
+                backgroundColor: attendanceMode === 'report' ? 'rgba(255,255,255,0.05)' : 'transparent',
+                borderColor: attendanceMode === 'report' ? 'var(--color-primary)' : 'var(--border-color)'
+              }}
+            >
+              Monthly Attendance Report
+            </button>
+          </div>
+        </div>
+
+        <div className="erp-card" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', padding: '16px' }}>
+          <div>
+            <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Class</label>
+            <select
+              value={attendanceClassId}
+              onChange={(e) => {
+                const cid = e.target.value;
+                setAttendanceClassId(cid);
+                if (attendanceMode === 'mark') {
+                  fetchAttendance(cid, attendanceDate, activeYearId, attendanceGroupName);
+                } else {
+                  fetchAttendanceReport(cid, attendanceReportMonth, activeYearId, attendanceGroupName);
+                }
+              }}
+              className="form-control"
+              style={{ width: '100%', marginTop: '4px' }}
+            >
+              <option value="">Select Class...</option>
+              {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Section</label>
+            <select
+              value={attendanceGroupName}
+              onChange={(e) => {
+                const sec = e.target.value;
+                setAttendanceGroupName(sec);
+                if (attendanceMode === 'mark') {
+                  fetchAttendance(attendanceClassId, attendanceDate, activeYearId, sec);
+                } else {
+                  fetchAttendanceReport(attendanceClassId, attendanceReportMonth, activeYearId, sec);
+                }
+              }}
+              className="form-control"
+              style={{ width: '100%', marginTop: '4px' }}
+            >
+              <option value="all">All Sections</option>
+              {sections.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+
+          {attendanceMode === 'mark' ? (
+            <div>
+              <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Date</label>
+              <input
+                type="date"
+                value={attendanceDate}
+                onChange={(e) => {
+                  const d = e.target.value;
+                  setAttendanceDate(d);
+                  fetchAttendance(attendanceClassId, d, activeYearId, attendanceGroupName);
+                }}
+                className="form-control"
+                style={{ width: '100%', marginTop: '4px' }}
+              />
+            </div>
+          ) : (
+            <div>
+              <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Month</label>
+              <input
+                type="month"
+                value={attendanceReportMonth}
+                onChange={(e) => {
+                  const m = e.target.value;
+                  setAttendanceReportMonth(m);
+                  fetchAttendanceReport(attendanceClassId, m, activeYearId, attendanceGroupName);
+                }}
+                className="form-control"
+                style={{ width: '100%', marginTop: '4px' }}
+              />
+            </div>
+          )}
+        </div>
+
+        {attendanceMode === 'mark' ? (
+          !attendanceClassId ? (
+            <div className="erp-card" style={{ padding: '32px', fontStyle: 'italic', color: 'var(--text-muted)', textAlign: 'center' }}>
+              Please select a class to load student attendance.
+            </div>
+          ) : isFetchingAttendance ? (
+            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+              <RefreshCw className="spin" size={24} style={{ marginRight: '8px' }} /> Loading students...
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div className="erp-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', gap: '12px', flexWrap: 'wrap', background: 'rgba(255,255,255,0.015)' }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                  Marking attendance for <strong>{attendanceStudents.length}</strong> students:
+                </span>
+                
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => {
+                      const updated = {};
+                      attendanceStudents.forEach(s => { updated[s.id] = 'Present'; });
+                      setMarkedAttendance(prev => ({ ...prev, ...updated }));
+                    }}
+                    className="btn-outline"
+                    style={{ fontSize: '0.75rem', padding: '4px 10px', color: '#10b981', borderColor: 'rgba(16, 185, 129, 0.3)' }}
+                  >
+                    Mark All Present
+                  </button>
+                  <button
+                    onClick={() => {
+                      const updated = {};
+                      attendanceStudents.forEach(s => { updated[s.id] = 'Absent'; });
+                      setMarkedAttendance(prev => ({ ...prev, ...updated }));
+                    }}
+                    className="btn-outline"
+                    style={{ fontSize: '0.75rem', padding: '4px 10px', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.3)' }}
+                  >
+                    Mark All Absent
+                  </button>
+                  <button
+                    onClick={() => {
+                      const updated = {};
+                      attendanceStudents.forEach(s => { updated[s.id] = 'Leave'; });
+                      setMarkedAttendance(prev => ({ ...prev, ...updated }));
+                    }}
+                    className="btn-outline"
+                    style={{ fontSize: '0.75rem', padding: '4px 10px', color: '#f59e0b', borderColor: 'rgba(245, 158, 11, 0.3)' }}
+                  >
+                    Mark All Leave
+                  </button>
+                </div>
+              </div>
+
+              {attendanceStudents.length === 0 ? (
+                <div className="erp-card" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                  No active students enrolled in this class/section.
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
+                    {attendanceStudents.map(student => {
+                      const currentStatus = markedAttendance[student.id] !== undefined ? markedAttendance[student.id] : student.status;
+                      
+                      return (
+                        <div 
+                          key={student.id} 
+                          className="erp-card" 
+                          style={{ 
+                            padding: '16px', 
+                            display: 'flex', 
+                            flexDirection: 'column', 
+                            gap: '12px',
+                            borderLeft: `4px solid ${
+                              currentStatus === 'Present' ? '#10b981' :
+                              currentStatus === 'Absent' ? '#ef4444' :
+                              currentStatus === 'Leave' ? '#f59e0b' : 'var(--border-color)'
+                            }`
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <div>
+                              <strong style={{ fontSize: '0.95rem', display: 'block', color: 'var(--text-primary)' }}>{student.name}</strong>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Roll No: {student.roll_number}</span>
+                            </div>
+                            {student.group_name && (
+                              <span className="badge badge-primary" style={{ fontSize: '0.7rem', padding: '2px 6px' }}>{student.group_name}</span>
+                            )}
+                          </div>
+                          
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', marginTop: '4px' }}>
+                            <button
+                              onClick={() => setMarkedAttendance(prev => ({ ...prev, [student.id]: 'Present' }))}
+                              style={{
+                                padding: '8px 4px',
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                border: '1px solid',
+                                backgroundColor: currentStatus === 'Present' ? '#10b981' : 'transparent',
+                                color: currentStatus === 'Present' ? '#ffffff' : '#10b981',
+                                borderColor: '#10b981',
+                                opacity: currentStatus === 'Present' ? 1 : 0.6
+                              }}
+                            >
+                              Present
+                            </button>
+                            <button
+                              onClick={() => setMarkedAttendance(prev => ({ ...prev, [student.id]: 'Absent' }))}
+                              style={{
+                                padding: '8px 4px',
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                border: '1px solid',
+                                backgroundColor: currentStatus === 'Absent' ? '#ef4444' : 'transparent',
+                                color: currentStatus === 'Absent' ? '#ffffff' : '#ef4444',
+                                borderColor: '#ef4444',
+                                opacity: currentStatus === 'Absent' ? 1 : 0.6
+                              }}
+                            >
+                              Absent
+                            </button>
+                            <button
+                              onClick={() => setMarkedAttendance(prev => ({ ...prev, [student.id]: 'Leave' }))}
+                              style={{
+                                padding: '8px 4px',
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                border: '1px solid',
+                                backgroundColor: currentStatus === 'Leave' ? '#f59e0b' : 'transparent',
+                                color: currentStatus === 'Leave' ? '#ffffff' : '#f59e0b',
+                                borderColor: '#f59e0b',
+                                opacity: currentStatus === 'Leave' ? 1 : 0.6
+                              }}
+                            >
+                              Leave
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px', position: 'sticky', bottom: '16px', zIndex: 10 }}>
+                    <button
+                      onClick={() => {
+                        const payload = attendanceStudents.map(student => ({
+                          student_id: student.id,
+                          status: markedAttendance[student.id] !== undefined ? markedAttendance[student.id] : (student.status || 'Present')
+                        }));
+                        saveAttendanceBulk(attendanceClassId, attendanceDate, activeYearId, payload);
+                      }}
+                      className="btn-primary"
+                      disabled={isSavingAttendance}
+                      style={{ padding: '12px 24px', borderRadius: '8px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}
+                    >
+                      {isSavingAttendance ? <RefreshCw className="spin" size={16} /> : null}
+                      Save Attendance
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )
+        ) : (
+          !attendanceClassId ? (
+            <div className="erp-card" style={{ padding: '32px', fontStyle: 'italic', color: 'var(--text-muted)', textAlign: 'center' }}>
+              Please select a class to generate report.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                  Attendance Summary for <strong>{getClassName(attendanceClassId)}</strong> ({attendanceReportMonth})
+                </span>
+                
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => {
+                      window.print();
+                    }}
+                    className="btn-outline"
+                    style={{ fontSize: '0.85rem', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  >
+                    <Printer size={14} /> Export PDF
+                  </button>
+                  <button
+                    onClick={() => {
+                      let csv = "Roll No,Student Name,Section,Present,Absent,Leave,Percentage\n";
+                      attendanceReportData.forEach(row => {
+                        csv += `"${row.roll_number}","${row.name}","${row.group_name || ''}",${row.present},${row.absent},${row.leave},${row.percentage}%\n`;
+                      });
+                      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                      const link = document.createElement("a");
+                      link.href = URL.createObjectURL(blob);
+                      link.setAttribute("download", `Attendance_Report_${getClassName(attendanceClassId)}_${attendanceReportMonth}.csv`);
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                    }}
+                    className="btn-outline"
+                    style={{ fontSize: '0.85rem', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  >
+                    <FileSpreadsheet size={14} /> Export Excel
+                  </button>
+                </div>
+              </div>
+
+              <div className="erp-card" style={{ padding: 0, overflowX: 'auto' }}>
+                <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                      <th style={{ padding: '12px 16px' }}>Roll No</th>
+                      <th style={{ padding: '12px 16px' }}>Student Name</th>
+                      <th style={{ padding: '12px 16px' }}>Section</th>
+                      <th style={{ padding: '12px 16px' }}>Present</th>
+                      <th style={{ padding: '12px 16px' }}>Absent</th>
+                      <th style={{ padding: '12px 16px' }}>Leave</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'right' }}>Percentage</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {attendanceReportData.length === 0 ? (
+                      <tr>
+                        <td colSpan="7" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                          No attendance records found for this period.
+                        </td>
+                      </tr>
+                    ) : (
+                      attendanceReportData.map(row => {
+                        const isGreen = row.percentage >= 95;
+                        const isYellow = row.percentage >= 75 && row.percentage < 95;
+                        
+                        return (
+                          <tr key={row.id} style={{ borderBottom: '1px solid var(--border-color)', fontSize: '0.85rem' }}>
+                            <td style={{ padding: '12px 16px' }}>{row.roll_number}</td>
+                            <td style={{ padding: '12px 16px', fontWeight: 600 }}>{row.name}</td>
+                            <td style={{ padding: '12px 16px' }}>{row.group_name || 'N/A'}</td>
+                            <td style={{ padding: '12px 16px', color: '#10b981', fontWeight: 600 }}>{row.present} Days</td>
+                            <td style={{ padding: '12px 16px', color: '#ef4444', fontWeight: 600 }}>{row.absent} Days</td>
+                            <td style={{ padding: '12px 16px', color: '#f59e0b', fontWeight: 600 }}>{row.leave} Days</td>
+                            <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                              <span 
+                                className="badge" 
+                                style={{ 
+                                  backgroundColor: isGreen ? 'rgba(16, 185, 129, 0.1)' : isYellow ? 'rgba(245, 158, 11, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                                  color: isGreen ? '#10b981' : isYellow ? '#f59e0b' : '#ef4444',
+                                  fontWeight: 'bold',
+                                  padding: '4px 8px',
+                                  borderRadius: '4px'
+                                }}
+                              >
+                                {row.percentage}%
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )
+        )}
+      </div>
+    );
+  };
+
+  const renderExamsModule = () => {
+    if (examMarksMode === 'entry' && selectedExam) {
+      const examSubjects = selectedExam.subjects || [];
+      
+      if (!marksSubjectFilter && examSubjects.length > 0) {
+        setMarksSubjectFilter(examSubjects[0].subject_name);
+      }
+      
+      const currentSubject = examSubjects.find(s => s.subject_name === marksSubjectFilter) || examSubjects[0];
+      const maxMarks = currentSubject ? currentSubject.max_marks : 100;
+      
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+            <div>
+              <button 
+                onClick={() => {
+                  setExamMarksMode('list');
+                  setSelectedExam(null);
+                  setMarksSubjectFilter('');
+                }}
+                className="btn-outline"
+                style={{ padding: '4px 10px', fontSize: '0.8rem', borderRadius: '4px', marginBottom: '8px' }}
+              >
+                ← Back to Exams
+              </button>
+              <h4 style={{ fontSize: '1.15rem' }}>Marks Entry: <strong>{selectedExam.name}</strong> ({getClassName(selectedExam.class_id)})</h4>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                Exam Period: {formatDate(selectedExam.start_date)} - {formatDate(selectedExam.end_date)}
+              </span>
+            </div>
+            
+            {marksSaveStatus && (
+              <div 
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '6px', 
+                  fontSize: '0.8rem', 
+                  color: marksSaveStatus === 'saving' ? '#f59e0b' : '#10b981',
+                  background: marksSaveStatus === 'saving' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                  padding: '6px 12px',
+                  borderRadius: '4px',
+                  fontWeight: 600
+                }}
+              >
+                {marksSaveStatus === 'saving' ? (
+                  <>
+                    <RefreshCw className="spin" size={14} /> Saving marks...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 size={14} /> Auto-saved successfully
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="erp-card" style={{ padding: '16px', display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+            <div>
+              <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Select Subject</label>
+              <select
+                value={marksSubjectFilter}
+                onChange={(e) => {
+                  setMarksSubjectFilter(e.target.value);
+                  fetchExamMarks(selectedExam);
+                }}
+                className="form-control"
+                style={{ minWidth: '200px', marginTop: '4px' }}
+              >
+                {examSubjects.map(s => (
+                  <option key={s.subject_name} value={s.subject_name}>
+                    {s.subject_name} (Max: {s.max_marks})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="erp-card" style={{ padding: 0, overflowX: 'auto' }}>
+            <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                  <th style={{ padding: '12px 16px' }}>Roll No</th>
+                  <th style={{ padding: '12px 16px' }}>Student Name</th>
+                  <th style={{ padding: '12px 16px' }}>Marks Obtained (Max: {maxMarks})</th>
+                  <th style={{ padding: '12px 16px' }}>Total Obtained (All Subjects)</th>
+                  <th style={{ padding: '12px 16px' }}>Percentage</th>
+                  <th style={{ padding: '12px 16px' }}>Grade</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'right' }}>Calculated Rank</th>
+                </tr>
+              </thead>
+              <tbody>
+                {examMarks.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                      No active students found in this class.
+                    </td>
+                  </tr>
+                ) : (
+                  examMarks.map(row => {
+                    const currentMark = row.marks[marksSubjectFilter] !== undefined ? row.marks[marksSubjectFilter] : '';
+                    const totalMax = examSubjects.reduce((sum, s) => sum + s.max_marks, 0);
+                    
+                    const totalObtained = examSubjects.reduce((sum, s) => {
+                      const mark = row.marks[s.subject_name] !== undefined ? parseFloat(row.marks[s.subject_name]) : 0;
+                      return sum + mark;
+                    }, 0);
+                    
+                    const percentage = totalMax > 0 ? roundDecimal((totalObtained / totalMax) * 100, 1) : 0;
+                    
+                    let grade = 'F';
+                    for (const scale of gradingScales) {
+                      if (percentage >= scale.min_percentage && percentage <= scale.max_percentage) {
+                        grade = scale.grade_name;
+                        break;
+                      }
+                    }
+                    
+                    const getStudentRank = (studentId) => {
+                      const sorted = [...examMarks].map(m => {
+                        const tot = examSubjects.reduce((sSum, s) => sSum + (parseFloat(m.marks[s.subject_name]) || 0), 0);
+                        return { student_id: m.student_id, tot };
+                      }).sort((a, b) => b.tot - a.tot);
+                      const idx = sorted.findIndex(s => s.student_id === studentId);
+                      return idx !== -1 ? idx + 1 : '-';
+                    };
+                    
+                    const rank = getStudentRank(row.student_id);
+
+                    return (
+                      <tr key={row.student_id} style={{ borderBottom: '1px solid var(--border-color)', fontSize: '0.85rem' }}>
+                        <td style={{ padding: '12px 16px' }}>{row.roll_number}</td>
+                        <td style={{ padding: '12px 16px', fontWeight: 600 }}>{row.name}</td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <input
+                              type="number"
+                              min="0"
+                              max={maxMarks}
+                              value={currentMark}
+                              onChange={(e) => {
+                                let val = e.target.value;
+                                if (val !== '') {
+                                  val = Math.max(0, Math.min(maxMarks, parseFloat(val) || 0));
+                                }
+                                
+                                const updatedMarks = examMarks.map(m => {
+                                  if (m.student_id === row.student_id) {
+                                    return {
+                                      ...m,
+                                      marks: {
+                                        ...m.marks,
+                                        [marksSubjectFilter]: val
+                                      }
+                                    };
+                                  }
+                                  return m;
+                                });
+                                setExamMarks(updatedMarks);
+                                
+                                if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+                                setMarksSaveStatus('saving');
+                                autoSaveTimerRef.current = setTimeout(() => {
+                                  const payload = updatedMarks.map(m => ({
+                                    student_id: m.student_id,
+                                    subject_name: marksSubjectFilter,
+                                    marks_obtained: m.marks[marksSubjectFilter] !== '' ? m.marks[marksSubjectFilter] : 0
+                                  }));
+                                  saveExamMarksBulk(selectedExam.id, payload);
+                                }, 1200);
+                              }}
+                              className="form-control"
+                              style={{ width: '90px', padding: '6px' }}
+                              placeholder="0.00"
+                            />
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>/ {maxMarks}</span>
+                          </div>
+                        </td>
+                        <td style={{ padding: '12px 16px', fontWeight: 700 }}>{totalObtained} / {totalMax}</td>
+                        <td style={{ padding: '12px 16px', color: 'var(--color-primary)', fontWeight: 700 }}>{percentage}%</td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <span className={`badge ${grade === 'F' ? 'badge-danger' : 'badge-success'}`} style={{ fontWeight: 'bold' }}>
+                            {grade}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 'bold', fontSize: '0.9rem' }}>{rank}</td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+    
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+            Exams registered for the current academic session:
+          </span>
+          {isCurrentYearActive() && (
+            <button
+              onClick={() => {
+                setNewExamForm({
+                  name: '',
+                  class_id: classes[0]?.id || '',
+                  group_name: '',
+                  start_date: '',
+                  end_date: '',
+                  subjects: [{ subject_name: '', max_marks: 100 }]
+                });
+                setShowCreateExamModal(true);
+              }}
+              className="btn-primary"
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '6px' }}
+            >
+              <Plus size={16} /> Create Exam
+            </button>
+          )}
+        </div>
+
+        {isFetchingExams ? (
+          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+            <RefreshCw className="spin" size={24} style={{ marginRight: '8px' }} /> Loading exams...
+          </div>
+        ) : examsList.length === 0 ? (
+          <div className="erp-card" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+            No exams created yet. Click 'Create Exam' to get started.
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
+            {examsList.map(exam => {
+              const subjects = exam.subjects || [];
+              return (
+                <div key={exam.id} className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '14px', borderLeft: '4px solid var(--color-primary)' }}>
+                  <div>
+                    <h4 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{exam.name}</h4>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'block', marginTop: '2px' }}>
+                      Class: <strong>{exam.class_name || getClassName(exam.class_id)}</strong> {exam.group_name ? `(${exam.group_name})` : ''}
+                    </span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>
+                      Dates: {formatDate(exam.start_date)} - {formatDate(exam.end_date)}
+                    </span>
+                  </div>
+                  
+                  <div style={{ borderTop: '1px solid var(--border-color)', borderBottom: '1px solid var(--border-color)', padding: '10px 0' }}>
+                    <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Subjects Matrix:</span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {subjects.map(s => (
+                        <span key={s.subject_name} className="badge" style={{ fontSize: '0.75rem', padding: '4px 8px', borderRadius: '4px', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)' }}>
+                          {s.subject_name} ({s.max_marks})
+                        </span>
+                      ))}
+                      {subjects.length === 0 && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>No subjects mapped</span>}
+                    </div>
+                  </div>
+                  
+                  <div style={{ display: 'flex', gap: '8px', marginTop: 'auto', justifyContent: 'flex-end' }}>
+                    <button
+                      onClick={() => {
+                        setSelectedExam(exam);
+                        setExamMarksMode('entry');
+                        if (exam.subjects && exam.subjects.length > 0) {
+                          setMarksSubjectFilter(exam.subjects[0].subject_name);
+                        }
+                        fetchExamMarks(exam);
+                      }}
+                      className="btn-primary"
+                      style={{ padding: '6px 12px', fontSize: '0.8rem', borderRadius: '4px' }}
+                    >
+                      Enter Marks
+                    </button>
+                    {isCurrentYearActive() && (
+                      <button
+                        onClick={() => {
+                          setDeleteConfirm({
+                            message: `Are you sure you want to delete exam "${exam.name}"? This will delete all marks recorded for this exam.`,
+                            onConfirm: () => {
+                              deleteExam(exam.id);
+                              setDeleteConfirm(null);
+                            }
+                          });
+                        }}
+                        className="btn-outline"
+                        style={{ padding: '6px 12px', fontSize: '0.8rem', borderRadius: '4px', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.3)' }}
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderReportCardsModule = () => {
+    const selectedClassStudents = students.filter(s => parseInt(s.class_id) === parseInt(reportCardClassId));
+    const sections = Array.from(new Set(selectedClassStudents.map(s => s.group_name).filter(Boolean)));
+    
+    const studentsInSelection = selectedClassStudents.filter(s => 
+      s.status === 'Active' &&
+      (reportCardGroupName === 'all' || !reportCardGroupName || s.group_name === reportCardGroupName)
+    );
+    
+    const activeRCStudent = studentsInSelection.find(s => parseInt(s.id) === parseInt(reportCardStudentId));
+    const examsInClass = examsList.filter(e => parseInt(e.class_id) === parseInt(reportCardClassId));
+    
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+            Choose filters to preview and generate academic report cards:
+          </span>
+          <button
+            onClick={() => {
+              fetchSchoolSignatures();
+              fetchGradingScales();
+              setShowSignatureSettings(true);
+            }}
+            className="btn-outline"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '6px' }}
+          >
+            <Sliders size={14} /> Signature & Grading settings
+          </button>
+        </div>
+
+        <div className="erp-card" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '16px', padding: '16px' }}>
+          <div>
+            <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Class</label>
+            <select
+              value={reportCardClassId}
+              onChange={(e) => {
+                const cid = e.target.value;
+                setReportCardClassId(cid);
+                setReportCardStudentId('');
+                fetchExams(activeYearId, cid);
+              }}
+              className="form-control"
+              style={{ width: '100%', marginTop: '4px' }}
+            >
+              <option value="">Select Class...</option>
+              {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Section</label>
+            <select
+              value={reportCardGroupName}
+              onChange={(e) => {
+                setReportCardGroupName(e.target.value);
+                setReportCardStudentId('');
+              }}
+              className="form-control"
+              style={{ width: '100%', marginTop: '4px' }}
+            >
+              <option value="all">All Sections</option>
+              {sections.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Student</label>
+            <select
+              value={reportCardStudentId}
+              onChange={(e) => {
+                const sid = e.target.value;
+                setReportCardStudentId(sid);
+                if (reportCardExamId !== 'overall') {
+                  fetchReportCardRemarks(reportCardExamId);
+                }
+              }}
+              className="form-control"
+              style={{ width: '100%', marginTop: '4px' }}
+            >
+              <option value="">Select Student...</option>
+              {studentsInSelection.map(s => (
+                <option key={s.id} value={s.id}>
+                  {s.name} (Roll: {s.roll_number})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Examination Report</label>
+            <select
+              value={reportCardExamId}
+              onChange={(e) => {
+                const exid = e.target.value;
+                setReportCardExamId(exid);
+                if (exid !== 'overall') {
+                  fetchReportCardRemarks(exid);
+                }
+              }}
+              className="form-control"
+              style={{ width: '100%', marginTop: '4px' }}
+            >
+              <option value="overall">Overall (Academic Year Result)</option>
+              {examsInClass.map(e => (
+                <option key={e.id} value={e.id}>{e.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {activeRCStudent && reportCardExamId !== 'overall' && (
+          <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <label className="form-label" style={{ fontSize: '0.85rem', fontWeight: 600 }}>Teacher Remarks for report card:</label>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <textarea
+                value={reportCardRemarks[activeRCStudent.id] || ''}
+                onChange={(e) => {
+                  setReportCardRemarks(prev => ({
+                    ...prev,
+                    [activeRCStudent.id]: e.target.value
+                  }));
+                }}
+                className="form-control"
+                placeholder="e.g. Excellent academic performance, keep it up!"
+                style={{ flex: 1, height: '60px', padding: '8px' }}
+              />
+              <button
+                onClick={() => {
+                  const remarkText = reportCardRemarks[activeRCStudent.id] || '';
+                  saveStudentRemarks(reportCardExamId, [{ student_id: activeRCStudent.id, remarks: remarkText }]);
+                }}
+                className="btn-primary"
+                style={{ padding: '0 20px', borderRadius: '4px', fontWeight: 'bold' }}
+              >
+                Save Remarks
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!activeRCStudent ? (
+          <div className="erp-card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+            Please select Class, Student, and Exam type to preview Report Card.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => window.print()}
+                className="btn-primary"
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', fontWeight: 'bold', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+              >
+                <Printer size={16} /> Print / Save PDF Report Card
+              </button>
+            </div>
+            
+            {renderActualReportCard(activeRCStudent, reportCardExamId)}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderActualReportCard = (student, examId) => {
+    if (!studentPerformanceSummary) {
+      return (
+        <div className="erp-card" style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>
+          <RefreshCw className="spin" size={20} style={{ marginRight: '8px' }} /> Loading performance data...
+        </div>
+      );
+    }
+    
+    const { attendance, exams, signatures, grading_scales } = studentPerformanceSummary;
+    
+    const getGrade = (percentage) => {
+      let grade = 'F';
+      for (const scale of grading_scales) {
+        if (percentage >= scale.min_percentage && percentage <= scale.max_percentage) {
+          grade = scale.grade_name;
+          break;
+        }
+      }
+      return grade;
+    };
+    
+    let reportTitle = '';
+    let marksRowsData = [];
+    let grandMax = 0;
+    let grandObtained = 0;
+    let remarksText = '';
+    let examRank = '-';
+    
+    if (examId === 'overall') {
+      reportTitle = 'ANNUAL PROGRESS REPORT CARD';
+      remarksText = 'Consolidated evaluation for the complete academic session.';
+      
+      const subjectSummaryMap = {};
+      exams.forEach(exam => {
+        const subjects = exam.subjects || [];
+        subjects.forEach(sub => {
+          const subName = sub.subject_name;
+          const maxMarks = parseFloat(sub.max_marks) || 100;
+          const obtained = parseFloat(exam.marks[subName]) || 0;
+          
+          if (!subjectSummaryMap[subName]) {
+            subjectSummaryMap[subName] = { max_marks: 0, obtained_marks: 0 };
+          }
+          subjectSummaryMap[subName].max_marks += maxMarks;
+          subjectSummaryMap[subName].obtained_marks += obtained;
+        });
+      });
+      
+      Object.keys(subjectSummaryMap).forEach(subName => {
+        const item = subjectSummaryMap[subName];
+        grandMax += item.max_marks;
+        grandObtained += item.obtained_marks;
+        const pct = item.max_marks > 0 ? roundDecimal((item.obtained_marks / item.max_marks) * 100, 1) : 0;
+        
+        marksRowsData.push({
+          subject_name: subName,
+          max_marks: item.max_marks,
+          obtained_marks: item.obtained_marks,
+          percentage: pct,
+          grade: getGrade(pct)
+        });
+      });
+      
+      const ranks = exams.map(e => parseInt(e.rank)).filter(r => !isNaN(r));
+      if (ranks.length > 0) {
+        const sum = ranks.reduce((s, r) => s + r, 0);
+        examRank = String(Math.round(sum / ranks.length));
+      } else {
+        examRank = '1';
+      }
+      
+    } else {
+      const activeExam = exams.find(e => parseInt(e.id) === parseInt(examId));
+      if (!activeExam) {
+        return (
+          <div className="erp-card" style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+            Exam data not found for this student.
+          </div>
+        );
+      }
+      
+      reportTitle = activeExam.name.toUpperCase();
+      remarksText = activeExam.remarks || 'No remarks recorded.';
+      examRank = activeExam.rank || '-';
+      
+      const subjects = activeExam.subjects || [];
+      subjects.forEach(sub => {
+        const subName = sub.subject_name;
+        const maxMarks = parseFloat(sub.max_marks) || 100;
+        const obtained = parseFloat(activeExam.marks[subName]) || 0;
+        
+        grandMax += maxMarks;
+        grandObtained += obtained;
+        const pct = maxMarks > 0 ? roundDecimal((obtained / maxMarks) * 100, 1) : 0;
+        
+        marksRowsData.push({
+          subject_name: subName,
+          max_marks: maxMarks,
+          obtained_marks: obtained,
+          percentage: pct,
+          grade: getGrade(pct)
+        });
+      });
+    }
+    
+    const overallPercentage = grandMax > 0 ? roundDecimal((grandObtained / grandMax) * 100, 1) : 0;
+    const overallGrade = getGrade(overallPercentage);
+    const resultStatus = overallPercentage >= 40 ? 'PASSED' : 'FAILED';
+    const activeYearName = years.find(y => y.id === activeYearId)?.name || '';
+
+    return (
+      <div 
+        className="report-card-container report-card-print-area" 
+        style={{
+          backgroundColor: '#111827',
+          color: '#f3f4f6',
+          border: '2px solid #374151',
+          borderRadius: '12px',
+          padding: '40px',
+          fontFamily: "'Inter', sans-serif",
+          boxShadow: '0 10px 25px rgba(0,0,0,0.3)',
+          maxWidth: '850px',
+          margin: '0 auto',
+          position: 'relative'
+        }}
+      >
+        <style dangerouslySetInnerHTML={{__html: `
+          @media print {
+            body * {
+              visibility: hidden;
+            }
+            .report-card-print-area, .report-card-print-area * {
+              visibility: visible;
+            }
+            .report-card-print-area {
+              position: absolute;
+              left: 0;
+              top: 0;
+              width: 100% !important;
+              max-width: 100% !important;
+              border: none !important;
+              box-shadow: none !important;
+              padding: 0 !important;
+              background-color: white !important;
+              color: black !important;
+            }
+            .report-card-print-area table {
+              border-color: #000 !important;
+            }
+            .report-card-print-area th, .report-card-print-area td {
+              border-color: #000 !important;
+              color: black !important;
+            }
+            .report-card-print-area strong, .report-card-print-area h2, .report-card-print-area h3, .report-card-print-area h4 {
+              color: black !important;
+            }
+            .badge {
+              border: 1px solid #000 !important;
+              background: transparent !important;
+              color: black !important;
+            }
+          }
+        `}} />
+        
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', borderBottom: '3px double #4b5563', paddingBottom: '20px', marginBottom: '24px' }}>
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, letterSpacing: '1px', textTransform: 'uppercase', color: '#6366f1' }}>
+            {adminProfile?.school_name || 'B.N. Public School'}
+          </h2>
+          <span style={{ fontSize: '0.85rem', color: '#9ca3af', textTransform: 'uppercase', marginTop: '2px', fontWeight: 600 }}>
+            Academic Session: {activeYearName}
+          </span>
+          <h3 style={{ fontSize: '1.2rem', fontWeight: 700, letterSpacing: '2px', marginTop: '12px', color: '#10b981', textTransform: 'uppercase', border: '1px solid #374151', padding: '4px 16px', borderRadius: '4px' }}>
+            {reportTitle}
+          </h3>
+        </div>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px', backgroundColor: 'rgba(255, 255, 255, 0.02)', padding: '16px', borderRadius: '8px', border: '1px solid #374151' }}>
+          <div>
+            <span style={{ fontSize: '0.8rem', color: '#9ca3af', display: 'block' }}>Student Name:</span>
+            <strong style={{ fontSize: '1.1rem', color: '#ffffff' }}>{student.name}</strong>
+          </div>
+          <div>
+            <span style={{ fontSize: '0.8rem', color: '#9ca3af', display: 'block' }}>Class & Section:</span>
+            <strong style={{ fontSize: '1.1rem', color: '#ffffff' }}>{getClassName(student.class_id)} {student.group_name ? `(${student.group_name})` : ''}</strong>
+          </div>
+          <div>
+            <span style={{ fontSize: '0.8rem', color: '#9ca3af', display: 'block' }}>Roll Number:</span>
+            <strong style={{ fontSize: '1.1rem', color: '#ffffff' }}>{student.roll_number}</strong>
+          </div>
+          <div>
+            <span style={{ fontSize: '0.8rem', color: '#9ca3af', display: 'block' }}>Academic Status:</span>
+            <strong style={{ fontSize: '1.1rem', color: '#ffffff' }}>Enrolled (Active)</strong>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: '24px' }}>
+          <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#f3f4f6', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Subject Performance Analysis</h4>
+          <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #374151' }}>
+            <thead>
+              <tr style={{ backgroundColor: 'rgba(255, 255, 255, 0.04)', borderBottom: '2px solid #374151', fontSize: '0.85rem' }}>
+                <th style={{ padding: '12px', textAlign: 'left', borderRight: '1px solid #374151' }}>Subject</th>
+                <th style={{ padding: '12px', textAlign: 'center', borderRight: '1px solid #374151' }}>Max Marks</th>
+                <th style={{ padding: '12px', textAlign: 'center', borderRight: '1px solid #374151' }}>Obtained Marks</th>
+                <th style={{ padding: '12px', textAlign: 'center', borderRight: '1px solid #374151' }}>Percentage</th>
+                <th style={{ padding: '12px', textAlign: 'center' }}>Grade</th>
+              </tr>
+            </thead>
+            <tbody>
+              {marksRowsData.map((row, idx) => (
+                <tr key={idx} style={{ borderBottom: '1px solid #374151', fontSize: '0.85rem' }}>
+                  <td style={{ padding: '12px', textAlign: 'left', borderRight: '1px solid #374151', fontWeight: 600 }}>{row.subject_name}</td>
+                  <td style={{ padding: '12px', textAlign: 'center', borderRight: '1px solid #374151' }}>{row.max_marks}</td>
+                  <td style={{ padding: '12px', textAlign: 'center', borderRight: '1px solid #374151', fontWeight: 700, color: '#f3f4f6' }}>{row.obtained_marks}</td>
+                  <td style={{ padding: '12px', textAlign: 'center', borderRight: '1px solid #374151', color: '#6366f1', fontWeight: 700 }}>{row.percentage}%</td>
+                  <td style={{ padding: '12px', textAlign: 'center', fontWeight: 'bold' }}>
+                    <span style={{ color: row.grade === 'F' ? '#ef4444' : '#10b981' }}>{row.grade}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '28px' }}>
+          <div style={{ border: '1px solid #374151', borderRadius: '8px', padding: '16px', backgroundColor: 'rgba(255, 255, 255, 0.01)' }}>
+            <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#f3f4f6', marginBottom: '10px', textTransform: 'uppercase' }}>Academic Summary</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.85rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#9ca3af' }}>Grand Total:</span>
+                <strong style={{ color: '#ffffff' }}>{grandObtained} / {grandMax}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#9ca3af' }}>Percentage:</span>
+                <strong style={{ color: '#6366f1' }}>{overallPercentage}%</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#9ca3af' }}>Overall Grade:</span>
+                <strong style={{ color: overallGrade === 'F' ? '#ef4444' : '#10b981' }}>{overallGrade}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#9ca3af' }}>Class Rank:</span>
+                <strong style={{ color: '#ffffff' }}>{examRank}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #374151', paddingTop: '8px', marginTop: '4px' }}>
+                <span style={{ color: '#9ca3af' }}>Result Status:</span>
+                <strong style={{ color: resultStatus === 'PASSED' ? '#10b981' : '#ef4444' }}>{resultStatus}</strong>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ border: '1px solid #374151', borderRadius: '8px', padding: '16px', backgroundColor: 'rgba(255, 255, 255, 0.01)' }}>
+            <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#f3f4f6', marginBottom: '10px', textTransform: 'uppercase' }}>Attendance Record</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.85rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#9ca3af' }}>Total Working Days:</span>
+                <strong style={{ color: '#ffffff' }}>{attendance.total} Days</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#9ca3af' }}>Days Present:</span>
+                <strong style={{ color: '#10b981' }}>{attendance.present} Days</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#9ca3af' }}>Days Absent:</span>
+                <strong style={{ color: '#ef4444' }}>{attendance.absent} Days</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#9ca3af' }}>Days Leave:</span>
+                <strong style={{ color: '#f59e0b' }}>{attendance.leave} Days</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #374151', paddingTop: '8px', marginTop: '4px' }}>
+                <span style={{ color: '#9ca3af' }}>Attendance Rate:</span>
+                <strong style={{ color: attendance.percentage >= 75 ? '#10b981' : '#ef4444' }}>{attendance.percentage}%</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: '32px', border: '1px solid #374151', borderRadius: '8px', padding: '12px 16px', backgroundColor: 'rgba(255, 255, 255, 0.01)' }}>
+          <span style={{ fontSize: '0.8rem', color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>Evaluative Remarks</span>
+          <p style={{ fontSize: '0.9rem', color: '#e5e7eb', fontStyle: 'italic', margin: 0 }}>
+            "{remarksText}"
+          </p>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px', borderTop: '1px dashed #4b5563', paddingTop: '30px', marginTop: '30px', textAlign: 'center' }}>
+          <div>
+            {signatures.teacher_signature ? (
+              <img src={signatures.teacher_signature} alt="Class Teacher Signature" style={{ height: '40px', objectFit: 'contain', display: 'block', margin: '0 auto 8px auto' }} />
+            ) : (
+              <div style={{ height: '40px', borderBottom: '1px solid #4b5563', width: '80%', margin: '0 auto 8px auto' }}></div>
+            )}
+            <span style={{ fontSize: '0.8rem', color: '#9ca3af', display: 'block' }}>Class Teacher</span>
+          </div>
+          <div>
+            {signatures.class_teacher_signature ? (
+              <img src={signatures.class_teacher_signature} alt="Co-Teacher Signature" style={{ height: '40px', objectFit: 'contain', display: 'block', margin: '0 auto 8px auto' }} />
+            ) : (
+              <div style={{ height: '40px', borderBottom: '1px solid #4b5563', width: '80%', margin: '0 auto 8px auto' }}></div>
+            )}
+            <span style={{ fontSize: '0.8rem', color: '#9ca3af', display: 'block' }}>Academic Head</span>
+          </div>
+          <div>
+            {signatures.principal_signature ? (
+              <img src={signatures.principal_signature} alt="Principal Signature" style={{ height: '40px', objectFit: 'contain', display: 'block', margin: '0 auto 8px auto' }} />
+            ) : (
+              <div style={{ height: '40px', borderBottom: '1px solid #4b5563', width: '80%', margin: '0 auto 8px auto' }}></div>
+            )}
+            <span style={{ fontSize: '0.8rem', color: '#9ca3af', display: 'block' }}>Principal</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderStudentPerformanceTab = () => {
+    return (
+      <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+          <div>
+            <h3 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <GraduationCap size={22} className="gradient-text" /> Student Performance & Academics
+            </h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '4px' }}>
+              Manage student attendance, examine class grades, entry marks, and generate report cards.
+            </p>
+          </div>
+          
+          <div style={{ display: 'flex', gap: '8px', background: 'rgba(255, 255, 255, 0.02)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+            <button
+              onClick={() => setPerformanceSubTab('attendance')}
+              className={performanceSubTab === 'attendance' ? 'btn-primary' : 'btn-outline'}
+              style={{ border: 'none', padding: '6px 16px', fontSize: '0.85rem', borderRadius: '6px' }}
+            >
+              Attendance
+            </button>
+            <button
+              onClick={() => {
+                setPerformanceSubTab('exams');
+                fetchExams(activeYearId);
+              }}
+              className={performanceSubTab === 'exams' ? 'btn-primary' : 'btn-outline'}
+              style={{ border: 'none', padding: '6px 16px', fontSize: '0.85rem', borderRadius: '6px' }}
+            >
+              Examinations
+            </button>
+            <button
+              onClick={() => {
+                setPerformanceSubTab('report_cards');
+                fetchExams(activeYearId);
+                fetchSchoolSignatures();
+                fetchGradingScales();
+              }}
+              className={performanceSubTab === 'report_cards' ? 'btn-primary' : 'btn-outline'}
+              style={{ border: 'none', padding: '6px 16px', fontSize: '0.85rem', borderRadius: '6px' }}
+            >
+              Report Cards
+            </button>
+          </div>
+        </div>
+
+        {performanceSubTab === 'attendance' && renderAttendanceModule()}
+        {performanceSubTab === 'exams' && renderExamsModule()}
+        {performanceSubTab === 'report_cards' && renderReportCardsModule()}
+      </div>
+    );
+  };
+
   const renderAdminProfileTab = () => {
     return (
       <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -5016,7 +11880,15 @@ export default function App() {
           {/* Left Card: Avatar & Brief Info */}
           <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', textAlign: 'center' }}>
             <div style={{ position: 'relative', width: '120px', height: '120px' }}>
-              {adminProfileForm.profile_image ? (
+              {adminProfile?.role === 'School Admin' && adminProfile?.school_logo_path ? (
+                <div style={{ width: '120px', height: '120px', borderRadius: '16px', overflow: 'hidden', border: '3px solid var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffffff', padding: '8px' }}>
+                  <img 
+                    src={adminProfile.school_logo_path} 
+                    alt="School Logo" 
+                    style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} 
+                  />
+                </div>
+              ) : adminProfileForm.profile_image ? (
                 <img 
                   src={adminProfileForm.profile_image} 
                   alt="Profile Avatar" 
@@ -5040,41 +11912,45 @@ export default function App() {
             </div>
             
             {/* Photo Actions */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
-              <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                <button 
-                  type="button" 
-                  className="btn-outline" 
-                  style={{ padding: '6px 12px', fontSize: '0.8rem' }}
-                  onClick={() => document.getElementById('admin-avatar-upload').click()}
-                >
-                  Upload Photo
-                </button>
-                <input 
-                  id="admin-avatar-upload" 
-                  type="file" 
-                  accept="image/png, image/jpeg, image/jpg" 
-                  style={{ display: 'none' }} 
-                  onChange={handleProfilePhotoChange} 
-                />
-                {adminProfileForm.profile_image && (
+            {adminProfile?.role !== 'School Admin' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
                   <button 
                     type="button" 
                     className="btn-outline" 
-                    style={{ padding: '6px 12px', fontSize: '0.8rem', borderColor: '#ef4444', color: '#ef4444' }}
-                    onClick={handleRemoveProfilePhoto}
+                    style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                    onClick={() => document.getElementById('admin-avatar-upload').click()}
                   >
-                    Remove
+                    Upload Photo
                   </button>
-                )}
+                  <input 
+                    id="admin-avatar-upload" 
+                    type="file" 
+                    accept="image/png, image/jpeg, image/jpg" 
+                    style={{ display: 'none' }} 
+                    onChange={handleProfilePhotoChange} 
+                  />
+                  {adminProfileForm.profile_image && (
+                    <button 
+                      type="button" 
+                      className="btn-outline" 
+                      style={{ padding: '6px 12px', fontSize: '0.8rem', borderColor: '#ef4444', color: '#ef4444' }}
+                      onClick={handleRemoveProfilePhoto}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Max file size: 2MB (PNG/JPG)</span>
               </div>
-              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Max file size: 2MB (PNG/JPG)</span>
-            </div>
+            )}
 
             <div style={{ width: '100%', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
-              <h4 style={{ fontSize: '1.1rem', margin: 0 }}>{adminProfile?.name || 'Administrator'}</h4>
+              <h4 style={{ fontSize: '1.1rem', margin: 0 }}>
+                {adminProfile?.role === 'School Admin' ? (adminProfile?.school_name || 'School Admin') : (adminProfile?.name || 'Administrator')}
+              </h4>
               <span className="badge badge-success" style={{ marginTop: '8px' }}>
-                {adminProfile?.role === 'Super Admin' ? 'Super Admin' : 'Administrator'}
+                {adminProfile?.role === 'Super Admin' ? 'Super Admin' : 'School Admin'}
               </span>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                 <Clock size={12} /> {adminProfile?.timezone || 'Asia/Kolkata'}
@@ -5093,27 +11969,29 @@ export default function App() {
               >
                 Profile Details
               </button>
-              <button 
-                type="button"
-                className={`profile-tab ${profileSubTab === 'edit' ? 'active' : ''}`}
-                onClick={() => {
-                  setProfileSubTab('edit');
-                  setAdminProfileForm({
-                    name: adminProfile?.name || '',
-                    email: adminProfile?.email || '',
-                    phone: adminProfile?.phone || '',
-                    address: adminProfile?.address || '',
-                    city: adminProfile?.city || '',
-                    state: adminProfile?.state || '',
-                    country: adminProfile?.country || '',
-                    timezone: adminProfile?.timezone || 'Asia/Kolkata',
-                    profile_image: adminProfile?.profile_image || ''
-                  });
-                  setProfileErrors({});
-                }}
-              >
-                Edit Profile
-              </button>
+              {adminProfile?.role !== 'School Admin' && (
+                <button 
+                  type="button"
+                  className={`profile-tab ${profileSubTab === 'edit' ? 'active' : ''}`}
+                  onClick={() => {
+                    setProfileSubTab('edit');
+                    setAdminProfileForm({
+                      name: adminProfile?.name || '',
+                      email: adminProfile?.email || '',
+                      phone: adminProfile?.phone || '',
+                      address: adminProfile?.address || '',
+                      city: adminProfile?.city || '',
+                      state: adminProfile?.state || '',
+                      country: adminProfile?.country || '',
+                      timezone: adminProfile?.timezone || 'Asia/Kolkata',
+                      profile_image: adminProfile?.profile_image || ''
+                    });
+                    setProfileErrors({});
+                  }}
+                >
+                  Edit Profile
+                </button>
+              )}
               <button 
                 type="button"
                 className={`profile-tab ${profileSubTab === 'password' ? 'active' : ''}`}
@@ -5125,77 +12003,121 @@ export default function App() {
               >
                 Change Password
               </button>
+              {adminProfile?.role === 'School Admin' && (
+                <button 
+                  type="button"
+                  className={`profile-tab ${profileSubTab === 'subscription' ? 'active' : ''}`}
+                  onClick={() => setProfileSubTab('subscription')}
+                >
+                  Subscription Details
+                </button>
+              )}
             </div>
 
             {/* Sub-tab content body */}
             <div style={{ padding: '24px' }}>
               {profileSubTab === 'details' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  <h4 style={{ fontSize: '1.05rem', margin: 0, fontWeight: 700, borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>Personal Information</h4>
-                  <div className="profile-detail-grid">
-                    <div className="profile-detail-item">
-                      <span className="profile-detail-label">Full Name</span>
-                      <span className="profile-detail-value">{adminProfile?.name || 'N/A'}</span>
+                adminProfile?.role === 'School Admin' ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    {/* Warning Alert Note */}
+                    <div style={{
+                      backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                      border: '1px solid rgba(239, 68, 68, 0.2)',
+                      borderRadius: '12px',
+                      padding: '16px 20px',
+                      display: 'flex',
+                      gap: '12px',
+                      alignItems: 'flex-start'
+                    }}>
+                      <AlertTriangle size={20} style={{ color: '#ef4444', flexShrink: 0, marginTop: '2px' }} />
+                      <div>
+                        <h5 style={{ margin: '0 0 4px 0', fontSize: '0.9rem', fontWeight: 600, color: '#ef4444' }}>Profile Edit Restricted</h5>
+                        <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                          These profile settings are managed by the platform administration. Please reach out to support at <strong>{adminProfile?.school_email || 'xavier.admin@xavier.edu'}</strong> or contact system administration to request any updates.
+                        </p>
+                      </div>
                     </div>
-                    <div className="profile-detail-item">
-                      <span className="profile-detail-label">Email Address</span>
-                      <span className="profile-detail-value">{adminProfile?.email || 'N/A'}</span>
-                    </div>
-                    <div className="profile-detail-item">
-                      <span className="profile-detail-label">Phone Number</span>
-                      <span className="profile-detail-value">{adminProfile?.phone || 'N/A'}</span>
-                    </div>
-                    <div className="profile-detail-item">
-                      <span className="profile-detail-label">Designation</span>
-                      <span className="profile-detail-value">{adminProfile?.role === 'Super Admin' ? 'Super Admin' : 'Administrator'}</span>
-                    </div>
-                    <div className="profile-detail-item" style={{ gridColumn: 'span 2' }}>
-                      <span className="profile-detail-label">Address</span>
-                      <span className="profile-detail-value">
-                        {[adminProfile?.address, adminProfile?.city, adminProfile?.state, adminProfile?.country].filter(Boolean).join(', ') || 'N/A'}
-                      </span>
-                    </div>
-                    <div className="profile-detail-item">
-                      <span className="profile-detail-label">Time Zone</span>
-                      <span className="profile-detail-value">{adminProfile?.timezone || 'Asia/Kolkata'}</span>
-                    </div>
-                    <div className="profile-detail-item">
-                      <span className="profile-detail-label">Account Created</span>
-                      <span className="profile-detail-value">{adminProfile?.created_at || 'N/A'}</span>
-                    </div>
-                    <div className="profile-detail-item">
-                      <span className="profile-detail-label">Last Login Date</span>
-                      <span className="profile-detail-value">{adminProfile?.last_login_at || 'N/A'}</span>
+
+                    <h4 style={{ fontSize: '1.05rem', margin: 0, fontWeight: 700, borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>Profile Details</h4>
+                    <div className="profile-detail-grid">
+                      {adminProfile?.school_name && (
+                        <div className="profile-detail-item">
+                          <span className="profile-detail-label">Official School Name</span>
+                          <span className="profile-detail-value">{adminProfile.school_name}</span>
+                        </div>
+                      )}
+                      {adminProfile?.school_contact_person && (
+                        <div className="profile-detail-item">
+                          <span className="profile-detail-label">Contact Person</span>
+                          <span className="profile-detail-value">{adminProfile.school_contact_person}</span>
+                        </div>
+                      )}
+                      {adminProfile?.school_phone && (
+                        <div className="profile-detail-item">
+                          <span className="profile-detail-label">Contact Number</span>
+                          <span className="profile-detail-value">{adminProfile.school_phone}</span>
+                        </div>
+                      )}
+                      {adminProfile?.school_email && (
+                        <div className="profile-detail-item">
+                          <span className="profile-detail-label">Email Address</span>
+                          <span className="profile-detail-value">{adminProfile.school_email}</span>
+                        </div>
+                      )}
+                      {([adminProfile?.school_address, adminProfile?.school_city, adminProfile?.school_state, adminProfile?.school_country].filter(Boolean).join(', ') || adminProfile?.school_address) && (
+                        <div className="profile-detail-item" style={{ gridColumn: 'span 2' }}>
+                          <span className="profile-detail-label">Physical Address</span>
+                          <span className="profile-detail-value">
+                            {[adminProfile?.school_address, adminProfile?.school_city, adminProfile?.school_state, adminProfile?.school_country].filter(Boolean).join(', ') || adminProfile?.school_address}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
-
-                  {adminProfile?.role === 'School Admin' && (
-                    <>
-                      <h4 style={{ fontSize: '1.05rem', margin: '16px 0 0 0', fontWeight: 700, borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>School Tenant Details</h4>
-                      <div className="profile-detail-grid">
-                        <div className="profile-detail-item">
-                          <span className="profile-detail-label">School Name</span>
-                          <span className="profile-detail-value">{adminProfile?.school_name || 'N/A'}</span>
-                        </div>
-                        <div className="profile-detail-item">
-                          <span className="profile-detail-label">School Email</span>
-                          <span className="profile-detail-value">{adminProfile?.school_email || 'N/A'}</span>
-                        </div>
-                        <div className="profile-detail-item">
-                          <span className="profile-detail-label">School Contact</span>
-                          <span className="profile-detail-value">{adminProfile?.school_phone || 'N/A'}</span>
-                        </div>
-                        <div className="profile-detail-item" style={{ gridColumn: 'span 2' }}>
-                          <span className="profile-detail-label">School Address</span>
-                          <span className="profile-detail-value">{adminProfile?.school_address || 'N/A'}</span>
-                        </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    <h4 style={{ fontSize: '1.05rem', margin: 0, fontWeight: 700, borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>Personal Information</h4>
+                    <div className="profile-detail-grid">
+                      <div className="profile-detail-item">
+                        <span className="profile-detail-label">Full Name</span>
+                        <span className="profile-detail-value">{adminProfile?.name || 'N/A'}</span>
                       </div>
-                    </>
-                  )}
-                </div>
+                      <div className="profile-detail-item">
+                        <span className="profile-detail-label">Email Address</span>
+                        <span className="profile-detail-value">{adminProfile?.email || 'N/A'}</span>
+                      </div>
+                      <div className="profile-detail-item">
+                        <span className="profile-detail-label">Phone Number</span>
+                        <span className="profile-detail-value">{adminProfile?.phone || 'N/A'}</span>
+                      </div>
+                      <div className="profile-detail-item">
+                        <span className="profile-detail-label">Designation</span>
+                        <span className="profile-detail-value">{adminProfile?.role === 'Super Admin' ? 'Super Admin' : 'Administrator'}</span>
+                      </div>
+                      <div className="profile-detail-item" style={{ gridColumn: 'span 2' }}>
+                        <span className="profile-detail-label">Address</span>
+                        <span className="profile-detail-value">
+                          {[adminProfile?.address, adminProfile?.city, adminProfile?.state, adminProfile?.country].filter(Boolean).join(', ') || 'N/A'}
+                        </span>
+                      </div>
+                      <div className="profile-detail-item">
+                        <span className="profile-detail-label">Time Zone</span>
+                        <span className="profile-detail-value">{adminProfile?.timezone || 'Asia/Kolkata'}</span>
+                      </div>
+                      <div className="profile-detail-item">
+                        <span className="profile-detail-label">Account Created</span>
+                        <span className="profile-detail-value">{adminProfile?.created_at || 'N/A'}</span>
+                      </div>
+                      <div className="profile-detail-item">
+                        <span className="profile-detail-label">Last Login Date</span>
+                        <span className="profile-detail-value">{adminProfile?.last_login_at || 'N/A'}</span>
+                      </div>
+                    </div>
+                  </div>
+                )
               )}
 
-              {profileSubTab === 'edit' && (
+              {profileSubTab === 'edit' && adminProfile?.role !== 'School Admin' && (
                 <form onSubmit={handleUpdateProfile} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                     <div>
@@ -5384,6 +12306,167 @@ export default function App() {
                   </div>
                 </form>
               )}
+
+              {profileSubTab === 'subscription' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
+                    <div>
+                      <h4 style={{ fontSize: '1.1rem', margin: 0, fontWeight: 700 }}>Current Subscription Status</h4>
+                      <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>Details and validity of your platform license plan.</p>
+                    </div>
+                    <span className="badge" style={{
+                      backgroundColor: adminProfile.subscription?.status === 'Active' || adminProfile.subscription?.status === 'Trial Active' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                      color: adminProfile.subscription?.status === 'Active' || adminProfile.subscription?.status === 'Trial Active' ? '#10b981' : '#ef4444',
+                      padding: '6px 14px',
+                      fontSize: '0.85rem',
+                      fontWeight: 700
+                    }}>
+                      {adminProfile.subscription?.status || 'No Active License'}
+                    </span>
+                  </div>
+
+                  {/* Subscription card details */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '24px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      <div className="profile-detail-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                        <div className="profile-detail-item">
+                          <span className="profile-detail-label">Active License Plan</span>
+                          <span className="profile-detail-value" style={{ fontWeight: 800, color: 'var(--color-primary)' }}>{adminProfile.subscription?.plan_name || 'None'}</span>
+                        </div>
+                        <div className="profile-detail-item">
+                          <span className="profile-detail-label">Days Remaining</span>
+                          <span className="profile-detail-value" style={{ fontWeight: 800, color: adminProfile.subscription?.remaining_days < 15 ? '#ef4444' : '#10b981' }}>
+                            {adminProfile.subscription?.remaining_days !== undefined && adminProfile.subscription?.remaining_days !== null ? `${adminProfile.subscription.remaining_days} Days` : '-'}
+                          </span>
+                        </div>
+                        <div className="profile-detail-item">
+                          <span className="profile-detail-label">Activation Date</span>
+                          <span className="profile-detail-value">{adminProfile.subscription?.start_date || '-'}</span>
+                        </div>
+                        <div className="profile-detail-item">
+                          <span className="profile-detail-label">License Expiration</span>
+                          <span className="profile-detail-value">{adminProfile.subscription?.expiry_date || '-'}</span>
+                        </div>
+                      </div>
+                      
+                      {/* Inquiry Contact Section */}
+                      <div style={{ 
+                        marginTop: '20px', 
+                        padding: '20px', 
+                        border: '1px solid var(--border-color)', 
+                        borderRadius: '12px', 
+                        background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%)',
+                        boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.15)',
+                        position: 'relative',
+                        overflow: 'hidden'
+                      }}>
+                        {/* Decorative glowing background accent */}
+                        <div style={{
+                          position: 'absolute',
+                          top: '-20px',
+                          right: '-20px',
+                          width: '80px',
+                          height: '80px',
+                          borderRadius: '50%',
+                          background: 'radial-gradient(circle, var(--color-primary) 0%, transparent 70%)',
+                          opacity: 0.15,
+                          pointerEvents: 'none'
+                        }} />
+
+                        <h5 style={{ margin: '0 0 10px 0', fontSize: '1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+                          <span style={{ fontSize: '1.1rem' }}>💬</span> Need Assistance?
+                        </h5>
+                        <p style={{ margin: '0 0 16px 0', fontSize: '0.825rem', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
+                          For subscription upgrades, renewals, account-related queries, or platform support, please contact:
+                        </p>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          <div style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '12px', 
+                            padding: '10px 14px', 
+                            borderRadius: '8px', 
+                            background: 'rgba(255, 255, 255, 0.02)', 
+                            border: '1px solid rgba(255, 255, 255, 0.04)',
+                            transition: 'all 0.2s ease'
+                          }}
+                          className="hover-scale-subtle"
+                          >
+                            <span style={{ fontSize: '1.2rem', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }}>📧</span>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Email</span>
+                              <a 
+                                href="mailto:bilalnashi6@gmail.com" 
+                                style={{ 
+                                  fontSize: '0.85rem', 
+                                  color: 'var(--color-primary)', 
+                                  textDecoration: 'none', 
+                                  fontWeight: 700,
+                                  transition: 'color 0.2s ease'
+                                }}
+                              >
+                                bilalnashi6@gmail.com
+                              </a>
+                            </div>
+                          </div>
+
+                          <div style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '12px', 
+                            padding: '10px 14px', 
+                            borderRadius: '8px', 
+                            background: 'rgba(255, 255, 255, 0.02)', 
+                            border: '1px solid rgba(255, 255, 255, 0.04)',
+                            transition: 'all 0.2s ease'
+                          }}
+                          className="hover-scale-subtle"
+                          >
+                            <span style={{ fontSize: '1.2rem', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }}>📞</span>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Contact Number</span>
+                              <a 
+                                href="tel:8650302499" 
+                                style={{ 
+                                  fontSize: '0.85rem', 
+                                  color: 'var(--color-primary)', 
+                                  textDecoration: 'none', 
+                                  fontWeight: 700,
+                                  transition: 'color 0.2s ease'
+                                }}
+                              >
+                                8650302499
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', borderLeft: '1px solid var(--border-color)', paddingLeft: '24px' }}>
+                      <h5 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>Platform Subscription Pricing</h5>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {activePlans.length === 0 ? (
+                          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Loading plan options...</p>
+                        ) : (
+                          activePlans.map(plan => (
+                            <div key={plan.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '6px' }}>
+                              <div>
+                                <div style={{ fontSize: '0.85rem', fontWeight: 700 }}>{plan.name}</div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Duration: {plan.duration_days} Days</div>
+                              </div>
+                              <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--color-primary)' }}>
+                                {parseFloat(plan.price) === 0 ? 'Free' : `₹${parseFloat(plan.price).toLocaleString()}`}
+                              </span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -5410,10 +12493,14 @@ export default function App() {
         )}
 
         {toast && (
-          <div className="toast-in-out" style={{
-            position: 'fixed', top: '24px', right: '24px', zIndex: 100005, padding: '16px 20px', borderRadius: 'var(--radius-md)',
-            backgroundColor: toast.type === 'success' ? '#10b981' : '#ef4444', color: '#ffffff', boxShadow: 'var(--shadow-lg)', display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.9rem', fontWeight: 600
-          }}>
+          <div className="toast-in-out" 
+            onMouseEnter={pauseToastTimer}
+            onMouseLeave={resumeToastTimer}
+            style={{
+              position: 'fixed', top: '24px', right: '24px', zIndex: 100005, padding: '16px 20px', borderRadius: 'var(--radius-md)',
+              backgroundColor: toast.type === 'success' ? '#10b981' : '#ef4444', color: '#ffffff', boxShadow: 'var(--shadow-lg)', display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.9rem', fontWeight: 600
+            }}
+          >
             {toast.type === 'success' ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
             <span>{toast.message}</span>
           </div>
@@ -5435,7 +12522,17 @@ export default function App() {
           </div>
 
           <div className="sidebar-nav">
-            <button onClick={() => setActiveTab('dashboard')} className={`sidebar-item ${activeTab === 'dashboard' ? 'active' : ''}`}>
+            <button 
+              onClick={() => {
+                setActiveTab('dashboard');
+                window.scrollTo(0, 0);
+                const wrapper = document.querySelector('.main-wrapper');
+                if (wrapper) {
+                  wrapper.scrollTop = 0;
+                }
+              }} 
+              className={`sidebar-item ${activeTab === 'dashboard' ? 'active' : ''}`}
+            >
               <Activity size={18} /> Platform Stats
             </button>
             <button onClick={() => {
@@ -5443,6 +12540,12 @@ export default function App() {
               fetchSuperAdminData(null, true);
             }} className={`sidebar-item ${activeTab === 'schools' ? 'active' : ''}`}>
               <Building size={18} /> Manage Schools
+            </button>
+            <button onClick={() => {
+              setActiveTab('subscriptions');
+              fetchSuperAdminData(null, true);
+            }} className={`sidebar-item ${activeTab === 'subscriptions' ? 'active' : ''}`}>
+              <CreditCard size={18} /> Manage Subscription
             </button>
           </div>
 
@@ -5452,7 +12555,7 @@ export default function App() {
           >
             {adminProfile?.profile_image ? (
               <img 
-                src={adminProfile.profile_image} 
+                src={adminProfile?.profile_image} 
                 alt="Admin Avatar" 
                 style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border-color)' }} 
               />
@@ -5483,7 +12586,7 @@ export default function App() {
 
         {/* Main Panel */}
         <div className="main-wrapper">
-          <header className="header">
+          <header className="header" style={{ position: 'sticky', top: 0, zIndex: 120, backgroundColor: 'var(--bg-surface)', opacity: 1 }}>
             <h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Platform Control Panel</h2>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               <button 
@@ -5540,12 +12643,19 @@ export default function App() {
                           <th>Admin Email</th>
                           <th>Status</th>
                           <th>Onboard Date</th>
+                          <th>Action</th>
                         </tr>
                       </thead>
                       <tbody>
                         {superStats.recent_schools && superStats.recent_schools.map((school, i) => (
                           <tr key={i}>
-                            <td style={{ fontWeight: 'bold' }}>{school.name}</td>
+                            <td 
+                              onClick={() => handleViewSchoolDetails(school.id)}
+                              style={{ fontWeight: 'bold', color: 'var(--color-primary)', cursor: 'pointer' }}
+                              title="Click to view details"
+                            >
+                              {school.name}
+                            </td>
                             <td>{school.email}</td>
                             <td>
                               <span className={`badge ${(school.status === 'Active' && (school.days_remaining === undefined || school.days_remaining > 0)) ? 'badge-success' : 'badge-danger'}`}>
@@ -5553,6 +12663,16 @@ export default function App() {
                               </span>
                             </td>
                             <td>{school.created_at}</td>
+                            <td>
+                              <button 
+                                onClick={() => handleViewSchoolDetails(school.id)}
+                                className="btn-outline" 
+                                style={{ padding: '4px 8px', fontSize: '0.75rem', borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}
+                                title="View School Details"
+                              >
+                                <Eye size={12} style={{ pointerEvents: 'none' }} />
+                              </button>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -5578,10 +12698,6 @@ export default function App() {
                       <thead>
                         <tr>
                           <th>School Name</th>
-                          <th>Code</th>
-                          <th>Contact Person</th>
-                          <th>Phone</th>
-                          <th>Email Address</th>
                           <th>Subscription Expiry</th>
                           <th>Days Left</th>
                           <th>Status</th>
@@ -5591,12 +12707,15 @@ export default function App() {
                       <tbody>
                         {schools.map(school => (
                           <tr key={school.id}>
-                            <td style={{ fontWeight: 'bold' }}>{school.name || '-'}</td>
-                            <td style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{school.code || '-'}</td>
-                            <td>{school.contact_person || '-'}</td>
-                            <td>{school.contact_number || '-'}</td>
-                            <td>{school.email}</td>
-                            <td>{school.subscription_end}</td>
+                            <td 
+                              onClick={() => handleViewSchoolDetails(school.id)}
+                              style={{ cursor: 'pointer', padding: '12px 16px' }}
+                            >
+                              <div style={{ fontWeight: 'bold', color: 'var(--color-primary)' }} title="Click to view details">
+                                {school.name ? (school.name.length > 30 ? school.name.substring(0, 30) + '...' : school.name) : '-'}
+                              </div>
+                            </td>
+                            <td>{school.subscription_end || '-'}</td>
                             <td>
                               <span className={`badge ${school.days_remaining > 15 ? 'badge-success' : school.days_remaining > 0 ? 'badge-warning' : 'badge-danger'}`} style={{ whiteSpace: 'nowrap', width: '95px', display: 'inline-flex', justifyContent: 'center' }}>
                                 {school.days_remaining} Days
@@ -5611,26 +12730,220 @@ export default function App() {
                                 {(school.status === 'Active' && school.days_remaining > 0) ? 'Active' : 'Inactive'}
                               </button>
                             </td>
-                            <td>
-                              <div style={{ display: 'flex', gap: '8px' }}>
+                            <td style={{ overflow: 'visible', position: 'relative' }}>
+                              <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
                                 <button 
-                                  onClick={() => setShowExtendModal(school)}
-                                  className="btn-outline" 
-                                  style={{ padding: '4px 8px', fontSize: '0.75rem' }}
+                                  id={`school-menu-btn-${school.id}`}
+                                  onClick={() => setActiveSchoolMenuId(activeSchoolMenuId === school.id ? null : school.id)}
+                                  className="menu-dot-trigger"
                                 >
-                                  Extend
+                                  <MoreVertical size={16} />
                                 </button>
-                                <button 
-                                  onClick={() => handleDeleteSchool(school.id)}
-                                  className="btn-outline" 
-                                  style={{ padding: '4px 8px', fontSize: '0.75rem', borderColor: '#ef4444', color: '#ef4444' }}
-                                >
-                                  <Trash2 size={12} style={{ pointerEvents: 'none' }} />
-                                </button>
+                                {activeSchoolMenuId === school.id && (
+                                  <div className="menu-dropdown" style={{ right: 0, top: '24px' }}>
+                                    <button 
+                                      id={`school-view-btn-${school.id}`}
+                                      onClick={() => {
+                                        handleViewSchoolDetails(school.id);
+                                        setActiveSchoolMenuId(null);
+                                      }}
+                                      className="menu-dropdown-item"
+                                    >
+                                      View Details
+                                    </button>
+                                    <button 
+                                      id={`school-edit-btn-${school.id}`}
+                                      onClick={() => {
+                                        setEditSchoolForm({
+                                          name: school.name || '',
+                                          contact_person: school.contact_person || '',
+                                          contact_number: school.contact_number || '',
+                                          subscription_end: school.subscription_end || '',
+                                          status: school.status
+                                        });
+                                        setShowEditSchoolModal(school);
+                                        setActiveSchoolMenuId(null);
+                                      }}
+                                      className="menu-dropdown-item"
+                                    >
+                                      Edit Profile
+                                    </button>
+                                    <button 
+                                      id={`school-delete-btn-${school.id}`}
+                                      onClick={() => {
+                                        handleDeleteSchool(school.id);
+                                        setActiveSchoolMenuId(null);
+                                      }}
+                                      className="menu-dropdown-item"
+                                      style={{ color: '#ef4444' }}
+                                    >
+                                      Delete School
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             </td>
                           </tr>
                         ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 3: Manage Subscriptions */}
+            {activeTab === 'subscriptions' && (
+              <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0 }}>Subscription Management Panel</h3>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>Configure plans, manual activations, upgrades, and audit trail logs.</p>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      setPlanForm({ name: '', duration_days: '', price: '', is_active: 1, description: '' });
+                      setShowAddPlanModal(true);
+                    }} 
+                    className="btn-primary" 
+                    style={{ background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%)' }}
+                  >
+                    <Plus size={16} /> Create Plan
+                  </button>
+                </div>
+
+                {/* Plan Settings Card */}
+                <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <h4 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0 }}>Subscription Plan Configurations</h4>
+                  <div className="erp-table-container">
+                    <table className="erp-table">
+                      <thead>
+                        <tr>
+                          <th>Plan Name</th>
+                          <th>Duration (Days)</th>
+                          <th>Price</th>
+                          <th>Status</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {superPlans.length === 0 ? (
+                          <tr>
+                            <td colSpan="5" style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '24px' }}>No plans configured.</td>
+                          </tr>
+                        ) : (
+                          superPlans.map((plan) => (
+                            <tr key={plan.id}>
+                              <td style={{ fontWeight: 600 }}>{plan.name}</td>
+                              <td>{plan.duration_days} Days</td>
+                              <td style={{ fontWeight: 600, color: 'var(--color-primary)' }}>
+                                {parseFloat(plan.price) === 0 ? 'Free' : `₹${parseFloat(plan.price).toLocaleString()}`}
+                              </td>
+                              <td>
+                                <span className={`badge ${plan.is_active ? 'badge-primary' : 'badge-danger'}`} style={{ backgroundColor: plan.is_active ? 'rgba(79, 70, 229, 0.1)' : 'rgba(239, 68, 68, 0.1)', color: plan.is_active ? 'var(--color-primary)' : '#ef4444' }}>
+                                  {plan.is_active ? 'Active' : 'Inactive'}
+                                </span>
+                              </td>
+                              <td>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                  <button 
+                                    onClick={() => {
+                                      setPlanForm({
+                                        name: plan.name,
+                                        duration_days: plan.duration_days,
+                                        price: plan.price,
+                                        is_active: plan.is_active,
+                                        description: plan.description || ''
+                                      });
+                                      setShowEditPlanModal(plan);
+                                    }}
+                                    className="btn-outline" 
+                                    style={{ padding: '4px 8px', fontSize: '0.75rem' }}
+                                  >
+                                    Edit
+                                  </button>
+                                  <button 
+                                    onClick={() => handleDeletePlan(plan.id)}
+                                    className="btn-outline" 
+                                    style={{ padding: '4px 8px', fontSize: '0.75rem', color: '#ef4444', borderColor: '#fca5a5' }}
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Tenant subscriptions view */}
+                <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <h4 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0 }}>School Tenant Subscription Directory</h4>
+                  <div className="erp-table-container">
+                    <table className="erp-table">
+                      <thead>
+                        <tr>
+                          <th>School Name</th>
+                          <th>Registered Email</th>
+                          <th>Current Plan</th>
+                          <th>License Expiration</th>
+                          <th>Days Left</th>
+                          <th>Status</th>
+                          <th>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {superSubscriptions.length === 0 ? (
+                          <tr>
+                            <td colSpan="7" style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '24px' }}>No school subscription records found.</td>
+                          </tr>
+                        ) : (
+                          superSubscriptions.map((sub) => {
+                            const badgeColor = sub.status === 'Active' || sub.status === 'Trial Active' 
+                              ? 'rgba(16, 185, 129, 0.1)' 
+                              : (sub.status === 'Expiring Soon' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(239, 68, 68, 0.1)');
+                            const textColor = sub.status === 'Active' || sub.status === 'Trial Active' 
+                              ? '#10b981' 
+                              : (sub.status === 'Expiring Soon' ? '#f59e0b' : '#ef4444');
+                            
+                            return (
+                              <tr key={sub.school_id}>
+                                <td style={{ fontWeight: 600 }}>{sub.school_name}</td>
+                                <td>{sub.school_email}</td>
+                                <td style={{ fontWeight: 600 }}>{sub.plan_name || 'No Plan Active'}</td>
+                                <td>{sub.expiry_date || '-'}</td>
+                                <td style={{ fontWeight: 800, color: sub.remaining_days < 15 ? '#ef4444' : 'inherit' }}>
+                                  {sub.remaining_days !== null ? `${sub.remaining_days} Days` : '-'}
+                                </td>
+                                <td>
+                                  <span className="badge" style={{ backgroundColor: badgeColor, color: textColor }}>
+                                    {sub.status || 'No License'}
+                                  </span>
+                                </td>
+                                <td>
+                                  <button 
+                                    onClick={() => {
+                                      setManualSubForm({
+                                        plan_id: sub.plan_id || '',
+                                        action_type: 'Activate',
+                                        start_date: '',
+                                        expiry_date: ''
+                                      });
+                                      setShowManualSubModal(sub);
+                                    }}
+                                    className="btn-primary" 
+                                    style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                                  >
+                                    Manage
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -5654,6 +12967,22 @@ export default function App() {
                 <div>
                   <label htmlFor="inv-email" className="form-label">Admin Email Address</label>
                   <input id="inv-email" type="email" className="erp-input" value={inviteForm.email} onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })} required placeholder="school.admin@domain.com" />
+                </div>
+                <div>
+                  <label htmlFor="inv-plan" className="form-label">Subscription Plan</label>
+                  <select 
+                    id="inv-plan"
+                    className="erp-input"
+                    value={inviteForm.plan_id} 
+                    onChange={(e) => setInviteForm({ ...inviteForm, plan_id: e.target.value })}
+                    required
+                  >
+                    <option value="" disabled>Select Plan</option>
+                    {superPlans.filter(p => Number(p.is_active) !== 0).map(plan => (
+                      <option key={plan.id} value={plan.id}>{plan.name}</option>
+                    ))}
+                    <option value="without_plan">Without Plan</option>
+                  </select>
                 </div>
                 <button type="submit" className="btn-primary" style={{ marginTop: '10px', justifyContent: 'center' }} disabled={isSendingInvite}>
                   {isSendingInvite ? 'Sending...' : 'Send Invitation'}
@@ -5689,6 +13018,154 @@ export default function App() {
                   </select>
                 </div>
                 <button type="submit" className="btn-primary" style={{ marginTop: '10px', justifyContent: 'center' }}>Extend License</button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Add Subscription Plan Modal */}
+        {showAddPlanModal && (
+          <div className="modal-overlay" onClick={() => setShowAddPlanModal(false)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Create Subscription Plan</h3>
+                <button onClick={() => setShowAddPlanModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={20} /></button>
+              </div>
+
+              <form onSubmit={handleSavePlan} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div>
+                  <label htmlFor="plan-name" className="form-label">Plan Name</label>
+                  <input id="plan-name" type="text" className="erp-input" value={planForm.name} onChange={(e) => setPlanForm({ ...planForm, name: e.target.value })} required placeholder="e.g. 1 Year Plan" />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label htmlFor="plan-duration" className="form-label">Duration (Days)</label>
+                    <input id="plan-duration" type="number" className="erp-input" value={planForm.duration_days} onChange={(e) => setPlanForm({ ...planForm, duration_days: e.target.value })} required placeholder="365" />
+                  </div>
+                  <div>
+                    <label htmlFor="plan-price" className="form-label">Price (INR)</label>
+                    <input id="plan-price" type="number" step="0.01" className="erp-input" value={planForm.price} onChange={(e) => setPlanForm({ ...planForm, price: e.target.value })} required placeholder="12000" />
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="plan-status" className="form-label">Status</label>
+                  <select id="plan-status" className="erp-input" value={planForm.is_active} onChange={(e) => setPlanForm({ ...planForm, is_active: parseInt(e.target.value) })}>
+                    <option value={1}>Active</option>
+                    <option value={0}>Inactive</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="plan-desc" className="form-label">Description</label>
+                  <textarea id="plan-desc" className="erp-input" style={{ minHeight: '80px', resize: 'vertical' }} value={planForm.description} onChange={(e) => setPlanForm({ ...planForm, description: e.target.value })} placeholder="Write plan details..."></textarea>
+                </div>
+                <button type="submit" className="btn-primary" style={{ marginTop: '10px', justifyContent: 'center' }} disabled={isSavingPlan}>
+                  {isSavingPlan ? 'Saving...' : 'Create Plan'}
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Subscription Plan Modal */}
+        {showEditPlanModal && (
+          <div className="modal-overlay" onClick={() => setShowEditPlanModal(null)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Edit Plan: {showEditPlanModal.name}</h3>
+                <button onClick={() => setShowEditPlanModal(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={20} /></button>
+              </div>
+
+              <form onSubmit={handleSavePlan} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div>
+                  <label htmlFor="edit-plan-name" className="form-label">Plan Name</label>
+                  <input id="edit-plan-name" type="text" className="erp-input" value={planForm.name} onChange={(e) => setPlanForm({ ...planForm, name: e.target.value })} required />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label htmlFor="edit-plan-duration" className="form-label">Duration (Days)</label>
+                    <input id="edit-plan-duration" type="number" className="erp-input" value={planForm.duration_days} onChange={(e) => setPlanForm({ ...planForm, duration_days: e.target.value })} required />
+                  </div>
+                  <div>
+                    <label htmlFor="edit-plan-price" className="form-label">Price (INR)</label>
+                    <input id="edit-plan-price" type="number" step="0.01" className="erp-input" value={planForm.price} onChange={(e) => setPlanForm({ ...planForm, price: e.target.value })} required />
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="edit-plan-status" className="form-label">Status</label>
+                  <select id="edit-plan-status" className="erp-input" value={planForm.is_active} onChange={(e) => setPlanForm({ ...planForm, is_active: parseInt(e.target.value) })}>
+                    <option value={1}>Active</option>
+                    <option value={0}>Inactive</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="edit-plan-desc" className="form-label">Description</label>
+                  <textarea id="edit-plan-desc" className="erp-input" style={{ minHeight: '80px', resize: 'vertical' }} value={planForm.description} onChange={(e) => setPlanForm({ ...planForm, description: e.target.value })}></textarea>
+                </div>
+                <button type="submit" className="btn-primary" style={{ marginTop: '10px', justifyContent: 'center' }} disabled={isSavingPlan}>
+                  {isSavingPlan ? 'Saving...' : 'Save Plan Settings'}
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Manual Subscription Activation / Modification Modal */}
+        {showManualSubModal && (
+          <div className="modal-overlay" onClick={() => setShowManualSubModal(null)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <div>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0 }}>Manage Subscription</h3>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{showManualSubModal.school_name}</span>
+                </div>
+                <button onClick={() => setShowManualSubModal(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={20} /></button>
+              </div>
+
+              <form onSubmit={handleSaveManualSubscription} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div>
+                  <label htmlFor="manual-action" className="form-label">Action Type</label>
+                  <select 
+                    id="manual-action" 
+                    className="erp-input" 
+                    value={manualSubForm.action_type} 
+                    onChange={(e) => setManualSubForm({ ...manualSubForm, action_type: e.target.value })}
+                  >
+                    <option value="Activate">Activate Subscription</option>
+                    <option value="Extend">Extend Duration</option>
+                    <option value="Upgrade">Upgrade Plan</option>
+                    <option value="Downgrade">Downgrade Plan</option>
+                    <option value="Cancel">Cancel / Disable Subscription</option>
+                  </select>
+                </div>
+
+                {manualSubForm.action_type !== 'Cancel' && (
+                  <div>
+                    <label htmlFor="manual-plan" className="form-label">Subscription Plan</label>
+                    <select 
+                      id="manual-plan" 
+                      className="erp-input" 
+                      value={manualSubForm.plan_id} 
+                      onChange={(e) => setManualSubForm({ ...manualSubForm, plan_id: e.target.value })}
+                      required
+                    >
+                      <option value="">Select Plan...</option>
+                      {superPlans.map(p => (
+                        <option key={p.id} value={p.id}>{p.name} ({p.duration_days} Days - ₹{parseFloat(p.price).toLocaleString()})</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+
+                {manualSubForm.action_type === 'Cancel' && (
+                  <p style={{ color: '#ef4444', fontSize: '0.85rem', fontWeight: 600 }}>
+                    Warning: Canceling will expire this school's license immediately and lock out all admin/student access.
+                  </p>
+                )}
+
+                <button type="submit" className="btn-primary" style={{ marginTop: '10px', justifyContent: 'center' }} disabled={isSavingSub}>
+                  {isSavingSub ? 'Saving Changes...' : 'Process Subscription action'}
+                </button>
               </form>
             </div>
           </div>
@@ -5806,6 +13283,1078 @@ export default function App() {
           </div>
         )}
 
+        {/* School Profile Details Modal */}
+        {selectedViewSchool && (
+          <div className="modal-overlay" onClick={() => { setSelectedViewSchool(null); setSchoolDetailsData(null); }}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '900px', width: '90%', maxHeight: '90vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
+              
+              {/* Header */}
+              <div style={{ padding: '24px 24px 16px 24px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <h3 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0 }}>{selectedViewSchool.name}</h3>
+                    <span className={`status-badge ${selectedViewSchool.status === 'Active' ? 'status-active' : 'status-inactive'}`} style={{ margin: 0 }}>
+                      {selectedViewSchool.status}
+                    </span>
+                  </div>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', margin: '4px 0 0 0' }}>
+                    ID: {selectedViewSchool.id} • Registered Admin: {selectedViewSchool.email}
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button 
+                    onClick={() => {
+                      setEditSchoolForm({
+                        name: selectedViewSchool.name,
+                        contact_person: selectedViewSchool.contact_person || '',
+                        contact_number: selectedViewSchool.contact_number || '',
+                        subscription_end: selectedViewSchool.subscription_end || '',
+                        status: selectedViewSchool.status
+                      });
+                      setShowEditSchoolModal(selectedViewSchool);
+                    }}
+                    className="btn-outline" 
+                    style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <Edit size={16} /> Edit Profile
+                  </button>
+                  <button onClick={() => { setSelectedViewSchool(null); setSchoolDetailsData(null); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}>
+                    <X size={24} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Tabs list */}
+              <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', background: 'rgba(255, 255, 255, 0.02)', padding: '0 24px' }}>
+                {[
+                  { id: 'overview', label: 'Overview' },
+                  { id: 'history', label: 'Subscription History' },
+                  { id: 'billing', label: 'Billing & Invoices' },
+                  { id: 'logs', label: 'Audit Logs' },
+                  { id: 'members', label: 'Academic Members' }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setSchoolDetailsTab(tab.id)}
+                    style={{
+                      padding: '16px 20px',
+                      background: 'transparent',
+                      border: 'none',
+                      borderBottom: schoolDetailsTab === tab.id ? '2px solid var(--color-primary)' : '2px solid transparent',
+                      color: schoolDetailsTab === tab.id ? 'var(--color-primary)' : 'var(--text-secondary)',
+                      fontWeight: schoolDetailsTab === tab.id ? 700 : 500,
+                      cursor: 'pointer',
+                      fontSize: '0.9rem',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Content body */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
+                {isLoadingSchoolDetails ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px 0' }}>
+                    <div style={{ height: '20px', width: '40%', background: 'rgba(255,255,255,0.05)', borderRadius: '4px' }}></div>
+                    <div style={{ height: '100px', width: '100%', background: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}></div>
+                    <div style={{ height: '150px', width: '100%', background: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}></div>
+                  </div>
+                ) : (
+                  <>
+                    {/* OVERVIEW TAB */}
+                    {schoolDetailsTab === 'overview' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                        
+                        {/* Stats Grid */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                          <div style={{ padding: '20px', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
+                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Total Classes</span>
+                            <h4 style={{ fontSize: '2rem', fontWeight: 800, margin: '8px 0 0 0', color: 'var(--color-primary)' }}>{schoolDetailsData?.classes_count ?? 0}</h4>
+                          </div>
+                          <div style={{ padding: '20px', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
+                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Total Faculty</span>
+                            <h4 style={{ fontSize: '2rem', fontWeight: 800, margin: '8px 0 0 0', color: 'var(--color-primary)' }}>{schoolDetailsData?.teachers_count ?? 0}</h4>
+                          </div>
+                          <div style={{ padding: '20px', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
+                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Total Students</span>
+                            <h4 style={{ fontSize: '2rem', fontWeight: 800, margin: '8px 0 0 0', color: 'var(--color-primary)' }}>{schoolDetailsData?.students_count ?? 0}</h4>
+                          </div>
+                        </div>
+
+                        {/* General Info */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                          
+                          {/* License Info */}
+                          <div style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '20px', background: 'rgba(255,255,255,0.01)' }}>
+                            <h4 style={{ fontSize: '1.05rem', fontWeight: 700, margin: '0 0 16px 0', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>License & Subscription</h4>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Active Plan:</span>
+                                <span style={{ fontWeight: 600 }}>{selectedViewSchool.plan_name || 'Free Trial'}</span>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Days Remaining:</span>
+                                <span style={{ fontWeight: 600, color: selectedViewSchool.days_remaining <= 15 ? '#ef4444' : 'inherit' }}>
+                                  {selectedViewSchool.days_remaining} Days
+                                </span>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Start Date:</span>
+                                <span style={{ fontWeight: 600 }}>{selectedViewSchool.subscription_start || 'N/A'}</span>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>End Date:</span>
+                                <span style={{ fontWeight: 600 }}>{selectedViewSchool.subscription_end || 'N/A'}</span>
+                              </div>
+                            </div>
+                            <button 
+                              onClick={() => {
+                                setExtendMonths("3");
+                                setShowExtendModal({ id: selectedViewSchool.id, name: selectedViewSchool.name });
+                              }}
+                              className="btn-primary" 
+                              style={{ width: '100%', marginTop: '16px', justifyContent: 'center' }}
+                            >
+                              Extend License
+                            </button>
+                          </div>
+
+                          {/* Contact Info */}
+                          <div style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '20px', background: 'rgba(255,255,255,0.01)' }}>
+                            <h4 style={{ fontSize: '1.05rem', fontWeight: 700, margin: '0 0 16px 0', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>Contact Information</h4>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                              <div>
+                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', display: 'block', marginBottom: '2px' }}>Primary Contact Person:</span>
+                                <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>{selectedViewSchool.contact_person || 'Not Set'}</span>
+                              </div>
+                              <div>
+                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', display: 'block', marginBottom: '2px' }}>Contact Number:</span>
+                                <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>{selectedViewSchool.contact_number || 'Not Set'}</span>
+                              </div>
+                              <div>
+                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', display: 'block', marginBottom: '2px' }}>System Onboard Date:</span>
+                                <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>{selectedViewSchool.created_at || 'N/A'}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                        </div>
+                      </div>
+                    )}
+
+                    {/* SUBSCRIPTION HISTORY */}
+                    {schoolDetailsTab === 'history' && (
+                      <div>
+                        {(!schoolDetailsData?.subscription_history || schoolDetailsData.subscription_history.length === 0) ? (
+                          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
+                            No subscription history recorded.
+                          </div>
+                        ) : (
+                          <div className="table-responsive" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+                            <table className="erp-table">
+                              <thead>
+                                <tr>
+                                  <th>Action</th>
+                                  <th>Plan / Description</th>
+                                  <th>Performed By</th>
+                                  <th>Date & Time</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {schoolDetailsData.subscription_history.map((h, i) => (
+                                  <tr key={h.id || i}>
+                                    <td style={{ fontWeight: 600 }}>{h.action}</td>
+                                    <td>{h.plan_name || 'N/A'}</td>
+                                    <td>{h.performed_by}</td>
+                                    <td>{h.created_at}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* BILLING HISTORY */}
+                    {schoolDetailsTab === 'billing' && (
+                      <div>
+                        {(!schoolDetailsData?.billing_history || schoolDetailsData.billing_history.length === 0) ? (
+                          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
+                            No billing transactions found.
+                          </div>
+                        ) : (
+                          <div className="table-responsive" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+                            <table className="erp-table">
+                              <thead>
+                                <tr>
+                                  <th>Transaction ID</th>
+                                  <th>Type</th>
+                                  <th>Amount</th>
+                                  <th>Status</th>
+                                  <th>Date</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {schoolDetailsData.billing_history.map((b, i) => (
+                                  <tr key={b.id || i}>
+                                    <td style={{ fontFamily: 'monospace' }}>#{b.id}</td>
+                                    <td>{b.type}</td>
+                                    <td>₹{parseFloat(b.amount || 0).toLocaleString()}</td>
+                                    <td>
+                                      <span className={`status-badge ${b.status === 'Paid' ? 'status-active' : 'status-inactive'}`} style={{ fontSize: '0.75rem', padding: '2px 8px' }}>
+                                        {b.status}
+                                      </span>
+                                    </td>
+                                    <td>{b.date}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* AUDIT LOGS */}
+                    {schoolDetailsTab === 'logs' && (
+                      <div>
+                        {(!schoolDetailsData?.audit_logs || schoolDetailsData.audit_logs.length === 0) ? (
+                          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
+                            No audit logs available for this school.
+                          </div>
+                        ) : (
+                          <div className="table-responsive" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+                            <table className="erp-table">
+                              <thead>
+                                <tr>
+                                  <th style={{ width: '180px' }}>Timestamp</th>
+                                  <th>Operator</th>
+                                  <th>Action</th>
+                                  <th>Details</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {schoolDetailsData.audit_logs.map((l, i) => (
+                                  <tr key={l.id || i}>
+                                    <td style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{l.timestamp}</td>
+                                    <td style={{ fontWeight: 600 }}>{l.operator}</td>
+                                    <td>{l.action}</td>
+                                    <td style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{l.details}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                        {/* ACADEMIC MEMBERS TAB */}
+                    {schoolDetailsTab === 'members' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                        {selectedMemberStudent ? (
+                          /* 1. STUDENT DETAIL VIEW INSIDE TAB */
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }} className="fade-in">
+                            <div>
+                              <button 
+                                onClick={() => {
+                                  setSelectedMemberStudent(null);
+                                  setMemberStudentFees([]);
+                                }}
+                                className="btn-outline" 
+                                style={{ padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                              >
+                                ← {selectedMemberClass ? "Back to Class List" : "Back to Academic Members"}
+                              </button>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr)', gap: '24px', alignItems: 'start' }}>
+                              
+                              {/* Left Column Profile Card */}
+                              <div className="erp-card" style={{ textAlign: 'center', background: 'rgba(255, 255, 255, 0.01)', padding: '20px' }}>
+                                <img 
+                                  src={getStudentAvatar(selectedMemberStudent)} 
+                                  alt={selectedMemberStudent.name} 
+                                  style={{ width: '100px', height: '100px', borderRadius: '50%', objectFit: 'cover', marginBottom: '16px', border: '3px solid var(--color-primary)' }}
+                                />
+                                <h3 style={{ fontSize: '1.2rem', marginBottom: '8px' }}>{selectedMemberStudent.name}</h3>
+                                
+                                {(() => {
+                                  const statusStr = getStudentFeeStatus(selectedMemberStudent);
+                                  const badge = getFeeStatusBadgeInfo(statusStr);
+                                  return (
+                                    <span className={`badge ${badge.class}`} style={{ fontSize: '0.75rem', padding: '4px 12px', display: 'inline-flex' }}>
+                                      {badge.label}
+                                    </span>
+                                  );
+                                })()}
+                                
+                                <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '16px', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.8rem', textAlign: 'left', color: 'var(--text-secondary)' }}>
+                                  <div><strong>Roll No.:</strong> {selectedMemberStudent.roll_number || 'N/A'}</div>
+                                  <div><strong>SR No.:</strong> {selectedMemberStudent.sr_no || 'N/A'}</div>
+                                  <div><strong>Class:</strong> {selectedMemberClass ? selectedMemberClass.name : (schoolDetailsData.classes.find(c => c.id === selectedMemberStudent.class_id)?.name || 'N/A')}</div>
+                                  <div><strong>Section:</strong> {selectedMemberStudent.group_name || 'N/A'}</div>
+                                  <div><strong>Gender:</strong> {selectedMemberStudent.gender || 'Male'}</div>
+                                  <div><strong>Contact:</strong> {selectedMemberStudent.phone || 'N/A'}</div>
+                                  <div><strong>Email:</strong> {selectedMemberStudent.email || 'N/A'}</div>
+                                  <div><strong>Nationality:</strong> {selectedMemberStudent.nationality || 'Indian'}</div>
+                                  <div><strong>Caste:</strong> {selectedMemberStudent.caste || 'N/A'}</div>
+                                  <div><strong>Status:</strong> <span className={`badge ${selectedMemberStudent.status === 'Inactive' ? 'badge-danger' : 'badge-success'}`} style={{ display: 'inline-block', padding: '1px 6px', fontSize: '0.7rem' }}>{selectedMemberStudent.status || 'Active'}</span></div>
+                                  {selectedMemberStudent.exit_date && (
+                                    <div><strong>Exit Date:</strong> {formatDate(selectedMemberStudent.exit_date)}</div>
+                                  )}
+                                  <div><strong>Date of Birth:</strong> {formatDate(selectedMemberStudent.date_of_birth)}</div>
+                                  <div><strong>Admission Date:</strong> {formatDate(selectedMemberStudent.admission_date)}</div>
+                                </div>
+                              </div>
+
+                              {/* Right Column: Family Details & Ledger */}
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                <div className="erp-card" style={{ padding: '16px' }}>
+                                  <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '12px', color: 'var(--text-primary)' }}>Family & Identification</h4>
+                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.85rem' }}>
+                                    <div><strong>Father's Name:</strong> {selectedMemberStudent.father_name || 'N/A'}</div>
+                                    <div><strong>Mother's Name:</strong> {selectedMemberStudent.mother_name || 'N/A'}</div>
+                                    <div><strong>Emergency Contact:</strong> {selectedMemberStudent.emergency_contact || 'N/A'}</div>
+                                    <div><strong>Blood Group:</strong> {selectedMemberStudent.blood_group || 'N/A'}</div>
+                                    <div><strong>Aadhaar Number:</strong> {selectedMemberStudent.aadhaar_number || 'N/A'}</div>
+                                  </div>
+                                </div>
+
+                                {/* Sub-tab Navigation */}
+                                <div style={{ display: 'flex', gap: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px' }}>
+                                  <button
+                                    onClick={() => setMemberDetailTab('fees')}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      color: memberDetailTab === 'fees' ? 'var(--color-primary)' : 'var(--text-muted)',
+                                      fontWeight: 700,
+                                      fontSize: '0.9rem',
+                                      cursor: 'pointer',
+                                      borderBottom: memberDetailTab === 'fees' ? '2px solid var(--color-primary)' : 'none',
+                                      paddingBottom: '8px'
+                                    }}
+                                  >
+                                    Fee Collection Ledger
+                                  </button>
+                                  <button
+                                    onClick={() => setMemberDetailTab('documents')}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      color: memberDetailTab === 'documents' ? 'var(--color-primary)' : 'var(--text-muted)',
+                                      fontWeight: 700,
+                                      fontSize: '0.9rem',
+                                      cursor: 'pointer',
+                                      borderBottom: memberDetailTab === 'documents' ? '2px solid var(--color-primary)' : 'none',
+                                      paddingBottom: '8px'
+                                    }}
+                                  >
+                                    Attached Documents ({(() => {
+                                      const docsList = typeof selectedMemberStudent.documents === 'string' ? JSON.parse(selectedMemberStudent.documents) : (selectedMemberStudent.documents || []);
+                                      return docsList.length;
+                                    })()})
+                                  </button>
+                                </div>
+
+                                {memberDetailTab === 'fees' ? (
+                                  <div className="erp-card" style={{ padding: '16px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                                      <h4 style={{ fontSize: '0.95rem', fontWeight: 700 }}>Monthly Fee Record</h4>
+                                      <div style={{ display: 'flex', gap: '12px', fontSize: '0.75rem' }}>
+                                        <span style={{ color: '#10b981', fontWeight: 600 }}>Paid: {memberStudentFees.filter(f => f.status === 'Paid').length}</span>
+                                        <span style={{ color: '#ef4444', fontWeight: 600 }}>Pending: {memberStudentFees.filter(f => f.status === 'Pending').length}</span>
+                                      </div>
+                                    </div>
+
+                                    <div className="table-responsive" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+                                      <table className="erp-table">
+                                        <thead>
+                                          <tr>
+                                            <th>Month</th>
+                                            <th>Status</th>
+                                            <th>Amount</th>
+                                            <th>Due Date</th>
+                                            <th>Payment Date</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {(!memberStudentFees || memberStudentFees.length === 0) ? (
+                                            <tr>
+                                              <td colSpan="5" style={{ textAlign: 'center', color: 'var(--text-secondary)', fontStyle: 'italic', padding: '16px' }}>
+                                                No fee records found for this student.
+                                              </td>
+                                            </tr>
+                                          ) : (
+                                            memberStudentFees.map(fee => (
+                                              <tr key={fee.id}>
+                                                <td style={{ fontWeight: 600 }}>{fee.month}</td>
+                                                <td>
+                                                  <span className={`badge ${fee.status === 'Paid' ? 'badge-success' : 'badge-danger'}`}>
+                                                    {fee.status}
+                                                  </span>
+                                                </td>
+                                                <td style={{ fontWeight: 600 }}>
+                                                  {selectedViewSchool?.currency || 'INR'} {fee.amount ? Math.round(fee.amount).toLocaleString() : '0'}
+                                                </td>
+                                                <td style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+                                                  {fee.due_date ? formatDate(fee.due_date) : 'N/A'}
+                                                </td>
+                                                <td style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+                                                  {fee.status === 'Paid' ? (fee.payment_date ? formatDate(fee.payment_date) : 'N/A') : '-'}
+                                                </td>
+                                              </tr>
+                                            ))
+                                          )}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="erp-card" style={{ padding: '16px' }}>
+                                    <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '12px' }}>Attached Documents</h4>
+                                    {(() => {
+                                      const docsList = typeof selectedMemberStudent.documents === 'string' ? JSON.parse(selectedMemberStudent.documents) : (selectedMemberStudent.documents || []);
+                                      if (docsList.length === 0) {
+                                        return <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontStyle: 'italic' }}>No documents attached to this student profile.</p>;
+                                      }
+                                      return (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                          {docsList.map((doc, idx) => (
+                                            <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
+                                              <div>
+                                                <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{doc.name || `Document ${idx+1}`}</div>
+                                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Type: {doc.type || 'N/A'}</span>
+                                              </div>
+                                              {doc.url && (
+                                                <a href={doc.url} target="_blank" rel="noopener noreferrer" className="btn-outline" style={{ padding: '4px 8px', fontSize: '0.75rem', textDecoration: 'none' }}>
+                                                  View / Download
+                                                </a>
+                                              )}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      );
+                                    })()}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ) : selectedMemberTeacher ? (
+                          /* 2. TEACHER DETAIL VIEW INSIDE TAB */
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }} className="fade-in">
+                            <div>
+                              <button 
+                                onClick={() => {
+                                  setSelectedMemberTeacher(null);
+                                  setMemberTeacherSalaries([]);
+                                }}
+                                className="btn-outline" 
+                                style={{ padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                              >
+                                ← Back to Academic Members
+                              </button>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr)', gap: '24px', alignItems: 'start' }}>
+                              
+                              {/* Left Column Profile Card */}
+                              <div className="erp-card" style={{ textAlign: 'center', background: 'rgba(255, 255, 255, 0.01)', padding: '20px' }}>
+                                {selectedMemberTeacher.profile_image ? (
+                                  <img 
+                                    src={selectedMemberTeacher.profile_image} 
+                                    alt={selectedMemberTeacher.name} 
+                                    style={{ width: '100px', height: '100px', borderRadius: '50%', objectFit: 'cover', marginBottom: '16px', border: '3px solid var(--color-secondary)' }}
+                                  />
+                                ) : (
+                                  <div 
+                                    style={{ 
+                                      width: '100px', 
+                                      height: '100px', 
+                                      borderRadius: '50%', 
+                                      background: 'rgba(255,255,255,0.05)', 
+                                      border: '3px solid var(--border-color)', 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      justifyContent: 'center',
+                                      margin: '0 auto 16px auto',
+                                      color: 'var(--text-secondary)'
+                                    }}
+                                  >
+                                    <User size={48} />
+                                  </div>
+                                )}
+                                <h3 style={{ fontSize: '1.2rem', marginBottom: '8px' }}>{selectedMemberTeacher.name}</h3>
+                                <span className="badge badge-secondary" style={{ fontSize: '0.75rem', padding: '4px 12px', display: 'inline-flex' }}>
+                                  {selectedMemberTeacher.subject || 'General'}
+                                </span>
+                                
+                                <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '16px', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.8rem', textAlign: 'left', color: 'var(--text-secondary)' }}>
+                                  <div><strong>Gender:</strong> {selectedMemberTeacher.gender || 'Male'}</div>
+                                  <div><strong>Email:</strong> {selectedMemberTeacher.email || 'N/A'}</div>
+                                  <div><strong>Phone:</strong> {selectedMemberTeacher.phone || 'N/A'}</div>
+                                  <div><strong>Address:</strong> {selectedMemberTeacher.address || 'N/A'}</div>
+                                  <div><strong>Status:</strong> <span className={`badge ${selectedMemberTeacher.status === 'Inactive' ? 'badge-danger' : 'badge-success'}`} style={{ display: 'inline-block', padding: '1px 6px', fontSize: '0.7rem' }}>{selectedMemberTeacher.status || 'Active'}</span></div>
+                                </div>
+                              </div>
+
+                              {/* Right Column: Qualifications & Ledger */}
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                <div className="erp-card" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', padding: '16px' }}>
+                                  <div>
+                                    <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '10px', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px', color: 'var(--text-primary)' }}>Employment Information</h4>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                      <div><strong>Joining Date:</strong> {selectedMemberTeacher.joining_date ? formatDate(selectedMemberTeacher.joining_date) : 'N/A'}</div>
+                                      <div><strong>Exit Date:</strong> {selectedMemberTeacher.exit_date && selectedMemberTeacher.exit_date !== 'Active / None' ? formatDate(selectedMemberTeacher.exit_date) : 'Active / None'}</div>
+                                      <div><strong>Assigned Classes:</strong> {selectedMemberTeacher.assigned_classes || 'None'}</div>
+                                      <div><strong>Base Salary:</strong> {selectedViewSchool?.currency || 'INR'} {selectedMemberTeacher.salary_amount ? Math.round(selectedMemberTeacher.salary_amount).toLocaleString() : '0'}</div>
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '10px', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px', color: 'var(--text-primary)' }}>Qualifications & Identity</h4>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                      <div><strong>Education:</strong> {selectedMemberTeacher.qualification || 'N/A'}</div>
+                                      <div><strong>Experience:</strong> {selectedMemberTeacher.experience || 'N/A'}</div>
+                                      <div><strong>Aadhaar Number:</strong> {selectedMemberTeacher.aadhaar_number || 'N/A'}</div>
+                                      <div><strong>PAN Number:</strong> {selectedMemberTeacher.pan_number ? selectedMemberTeacher.pan_number.toUpperCase() : 'N/A'}</div>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Sub-tab Navigation */}
+                                <div style={{ display: 'flex', gap: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px' }}>
+                                  <button
+                                    onClick={() => setMemberDetailTab('fees')}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      color: memberDetailTab === 'fees' ? 'var(--color-primary)' : 'var(--text-muted)',
+                                      fontWeight: 700,
+                                      fontSize: '0.9rem',
+                                      cursor: 'pointer',
+                                      borderBottom: memberDetailTab === 'fees' ? '2px solid var(--color-primary)' : 'none',
+                                      paddingBottom: '8px'
+                                    }}
+                                  >
+                                    Salary Disbursements
+                                  </button>
+                                  <button
+                                    onClick={() => setMemberDetailTab('documents')}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      color: memberDetailTab === 'documents' ? 'var(--color-primary)' : 'var(--text-muted)',
+                                      fontWeight: 700,
+                                      fontSize: '0.9rem',
+                                      cursor: 'pointer',
+                                      borderBottom: memberDetailTab === 'documents' ? '2px solid var(--color-primary)' : 'none',
+                                      paddingBottom: '8px'
+                                    }}
+                                  >
+                                    Attached Documents ({(() => {
+                                      const docsList = typeof selectedMemberTeacher.documents === 'string' ? JSON.parse(selectedMemberTeacher.documents) : (selectedMemberTeacher.documents || []);
+                                      return docsList.length;
+                                    })()})
+                                  </button>
+                                </div>
+
+                                {memberDetailTab === 'fees' ? (
+                                  <div className="erp-card" style={{ padding: '16px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                                      <h4 style={{ fontSize: '0.95rem', fontWeight: 700 }}>Monthly Salary Record</h4>
+                                      <div style={{ display: 'flex', gap: '12px', fontSize: '0.75rem' }}>
+                                        <span style={{ color: '#10b981', fontWeight: 600 }}>Paid: {memberTeacherSalaries.filter(s => s.status === 'Paid').length}</span>
+                                        <span style={{ color: '#ef4444', fontWeight: 600 }}>Pending: {memberTeacherSalaries.filter(s => s.status === 'Pending').length}</span>
+                                      </div>
+                                    </div>
+
+                                    <div className="table-responsive" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+                                      <table className="erp-table">
+                                        <thead>
+                                          <tr>
+                                            <th>Month</th>
+                                            <th>Status</th>
+                                            <th>Amount</th>
+                                            <th>Payment Date</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {(!memberTeacherSalaries || memberTeacherSalaries.length === 0) ? (
+                                            <tr>
+                                              <td colSpan="4" style={{ textAlign: 'center', color: 'var(--text-secondary)', fontStyle: 'italic', padding: '16px' }}>
+                                                No salary records found for this teacher.
+                                              </td>
+                                            </tr>
+                                          ) : (
+                                            memberTeacherSalaries.map(salary => (
+                                              <tr key={salary.id}>
+                                                <td style={{ fontWeight: 600 }}>{salary.month}</td>
+                                                <td>
+                                                  <span className={`badge ${salary.status === 'Paid' ? 'badge-success' : 'badge-danger'}`}>
+                                                    {salary.status}
+                                                  </span>
+                                                </td>
+                                                <td style={{ fontWeight: 600 }}>
+                                                  {selectedViewSchool?.currency || 'INR'} {salary.amount ? Math.round(salary.amount).toLocaleString() : '0'}
+                                                </td>
+                                                <td style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+                                                  {salary.status === 'Paid' ? (salary.payment_date ? formatDate(salary.payment_date) : 'N/A') : '-'}
+                                                </td>
+                                              </tr>
+                                            ))
+                                          )}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="erp-card" style={{ padding: '16px' }}>
+                                    <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '12px' }}>Attached Documents</h4>
+                                    {(() => {
+                                      const docsList = typeof selectedMemberTeacher.documents === 'string' ? JSON.parse(selectedMemberTeacher.documents) : (selectedMemberTeacher.documents || []);
+                                      if (docsList.length === 0) {
+                                        return <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontStyle: 'italic' }}>No documents attached to this faculty profile.</p>;
+                                      }
+                                      return (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                          {docsList.map((doc, idx) => (
+                                            <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
+                                              <div>
+                                                <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{doc.name || `Document ${idx+1}`}</div>
+                                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Type: {doc.type || 'N/A'}</span>
+                                              </div>
+                                              {doc.url && (
+                                                <a href={doc.url} target="_blank" rel="noopener noreferrer" className="btn-outline" style={{ padding: '4px 8px', fontSize: '0.75rem', textDecoration: 'none' }}>
+                                                  View / Download
+                                                </a>
+                                              )}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      );
+                                    })()}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ) : selectedMemberClass ? (
+                          /* 3. CLASSROOM STUDENT LIST VIEW INSIDE TAB */
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }} className="fade-in">
+                            <div>
+                              <button 
+                                onClick={() => setSelectedMemberClass(null)}
+                                className="btn-outline" 
+                                style={{ padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                              >
+                                ← Back to Academic Members
+                              </button>
+                            </div>
+
+                            <div>
+                              <h4 style={{ fontSize: '1.05rem', fontWeight: 700, margin: '0 0 16px 0' }}>
+                                Students in {selectedMemberClass.name} ({schoolDetailsData.students.filter(s => s.class_id === selectedMemberClass.id).length})
+                              </h4>
+                              {(() => {
+                                const classStudents = schoolDetailsData.students.filter(s => s.class_id === selectedMemberClass.id);
+                                if (classStudents.length === 0) {
+                                  return <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', fontStyle: 'italic' }}>No students enrolled in this class.</p>;
+                                }
+                                return (
+                                  <div className="table-responsive" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+                                    <table className="erp-table">
+                                      <thead>
+                                        <tr>
+                                          <th>Roll No</th>
+                                          <th>Name</th>
+                                          <th>Status</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {classStudents.map(st => (
+                                          <tr 
+                                            key={st.id} 
+                                            style={{ cursor: 'pointer' }}
+                                            onClick={() => {
+                                              setSelectedMemberStudent(st);
+                                              fetchMemberStudentFees(selectedViewSchool.id, st.id);
+                                            }}
+                                          >
+                                            <td>{st.roll_number}</td>
+                                            <td style={{ fontWeight: 600, color: 'var(--color-primary)' }}>
+                                              {st.name} <span style={{ fontSize: '0.75rem', fontWeight: 400, color: 'var(--text-muted)', marginLeft: '4px' }}>(Click to view ledger)</span>
+                                            </td>
+                                            <td>
+                                              <span className={`status-badge ${st.status === 'Active' ? 'status-active' : 'status-inactive'}`} style={{ fontSize: '0.7rem', padding: '1px 6px' }}>
+                                                {st.status}
+                                              </span>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                          </div>
+                        ) : (
+                          /* 4. DEFAULT VIEW (CLASSES GRID & FACULTY GRID) */
+                          <>
+                            {/* Classes list */}
+                            <div>
+                              <h4 style={{ fontSize: '1.05rem', fontWeight: 700, margin: '0 0 12px 0' }}>Academic Classes ({schoolDetailsData?.classes?.length || 0})</h4>
+                              {(!schoolDetailsData?.classes || schoolDetailsData.classes.length === 0) ? (
+                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', fontStyle: 'italic' }}>No classes onboarded.</p>
+                              ) : (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
+                                  {schoolDetailsData.classes.map(c => (
+                                    <div 
+                                      key={c.id} 
+                                      onClick={() => setSelectedMemberClass(c)}
+                                      style={{ padding: '12px', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}
+                                      className="hoverable-card"
+                                    >
+                                      <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{c.name}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Teachers list */}
+                            <div>
+                              <h4 style={{ fontSize: '1.05rem', fontWeight: 700, margin: '0 0 12px 0' }}>Faculty Members ({schoolDetailsData?.teachers?.length || 0})</h4>
+                              {(!schoolDetailsData?.teachers || schoolDetailsData.teachers.length === 0) ? (
+                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', fontStyle: 'italic' }}>No faculty members onboarded.</p>
+                              ) : (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '12px' }}>
+                                  {schoolDetailsData.teachers.map(t => (
+                                    <div 
+                                      key={t.id} 
+                                      className="hoverable-card"
+                                      onClick={() => {
+                                        setSelectedMemberTeacher(t);
+                                        fetchMemberTeacherSalaries(selectedViewSchool.id, t.id);
+                                      }}
+                                      style={{ 
+                                        padding: '12px', 
+                                        background: 'rgba(255, 255, 255, 0.02)', 
+                                        border: '1px solid var(--border-color)', 
+                                        borderRadius: 'var(--radius-md)', 
+                                        display: 'flex', 
+                                        justifyContent: 'space-between', 
+                                        alignItems: 'center',
+                                        cursor: 'pointer'
+                                      }}
+                                    >
+                                      <div>
+                                        <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{t.name}</div>
+                                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{t.subject || 'General'}</span>
+                                      </div>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span className={`status-badge ${t.status === 'Active' ? 'status-active' : 'status-inactive'}`} style={{ fontSize: '0.7rem', padding: '1px 6px' }}>
+                                          {t.status}
+                                        </span>
+                                        <span style={{ color: 'var(--color-primary)', fontSize: '0.8rem', fontWeight: 600 }}>→</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+            </div>
+          </div>
+        )}
+
+        {/* Edit School Profile Modal */}
+        {showEditSchoolModal && (
+          <div className="modal-overlay" onClick={() => setShowEditSchoolModal(null)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Edit School Profile</h3>
+                <button onClick={() => setShowEditSchoolModal(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={20} /></button>
+              </div>
+
+              <form onSubmit={handleEditSchoolSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div>
+                  <label htmlFor="edit-sch-name" className="form-label">School Name</label>
+                  <input id="edit-sch-name" type="text" className="erp-input" value={editSchoolForm.name} onChange={(e) => setEditSchoolForm({ ...editSchoolForm, name: e.target.value })} required />
+                </div>
+                <div>
+                  <label htmlFor="edit-sch-contact" className="form-label">Contact Person</label>
+                  <input id="edit-sch-contact" type="text" className="erp-input" value={editSchoolForm.contact_person} onChange={(e) => setEditSchoolForm({ ...editSchoolForm, contact_person: e.target.value })} required />
+                </div>
+                <div>
+                  <label htmlFor="edit-sch-phone" className="form-label">Contact Phone</label>
+                  <input id="edit-sch-phone" type="text" className="erp-input" value={editSchoolForm.contact_number} onChange={(e) => setEditSchoolForm({ ...editSchoolForm, contact_number: e.target.value })} required />
+                </div>
+                <div>
+                  <label htmlFor="edit-sch-sub-end" className="form-label">Subscription End Date</label>
+                  <input id="edit-sch-sub-end" type="date" className="erp-input" value={editSchoolForm.subscription_end} onChange={(e) => setEditSchoolForm({ ...editSchoolForm, subscription_end: e.target.value })} required />
+                </div>
+                <div>
+                  <label htmlFor="edit-sch-status" className="form-label">License Status</label>
+                  <select id="edit-sch-status" className="erp-input" value={editSchoolForm.status} onChange={(e) => setEditSchoolForm({ ...editSchoolForm, status: e.target.value })}>
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive / Suspended</option>
+                  </select>
+                </div>
+                <button type="submit" className="btn-primary" style={{ marginTop: '10px', justifyContent: 'center' }} disabled={isSavingSchool}>
+                  {isSavingSchool ? 'Saving Changes...' : 'Save School Info'}
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Member Student Fee Ledger Modal */}
+        {selectedMemberStudent && (
+          <div className="modal-overlay" style={{ zIndex: 300000 }} onClick={() => setSelectedMemberStudent(null)}>
+            <div className="modal-content fade-in" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '750px', width: '90%', maxHeight: '85vh', display: 'flex', flexDirection: 'column', padding: '24px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(var(--color-primary-rgb), 0.1)', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
+                    {selectedMemberStudent.name ? selectedMemberStudent.name.split(' ').map(n => n[0]).join('') : 'ST'}
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0 }}>Student Profile & Fee Ledger</h3>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Roll Number: {selectedMemberStudent.roll_number || 'N/A'}</span>
+                  </div>
+                </div>
+                <button onClick={() => setSelectedMemberStudent(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={20} /></button>
+              </div>
+
+              <div style={{ overflowY: 'auto', flex: 1, paddingRight: '4px' }}>
+                {/* Profile Grid */}
+                <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '16px', marginBottom: '20px' }}>
+                  <h4 style={{ fontSize: '0.9rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '12px', letterSpacing: '0.5px' }}>Student Profile Details</h4>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                    <div>
+                      <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Class / Grade</span>
+                      <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{selectedMemberStudent.class_name || 'Not Assigned'}</span>
+                    </div>
+                    <div>
+                      <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Contact Phone</span>
+                      <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{selectedMemberStudent.phone || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Email Address</span>
+                      <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{selectedMemberStudent.email || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Gender</span>
+                      <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{selectedMemberStudent.gender || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Admission Date</span>
+                      <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{selectedMemberStudent.admission_date || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Status</span>
+                      <span className={`status-badge ${selectedMemberStudent.status === 'Active' ? 'status-active' : 'status-inactive'}`} style={{ display: 'inline-block', marginTop: '4px', fontSize: '0.75rem', padding: '2px 8px' }}>
+                        {selectedMemberStudent.status}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Ledger Title & Stats */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <h4 style={{ fontSize: '1rem', fontWeight: 700 }}>Monthly Fee Record</h4>
+                  <div style={{ display: 'flex', gap: '12px', fontSize: '0.8rem' }}>
+                    <span style={{ color: '#10b981', fontWeight: 600 }}>Paid: {memberStudentFees.filter(f => f.status === 'Paid').length}</span>
+                    <span style={{ color: '#ef4444', fontWeight: 600 }}>Pending: {memberStudentFees.filter(f => f.status === 'Pending').length}</span>
+                  </div>
+                </div>
+
+                {/* Month ledger table */}
+                <div className="table-responsive" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+                  <table className="erp-table">
+                    <thead>
+                      <tr>
+                        <th>Month</th>
+                        <th>Status</th>
+                        <th>Amount</th>
+                        <th>Due Date</th>
+                        <th>Payment Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(!memberStudentFees || memberStudentFees.length === 0) ? (
+                        <tr>
+                          <td colSpan="5" style={{ textAlign: 'center', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                            No fee records found for this student.
+                          </td>
+                        </tr>
+                      ) : (
+                        memberStudentFees.map(fee => (
+                          <tr key={fee.id}>
+                            <td style={{ fontWeight: 600 }}>{fee.month}</td>
+                            <td>
+                              <span className={`badge ${fee.status === 'Paid' ? 'badge-success' : 'badge-danger'}`}>
+                                {fee.status}
+                              </span>
+                            </td>
+                            <td style={{ fontWeight: 600 }}>
+                              {selectedViewSchool?.currency || 'INR'} {fee.amount?.toLocaleString()}
+                            </td>
+                            <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                              {fee.due_date || 'N/A'}
+                            </td>
+                            <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                              {fee.status === 'Paid' ? (fee.payment_date || 'N/A') : '-'}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px', marginTop: '16px', display: 'flex', justifyContent: 'flex-end' }}>
+                <button onClick={() => setSelectedMemberStudent(null)} className="btn-outline">
+                  Close Details
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Member Teacher Salary Ledger Modal */}
+        {selectedMemberTeacher && (
+          <div className="modal-overlay" style={{ zIndex: 300000 }} onClick={() => setSelectedMemberTeacher(null)}>
+            <div className="modal-content fade-in" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '750px', width: '90%', maxHeight: '85vh', display: 'flex', flexDirection: 'column', padding: '24px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(var(--color-secondary-rgb), 0.1)', color: 'var(--color-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
+                    {selectedMemberTeacher.name ? selectedMemberTeacher.name.split(' ').map(n => n[0]).join('') : 'TE'}
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0 }}>Faculty Profile & Salary Ledger</h3>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Subject: {selectedMemberTeacher.subject || 'General'}</span>
+                  </div>
+                </div>
+                <button onClick={() => setSelectedMemberTeacher(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={20} /></button>
+              </div>
+
+              <div style={{ overflowY: 'auto', flex: 1, paddingRight: '4px' }}>
+                {/* Profile Grid */}
+                <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '16px', marginBottom: '20px' }}>
+                  <h4 style={{ fontSize: '0.9rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '12px', letterSpacing: '0.5px' }}>Teacher Profile Details</h4>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                    <div>
+                      <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Assigned Classes</span>
+                      <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{selectedMemberTeacher.assigned_classes || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Qualification</span>
+                      <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{selectedMemberTeacher.qualification || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Experience</span>
+                      <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{selectedMemberTeacher.experience || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Base Salary</span>
+                      <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{selectedViewSchool?.currency || 'INR'} {selectedMemberTeacher.salary_amount?.toLocaleString() || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Contact Phone</span>
+                      <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{selectedMemberTeacher.phone || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Email Address</span>
+                      <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{selectedMemberTeacher.email || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Joining Date</span>
+                      <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{selectedMemberTeacher.joining_date || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Status</span>
+                      <span className={`status-badge ${selectedMemberTeacher.status === 'Active' ? 'status-active' : 'status-inactive'}`} style={{ display: 'inline-block', marginTop: '4px', fontSize: '0.75rem', padding: '2px 8px' }}>
+                        {selectedMemberTeacher.status}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Ledger Title & Stats */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <h4 style={{ fontSize: '1rem', fontWeight: 700 }}>Monthly Salary Record</h4>
+                  <div style={{ display: 'flex', gap: '12px', fontSize: '0.8rem' }}>
+                    <span style={{ color: '#10b981', fontWeight: 600 }}>Paid: {memberTeacherSalaries.filter(s => s.status === 'Paid').length}</span>
+                    <span style={{ color: '#ef4444', fontWeight: 600 }}>Pending: {memberTeacherSalaries.filter(s => s.status === 'Pending').length}</span>
+                  </div>
+                </div>
+
+                {/* Month ledger table */}
+                <div className="table-responsive" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+                  <table className="erp-table">
+                    <thead>
+                      <tr>
+                        <th>Month</th>
+                        <th>Status</th>
+                        <th>Amount</th>
+                        <th>Payment Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(!memberTeacherSalaries || memberTeacherSalaries.length === 0) ? (
+                        <tr>
+                          <td colSpan="4" style={{ textAlign: 'center', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                            No salary records found for this teacher.
+                          </td>
+                        </tr>
+                      ) : (
+                        memberTeacherSalaries.map(salary => (
+                          <tr key={salary.id}>
+                            <td style={{ fontWeight: 600 }}>{salary.month}</td>
+                            <td>
+                              <span className={`badge ${salary.status === 'Paid' ? 'badge-success' : 'badge-danger'}`}>
+                                {salary.status}
+                              </span>
+                            </td>
+                            <td style={{ fontWeight: 600 }}>
+                              {selectedViewSchool?.currency || 'INR'} {salary.amount?.toLocaleString()}
+                            </td>
+                            <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                              {salary.status === 'Paid' ? (salary.payment_date || 'N/A') : '-'}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px', marginTop: '16px', display: 'flex', justifyContent: 'flex-end' }}>
+                <button onClick={() => setSelectedMemberTeacher(null)} className="btn-outline">
+                  Close Details
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* TAB 3: Admin Profile */}
         {activeTab === 'profile' && renderAdminProfileTab()}
 
@@ -5814,6 +14363,153 @@ export default function App() {
   }
 
   // 5. School Admin Portal (Standard ERP View)
+  const isSubscriptionExpired = adminProfile && adminProfile.subscription &&
+    (adminProfile.subscription.status === 'Expired' || 
+     adminProfile.subscription.status === 'Trial Expired' || 
+     (adminProfile.subscription.remaining_days !== null && adminProfile.subscription.remaining_days <= 0)) &&
+    role !== 'Super Admin';
+
+  if (isSubscriptionExpired) {
+    return (
+      <div className={`app-layout ${isDarkMode ? 'dark-theme' : ''}`} style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: isDarkMode ? 'radial-gradient(circle at top, #1e1b4b 0%, #090d16 100%)' : 'radial-gradient(circle at top, #f3f4f6 0%, #e5e7eb 100%)',
+        padding: '40px 20px'
+      }}>
+        <div style={{
+          maxWidth: '800px',
+          width: '100%',
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border-color)',
+          borderRadius: '16px',
+          padding: '40px',
+          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '28px',
+          textAlign: 'center'
+        }}>
+          {/* Logo or Icon */}
+          <div style={{
+            width: '80px',
+            height: '80px',
+            borderRadius: '50%',
+            background: 'rgba(239, 68, 68, 0.1)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#ef4444'
+          }}>
+            <Lock size={40} />
+          </div>
+
+          <div>
+            <h2 style={{ fontSize: '2rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>Access Suspended</h2>
+            <p style={{ fontSize: '1rem', color: 'var(--text-secondary)', marginTop: '8px', lineHeight: '1.6' }}>
+              The subscription license for <strong>{adminProfile.school_name || 'your school'}</strong> has expired. To restore access for all administrators, teachers, and students, please renew the license subscription.
+            </p>
+          </div>
+
+          {/* Pricing cards */}
+          <div style={{ width: '100%' }}>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '20px', color: 'var(--text-primary)' }}>Available Subscription Plans</h3>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: activePlans.length === 0 ? '1fr' : `repeat(${Math.min(activePlans.length, 3)}, 1fr)`,
+              gap: '20px',
+              width: '100%'
+            }}>
+              {activePlans.length === 0 ? (
+                <div style={{ padding: '24px', border: '1px dashed var(--border-color)', borderRadius: '8px', color: 'var(--text-secondary)' }}>
+                  No plans are currently available for online renewal. Please contact the platform administration.
+                </div>
+              ) : (
+                activePlans.map(plan => (
+                  <div key={plan.id} style={{
+                    background: 'rgba(255,255,255,0.01)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '12px',
+                    padding: '24px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '16px',
+                    transition: 'transform 0.2s',
+                    cursor: 'default'
+                  }}>
+                    <div>
+                      <h4 style={{ fontSize: '1.1rem', fontWeight: 800, margin: '0 0 4px 0', color: 'var(--text-primary)' }}>{plan.name}</h4>
+                      <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0 0 12px 0', minHeight: '36px' }}>{plan.description || 'Access all premium platform modules.'}</p>
+                      <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-primary)' }}>
+                        {parseFloat(plan.price) === 0 ? 'Free' : `₹${parseFloat(plan.price).toLocaleString()}`}
+                      </div>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Duration: {plan.duration_days} Days</span>
+                    </div>
+
+                    <a 
+                      href={`mailto:bilalnashi6@gmail.com?subject=Subscription%20Renewal%20Inquiry%20-%20${encodeURIComponent(adminProfile.school_name || '')}&body=Hello%20Super%20Admin,%0A%0AOur%20subscription%20has%20expired%20and%20we%20wish%20to%20purchase/activate%20the%20following%20plan:%0A%0APlan%20Name:%20${encodeURIComponent(plan.name)}%0APrice:%20%E2%82%B9${parseFloat(plan.price).toLocaleString()}%0ADuration:%20${plan.duration_days}%20Days%0A%0APlease%20let%20us%20know%20the%20payment%20steps.%0A%0AThanks!`}
+                      className="btn-primary"
+                      style={{ textDecoration: 'none', justifyContent: 'center', fontSize: '0.85rem', width: '100%', padding: '10px 0' }}
+                    >
+                      Inquire Plan
+                    </a>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '20px', width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ textAlign: 'left' }}>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Support Inquiry</span>
+              <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>bilalnashi6@gmail.com</div>
+            </div>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button 
+                onClick={async () => {
+                  try {
+                    await fetchProfileData();
+                    showToast('Subscription status updated successfully.', 'success');
+                  } catch (e) {
+                    showToast('Failed to fetch subscription status.', 'error');
+                  }
+                }} 
+                className="btn-primary" 
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px' }}
+              >
+                <RefreshCw size={16} /> Check Subscription Status
+              </button>
+              <button 
+                onClick={() => handleLogout()} 
+                className="btn-outline" 
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px' }}
+              >
+                <LogOut size={16} /> Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const currentTeacherProfile = teachers.find(t => t.phone === username || t.email === username);
+  const visibleClasses = role === 'Teacher' 
+    ? classes.filter(c => Number(c.class_teacher_id) === Number(currentTeacherProfile?.id)) 
+    : classes;
+
+  const activeStudent = selectedStudent ? (students.find(s => s.id === selectedStudent.id) || selectedStudent) : null;
+  const hasPlannerPeriods = Object.values(scheduleForm).some(periods => Array.isArray(periods) && periods.length > 0);
+  const hasPlannerPendingSelection = Object.keys(scheduleForm).some(day => 
+    (selectedDaySubject[day] && selectedDaySubject[day] !== '') || 
+    (selectedDayTeacher[day] && selectedDayTeacher[day] !== '')
+  );
+  const isPlannerButtonsDisabled = isSavingSchedule || !plannerClassId || !isCurrentYearActive() || !hasPlannerPeriods || hasPlannerPendingSelection;
+
   return (
     <div className={`app-layout ${isDarkMode ? 'dark-theme' : ''}`}>
       
@@ -5831,10 +14527,14 @@ export default function App() {
       )}
       
       {toast && (
-        <div className="toast-in-out" style={{
-          position: 'fixed', top: '24px', right: '24px', zIndex: 100005, padding: '16px 20px', borderRadius: 'var(--radius-md)',
-          backgroundColor: toast.type === 'success' ? '#10b981' : '#ef4444', color: '#ffffff', boxShadow: 'var(--shadow-lg)', display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.9rem', fontWeight: 600
-        }}>
+        <div className="toast-in-out" 
+          onMouseEnter={pauseToastTimer}
+          onMouseLeave={resumeToastTimer}
+          style={{
+            position: 'fixed', top: '24px', right: '24px', zIndex: 100005, padding: '16px 20px', borderRadius: 'var(--radius-md)',
+            backgroundColor: toast.type === 'success' ? '#10b981' : '#ef4444', color: '#ffffff', boxShadow: 'var(--shadow-lg)', display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.9rem', fontWeight: 600
+          }}
+        >
           {toast.type === 'success' ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
           <span>{toast.message}</span>
         </div>
@@ -5857,27 +14557,65 @@ export default function App() {
         </div>
 
         <div className="sidebar-nav">
-          <button id="nav-btn-dashboard" onClick={() => { setActiveTab('dashboard'); setSelectedClassId(null); setSelectedTeacher(null); setSelectedStudent(null); }} className={`sidebar-item ${activeTab === 'dashboard' ? 'active' : ''}`}>
+          <button 
+            id="nav-btn-dashboard" 
+            onClick={() => { 
+              setActiveTab('dashboard'); 
+              setSelectedClassId(null); 
+              setSelectedTeacher(null); 
+              setSelectedStudent(null); 
+              window.scrollTo(0, 0);
+              const wrapper = document.querySelector('.main-wrapper');
+              if (wrapper) {
+                wrapper.scrollTop = 0;
+              }
+            }} 
+            className={`sidebar-item ${activeTab === 'dashboard' ? 'active' : ''}`}
+          >
             <Activity size={18} /> Dashboard
           </button>
-          <button id="nav-btn-faculty" onClick={() => { setActiveTab('faculty'); setSelectedClassId(null); setSelectedTeacher(null); setSelectedStudent(null); }} className={`sidebar-item ${activeTab === 'faculty' ? 'active' : ''}`}>
-            <Users size={18} /> Teachers
-          </button>
-          <button id="nav-btn-students" onClick={() => { setActiveTab('students'); setSelectedClassId(null); setSelectedTeacher(null); setSelectedStudent(null); }} className={`sidebar-item ${activeTab === 'students' ? 'active' : ''}`}>
-            <GraduationCap size={18} /> Classes
-          </button>
-          <button id="nav-btn-planner" onClick={() => { setActiveTab('planner'); setSelectedClassId(null); setSelectedTeacher(null); setSelectedStudent(null); }} className={`sidebar-item ${activeTab === 'planner' ? 'active' : ''}`}>
-            <Calendar size={18} /> Academic Planner
-          </button>
-          <button id="nav-btn-fees" onClick={() => { setActiveTab('fees'); setSelectedFeesClassId(null); setSelectedClassId(null); setSelectedTeacher(null); setSelectedStudent(null); }} className={`sidebar-item ${activeTab === 'fees' ? 'active' : ''}`}>
-            <DollarSign size={18} /> Fees Portal
-          </button>
-          <button id="nav-btn-reports" onClick={() => { setActiveTab('reports'); setSelectedClassId(null); setSelectedTeacher(null); setSelectedStudent(null); }} className={`sidebar-item ${activeTab === 'reports' ? 'active' : ''}`}>
-            <FileText size={18} /> Reports
-          </button>
-          <button id="nav-btn-settings" onClick={() => { setActiveTab('settings'); setSelectedClassId(null); setSelectedTeacher(null); setSelectedStudent(null); }} className={`sidebar-item ${activeTab === 'settings' ? 'active' : ''}`}>
-            <Shield size={18} /> Audits & Settings
-          </button>
+          
+          {hasPermission('administration') && (
+            <button id="nav-btn-faculty" onClick={() => { setActiveTab('faculty'); setSelectedClassId(null); setSelectedTeacher(null); setSelectedStudent(null); }} className={`sidebar-item ${activeTab === 'faculty' ? 'active' : ''}`}>
+              <Users size={18} /> Teachers
+            </button>
+          )}
+          {(hasPermission('attendance') || hasPermission('performance') || hasPermission('planner')) && (
+            <button id="nav-btn-students" onClick={() => { setActiveTab('students'); setSelectedClassId(null); setSelectedTeacher(null); setSelectedStudent(null); }} className={`sidebar-item ${activeTab === 'students' ? 'active' : ''}`}>
+              <GraduationCap size={18} /> Classes
+            </button>
+          )}
+          {hasPermission('planner') && (
+            <button id="nav-btn-planner" onClick={() => { setActiveTab('planner'); setSelectedClassId(null); setSelectedTeacher(null); setSelectedStudent(null); }} className={`sidebar-item ${activeTab === 'planner' ? 'active' : ''}`}>
+              <Calendar size={18} /> Academic Planner
+            </button>
+          )}
+          {(hasPermission('finance') || role === 'Teacher') && (
+            <button id="nav-btn-fees" onClick={() => { setActiveTab('fees'); setSelectedFeesClassId(null); setSelectedClassId(null); setSelectedTeacher(null); setSelectedStudent(null); }} className={`sidebar-item ${activeTab === 'fees' ? 'active' : ''}`}>
+              <DollarSign size={18} /> Fees Portal
+            </button>
+          )}
+
+          {hasPermission('reports') && (
+            <button id="nav-btn-financial" onClick={() => { setActiveTab('financial'); setSelectedClassId(null); setSelectedTeacher(null); setSelectedStudent(null); }} className={`sidebar-item ${activeTab === 'financial' ? 'active' : ''}`}>
+              <FileSpreadsheet size={18} /> Financial Reports
+            </button>
+          )}
+          {(hasPermission('finance') || role === 'Teacher') && (
+            <button id="nav-btn-finance-management" onClick={() => { setActiveTab('finance_management'); setFinanceManagementSubTab(role === 'Teacher' ? 'recoveries' : 'fees'); setSelectedClassId(null); setSelectedTeacher(null); setSelectedStudent(null); }} className={`sidebar-item ${activeTab === 'finance_management' ? 'active' : ''}`}>
+              <Briefcase size={18} /> Finance Management
+            </button>
+          )}
+          {(hasPermission('attendance') || hasPermission('performance')) && (
+            <button id="nav-btn-performance" onClick={() => { setActiveTab('performance'); setSelectedClassId(null); setSelectedTeacher(null); setSelectedStudent(null); }} className={`sidebar-item ${activeTab === 'performance' ? 'active' : ''}`}>
+              <BookOpen size={18} /> Student Performance
+            </button>
+          )}
+          {hasPermission('administration') && (
+            <button id="nav-btn-settings" onClick={() => { setActiveTab('settings'); setSelectedClassId(null); setSelectedTeacher(null); setSelectedStudent(null); }} className={`sidebar-item ${activeTab === 'settings' ? 'active' : ''}`}>
+              <Shield size={18} /> Audits & Settings
+            </button>
+          )}
         </div>
 
         <div 
@@ -5886,7 +14624,7 @@ export default function App() {
         >
           {adminProfile?.profile_image ? (
             <img 
-              src={adminProfile.profile_image} 
+              src={adminProfile?.profile_image} 
               alt="Admin Avatar" 
               style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border-color)' }} 
             />
@@ -5918,84 +14656,386 @@ export default function App() {
       {/* Main Wrapper */}
       <div className="main-wrapper">
         
-        {/* Header */}
-        <header className="header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-            <h2 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
-              {schoolName}
-            </h2>
-            <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--border-color)' }} />
-            {/* Academic Year Selector */}
-            {years.length > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>Academic Year:</span>
-                <select 
-                  id="academic-year-select"
-                  value={activeYearId} 
-                  onChange={(e) => {
-                    const newId = parseInt(e.target.value);
-                    setActiveYearId(newId);
-                    setSelectedClassId(null);
-                    setSelectedStudent(null);
-                  }} 
-                  className="erp-input" 
-                  style={{ width: '180px', padding: '6px 12px', fontSize: '0.85rem' }}
-                >
-                  {years.map(y => (
-                    <option key={y.id} value={y.id}>{y.year_range} ({y.status || (y.is_active ? 'Active' : 'Archived')})</option>
-                  ))}
-                </select>
-              </div>
-            )}
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            {/* Theme Toggle */}
+        {adminProfile && adminProfile.role === 'School Admin' && adminProfile.subscription && adminProfile.subscription.remaining_days !== null && adminProfile.subscription.remaining_days < 15 && adminProfile.subscription.remaining_days >= 0 && (
+          <div style={{
+            background: 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)',
+            color: 'white',
+            padding: '10px 24px',
+            fontSize: '0.85rem',
+            fontWeight: 600,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+            zIndex: 10,
+            position: 'relative'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Info size={16} />
+              <span>
+                Your school subscription is expiring in <strong>{adminProfile.subscription.remaining_days} days</strong> ({adminProfile.subscription.expiry_date}). Please contact the Super Admin or renew to avoid access interruption.
+              </span>
+            </div>
             <button 
-              id="theme-toggle"
-              onClick={() => setIsDarkMode(!isDarkMode)}
-              style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', padding: '8px', borderRadius: '50%' }}
-              className="menu-dot-trigger"
+              onClick={() => setActiveTab('profile')} 
+              style={{
+                background: 'white',
+                color: '#d97706',
+                border: 'none',
+                padding: '4px 12px',
+                borderRadius: '4px',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
             >
-              {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+              Renew Subscription
             </button>
+          </div>
+        )}
 
-            {/* Notification trigger */}
-            <div style={{ position: 'relative' }}>
-              <button 
-                id="notification-trigger"
-                onClick={() => setShowNotificationDrawer(!showNotificationDrawer)}
-                className="menu-dot-trigger"
-                style={{ padding: '8px', position: 'relative' }}
-              >
-                <Bell size={18} />
-                {notifications.filter(n => !n.is_read).length > 0 && (
-                  <span style={{ position: 'absolute', top: '2px', right: '2px', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444' }} />
-                )}
-              </button>
-              
-              {showNotificationDrawer && (
-                <div className="menu-dropdown" style={{ width: '300px', right: 0, padding: '12px' }}>
-                  <h4 style={{ fontSize: '0.9rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '8px' }}>Reminders & Alerts</h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '250px', overflowY: 'auto' }}>
-                    {notifications.map(n => (
-                      <div key={n.id} style={{ fontSize: '0.75rem', padding: '8px', borderRadius: '4px', backgroundColor: n.is_read ? 'transparent' : 'rgba(59,130,246,0.05)', borderLeft: '3px solid var(--color-primary)' }}>
-                        <strong>{n.title}</strong>
-                        <p style={{ color: 'var(--text-secondary)', marginTop: '2px' }}>{n.content}</p>
-                      </div>
-                    ))}
+        {activeTab === 'faculty' && !selectedTeacher ? (
+          <header className="faculty-sticky-header" style={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 120,
+            backgroundColor: 'var(--bg-surface)',
+            opacity: 1,
+            borderBottom: '1px solid var(--border-color)',
+            display: 'flex',
+            flexDirection: 'column',
+            padding: '16px 32px',
+            gap: '16px',
+            flexShrink: 0,
+            height: 'auto',
+            minHeight: '140px',
+            justifyContent: 'flex-start',
+            alignItems: 'stretch'
+          }}>
+            {/* Row 1: Academic Year & Actions */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                {/* Academic Year Selector */}
+                {years.length > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>Academic Year:</span>
+                    <select 
+                      id="academic-year-select"
+                      value={activeYearId} 
+                      onChange={(e) => {
+                        const newId = parseInt(e.target.value);
+                        setActiveYearId(newId);
+                        localStorage.setItem('bn_active_year_id', newId);
+                        setSelectedClassId(null);
+                        setSelectedStudent(null);
+                      }} 
+                      className="erp-input" 
+                      style={{ width: '180px', padding: '6px 12px', fontSize: '0.85rem' }}
+                    >
+                      {years.map(y => (
+                        <option key={y.id} value={y.id}>{y.year_range} ({y.status || (y.is_active ? 'Active' : 'Archived')})</option>
+                      ))}
+                    </select>
                   </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                {/* Theme Toggle */}
+                <button 
+                  id="theme-toggle"
+                  onClick={() => setIsDarkMode(!isDarkMode)}
+                  style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', padding: '8px', borderRadius: '50%' }}
+                  className="menu-dot-trigger"
+                >
+                  {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+                </button>
+
+                {/* Notification trigger */}
+                <div style={{ position: 'relative' }}>
+                  <button 
+                    id="notification-trigger"
+                    onClick={async () => {
+                      const next = !showNotificationDrawer;
+                      setShowNotificationDrawer(next);
+                      if (next) {
+                        await fetchNotifications();
+                        await markNotificationsAsRead();
+                      }
+                    }}
+                    className="menu-dot-trigger"
+                    style={{ padding: '8px', position: 'relative' }}
+                  >
+                    <Bell size={18} />
+                    {notifications.filter(n => !n.is_read).length > 0 && (
+                      <span style={{ position: 'absolute', top: '2px', right: '2px', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444' }} />
+                    )}
+                  </button>
+                  
+                  {showNotificationDrawer && (
+                    <div className="menu-dropdown notification-drawer-content" style={{ width: '300px', right: 0, padding: '12px' }}>
+                      <h4 style={{ fontSize: '0.9rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '8px' }}>Notifications</h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '250px', overflowY: 'auto' }}>
+                        {notifications.length === 0 ? (
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', padding: '16px' }}>No new notifications</div>
+                        ) : (
+                          [...notifications]
+                            .sort((a, b) => new Date(b.created_at || b.timestamp) - new Date(a.created_at || a.timestamp))
+                            .slice(0, 5)
+                            .map(n => (
+                              <div key={n.id} style={{ fontSize: '0.75rem', padding: '8px', borderRadius: '4px', backgroundColor: n.is_read ? 'transparent' : 'rgba(59,130,246,0.05)', borderLeft: '3px solid var(--color-primary)' }}>
+                                <strong style={{ display: 'block' }}>{n.title}</strong>
+                                <p style={{ color: 'var(--text-secondary)', marginTop: '2px', marginBottom: '4px' }}>{n.content}</p>
+                                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                                  {formatNotificationTime(n.created_at || n.timestamp)}
+                                </span>
+                              </div>
+                            ))
+                        )}
+                      </div>
+                      <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '8px', marginTop: '8px', textAlign: 'center' }}>
+                        <button 
+                          onClick={() => {
+                            setShowNotificationDrawer(false);
+                            setShowAllNotificationsModal(true);
+                          }}
+                          className="btn-link"
+                          style={{ fontSize: '0.8rem', color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 600 }}
+                        >
+                          View All
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ height: '24px', width: '1px', backgroundColor: 'var(--border-color)' }} />
+                
+                <button id="btn-logout" onClick={() => setShowLogoutConfirm(true)} className="btn-outline" style={{ padding: '6px 14px', fontSize: '0.85rem' }} disabled={isLoggingOut}>
+                  Sign Out
+                </button>
+              </div>
+            </div>
+
+            {/* Row 2: Search, Filters, Add Teacher button */}
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              width: '100%',
+              borderTop: '1px solid var(--border-color)',
+              paddingTop: '12px',
+              flexWrap: 'wrap',
+              gap: '12px'
+            }}>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    id="search-teacher-name"
+                    type="text"
+                    placeholder="Search teachers by name..."
+                    value={teacherSearchQuery}
+                    onChange={(e) => setTeacherSearchQuery(e.target.value)}
+                    className="erp-input"
+                    style={{ width: '220px', paddingLeft: '36px', paddingRight: teacherSearchQuery ? '32px' : '12px', height: '38px', fontSize: '0.85rem' }}
+                  />
+                  <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  {teacherSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setTeacherSearchQuery('')}
+                      style={{
+                        position: 'absolute',
+                        right: '8px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--text-muted)',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                      title="Clear search"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+                <select 
+                  id="filter-teacher-subject"
+                  value={subjectFilter} 
+                  onChange={(e) => setSubjectFilter(e.target.value)} 
+                  className="erp-input" 
+                  style={{ width: '160px' }}
+                >
+                  <option value="all">All Subjects</option>
+                  {Array.from(new Set(teachers.map(t => t.subject).filter(Boolean)))
+                    .sort((a, b) => a.localeCompare(b))
+                    .map(sub => (
+                      <option key={sub} value={sub}>{sub}</option>
+                    ))
+                  }
+                </select>
+
+                <select 
+                  id="filter-teacher-status"
+                  value={statusFilter} 
+                  onChange={(e) => setStatusFilter(e.target.value)} 
+                  className="erp-input" 
+                  style={{ width: '140px' }}
+                >
+                  <option value="all">All Status</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '8px' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Check Availability Date:</span>
+                  <input 
+                    id="filter-teacher-availability-date"
+                    type="date"
+                    value={facultySelectedDate}
+                    onChange={(e) => handleFacultyDateChange(e.target.value)}
+                    className="erp-input"
+                    style={{ width: '150px', padding: '6px 12px' }}
+                  />
+                  {facultySelectedDate !== getTodayDateStr() && (
+                    <button
+                      id="btn-reset-faculty-date"
+                      type="button"
+                      onClick={() => handleFacultyDateChange(getTodayDateStr())}
+                      className="btn-outline"
+                      style={{ padding: '6px 12px', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+                    >
+                      Reset to Today
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {isCurrentYearActive() && (
+                <button 
+                  id="btn-add-teacher" 
+                  onClick={() => {
+                    setEditingTeacher(null);
+                    setTForm({ name: '', subject: '', phone: '', email: '', qualification: '', experience: '', address: '', joining_date: new Date().toISOString().split('T')[0], exit_date: '', salary_amount: 3000.0, assigned_classes: '', gender: 'Male', aadhaar_number: '', pan_number: '', profile_image: '', documents: [] });
+                    setShowAddTeacherModal(true);
+                  }} 
+                  className="btn-primary"
+                >
+                  <Plus size={16} /> Add Teacher
+                </button>
+              )}
+            </div>
+          </header>
+        ) : (
+          <header className="header" style={{ position: 'sticky', top: 0, zIndex: 120, backgroundColor: 'var(--bg-surface)', opacity: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+              {/* Academic Year Selector */}
+              {years.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>Academic Year:</span>
+                  <select 
+                    id="academic-year-select"
+                    value={activeYearId} 
+                    onChange={(e) => {
+                      const newId = parseInt(e.target.value);
+                      setActiveYearId(newId);
+                      localStorage.setItem('bn_active_year_id', newId);
+                      setSelectedClassId(null);
+                      setSelectedStudent(null);
+                    }} 
+                    className="erp-input" 
+                    style={{ width: '180px', padding: '6px 12px', fontSize: '0.85rem' }}
+                  >
+                    {years.map(y => (
+                      <option key={y.id} value={y.id}>{y.year_range} ({y.status || (y.is_active ? 'Active' : 'Archived')})</option>
+                    ))}
+                  </select>
                 </div>
               )}
             </div>
 
-            <div style={{ height: '24px', width: '1px', backgroundColor: 'var(--border-color)' }} />
-            
-            <button id="btn-logout" onClick={() => setShowLogoutConfirm(true)} className="btn-outline" style={{ padding: '6px 14px', fontSize: '0.85rem' }} disabled={isLoggingOut}>
-              Sign Out
-            </button>
-          </div>
-        </header>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              {/* Theme Toggle */}
+              <button 
+                id="theme-toggle"
+                onClick={() => setIsDarkMode(!isDarkMode)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', padding: '8px', borderRadius: '50%' }}
+                className="menu-dot-trigger"
+              >
+                {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+              </button>
+
+              {/* Notification trigger */}
+              <div style={{ position: 'relative' }}>
+                 <button 
+                   id="notification-trigger"
+                   onClick={async () => {
+                     const next = !showNotificationDrawer;
+                     setShowNotificationDrawer(next);
+                     if (next) {
+                       await fetchNotifications();
+                       await markNotificationsAsRead();
+                     }
+                   }}
+                   className="menu-dot-trigger"
+                   style={{ padding: '8px', position: 'relative' }}
+                 >
+                   <Bell size={18} />
+                   {notifications.filter(n => !n.is_read).length > 0 && (
+                     <span style={{ position: 'absolute', top: '2px', right: '2px', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444' }} />
+                   )}
+                 </button>
+                 
+                 {showNotificationDrawer && (
+                   <div className="menu-dropdown notification-drawer-content" style={{ width: '300px', right: 0, padding: '12px' }}>
+                     <h4 style={{ fontSize: '0.9rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '8px' }}>Notifications</h4>
+                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '250px', overflowY: 'auto' }}>
+                       {notifications.length === 0 ? (
+                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', padding: '16px' }}>No new notifications</div>
+                       ) : (
+                         [...notifications]
+                           .sort((a, b) => new Date(b.created_at || b.timestamp) - new Date(a.created_at || a.timestamp))
+                           .slice(0, 5)
+                           .map(n => (
+                             <div key={n.id} style={{ fontSize: '0.75rem', padding: '8px', borderRadius: '4px', backgroundColor: n.is_read ? 'transparent' : 'rgba(59,130,246,0.05)', borderLeft: '3px solid var(--color-primary)' }}>
+                               <strong style={{ display: 'block' }}>{n.title}</strong>
+                               <p style={{ color: 'var(--text-secondary)', marginTop: '2px', marginBottom: '4px' }}>{n.content}</p>
+                               <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                                 {formatNotificationTime(n.created_at || n.timestamp)}
+                                </span>
+                             </div>
+                           ))
+                       )}
+                     </div>
+                     <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '8px', marginTop: '8px', textAlign: 'center' }}>
+                       <button 
+                         onClick={() => {
+                           setShowNotificationDrawer(false);
+                           setShowAllNotificationsModal(true);
+                         }}
+                         className="btn-link"
+                         style={{ fontSize: '0.8rem', color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 600 }}
+                       >
+                         View All
+                       </button>
+                     </div>
+                   </div>
+                 )}
+              </div>
+
+              <div style={{ height: '24px', width: '1px', backgroundColor: 'var(--border-color)' }} />
+              
+              <button id="btn-logout" onClick={() => setShowLogoutConfirm(true)} className="btn-outline" style={{ padding: '6px 14px', fontSize: '0.85rem' }} disabled={isLoggingOut}>
+                Sign Out
+              </button>
+            </div>
+          </header>
+        )}
 
         {/* Content body */}
         <div className="content-body">
@@ -6030,10 +15070,623 @@ export default function App() {
           ) : (
             <>
               {/* --- 1. DASHBOARD TAB --- */}
-              {activeTab === 'dashboard' && dashboardStats && (
-            <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              {/* Metric stats grid */}
-              <div className="stats-grid">
+              {activeTab === 'dashboard' && role === 'Parent' && (
+                <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                  <div className="erp-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', padding: '20px' }}>
+                    <div>
+                      <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)' }}>Parent Portal</h2>
+                      <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Select a child to view academic performance, attendance, and fee details.</p>
+                    </div>
+                    <div>
+                      <select
+                        className="erp-input"
+                        style={{ minWidth: '200px' }}
+                        value={selectedParentStudentId || ''}
+                        onChange={(e) => setSelectedParentStudentId(Number(e.target.value))}
+                      >
+                        {parentStudents.map(child => (
+                          <option key={child.id} value={child.id}>
+                            {child.first_name} {child.last_name} ({child.class_name || 'N/A'})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {isParentDashboardLoading ? (
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
+                      <div className="loading-spinner"></div>
+                    </div>
+                  ) : parentDashboardData ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                      
+                      {/* Child Profile Details */}
+                      <div className="erp-card" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
+                        <div>
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 600 }}>Student Name</span>
+                          <div style={{ fontSize: '1.1rem', fontWeight: 700, marginTop: '4px' }}>
+                            {parentDashboardData.student.first_name} {parentDashboardData.student.last_name}
+                          </div>
+                        </div>
+                        <div>
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 600 }}>Class</span>
+                          <div style={{ fontSize: '1.1rem', fontWeight: 700, marginTop: '4px' }}>
+                            {parentDashboardData.student.class_name}
+                          </div>
+                        </div>
+                        <div>
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 600 }}>GR Number</span>
+                          <div style={{ fontSize: '1.1rem', fontWeight: 700, marginTop: '4px' }}>
+                            {parentDashboardData.student.gr_no}
+                          </div>
+                        </div>
+                        <div>
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 600 }}>Status</span>
+                          <div style={{ marginTop: '4px' }}>
+                            <span className="badge badge-success">{parentDashboardData.student.status || 'Active'}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Fee Status Summary Cards */}
+                      {(() => {
+                        const fees = parentDashboardData.fees || [];
+                        const extras = parentDashboardData.extra_fees || [];
+                        const carry = parentDashboardData.carry_forward || [];
+                        const totalPaid = fees.filter(f => f.status === 'Paid').reduce((acc, f) => acc + Number(f.amount), 0);
+                        const totalPending = fees.filter(f => f.status !== 'Paid').reduce((acc, f) => acc + Number(f.amount), 0);
+                        const totalExtra = extras.reduce((acc, f) => acc + Number(f.amount), 0);
+                        const totalPrevious = carry.reduce((acc, f) => acc + Number(f.due_amount || f.amount || 0), 0);
+
+                        return (
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
+                            <div className="erp-card" style={{ borderLeft: '4px solid #10b981' }}>
+                              <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 600 }}>Submitted Fees</span>
+                              <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '6px', color: '#10b981' }}>
+                                {formatMoney(totalPaid)}
+                              </div>
+                            </div>
+                            <div className="erp-card" style={{ borderLeft: '4px solid #ef4444' }}>
+                              <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 600 }}>Pending Fees</span>
+                              <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '6px', color: '#ef4444' }}>
+                                {formatMoney(totalPending)}
+                              </div>
+                            </div>
+                            <div className="erp-card" style={{ borderLeft: '4px solid #3b82f6' }}>
+                              <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 600 }}>Additional Fees</span>
+                              <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '6px', color: '#3b82f6' }}>
+                                {formatMoney(totalExtra)}
+                              </div>
+                            </div>
+                            <div className="erp-card" style={{ borderLeft: '4px solid #f59e0b' }}>
+                              <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 600 }}>Previous Year Dues</span>
+                              <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '6px', color: '#f59e0b' }}>
+                                {formatMoney(totalPrevious)}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Attendance and Recent logs */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px' }}>
+                        
+                        {/* Attendance summary */}
+                        <div className="erp-card">
+                          <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '16px' }}>Attendance Summary</h3>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', textAlign: 'center', marginBottom: '20px' }}>
+                            <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '12px', borderRadius: '8px' }}>
+                              <div style={{ color: '#10b981', fontSize: '1.5rem', fontWeight: 800 }}>
+                                {parentDashboardData.attendance_stats.present_days}
+                              </div>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Present</span>
+                            </div>
+                            <div style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '12px', borderRadius: '8px' }}>
+                              <div style={{ color: '#ef4444', fontSize: '1.5rem', fontWeight: 800 }}>
+                                {parentDashboardData.attendance_stats.absent_days}
+                              </div>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Absent</span>
+                            </div>
+                            <div style={{ background: 'rgba(245, 158, 11, 0.1)', padding: '12px', borderRadius: '8px' }}>
+                              <div style={{ color: '#f59e0b', fontSize: '1.5rem', fontWeight: 800 }}>
+                                {parentDashboardData.attendance_stats.leave_days}
+                              </div>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Leave</span>
+                            </div>
+                          </div>
+                          
+                          {/* Percentage Progress Bar */}
+                          <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '6px' }}>
+                              <span>Attendance Percentage</span>
+                              <strong>
+                                {parentDashboardData.attendance_stats.total_days > 0 
+                                  ? Math.round((parentDashboardData.attendance_stats.present_days / parentDashboardData.attendance_stats.total_days) * 100)
+                                  : 100}%
+                              </strong>
+                            </div>
+                            <div style={{ height: '8px', background: 'var(--border-color)', borderRadius: '4px', overflow: 'hidden' }}>
+                              <div style={{
+                                height: '100%',
+                                background: 'var(--color-primary)',
+                                width: `${parentDashboardData.attendance_stats.total_days > 0 
+                                  ? (parentDashboardData.attendance_stats.present_days / parentDashboardData.attendance_stats.total_days) * 100
+                                  : 100}%`
+                              }}></div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Recent logs */}
+                        <div className="erp-card">
+                          <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '16px' }}>Recent Attendance Logs</h3>
+                          <div className="table-responsive" style={{ maxHeight: '180px', overflowY: 'auto' }}>
+                            <table className="erp-table">
+                              <thead>
+                                <tr>
+                                  <th>Date</th>
+                                  <th>Status</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {parentDashboardData.recent_attendance.map((att, idx) => (
+                                  <tr key={idx}>
+                                    <td>{att.attendance_date}</td>
+                                    <td>
+                                      <span className={`badge ${att.status === 'Present' ? 'badge-success' : att.status === 'Absent' ? 'badge-danger' : att.status === 'Leave' ? 'badge-warning' : 'badge-secondary'}`}>
+                                        {att.status}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                                {parentDashboardData.recent_attendance.length === 0 && (
+                                  <tr>
+                                    <td colSpan="2" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No recent attendance records.</td>
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Scheme & Timetable Section */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px' }}>
+                        {/* Scheme (Monthly Tuition Fee Structure) */}
+                        <div className="erp-card">
+                          <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '16px' }}>Class Scheme (Tuition Fee Structure)</h3>
+                          <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '16px' }}>
+                            Monthly tuition fees set by school administration for {parentDashboardData.student.class_name}:
+                          </p>
+                          {parentDashboardData.class_fee_structure ? (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                              {Object.entries(parentDashboardData.class_fee_structure)
+                                .filter(([key]) => key !== 'is_locked' && key !== 'is_configured')
+                                .map(([month, amount]) => (
+                                  <div key={month} style={{ border: '1px solid var(--border-color)', borderRadius: '6px', padding: '10px', textAlign: 'center', backgroundColor: 'rgba(255,255,255,0.01)' }}>
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{month}</div>
+                                    <div style={{ fontSize: '0.9rem', fontWeight: 700, marginTop: '4px', color: 'var(--color-primary)' }}>
+                                      {formatMoney(amount)}
+                                    </div>
+                                  </div>
+                                ))}
+                            </div>
+                          ) : (
+                            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                              No fee structure configured for this class yet.
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Additional Fees list */}
+                        <div className="erp-card">
+                          <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '16px' }}>Additional Assigned Fees</h3>
+                          <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '16px' }}>
+                            One-off extra fees assigned to this student:
+                          </p>
+                          <div className="table-responsive" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                            <table className="erp-table">
+                              <thead>
+                                <tr>
+                                  <th>Description</th>
+                                  <th>Amount</th>
+                                  <th>Status</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {parentDashboardData.extra_fees && parentDashboardData.extra_fees.length > 0 ? (
+                                  parentDashboardData.extra_fees.map((extra, idx) => (
+                                    <tr key={idx}>
+                                      <td style={{ fontWeight: 600 }}>{extra.title}</td>
+                                      <td style={{ fontWeight: 600 }}>{formatMoney(extra.amount)}</td>
+                                      <td>
+                                        <span className={`badge ${extra.status === 'Paid' ? 'badge-success' : 'badge-danger'}`}>
+                                          {extra.status}
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  ))
+                                ) : (
+                                  <tr>
+                                    <td colSpan="3" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No additional fees assigned.</td>
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Fee Schedule */}
+                      <div className="erp-card">
+                        <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '16px' }}>Fee Schedule & Status</h3>
+                        <div className="table-responsive">
+                          <table className="erp-table">
+                            <thead>
+                              <tr>
+                                <th>Due Date</th>
+                                <th>Description</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>Paid At</th>
+                                <th>Payment Mode</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {parentDashboardData.fees.map((fee, idx) => (
+                                <tr key={idx}>
+                                  <td>{fee.due_date}</td>
+                                  <td>{fee.title || `${fee.month} Tuition Fee`}</td>
+                                  <td>{formatMoney(fee.amount)}</td>
+                                  <td>
+                                    <span className={`badge ${fee.status === 'Paid' ? 'badge-success' : 'badge-danger'}`}>
+                                      {fee.status}
+                                    </span>
+                                  </td>
+                                  <td>{fee.paid_at || '-'}</td>
+                                  <td>{fee.payment_mode || '-'}</td>
+                                </tr>
+                              ))}
+                              {parentDashboardData.fees.length === 0 && (
+                                <tr>
+                                  <td colSpan="6" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No fee records.</td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      {/* Exam Performance */}
+                      <div className="erp-card">
+                        <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '16px' }}>Exam Grades & Report Cards</h3>
+                        <div className="table-responsive">
+                          <table className="erp-table">
+                            <thead>
+                              <tr>
+                                <th>Exam Name</th>
+                                <th>Subject</th>
+                                <th>Marks Obtained</th>
+                                <th>Max Marks</th>
+                                <th>Percentage</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {parentDashboardData.exam_marks.map((mark, idx) => (
+                                <tr key={idx}>
+                                  <td>{mark.exam_name}</td>
+                                  <td>{mark.subject_name}</td>
+                                  <td>{mark.marks_obtained}</td>
+                                  <td>{mark.max_marks}</td>
+                                  <td>{Math.round((mark.marks_obtained / mark.max_marks) * 100)}%</td>
+                                </tr>
+                              ))}
+                              {parentDashboardData.exam_marks.length === 0 && (
+                                <tr>
+                                  <td colSpan="5" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No exam records yet.</td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                    </div>
+                  ) : (
+                    <div className="erp-card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                      No data loaded. Please check your connection.
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'dashboard' && role !== 'Parent' && dashboardStats && (
+                role === 'Teacher' ? (
+                  /* --- CLASS TEACHER DASHBOARD --- */
+                  (() => {
+                    const currentTeacher = teachers.find(t => t.phone === username || t.email === username);
+                    const assignedClass = classes.find(c => Number(c.class_teacher_id) === Number(currentTeacher?.id));
+                    const assignedClassStudents = assignedClass ? students.filter(s => s.class_id === assignedClass.id) : [];
+                    
+                    const totalStudents = assignedClassStudents.length;
+                    const presentToday = teacherTodayAttendance.filter(r => r.status === 'Present').length;
+                    const absentToday = teacherTodayAttendance.filter(r => r.status === 'Absent').length;
+                    const leaveToday = teacherTodayAttendance.filter(r => r.status === 'Leave').length;
+                    const markedToday = teacherTodayAttendance.length;
+                    const attendancePercentage = totalStudents > 0 && markedToday > 0
+                      ? Math.round((presentToday / markedToday) * 100)
+                      : 100;
+                      
+                    const todayDay = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+                    const tomorrowDay = new Date(Date.now() + 86400000).toLocaleDateString('en-US', { weekday: 'long' });
+                    
+                    const getTeacherSchedulesForDay = (dayName) => {
+                      const list = [];
+                      allWeeklySchedules.forEach(sched => {
+                        if (sched.day_of_week.toLowerCase() === dayName.toLowerCase()) {
+                          const cls = classes.find(c => c.id === sched.class_id);
+                          const subjects = Array.isArray(sched.subjects) ? sched.subjects : [];
+                          subjects.forEach((p, idx) => {
+                            if (Number(p.teacher_id) === Number(currentTeacher?.id)) {
+                              list.push({
+                                period: idx + 1,
+                                class_name: cls ? cls.name : 'Unknown Class',
+                                subject: p.subject_name || p.subject,
+                                start_time: p.start_time,
+                                end_time: p.end_time
+                              });
+                            }
+                          });
+                        }
+                      });
+                      return list.sort((a, b) => a.period - b.period);
+                    };
+
+                    const todaySchedule = getTeacherSchedulesForDay(todayDay);
+                    const tomorrowSchedule = getTeacherSchedulesForDay(tomorrowDay);
+
+                    return (
+                      <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                        <div className="erp-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px' }}>
+                          <div>
+                            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                              Class Teacher Dashboard
+                            </h2>
+                            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                              Welcome, {currentTeacher ? currentTeacher.name : 'Teacher'}. Managing {assignedClass ? assignedClass.name : 'Unassigned Class'}.
+                            </p>
+                          </div>
+                          {assignedClass && (
+                            <span className="badge badge-primary" style={{ padding: '8px 12px', fontSize: '0.85rem' }}>
+                              Classroom: {assignedClass.room || 'N/A'}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="stats-grid">
+                          <div className="erp-card">
+                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600 }}>Class Strength</span>
+                            <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px' }}>{totalStudents}</div>
+                            <span className="badge badge-primary" style={{ marginTop: '8px' }}>Total Students</span>
+                          </div>
+                          
+                          <div className="erp-card">
+                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600 }}>Present Today</span>
+                            <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px', color: '#10b981' }}>
+                              {markedToday > 0 ? presentToday : '-'}
+                            </div>
+                            <span className={`badge ${markedToday > 0 ? 'badge-success' : 'badge-outline'}`} style={{ marginTop: '8px' }}>
+                              {markedToday > 0 ? 'Marked' : 'Not Marked Yet'}
+                            </span>
+                          </div>
+
+                          <div className="erp-card">
+                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600 }}>Absent Today</span>
+                            <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px', color: '#ef4444' }}>
+                              {markedToday > 0 ? absentToday : '-'}
+                            </div>
+                            <span className={`badge ${markedToday > 0 ? 'badge-danger' : 'badge-outline'}`} style={{ marginTop: '8px' }}>
+                              {markedToday > 0 ? 'Marked' : 'Not Marked Yet'}
+                            </span>
+                          </div>
+
+                          <div className="erp-card">
+                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600 }}>Attendance Rate</span>
+                            <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px', color: 'var(--color-primary)' }}>
+                              {markedToday > 0 ? `${attendancePercentage}%` : '-'}
+                            </div>
+                            <span className="badge badge-success" style={{ marginTop: '8px' }}>Active Term</span>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px' }}>
+                          <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>Your Schedule & Timetable</h3>
+                            
+                            <div>
+                              <h4 style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '10px', display: 'flex', justifyContent: 'space-between' }}>
+                                <span>Today's Periods ({todayDay})</span>
+                                <span className="badge badge-outline">{todaySchedule.length} Periods</span>
+                              </h4>
+                              {todaySchedule.length > 0 ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                  {todaySchedule.map(sched => (
+                                    <div key={sched.period} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '10px', backgroundColor: 'rgba(255,255,255,0.01)' }}>
+                                      <div>
+                                        <span style={{ fontSize: '0.75rem', color: 'var(--color-primary)', fontWeight: 600 }}>Period {sched.period}</span>
+                                        <div style={{ fontSize: '0.9rem', fontWeight: 700, marginTop: '2px' }}>{sched.subject}</div>
+                                      </div>
+                                      <div style={{ textAlign: 'right' }}>
+                                        <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{sched.class_name}</div>
+                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{sched.start_time} - {sched.end_time}</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', border: '1px dashed var(--border-color)', borderRadius: '6px' }}>
+                                  No periods scheduled for today.
+                                </div>
+                              )}
+                            </div>
+
+                            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
+                              <h4 style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '10px', display: 'flex', justifyContent: 'space-between' }}>
+                                <span>Tomorrow's Periods ({tomorrowDay})</span>
+                                <span className="badge badge-outline">{tomorrowSchedule.length} Periods</span>
+                              </h4>
+                              {tomorrowSchedule.length > 0 ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                  {tomorrowSchedule.map(sched => (
+                                    <div key={sched.period} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '10px', backgroundColor: 'rgba(255,255,255,0.01)' }}>
+                                      <div>
+                                        <span style={{ fontSize: '0.75rem', color: 'var(--color-primary)', fontWeight: 600 }}>Period {sched.period}</span>
+                                        <div style={{ fontSize: '0.9rem', fontWeight: 700, marginTop: '2px' }}>{sched.subject}</div>
+                                      </div>
+                                      <div style={{ textAlign: 'right' }}>
+                                        <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{sched.class_name}</div>
+                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{sched.start_time} - {sched.end_time}</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', border: '1px dashed var(--border-color)', borderRadius: '6px' }}>
+                                  No periods scheduled for tomorrow.
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>Class Scheme (Tuition Fee Structure)</h3>
+                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '8px' }}>
+                              Monthly tuition fees configured for your class {assignedClass ? assignedClass.name : ''}:
+                            </p>
+                            {teacherClassFeeStructure ? (
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                                {Object.entries(teacherClassFeeStructure)
+                                  .filter(([key]) => key !== 'is_locked' && key !== 'is_configured')
+                                  .map(([month, amount]) => (
+                                    <div key={month} style={{ border: '1px solid var(--border-color)', borderRadius: '6px', padding: '10px', textAlign: 'center', backgroundColor: 'rgba(255,255,255,0.01)' }}>
+                                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{month}</div>
+                                      <div style={{ fontSize: '0.90rem', fontWeight: 700, marginTop: '4px', color: 'var(--color-primary)' }}>
+                                        {formatMoney(amount)}
+                                      </div>
+                                    </div>
+                                  ))}
+                              </div>
+                            ) : (
+                              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', border: '1px dashed var(--border-color)', borderRadius: '6px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                No fee structure configured for your classroom yet.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="erp-card">
+                          <h3 style={{ fontSize: '1.0rem', fontWeight: 700, marginBottom: '16px' }}>Weekly timetable schedule</h3>
+                          <div className="table-responsive">
+                            <table className="erp-table">
+                              <thead>
+                                <tr>
+                                  <th>Day</th>
+                                  <th>Periods Sequence</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => {
+                                  const dayScheds = getTeacherSchedulesForDay(day);
+                                  return (
+                                    <tr key={day}>
+                                      <td style={{ fontWeight: 700, width: '120px' }}>{day}</td>
+                                      <td>
+                                        {dayScheds.length > 0 ? (
+                                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                            {dayScheds.map(p => (
+                                              <span key={p.period} className="badge badge-outline" style={{ display: 'inline-flex', flexDirection: 'column', padding: '6px 10px', fontSize: '0.75rem', gap: '2px', border: '1px solid var(--border-color)' }}>
+                                                <strong style={{ color: 'var(--color-primary)' }}>P{p.period}: {p.subject}</strong>
+                                                <span style={{ color: 'var(--text-muted)' }}>{p.class_name} ({p.start_time})</span>
+                                              </span>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.8rem' }}>No periods</span>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+
+                        <div className="erp-card">
+                          <h3 style={{ fontSize: '1.0rem', fontWeight: 700, marginBottom: '16px' }}>Student Fee Status Overview</h3>
+                          <div className="table-responsive">
+                            <table className="erp-table">
+                              <thead>
+                                <tr>
+                                  <th>Student Name</th>
+                                  <th>Roll Number</th>
+                                  <th>Status</th>
+                                  <th>Submitted Amount</th>
+                                  <th>Pending Dues</th>
+                                  <th>Previous Year Dues</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {assignedClassStudents.map(student => {
+                                  const keySuffix = schoolId || 'default';
+                                  let studFees = [];
+                                  if (token.includes('mock') || !isConnected) {
+                                    studFees = JSON.parse(localStorage.getItem(`bn_sandbox_fees_${keySuffix}_${student.id}_${activeYearId}`) || '[]');
+                                  }
+                                  
+                                  const submitted = studFees.filter(f => f.status === 'Paid').reduce((acc, f) => acc + Number(f.amount), 0);
+                                  const pending = studFees.filter(f => f.status !== 'Paid').reduce((acc, f) => acc + Number(f.amount), 0);
+                                  
+                                  let prevDues = 0;
+                                  if (token.includes('mock') || !isConnected) {
+                                    const savedCarry = JSON.parse(localStorage.getItem(`bn_sandbox_carry_forward_${keySuffix}`) || '[]');
+                                    const matchedCarry = savedCarry.find(c => Number(c.student_id) === Number(student.id));
+                                    prevDues = matchedCarry ? Number(matchedCarry.due_amount || matchedCarry.amount || 0) : 0;
+                                  }
+                                  
+                                  return (
+                                    <tr key={student.id}>
+                                      <td style={{ fontWeight: 600 }}>{student.name}</td>
+                                      <td>{student.roll_number}</td>
+                                      <td>
+                                        <span className={`badge ${student.status === 'Inactive' ? 'badge-danger' : 'badge-success'}`}>
+                                          {student.status || 'Active'}
+                                        </span>
+                                      </td>
+                                      <td style={{ fontWeight: 600, color: '#10b981' }}>{formatMoney(submitted)}</td>
+                                      <td style={{ fontWeight: 600, color: '#ef4444' }}>{formatMoney(pending)}</td>
+                                      <td style={{ fontWeight: 600, color: '#f59e0b' }}>{formatMoney(prevDues)}</td>
+                                    </tr>
+                                  );
+                                })}
+                                {assignedClassStudents.length === 0 && (
+                                  <tr>
+                                    <td colSpan="6" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No students enrolled.</td>
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+
+                      </div>
+                    );
+                  })()
+                ) : (
+                  /* --- STANDARD ADMIN DASHBOARD --- */
+                  <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                    {/* Metric stats grid */}
+                    <div className="stats-grid">
                 <div className="erp-card">
                   <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600 }}>Total Students</span>
                   <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px' }}>{dashboardStats.total_students}</div>
@@ -6051,7 +15704,7 @@ export default function App() {
                     onClick={() => {
                       setActiveTab('fees');
                       setSelectedFeesClassId('all');
-                      setFeesStatusFilter('Overdue');
+                      setFeesStatusFilter('All');
                     }}
                   >
                     <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600 }}>Dues Balance Sheets</span>
@@ -6067,18 +15720,19 @@ export default function App() {
                  <div className="erp-card">
                   <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600 }}>Total Revenue</span>
                   <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px', color: '#10b981' }}>
-                    {formatMoney(isConnected ? dashboardStats.monthly_revenue : getTotalPaidRevenueAmount())}
+                    {formatMoney(dashboardStats.monthly_revenue)}
                   </div>
                   <span className="badge badge-success" style={{ marginTop: '8px' }}>Tuition Collected</span>
                 </div>
               </div>
 
+
               {/* Chart panels */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                 {/* SVG Tuition Collection Chart */}
                 <div className="erp-card">
                   <h3 style={{ fontSize: '1.1rem', marginBottom: '20px' }}>Tuition Collection History</h3>
-                  <div style={{ height: '220px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '10px 20px', borderBottom: '2px solid var(--border-color)' }}>
+                  <div style={{ height: '320px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '10px 20px', borderBottom: '2px solid var(--border-color)' }}>
                     {(() => {
                       const feeData = isConnected ? dashboardStats.charts.fee_collection : getDynamicFeeCollectionChartData();
                       const maxAmount = Math.max(...feeData.map(f => f.amount)) || 1;
@@ -6086,7 +15740,7 @@ export default function App() {
                       return feeData.map(f => (
                         <div key={f.month} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, gap: '8px' }}>
                           <div style={{
-                            height: `${Math.max((f.amount / maxAmount) * 150, 10)}px`, width: '32px',
+                            height: `${Math.max((f.amount / maxAmount) * 240, 10)}px`, width: '45%', maxWidth: '48px', minWidth: '16px',
                             background: 'linear-gradient(to top, var(--color-primary) 0%, var(--color-accent) 100%)',
                             borderRadius: '4px 4px 0 0', position: 'relative'
                           }} title={`${symbol}${f.amount}`}>
@@ -6102,18 +15756,25 @@ export default function App() {
                 {/* SVG Salary Expense Chart */}
                 <div className="erp-card">
                   <h3 style={{ fontSize: '1.1rem', marginBottom: '20px' }}>Salary Disbursements</h3>
-                  <div style={{ height: '220px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '10px 20px', borderBottom: '2px solid var(--border-color)' }}>
+                  <div style={{ height: '320px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '10px 20px', borderBottom: '2px solid var(--border-color)' }}>
                     {(() => {
                       const salData = isConnected ? dashboardStats.charts.salary_expense : getDynamicSalaryChartData();
                       const maxAmount = Math.max(...salData.map(s => s.amount)) || 1;
                       const symbol = currencyMap[schoolCurrency]?.symbol || '$';
                       return salData.map(s => (
                         <div key={s.month} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, gap: '8px' }}>
-                          <div style={{
-                            height: `${Math.max((s.amount / maxAmount) * 150, 10)}px`, width: '32px',
-                            background: 'linear-gradient(to top, var(--color-secondary) 0%, #ec4899 100%)',
-                            borderRadius: '4px 4px 0 0', position: 'relative'
-                          }} title={`${symbol}${s.amount}`}>
+                          <div 
+                            onClick={() => handleSalaryBarClick(s.month)}
+                            style={{
+                              height: `${Math.max((s.amount / maxAmount) * 240, 10)}px`, width: '45%', maxWidth: '48px', minWidth: '16px',
+                              background: 'linear-gradient(to top, var(--color-secondary) 0%, #ec4899 100%)',
+                              borderRadius: '4px 4px 0 0', position: 'relative',
+                              cursor: 'pointer',
+                              transition: 'transform 0.2s, filter 0.2s'
+                            }} 
+                            className="salary-bar-interactive"
+                            title={`${symbol}${s.amount} - Click to view detailed breakdown`}
+                          >
                             <span style={{ position: 'absolute', top: '-20px', left: '50%', transform: 'translateX(-50%)', fontSize: '0.7rem', fontWeight: 'bold' }}>{symbol}{s.amount}</span>
                           </div>
                           <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{s.month.slice(0, 3)}</span>
@@ -6173,10 +15834,11 @@ export default function App() {
                       <span>Day: <strong>{dashboardTodaySchedule.day_of_week}</strong></span>
                       <span className="badge badge-success">Published</span>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px', marginTop: '8px' }}>
+                    <div className="dashboard-timetable-grid" style={{ gap: '16px', marginTop: '8px' }}>
                       {dashboardTodaySchedule.subjects.map((sub, index) => {
                         const subjectName = typeof sub === 'object' ? sub.subject : sub;
-                        const teacherName = typeof sub === 'object' ? sub.teacher_name : '';
+                        const isBackupActive = typeof sub === 'object' && sub.backup_teacher_id && sub.backup_teacher_name;
+                        const teacherName = isBackupActive ? sub.backup_teacher_name : (typeof sub === 'object' ? sub.teacher_name : '');
                         return (
                           <div 
                             key={index} 
@@ -6194,7 +15856,10 @@ export default function App() {
                             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Period {index + 1}</span>
                             <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>{subjectName}</span>
                             {teacherName && (
-                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{teacherName}</span>
+                              <span style={{ fontSize: '0.75rem', color: isBackupActive ? 'var(--color-primary)' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                                {isBackupActive && <span>🛡️</span>}
+                                {teacherName} {isBackupActive && <strong style={{ color: '#f59e0b', fontSize: '0.7rem' }}>(Backup)</strong>}
+                              </span>
                             )}
                           </div>
                         );
@@ -6204,6 +15869,7 @@ export default function App() {
                 )}
               </div>
             </div>
+            )
           )}
 
           {/* --- 2. FACULTY TAB --- */}
@@ -6214,22 +15880,49 @@ export default function App() {
                 <div className="erp-card">
                   <button 
                     id="btn-teacher-back"
-                    onClick={() => { setSelectedTeacher(null); setTeacherSalaries([]); }}
+                    onClick={() => { 
+                      setSelectedTeacher(null); 
+                      setTeacherSalaries([]); 
+                      if (teacherProfileBackTab === 'dashboard') {
+                        skipERPFetchRef.current = true;
+                        setActiveTab('dashboard');
+                      }
+                      setTeacherProfileBackTab(null);
+                    }}
                     className="btn-outline" 
                     style={{ marginBottom: '24px', padding: '6px 12px' }}
                   >
-                    Back to Faculty
+                    {teacherProfileBackTab === 'dashboard' ? 'Back' : 'Back to Faculty'}
                   </button>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '32px', alignItems: 'start' }}>
                     
                     {/* Left Column Profile Card */}
                     <div className="erp-card" style={{ textAlign: 'center', background: 'rgba(2, 6, 23, 0.2)' }}>
-                      <img 
-                        src={selectedTeacher.profile_image || "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150"} 
-                        alt={selectedTeacher.name} 
-                        style={{ width: '120px', height: '120px', borderRadius: '50%', objectFit: 'cover', marginBottom: '16px', border: '3px solid var(--color-secondary)' }}
-                      />
+                      {selectedTeacher.profile_image ? (
+                        <img 
+                          src={selectedTeacher.profile_image} 
+                          alt={selectedTeacher.name} 
+                          style={{ width: '120px', height: '120px', borderRadius: '50%', objectFit: 'cover', marginBottom: '16px', border: '3px solid var(--color-secondary)' }}
+                        />
+                      ) : (
+                        <div 
+                          style={{ 
+                            width: '120px', 
+                            height: '120px', 
+                            borderRadius: '50%', 
+                            background: 'rgba(255,255,255,0.05)', 
+                            border: '3px solid var(--border-color)', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            margin: '0 auto 16px auto',
+                            color: 'var(--text-secondary)'
+                          }}
+                        >
+                          <User size={64} />
+                        </div>
+                      )}
                       <h3 style={{ fontSize: '1.25rem' }}>{selectedTeacher.name}</h3>
                       <span className="badge badge-secondary" style={{ marginTop: '8px' }}>{selectedTeacher.subject}</span>
                       
@@ -6313,7 +16006,7 @@ export default function App() {
                             <div><strong>Education:</strong> {selectedTeacher.qualification || 'N/A'}</div>
                             <div><strong>Experience:</strong> {selectedTeacher.experience || 'N/A'}</div>
                             <div><strong>Aadhaar Number:</strong> {selectedTeacher.aadhaar_number || 'N/A'}</div>
-                            <div><strong>PAN Number:</strong> {selectedTeacher.pan_number || 'N/A'}</div>
+                            <div><strong>PAN Number:</strong> {selectedTeacher.pan_number ? selectedTeacher.pan_number.toUpperCase() : 'N/A'}</div>
                           </div>
                         </div>
                       </div>
@@ -6423,94 +16116,17 @@ export default function App() {
               ) : (
                 /* Faculty Directory View */
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-                      <select 
-                        id="filter-teacher-subject"
-                        value={subjectFilter} 
-                        onChange={(e) => setSubjectFilter(e.target.value)} 
-                        className="erp-input" 
-                        style={{ width: '160px' }}
-                      >
-                        <option value="all">All Subjects</option>
-                        {Array.from(new Set(teachers.map(t => t.subject).filter(Boolean)))
-                          .sort((a, b) => a.localeCompare(b))
-                          .map(sub => (
-                            <option key={sub} value={sub}>{sub}</option>
-                          ))
-                        }
-                      </select>
 
-                      <select 
-                        id="filter-teacher-status"
-                        value={statusFilter} 
-                        onChange={(e) => setStatusFilter(e.target.value)} 
-                        className="erp-input" 
-                        style={{ width: '140px' }}
-                      >
-                        <option value="all">All Status</option>
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                      </select>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '8px' }}>
-                        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Check Availability Date:</span>
-                        <input 
-                          id="filter-teacher-availability-date"
-                          type="date"
-                          value={facultySelectedDate}
-                          onChange={(e) => handleFacultyDateChange(e.target.value)}
-                          className="erp-input"
-                          style={{ width: '150px', padding: '6px 12px' }}
-                        />
-                        {facultySelectedDate !== getTodayDateStr() && (
-                          <button
-                            id="btn-reset-faculty-date"
-                            type="button"
-                            onClick={() => handleFacultyDateChange(getTodayDateStr())}
-                            className="btn-outline"
-                            style={{ padding: '6px 12px', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
-                          >
-                            Reset to Today
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {isCurrentYearActive() && (
-                      <button 
-                        id="btn-add-teacher" 
-                        onClick={() => {
-                          setEditingTeacher(null);
-                          setTForm({ name: '', subject: '', phone: '', email: '', qualification: '', experience: '', address: '', joining_date: new Date().toISOString().split('T')[0], exit_date: '', salary_amount: 3000.0, assigned_classes: '', gender: 'Male', aadhaar_number: '', pan_number: '', profile_image: '', documents: [] });
-                          setShowAddTeacherModal(true);
-                        }} 
-                        className="btn-primary"
-                      >
-                        <Plus size={16} /> Add Teacher
-                      </button>
-                    )}
-                  </div>
 
                   {/* Teacher card grid */}
                   <div className="teacher-grid">
-                    {filteredTeachers.map(t => {
+                    {filteredTeachers.slice(0, visibleTeachersCount).map(t => {
                       // WorkloadAvailability Logic (calculated for facultySelectedDate)
-                      let assignedCount = 0;
-
-                      allWeeklySchedules.forEach(sched => {
-                        if (sched.schedule_date === facultySelectedDate && Array.isArray(sched.subjects)) {
-                          sched.subjects.forEach(period => {
-                            if (period && typeof period === 'object' && parseInt(period.teacher_id) === parseInt(t.id)) {
-                              assignedCount++;
-                            }
-                          });
-                        }
-                      });
+                      let assignedCount = getTeacherAssignedCountOnDate(t.id, facultySelectedDate);
                       const maxPeriods = totalPeriodsPerDay;
                       const isOccupied = assignedCount >= maxPeriods;
                       const statusText = isOccupied ? 'Occupied' : 'Available';
-                      const badgeColor = isOccupied ? 'badge-danger' : 'badge-success';
+                      const badgeColor = isOccupied ? 'badge-warning' : 'badge-success';
 
                       return (
                         <div 
@@ -6566,11 +16182,29 @@ export default function App() {
                           </div>
 
                           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
-                            <img 
-                              src={t.profile_image || "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150"} 
-                              alt={t.name} 
-                              style={{ width: '60px', height: '60px', borderRadius: '50%', objectFit: 'cover' }}
-                            />
+                            {t.profile_image ? (
+                              <img 
+                                src={t.profile_image} 
+                                alt={t.name} 
+                                style={{ width: '60px', height: '60px', borderRadius: '50%', objectFit: 'cover' }}
+                              />
+                            ) : (
+                              <div 
+                                style={{ 
+                                  width: '60px', 
+                                  height: '60px', 
+                                  borderRadius: '50%', 
+                                  background: 'rgba(255,255,255,0.05)', 
+                                  border: '1px solid var(--border-color)', 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  justifyContent: 'center',
+                                  color: 'var(--text-secondary)'
+                                }}
+                              >
+                                <User size={28} />
+                              </div>
+                            )}
                             <div>
                               <h4 style={{ fontSize: '1rem', fontWeight: 700 }}>{t.name}</h4>
                               <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{t.subject}</span>
@@ -6582,7 +16216,7 @@ export default function App() {
                             <div><strong>Joined:</strong> {t.joining_date || 'N/A'}</div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
                               <span className={`badge ${badgeColor}`}>{statusText}</span>
-                              <span style={{ fontWeight: 'bold', marginLeft: 'auto', color: isOccupied ? '#ef4444' : '#10b981' }}>
+                              <span style={{ fontWeight: 'bold', marginLeft: 'auto', color: isOccupied ? '#f59e0b' : '#10b981' }}>
                                 Assigned: {assignedCount} / {maxPeriods} Periods
                               </span>
                             </div>
@@ -6591,6 +16225,19 @@ export default function App() {
                       );
                     })}
                   </div>
+
+                  {visibleTeachersCount < filteredTeachers.length && (
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '24px 0', width: '100%', gap: '8px' }}>
+                      <RefreshCw className="animate-spin" size={18} style={{ color: 'var(--color-primary)' }} />
+                      <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Loading More Teachers</span>
+                    </div>
+                  )}
+
+                  {filteredTeachers.length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-secondary)' }}>
+                      No faculty members found matching the filters.
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -6623,57 +16270,102 @@ export default function App() {
                     {/* Left Column Profile Card */}
                     <div className="erp-card" style={{ textAlign: 'center', background: 'rgba(2, 6, 23, 0.2)' }}>
                       <img 
-                        src={getStudentAvatar(selectedStudent)} 
-                        alt={selectedStudent.name} 
+                        src={getStudentAvatar(activeStudent)} 
+                        alt={activeStudent.name} 
                         style={{ width: '120px', height: '120px', borderRadius: '50%', objectFit: 'cover', marginBottom: '16px', border: '3px solid var(--color-primary)' }}
                       />
-                      <h3 style={{ fontSize: '1.25rem', marginBottom: '8px' }}>{selectedStudent.name}</h3>
+                      <h3 style={{ fontSize: '1.25rem', marginBottom: '8px' }}>{activeStudent.name}</h3>
+                      {/* Pending Additional Fee Badges */}
                       {(() => {
-                        const statusStr = getStudentFeeStatus(selectedStudent);
-                        const badge = getFeeStatusBadgeInfo(statusStr);
-                        return (
-                          <span className={`badge ${badge.class}`} style={{ fontSize: '0.8rem', padding: '6px 16px', display: 'inline-flex' }}>
-                            {badge.label}
-                          </span>
+                        const pendingExtra = studentExtraFees.filter(
+                          item => parseInt(item.student_id) === parseInt(activeStudent.id) && item.status !== 'Paid'
                         );
+                        if (pendingExtra.length > 0) {
+                          return (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginTop: '6px', marginBottom: '6px' }}>
+                              {pendingExtra.map(fee => (
+                                <span 
+                                  key={fee.id} 
+                                  className="badge badge-warning" 
+                                  style={{ 
+                                    fontSize: '0.8rem', 
+                                    padding: '4px 10px', 
+                                    backgroundColor: '#f59e0b', 
+                                    color: '#ffffff', 
+                                    fontWeight: 'bold',
+                                    borderRadius: '4px'
+                                  }}
+                                >
+                                  {fee.fee_name || 'Additional Fee'} Due
+                                </span>
+                              ))}
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
+                      {(() => {
+                        const totalLastYearDues = studentCarryForwardDues.reduce((acc, d) => {
+                          if (d.status !== 'Paid') {
+                            const remaining = parseFloat(d.amount) - parseFloat(d.paid_amount || 0);
+                            return acc + (remaining > 0 ? remaining : 0);
+                          }
+                          return acc;
+                        }, 0);
+
+                        if (totalLastYearDues > 0) {
+                          return (
+                            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '4px' }}>
+                              <span className="badge badge-danger" style={{ fontSize: '0.8rem', padding: '6px 16px', display: 'inline-flex', backgroundColor: '#ef4444', color: '#ffffff', fontWeight: 'bold' }}>
+                                Last Year Dues - {formatMoney(totalLastYearDues)}
+                              </span>
+                            </div>
+                          );
+                        }
+                        return null;
                       })()}
                       
                       <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '16px', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.85rem', textAlign: 'left', color: 'var(--text-secondary)' }}>
-                        <div><strong>Roll No.:</strong> {selectedStudent.roll_number}</div>
-                        <div><strong>SR No.:</strong> {selectedStudent.sr_no || 'N/A'}</div>
-                        <div><strong>Class:</strong> {getClassName(selectedStudent.class_id)}</div>
-                        <div><strong>Section:</strong> {selectedStudent.group_name || 'NA'}</div>
-                        <div><strong>Gender:</strong> {selectedStudent.gender || 'Male'}</div>
-                        <div><strong>Contact:</strong> {selectedStudent.phone || 'N/A'}</div>
-                        <div><strong>Email:</strong> {selectedStudent.email || 'N/A'}</div>
-                        <div><strong>Country:</strong> {selectedStudent.country || 'N/A'}</div>
-                        <div><strong>State:</strong> {selectedStudent.state || 'N/A'}</div>
-                        <div><strong>City:</strong> {selectedStudent.city || 'N/A'}</div>
-                        <div><strong>Address:</strong> {selectedStudent.address || 'N/A'}</div>
-                        <div><strong>Nationality:</strong> {selectedStudent.nationality || 'Indian'}</div>
-                        <div><strong>Caste:</strong> {selectedStudent.caste || 'N/A'}</div>
-                        <div><strong>Date of Birth:</strong> {formatDate(selectedStudent.date_of_birth)}</div>
-                        <div><strong>Admission Date:</strong> {formatDate(selectedStudent.admission_date)}</div>
+                        <div><strong>Roll No.:</strong> {activeStudent.roll_number}</div>
+                        <div><strong>SR No.:</strong> {activeStudent.sr_no || 'N/A'}</div>
+                        <div><strong>Class:</strong> {getClassName(activeStudent.class_id)}</div>
+                        <div><strong>Section:</strong> {activeStudent.group_name || 'NA'}</div>
+                        <div><strong>Gender:</strong> {activeStudent.gender || 'Male'}</div>
+                        <div><strong>Contact:</strong> {activeStudent.phone || 'N/A'}</div>
+                        <div><strong>Email:</strong> {activeStudent.email || 'N/A'}</div>
+                        <div><strong>Country:</strong> {activeStudent.country || 'N/A'}</div>
+                        <div><strong>State:</strong> {activeStudent.state || 'N/A'}</div>
+                        <div><strong>City:</strong> {activeStudent.city || 'N/A'}</div>
+                        <div><strong>Address:</strong> {activeStudent.address || 'N/A'}</div>
+                        <div><strong>Nationality:</strong> {activeStudent.nationality || 'Indian'}</div>
+                        <div><strong>Caste:</strong> {activeStudent.caste || 'N/A'}</div>
+                        <div><strong>Status:</strong> <span className={`badge ${activeStudent.status === 'Inactive' ? 'badge-danger' : 'badge-success'}`} style={{ display: 'inline-block', padding: '2px 8px', fontSize: '0.75rem' }}>{activeStudent.status || 'Active'}</span></div>
+                        {activeStudent.exit_date && (
+                          <div><strong>Exit Date:</strong> {formatDate(activeStudent.exit_date)}</div>
+                        )}
+                        <div><strong>Date of Birth:</strong> {formatDate(activeStudent.date_of_birth)}</div>
+                        <div><strong>Admission Date:</strong> {formatDate(activeStudent.admission_date)}</div>
                       </div>
                       
-                      {isCurrentYearActive() && (
+                      {isCurrentYearActive() && role !== 'Teacher' && (
                         <>
                           <button 
                             onClick={() => {
-                              setEditingStudent(selectedStudent);
+                              setEditingStudent(activeStudent);
                               setSForm({
-                                ...selectedStudent,
-                                sr_no: selectedStudent.sr_no || '',
-                                group_name: selectedStudent.group_name || '',
-                                gender: selectedStudent.gender || 'Male',
-                                country: selectedStudent.country || '',
-                                state: selectedStudent.state || '',
-                                city: selectedStudent.city || '',
-                                profile_image: selectedStudent.profile_image || '',
-                                blood_group: selectedStudent.blood_group || '',
-                                nationality: selectedStudent.nationality || 'Indian',
-                                caste: selectedStudent.caste || '',
-                                documents: typeof selectedStudent.documents === 'string' ? JSON.parse(selectedStudent.documents) : (selectedStudent.documents || [])
+                                ...activeStudent,
+                                sr_no: activeStudent.sr_no || '',
+                                group_name: activeStudent.group_name || '',
+                                gender: activeStudent.gender || 'Male',
+                                country: activeStudent.country || '',
+                                state: activeStudent.state || '',
+                                city: activeStudent.city || '',
+                                profile_image: activeStudent.profile_image || '',
+                                exit_date: activeStudent.exit_date || '',
+                                blood_group: activeStudent.blood_group || '',
+                                nationality: activeStudent.nationality || 'Indian',
+                                caste: activeStudent.caste || '',
+                                documents: typeof activeStudent.documents === 'string' ? JSON.parse(activeStudent.documents) : (activeStudent.documents || [])
                               });
                               setShowAddStudentModal(true);
                             }}
@@ -6688,7 +16380,7 @@ export default function App() {
                               setDeleteConfirm({
                                 message: 'Are you sure you want to delete permanently?',
                                 onConfirm: () => {
-                                  handleDeleteStudent(selectedStudent.id);
+                                  handleDeleteStudent(activeStudent.id);
                                   setDeleteConfirm(null);
                                 }
                               });
@@ -6707,11 +16399,11 @@ export default function App() {
                       <div className="erp-card">
                         <h4 style={{ fontSize: '1.1rem', marginBottom: '16px' }}>Family & Identification</h4>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', fontSize: '0.9rem' }}>
-                          <div><strong>Father's Name:</strong> {selectedStudent.father_name || 'N/A'}</div>
-                          <div><strong>Mother's Name:</strong> {selectedStudent.mother_name || 'N/A'}</div>
-                          <div><strong>Emergency Contact:</strong> {selectedStudent.emergency_contact || 'N/A'}</div>
-                          <div><strong>Blood Group:</strong> {selectedStudent.blood_group || 'N/A'}</div>
-                          <div><strong>Aadhaar Number:</strong> {selectedStudent.aadhaar_number || 'N/A'}</div>
+                          <div><strong>Father's Name:</strong> {activeStudent.father_name || 'N/A'}</div>
+                          <div><strong>Mother's Name:</strong> {activeStudent.mother_name || 'N/A'}</div>
+                          <div><strong>Emergency Contact:</strong> {activeStudent.emergency_contact || 'N/A'}</div>
+                          <div><strong>Blood Group:</strong> {activeStudent.blood_group || 'N/A'}</div>
+                          <div><strong>Aadhaar Number:</strong> {activeStudent.aadhaar_number || 'N/A'}</div>
                         </div>
                       </div>
 
@@ -6745,63 +16437,111 @@ export default function App() {
                             paddingBottom: '12px'
                           }}
                         >
-                          Attached Documents ({typeof selectedStudent.documents === 'string' ? JSON.parse(selectedStudent.documents).length : (selectedStudent.documents || []).length})
+                          Attached Documents ({typeof activeStudent.documents === 'string' ? JSON.parse(activeStudent.documents).length : (activeStudent.documents || []).length})
+                        </button>
+                        <button
+                          onClick={() => setStudentDetailTab('performance')}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: studentDetailTab === 'performance' ? 'var(--color-primary)' : 'var(--text-muted)',
+                            fontWeight: 700,
+                            fontSize: '0.95rem',
+                            cursor: 'pointer',
+                            borderBottom: studentDetailTab === 'performance' ? '2px solid var(--color-primary)' : 'none',
+                            paddingBottom: '12px'
+                          }}
+                        >
+                          Academic & Performance
                         </button>
                       </div>
 
-                      {studentDetailTab === 'fees' ? (
-                        /* Fee ledger section */
-                        <div className="erp-card">
-                          <h4 style={{ fontSize: '1.1rem', marginBottom: '16px' }}>Fee Collection Ledger ({getActiveYearRange()})</h4>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            {studentFees.map(fee => (
-                              <div key={fee.month} className="fees-month-item" style={{ borderLeft: `4px solid ${fee.status === 'Paid' ? '#10b981' : '#ef4444'}`, padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '4px', marginBottom: '6px' }}>
-                                <div>
-                                  <strong style={{ fontSize: '0.9rem' }}>{fee.month}</strong>
-                                  <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                    {fee.status === 'Paid' ? `Paid on: ${fee.payment_date ? formatDate(fee.payment_date) : 'N/A'}` : `Due Date: ${formatDate(fee.due_date)}`}
-                                  </span>
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                                  <strong style={{ fontSize: '1rem' }}>{formatMoney(fee.amount)}</strong>
-                                  {fee.status === 'Paid' ? (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                       <span 
-                                         className="badge badge-success"
-                                         style={{ cursor: 'pointer' }}
-                                         title="Click to revert to Unpaid"
-                                         onClick={() => handleRevertFeePayment(selectedStudent.id, fee.month)}
-                                       >
-                                         Paid
-                                       </span>
-                                      <button 
-                                        onClick={() => handlePrintReceipt(selectedStudent, fee)}
-                                        className="btn-outline" 
-                                        style={{ padding: '4px 8px', fontSize: '0.75rem' }}
-                                      >
-                                        <Printer size={12} /> Receipt
-                                      </button>
+                      {studentDetailTab === 'fees' && (
+                        /* Fee ledger section split into Current Session and Past Years Dues */
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                          {/* Current Session Dues */}
+                          <div className="erp-card">
+                            <h4 style={{ fontSize: '1.1rem', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span>Current Session Fees ({getActiveYearRange()})</span>
+                              {isCurrentYearActive() && role !== 'Teacher' && (
+                                <button 
+                                  disabled={selectedMonthsForPayment.length === 0}
+                                  onClick={() => processMultiMonthFeePayment(activeStudent.id, selectedMonthsForPayment)}
+                                  className="btn-primary"
+                                  style={{ 
+                                    padding: '6px 12px', 
+                                    fontSize: '0.8rem', 
+                                    opacity: selectedMonthsForPayment.length === 0 ? 0.5 : 1,
+                                    cursor: selectedMonthsForPayment.length === 0 ? 'not-allowed' : 'pointer'
+                                  }}
+                                >
+                                  Pay Selected {selectedMonthsForPayment.length > 0 ? `(${formatMoney(selectedMonthsForPayment.reduce((sum, m) => {
+                                    const fee = studentFees.find(f => f.month === m);
+                                    return sum + (fee ? parseFloat(fee.amount) || 0 : 0);
+                                  }, 0))})` : ''}
+                                </button>
+                              )}
+                            </h4>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                              {studentFees.map(fee => {
+                                return (
+                                  <div key={fee.month} className="fees-month-item" style={{ borderLeft: `4px solid ${fee.status === 'Paid' ? '#10b981' : '#ef4444'}`, padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '4px', marginBottom: '2px' }}>
+                                    <div>
+                                      <strong style={{ fontSize: '0.9rem' }}>{fee.month}</strong>
+                                      <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                        {fee.status === 'Paid' ? `Paid on: ${fee.payment_date ? formatDate(fee.payment_date) : 'N/A'}` : `Due Date: ${formatDate(fee.due_date)}`}
+                                      </span>
                                     </div>
-                                  ) : (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                      <span className="badge badge-danger">Unpaid</span>
-                                      {isCurrentYearActive() && (
-                                        <button 
-                                          onClick={() => processFeePayment(selectedStudent.id, fee.month)}
-                                          className="btn-primary" 
-                                          style={{ padding: '4px 10px', fontSize: '0.75rem', borderRadius: '4px' }}
-                                        >
-                                          Deposit
-                                        </button>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                      <strong style={{ fontSize: '1rem' }}>{formatMoney(fee.amount)}</strong>
+                                      {fee.status === 'Paid' ? (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                           <span 
+                                              className="badge badge-success"
+                                              style={{ cursor: role === 'Teacher' ? 'default' : 'pointer' }}
+                                              title={role === 'Teacher' ? 'Paid' : 'Click to revert to Unpaid'}
+                                              onClick={role === 'Teacher' ? undefined : () => handleRevertFeePayment(activeStudent.id, fee.month)}
+                                            >
+                                              Paid
+                                            </span>
+                                          <button 
+                                            onClick={() => handlePrintReceipt(activeStudent, fee)}
+                                            className="btn-outline" 
+                                            style={{ padding: '4px 8px', fontSize: '0.75rem' }}
+                                          >
+                                            <Printer size={12} /> Receipt
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                          <span className="badge badge-danger">Unpaid</span>
+                                          {isCurrentYearActive() && role !== 'Teacher' && (
+                                            <input 
+                                              type="checkbox"
+                                              checked={selectedMonthsForPayment.includes(fee.month)}
+                                              onChange={(e) => handleMonthCheckboxChange(fee.month, e.target.checked)}
+                                              style={{ 
+                                                width: '18px', 
+                                                height: '18px', 
+                                                cursor: 'pointer',
+                                                accentColor: 'var(--color-primary)'
+                                              }}
+                                            />
+                                          )}
+                                        </div>
                                       )}
                                     </div>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
+
+
                         </div>
-                      ) : (
+                      )}
+
+                      {studentDetailTab === 'documents' && (
                         /* Documents section */
                         <div className="erp-card">
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
@@ -6871,7 +16611,7 @@ export default function App() {
                                     const reader = new FileReader();
                                     reader.onloadend = async () => {
                                       const base64data = reader.result;
-                                      const currentDocs = typeof selectedStudent.documents === 'string' ? JSON.parse(selectedStudent.documents) : (selectedStudent.documents || []);
+                                      const currentDocs = typeof activeStudent.documents === 'string' ? JSON.parse(activeStudent.documents) : (activeStudent.documents || []);
                                       const newDoc = {
                                         id: Date.now() + Math.random(),
                                         type: docType,
@@ -6883,7 +16623,7 @@ export default function App() {
                                       const filtered = currentDocs.filter(d => d.type !== docType);
                                       const updatedDocs = [...filtered, newDoc];
                                       
-                                      await handleUpdateStudentDocuments(selectedStudent.id, updatedDocs);
+                                      await handleUpdateStudentDocuments(activeStudent.id, updatedDocs);
                                       document.getElementById('detail-upload-doc-type').value = "";
                                       e.target.value = "";
                                     };
@@ -6895,7 +16635,7 @@ export default function App() {
                           </div>
 
                           {(() => {
-                            const docsList = typeof selectedStudent.documents === 'string' ? JSON.parse(selectedStudent.documents) : (selectedStudent.documents || []);
+                            const docsList = typeof activeStudent.documents === 'string' ? JSON.parse(activeStudent.documents) : (activeStudent.documents || []);
                             if (docsList.length === 0) {
                               return (
                                 <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '32px 24px', fontSize: '0.85rem', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
@@ -6950,7 +16690,7 @@ export default function App() {
                                                   message: 'Are you sure you want to delete this?',
                                                   onConfirm: async () => {
                                                     const updatedDocs = docsList.filter(d => d.id !== doc.id);
-                                                    await handleUpdateStudentDocuments(selectedStudent.id, updatedDocs);
+                                                    await handleUpdateStudentDocuments(activeStudent.id, updatedDocs);
                                                   }
                                                 });
                                               }}
@@ -6968,6 +16708,44 @@ export default function App() {
                               </div>
                             );
                           })()}
+                        </div>
+                      )}
+
+                      {studentDetailTab === 'performance' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                          <div className="erp-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', gap: '16px', flexWrap: 'wrap' }}>
+                            <div>
+                              <h4 style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>Academic Progress Analytics</h4>
+                              <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '2px' }}>
+                                View performance records and print/save report cards.
+                              </p>
+                            </div>
+                            
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              <label className="form-label" style={{ fontSize: '0.8rem', margin: 0 }}>Report Scheme:</label>
+                              <select
+                                value={profileStudentExamId}
+                                onChange={(e) => setProfileStudentExamId(e.target.value)}
+                                className="form-control"
+                                style={{ minWidth: '220px' }}
+                              >
+                                <option value="overall">Overall (Annual Report Card)</option>
+                                {examsList.filter(e => parseInt(e.class_id) === parseInt(activeStudent.class_id)).map(e => (
+                                  <option key={e.id} value={e.id}>{e.name}</option>
+                                ))}
+                              </select>
+                              
+                              <button
+                                onClick={() => window.print()}
+                                className="btn-primary"
+                                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', padding: '8px 16px' }}
+                              >
+                                <Printer size={14} /> Print A4 PDF
+                              </button>
+                            </div>
+                          </div>
+                          
+                          {renderActualReportCard(activeStudent, profileStudentExamId)}
                         </div>
                       )}
                     </div>
@@ -6992,7 +16770,9 @@ export default function App() {
                       s.roll_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
                       (s.phone && s.phone.toLowerCase().includes(searchQuery.toLowerCase())) ||
                       (s.email && s.email.toLowerCase().includes(searchQuery.toLowerCase()));
-                    return matchesGroup && matchesSearch;
+                    const sStatus = s.status || 'Active';
+                    const matchesStatus = studentStatusFilter === 'All' || sStatus === studentStatusFilter;
+                    return matchesGroup && matchesSearch && matchesStatus;
                   });
 
                   const visibleStudents = filteredStudents.slice(0, visibleCount);
@@ -7014,7 +16794,7 @@ export default function App() {
                         </h3>
                         
                         <div>
-                          {isCurrentYearActive() && (
+                          {isCurrentYearActive() && role !== 'Teacher' && (
                             <button 
                               id="btn-add-student" 
                               onClick={() => {
@@ -7062,11 +16842,52 @@ export default function App() {
                             type="text"
                             placeholder="Search students..."
                             className="erp-input"
-                            style={{ width: '100%', paddingLeft: '36px' }}
+                            style={{ width: '100%', paddingLeft: '36px', paddingRight: searchQuery ? '32px' : '12px' }}
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                           />
                           <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                          {searchQuery && (
+                            <button
+                              type="button"
+                              onClick={() => setSearchQuery('')}
+                              style={{
+                                position: 'absolute',
+                                right: '10px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                background: 'none',
+                                border: 'none',
+                                color: 'var(--text-muted)',
+                                cursor: 'pointer',
+                                padding: '4px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}
+                              title="Clear search"
+                            >
+                              <X size={14} />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Status Filter */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <label htmlFor="student-status-filter" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                            Status:
+                          </label>
+                          <select 
+                            id="student-status-filter"
+                            className="erp-input"
+                            style={{ width: '150px', padding: '6px 12px' }}
+                            value={studentStatusFilter}
+                            onChange={(e) => setStudentStatusFilter(e.target.value)}
+                          >
+                            <option value="All">All</option>
+                            <option value="Active">Active</option>
+                            <option value="Inactive">Inactive</option>
+                          </select>
                         </div>
 
                         {/* Section Filter */}
@@ -7118,12 +16939,12 @@ export default function App() {
                               <th>Contact</th>
                               <th>Email Address</th>
                               <th>City</th>
-                              <th>Actions</th>
+                              {role !== 'Teacher' && <th>Actions</th>}
                             </tr>
                           </thead>
                           <tbody>
                             {visibleStudents.map(student => (
-                              <tr key={student.id} onClick={() => { setSelectedStudent(student); fetchStudentFeesRecords(student.id); setLedgerBackSource('students'); }} style={{ cursor: 'pointer' }}>
+                              <tr key={student.id} onClick={() => { setSelectedStudent(student); fetchStudentFeesRecords(student.id, student.class_id); setLedgerBackSource('students'); }} style={{ cursor: 'pointer' }}>
                                 <td style={{ fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '150px' }} title={student.name}>
                                   {student.name}
                                 </td>
@@ -7137,48 +16958,64 @@ export default function App() {
                                 <td>{student.phone || 'N/A'}</td>
                                 <td>{student.email || 'N/A'}</td>
                                 <td>{student.city || 'N/A'}</td>
-                                <td onClick={(e) => e.stopPropagation()}>
-                                  <button 
-                                    onClick={() => {
-                                      setEditingStudent(student);
-                                      setSForm({
-                                        ...student,
-                                        sr_no: student.sr_no || '',
-                                        group_name: student.group_name || '',
-                                        gender: student.gender || 'Male',
-                                        country: student.country || '',
-                                        state: student.state || '',
-                                        city: student.city || '',
-                                        profile_image: student.profile_image || '',
-                                        blood_group: student.blood_group || '',
-                                        nationality: student.nationality || 'Indian',
-                                        caste: student.caste || '',
-                                        documents: typeof student.documents === 'string' ? JSON.parse(student.documents) : (student.documents || [])
-                                      });
-                                      setShowAddStudentModal(true);
-                                    }}
-                                    className="btn-outline" 
-                                    style={{ padding: '4px 8px', marginRight: '6px' }}
-                                  >
-                                    Edit
-                                  </button>
-                                  <button 
-                                    id={`btn-remove-student-${student.id}`}
-                                    onClick={() => {
-                                      setDeleteConfirm({
-                                        message: 'Are you sure you want to delete permanently?',
-                                        onConfirm: () => {
-                                          handleDeleteStudent(student.id);
-                                          setDeleteConfirm(null);
-                                        }
-                                      });
-                                    }}
-                                    className="btn-outline" 
-                                    style={{ padding: '4px 8px', color: '#ef4444', borderColor: '#ef4444' }}
-                                  >
-                                    Delete
-                                  </button>
-                                </td>
+                                {role !== 'Teacher' && (
+                                  <td onClick={(e) => e.stopPropagation()} style={{ position: 'relative' }}>
+                                    <button 
+                                      id={`student-menu-btn-${student.id}`}
+                                      onClick={() => setActiveStudentMenuId(activeStudentMenuId === student.id ? null : student.id)}
+                                      className="menu-dot-trigger"
+                                    >
+                                      <MoreVertical size={16} />
+                                    </button>
+                                    {activeStudentMenuId === student.id && (
+                                      <div className="menu-dropdown" style={{ right: '8px', top: '34px', zIndex: 100 }}>
+                                        <button 
+                                          id={`student-edit-btn-${student.id}`}
+                                          onClick={() => {
+                                            setEditingStudent(student);
+                                            setSForm({
+                                              ...student,
+                                              sr_no: student.sr_no || '',
+                                              group_name: student.group_name || '',
+                                              gender: student.gender || 'Male',
+                                              country: student.country || '',
+                                              state: student.state || '',
+                                              city: student.city || '',
+                                              profile_image: student.profile_image || '',
+                                              exit_date: student.exit_date || '',
+                                              blood_group: student.blood_group || '',
+                                              nationality: student.nationality || 'Indian',
+                                              caste: student.caste || '',
+                                              documents: typeof student.documents === 'string' ? JSON.parse(student.documents) : (student.documents || [])
+                                            });
+                                            setShowAddStudentModal(true);
+                                            setActiveStudentMenuId(null);
+                                          }}
+                                          className="menu-dropdown-item"
+                                        >
+                                          Edit
+                                        </button>
+                                        <button 
+                                          id={`student-remove-btn-${student.id}`}
+                                          onClick={() => {
+                                            setDeleteConfirm({
+                                              message: 'Are you sure you want to delete permanently?',
+                                              onConfirm: () => {
+                                                handleDeleteStudent(student.id);
+                                                setDeleteConfirm(null);
+                                              }
+                                            });
+                                            setActiveStudentMenuId(null);
+                                          }}
+                                          className="menu-dropdown-item"
+                                          style={{ color: '#ef4444' }}
+                                        >
+                                          Delete
+                                        </button>
+                                      </div>
+                                    )}
+                                  </td>
+                                )}
                               </tr>
                             ))}
                           </tbody>
@@ -7209,7 +17046,7 @@ export default function App() {
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                     <h3 style={{ fontSize: '1.15rem' }}>Select Classroom to View Rosters</h3>
-                    {isCurrentYearActive() && (
+                    {isCurrentYearActive() && role !== 'Teacher' && (
                       <button 
                         id="btn-create-class"
                         onClick={() => {
@@ -7223,26 +17060,82 @@ export default function App() {
                     )}
                   </div>
 
-                  <div className="class-grid">
-                    {classes.map(cls => (
-                      <div 
-                        key={cls.id} 
-                        className="class-card"
-                        onClick={() => {
-                          setSelectedClassId(cls.id);
-                          const hasGrps = cls.groups && cls.groups.length > 0;
-                          setSelectedGroupId(hasGrps ? null : 'all');
-                          setGroupFilter(hasGrps ? 'all' : 'all');
-                        }}
-                      >
-                        <h4 style={{ fontSize: '1.25rem', marginBottom: '8px' }}>{cls.name}</h4>
-                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '12px' }}>{cls.room || 'No Room'}</span>
-                        <span className="badge badge-primary">
-                          {students.filter(s => s.class_id === cls.id).length} Students
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+                  {visibleClasses.length === 0 ? (
+                    <div className="card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 24px', textAlign: 'center', background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', marginTop: '24px' }}>
+                      <div style={{ fontSize: '3.5rem', marginBottom: '16px' }}>🏫</div>
+                      <h4 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '8px', color: 'var(--text-primary)' }}>
+                        {role === 'Teacher' ? 'No Class Assigned' : 'No Classes Created Yet'}
+                      </h4>
+                      <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', maxWidth: '360px', marginBottom: '0', lineHeight: '1.5' }}>
+                        {role === 'Teacher' 
+                          ? 'You are not assigned as a Class Teacher to any class. Please contact the administrator.'
+                          : 'Create your first classroom to start organizing your students, setting up rosters, and configuring fee schedules.'}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="class-grid">
+                      {visibleClasses.map(cls => (
+                        <div 
+                          key={cls.id} 
+                          className="class-card"
+                          style={{ overflow: 'visible' }}
+                          onClick={() => {
+                            setSelectedClassId(cls.id);
+                            const hasGrps = cls.groups && cls.groups.length > 0;
+                            setSelectedGroupId(hasGrps ? null : 'all');
+                            setGroupFilter(hasGrps ? 'all' : 'all');
+                          }}
+                        >
+                          {isCurrentYearActive() && role !== 'Teacher' && (
+                            <div style={{ position: 'absolute', top: '16px', right: '16px' }} onClick={(e) => e.stopPropagation()}>
+                              <button 
+                                id={`class-menu-btn-${cls.id}`}
+                                onClick={() => setActiveClassMenuId(activeClassMenuId === cls.id ? null : cls.id)}
+                                className="menu-dot-trigger"
+                              >
+                                <MoreVertical size={16} />
+                              </button>
+                              {activeClassMenuId === cls.id && (
+                                <div className="menu-dropdown" style={{ right: 0, top: '24px' }}>
+                                  <button 
+                                    id={`class-edit-btn-${cls.id}`}
+                                    onClick={() => {
+                                      setEditingClass(cls);
+                                      setEditClassForm({ name: cls.name });
+                                      setShowEditClassModal(true);
+                                      setActiveClassMenuId(null);
+                                    }}
+                                    className="menu-dropdown-item"
+                                  >
+                                    Edit Class
+                                  </button>
+                                  <button 
+                                    id={`class-delete-btn-${cls.id}`}
+                                    onClick={() => {
+                                      setSimpleConfirm({
+                                        title: 'Delete Class',
+                                        message: `Are you sure you want to delete "${cls.name}"? This action is permanent and will delete all student profiles, fee records, and schedules associated with this class.`,
+                                        onConfirm: () => handleDeleteClass(cls.id)
+                                      });
+                                      setActiveClassMenuId(null);
+                                    }}
+                                    className="menu-dropdown-item"
+                                    style={{ color: '#ef4444' }}
+                                  >
+                                    Delete Class
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          <h4 style={{ fontSize: '1.25rem', marginBottom: '16px', paddingRight: '20px' }}>{cls.name}</h4>
+                          <span className="badge badge-primary">
+                            {students.filter(s => s.class_id === cls.id).length} Students
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -7257,21 +17150,34 @@ export default function App() {
                     <h3 style={{ fontSize: '1.15rem' }}>Select Classroom to View Rosters</h3>
                   </div>
 
-                  <div className="class-grid">
-                    {classes.map(cls => (
-                      <div 
-                        key={cls.id} 
-                        className="class-card"
-                        onClick={() => setSelectedFeesClassId(cls.id)}
-                      >
-                        <h4 style={{ fontSize: '1.25rem', marginBottom: '8px' }}>{cls.name}</h4>
-                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '12px' }}>{cls.room || 'No Room'}</span>
-                        <span className="badge badge-primary">
-                          {students.filter(s => s.class_id === cls.id).length} Students
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+                  {visibleClasses.length === 0 ? (
+                    <div className="card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 24px', textAlign: 'center', background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', marginTop: '24px' }}>
+                      <div style={{ fontSize: '3.5rem', marginBottom: '16px' }}>🏫</div>
+                      <h4 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '8px', color: 'var(--text-primary)' }}>
+                        {role === 'Teacher' ? 'No Class Assigned' : 'No Classes Created Yet'}
+                      </h4>
+                      <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', maxWidth: '360px', marginBottom: '0', lineHeight: '1.5' }}>
+                        {role === 'Teacher' 
+                          ? 'You are not assigned as a Class Teacher to any class. Please contact the administrator.'
+                          : 'Create a classroom first to start managing outstanding student fees.'}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="class-grid">
+                      {visibleClasses.map(cls => (
+                        <div 
+                          key={cls.id} 
+                          className="class-card"
+                          onClick={() => setSelectedFeesClassId(cls.id)}
+                        >
+                          <h4 style={{ fontSize: '1.25rem', marginBottom: '16px' }}>{cls.name}</h4>
+                          <span className="badge badge-primary">
+                            {students.filter(s => s.class_id === cls.id).length} Students
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="erp-card">
@@ -7289,22 +17195,39 @@ export default function App() {
                       </h3>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Status Filter:</span>
-                      <select
-                        value={feesStatusFilter}
-                        onChange={(e) => setFeesStatusFilter(e.target.value)}
-                        className="erp-input"
-                        style={{ padding: '6px 12px', fontSize: '0.85rem', minWidth: '160px', width: 'auto' }}
-                      >
-                        <option value="All">All</option>
-                        <option value="Overdue">Overdue Only (1+ Months)</option>
-                        <option value="DUES PENDING">DUES PENDING</option>
-                        <option value="PAYMENT OVERDUE">PAYMENT OVERDUE</option>
-                        <option value="CRITICAL DUES">CRITICAL DUES</option>
-                        <option value="FEE DEFAULT ALERT">FEE DEFAULT ALERT</option>
-                        <option value="NO DUES">NO DUES</option>
-                      </select>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Status Filter:</span>
+                        <select
+                          value={feesStatusFilter}
+                          onChange={(e) => setFeesStatusFilter(e.target.value)}
+                          className="erp-input"
+                          style={{ padding: '6px 12px', fontSize: '0.85rem', minWidth: '160px', width: 'auto' }}
+                        >
+                          <option value="All">All</option>
+                          <option value="NO DUES">NO DUES</option>
+                          <option value="DUES PENDING">DUES PENDING</option>
+                          <option value="CRITICAL DUES">CRITICAL DUES</option>
+                          <option value="DEFAULT ALERT">DEFAULT ALERT</option>
+                        </select>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Sort By:</span>
+                        <select
+                          value={feesSortField}
+                          onChange={(e) => setFeesSortField(e.target.value)}
+                          className="erp-input"
+                          style={{ padding: '6px 12px', fontSize: '0.85rem', minWidth: '160px', width: 'auto' }}
+                        >
+                          <option value="dues_desc">Dues (Highest First)</option>
+                          <option value="dues_asc">Dues (Lowest First)</option>
+                          <option value="name_asc">Student Name (A-Z)</option>
+                          <option value="name_desc">Student Name (Z-A)</option>
+                          <option value="roll_asc">Roll Number (Ascending)</option>
+                          <option value="roll_desc">Roll Number (Descending)</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
                   
@@ -7315,321 +17238,189 @@ export default function App() {
                         type="text"
                         placeholder="Search students..."
                         className="erp-input"
-                        style={{ width: '100%', paddingLeft: '36px' }}
+                        style={{ width: '100%', paddingLeft: '36px', paddingRight: searchQuery ? '32px' : '12px' }}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                       />
                       <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                      {searchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setSearchQuery('')}
+                          style={{
+                            position: 'absolute',
+                            right: '10px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--text-muted)',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                          title="Clear search"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
                     </div>
                   </div>
 
-                  <div className="erp-table-container">
-                    <table className="erp-table">
-                      <thead>
-                        <tr>
-                          <th>Roll Number</th>
-                          <th>Student Name</th>
-                          <th>Class</th>
-                          <th>Tuition Amount</th>
-                          <th>Status</th>
-                          <th>Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {students
-                          .filter(s => {
-                            if (selectedFeesClassId !== 'all' && s.class_id !== selectedFeesClassId) {
+                  {(() => {
+                    const filteredStudents = students
+                      .filter(s => {
+                        if (selectedFeesClassId !== 'all' && s.class_id !== selectedFeesClassId) {
+                          return false;
+                        }
+                        
+                        const statusStr = getStudentFeeStatus(s);
+                        if (feesStatusFilter !== 'All') {
+                          const mappedStatus = feesStatusFilter === 'NO DUES' ? 'PAID' : feesStatusFilter;
+                          if (mappedStatus === 'DUES PENDING') {
+                            if (statusStr !== 'DUES PENDING' && statusStr !== 'PAYMENT OVERDUE') {
                               return false;
                             }
-                            
-                            const statusStr = getStudentFeeStatus(s);
-                            if (feesStatusFilter === 'Overdue') {
-                              if (statusStr !== 'PAYMENT OVERDUE' && statusStr !== 'CRITICAL DUES' && statusStr !== 'FEE DEFAULT ALERT') {
-                                return false;
-                              }
-                            } else if (feesStatusFilter !== 'All') {
-                              const mappedStatus = feesStatusFilter === 'NO DUES' ? 'PAID' : feesStatusFilter;
-                              if (statusStr !== mappedStatus) {
-                                return false;
-                              }
+                          } else {
+                            if (statusStr !== mappedStatus) {
+                              return false;
                             }
-                            
-                            if (searchQuery) {
-                              const q = searchQuery.toLowerCase();
-                              return s.name.toLowerCase().includes(q) || s.roll_number.includes(q);
-                            }
-                            return true;
-                          })
-                          .map(student => (
-                            <tr key={student.id}>
-                              <td style={{ fontWeight: 'bold' }}>{student.roll_number}</td>
-                              <td>{student.name}</td>
-                              <td>{getClassName(student.class_id)}</td>
-                              <td>{formatMoney(getClassMonthlyFee(student.class_id))}/mo</td>
-                              <td>
-                                {(() => {
-                                  const statusStr = getStudentFeeStatus(student);
-                                  const badge = getFeeStatusBadgeInfo(statusStr);
-                                  return (
-                                    <span className={`badge ${badge.class}`}>
-                                      {badge.label}
-                                    </span>
-                                  );
-                                })()}
-                              </td>
-                              <td>
-                                <button 
-                                  id={`btn-open-student-ledger-${student.id}`}
-                                  onClick={() => { 
-                                    setSelectedStudent(student); 
-                                    fetchStudentFeesRecords(student.id); 
-                                    setLedgerBackSource('fees');
-                                    setActiveTab('students'); 
-                                  }}
-                                  className="btn-primary" 
-                                  style={{ padding: '6px 12px', fontSize: '0.8rem' }}
-                                >
-                                  Open Ledger
-                                </button>
-                              </td>
+                          }
+                        }
+                        
+                        if (searchQuery) {
+                          const q = searchQuery.toLowerCase();
+                          const contact = (s.emergency_contact || s.phone || '').toLowerCase();
+                          return s.name.toLowerCase().includes(q) || s.roll_number.toLowerCase().includes(q) || contact.includes(q);
+                        }
+                        return true;
+                      })
+                      .sort((a, b) => {
+                        if (feesSortField === 'dues_desc') {
+                          return getStudentDuesAmount(b) - getStudentDuesAmount(a);
+                        }
+                        if (feesSortField === 'dues_asc') {
+                          return getStudentDuesAmount(a) - getStudentDuesAmount(b);
+                        }
+                        if (feesSortField === 'name_asc') {
+                          return a.name.localeCompare(b.name);
+                        }
+                        if (feesSortField === 'name_desc') {
+                          return b.name.localeCompare(a.name);
+                        }
+                        if (feesSortField === 'roll_asc') {
+                          return a.roll_number.localeCompare(b.roll_number, undefined, { numeric: true });
+                        }
+                        if (feesSortField === 'roll_desc') {
+                          return b.roll_number.localeCompare(a.roll_number, undefined, { numeric: true });
+                        }
+                        return 0;
+                      });
+
+                    if (filteredStudents.length === 0) {
+                      return (
+                        <div style={{ 
+                          textAlign: 'center', 
+                          padding: '48px 24px', 
+                          color: 'var(--text-secondary)',
+                          backgroundColor: 'rgba(255,255,255,0.02)',
+                          border: '1px dashed var(--border-color)',
+                          borderRadius: 'var(--radius-md)',
+                          margin: '20px 0'
+                        }}>
+                          <div style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '8px' }}>
+                            No students found with outstanding dues.
+                          </div>
+                          <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                            Try adjusting your search query or status filter.
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="erp-table-container">
+                        <table className="erp-table">
+                          <thead>
+                            <tr>
+                              <th>Roll Number</th>
+                              <th>Student Name</th>
+                              <th>Contact</th>
+                              <th>Dues Amount</th>
+                              <th>Status</th>
+                              <th>Action</th>
                             </tr>
-                          ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* --- 5. REPORTS TAB --- */}
-          {activeTab === 'reports' && (
-            <div className="erp-card fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', flexWrap: 'wrap', gap: '16px' }}>
-                <div style={{ display: 'flex', gap: '16px' }}>
-                  <button 
-                    onClick={() => setReportSubTab('session')} 
-                    className={`btn-subtab ${reportSubTab === 'session' ? 'active' : ''}`}
-                    style={{ 
-                      background: 'none', 
-                      border: 'none', 
-                      color: reportSubTab === 'session' ? 'var(--color-primary)' : 'var(--text-muted)', 
-                      fontWeight: 700, 
-                      fontSize: '0.9rem', 
-                      cursor: 'pointer',
-                      borderBottom: reportSubTab === 'session' ? '2px solid var(--color-primary)' : 'none',
-                      paddingBottom: '8px'
-                    }}
-                  >
-                    Active Session Reports ({getActiveYearRange()})
-                  </button>
-                  <button 
-                    onClick={() => setReportSubTab('cross-year')} 
-                    className={`btn-subtab ${reportSubTab === 'cross-year' ? 'active' : ''}`}
-                    style={{ 
-                      background: 'none', 
-                      border: 'none', 
-                      color: reportSubTab === 'cross-year' ? 'var(--color-primary)' : 'var(--text-muted)', 
-                      fontWeight: 700, 
-                      fontSize: '0.9rem', 
-                      cursor: 'pointer',
-                      borderBottom: reportSubTab === 'cross-year' ? '2px solid var(--color-primary)' : 'none',
-                      paddingBottom: '8px'
-                    }}
-                  >
-                    Cross-Year Analytics
-                  </button>
-                </div>
-                <button 
-                  id="btn-print-reports"
-                  onClick={() => window.print()}
-                  className="btn-primary"
-                >
-                  <FileSpreadsheet size={16} /> Export PDF/Print
-                </button>
-              </div>
-
-              {reportSubTab === 'session' && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-                  <div className="erp-card">
-                    <h4 style={{ fontSize: '1.1rem', marginBottom: '16px', color: '#ef4444' }}>Outstanding Fees Summary</h4>
-                    <div className="erp-table-container">
-                      <table className="erp-table">
-                        <thead>
-                          <tr>
-                            <th>Roll</th>
-                            <th>Student</th>
-                            <th>Class</th>
-                            <th>Dues Outstanding</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {getDuesReport().map((r, i) => (
-                            <tr key={i}>
-                              <td>{r.roll}</td>
-                              <td>{r.name}</td>
-                              <td>{r.class}</td>
-                              <td style={{ fontWeight: 'bold', color: '#ef4444' }}>{formatMoney(r.dues)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  <div className="erp-card">
-                    <h4 style={{ fontSize: '1.1rem', marginBottom: '16px', color: '#10b981' }}>Payroll Expense logs</h4>
-                    <div className="erp-table-container">
-                      <table className="erp-table">
-                        <thead>
-                          <tr>
-                            <th>Faculty Name</th>
-                            <th>Subject</th>
-                            <th>Monthly Base</th>
-                            <th>Payroll Status</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {teachers.map((t, i) => (
-                            <tr key={i}>
-                              <td>{t.name}</td>
-                              <td>{t.subject}</td>
-                              <td>{formatMoney(t.salary_amount)}</td>
-                              <td><span className="badge badge-success">Processed (April-Oct)</span></td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {reportSubTab === 'cross-year' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                  {isFetchingCrossYear ? (
-                    <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-                      Loading cross-year comparative analytics...
-                    </div>
-                  ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-                      {/* Student Growth Year Wise */}
-                      <div className="erp-card">
-                        <h4 style={{ fontSize: '1.1rem', marginBottom: '16px', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <Users size={18} /> Student Growth (Year-Wise)
-                        </h4>
-                        <div className="erp-table-container">
-                          <table className="erp-table">
-                            <thead>
-                              <tr>
-                                <th>Academic Session</th>
-                                <th>Active Student Enrollment</th>
-                                <th>Session Status</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {crossYearReports.map((r, i) => (
-                                <tr key={i}>
-                                  <td style={{ fontWeight: 'bold' }}>{r.year_range}</td>
-                                  <td>{r.student_count} Students</td>
+                          </thead>
+                          <tbody>
+                            {filteredStudents.slice(0, visibleFeesStudentsCount).map(student => {
+                              const contactNum = student.emergency_contact || student.phone || 'N/A';
+                              const duesVal = getStudentDuesAmount(student);
+                              return (
+                                <tr key={student.id}>
+                                  <td style={{ fontWeight: 'bold' }}>{student.roll_number}</td>
+                                  <td>{student.name}</td>
+                                  <td>{contactNum}</td>
+                                  <td>{formatMoney(duesVal)}</td>
                                   <td>
-                                    <span className={`badge ${r.status === 'Active' ? 'badge-success' : 'badge-secondary'}`}>{r.status}</span>
+                                    {(() => {
+                                      const statusStr = getStudentFeeStatus(student);
+                                      const badge = getFeeStatusBadgeInfo(statusStr);
+                                      return (
+                                        <span className={`badge ${badge.class} badge-fixed`}>
+                                          {badge.label}
+                                        </span>
+                                      );
+                                    })()}
+                                  </td>
+                                  <td>
+                                    <button 
+                                      id={`btn-open-student-ledger-${student.id}`}
+                                      onClick={() => { 
+                                        setSelectedStudent(student); 
+                                        fetchStudentFeesRecords(student.id, student.class_id); 
+                                        setLedgerBackSource('fees');
+                                        setActiveTab('students'); 
+                                        
+                                        // Reset scroll position to top immediately
+                                        window.scrollTo(0, 0);
+                                        const wrapper = document.querySelector('.main-wrapper');
+                                        if (wrapper) {
+                                          wrapper.scrollTop = 0;
+                                        }
+                                      }}
+                                      className="btn-primary" 
+                                      style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                                    >
+                                      Open Ledger
+                                    </button>
                                   </td>
                                 </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
+                              );
+                            })}
+                          </tbody>
+                        </table>
 
-                      {/* Revenue Year Wise */}
-                      <div className="erp-card">
-                        <h4 style={{ fontSize: '1.1rem', marginBottom: '16px', color: '#10b981', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <DollarSign size={18} /> Fee Revenue collection (Year-Wise)
-                        </h4>
-                        <div className="erp-table-container">
-                          <table className="erp-table">
-                            <thead>
-                              <tr>
-                                <th>Academic Session</th>
-                                <th>Total Paid Fees</th>
-                                <th>Session Status</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {crossYearReports.map((r, i) => (
-                                <tr key={i}>
-                                  <td style={{ fontWeight: 'bold' }}>{r.year_range}</td>
-                                  <td style={{ fontWeight: 'bold', color: '#10b981' }}>{formatMoney(r.revenue)}</td>
-                                  <td>
-                                    <span className={`badge ${r.status === 'Active' ? 'badge-success' : 'badge-secondary'}`}>{r.status}</span>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
+                        {/* Lazy Loading Spinner */}
+                        {isFetchingMoreFeesStudents && (
+                          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '16px', gap: '8px' }}>
+                            <span 
+                              style={{ 
+                                border: '2px solid rgba(255,255,255,0.2)', 
+                                borderTop: '2px solid white', 
+                                borderRadius: '50%', 
+                                width: '16px', 
+                                height: '16px', 
+                                animation: 'spin 0.8s linear infinite' 
+                              }}
+                            ></span>
+                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Loading More Data...</span>
+                          </div>
+                        )}
                       </div>
-
-                      {/* Faculty History Year Wise */}
-                      <div className="erp-card">
-                        <h4 style={{ fontSize: '1.1rem', marginBottom: '16px', color: '#a855f7', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <Briefcase size={18} /> Faculty Payroll Expense (Year-Wise)
-                        </h4>
-                        <div className="erp-table-container">
-                          <table className="erp-table">
-                            <thead>
-                              <tr>
-                                <th>Academic Session</th>
-                                <th>Total Salary Disbursed</th>
-                                <th>Session Status</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {crossYearReports.map((r, i) => (
-                                <tr key={i}>
-                                  <td style={{ fontWeight: 'bold' }}>{r.year_range}</td>
-                                  <td style={{ fontWeight: 'bold', color: '#a855f7' }}>{formatMoney(r.salary_expense)}</td>
-                                  <td>
-                                    <span className={`badge ${r.status === 'Active' ? 'badge-success' : 'badge-secondary'}`}>{r.status}</span>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-
-                      {/* Academic Performance Year Wise */}
-                      <div className="erp-card">
-                        <h4 style={{ fontSize: '1.1rem', marginBottom: '16px', color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <FileText size={18} /> Academic Performance Index (Year-Wise)
-                        </h4>
-                        <div className="erp-table-container">
-                          <table className="erp-table">
-                            <thead>
-                              <tr>
-                                <th>Academic Session</th>
-                                <th>Average Performance Score</th>
-                                <th>Session Status</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {crossYearReports.map((r, i) => (
-                                <tr key={i}>
-                                  <td style={{ fontWeight: 'bold' }}>{r.year_range}</td>
-                                  <td style={{ fontWeight: 'bold', color: '#fbbf24' }}>{r.performance_index}</td>
-                                  <td>
-                                    <span className={`badge ${r.status === 'Active' ? 'badge-success' : 'badge-secondary'}`}>{r.status}</span>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                 </div>
               )}
             </div>
@@ -7734,134 +17525,373 @@ export default function App() {
               </div>
 
               {/* Tuition Fee settings configuration */}
-              <div className="erp-card">
-                <h4 style={{ fontSize: '1.1rem', margin: 0, fontWeight: 700 }}>Class-wise Tuition Fee Configuration</h4>
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '4px', marginBottom: '16px' }}>
-                  Define class-wise monthly tuition fee amounts for the currently active academic session.
-                </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '220px' }}>
-                      <label className="form-label" style={{ fontWeight: 600 }}>Select Class</label>
-                      <select
-                        value={selectedFeeClassId}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setSelectedFeeClassId(val);
-                          fetchClassFeeStructure(val);
-                        }}
-                        className="erp-input"
-                      >
-                        <option value="">-- Choose Class --</option>
-                        {classes.map(c => (
-                          <option key={c.id} value={c.id}>{c.name}</option>
-                        ))}
-                      </select>
-                    </div>
+              {(() => {
+                const isLocked = classFeeStructure && (classFeeStructure.is_locked === 1 || classFeeStructure.is_locked === true || classFeeStructure.is_locked === '1');
+                return (
+                  <div className="erp-card">
+                    <h4 style={{ fontSize: '1.1rem', margin: 0, fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      Class-wise Tuition Fee Configuration
+                      {isLocked && (
+                        <span style={{ fontSize: '0.8rem', color: '#10b981', background: 'rgba(16, 185, 129, 0.1)', padding: '2px 8px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+                          🔒 Fee Structure Locked
+                        </span>
+                      )}
+                    </h4>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '4px', marginBottom: '16px' }}>
+                      Define class-wise monthly tuition fee amounts for the currently active academic session.
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '220px' }}>
+                          <label className="form-label" style={{ fontWeight: 600 }}>Select Class</label>
+                          <select
+                            value={selectedFeeClassId}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setSelectedFeeClassId(val);
+                              fetchClassFeeStructure(val);
+                            }}
+                            className="erp-input"
+                            disabled={isLocked}
+                          >
+                            <option value="">-- Choose Class --</option>
+                            {classes.map(c => (
+                              <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        {isLocked && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedFeeClassId('');
+                              setClassFeeStructure(null);
+                            }}
+                            className="btn-outline"
+                            style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', height: '38px', alignSelf: 'flex-end' }}
+                          >
+                            Switch Class
+                          </button>
+                        )}
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '220px' }}>
-                      <label className="form-label" style={{ fontWeight: 600 }}>Default Currency</label>
-                      <select
-                        value={schoolCurrency}
-                        onChange={async (e) => {
-                          const val = e.target.value;
-                          setSchoolCurrency(val);
-                          
-                          if (isConnected) {
-                            try {
-                              const res = await fetch('/api/school/currency', {
-                                method: 'PUT',
-                                headers: getHeaders(),
-                                body: JSON.stringify({ currency: val })
-                              });
-                              if (res.ok) {
-                                showToast(`Default currency updated to ${val} successfully.`, "success");
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '220px' }}>
+                          <label className="form-label" style={{ fontWeight: 600 }}>Default Currency</label>
+                          <select
+                            value={schoolCurrency}
+                            onChange={async (e) => {
+                              const val = e.target.value;
+                              setSchoolCurrency(val);
+                              
+                              if (isConnected) {
+                                try {
+                                  const res = await fetch('/api/school/currency', {
+                                    method: 'PUT',
+                                    headers: getHeaders(),
+                                    body: JSON.stringify({ currency: val })
+                                  });
+                                  if (res.ok) {
+                                    showToast(`Default currency updated to ${val} successfully.`, "success");
+                                  } else {
+                                    showToast("Failed to save currency configuration on server.", "error");
+                                  }
+                                } catch (err) {
+                                  showToast("Error updating currency.", "error");
+                                }
                               } else {
-                                showToast("Failed to save currency configuration on server.", "error");
+                                const keySuffix = schoolId || 'default';
+                                localStorage.setItem(`bn_sandbox_school_currency_${keySuffix}`, val);
+                                showToast(`Default currency updated to ${val} (Offline Mode) successfully.`, "success");
                               }
-                            } catch (err) {
-                              showToast("Error updating currency.", "error");
-                            }
-                          } else {
-                            const keySuffix = schoolId || 'default';
-                            localStorage.setItem(`bn_sandbox_school_currency_${keySuffix}`, val);
-                            showToast(`Default currency updated to ${val} (Offline Mode) successfully.`, "success");
-                          }
-                        }}
-                        className="erp-input"
-                      >
-                        {Object.values(currencyMap).map(c => (
-                          <option key={c.code} value={c.code}>{c.label}</option>
-                        ))}
-                      </select>
+                            }}
+                            className="erp-input"
+                          >
+                            {Object.values(currencyMap).map(c => (
+                              <option key={c.code} value={c.code}>{c.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      {selectedFeeClassId && classFeeStructure && (
+                        <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px', background: 'rgba(255,255,255,0.01)', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                          
+                          {/* Fee Structure Mode Selector */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Fee Structure Mode</label>
+                            <div style={{ display: 'inline-flex', background: 'rgba(255,255,255,0.05)', padding: '4px', borderRadius: '8px', gap: '4px', alignSelf: 'flex-start' }}>
+                              <button
+                                type="button"
+                                onClick={() => !isLocked && setFeeStructureMode('same')}
+                                style={{
+                                  border: 'none',
+                                  outline: 'none',
+                                  background: feeStructureMode === 'same' ? 'var(--color-primary)' : 'transparent',
+                                  color: feeStructureMode === 'same' ? '#ffffff' : 'var(--text-secondary)',
+                                  padding: '6px 16px',
+                                  fontSize: '0.85rem',
+                                  fontWeight: 600,
+                                  borderRadius: '6px',
+                                  cursor: isLocked ? 'not-allowed' : 'pointer',
+                                  opacity: isLocked && feeStructureMode !== 'same' ? 0.5 : 1,
+                                  transition: 'all 0.2s ease-in-out'
+                                }}
+                                disabled={isLocked}
+                              >
+                                Same Fee For All Months
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => !isLocked && setFeeStructureMode('custom')}
+                                style={{
+                                  border: 'none',
+                                  outline: 'none',
+                                  background: feeStructureMode === 'custom' ? 'var(--color-primary)' : 'transparent',
+                                  color: feeStructureMode === 'custom' ? '#ffffff' : 'var(--text-secondary)',
+                                  padding: '6px 16px',
+                                  fontSize: '0.85rem',
+                                  fontWeight: 600,
+                                  borderRadius: '6px',
+                                  cursor: isLocked ? 'not-allowed' : 'pointer',
+                                  opacity: isLocked && feeStructureMode !== 'custom' ? 0.5 : 1,
+                                  transition: 'all 0.2s ease-in-out'
+                                }}
+                                disabled={isLocked}
+                              >
+                                Custom Fee Per Month
+                              </button>
+                            </div>
+                          </div>
+
+                          {feeStructureMode === 'same' ? (
+                            <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxWidth: '300px' }}>
+                              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Monthly Tuition Fee</label>
+                              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                <span style={{ position: 'absolute', left: '12px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                                  {currencyMap[schoolCurrency]?.symbol || '₹'}
+                                </span>
+                                <input 
+                                  type="number"
+                                  value={sameMonthlyFee === 0 ? '' : sameMonthlyFee}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setSameMonthlyFee(val === '' ? 0 : (parseFloat(val) || 0));
+                                  }}
+                                  className="erp-input"
+                                  style={{ padding: '8px 12px 8px 28px', fontSize: '0.9rem', width: '100%' }}
+                                  required
+                                  min="0"
+                                  placeholder="e.g. 150"
+                                  disabled={isLocked}
+                                />
+                              </div>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '2px' }}>
+                                The entered amount will automatically be applied to all months of the academic session.
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="fade-in" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px' }}>
+                              {["April", "May", "June", "July", "August", "September", "October", "November", "December", "January", "February", "March"].map(m => (
+                                <div key={m} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{m}</label>
+                                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                    <span style={{ position: 'absolute', left: '12px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                                      {currencyMap[schoolCurrency]?.symbol || '₹'}
+                                    </span>
+                                    <input 
+                                      type="number"
+                                      value={classFeeStructure[m] === 0 ? '' : (classFeeStructure[m] ?? 0)}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setClassFeeStructure(prev => ({
+                                          ...prev,
+                                          [m]: val === '' ? 0 : (parseFloat(val) || 0)
+                                        }));
+                                      }}
+                                      className="erp-input"
+                                      style={{ padding: '8px 12px 8px 28px', fontSize: '0.9rem', width: '100%' }}
+                                      required
+                                      min="0"
+                                      disabled={isLocked}
+                                    />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+                            {isLocked ? (
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', padding: '8px 16px', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(16, 185, 129, 0.2)', fontWeight: 600, fontSize: '0.9rem' }}>
+                                🔒 Fee Structure Locked
+                              </div>
+                            ) : (
+                              <button onClick={() => setShowConfirmLockModal(true)} className="btn-primary">
+                                Save Fee Structure
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
-
-                  {selectedFeeClassId && classFeeStructure && (
-                    <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'rgba(255,255,255,0.01)', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px' }}>
-                        {["April", "May", "June", "July", "August", "September", "October", "November", "December", "January", "February", "March"].map(m => (
-                          <div key={m} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{m}</label>
-                            <input 
-                              type="number"
-                              value={classFeeStructure[m] ?? 150}
-                              onChange={(e) => {
-                                const val = parseFloat(e.target.value) || 0;
-                                setClassFeeStructure(prev => ({
-                                  ...prev,
-                                  [m]: val
-                                }));
-                              }}
-                              className="erp-input"
-                              style={{ padding: '6px 10px', fontSize: '0.85rem' }}
-                              required
-                              min="0"
-                            />
-                          </div>
-                        ))}
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
-                        <button onClick={saveClassFeeStructure} className="btn-primary">
-                          Save Fee Structure
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
+                );
+              })()}
 
               {/* School settings configuration */}
               <div className="erp-card">
-                <h4 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '12px', color: 'var(--text-primary)' }}>School Settings & Timetable Configuration</h4>
+                <h4 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '12px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  School Settings & Timetable Configuration
+                  {hasUnsavedChanges && (
+                    <span className="badge badge-warning" style={{ fontSize: '0.65rem', padding: '2px 6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Unsaved Changes
+                    </span>
+                  )}
+                </h4>
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '16px' }}>
                   Define structural settings for classroom schedulers and faculty workload computation.
                 </p>
-                <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '180px' }}>
-                    <label htmlFor="settings-total-periods" className="form-label" style={{ fontWeight: 600 }}>Total Periods Per Day</label>
-                    <input
-                      id="settings-total-periods"
-                      type="number"
-                      min="1"
-                      max="15"
-                      value={totalPeriodsPerDay}
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value) || 8;
-                        setTotalPeriodsPerDay(val);
-                        localStorage.setItem('bn_settings_total_periods', val);
-                      }}
-                      className="erp-input"
-                      style={{ padding: '6px 12px' }}
-                    />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', alignItems: 'start' }}>
+                    
+                    {/* School Start Time */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label htmlFor="settings-start-time" className="form-label" style={{ fontWeight: 600 }}>School Start Time</label>
+                      <input
+                        id="settings-start-time"
+                        type="time"
+                        value={convertTimeTo24h(draftSchoolStartTime)}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val) {
+                            const mins = parseTimeToMinutes(val);
+                            setDraftSchoolStartTime(formatMinutesToTime(mins));
+                          }
+                        }}
+                        className="erp-input"
+                        style={{ padding: '6px 12px' }}
+                      />
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Selected: {draftSchoolStartTime}</span>
+                    </div>
+
+                    {/* Period Duration */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label htmlFor="settings-period-duration" className="form-label" style={{ fontWeight: 600 }}>Period Duration (Minutes)</label>
+                      <input
+                        id="settings-period-duration"
+                        type="number"
+                        min="1"
+                        value={draftPeriodDuration || ''}
+                        onChange={(e) => setDraftPeriodDuration(parseInt(e.target.value) !== undefined ? (parseInt(e.target.value) || 0) : 40)}
+                        className={`erp-input ${periodDurationError ? 'input-error' : ''}`}
+                        style={{ padding: '6px 12px' }}
+                      />
+                      {periodDurationError && <span style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: 500 }}>{periodDurationError}</span>}
+                    </div>
+
+                    {/* Interval Duration */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label htmlFor="settings-interval-duration" className="form-label" style={{ fontWeight: 600 }}>Interval Duration (Minutes)</label>
+                      <input
+                        id="settings-interval-duration"
+                        type="number"
+                        min="0"
+                        value={draftIntervalDuration !== undefined ? draftIntervalDuration : ''}
+                        onChange={(e) => setDraftIntervalDuration(parseInt(e.target.value) !== undefined ? (parseInt(e.target.value) || 0) : 0)}
+                        className={`erp-input ${intervalDurationError ? 'input-error' : ''}`}
+                        style={{ padding: '6px 12px' }}
+                      />
+                      {intervalDurationError && <span style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: 500 }}>{intervalDurationError}</span>}
+                    </div>
+
+                    {/* Interval After Period */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label htmlFor="settings-interval-after" className="form-label" style={{ fontWeight: 600 }}>Interval After Period</label>
+                      <input
+                        id="settings-interval-after"
+                        type="number"
+                        min="0"
+                        value={draftIntervalAfterPeriod !== undefined ? draftIntervalAfterPeriod : ''}
+                        onChange={(e) => setDraftIntervalAfterPeriod(parseInt(e.target.value) !== undefined ? (parseInt(e.target.value) || 0) : 0)}
+                        className={`erp-input ${intervalAfterPeriodError ? 'input-error' : ''}`}
+                        style={{ padding: '6px 12px' }}
+                      />
+                      {intervalAfterPeriodError && <span style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: 500 }}>{intervalAfterPeriodError}</span>}
+                    </div>
+
+                    {/* Total Periods */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label htmlFor="settings-total-periods" className="form-label" style={{ fontWeight: 600 }}>Total Periods Per Day</label>
+                      <input
+                        id="settings-total-periods"
+                        type="number"
+                        min="1"
+                        max="15"
+                        value={draftTotalPeriods || ''}
+                        onChange={(e) => setDraftTotalPeriods(parseInt(e.target.value) !== undefined ? (parseInt(e.target.value) || 0) : 8)}
+                        className={`erp-input ${totalPeriodsError ? 'input-error' : ''}`}
+                        style={{ padding: '6px 12px' }}
+                      />
+                      {totalPeriodsError && <span style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: 500 }}>{totalPeriodsError}</span>}
+                    </div>
+
+                    {/* Save Button */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', justifyContent: 'flex-end', height: '100%' }}>
+                      <button
+                        onClick={handleSaveTimetableConfig}
+                        disabled={hasValidationErrors}
+                        className="btn-primary"
+                        style={{ padding: '8px 16px', height: '38px', opacity: hasValidationErrors ? 0.5 : 1, cursor: hasValidationErrors ? 'not-allowed' : 'pointer', width: '100%' }}
+                      >
+                        Save Configuration
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    onClick={() => showToast('Total periods limit saved successfully!', 'success')}
-                    className="btn-primary"
-                    style={{ padding: '8px 16px' }}
-                  >
-                    Save Configuration
-                  </button>
+
+                  {/* Dynamic Timetable Preview Section */}
+                  {!hasValidationErrors && draftTotalPeriods > 0 && (
+                    <div style={{ marginTop: '8px', padding: '16px', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
+                      <h5 style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '2px', color: hasUnsavedChanges ? 'var(--text-secondary)' : '#10b981' }}>
+                        {hasUnsavedChanges ? 'Preview (Not Yet Saved)' : 'Active Timetable Schedule'}
+                      </h5>
+                      <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginBottom: '12px' }}>
+                        {hasUnsavedChanges 
+                          ? 'These timings will be applied only after clicking Save Configuration.' 
+                          : 'These timings are currently active across the platform.'}
+                      </p>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px' }}>
+                        {Array.from({ length: draftTotalPeriods }).map((_, i) => {
+                          const pNum = i + 1;
+                          const timeStr = getDraftPeriodTimingString(pNum);
+                          const isIntervalAfter = pNum === draftIntervalAfterPeriod;
+                          
+                          let intervalTimeStr = '';
+                          if (isIntervalAfter && draftIntervalDuration > 0) {
+                            const startMins = parseTimeToMinutes(draftSchoolStartTime);
+                            const pDur = parseInt(draftPeriodDuration) || 40;
+                            const iDur = parseInt(draftIntervalDuration) || 20;
+                            const intervalStartMins = startMins + pNum * pDur;
+                            const intervalEndMins = intervalStartMins + iDur;
+                            intervalTimeStr = `${formatMinutesToTime(intervalStartMins)} - ${formatMinutesToTime(intervalEndMins)}`;
+                          }
+
+                          return (
+                            <React.Fragment key={pNum}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '4px', fontSize: '0.8rem' }}>
+                                <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Period {pNum}</span>
+                                <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{timeStr}</span>
+                              </div>
+                              {isIntervalAfter && draftIntervalDuration > 0 && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(245, 158, 11, 0.08)', border: '1px dashed rgba(245, 158, 11, 0.25)', borderRadius: '4px', fontSize: '0.8rem' }}>
+                                  <span style={{ fontWeight: 600, color: '#fbbf24' }}>Interval</span>
+                                  <span style={{ color: '#fbbf24', fontWeight: 500 }}>{intervalTimeStr}</span>
+                                </div>
+                              )}
+                            </React.Fragment>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -7893,6 +17923,1623 @@ export default function App() {
                   </table>
                 </div>
               </div>
+
+              {/* Dynamic User Roles & Permissions Configuration */}
+              <div className="erp-card">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', flexWrap: 'wrap', gap: '12px' }}>
+                  <div>
+                    <h4 style={{ fontSize: '1.1rem', margin: 0, fontWeight: 700 }}>🛡️ Access Control & Dynamic Roles Manager</h4>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '4px' }}>
+                      Configure customized access policies, permissions, and operator accounts.
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      className={`btn-tab ${rolesSubTab === 'roles' ? 'active' : ''}`}
+                      onClick={() => setRolesSubTab('roles')}
+                      style={{ padding: '6px 12px', fontSize: '0.85rem' }}
+                    >
+                      Roles & Permissions
+                    </button>
+                    <button
+                      className={`btn-tab ${rolesSubTab === 'users' ? 'active' : ''}`}
+                      onClick={() => setRolesSubTab('users')}
+                      style={{ padding: '6px 12px', fontSize: '0.85rem' }}
+                    >
+                      Operator User Accounts
+                    </button>
+                  </div>
+                </div>
+
+                {isRolesLoading ? (
+                  <div style={{ display: 'flex', justifyContent: 'center', padding: '30px' }}>
+                    <div className="loading-spinner"></div>
+                  </div>
+                ) : rolesSubTab === 'roles' ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    {/* Add Role Form */}
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (!roleFormName.trim()) {
+                          showToast('Please enter a role name', 'error');
+                          return;
+                        }
+                        handleAddRole(roleFormName.trim(), roleFormPerms);
+                        setRoleFormName('');
+                        setRoleFormPerms([]);
+                      }}
+                      className="erp-card"
+                      style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', padding: '16px' }}
+                    >
+                      <h5 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', fontWeight: 700 }}>Create New Access Role</h5>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', alignItems: 'end' }}>
+                        <div>
+                          <label className="erp-label">Role Name</label>
+                          <input
+                            type="text"
+                            className="erp-input"
+                            placeholder="e.g. Accountant, Coordinator"
+                            value={roleFormName}
+                            onChange={(e) => setRoleFormName(e.target.value)}
+                          />
+                        </div>
+                        <div style={{ gridColumn: 'span 2' }}>
+                          <label className="erp-label">Granted Permissions</label>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '6px' }}>
+                            {[
+                              { key: 'attendance', label: 'Attendance Entry' },
+                              { key: 'performance', label: 'Student Performance' },
+                              { key: 'planner', label: 'Academic Planner' },
+                              { key: 'finance', label: 'Fees & Finance' },
+                              { key: 'reports', label: 'Financial Reports' },
+                              { key: 'administration', label: 'System Settings' },
+                              { key: 'parent_portal', label: 'Parent Portal' }
+                            ].map(p => (
+                              <label key={p.key} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', cursor: 'pointer' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={roleFormPerms.includes(p.key)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setRoleFormPerms([...roleFormPerms, p.key]);
+                                    } else {
+                                      setRoleFormPerms(roleFormPerms.filter(x => x !== p.key));
+                                    }
+                                  }}
+                                />
+                                {p.label}
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <button type="submit" className="btn-primary" style={{ width: '100%', padding: '10px' }}>
+                            Create Role
+                          </button>
+                        </div>
+                      </div>
+                    </form>
+
+                    {/* Roles Table */}
+                    <div className="erp-table-container">
+                      <table className="erp-table">
+                        <thead>
+                          <tr>
+                            <th>Role Name</th>
+                            <th>Permissions Allowed</th>
+                            <th style={{ textAlign: 'right' }}>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {dbRoles.map((r, idx) => (
+                            <tr key={r.id || idx}>
+                              <td style={{ fontWeight: 'bold' }}>{r.name}</td>
+                              <td>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                  {r.permissions && r.permissions.length > 0 ? (
+                                    r.permissions.map(p => (
+                                      <span key={p} className="badge badge-primary" style={{ fontSize: '0.75rem' }}>
+                                        {p}
+                                      </span>
+                                    ))
+                                  ) : (
+                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>None (Read-Only)</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td style={{ textAlign: 'right' }}>
+                                {['School Admin', 'Teacher', 'Parent'].includes(r.name) ? (
+                                  <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>System Protected</span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (confirm(`Are you sure you want to delete the role "${r.name}"?`)) {
+                                        handleDeleteRole(r.id);
+                                      }
+                                    }}
+                                    className="btn-danger"
+                                    style={{ padding: '4px 8px', fontSize: '0.8rem' }}
+                                  >
+                                    Delete
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    {/* Add/Edit User Form */}
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (!userFormEmail.trim()) {
+                          showToast('Please fill Email or Phone', 'error');
+                          return;
+                        }
+                        if (!editingUser && !userFormPass.trim()) {
+                          showToast('Password is required for new accounts', 'error');
+                          return;
+                        }
+                        
+                        handleSaveUser(
+                          editingUser ? editingUser.id : null,
+                          userFormEmail.trim(),
+                          userFormPass,
+                          userFormRole,
+                          userFormClassId || null,
+                          userFormChildIds
+                        );
+                        
+                        setUserFormEmail('');
+                        setUserFormPass('');
+                        setUserFormClassId('');
+                        setUserFormChildIds([]);
+                      }}
+                      className="erp-card"
+                      style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', padding: '16px' }}
+                    >
+                      <h5 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', fontWeight: 700 }}>
+                        {editingUser ? 'Edit Operator Account' : 'Create New Operator Account'}
+                      </h5>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', alignItems: 'end' }}>
+                        <div>
+                          <label className="erp-label">Email or Mobile Number</label>
+                          <input
+                            type="text"
+                            className="erp-input"
+                            placeholder="e.g. user@school.com or 9876543210"
+                            value={userFormEmail}
+                            onChange={(e) => setUserFormEmail(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="erp-label">Password {editingUser && '(Leave blank to keep current)'}</label>
+                          <input
+                            type="password"
+                            className="erp-input"
+                            placeholder={editingUser ? '••••••••' : 'Min 8 characters'}
+                            value={userFormPass}
+                            onChange={(e) => setUserFormPass(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="erp-label">Assigned Role</label>
+                          <select
+                            className="erp-input"
+                            value={userFormRole}
+                            onChange={(e) => setUserFormRole(e.target.value)}
+                          >
+                            {dbRoles.map(r => (
+                              <option key={r.name} value={r.name}>{r.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        
+                        {userFormRole === 'Teacher' && (
+                          <div>
+                            <label className="erp-label">Assigned Classroom (Optional)</label>
+                            <select
+                              className="erp-input"
+                              value={userFormClassId}
+                              onChange={(e) => setUserFormClassId(e.target.value)}
+                            >
+                              <option value="">Select Classroom...</option>
+                              {classes.map(c => (
+                                <option key={c.id} value={c.id}>{c.class_name}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
+                        {userFormRole === 'Parent' && (
+                          <div>
+                            <label className="erp-label">Linked Student IDs (Comma Separated)</label>
+                            <input
+                              type="text"
+                              className="erp-input"
+                              placeholder="e.g. 4, 5"
+                              value={userFormChildIds.join(', ')}
+                              onChange={(e) => {
+                                const vals = e.target.value.split(',').map(s => Number(s.trim())).filter(n => !isNaN(n) && n > 0);
+                                setUserFormChildIds(vals);
+                              }}
+                            />
+                          </div>
+                        )}
+
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button type="submit" className="btn-primary" style={{ flex: 1, padding: '10px' }}>
+                            {editingUser ? 'Save Changes' : 'Add Account'}
+                          </button>
+                          {editingUser && (
+                            <button
+                              type="button"
+                              className="btn-secondary"
+                              style={{ padding: '10px' }}
+                              onClick={() => {
+                                setEditingUser(null);
+                                setUserFormEmail('');
+                                setUserFormPass('');
+                                setUserFormClassId('');
+                                setUserFormChildIds([]);
+                              }}
+                            >
+                              Cancel
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </form>
+
+                    {/* Users Table */}
+                    <div className="erp-table-container">
+                      <table className="erp-table">
+                        <thead>
+                          <tr>
+                            <th>User Email / Mobile</th>
+                            <th>Role</th>
+                            <th>Class/Student Context</th>
+                            <th>Effective Permissions</th>
+                            <th style={{ textAlign: 'right' }}>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {dbUsers.map((u, idx) => (
+                            <tr key={u.id || idx}>
+                              <td style={{ fontWeight: 'bold' }}>{u.email || u.phone || 'N/A'}</td>
+                              <td>
+                                <span className="badge badge-secondary">{u.role}</span>
+                              </td>
+                              <td>
+                                {u.role === 'Teacher' ? (
+                                  <span>Classroom ID: {u.classroom_id || 'None'}</span>
+                                ) : u.role === 'Parent' ? (
+                                  <span>Student IDs: {u.linked_student_ids ? u.linked_student_ids.join(', ') : 'None'}</span>
+                                ) : (
+                                  <span>All Classrooms</span>
+                                )}
+                              </td>
+                              <td>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                  {u.permissions && u.permissions.length > 0 ? (
+                                    u.permissions.map(p => (
+                                      <span key={p} className="badge badge-primary" style={{ fontSize: '0.75rem' }}>
+                                        {p}
+                                      </span>
+                                    ))
+                                  ) : (
+                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>None</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td style={{ textAlign: 'right' }}>
+                                {['Admin@yopmail.com', username].includes(u.email) ? (
+                                  <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Active Operator</span>
+                                ) : (
+                                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditingUser(u);
+                                        setUserFormEmail(u.email || u.phone || '');
+                                        setUserFormPass('');
+                                        setUserFormRole(u.role);
+                                        setUserFormClassId(u.classroom_id || '');
+                                        setUserFormChildIds(u.linked_student_ids || []);
+                                      }}
+                                      className="btn-primary"
+                                      style={{ padding: '4px 8px', fontSize: '0.8rem' }}
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (confirm(`Are you sure you want to delete account "${u.email || u.phone}"?`)) {
+                                          handleDeleteUser(u.id);
+                                        }
+                                      }}
+                                      className="btn-danger"
+                                      style={{ padding: '4px 8px', fontSize: '0.8rem' }}
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* --- 6.1 FINANCIAL REPORTS TAB --- */}
+          {activeTab === 'financial' && (
+            <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              <div className="erp-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                <div>
+                  <h3 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <FileSpreadsheet size={22} className="gradient-text" />
+                    Financial Reports & Accounts History
+                  </h3>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '4px' }}>
+                    Preview current profit/loss statement, generate official reports, and track statement settlements.
+                  </p>
+                </div>
+              </div>
+
+              {/* STATEMENTS TAB PANEL */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                {/* Date Selector & Action Cards */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+                  
+                  {/* Inputs Card */}
+                  <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    <h4 style={{ fontSize: '1.05rem', fontWeight: 700, borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', color: 'var(--text-primary)' }}>
+                      New Report Parameters
+                    </h4>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <label className="form-label" style={{ fontWeight: 600 }}>From Date</label>
+                        <input 
+                          type="date"
+                          value={reportFromDate}
+                          onChange={(e) => setReportFromDate(e.target.value)}
+                          className="erp-input"
+                        />
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <label className="form-label" style={{ fontWeight: 600 }}>To Date</label>
+                        <input 
+                          type="date"
+                          value={reportToDate}
+                          onChange={(e) => setReportToDate(e.target.value)}
+                          className="erp-input"
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                      <button 
+                        onClick={handlePreviewReport}
+                        disabled={isReportPreviewing}
+                        className="btn-outline"
+                        style={{ flex: 1, padding: '10px', height: '40px', fontSize: '0.9rem' }}
+                      >
+                        {isReportPreviewing ? "Calculating..." : "Preview Report"}
+                      </button>
+
+                      {reportPreview && (
+                        <button 
+                          onClick={() => setShowGenerateConfirm(true)}
+                          disabled={isGeneratingReport}
+                          className="btn-primary"
+                          style={{ flex: 1, padding: '10px', height: '40px', fontSize: '0.9rem' }}
+                        >
+                          {isGeneratingReport ? "Generating..." : "Generate Report"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Preview Card */}
+                  <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', justifyContent: 'center', minHeight: '220px' }}>
+                    <h4 style={{ fontSize: '1.05rem', fontWeight: 700, borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', color: 'var(--text-primary)', margin: 0 }}>
+                      Financial Statement Preview
+                    </h4>
+                    
+                    {reportPreview ? (
+                      <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid var(--border-color)', borderRadius: '6px' }}>
+                          <span style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: '0.85rem' }}>Tuition Fees Collected:</span>
+                          <strong style={{ color: '#10b981', fontSize: '1rem' }}>{formatMoney(reportPreview.fees_collected)}</strong>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid var(--border-color)', borderRadius: '6px' }}>
+                          <span style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: '0.85rem' }}>Additional Fees Collected:</span>
+                          <strong style={{ color: '#10b981', fontSize: '1rem' }}>{formatMoney(reportPreview.extra_fees_collected)}</strong>
+                        </div>
+
+                        {parseFloat(reportPreview.previous_year_recoveries || reportPreview.previous_year_recovery || 0) > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid var(--border-color)', borderRadius: '6px' }}>
+                            <span style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: '0.85rem' }}>Previous Year Dues Recovered:</span>
+                            <strong style={{ color: '#10b981', fontSize: '1rem' }}>{formatMoney(reportPreview.previous_year_recoveries || reportPreview.previous_year_recovery)}</strong>
+                          </div>
+                        )}
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 12px', background: 'rgba(16, 185, 129, 0.04)', border: '1px solid rgba(16, 185, 129, 0.15)', borderRadius: '6px' }}>
+                          <span style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: '0.9rem' }}>Total Income:</span>
+                          <strong style={{ color: '#10b981', fontSize: '1.05rem' }}>{formatMoney(reportPreview.total_income || (reportPreview.fees_collected + (reportPreview.previous_year_recoveries || reportPreview.previous_year_recovery || 0) + reportPreview.extra_fees_collected))}</strong>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid var(--border-color)', borderRadius: '6px' }}>
+                          <span style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: '0.85rem' }}>Teacher Salaries Paid:</span>
+                          <strong style={{ color: '#ef4444', fontSize: '1rem' }}>{formatMoney(reportPreview.salaries_paid)}</strong>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid var(--border-color)', borderRadius: '6px' }}>
+                          <span style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: '0.85rem' }}>Expenses Paid:</span>
+                          <strong style={{ color: '#ef4444', fontSize: '1rem' }}>{formatMoney(reportPreview.school_expenses)}</strong>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 12px', background: 'rgba(239, 68, 68, 0.04)', border: '1px solid rgba(239, 68, 68, 0.15)', borderRadius: '6px' }}>
+                          <span style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: '0.9rem' }}>Total Expenses:</span>
+                          <strong style={{ color: '#ef4444', fontSize: '1.05rem' }}>{formatMoney(reportPreview.total_expenses || (reportPreview.salaries_paid + reportPreview.school_expenses))}</strong>
+                        </div>
+
+                        <div style={{ 
+                          display: 'flex', 
+                          justifyContent: 'space-between', 
+                          padding: '12px 14px', 
+                          background: reportPreview.net_profit >= 0 ? 'rgba(16, 185, 129, 0.08)' : 'rgba(239, 68, 68, 0.08)', 
+                          border: reportPreview.net_profit >= 0 ? '1px solid rgba(16, 185, 129, 0.25)' : '1px solid rgba(239, 68, 68, 0.25)', 
+                          borderRadius: '8px',
+                          marginTop: '4px'
+                        }}>
+                          <span style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: '0.95rem' }}>
+                            {reportPreview.net_profit >= 0 ? "Net Profit:" : "Net Loss:"}
+                          </span>
+                          <strong style={{ 
+                            color: reportPreview.net_profit >= 0 ? '#34d399' : '#f87171', 
+                            fontSize: '1.2rem',
+                            textShadow: reportPreview.net_profit >= 0 ? '0 0 10px rgba(16, 185, 129, 0.2)' : '0 0 10px rgba(239, 68, 68, 0.2)'
+                          }}>
+                            {formatMoney(Math.abs(reportPreview.net_profit))}
+                          </strong>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', color: 'var(--text-muted)', flex: 1, padding: '20px 0' }}>
+                        <span>📊 Select date range and click Preview Report.</span>
+                        <span style={{ fontSize: '0.75rem', fontStyle: 'italic', textAlign: 'center' }}>Previews are temporary and do not record history.</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Financial History Section */}
+                <div className="erp-card">
+                  <h4 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    Financial Statements History
+                    <span className="badge" style={{ background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
+                      {financialReports.length} {financialReports.length === 1 ? 'Statement' : 'Statements'}
+                    </span>
+                  </h4>
+
+                  {financialReports.length === 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 0', color: 'var(--text-muted)', gap: '10px' }}>
+                      <span style={{ fontSize: '2rem' }}>📜</span>
+                      <p style={{ fontSize: '0.9rem', fontStyle: 'italic', margin: 0 }}>No official reports generated yet.</p>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
+                      {financialReports.map((report) => {
+                        const isProfit = parseFloat(report.net_profit) >= 0;
+                        return (
+                          <div key={report.id} className="erp-card fade-in" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px', border: '1px solid var(--border-color)', background: 'rgba(255, 255, 255, 0.01)', position: 'relative' }}>
+                            
+                            {/* Header ID & Status */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--color-primary)' }}>
+                                {report.report_id || `REP-${String(report.id).padStart(3, '0')}`}
+                              </span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                {settlingReportId === report.id ? (
+                                  <span 
+                                    className="badge"
+                                    style={{ margin: 0, backgroundColor: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                                  >
+                                    <RefreshCw size={12} className="animate-spin" />
+                                    Settling... ⏳
+                                  </span>
+                                ) : (
+                                  <span 
+                                    className={`badge ${report.settlement_status === 'Settled' ? 'badge-success' : 'badge-warning'}`}
+                                    style={{ cursor: settlingReportId ? 'not-allowed' : 'pointer', margin: 0 }}
+                                    onClick={() => {
+                                      if (settlingReportId) return;
+                                      setReportStatusConfirm({
+                                        id: report.id,
+                                        currentStatus: report.settlement_status,
+                                        newStatus: report.settlement_status === 'Settled' ? 'Pending' : 'Settled'
+                                      });
+                                    }}
+                                    title="Click to change report status"
+                                  >
+                                    {report.settlement_status}
+                                  </span>
+                                )}
+                                <button 
+                                  id={`btn-export-report-${report.id}`}
+                                  disabled={exportingReportId === report.id}
+                                  onClick={() => handleExportReport(report)}
+                                  className="btn-outline"
+                                  style={{ padding: '2px 8px', fontSize: '0.75rem', height: '24px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                                >
+                                  {exportingReportId === report.id ? (
+                                    <>
+                                      <RefreshCw size={12} className="animate-spin" />
+                                      Downloading report...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Download size={12} />
+                                      Export
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Period */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', background: 'rgba(255, 255, 255, 0.02)', padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Report Period</span>
+                              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                                {new Date(report.from_date).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })} → {new Date(report.to_date).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })}
+                              </span>
+                            </div>
+
+                            {/* Metrics summary grid */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Tuition Fees:</span>
+                                <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>{formatMoney(report.fees_collected)}</strong>
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Additional Fees:</span>
+                                <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>{formatMoney(report.extra_fees_collected || 0)}</strong>
+                              </div>
+                              {parseFloat(report.previous_year_recoveries || report.previous_year_recovery || 0) > 0 && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Previous Year Dues Recovered:</span>
+                                  <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>{formatMoney(report.previous_year_recoveries || report.previous_year_recovery)}</strong>
+                                </div>
+                              )}
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Salaries Paid:</span>
+                                <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>{formatMoney(report.salaries_paid)}</strong>
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Expenses:</span>
+                                <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>{formatMoney(report.school_expenses || 0)}</strong>
+                              </div>
+                            </div>
+
+                            {/* Net Profit / Loss */}
+                            <div style={{ 
+                              display: 'flex', 
+                              justifyContent: 'space-between', 
+                              alignItems: 'center',
+                              borderTop: '1px solid var(--border-color)', 
+                              paddingTop: '10px',
+                              marginTop: '2px'
+                            }}>
+                              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                                {isProfit ? "Profit:" : "Loss:"}
+                              </span>
+                              <strong style={{ fontSize: '1.05rem', color: isProfit ? '#10b981' : '#ef4444' }}>
+                                {formatMoney(Math.abs(report.net_profit))}
+                              </strong>
+                            </div>
+
+                            {/* Timestamps */}
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed var(--border-color)', paddingTop: '8px', marginTop: '2px' }}>
+                              <span>Generated:</span>
+                              <span style={{ fontWeight: 500 }}>
+                                {new Date(report.created_at).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })} {new Date(report.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* --- 6.2 FINANCE MANAGEMENT TAB --- */}
+          {activeTab === 'finance_management' && (
+            <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              <div className="erp-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                <div>
+                  <h3 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Briefcase size={22} className="gradient-text" />
+                    Finance Management
+                  </h3>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '4px' }}>
+                    Manage daily financial entries that later contribute to Financial Reports, including Expenses and the Additional Fee Ledger.
+                  </p>
+                </div>
+              </div>
+
+              {/* Finance Management Subtabs */}
+              <div style={{ display: 'flex', gap: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>
+                {role !== 'Teacher' && (
+                  <>
+                    <button
+                      onClick={() => setFinanceManagementSubTab('fees')}
+                      className={`btn-subtab ${financeManagementSubTab === 'fees' ? 'active' : ''}`}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: financeManagementSubTab === 'fees' ? 'var(--color-primary)' : 'var(--text-muted)',
+                        fontWeight: 700,
+                        fontSize: '0.9rem',
+                        cursor: 'pointer',
+                        borderBottom: financeManagementSubTab === 'fees' ? '2px solid var(--color-primary)' : 'none',
+                        paddingBottom: '8px'
+                      }}
+                    >
+                      🏷️ Additional Fee Ledger
+                    </button>
+                    <button
+                      onClick={() => setFinanceManagementSubTab('expenses')}
+                      className={`btn-subtab ${financeManagementSubTab === 'expenses' ? 'active' : ''}`}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: financeManagementSubTab === 'expenses' ? 'var(--color-primary)' : 'var(--text-muted)',
+                        fontWeight: 700,
+                        fontSize: '0.9rem',
+                        cursor: 'pointer',
+                        borderBottom: financeManagementSubTab === 'expenses' ? '2px solid var(--color-primary)' : 'none',
+                        paddingBottom: '8px'
+                      }}
+                    >
+                      💸 Expenses
+                    </button>
+                    <button
+                      onClick={() => setFinanceManagementSubTab('promises')}
+                      className={`btn-subtab ${financeManagementSubTab === 'promises' ? 'active' : ''}`}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: financeManagementSubTab === 'promises' ? 'var(--color-primary)' : 'var(--text-muted)',
+                        fontWeight: 700,
+                        fontSize: '0.9rem',
+                        cursor: 'pointer',
+                        borderBottom: financeManagementSubTab === 'promises' ? '2px solid var(--color-primary)' : 'none',
+                        paddingBottom: '8px'
+                      }}
+                    >
+                      📅 Payment Promise Tracker
+                    </button>
+                  </>
+                )}
+                <button
+                  onClick={() => setFinanceManagementSubTab('recoveries')}
+                  className={`btn-subtab ${financeManagementSubTab === 'recoveries' ? 'active' : ''}`}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: financeManagementSubTab === 'recoveries' ? 'var(--color-primary)' : 'var(--text-muted)',
+                    fontWeight: 700,
+                    fontSize: '0.9rem',
+                    cursor: 'pointer',
+                    borderBottom: financeManagementSubTab === 'recoveries' ? '2px solid var(--color-primary)' : 'none',
+                    paddingBottom: '8px'
+                  }}
+                >
+                  ⏳ Previous Year Recovery Dues
+                </button>
+              </div>
+
+              {/* SCHOOL EXPENSES PANEL */}
+              {financeManagementSubTab === 'expenses' && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+                  
+                  {/* Add Expense Card */}
+                  <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px', height: 'fit-content' }}>
+                    <h4 style={{ fontSize: '1.05rem', fontWeight: 700, borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', color: 'var(--text-primary)' }}>
+                      Record Operational Expense
+                    </h4>
+                    
+                    <form onSubmit={handleAddExpense} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <label className="form-label" style={{ fontWeight: 600 }}>Description</label>
+                        <input 
+                          type="text"
+                          placeholder="e.g. Electricity Bill, Stationery"
+                          value={expenseDesc}
+                          onChange={(e) => setExpenseDesc(e.target.value)}
+                          className="erp-input"
+                          required
+                        />
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <label className="form-label" style={{ fontWeight: 600 }}>Amount (₹)</label>
+                        <input 
+                          type="number"
+                          placeholder="e.g. 2500"
+                          value={expenseAmount}
+                          onChange={(e) => setExpenseAmount(e.target.value)}
+                          className="erp-input"
+                          min="1"
+                          required
+                        />
+                      </div>
+
+                      <button type="submit" className="btn-primary" style={{ width: '100%', padding: '10px', height: '40px', fontSize: '0.95rem' }}>
+                        Add Expense
+                      </button>
+                    </form>
+                  </div>
+
+                  {/* Expenses History List Card */}
+                  <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <h4 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      Operational Expenses Log
+                      <span className="badge" style={{ background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
+                        {expenses.length} {expenses.length === 1 ? 'Record' : 'Records'}
+                      </span>
+                    </h4>
+
+                    {expenses.length === 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 0', color: 'var(--text-muted)', gap: '10px' }}>
+                        <span style={{ fontSize: '2rem' }}>💸</span>
+                        <p style={{ fontSize: '0.9rem', fontStyle: 'italic', margin: 0 }}>No expenses recorded yet.</p>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '450px', overflowY: 'auto', paddingRight: '4px' }}>
+                        {expenses.map((exp) => (
+                          <div key={exp.id} className="erp-card fade-in" style={{ padding: '14px', border: '1px solid var(--border-color)', background: 'rgba(255, 255, 255, 0.01)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                              <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>{exp.description}</strong>
+                              <span style={{ fontWeight: 700, color: '#ef4444', fontSize: '1.05rem' }}>{formatMoney(exp.amount)}</span>
+                            </div>
+                            
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed var(--border-color)', paddingTop: '8px', marginTop: '4px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                              <span>Created By: <strong>{exp.created_by}</strong></span>
+                              <span>
+                                {new Date(exp.expense_date).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })} @ {exp.expense_time ? exp.expense_time.substring(0, 5) : ''}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* ADDITIONAL FEE LEDGER PANEL */}
+              {financeManagementSubTab === 'fees' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                  
+                  {/* Top Section: Configure Additional Fee Type */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+                    
+                    {/* Add Fee Type Card */}
+                    <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: 1 }}>
+                      <h4 style={{ fontSize: '1.05rem', fontWeight: 700, borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', color: 'var(--text-primary)' }}>
+                        Configure Additional Fee Type
+                      </h4>
+                      <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '-10px 0 10px 0', lineHeight: '1.4' }}>
+                        Creating an additional fee type automatically assigns this fee charge to all active students in the school.
+                      </p>
+                      
+                      <form onSubmit={handleAddExtraFeeType} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <label className="form-label" style={{ fontWeight: 600 }}>Fee Name</label>
+                          <input 
+                            type="text"
+                            placeholder="e.g. Admission Fee, Examination Fee"
+                            value={newTypeName}
+                            onChange={(e) => setNewTypeName(e.target.value)}
+                            className="erp-input"
+                            required
+                          />
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <label className="form-label" style={{ fontWeight: 600 }}>Amount (₹)</label>
+                          <input 
+                            type="number"
+                            placeholder="e.g. 500"
+                            value={newTypeAmount}
+                            onChange={(e) => setNewTypeAmount(e.target.value)}
+                            className="erp-input"
+                            min="1"
+                            required
+                          />
+                        </div>
+
+                        <button type="submit" className="btn-primary" style={{ width: '100%', padding: '10px', height: '40px', fontSize: '0.95rem' }}>
+                          Create & Assign Fee
+                        </button>
+                      </form>
+                    </div>
+
+                    {/* Configured Fee Types List Card */}
+                    <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1 }}>
+                      <h4 style={{ fontSize: '1.05rem', fontWeight: 700, borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', color: 'var(--text-primary)' }}>
+                        Configured Fee Types
+                      </h4>
+                      {extraFeeTypes.length === 0 ? (
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontStyle: 'italic', margin: 0 }}>
+                          No additional fee types configured yet.
+                        </p>
+                      ) : (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', maxHeight: '220px', overflowY: 'auto', paddingRight: '4px' }}>
+                          {extraFeeTypes.map(t => (
+                            <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-color)', borderRadius: '20px', padding: '6px 14px', fontSize: '0.85rem' }}>
+                              <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{t.name}</span>
+                              <span style={{ color: 'var(--color-primary)', fontWeight: 700 }}>{formatMoney(t.amount)}</span>
+                              <button 
+                                type="button"
+                                onClick={() => {
+                                  setEditingExtraFeeType(t);
+                                  setEditExtraFeeTypeName(t.name);
+                                  setEditExtraFeeTypeAmount(t.amount);
+                                }}
+                                style={{ background: 'none', border: 'none', padding: '0', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}
+                                title="Edit Fee Type"
+                              >
+                                <Edit size={12} style={{ marginLeft: '4px', color: 'var(--text-secondary)' }} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                  </div>
+
+                  {/* Student Additional Fees Ledger Card (Full Width Below) */}
+                  <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
+                    <h4 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      Student Additional Fee Ledger
+                    </h4>
+                    
+                    {/* Filters Row */}
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: '180px' }}>
+                        <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Search Student</label>
+                        <div style={{ position: 'relative' }}>
+                          <input
+                            type="text"
+                            placeholder="Search student name..."
+                            value={extraFeeSearch}
+                            onChange={(e) => setExtraFeeSearch(e.target.value)}
+                            className="erp-input"
+                            style={{ height: '36px', fontSize: '0.85rem', paddingRight: extraFeeSearch ? '56px' : '28px' }}
+                          />
+                          <Search size={14} style={{ position: 'absolute', right: '10px', top: '11px', color: 'var(--text-muted)' }} />
+                          {extraFeeSearch && (
+                            <button
+                              type="button"
+                              onClick={() => setExtraFeeSearch('')}
+                              style={{
+                                position: 'absolute',
+                                right: '28px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                background: 'none',
+                                border: 'none',
+                                color: 'var(--text-muted)',
+                                cursor: 'pointer',
+                                padding: '4px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}
+                              title="Clear search"
+                            >
+                              <X size={12} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '140px' }}>
+                        <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Class</label>
+                        <select
+                          value={extraFeeClassFilter}
+                          onChange={(e) => setExtraFeeClassFilter(e.target.value)}
+                          className="erp-input"
+                          style={{ height: '36px', fontSize: '0.85rem' }}
+                        >
+                          <option value="All">All Classes</option>
+                          {classes.map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '160px' }}>
+                        <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Fee Type</label>
+                        <select
+                          value={extraFeeTypeFilter}
+                          onChange={(e) => setExtraFeeTypeFilter(e.target.value)}
+                          className="erp-input"
+                          style={{ height: '36px', fontSize: '0.85rem' }}
+                        >
+                          <option value="All">All Fee Types</option>
+                          {extraFeeTypes.map(t => (
+                            <option key={t.id} value={t.name}>{t.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '120px' }}>
+                        <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Status</label>
+                        <select
+                          value={extraFeeStatusFilter}
+                          onChange={(e) => setExtraFeeStatusFilter(e.target.value)}
+                          className="erp-input"
+                          style={{ height: '36px', fontSize: '0.85rem' }}
+                        >
+                          <option value="All">All Statuses</option>
+                          <option value="Pending">Pending</option>
+                          <option value="Paid">Paid</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="erp-table-container" style={{ maxHeight: '450px', overflowY: 'auto' }}>
+                      <table className="erp-table">
+                        <thead>
+                          <tr>
+                            <th>Student Name</th>
+                            <th>Roll Number</th>
+                            <th>Class</th>
+                            <th>Fee Type</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {studentExtraFees
+                            .filter(sef => {
+                              const matchesSearch = sef.student_name.toLowerCase().includes(extraFeeSearch.toLowerCase());
+                              const matchesClass = extraFeeClassFilter === 'All' || String(sef.class_id) === String(extraFeeClassFilter);
+                              const matchesType = extraFeeTypeFilter === 'All' || sef.fee_name === extraFeeTypeFilter;
+                              const matchesStatus = extraFeeStatusFilter === 'All' || sef.status === extraFeeStatusFilter;
+                              return matchesSearch && matchesClass && matchesType && matchesStatus;
+                            })
+                            .slice(0, visibleAdditionalFeeStudentsCount)
+                            .map((sef) => (
+                              <tr key={sef.id}>
+                                <td style={{ fontWeight: 'bold' }}>{sef.student_name}</td>
+                                <td>{sef.roll_number}</td>
+                                <td>
+                                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                                    {sef.class_name || 'N/A'}
+                                  </span>
+                                </td>
+                                <td>
+                                  <span className="badge badge-primary">{sef.fee_name}</span>
+                                </td>
+                                <td>{formatMoney(sef.amount)}</td>
+                                <td>
+                                  {(() => {
+                                    const isLocked = token.includes('mock') || !isConnected 
+                                      ? (sef.status === 'Paid' && isSandboxTransactionLocked(sef.paid_at)) 
+                                      : sef.locked;
+                                    return (
+                                      <span 
+                                        className={`badge ${sef.status === 'Paid' ? 'badge-success' : 'badge-warning'}`}
+                                        style={{ 
+                                          display: 'inline-flex', 
+                                          justifyContent: 'center', 
+                                          alignItems: 'center', 
+                                          minWidth: '76px', 
+                                          cursor: isLocked ? 'not-allowed' : 'pointer', 
+                                          height: '24px', 
+                                          boxSizing: 'border-box',
+                                          opacity: isLocked ? 0.65 : 1
+                                        }}
+                                        title={isLocked ? "This fee payment is finalized and locked" : (sef.status === 'Paid' ? "Click to revert to Pending" : "Click to mark as Paid")}
+                                        onClick={() => {
+                                          if (isLocked) {
+                                            showToast("This extra fee payment is part of a finalized Financial Report and cannot be reverted.", "error");
+                                            return;
+                                          }
+                                          if (sef.status === 'Paid') {
+                                            setUnpayExtraFeeConfirm({ id: sef.id, fee_name: sef.fee_name });
+                                          } else {
+                                            handleDepositExtraFee(sef.id);
+                                          }
+                                        }}
+                                      >
+                                        {sef.status}
+                                      </span>
+                                    );
+                                  })()}
+                                </td>
+                                <td>
+                                  {sef.status === 'Pending' ? (
+                                    <button
+                                      onClick={() => handleDepositExtraFee(sef.id)}
+                                      className="btn-outline"
+                                      style={{ padding: '2px 8px', fontSize: '0.75rem', height: '24px', borderRadius: '4px', color: '#10b981', borderColor: '#10b981' }}
+                                    >
+                                      Deposit Fee
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => {
+                                        const studentObj = {
+                                          id: sef.student_id,
+                                          name: sef.student_name,
+                                          roll_number: sef.roll_number,
+                                          sr_no: sef.sr_no || 'N/A',
+                                          class_id: sef.class_id
+                                        };
+                                        const recordObj = {
+                                          id: sef.id,
+                                          fee_name: sef.fee_name,
+                                          amount: sef.amount,
+                                          payment_date: sef.payment_date,
+                                          status: sef.status
+                                        };
+                                        handlePrintReceipt(studentObj, recordObj);
+                                      }}
+                                      className="btn-outline"
+                                      style={{ padding: '2px 8px', fontSize: '0.75rem', height: '24px', borderRadius: '4px', color: 'var(--color-primary)', borderColor: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                    >
+                                      <Printer size={12} /> Receipt
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          {studentExtraFees.length === 0 && (
+                            <tr>
+                              <td colSpan="7" style={{ fontStyle: 'italic', color: 'var(--text-muted)', textAlign: 'center' }}>No ledger entries. Configure an additional fee type first.</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Lazy Loading Spinner */}
+                    {isFetchingMoreAdditionalFeeStudents && (
+                      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '16px', gap: '8px' }}>
+                        <span 
+                          style={{ 
+                            border: '2px solid rgba(255,255,255,0.2)', 
+                            borderTop: '2px solid white', 
+                            borderRadius: '50%', 
+                            width: '16px', 
+                            height: '16px', 
+                            animation: 'spin 0.8s linear infinite' 
+                          }}
+                        ></span>
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Loading More Data...</span>
+                      </div>
+                    )}
+
+                  </div>
+                </div>
+              )}
+
+              {/* PAYMENT PROMISE TRACKER PANEL */}
+              {financeManagementSubTab === 'promises' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                  
+                  {/* Filter & Actions Row */}
+                  <div className="erp-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '16px' }}>
+                    <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', flex: 1, alignItems: 'flex-end' }}>
+                      
+                      {/* Student Name Search */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '240px', flex: 1, position: 'relative' }}>
+                        <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Search Student</label>
+                        <div style={{ position: 'relative' }}>
+                          <input
+                            type="text"
+                            placeholder="Search student name..."
+                            value={promiseSearch}
+                            onChange={(e) => setPromiseSearch(e.target.value)}
+                            className="erp-input"
+                            style={{ width: '100%', paddingLeft: '32px', height: '38px', fontSize: '0.85rem' }}
+                          />
+                          <Search size={14} style={{ position: 'absolute', left: '10px', top: '12px', color: 'var(--text-muted)' }} />
+                          {promiseSearch && (
+                            <button
+                              type="button"
+                              onClick={() => setPromiseSearch('')}
+                              style={{
+                                position: 'absolute',
+                                right: '10px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                background: 'none',
+                                border: 'none',
+                                color: 'var(--text-muted)',
+                                cursor: 'pointer',
+                                fontSize: '0.85rem'
+                              }}
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Class Filter */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '180px' }}>
+                        <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Class Filter</label>
+                        <select
+                          value={promiseClassFilter}
+                          onChange={(e) => setPromiseClassFilter(e.target.value)}
+                          className="erp-input"
+                          style={{ height: '38px', fontSize: '0.85rem' }}
+                        >
+                          <option value="All">All Classes</option>
+                          {classes.map(cls => (
+                            <option key={cls.id} value={cls.name}>{cls.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setEditingPromise(null);
+                        setPromiseStudentId('');
+                        setPromiseStudentSearchQuery('');
+                        setPromiseDate('');
+                        setPromiseDescription('');
+                        setPromiseStatus('Pending');
+                        setPromiseModalOpen(true);
+                      }}
+                      className="btn-primary"
+                      style={{ height: '38px', display: 'flex', alignItems: 'center', gap: '8px', padding: '0 16px' }}
+                    >
+                      <Plus size={16} /> Add Payment Promise
+                    </button>
+                  </div>
+
+                  {/* Promises Cards Grid */}
+                  {(() => {
+                    const getLocalDateString = () => {
+                      const d = new Date();
+                      const offset = d.getTimezoneOffset();
+                      const localDate = new Date(d.getTime() - (offset * 60 * 1000));
+                      return localDate.toISOString().split('T')[0];
+                    };
+                    const todayStr = getLocalDateString();
+                    const filteredPromises = paymentPromises.filter(p => {
+                      const nameMatch = p.student_name ? p.student_name.toLowerCase().includes(promiseSearch.toLowerCase()) : false;
+                      const matchesClass = promiseClassFilter === 'All' || p.class_name === promiseClassFilter || (p.class_id && getClassName(p.class_id) === promiseClassFilter);
+                      return nameMatch && matchesClass;
+                    });
+                    
+                    const sortedPromises = [...filteredPromises].sort((a, b) => {
+                      return String(a.promise_date).localeCompare(String(b.promise_date));
+                    });
+
+                    if (sortedPromises.length === 0) {
+                      return (
+                        <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 0', color: 'var(--text-muted)', gap: '10px' }}>
+                          <span style={{ fontSize: '2rem' }}>📅</span>
+                          <p style={{ fontSize: '0.9rem', fontStyle: 'italic', margin: 0 }}>No payment promises found.</p>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+                        {sortedPromises.map(p => {
+                          const isPending = p.status === 'Pending' || p.status === undefined;
+                          const isToday = isPending && p.promise_date === todayStr;
+                          const isExpired = isPending && p.promise_date < todayStr;
+                          
+                          // Style highlights for commitments
+                          let borderStyle = '1px solid var(--border-color)';
+                          let bgStyle = 'rgba(255, 255, 255, 0.01)';
+                          if (isToday) {
+                            borderStyle = '1px solid #eab308';
+                            bgStyle = 'rgba(234, 179, 8, 0.02)';
+                          } else if (isExpired) {
+                            borderStyle = '1px solid #ef4444';
+                            bgStyle = 'rgba(239, 68, 68, 0.02)';
+                          }
+
+                          const cardStyle = {
+                            position: 'relative',
+                            padding: '20px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '12px',
+                            transition: 'all 0.2s ease',
+                            border: borderStyle,
+                            background: bgStyle,
+                            height: '210px'
+                          };
+
+                          return (
+                            <div key={p.id} className="erp-card fade-in" style={cardStyle}>
+                              
+                              {/* Card Header */}
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                  <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)' }}>{p.student_name}</strong>
+                                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{p.class_name}</span>
+                                </div>
+                                
+                                {/* 3-Dot Action Menu */}
+                                <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+                                  <button
+                                    onClick={() => setActivePromiseMenuId(activePromiseMenuId === p.id ? null : p.id)}
+                                    className="menu-dot-trigger"
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      color: 'var(--text-muted)',
+                                      cursor: 'pointer',
+                                      padding: '4px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      borderRadius: '4px'
+                                    }}
+                                  >
+                                    <MoreVertical size={16} />
+                                  </button>
+                                  {activePromiseMenuId === p.id && (
+                                    <div className="menu-dropdown" style={{ right: 0, top: '24px', zIndex: 10 }}>
+                                      <button
+                                        onClick={() => {
+                                          setEditingPromise(p);
+                                          setPromiseStudentId(p.student_id);
+                                          setPromiseStudentSearchQuery(p.roll_number ? `${p.student_name} (${p.roll_number})` : p.student_name);
+                                          setPromiseDate(p.promise_date);
+                                          setPromiseDescription(p.description);
+                                          setPromiseStatus(p.status || 'Pending');
+                                          setPromiseModalOpen(true);
+                                          setActivePromiseMenuId(null);
+                                        }}
+                                        className="menu-dropdown-item"
+                                      >
+                                        Edit
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          setSimpleConfirm({
+                                            title: 'Delete Payment Promise',
+                                            message: 'Are you sure you want to delete this payment promise? This action cannot be undone.',
+                                            confirmText: 'Delete',
+                                            onConfirm: () => handleDeletePaymentPromise(p.id)
+                                          });
+                                          setActivePromiseMenuId(null);
+                                        }}
+                                        className="menu-dropdown-item"
+                                        style={{ color: '#ef4444' }}
+                                      >
+                                        Delete
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Card Body / Description */}
+                              <p style={{
+                                fontSize: '0.85rem',
+                                color: 'var(--text-muted)',
+                                margin: 0,
+                                lineHeight: '1.4',
+                                wordBreak: 'break-word',
+                                display: '-webkit-box',
+                                WebkitLineClamp: 3,
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                flex: 1
+                              }}>
+                                {p.description || null}
+                              </p>
+
+                              {/* Card Footer / Date and Status */}
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '10px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Due:</span>
+                                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: isExpired ? '#ef4444' : (isToday ? '#eab308' : 'var(--text-secondary)') }}>
+                                    {p.promise_date}
+                                  </span>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  {isExpired && (
+                                    <span style={{
+                                      fontSize: '0.75rem',
+                                      fontWeight: 600,
+                                      padding: '2px 8px',
+                                      borderRadius: '12px',
+                                      background: 'rgba(239, 68, 68, 0.1)',
+                                      color: '#ef4444',
+                                      border: '1px solid rgba(239, 68, 68, 0.2)',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
+                                    }}>
+                                      ⚠️ Overdue
+                                    </span>
+                                  )}
+                                  {isToday && (
+                                    <span style={{
+                                      fontSize: '0.75rem',
+                                      fontWeight: 600,
+                                      padding: '2px 8px',
+                                      borderRadius: '12px',
+                                      background: 'rgba(234, 179, 8, 0.1)',
+                                      color: '#facc15',
+                                      border: '1px solid rgba(234, 179, 8, 0.2)',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
+                                    }}>
+                                      ⚠️ Due Today
+                                    </span>
+                                  )}
+                                  <span style={{
+                                    fontSize: '0.75rem',
+                                    fontWeight: 700,
+                                    padding: '2px 8px',
+                                    borderRadius: '12px',
+                                    background: p.status === 'Fulfilled' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                                    color: p.status === 'Fulfilled' ? '#4ade80' : '#f59e0b',
+                                    border: p.status === 'Fulfilled' ? '1px solid rgba(34, 197, 94, 0.2)' : '1px solid rgba(245, 158, 11, 0.2)'
+                                  }}>
+                                    {p.status || 'Pending'}
+                                  </span>
+                                </div>
+                              </div>
+
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* PREVIOUS YEAR RECOVERY HISTORY PANEL */}
+              {financeManagementSubTab === 'recoveries' && (
+                <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                  {/* Summary Cards */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px' }}>
+                    <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Total Dues Recovered</span>
+                      <strong style={{ fontSize: '1.8rem', color: '#10b981' }}>
+                        {formatMoney(previousYearRecoveries.reduce((sum, r) => sum + parseFloat(r.amount_recovered), 0))}
+                      </strong>
+                    </div>
+                    <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Total Recovery Dues</span>
+                      <strong style={{ fontSize: '1.8rem', color: '#f59e0b' }}>
+                        {formatMoney(previousDues.reduce((sum, d) => sum + (d.status !== 'Paid' ? (parseFloat(d.amount) - parseFloat(d.paid_amount)) : 0), 0))}
+                      </strong>
+                    </div>
+                  </div>
+
+                  {/* Filters Row */}
+                  <div className="erp-card" style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: '240px' }}>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Search Student</label>
+                      <input 
+                        type="text" 
+                        placeholder="Search student name..."
+                        className="erp-input"
+                        onChange={(e) => setRecoverySearchQuery(e.target.value)}
+                        value={recoverySearchQuery}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '180px' }}>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Original Year</label>
+                      <select 
+                        className="erp-input"
+                        value={recoveryYearFilter}
+                        onChange={(e) => setRecoveryYearFilter(e.target.value)}
+                      >
+                        <option value="All">All Years</option>
+                        {Array.from(new Set(previousDues.map(d => d.original_academic_year))).filter(Boolean).map(y => (
+                          <option key={y} value={y}>{y}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Logs Table */}
+                  <div className="erp-card" style={{ padding: 0 }}>
+                    <div style={{ overflowX: 'auto' }}>
+                      <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>
+                            <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 700 }}>Student Name</th>
+                            <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 700 }}>Last Year Class</th>
+                            <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 700 }}>Original Academic Year</th>
+                            <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 700 }}>Due Amount</th>
+                            <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 700 }}>Recovery Date</th>
+                            <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 700 }}>Status</th>
+                            <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 700, textAlign: 'right' }}>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(() => {
+                            const filtered = previousDues.filter(due => {
+                              const nameMatch = due.student_name ? due.student_name.toLowerCase().includes(recoverySearchQuery.toLowerCase()) : false;
+                              const yearMatch = recoveryYearFilter === 'All' || due.original_academic_year === recoveryYearFilter;
+                              return nameMatch && yearMatch;
+                            });
+
+                            if (filtered.length === 0) {
+                              return (
+                                <tr>
+                                  <td colSpan="7" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic' }}>
+                                    No previous year dues records found.
+                                  </td>
+                                </tr>
+                              );
+                            }
+
+                            return filtered.map(due => {
+                              const outstanding = parseFloat(due.amount) - parseFloat(due.paid_amount);
+                              const isPaid = due.status === 'Paid' || outstanding <= 0.01;
+                              const displayStatus = isPaid ? 'PAID' : 'PENDING';
+                              
+                              const dueRecoveries = previousYearRecoveries.filter(r => parseInt(r.carry_forward_due_id) === parseInt(due.id));
+                              const lastRecovery = dueRecoveries[0];
+                              const recoveryDateText = lastRecovery ? formatDate(lastRecovery.recovery_date) : 'N/A';
+
+                              return (
+                                <tr key={due.id} style={{ borderBottom: '1px solid var(--border-color)', fontSize: '0.85rem' }}>
+                                  <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: 600 }}>{due.student_name}</td>
+                                  <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>{due.class_name}</td>
+                                  <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>{due.original_academic_year}</td>
+                                  <td style={{ padding: '12px 16px', color: isPaid ? 'var(--text-muted)' : '#f59e0b', fontWeight: 700 }}>
+                                    {formatMoney(outstanding)}
+                                    {due.paid_amount > 0 && !isPaid && (
+                                      <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>
+                                        Paid: {formatMoney(due.paid_amount)} of {formatMoney(due.amount)}
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>{recoveryDateText}</td>
+                                  <td style={{ padding: '12px 16px' }}>
+                                    <span className={`badge ${isPaid ? 'badge-success' : 'badge-warning'}`} style={{ textTransform: 'uppercase', fontSize: '0.75rem', fontWeight: 'bold' }}>
+                                      {displayStatus}
+                                    </span>
+                                  </td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                                    <div style={{ display: 'inline-flex', gap: '8px', alignItems: 'center' }}>
+                                      {!isPaid && isCurrentYearActive() && (
+                                        <button
+                                          onClick={() => {
+                                            setSelectedCarryForwardDue(due);
+                                            setRecoveryAmount(String(outstanding));
+                                            setRecoveryDate(new Date().toISOString().split('T')[0]);
+                                            setShowPayRecoveryModal(true);
+                                          }}
+                                          className="btn-primary"
+                                          style={{ padding: '4px 10px', fontSize: '0.75rem', borderRadius: '4px' }}
+                                        >
+                                          Collect Payment
+                                        </button>
+                                      )}
+                                      {isPaid && dueRecoveries.length > 0 && (
+                                        <>
+                                          <button
+                                            onClick={() => handlePrintRecoveryReceipt(due, lastRecovery)}
+                                            className="btn-outline"
+                                            style={{ padding: '4px 10px', fontSize: '0.75rem', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                          >
+                                            <Printer size={12} /> Receipt
+                                          </button>
+                                          {(() => {
+                                            const isLocked = token.includes('mock') || !isConnected 
+                                              ? (lastRecovery && isSandboxTransactionLocked(lastRecovery.paid_at)) 
+                                              : (lastRecovery && lastRecovery.is_locked);
+                                            if (isLocked) {
+                                              return (
+                                                <button
+                                                  onClick={() => {
+                                                    showToast("This recovery payment has already been included in a generated financial report and can no longer be reverted.", "error");
+                                                  }}
+                                                  className="btn-outline"
+                                                  style={{
+                                                    padding: '4px 10px',
+                                                    fontSize: '0.75rem',
+                                                    borderRadius: '4px',
+                                                    color: 'var(--text-muted)',
+                                                    cursor: 'not-allowed',
+                                                    opacity: 0.5,
+                                                    background: 'rgba(255, 255, 255, 0.02)',
+                                                    border: '1px solid var(--border-color)',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '4px'
+                                                  }}
+                                                  title="This recovery payment has already been included in a generated financial report and can no longer be reverted."
+                                                >
+                                                  Revert
+                                                </button>
+                                              );
+                                            } else if (isCurrentYearActive()) {
+                                              return (
+                                                <button
+                                                  onClick={() => {
+                                                    setSimpleConfirm({
+                                                      title: 'Revert Recovery Payment',
+                                                      message: `Are you sure you want to revert recovery payment of ${formatMoney(lastRecovery.amount_recovered)} for ${due.student_name}? This will restore the student's carry forward dues balance.`,
+                                                      confirmText: 'Revert Payment',
+                                                      onConfirm: () => handleRevertRecovery(due.student_id, lastRecovery.id)
+                                                    });
+                                                  }}
+                                                  className="btn-outline"
+                                                  style={{
+                                                    padding: '4px 10px',
+                                                    fontSize: '0.75rem',
+                                                    borderRadius: '4px',
+                                                    color: '#ef4444',
+                                                    borderColor: 'rgba(239, 68, 68, 0.3)',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '4px'
+                                                  }}
+                                                  title="Revert payment"
+                                                >
+                                                  Revert
+                                                </button>
+                                              );
+                                            }
+                                            return null;
+                                          })()}
+                                        </>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            });
+                          })()}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -7930,9 +19577,8 @@ export default function App() {
                     className="btn-outline"
                     style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px', opacity: isCurrentYearActive() ? 1 : 0.5, cursor: isCurrentYearActive() ? 'pointer' : 'not-allowed' }}
                   >
-                    <Sliders size={16} /> Manage Subjects
+                    <Sliders size={16} /> Add Subjects
                   </button>
- 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <button 
                       id="btn-trigger-reminders"
@@ -7946,40 +19592,7 @@ export default function App() {
                     >
                       <span>📲 Send Tomorrow's Reminders</span>
                     </button>
-                    <span className="badge" style={{ fontSize: '0.65rem', background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.3)', whiteSpace: 'nowrap' }}>
-                      WhatsApp Integration Pending
-                    </span>
                   </div>
-                  
-                  <button 
-                    id="btn-copy-last-week"
-                    onClick={handleCopyLastWeekSchedule}
-                    disabled={isSavingSchedule || !plannerClassId || !isCurrentYearActive()}
-                    className="btn-outline"
-                    style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px', color: isCurrentYearActive() ? '#10b981' : 'var(--text-muted)', borderColor: isCurrentYearActive() ? '#10b981' : 'var(--border-color)' }}
-                  >
-                    <Copy size={16} /> Copy Last Week
-                  </button>
-                  
-                  <button 
-                    id="btn-save-draft"
-                    onClick={() => handleSaveFullSchedule('Draft')}
-                    disabled={isSavingSchedule || !plannerClassId || !isCurrentYearActive()}
-                    className="btn-primary"
-                    style={{ padding: '8px 16px' }}
-                  >
-                    {isSavingSchedule ? "Saving..." : "Save Draft"}
-                  </button>
- 
-                  <button 
-                    id="btn-publish-schedule"
-                    onClick={() => handleSaveFullSchedule('Published')}
-                    disabled={isSavingSchedule || !plannerClassId || !isCurrentYearActive()}
-                    className="btn-primary"
-                    style={{ padding: '8px 16px' }}
-                  >
-                    {isSavingSchedule ? "Publishing..." : "Publish"}
-                  </button>
                 </div>
               </div>
 
@@ -8003,7 +19616,7 @@ export default function App() {
                         <option value="">No Classes Available</option>
                       ) : (
                         classes.map(c => (
-                          <option key={c.id} value={c.id}>{c.name} {c.room ? `(${c.room})` : ''}</option>
+                          <option key={c.id} value={c.id}>{c.name}</option>
                         ))
                       )}
                     </select>
@@ -8071,20 +19684,37 @@ export default function App() {
                   <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginRight: '8px' }}>Schedule Status:</span>
                   {(() => {
                     const activeScheduleStatus = (() => {
-                      if (schedules.length === 0) return 'Draft';
-                      const statuses = schedules.map(s => s.status);
-                      const hasDraft = statuses.includes('Draft');
-                      const hasPublished = statuses.includes('Published');
-                      if (hasDraft && hasPublished) return 'Mixed';
-                      if (hasPublished) return 'Published';
-                      return 'Draft';
+                      const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                      const statuses = daysOfWeek.map(day => {
+                        const daySubjects = scheduleForm[day] || [];
+                        const daySchedule = schedules.find(s => s.day_of_week.toLowerCase() === day.toLowerCase());
+                        const isModified = (() => {
+                          if (!daySchedule) return false;
+                          const saved = Array.isArray(daySchedule.subjects) ? daySchedule.subjects : [];
+                          if (daySubjects.length !== saved.length) return true;
+                          for (let i = 0; i < daySubjects.length; i++) {
+                            const p1 = daySubjects[i];
+                            const p2 = saved[i];
+                            const p1Sub = typeof p1 === 'object' ? p1.subject : p1;
+                            const p2Sub = typeof p2 === 'object' ? p2.subject : p2;
+                            const p1Teach = typeof p1 === 'object' ? p1.teacher_id : null;
+                            const p2Teach = typeof p2 === 'object' ? p2.teacher_id : null;
+                            if (p1Sub !== p2Sub || parseInt(p1Teach) !== parseInt(p2Teach)) return true;
+                          }
+                          return false;
+                        })();
+                        return (daySchedule && !isModified && daySubjects.length > 0) ? daySchedule.status : 'Draft';
+                      });
+
+                      if (statuses.includes('Draft')) {
+                        return 'Draft';
+                      }
+                      return 'Published';
                     })();
                     return (
                       <span className={`badge ${
                         activeScheduleStatus === 'Published' ? 'badge-success' : 'badge-warning'
-                      }`} style={
-                        activeScheduleStatus === 'Mixed' ? { backgroundColor: 'rgba(245, 158, 11, 0.1)', color: '#fbbf24' } : {}
-                      }>
+                      }`}>
                         {activeScheduleStatus}
                       </span>
                     );
@@ -8172,8 +19802,9 @@ export default function App() {
                       style={{ 
                         display: 'flex', 
                         flexDirection: 'column', 
-                        gap: '16px', 
-                        minHeight: '340px',
+                        gap: '12px', 
+                        height: '450px',
+                        padding: '16px',
                         opacity: isPast ? 0.6 : (draggingDay === day ? 0.4 : 1),
                         border: dragOverDay === day 
                           ? '2px dashed #10b981' 
@@ -8185,7 +19816,9 @@ export default function App() {
                           ? 'rgba(16, 185, 129, 0.08)' 
                           : (isToday ? 'rgba(59, 130, 246, 0.03)' : 'var(--bg-surface)'),
                         transition: 'all 0.3s ease',
-                        cursor: isPast ? 'default' : 'grab'
+                        cursor: isPast ? 'default' : 'grab',
+                        position: 'relative',
+                        zIndex: activeDropdownKey && activeDropdownKey.startsWith(`${day}-`) ? 15 : 1
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>
@@ -8221,7 +19854,15 @@ export default function App() {
                       </div>
 
                       {/* Subject List for this day */}
-                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', maxHeight: '220px' }}>
+                      <div style={{ 
+                        flex: 1, 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        gap: '6px', 
+                        overflowY: 'auto', 
+                        maxHeight: '100%',
+                        minHeight: 0
+                      }}>
                         {daySubjects.length === 0 ? (
                           <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', padding: '20px' }}>
                             No periods scheduled.
@@ -8292,7 +19933,7 @@ export default function App() {
                                   display: 'flex', 
                                   justifyContent: 'space-between', 
                                   alignItems: 'center', 
-                                  padding: '8px 12px', 
+                                  padding: '6px 12px', 
                                   background: 'rgba(255, 255, 255, 0.02)', 
                                   border: '1px solid var(--border-color)', 
                                   borderRadius: 'var(--radius-sm)',
@@ -8318,37 +19959,155 @@ export default function App() {
                                       </span>
                                     )}
                                   </div>
-                                  {teacherName && (
-                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Taught by: {teacherName}</span>
-                                  )}
+                                  {(() => {
+                                    const backupTeacherName = typeof item === 'object' ? item.backup_teacher_name : '';
+                                    const activeTeacherName = backupTeacherName || teacherName;
+                                    return activeTeacherName && (
+                                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                        {activeTeacherName}
+                                        {backupTeacherName && (
+                                          <span style={{ color: '#fbbf24', marginLeft: '4px', fontWeight: 600 }}>
+                                            (Backup) [Main: {teacherName}]
+                                          </span>
+                                        )}
+                                        {" | "}{getPeriodTimingString(index + 1)}
+                                      </span>
+                                    );
+                                  })()}
                                 </div>
                                 {!isPast && isCurrentYearActive() && (
-                                  <button
-                                    onClick={() => {
-                                      const updated = scheduleForm[day].filter((_, i) => i !== index);
-                                      setScheduleForm(prev => ({
-                                        ...prev,
-                                        [day]: updated
-                                      }));
-                                      autoSaveDaySchedule(day, updated, 'Draft');
-                                    }}
-                                    style={{ 
-                                      background: 'none', 
-                                      border: 'none', 
-                                      color: '#ef4444', 
-                                      cursor: 'pointer',
-                                      padding: '4px',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      borderRadius: '4px',
-                                      transition: 'background-color 0.2s'
-                                    }}
-                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'}
-                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                                    title="Remove period"
-                                  >
-                                    <X size={14} />
-                                  </button>
+                                  <div style={{ position: 'relative' }}>
+                                    <button
+                                      type="button"
+                                      className="period-menu-trigger"
+                                      onClick={() => setActiveDropdownKey(activeDropdownKey === `${day}-${index}` ? null : `${day}-${index}`)}
+                                      style={{ 
+                                        background: 'none', 
+                                        border: 'none', 
+                                        color: 'var(--text-secondary)', 
+                                        cursor: 'pointer',
+                                        padding: '4px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        borderRadius: '4px',
+                                        transition: 'background-color 0.2s'
+                                      }}
+                                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'}
+                                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                      title="Period options"
+                                    >
+                                      <MoreVertical size={14} />
+                                    </button>
+
+                                    {activeDropdownKey === `${day}-${index}` && (
+                                      <div 
+                                        className="period-menu-dropdown"
+                                        style={{
+                                          position: 'absolute',
+                                          right: 0,
+                                          top: '24px',
+                                          background: '#1a1f2c',
+                                          border: '1px solid var(--border-color)',
+                                          borderRadius: '4px',
+                                          boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                                          zIndex: 10,
+                                          minWidth: '130px',
+                                          display: 'flex',
+                                          flexDirection: 'column',
+                                          padding: '4px 0'
+                                        }}
+                                      >
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                              setSelectedModalTeacherId(item.teacher_id || '');
+                                              setTeacherActionModal({
+                                                show: true,
+                                                type: 'Replace',
+                                                day: day,
+                                                periodIndex: index,
+                                                subject: subjectName,
+                                                currentTeacherId: item.teacher_id
+                                              });
+                                              setActiveDropdownKey(null);
+                                            }}
+                                            style={{
+                                              background: 'none',
+                                              border: 'none',
+                                              color: 'var(--text-primary)',
+                                              padding: '8px 12px',
+                                              textAlign: 'left',
+                                              fontSize: '0.8rem',
+                                              cursor: 'pointer',
+                                              width: '100%',
+                                              display: 'block'
+                                            }}
+                                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                                            onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                                          >
+                                            🔄 Replace
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setSelectedModalTeacherId(item.backup_teacher_id || '');
+                                              setTeacherActionModal({
+                                                show: true,
+                                                type: 'Backup',
+                                                day: day,
+                                                periodIndex: index,
+                                                subject: subjectName,
+                                                currentTeacherId: item.teacher_id
+                                              });
+                                              setActiveDropdownKey(null);
+                                            }}
+                                            style={{
+                                              background: 'none',
+                                              border: 'none',
+                                              color: 'var(--text-primary)',
+                                              padding: '8px 12px',
+                                              textAlign: 'left',
+                                              fontSize: '0.8rem',
+                                              cursor: 'pointer',
+                                              width: '100%',
+                                              display: 'block'
+                                            }}
+                                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                                            onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                                          >
+                                            🛡️ Backup
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={async () => {
+                                              const updated = scheduleForm[day].filter((_, i) => i !== index);
+                                              setScheduleForm(prev => ({
+                                                ...prev,
+                                                [day]: updated
+                                              }));
+                                              await autoSaveDaySchedule(day, updated, 'Draft', true, 'remove', index);
+                                              showToast(`Period removed and propagated to future weeks!`, 'success');
+                                              setActiveDropdownKey(null);
+                                            }}
+                                            style={{
+                                              background: 'none',
+                                              border: 'none',
+                                              color: '#ef4444',
+                                              padding: '8px 12px',
+                                              textAlign: 'left',
+                                              fontSize: '0.8rem',
+                                              cursor: 'pointer',
+                                              width: '100%',
+                                              display: 'block'
+                                            }}
+                                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'}
+                                            onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                                          >
+                                            ❌ Remove
+                                          </button>
+                                        </div>
+                                    )}
+                                  </div>
                                 )}
                               </div>
                             );
@@ -8385,7 +20144,10 @@ export default function App() {
                               }}
                             >
                               <option value="">Select Teacher</option>
-                              {teachers.map(t => (
+                              {teachers.filter(t => {
+                                const assignedCount = getTeacherAssignedCountOnDate(t.id, cardDateStr);
+                                return assignedCount < totalPeriodsPerDay;
+                              }).map(t => (
                                 <option key={t.id} value={t.id}>{t.name}</option>
                               ))}
                             </select>
@@ -8414,7 +20176,7 @@ export default function App() {
                               }));
                               setSelectedDaySubject(prev => ({ ...prev, [day]: '' }));
                               setSelectedDayTeacher(prev => ({ ...prev, [day]: '' }));
-                              autoSaveDaySchedule(day, updated, 'Draft');
+                              autoSaveDaySchedule(day, updated, 'Draft', true, 'add');
                             }}
                           >
                             <Plus size={14} /> Add Period
@@ -8462,6 +20224,9 @@ export default function App() {
 
           {/* TAB 8: Admin Profile */}
           {activeTab === 'profile' && renderAdminProfileTab()}
+
+          {/* TAB 9: Student Performance */}
+          {activeTab === 'performance' && renderStudentPerformanceTab()}
             </>
           )}
         </div>
@@ -8480,11 +20245,29 @@ export default function App() {
               
               {/* Photo Upload Area */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '12px', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-md)', background: 'rgba(255,255,255,0.01)' }}>
-                <img 
-                  src={tForm.profile_image || "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150"} 
-                  alt="Preview" 
-                  style={{ width: '64px', height: '64px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--color-primary)' }}
-                />
+                {tForm.profile_image ? (
+                  <img 
+                    src={tForm.profile_image} 
+                    alt="Preview" 
+                    style={{ width: '64px', height: '64px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--color-primary)' }}
+                  />
+                ) : (
+                  <div 
+                    style={{ 
+                      width: '64px', 
+                      height: '64px', 
+                      borderRadius: '50%', 
+                      background: 'rgba(255,255,255,0.05)', 
+                      border: '2px dashed var(--border-color)', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      color: 'var(--text-secondary)'
+                    }}
+                  >
+                    <User size={24} />
+                  </div>
+                )}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Profile Photo</label>
                   <div style={{ display: 'flex', gap: '8px' }}>
@@ -8753,6 +20536,327 @@ export default function App() {
         </div>
       )}
 
+      {/* --- CREATE EXAM MODAL --- */}
+      {showCreateExamModal && (
+        <div className="modal-overlay" onClick={() => setShowCreateExamModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ fontSize: '1.25rem' }}>Create New Examination Scheme</h3>
+              <button onClick={() => setShowCreateExamModal(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}><X size={20} /></button>
+            </div>
+            
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                saveExam(newExamForm);
+                setShowCreateExamModal(false);
+              }} 
+              style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}
+            >
+              <div>
+                <label className="form-label">Exam Scheme Name *</label>
+                <input
+                  type="text"
+                  className="erp-input"
+                  placeholder="e.g. First Term Examination"
+                  value={newExamForm.name}
+                  onChange={(e) => setNewExamForm({ ...newExamForm, name: e.target.value })}
+                  required
+                />
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label className="form-label">Target Class *</label>
+                  <select
+                    className="erp-input"
+                    value={newExamForm.class_id}
+                    onChange={(e) => {
+                      const cid = e.target.value;
+                      setNewExamForm({ ...newExamForm, class_id: cid });
+                    }}
+                    required
+                  >
+                    <option value="">-- Choose Class --</option>
+                    {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label">Section (Optional)</label>
+                  <input
+                    type="text"
+                    className="erp-input"
+                    placeholder="e.g. A"
+                    value={newExamForm.group_name}
+                    onChange={(e) => setNewExamForm({ ...newExamForm, group_name: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label className="form-label">Start Date *</label>
+                  <input
+                    type="date"
+                    className="erp-input"
+                    value={newExamForm.start_date}
+                    onChange={(e) => setNewExamForm({ ...newExamForm, start_date: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="form-label">End Date *</label>
+                  <input
+                    type="date"
+                    className="erp-input"
+                    value={newExamForm.end_date}
+                    onChange={(e) => setNewExamForm({ ...newExamForm, end_date: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Subjects mapped */}
+              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '14px', marginTop: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <h4 style={{ fontSize: '0.9rem', fontWeight: 600 }}>Examinable Subjects Matrix</h4>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewExamForm({
+                        ...newExamForm,
+                        subjects: [...newExamForm.subjects, { subject_name: '', max_marks: 100 }]
+                      });
+                    }}
+                    className="btn-outline"
+                    style={{ padding: '4px 10px', fontSize: '0.75rem', borderRadius: '4px' }}
+                  >
+                    + Add Subject
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '180px', overflowY: 'auto', paddingRight: '4px' }}>
+                  {newExamForm.subjects.map((sub, idx) => (
+                    <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr auto', gap: '8px', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        className="erp-input"
+                        placeholder="Subject Name (e.g. Science)"
+                        value={sub.subject_name}
+                        onChange={(e) => {
+                          const updated = [...newExamForm.subjects];
+                          updated[idx].subject_name = e.target.value;
+                          setNewExamForm({ ...newExamForm, subjects: updated });
+                        }}
+                        required
+                      />
+                      <input
+                        type="number"
+                        className="erp-input"
+                        placeholder="Max Marks"
+                        min="1"
+                        value={sub.max_marks}
+                        onChange={(e) => {
+                          const updated = [...newExamForm.subjects];
+                          updated[idx].max_marks = parseInt(e.target.value) || 100;
+                          setNewExamForm({ ...newExamForm, subjects: updated });
+                        }}
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updated = newExamForm.subjects.filter((_, sIdx) => sIdx !== idx);
+                          setNewExamForm({ ...newExamForm, subjects: updated });
+                        }}
+                        style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer' }}
+                        disabled={newExamForm.subjects.length <= 1}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <button type="submit" className="btn-primary" style={{ marginTop: '10px', justifyContent: 'center' }}>
+                Save Exam Scheme
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- SIGNATURES & GRADING SCALE SETTINGS MODAL --- */}
+      {showSignatureSettings && (
+        <div className="modal-overlay" onClick={() => setShowSignatureSettings(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ fontSize: '1.25rem' }}>School Report Settings Panel</h3>
+              <button onClick={() => setShowSignatureSettings(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}><X size={20} /></button>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              
+              {/* Signatures uploads */}
+              <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '12px' }}>A4 Official Signatures</h4>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                  {['teacher_signature', 'class_teacher_signature', 'principal_signature'].map((type) => {
+                    const label = type === 'teacher_signature' ? 'Class Teacher' : type === 'class_teacher_signature' ? 'Academic Head' : 'Principal';
+                    const signatureImg = schoolSignatures[type];
+                    
+                    return (
+                      <div key={type} style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center', textAlign: 'center', border: '1px solid var(--border-color)', padding: '10px', borderRadius: '6px', background: 'rgba(255,255,255,0.01)' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>{label}</span>
+                        <div style={{ width: '100%', height: '50px', background: 'rgba(255,255,255,0.03)', border: '1px dashed var(--border-color)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                          {signatureImg ? (
+                            <img src={signatureImg} alt={label} style={{ maxHeight: '100%', objectFit: 'contain' }} />
+                          ) : (
+                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>None uploaded</span>
+                          )}
+                        </div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          id={`upload-${type}`}
+                          onChange={(e) => {
+                            const file = e.target.files[0];
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              const updatedSigs = { ...schoolSignatures, [type]: reader.result };
+                              setSchoolSignatures(updatedSigs);
+                              saveSchoolSignatures(updatedSigs);
+                            };
+                            if (file) reader.readAsDataURL(file);
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => document.getElementById(`upload-${type}`).click()}
+                          className="btn-outline"
+                          style={{ padding: '2px 8px', fontSize: '0.65rem', borderRadius: '4px' }}
+                        >
+                          Upload
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Grading Scales */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <h4 style={{ fontSize: '0.95rem', fontWeight: 700 }}>Grading Metrics Matrix</h4>
+                  <button
+                    onClick={() => {
+                      const defaults = [
+                        { grade_name: 'A+', min_percentage: 90.00, max_percentage: 100.00 },
+                        { grade_name: 'A',  min_percentage: 80.00, max_percentage: 89.99 },
+                        { grade_name: 'B',  min_percentage: 70.00, max_percentage: 79.99 },
+                        { grade_name: 'C',  min_percentage: 60.00, max_percentage: 69.99 },
+                        { grade_name: 'D',  min_percentage: 40.00, max_percentage: 59.99 },
+                        { grade_name: 'F',  min_percentage: 0.00,  max_percentage: 39.99 }
+                      ];
+                      setGradingScales(defaults);
+                      saveGradingScales(defaults);
+                    }}
+                    className="btn-outline"
+                    style={{ padding: '4px 10px', fontSize: '0.75rem', borderRadius: '4px' }}
+                  >
+                    Reset Defaults
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto' }}>
+                  {gradingScales.map((scale, idx) => (
+                    <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1.5fr 2fr 2fr auto', gap: '8px', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        className="erp-input"
+                        value={scale.grade_name}
+                        onChange={(e) => {
+                          const updated = [...gradingScales];
+                          updated[idx].grade_name = e.target.value;
+                          setGradingScales(updated);
+                        }}
+                        style={{ padding: '6px' }}
+                      />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Min%:</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="erp-input"
+                          value={scale.min_percentage}
+                          onChange={(e) => {
+                            const updated = [...gradingScales];
+                            updated[idx].min_percentage = parseFloat(e.target.value) || 0;
+                            setGradingScales(updated);
+                          }}
+                          style={{ padding: '6px' }}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Max%:</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="erp-input"
+                          value={scale.max_percentage}
+                          onChange={(e) => {
+                            const updated = [...gradingScales];
+                            updated[idx].max_percentage = parseFloat(e.target.value) || 0;
+                            setGradingScales(updated);
+                          }}
+                          style={{ padding: '6px' }}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updated = gradingScales.filter((_, sIdx) => sIdx !== idx);
+                          setGradingScales(updated);
+                        }}
+                        style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer' }}
+                        disabled={gradingScales.length <= 1}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ))}
+                  
+                  <button
+                    onClick={() => {
+                      setGradingScales([...gradingScales, { grade_name: 'New Grade', min_percentage: 0.00, max_percentage: 0.00 }]);
+                    }}
+                    className="btn-outline"
+                    style={{ padding: '6px', fontSize: '0.8rem', width: '100%', borderStyle: 'dashed' }}
+                  >
+                    + Add Grade Bracket
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => {
+                    saveGradingScales(gradingScales);
+                    setShowSignatureSettings(false);
+                  }}
+                  className="btn-primary"
+                  style={{ width: '100%', marginTop: '20px', justifyContent: 'center' }}
+                >
+                  Save settings and scales
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* --- ADD / EDIT STUDENT MODAL --- */}
       {showAddStudentModal && (
         <div className="modal-overlay" onClick={() => { setShowAddStudentModal(false); setEditingStudent(null); }}>
@@ -8881,8 +20985,8 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 3. Admission Date & Date of Birth */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              {/* 3. Admission Date, Date of Birth & Exit Date */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
                 <div>
                   <label htmlFor="s-admission-date" className="form-label">Admission Date</label>
                   <input 
@@ -8912,6 +21016,18 @@ export default function App() {
                     required 
                   />
                   {sErrors.date_of_birth && <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px' }}>{sErrors.date_of_birth}</div>}
+                </div>
+                <div>
+                  <label htmlFor="s-exit-date" className="form-label">Exit Date (Optional)</label>
+                  <input 
+                    id="s-exit-date" 
+                    type="date" 
+                    className="erp-input" 
+                    value={sForm.exit_date || ''} 
+                    onChange={(e) => {
+                      setSForm({...sForm, exit_date: e.target.value});
+                    }} 
+                  />
                 </div>
               </div>
 
@@ -9392,6 +21508,134 @@ export default function App() {
         </div>
       )}
 
+      {/* --- FEE CONFIG REQUIRED MODAL --- */}
+      {showFeeConfigRequiredModal && (
+        <div className="modal-overlay" onClick={() => setShowFeeConfigRequiredModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px', padding: '24px', textAlign: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+              <button 
+                id="btn-close-fee-config-modal"
+                onClick={() => setShowFeeConfigRequiredModal(false)} 
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div style={{ fontSize: '3rem', marginBottom: '16px' }}>📋</div>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '12px', color: 'var(--text-primary)' }}>
+              Fee Structure Not Configured
+            </h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px', lineHeight: '1.5' }}>
+              Tuition fee structure has not been configured for this class in the current academic year. Please set up the fees first by going to the Audits & settings page.
+            </p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+              <button
+                id="btn-modal-cancel-fee-config"
+                className="btn-outline"
+                onClick={() => setShowFeeConfigRequiredModal(false)}
+                style={{ padding: '10px 20px', borderRadius: '6px' }}
+              >
+                Cancel
+              </button>
+              <button
+                id="btn-modal-goto-fee-config"
+                className="btn-primary"
+                onClick={() => {
+                  setShowFeeConfigRequiredModal(false);
+                  if (selectedStudent && selectedStudent.class_id) {
+                    setSelectedFeeClassId(String(selectedStudent.class_id));
+                    fetchClassFeeStructure(selectedStudent.class_id);
+                  }
+                  setActiveTab('settings');
+                }}
+                style={{ padding: '10px 20px', borderRadius: '6px' }}
+              >
+                Go to Audits & settings
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- CARRY FORWARD DUE PAYMENT / RECOVERY MODAL --- */}
+      {showPayRecoveryModal && selectedCarryForwardDue && (
+        <div className="modal-overlay" onClick={() => setShowPayRecoveryModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ fontSize: '1.25rem' }}>Deposit Previous Year Dues</h3>
+              <button onClick={() => setShowPayRecoveryModal(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}><X size={20} /></button>
+            </div>
+            
+            <div style={{ marginBottom: '16px', padding: '12px', borderRadius: '6px', backgroundColor: 'rgba(245, 158, 11, 0.05)', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
+              <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Student Name:</span>
+              <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)', display: 'block', marginBottom: '8px' }}>
+                {selectedCarryForwardDue.student_name} ({selectedCarryForwardDue.class_name})
+              </strong>
+              <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Outstanding for Academic Year {selectedCarryForwardDue.original_academic_year || selectedCarryForwardDue.year_range}:</span>
+              <strong style={{ fontSize: '1.2rem', color: '#f59e0b' }}>
+                {formatMoney(parseFloat(selectedCarryForwardDue.amount) - parseFloat(selectedCarryForwardDue.paid_amount))}
+              </strong>
+            </div>
+
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const amt = parseFloat(recoveryAmount);
+              const outstanding = parseFloat(selectedCarryForwardDue.amount) - parseFloat(selectedCarryForwardDue.paid_amount);
+              if (isNaN(amt) || amt <= 0) {
+                showToast("Please enter a valid amount greater than zero.", "error");
+                return;
+              }
+              if (amt > outstanding + 0.01) {
+                showToast("Payment amount exceeds outstanding dues.", "error");
+                return;
+              }
+              handlePayCarryForwardDue(selectedCarryForwardDue.student_id, selectedCarryForwardDue.id, amt, recoveryDate);
+            }} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label className="form-label">Payment Amount</label>
+                <input 
+                  type="number" 
+                  step="0.01"
+                  required
+                  placeholder="Enter amount to pay"
+                  className="erp-input" 
+                  value={recoveryAmount}
+                  onChange={(e) => setRecoveryAmount(e.target.value)}
+                />
+              </div>
+              
+              <div>
+                <label className="form-label">Payment Date</label>
+                <input 
+                  type="date" 
+                  required
+                  className="erp-input" 
+                  value={recoveryDate}
+                  onChange={(e) => setRecoveryDate(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '12px' }}>
+                <button 
+                  type="button" 
+                  onClick={() => setShowPayRecoveryModal(false)}
+                  className="btn-outline"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={isRecordingRecovery}
+                  className="btn-primary"
+                >
+                  {isRecordingRecovery ? 'Processing...' : 'Record Payment'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* --- CREATE CLASS MODAL --- */}
       {showCreateClassModal && (
         <div className="modal-overlay" onClick={() => setShowCreateClassModal(false)}>
@@ -9403,7 +21647,7 @@ export default function App() {
             
             <form onSubmit={(e) => {
               e.preventDefault();
-              handleAddClass(newClassForm.name, newClassForm.room, newClassForm.groups);
+              handleAddClass(newClassForm.name, '', newClassForm.groups);
               setShowCreateClassModal(false);
               setNewClassForm({ name: '', room: '', groups: [] });
             }} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -9417,17 +21661,6 @@ export default function App() {
                   value={newClassForm.name} 
                   onChange={(e) => setNewClassForm({...newClassForm, name: e.target.value})} 
                   required 
-                />
-              </div>
-              <div>
-                <label htmlFor="c-room" className="form-label">Room Number / Location</label>
-                <input 
-                  id="c-room" 
-                  type="text" 
-                  placeholder="e.g. Room 101"
-                  className="erp-input" 
-                  value={newClassForm.room} 
-                  onChange={(e) => setNewClassForm({...newClassForm, room: e.target.value})} 
                 />
               </div>
 
@@ -9501,14 +21734,52 @@ export default function App() {
         </div>
       )}
 
+      {/* --- EDIT CLASS MODAL --- */}
+      {showEditClassModal && editingClass && (
+        <div className="modal-overlay" onClick={() => { setShowEditClassModal(false); setEditingClass(null); }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ fontSize: '1.25rem' }}>Edit Classroom</h3>
+              <button onClick={() => { setShowEditClassModal(false); setEditingClass(null); }} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}><X size={20} /></button>
+            </div>
+            
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              handleUpdateClass(editingClass.id, editClassForm.name);
+              setShowEditClassModal(false);
+              setEditingClass(null);
+            }} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label htmlFor="edit-c-name" className="form-label">Class Name</label>
+                <input 
+                  id="edit-c-name" 
+                  type="text" 
+                  placeholder="e.g. Class 1 or BCA 1st Year"
+                  className="erp-input" 
+                  value={editClassForm.name} 
+                  onChange={(e) => setEditClassForm({...editClassForm, name: e.target.value})} 
+                  required 
+                />
+              </div>
+
+              <button type="submit" className="btn-primary" style={{ marginTop: '10px', justifyContent: 'center' }}>Save Changes</button>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* --- RECEIPT MODAL --- */}
       {receiptRecord && receiptStudent && (
         <div className="modal-overlay" onClick={() => { setReceiptRecord(null); setReceiptStudent(null); }}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
             <div id="receipt-print-area" className="receipt-box">
               <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>TUITION FEE INVOICE RECEIPT</h3>
-                <p>BN SCHOOL ERP PORTAL SYSTEM</p>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', textTransform: 'uppercase' }}>
+                  {schoolName || "SCHOOL HUB"}
+                </h3>
+                <p style={{ fontWeight: '600', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                  {receiptRecord.fee_name ? `${receiptRecord.fee_name.toUpperCase()} RECEIPT` : "TUITION FEE RECEIPT"}
+                </p>
                 <p>---------------------------------</p>
               </div>
               
@@ -9523,15 +21794,48 @@ export default function App() {
                   return `${schoolPart}${studentPart}${recordPart}`;
                 })()}</div>
                 <div><strong>ACADEMIC SESSION:</strong> {getActiveYearRange()}</div>
-                <div><strong>BILLING MONTH:</strong> {receiptRecord.month}</div>
-                <div><strong>DUE DEADLINE DATE:</strong> {formatDate(receiptRecord.due_date)}</div>
+                
+                {receiptRecord.isMultiMonth ? (
+                  <>
+                    <div><strong>MONTHS PAID:</strong>
+                      <ul style={{ paddingLeft: '20px', marginTop: '4px', marginBottom: '4px', listStyleType: 'disc' }}>
+                        {receiptRecord.records.map(r => {
+                          const range = getActiveYearRange();
+                          const [startYearStr, endYearStr] = range.split('-');
+                          const startYear = parseInt(startYearStr) || 2026;
+                          const endYear = parseInt(endYearStr) || 2027;
+                          const monthsOrder = ["April", "May", "June", "July", "August", "September", "October", "November", "December", "January", "February", "March"];
+                          const idx = monthsOrder.indexOf(r.month);
+                          const year = idx <= 8 ? startYear : endYear;
+                          return (
+                            <li key={r.month}>{r.month} {year} ({formatMoney(r.amount)})</li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                    <div><strong>FEE AMOUNT:</strong> {receiptRecord.records.map(r => formatMoney(r.amount)).join(' + ')}</div>
+                  </>
+                ) : (
+                  <>
+                    {receiptRecord.fee_name ? (
+                      <div><strong>FEE TYPE:</strong> {receiptRecord.fee_name}</div>
+                    ) : (
+                      <div><strong>BILLING MONTH:</strong> {receiptRecord.month}</div>
+                    )}
+                    {!receiptRecord.fee_name && receiptRecord.due_date && (
+                      <div><strong>DUE DEADLINE DATE:</strong> {formatDate(receiptRecord.due_date)}</div>
+                    )}
+                  </>
+                )}
+                
                 <div><strong>RECEIPT PAYMENT DATE:</strong> {formatDate(receiptRecord.payment_date)}</div>
                 <p>---------------------------------</p>
-                <div style={{ display: 'flex', justifyBetween: 'space-between', fontWeight: 'bold', fontSize: '1rem' }}>
-                  <span>TUITION AMOUNT:</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1rem' }}>
+                  <span>{receiptRecord.isMultiMonth ? 'TOTAL PAID:' : (receiptRecord.fee_name ? `${receiptRecord.fee_name.toUpperCase()}:` : 'TUITION AMOUNT:')}</span>
                   <span>{formatMoney(receiptRecord.amount)}</span>
                 </div>
-                <div style={{ display: 'flex', justifyBetween: 'space-between', fontWeight: 'bold' }}>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
                   <span>TRANSACTION STATUS:</span>
                   <span style={{ color: '#10b981' }}>PAID / RECEIVED</span>
                 </div>
@@ -9557,6 +21861,259 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* --- PREVIOUS YEAR RECOVERY RECEIPT MODAL --- */}
+      {showRecoveryReceiptModal && selectedRecoveryReceiptDue && selectedRecoveryReceiptRec && (
+        <div className="modal-overlay" onClick={() => { setShowRecoveryReceiptModal(false); setSelectedRecoveryReceiptDue(null); setSelectedRecoveryReceiptRec(null); }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+            <div id="recovery-receipt-print-area" className="receipt-box">
+              <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
+                  PREVIOUS YEAR DUES RECOVERY RECEIPT
+                </h3>
+                <p style={{ textTransform: 'uppercase' }}>{schoolName}</p>
+                <p>---------------------------------</p>
+              </div>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.85rem' }}>
+                <div><strong>STUDENT NAME:</strong> {selectedRecoveryReceiptDue.student_name}</div>
+                <div><strong>LAST YEAR CLASS:</strong> {selectedRecoveryReceiptDue.class_name}</div>
+                <div><strong>ORIGINAL ACADEMIC YEAR:</strong> {selectedRecoveryReceiptDue.original_academic_year || selectedRecoveryReceiptDue.year_range}</div>
+                <div><strong>RECOVERY TRANSACTION ID:</strong> {(() => {
+                  const schoolPart = String(schoolId || 1).padStart(2, '0').slice(-2);
+                  const studentPart = String(selectedRecoveryReceiptDue.student_id || 1).padStart(4, '0').slice(-4);
+                  const recordPart = String(selectedRecoveryReceiptRec.id || 1).padStart(6, '0').slice(-6);
+                  return `${schoolPart}${studentPart}${recordPart}`;
+                })()}</div>
+                <div><strong>RECEIPT PAYMENT DATE:</strong> {formatDate(selectedRecoveryReceiptRec.recovery_date)}</div>
+                <p>---------------------------------</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1rem' }}>
+                  <span>RECOVERED AMOUNT:</span>
+                  <span>{formatMoney(selectedRecoveryReceiptRec.amount_recovered)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
+                  <span>TRANSACTION STATUS:</span>
+                  <span style={{ color: '#10b981' }}>PAID / RECEIVED</span>
+                </div>
+              </div>
+              
+              <div style={{ textAlign: 'center', marginTop: '24px', fontSize: '0.75rem' }}>
+                <p>This is a computer generated receipt.</p>
+                <p>Thank you for your payment!</p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px', gap: '12px' }}>
+              <button onClick={handleDownloadRecoveryPDF} className="btn-primary" style={{ backgroundColor: 'var(--color-secondary)', borderColor: 'var(--color-secondary)' }}>
+                <Download size={14} /> Download PDF
+              </button>
+              <button onClick={() => window.print()} className="btn-primary">
+                <Printer size={14} /> Print Receipt
+              </button>
+              <button onClick={() => { setShowRecoveryReceiptModal(false); setSelectedRecoveryReceiptDue(null); setSelectedRecoveryReceiptRec(null); }} className="btn-outline">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- EDIT ADDITIONAL FEE TYPE MODAL --- */}
+      {editingExtraFeeType && (
+        <div className="modal-overlay" onClick={() => setEditingExtraFeeType(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 800, borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', marginBottom: '16px' }}>
+              Edit Additional Fee Type
+            </h3>
+            
+            <form onSubmit={handleUpdateExtraFeeType} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label className="form-label" style={{ fontWeight: 600 }}>Fee Name</label>
+                <input 
+                  type="text"
+                  placeholder="e.g. Admission Fee, Examination Fee"
+                  value={editExtraFeeTypeName}
+                  onChange={(e) => setEditExtraFeeTypeName(e.target.value)}
+                  className="erp-input"
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label className="form-label" style={{ fontWeight: 600 }}>Amount (₹)</label>
+                <input 
+                  type="number"
+                  placeholder="e.g. 500"
+                  value={editExtraFeeTypeAmount}
+                  onChange={(e) => setEditExtraFeeTypeAmount(e.target.value)}
+                  className="erp-input"
+                  min="1"
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '10px' }}>
+                <button type="button" onClick={() => setEditingExtraFeeType(null)} className="btn-outline">
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary">
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- ADD / EDIT PAYMENT PROMISE MODAL --- */}
+      {promiseModalOpen && (
+        <div className="modal-overlay" onClick={() => setPromiseModalOpen(false)}>
+          <div className="modal-content fade-in" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px', width: '90%' }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 800, borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', marginBottom: '16px' }}>
+              {editingPromise ? 'Edit Payment Promise' : 'Add Payment Promise'}
+            </h3>
+            
+            <form onSubmit={handleSavePaymentPromise} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              
+              {/* Searchable Student Selection */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', position: 'relative' }}>
+                <label className="form-label" style={{ fontWeight: 600 }}>Student Selection</label>
+                <input 
+                  type="text"
+                  placeholder="Type to search student..."
+                  value={promiseStudentSearchQuery}
+                  onChange={(e) => {
+                    setPromiseStudentSearchQuery(e.target.value);
+                    if (promiseStudentId) {
+                      setPromiseStudentId('');
+                    }
+                  }}
+                  className="erp-input"
+                  required
+                />
+                
+                {/* Autopopulated classroom display */}
+                {promiseStudentId ? (
+                  <div style={{ fontSize: '0.8rem', color: '#4ade80', marginTop: '2px', fontWeight: 500 }}>
+                    ✓ Selected Student Class: {(() => {
+                      const match = students.find(st => st.id === parseInt(promiseStudentId));
+                      return match ? getClassName(match.class_id) : 'Unassigned';
+                    })()}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                    Please select a student from the dropdown results.
+                  </div>
+                )}
+
+                {/* Dropdown Options */}
+                {!promiseStudentId && promiseStudentSearchQuery.trim().length > 0 && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    maxHeight: '180px',
+                    overflowY: 'auto',
+                    background: '#111827',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '6px',
+                    zIndex: 1000,
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                    marginTop: '4px'
+                  }}>
+                    {(() => {
+                      const list = students.filter(st => 
+                        st.name.toLowerCase().includes(promiseStudentSearchQuery.toLowerCase())
+                      );
+                      if (list.length === 0) {
+                        return (
+                          <div style={{ padding: '8px 12px', fontSize: '0.85rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                            No matching students found
+                          </div>
+                        );
+                      }
+                      return list.map(st => (
+                        <div
+                          key={st.id}
+                          onClick={() => {
+                            setPromiseStudentId(st.id);
+                            setPromiseStudentSearchQuery(`${st.name} (${st.roll_number})`);
+                          }}
+                          style={{
+                            padding: '8px 12px',
+                            cursor: 'pointer',
+                            fontSize: '0.85rem',
+                            borderBottom: '1px solid rgba(255,255,255,0.03)',
+                            color: 'var(--text-primary)',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}
+                          onMouseEnter={(e) => e.target.style.background = 'rgba(255,255,255,0.05)'}
+                          onMouseLeave={(e) => e.target.style.background = 'transparent'}
+                        >
+                          <strong>{st.name} ({st.roll_number})</strong>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{getClassName(st.class_id)}</span>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                )}
+              </div>
+
+              {/* Promise Date */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label className="form-label" style={{ fontWeight: 600 }}>Promise Date</label>
+                <input 
+                  type="date"
+                  value={promiseDate}
+                  onChange={(e) => setPromiseDate(e.target.value)}
+                  className="erp-input"
+                  required
+                />
+              </div>
+
+              {/* Description */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label className="form-label" style={{ fontWeight: 600 }}>Description</label>
+                <textarea 
+                  placeholder="Parent promised to deposit pending fee after..."
+                  value={promiseDescription}
+                  onChange={(e) => setPromiseDescription(e.target.value)}
+                  className="erp-input"
+                  style={{ minHeight: '100px', resize: 'vertical', padding: '10px', fontSize: '0.9rem', lineHeight: '1.4' }}
+                />
+              </div>
+
+              {/* Status */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label className="form-label" style={{ fontWeight: 600 }}>Promise Status</label>
+                <select
+                  value={promiseStatus}
+                  onChange={(e) => setPromiseStatus(e.target.value)}
+                  className="erp-input"
+                >
+                  <option value="Pending">Pending</option>
+                  <option value="Fulfilled">Fulfilled</option>
+                </select>
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '10px' }}>
+                <button type="button" onClick={() => setPromiseModalOpen(false)} className="btn-outline">
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary" disabled={isSavingPromise || !promiseStudentId}>
+                  {isSavingPromise ? 'Saving...' : editingPromise ? 'Save Changes' : 'Add Promise'}
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
+
               {/* Schedule Copy Confirmation Modal */}
               {scheduleCopyConfirm && (
                 <div className="modal-overlay" onClick={() => setScheduleCopyConfirm(null)}>
@@ -9869,7 +22426,7 @@ export default function App() {
                       }}>
                         <AlertTriangle size={32} />
                       </div>
-                      <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0 }}>Confirm Delete</h3>
+                      <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0 }}>{simpleConfirm.title || 'Confirm Delete'}</h3>
                       <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0, lineHeight: '1.5' }}>
                         {simpleConfirm.message || 'Are you sure you want to delete this?'}
                       </p>
@@ -9883,7 +22440,7 @@ export default function App() {
                           className="btn-primary"
                           style={{ flex: 1, backgroundColor: '#ef4444', border: '1px solid #ef4444', color: 'white', justifyContent: 'center' }}
                         >
-                          Yes, Delete
+                          {simpleConfirm.confirmText || 'Yes, Delete'}
                         </button>
                         <button 
                           onClick={() => setSimpleConfirm(null)}
@@ -10035,6 +22592,169 @@ export default function App() {
                 </button>
                 <button 
                   onClick={() => setUnpayConfirm(null)}
+                  className="btn-outline"
+                  style={{ flex: 1, justifyContent: 'center' }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showGenerateConfirm && (
+          <div className="modal-overlay" onClick={() => setShowGenerateConfirm(false)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px', textAlign: 'center' }}>
+              <div style={{
+                width: '60px',
+                height: '60px',
+                borderRadius: '50%',
+                background: 'rgba(59, 130, 246, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#3b82f6',
+                margin: '0 auto 16px auto'
+              }}>
+                <FileText size={30} />
+              </div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: '0 0 8px 0' }}>Generate Report</h3>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', lineHeight: '1.5', margin: '0 0 16px 0' }}>
+                Are you sure you want to generate this report?
+              </p>
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.02)',
+                padding: '12px',
+                borderRadius: '8px',
+                fontSize: '0.85rem',
+                textAlign: 'center',
+                marginBottom: '24px',
+                border: '1px solid var(--border-color)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '6px'
+              }}>
+                <span style={{ fontWeight: 500, color: 'var(--text-muted)' }}>Report Period:</span>
+                <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>
+                  {formatReportDateStr(reportFromDate)} → {formatReportDateStr(reportToDate)}
+                </strong>
+              </div>
+              <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
+                <button 
+                  onClick={() => setShowGenerateConfirm(false)}
+                  className="btn-outline"
+                  style={{ flex: 1, justifyContent: 'center' }}
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={async () => {
+                    setShowGenerateConfirm(false);
+                    await handleGenerateReport();
+                  }}
+                  className="btn-primary"
+                  style={{ flex: 1, backgroundColor: '#3b82f6', border: '1px solid #3b82f6', color: 'white', justifyContent: 'center' }}
+                >
+                  Generate Report
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {reportStatusConfirm && (
+          <div className="modal-overlay" onClick={() => setReportStatusConfirm(null)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px', textAlign: 'center' }}>
+              <div style={{
+                width: '60px',
+                height: '60px',
+                borderRadius: '50%',
+                background: 'rgba(59, 130, 246, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#3b82f6',
+                margin: '0 auto 16px auto'
+              }}>
+                <Info size={30} />
+              </div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: '0 0 8px 0' }}>Change Report Status</h3>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', lineHeight: '1.5', margin: '0 0 16px 0' }}>
+                Are you sure you want to change the status of this report?
+              </p>
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.02)',
+                padding: '12px',
+                borderRadius: '8px',
+                fontSize: '0.85rem',
+                textAlign: 'left',
+                marginBottom: '24px',
+                border: '1px solid var(--border-color)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '6px'
+              }}>
+                <div>Current Status: <span style={{ fontWeight: 700, color: reportStatusConfirm.currentStatus === 'Settled' ? '#10b981' : '#f59e0b' }}>{reportStatusConfirm.currentStatus}</span></div>
+                <div>New Status: <span style={{ fontWeight: 700, color: reportStatusConfirm.newStatus === 'Settled' ? '#10b981' : '#f59e0b' }}>{reportStatusConfirm.newStatus}</span></div>
+              </div>
+              <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
+                <button 
+                  onClick={() => setReportStatusConfirm(null)}
+                  className="btn-outline"
+                  style={{ flex: 1, justifyContent: 'center' }}
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={async () => {
+                    const targetId = reportStatusConfirm.id;
+                    setReportStatusConfirm(null);
+                    await handleToggleSettlement(targetId);
+                  }}
+                  className="btn-primary"
+                  style={{ flex: 1, backgroundColor: '#3b82f6', border: '1px solid #3b82f6', color: 'white', justifyContent: 'center' }}
+                >
+                  Confirm
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {unpayExtraFeeConfirm && (
+          <div className="modal-overlay" onClick={() => setUnpayExtraFeeConfirm(null)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px', textAlign: 'center' }}>
+              <div style={{
+                width: '60px',
+                height: '60px',
+                borderRadius: '50%',
+                background: 'rgba(239, 68, 68, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ef4444',
+                margin: '0 auto 16px auto'
+              }}>
+                <AlertTriangle size={30} />
+              </div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: '0 0 8px 0' }}>Revert Payment</h3>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', lineHeight: '1.5', margin: '0 0 24px 0' }}>
+                Are you sure you want to mark <strong>this fee</strong> as <strong>UNPAID</strong>?
+              </p>
+              <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
+                <button 
+                  onClick={async () => {
+                    const targetId = unpayExtraFeeConfirm.id;
+                    setUnpayExtraFeeConfirm(null);
+                    await executeRevertExtraFee(targetId);
+                  }}
+                  className="btn-primary"
+                  style={{ flex: 1, backgroundColor: '#ef4444', border: '1px solid #ef4444', color: 'white', justifyContent: 'center' }}
+                >
+                  Yes, Revert
+                </button>
+                <button 
+                  onClick={() => setUnpayExtraFeeConfirm(null)}
                   className="btn-outline"
                   style={{ flex: 1, justifyContent: 'center' }}
                 >
@@ -10351,6 +23071,197 @@ export default function App() {
           </div>
         )}
 
+        {/* All Notifications Modal */}
+        {showAllNotificationsModal && (
+          <div className="modal-overlay" onClick={() => setShowAllNotificationsModal(false)}>
+            <div className="modal-content fade-in" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', width: '90%' }}>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', marginBottom: '16px' }}>
+                Notifications
+              </h3>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '400px', overflowY: 'auto', paddingRight: '4px' }}>
+                {notifications.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                    No notifications found.
+                  </div>
+                ) : (
+                  [...notifications]
+                    .sort((a, b) => new Date(b.created_at || b.timestamp) - new Date(a.created_at || a.timestamp))
+                    .map(n => (
+                      <div 
+                        key={n.id} 
+                        style={{ 
+                          padding: '12px 16px', 
+                          borderRadius: '6px', 
+                          backgroundColor: n.is_read ? 'rgba(255,255,255,0.01)' : 'rgba(59,130,246,0.03)', 
+                          border: '1px solid var(--border-color)',
+                          borderLeft: '4px solid var(--color-primary)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '6px'
+                        }}
+                      >
+                        <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>{n.title}</strong>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: 0, lineHeight: '1.4' }}>{n.content}</p>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', alignSelf: 'flex-end', marginTop: '2px' }}>
+                          {formatNotificationTime(n.created_at || n.timestamp)}
+                        </span>
+                      </div>
+                    ))
+                )}
+              </div>
+              
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
+                <button onClick={() => setShowAllNotificationsModal(false)} className="btn-outline">
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Salary Disbursements Drill Down Modal */}
+        {showSalaryDrilldown && !selectedTeacher && (
+          <div className="modal-overlay" onClick={() => setShowSalaryDrilldown(null)}>
+            <div className="modal-content fade-in" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px', width: '95%' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0 }}>
+                  Salary Breakdown - {showSalaryDrilldown} {(() => {
+                    const yearRange = years.find(y => y.id === activeYearId)?.year_range || '';
+                    if (!yearRange) return '';
+                    const parts = yearRange.split('-');
+                    if (parts.length < 2) return '';
+                    const startYear = parts[0];
+                    const endYear = parts[1];
+                    const isNextYear = ["January", "February", "March"].includes(showSalaryDrilldown);
+                    return isNextYear ? endYear : startYear;
+                  })()}
+                </h3>
+                <button onClick={() => setShowSalaryDrilldown(null)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', padding: '4px', borderRadius: '50%' }} className="menu-dot-trigger">
+                  <X size={20} />
+                </button>
+              </div>
+
+              {isDrilldownLoading ? (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px', flexDirection: 'column', gap: '12px' }}>
+                  <RefreshCw className="animate-spin" size={32} style={{ color: 'var(--color-primary)' }} />
+                  <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Loading salary records...</span>
+                </div>
+              ) : salaryDrilldownData.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '48px 16px', color: 'var(--text-muted)' }}>
+                  <p style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>No salary records found for this month.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="erp-table-container" style={{ maxHeight: '380px', overflowY: 'auto', marginBottom: '20px' }}>
+                    <table className="erp-table">
+                      <thead>
+                        <tr>
+                          <th>Teacher</th>
+                          <th>Gender</th>
+                          <th>Contact Number</th>
+                          <th>Salary Amount</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {salaryDrilldownData.map(r => {
+                          const symbol = currencyMap[schoolCurrency]?.symbol || '$';
+                          const displayAmount = `${symbol}${parseFloat(r.amount).toLocaleString()}`;
+                          const isDisbursed = r.status === 'Paid';
+                          
+                          return (
+                            <tr 
+                              key={r.teacher_id}
+                              onClick={() => {
+                                const fullTeacher = teachers.find(t => t.id === r.teacher_id);
+                                if (fullTeacher) {
+                                  setTeacherProfileBackTab('dashboard');
+                                  setSelectedTeacher(fullTeacher);
+                                  fetchTeacherSalaryRecords(r.teacher_id);
+                                  setActiveTab('faculty');
+                                }
+                              }}
+                              style={{ cursor: 'pointer' }}
+                              className="teacher-row-clickable"
+                            >
+                              <td>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                  {r.profile_image ? (
+                                    <img 
+                                      src={r.profile_image} 
+                                      alt={r.name} 
+                                      style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }}
+                                    />
+                                  ) : (
+                                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}>
+                                      <User size={16} />
+                                    </div>
+                                  )}
+                                  <span style={{ fontWeight: 600 }}>{r.name}</span>
+                                </div>
+                              </td>
+                              <td>{r.gender || 'Male'}</td>
+                              <td>{r.phone || '9876543210'}</td>
+                              <td style={{ fontWeight: 'bold' }}>{displayAmount}</td>
+                              <td>
+                                <span 
+                                  className={`badge ${isDisbursed ? 'badge-success' : 'badge-pending'}`}
+                                  style={{
+                                    display: 'inline-flex',
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                    height: '28px',
+                                    minWidth: '110px',
+                                    padding: '0 12px',
+                                    textAlign: 'center',
+                                    boxSizing: 'border-box'
+                                  }}
+                                >
+                                  {isDisbursed ? 'Disbursed' : 'Pending'}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Summary Section */}
+                  {(() => {
+                    const symbol = currencyMap[schoolCurrency]?.symbol || '$';
+                    const disbursedSum = salaryDrilldownData
+                      .filter(r => r.status === 'Paid')
+                      .reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0);
+                    const pendingSum = salaryDrilldownData
+                      .filter(r => r.status !== 'Paid')
+                      .reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0);
+                    const totalSum = disbursedSum + pendingSum;
+
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid var(--border-color)', paddingTop: '16px', background: 'rgba(255,255,255,0.01)', borderRadius: 'var(--radius-md)', padding: '16px', border: '1px solid var(--border-color)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
+                          <span style={{ color: 'var(--text-secondary)' }}>Total Disbursed Amount:</span>
+                          <strong style={{ color: '#10b981' }}>{symbol}{disbursedSum.toLocaleString()}</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
+                          <span style={{ color: 'var(--text-secondary)' }}>Total Pending Amount:</span>
+                          <strong style={{ color: '#f97316' }}>{symbol}{pendingSum.toLocaleString()}</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1rem', borderTop: '1px dashed var(--border-color)', paddingTop: '8px', marginTop: '4px' }}>
+                          <strong style={{ color: 'var(--text-primary)' }}>Total Salary Amount:</strong>
+                          <strong style={{ color: 'var(--color-primary)', fontSize: '1.1rem' }}>{symbol}{totalSum.toLocaleString()}</strong>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
       {/* --- EXPERIENCE LETTER MODAL --- */}
       {showExperienceLetter && selectedTeacher && (
         <div className="modal-overlay" onClick={() => setShowExperienceLetter(false)}>
@@ -10419,6 +23330,228 @@ export default function App() {
           </div>
         </div>
       )}
+      
+      {/* Unsaved Changes Confirmation Modal */}
+      {showUnsavedConfirmModal && (
+        <div className="modal-overlay" onClick={() => {
+          setPendingTabChange(null);
+          setShowUnsavedConfirmModal(false);
+        }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px', textAlign: 'center', padding: '24px' }}>
+            <div style={{ 
+              margin: '0 auto 16px auto', 
+              width: '56px', 
+              height: '56px', 
+              borderRadius: '50%', 
+              background: 'rgba(245, 158, 11, 0.1)', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              color: '#fbbf24' 
+            }}>
+              <AlertTriangle size={28} />
+            </div>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '8px', color: 'var(--text-primary)' }}>Unsaved Changes</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '24px', lineHeight: '1.5', margin: '0 0 24px 0' }}>
+              You have unsaved timetable changes. Do you want to leave without saving?
+            </p>
+            <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
+              <button 
+                onClick={() => {
+                  resetDraftTimetableSettings();
+                  const target = pendingTabChange || 'dashboard';
+                  setPendingTabChange(null);
+                  setShowUnsavedConfirmModal(false);
+                  setActiveTab(target);
+                }}
+                className="btn-primary"
+                style={{ flex: 1, backgroundColor: '#ef4444', border: '1px solid #ef4444', color: 'white', justifyContent: 'center' }}
+              >
+                Leave
+              </button>
+              <button 
+                onClick={() => {
+                  setPendingTabChange(null);
+                  setShowUnsavedConfirmModal(false);
+                }}
+                className="btn-outline"
+                style={{ flex: 1, justifyContent: 'center' }}
+              >
+                Stay
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Teacher Action (Replace / Backup Assignment) Modal */}
+      {teacherActionModal.show && (
+        <div className="modal-overlay" onClick={() => setTeacherActionModal(prev => ({ ...prev, show: false }))}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px', padding: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '14px', marginBottom: '20px' }}>
+              <h3 style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontWeight: 800 }}>
+                {teacherActionModal.type === 'Replace' ? '🔄 Replace Teacher Forever' : '🛡️ Assign Backup Teacher (One Day)'}
+              </h3>
+              <button 
+                onClick={() => setTeacherActionModal(prev => ({ ...prev, show: false }))} 
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div style={{ marginBottom: '20px' }}>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '16px', lineHeight: '1.5' }}>
+                {teacherActionModal.type === 'Replace' 
+                  ? `Select a teacher to replace the main teacher for ${teacherActionModal.day}'s Period ${teacherActionModal.periodIndex + 1} (${teacherActionModal.subject}). This change will propagate to all upcoming weeks.`
+                  : `Select a backup teacher for ${teacherActionModal.day}'s Period ${teacherActionModal.periodIndex + 1} (${teacherActionModal.subject}). This override applies to this specific day only.`}
+              </p>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Select Faculty Member</label>
+                <select
+                  className="erp-input"
+                  style={{ width: '100%', padding: '8px 12px', fontSize: '0.9rem' }}
+                  value={selectedModalTeacherId}
+                  onChange={(e) => setSelectedModalTeacherId(e.target.value)}
+                >
+                  <option value="">-- Choose Teacher --</option>
+                  {(() => {
+                    const targetDateStr = getPlanDateFromDayName(teacherActionModal.day);
+                    return teachers.filter(t => {
+                      const assignedCount = getTeacherAssignedCountOnDate(t.id, targetDateStr);
+                      return assignedCount < totalPeriodsPerDay;
+                    }).map(t => (
+                      <option key={t.id} value={t.id}>{t.name} ({t.subject})</option>
+                    ));
+                  })()}
+                </select>
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
+              <button
+                type="button"
+                className="btn-outline"
+                onClick={() => setTeacherActionModal(prev => ({ ...prev, show: false }))}
+                style={{ padding: '8px 16px', fontSize: '0.85rem' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={async () => {
+                  const teachId = selectedModalTeacherId;
+                  if (!teachId) {
+                    showToast("Please select a teacher", "error");
+                    return;
+                  }
+                  
+                  const teacherObj = teachers.find(t => t.id === parseInt(teachId));
+                  if (!teacherObj) return;
+                  
+                  const targetDay = teacherActionModal.day;
+                  const targetIndex = teacherActionModal.periodIndex;
+                  const currentPeriods = [...(scheduleForm[targetDay] || [])];
+                  
+                  if (targetIndex >= 0 && targetIndex < currentPeriods.length) {
+                    if (teacherActionModal.type === 'Replace') {
+                      currentPeriods[targetIndex] = {
+                        ...currentPeriods[targetIndex],
+                        teacher_id: teacherObj.id,
+                        teacher_name: teacherObj.name,
+                        backup_teacher_id: null,
+                        backup_teacher_name: null
+                      };
+                      
+                      setScheduleForm(prev => ({
+                        ...prev,
+                        [targetDay]: currentPeriods
+                      }));
+                      
+                      await autoSaveDaySchedule(targetDay, currentPeriods, 'Draft', true, 'replace', targetIndex);
+                      showToast(`Teacher replaced successfully and propagated to future weeks!`, 'success');
+                    } else {
+                      currentPeriods[targetIndex] = {
+                        ...currentPeriods[targetIndex],
+                        backup_teacher_id: teacherObj.id,
+                        backup_teacher_name: teacherObj.name
+                      };
+                      
+                      setScheduleForm(prev => ({
+                        ...prev,
+                        [targetDay]: currentPeriods
+                      }));
+                      
+                      await autoSaveDaySchedule(targetDay, currentPeriods, 'Draft', false, 'none');
+                      showToast(`Backup teacher assigned successfully for today only!`, 'success');
+                    }
+                  }
+                  
+                  setTeacherActionModal(prev => ({ ...prev, show: false }));
+                }}
+                style={{ padding: '8px 16px', fontSize: '0.85rem' }}
+              >
+                Confirm Assignment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Confirm Fee Structure Lock Confirmation Modal */}
+      {showConfirmLockModal && (
+        <div className="modal-overlay" onClick={() => setShowConfirmLockModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px', padding: '24px', textAlign: 'center' }}>
+            <div style={{ 
+              margin: '0 auto 16px auto', 
+              width: '56px', 
+              height: '56px', 
+              borderRadius: '50%', 
+              background: 'rgba(239, 68, 68, 0.1)', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              color: '#ef4444',
+              fontSize: '24px'
+            }}>
+              🔒
+            </div>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '12px', color: 'var(--text-primary)' }}>
+              Confirm Fee Structure
+            </h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px', lineHeight: '1.6', margin: '0 0 24px 0' }}>
+              You are about to finalize the tuition fee structure for this class.
+              <br /><br />
+              <strong>Once saved, this fee structure will be permanently locked and cannot be modified later.</strong>
+              <br /><br />
+              Please review all monthly fee amounts carefully before proceeding.
+            </p>
+            <div style={{ display: 'flex', gap: '12px', width: '100%', justifyContent: 'center' }}>
+              <button 
+                onClick={() => setShowConfirmLockModal(false)}
+                className="btn-outline"
+                style={{ flex: 1, justifyContent: 'center', padding: '10px 16px' }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={async () => {
+                  setShowConfirmLockModal(false);
+                  await saveClassFeeStructure();
+                }}
+                className="btn-primary"
+                style={{ flex: 1, backgroundColor: 'var(--color-primary)', border: '1px solid var(--color-primary)', color: 'white', justifyContent: 'center', padding: '10px 16px' }}
+              >
+                Confirm & Lock Fee Structure
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+
+      
 
     </div>
   );
@@ -10426,8 +23559,8 @@ export default function App() {
 
 // Pre-seeded Mock Platform Data
 const MOCK_SCHOOLS = [
-  { id: 1, name: "St. Xavier's International School", code: "SCH-981763", contact_person: "Fr. Thomas Matthews", contact_number: "+1 (555) 019-8833", email: "xavier.admin@xavier.edu", status: "Active", subscription_start: "2026-04-01", subscription_end: "2027-03-31", setup_completed: 1, days_remaining: 305 },
-  { id: 2, name: "Lincoln Technical College", code: "SCH-098716", contact_person: "Dr. Elizabeth Vance", contact_number: "+1 (555) 021-3311", email: "lincoln.tech@lincoln.edu", status: "Active", subscription_start: "2026-05-01", subscription_end: "2026-06-30", setup_completed: 1, days_remaining: 31 }
+  { id: 1, name: "St. Xavier's International School", code: "SCH-981763", contact_person: "Fr. Thomas Matthews", contact_number: "+1 (555) 019-8833", email: "xavier.admin@xavier.edu", status: "Active", subscription_start: "2026-04-01", subscription_end: "2027-03-31", setup_completed: 1, days_remaining: 305, address: "123 School Lane, Lucknow, Uttar Pradesh, India", logo_path: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%234f46e5'/><path d='M50 25 L80 40 L50 55 L20 40 Z' fill='%23ffffff'/><path d='M35 47.5 L35 70 C35 75, 65 75, 65 70 L65 47.5' fill='%23ffffff' opacity='0.9'/><path d='M72 43 L72 65 L75 65 L75 43 Z' fill='%23f59e0b'/><circle cx='73.5' cy='67' r='3' fill='%23f59e0b'/></svg>" },
+  { id: 2, name: "Lincoln Technical College", code: "SCH-098716", contact_person: "Dr. Elizabeth Vance", contact_number: "+1 (555) 021-3311", email: "lincoln.tech@lincoln.edu", status: "Active", subscription_start: "2026-05-01", subscription_end: "2026-06-30", setup_completed: 1, days_remaining: 31, address: "456 Tech Parkway, City College, India", logo_path: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%238b5cf6'/><path d='M50 25 L80 40 L50 55 L20 40 Z' fill='%23ffffff'/><path d='M35 47.5 L35 70 C35 75, 65 75, 65 70 L65 47.5' fill='%23ffffff' opacity='0.9'/><path d='M72 43 L72 65 L75 65 L75 43 Z' fill='%23f59e0b'/><circle cx='73.5' cy='67' r='3' fill='%23f59e0b'/></svg>" }
 ];
 
 const MOCK_SUPER_STATS = {

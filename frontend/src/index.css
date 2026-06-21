@@ -151,6 +151,7 @@ h1, h2, h3, h4, h5, h6 {
   height: 100vh;
   overflow-y: auto;
   position: relative;
+  min-width: 0;
 }
 
 .header {
@@ -165,6 +166,23 @@ h1, h2, h3, h4, h5, h6 {
   top: 0;
   z-index: 10;
   transition: background-color var(--transition-normal), border-color var(--transition-normal);
+  flex-shrink: 0;
+}
+
+.faculty-sticky-header {
+  height: auto !important;
+  min-height: 140px !important;
+  background-color: var(--bg-surface) !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 16px 32px !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 120 !important;
+  transition: background-color var(--transition-normal), border-color var(--transition-normal) !important;
+  gap: 16px !important;
+  flex-shrink: 0 !important;
 }
 
 .content-body {
@@ -384,6 +402,18 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
 }
 
+.badge-fixed {
+  width: 160px !important;
+  height: 36px !important;
+  padding: 0 !important;
+  justify-content: center !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  border-radius: 9999px !important;
+  font-weight: 600 !important;
+  text-align: center !important;
+}
+
 @keyframes pulse-alert {
   0% {
     box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5);
@@ -530,7 +560,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .toast-in-out {
-  animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1), fadeOut 0.3s ease 3.2s forwards;
+  animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Override Autofill Styling */
@@ -772,4 +802,32 @@ select.erp-input option {
   font-weight: 500;
 }
 
+/* Today's Timetable Grid */
+.dashboard-timetable-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+}
 
+@media (min-width: 640px) {
+  .dashboard-timetable-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .dashboard-timetable-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1200px) {
+  .dashboard-timetable-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}.salary-bar-interactive:hover {
+  transform: scaleY(1.03);
+  filter: brightness(1.15);
+}
+.teacher-row-clickable:hover {
+  background-color: rgba(var(--color-primary-rgb), 0.08) !important;
+}

@@ -1,28 +1,28 @@
 [
     {
         "email": "abc@yopmail.com",
-        "password": "Test@123",
+        "password": "$2y$10$SuHVa34nhicG7eG6oWRpA.nL4e2Zg6PnjR3yRI7cEhaKmXbPqdm8K",
         "role": "School Admin",
         "school_id": 3,
         "setup_completed": 1
     },
     {
         "email": "gg@yopmail.com",
-        "password": "7!_uTSuUl6",
+        "password": "$2y$10$TiOixQ6afxbJOSTdc0O3Be7Dn2xZRqy5OXRwbkooGHPOs5c0c.\/W2",
         "role": "School Admin",
         "school_id": 4,
         "setup_completed": 0
     },
     {
         "email": "amu.akhlaq@gmail.com",
-        "password": "eoTp5M*T28",
+        "password": "$2y$10$an.1Yy5GpKLgPkz\/hzNi6Onbcy.k.UKCcs9CizsvsZlZnMn6Ag.Hm",
         "role": "School Admin",
         "school_id": 5,
         "setup_completed": 0
     },
     {
         "email": "bilalnashi6@gmail.com",
-        "password": "SecurePass123!",
+        "password": "$2y$10$YF0wVXvwRkjJJzkRFtCERunFJRRt6EccexWIY1ujeRX.vkwC2ueaK",
         "role": "School Admin",
         "school_id": 6,
         "setup_completed": 0,
@@ -30,21 +30,21 @@
     },
     {
         "email": "inter@yopmail.com",
-        "password": "ResetPassword123!",
+        "password": "$2y$10$bib0clmVb6\/LhwVVqalV0.5wDht3oysxEjfKriThSp9YxDGIJjVwK",
         "role": "School Admin",
         "school_id": 7,
         "setup_completed": 0
     },
     {
         "email": "BP@yopmail.com",
-        "password": "8t(Av0!663",
+        "password": "$2y$10$t6\/.jgeZuPP2yIb6Dpu0dOSLIqDopOVfVf9tJbtZU6D9CBmWFk30O",
         "role": "School Admin",
         "school_id": 8,
         "setup_completed": 1
     },
     {
         "email": "kk@yopmail.com",
-        "password": "Test@123",
+        "password": "$2y$10$3R2wEk9t\/je4UJeOfRxe4esicL.vN4yMMTtb7OF5tbf\/K3F09nmnK",
         "role": "School Admin",
         "school_id": 9,
         "setup_completed": 1,
@@ -52,7 +52,7 @@
     },
     {
         "email": "ak@yopmail.com",
-        "password": "Test@123",
+        "password": "$2y$10$hegMSgQUN7davJ8JVU9qm.bQUceGzpciPG32BNgVNxGc4QkWlR8Cy",
         "role": "School Admin",
         "school_id": 10,
         "setup_completed": 1,
@@ -60,7 +60,7 @@
     },
     {
         "email": "Sakir1@yopmail.com",
-        "password": "3Q$WS5mKF%",
+        "password": "$2y$10$wsHgeV5h7koq8rs8foWkTOrMfqdAZPG9NSwjf2a0wKWvh2QxJ6.eO",
         "role": "School Admin",
         "school_id": 11,
         "setup_completed": 1,
@@ -68,7 +68,7 @@
     },
     {
         "email": "nnn@yopmail.com",
-        "password": "$*rXl5qvC0",
+        "password": "$2y$10$vOYurcrKnZGVD2CZNhM5euvTLqSMHpRWjxQOsHIvakuxg8OGB.dxC",
         "role": "School Admin",
         "school_id": 12,
         "setup_completed": 1,
@@ -76,7 +76,7 @@
     },
     {
         "email": "pp@yopmail.com",
-        "password": "5J*w(i4YTd",
+        "password": "$2y$10$O\/9K1My6KHmKVSn8yH\/.M.rfUi.PrY03hVc.TRhhic0RzWCG04X1.",
         "role": "School Admin",
         "school_id": 13,
         "setup_completed": 0,
@@ -84,7 +84,7 @@
     },
     {
         "email": "dhjd@yopmail.com",
-        "password": "&xy2TyBS+X",
+        "password": "$2y$10$zGVlkZbBcaXgRLlnyAup8.uI4ExofinFfORrqRKa8w7BPdJL2maDK",
         "role": "School Admin",
         "school_id": 3,
         "setup_completed": 1,
@@ -92,7 +92,7 @@
     },
     {
         "email": "mpl@yopmail.com",
-        "password": "C5o1C%dq2(",
+        "password": "$2y$10$YqtimREGdTYgO6ecavfwFe2RFnc93qKWcLOQ4VwU37qCNNHyB3VQm",
         "role": "School Admin",
         "school_id": 4,
         "setup_completed": 1,
@@ -100,7 +100,7 @@
     },
     {
         "email": "sam@yopmail.com",
-        "password": ")&DwY#x2B@",
+        "password": "$2y$10$PE9NWmvmME99.Hawg3UomOaTdb.T2pN1ScOwQLSLaxsvDbt2JjjtS",
         "role": "School Admin",
         "school_id": 5,
         "setup_completed": 1,
@@ -108,7 +108,7 @@
     },
     {
         "email": "akhlak@yopmail.com",
-        "password": "b&3kVh)ULn",
+        "password": "$2y$10$3vH0f95TY\/RXDnzSwAQfPejYXXgcMqI6zm0d8uJTv5KHjSJg3MHgO",
         "role": "School Admin",
         "school_id": 6,
         "setup_completed": 1,
