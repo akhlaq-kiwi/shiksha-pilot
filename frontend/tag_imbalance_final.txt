@@ -1,0 +1,2409 @@
+Analyzing diff hunks for tag imbalance (div, form, fragment):
+
+Imbalance in hunk @@  export default function App() { @@:
+  Net Div: 1 (Added 5, Removed 4)
+  Net Form: 0 (Added 0, Removed 0)
+  Net Fragment: 0 (Added 1, Removed 1)
+  Added lines:
+    + <div class="header">
+    + </div>
+    + <div class="title">EXPERIENCE CERTIFICATE</div>
+    + <div class="content">
+    + </div>
+    + <div class="signature">
+    + </div>
+    + <div className={`app-layout ${isDarkMode ? 'dark-theme' : ''}`} style={{ background: 'var(--bg-app)', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', display: 'flex' }}>
+    + <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+    + </div>
+    + </div>
+    + <div className={`app-layout ${isDarkMode ? 'dark-theme' : ''}`} style={{ background: 'var(--bg-app)', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', display: 'flex', padding: '24px' }}>
+    + <div className="toast-in-out"
+    + </div>
+    + <div className="erp-card fade-in" style={{
+    + <div style={{
+    + <div style={{ position: 'relative', zIndex: 1 }}>
+    + <div style={{
+    + </div>
+    + <div style={{
+    + <div style={{ fontWeight: 600, color: '#ef4444', marginBottom: '4px', textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.05em' }}>
+    + </div>
+    + </div>
+    + <div style={{
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + <div className={`app-layout ${isDarkMode ? 'dark-theme' : ''}`} style={{ background: 'var(--bg-app)', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', display: 'flex' }}>
+    + <div className="toast-in-out"
+    + </div>
+    + <div className="erp-card fade-in" style={{ width: '100%', maxWidth: '420px', padding: '40px 32px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)' }}>
+    + <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+    + <div style={{
+    + </div>
+    + </div>
+    + <div style={{
+    + </div>
+    + <div style={{
+    + </div>
+    + <div style={{
+    + </div>
+    + <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', marginBottom: '20px', gap: '4px' }}>
+    + </div>
+    + <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    + <div>
+    + <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+    + </div>
+    + </div>
+    + <div>
+    + <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+    + </div>
+    + <div style={{ textAlign: 'right', marginTop: '8px' }}>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+    + </div>
+    + </form>
+    + <form onSubmit={handleRequestOtp} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    + <div>
+    + <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+    + </div>
+    + </div>
+    + </form>
+    + <form onSubmit={handleOtpLogin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    + <div>
+    + <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', gap: '10px' }}>
+    + </div>
+    + </form>
+    + <form onSubmit={handleForgotPasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    + <div>
+    + <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+    + </div>
+    + <div style={{ textAlign: 'center', marginTop: '8px' }}>
+    + </div>
+    + </form>
+    + <form onSubmit={handleVerifyOtpSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    + <div>
+    + <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+    + </div>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
+    + </div>
+    + </form>
+    + <form onSubmit={handleResetPasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    + <div>
+    + <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+    + </div>
+    + </div>
+    + <div>
+    + <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+    + </div>
+    + <div style={{ textAlign: 'center', marginTop: '8px' }}>
+    + </div>
+    + </form>
+    + <div style={{ textAlign: 'center', marginTop: '24px' }}>
+    + </div>
+    + </div>
+    + </div>
+    + <div className={`app-layout ${isDarkMode ? 'dark-theme' : ''}`} style={{ background: 'var(--bg-app)', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', display: 'flex' }}>
+    + <div className="erp-card fade-in" style={{ width: '100%', maxWidth: '550px', padding: '40px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)' }}>
+    + <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+    + </div>
+    + </div>
+    + <form onSubmit={handleWizardSubmit}>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    + <div>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    + <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+    + <div
+    + </div>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    + <div>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    + <div style={{ padding: '16px', borderRadius: 'var(--radius-md)', backgroundColor: 'rgba(2, 6, 23, 0.4)', fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+    + <div><strong>School Name:</strong> {wizardForm.name || 'N/A'}</div>
+    + <div><strong>Contact Person:</strong> {wizardForm.contact_person || 'N/A'} ({wizardForm.contact_number})</div>
+    + <div><strong>Address:</strong> {wizardForm.address || 'N/A'}</div>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '8px' }}>
+    + </div>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '32px', borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
+    + </div>
+    + </form>
+    + </div>
+    + </div>
+    + } else if (!/[!@#$%^&*()_+={}\[\]|\\\\:;\"\'<>,.?\/~`\-]/.test(np)) {
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+    + <div style={{ display: 'flex', gap: '8px' }}>
+    + </div>
+    + </div>
+    + <div className="erp-card" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', padding: '16px' }}>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + </div>
+    + <div className="erp-card" style={{ padding: '32px', fontStyle: 'italic', color: 'var(--text-muted)', textAlign: 'center' }}>
+    + </div>
+    + <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    + <div className="erp-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', gap: '12px', flexWrap: 'wrap', background: 'rgba(255,255,255,0.015)' }}>
+    + <div style={{ display: 'flex', gap: '8px' }}>
+    + </div>
+    + </div>
+    + <div className="erp-card" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+    + </div>
+    + <>
+    + <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
+    + <div
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+    + <div>
+    + </div>
+    + </div>
+    + <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', marginTop: '4px' }}>
+    + </div>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px', position: 'sticky', bottom: '16px', zIndex: 10 }}>
+    + </div>
+    + </>
+    + </div>
+    + <div className="erp-card" style={{ padding: '32px', fontStyle: 'italic', color: 'var(--text-muted)', textAlign: 'center' }}>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+    + <div style={{ display: 'flex', gap: '8px' }}>
+    + </div>
+    + </div>
+    + <div className="erp-card" style={{ padding: 0, overflowX: 'auto' }}>
+    + </div>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+    + <div>
+    + </div>
+    + <div
+    + <>
+    + </>
+    + <>
+    + </>
+    + </div>
+    + </div>
+    + <div className="erp-card" style={{ padding: '16px', display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+    + <div>
+    + </div>
+    + </div>
+    + <div className="erp-card" style={{ padding: 0, overflowX: 'auto' }}>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+    + </div>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+    + </div>
+    + <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+    + </div>
+    + <div className="erp-card" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+    + </div>
+    + <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
+    + <div key={exam.id} className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '14px', borderLeft: '4px solid var(--color-primary)' }}>
+    + <div>
+    + </div>
+    + <div style={{ borderTop: '1px solid var(--border-color)', borderBottom: '1px solid var(--border-color)', padding: '10px 0' }}>
+    + <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', gap: '8px', marginTop: 'auto', justifyContent: 'flex-end' }}>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+    + </div>
+    + <div className="erp-card" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '16px', padding: '16px' }}>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + </div>
+    + <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+    + <div style={{ display: 'flex', gap: '12px' }}>
+    + </div>
+    + </div>
+    + <div className="erp-card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    + <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+    + </div>
+    + </div>
+    + </div>
+    + <div className="erp-card" style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>
+    + </div>
+    + <div className="erp-card" style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+    + </div>
+    + <div
+    + <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', borderBottom: '3px double #4b5563', paddingBottom: '20px', marginBottom: '24px' }}>
+    + </div>
+    + <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px', backgroundColor: 'rgba(255, 255, 255, 0.02)', padding: '16px', borderRadius: '8px', border: '1px solid #374151' }}>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + </div>
+    + <div style={{ marginBottom: '24px' }}>
+    + </div>
+    + <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '28px' }}>
+    + <div style={{ border: '1px solid #374151', borderRadius: '8px', padding: '16px', backgroundColor: 'rgba(255, 255, 255, 0.01)' }}>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.85rem' }}>
+    + <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+    + </div>
+    + <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+    + </div>
+    + <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+    + </div>
+    + <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+    + </div>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #374151', paddingTop: '8px', marginTop: '4px' }}>
+    + </div>
+    + </div>
+    + </div>
+    + <div style={{ border: '1px solid #374151', borderRadius: '8px', padding: '16px', backgroundColor: 'rgba(255, 255, 255, 0.01)' }}>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.85rem' }}>
+    + <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+    + </div>
+    + <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+    + </div>
+    + <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+    + </div>
+    + <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+    + </div>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #374151', paddingTop: '8px', marginTop: '4px' }}>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + <div style={{ marginBottom: '32px', border: '1px solid #374151', borderRadius: '8px', padding: '12px 16px', backgroundColor: 'rgba(255, 255, 255, 0.01)' }}>
+    + </div>
+    + <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px', borderTop: '1px dashed #4b5563', paddingTop: '30px', marginTop: '30px', textAlign: 'center' }}>
+    + <div>
+    + <div style={{ height: '40px', borderBottom: '1px solid #4b5563', width: '80%', margin: '0 auto 8px auto' }}></div>
+    + </div>
+    + <div>
+    + <div style={{ height: '40px', borderBottom: '1px solid #4b5563', width: '80%', margin: '0 auto 8px auto' }}></div>
+    + </div>
+    + <div>
+    + <div style={{ height: '40px', borderBottom: '1px solid #4b5563', width: '80%', margin: '0 auto 8px auto' }}></div>
+    + </div>
+    + </div>
+    + </div>
+    + <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+    + <div>
+    + </div>
+    + <div style={{ display: 'flex', gap: '8px', background: 'rgba(255, 255, 255, 0.02)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+    + </div>
+    + </div>
+    + </div>
+    + <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    + </div>
+    + <div style={{ display: 'grid', gridTemplateColumns: '1fr 2.5fr', gap: '24px', alignItems: 'flex-start' }}>
+    + <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', textAlign: 'center' }}>
+    + <div style={{ position: 'relative', width: '120px', height: '120px' }}>
+    + <div style={{ width: '120px', height: '120px', borderRadius: '16px', overflow: 'hidden', border: '3px solid var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffffff', padding: '8px' }}>
+    + </div>
+  Removed lines:
+    - <div class="header">
+    - </div>
+    - <div class="title">EXPERIENCE CERTIFICATE</div>
+    - <div class="content">
+    - </div>
+    - <div class="signature">
+    - </div>
+    - <div className={`app-layout ${isDarkMode ? 'dark-theme' : ''}`} style={{ background: 'var(--bg-app)', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', display: 'flex' }}>
+    - <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+    - </div>
+    - </div>
+    - <div className={`app-layout ${isDarkMode ? 'dark-theme' : ''}`} style={{ background: 'var(--bg-app)', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', display: 'flex' }}>
+    - <div className="toast-in-out" style={{
+    - </div>
+    - <div className="erp-card fade-in" style={{ width: '100%', maxWidth: '420px', padding: '40px 32px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)' }}>
+    - <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+    - <div style={{
+    - </div>
+    - </div>
+    - <div style={{
+    - </div>
+    - <div style={{
+    - </div>
+    - <div style={{
+    - </div>
+    - <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    - <div>
+    - <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+    - </div>
+    - </div>
+    - <div>
+    - <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+    - </div>
+    - <div style={{ textAlign: 'right', marginTop: '8px' }}>
+    - </div>
+    - </div>
+    - <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+    - </div>
+    - </form>
+    - <form onSubmit={handleForgotPasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    - <div>
+    - <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+    - </div>
+    - </div>
+    - <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+    - </div>
+    - <div style={{ textAlign: 'center', marginTop: '8px' }}>
+    - </div>
+    - </form>
+    - <form onSubmit={handleVerifyOtpSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    - <div>
+    - <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+    - </div>
+    - </div>
+    - <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+    - </div>
+    - <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
+    - </div>
+    - </form>
+    - <form onSubmit={handleResetPasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    - <div>
+    - <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+    - </div>
+    - </div>
+    - <div>
+    - <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+    - </div>
+    - </div>
+    - <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+    - </div>
+    - <div style={{ textAlign: 'center', marginTop: '8px' }}>
+    - </div>
+    - </form>
+    - <div style={{ textAlign: 'center', marginTop: '24px' }}>
+    - </div>
+    - </div>
+    - </div>
+    - <div className={`app-layout ${isDarkMode ? 'dark-theme' : ''}`} style={{ background: 'var(--bg-app)', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', display: 'flex' }}>
+    - <div className="erp-card fade-in" style={{ width: '100%', maxWidth: '550px', padding: '40px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)' }}>
+    - <div style={{ display: 'flex', alignItems: 'center', justifyBetween: 'space-between', marginBottom: '24px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
+    - <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+    - </div>
+    - </div>
+    - <form onSubmit={handleWizardSubmit}>
+    - <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    - <div>
+    - </div>
+    - </div>
+    - <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    - <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+    - <div
+    - </div>
+    - </div>
+    - </div>
+    - <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    - <div>
+    - </div>
+    - </div>
+    - <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    - <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+    - <div>
+    - </div>
+    - <div>
+    - </div>
+    - </div>
+    - </div>
+    - <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    - <div style={{ padding: '16px', borderRadius: 'var(--radius-md)', backgroundColor: 'rgba(2, 6, 23, 0.4)', fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+    - <div><strong>School Name:</strong> {wizardForm.name || 'N/A'}</div>
+    - <div><strong>Contact Person:</strong> {wizardForm.contact_person || 'N/A'} ({wizardForm.contact_number})</div>
+    - <div><strong>Address:</strong> {wizardForm.address || 'N/A'}</div>
+    - <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '8px' }}>
+    - </div>
+    - </div>
+    - </div>
+    - <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '32px', borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
+    - </div>
+    - </form>
+    - </div>
+    - </div>
+    - } else if (!/[!@#$%^&*()_+={}\[\]|\\\\:;\"\'<>,.?\/~`\-]/.test(np)) {
+    - <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    - <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    - </div>
+    - <div style={{ display: 'grid', gridTemplateColumns: '1fr 2.5fr', gap: '24px', alignItems: 'flex-start' }}>
+    - <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', textAlign: 'center' }}>
+    - <div style={{ position: 'relative', width: '120px', height: '120px' }}>
+
+Imbalance in hunk @@  export default function App() { @@:
+  Net Div: 2 (Added 92, Removed 90)
+  Net Form: 0 (Added 0, Removed 0)
+  Net Fragment: 0 (Added 2, Removed 2)
+  Added lines:
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+    + <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+    + </div>
+    + </div>
+    + <div style={{ width: '100%', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
+    + </div>
+    + </div>
+    + <div className="erp-card" style={{ padding: '0', overflow: 'hidden' }}>
+    + <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.01)', padding: '0 16px' }}>
+    + </div>
+    + <div style={{ padding: '24px' }}>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    + <div style={{
+    + <div>
+    + </div>
+    + </div>
+    + <div className="profile-detail-grid">
+    + <div className="profile-detail-item">
+    + </div>
+    + <div className="profile-detail-item">
+    + </div>
+    + <div className="profile-detail-item">
+    + </div>
+    + <div className="profile-detail-item">
+    + </div>
+    + <div className="profile-detail-item" style={{ gridColumn: 'span 2' }}>
+    + </div>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    + <div className="profile-detail-grid">
+    + <div className="profile-detail-item">
+    + </div>
+    + <div className="profile-detail-item">
+    + </div>
+    + <div className="profile-detail-item">
+    + </div>
+    + <div className="profile-detail-item">
+    + </div>
+    + <div className="profile-detail-item" style={{ gridColumn: 'span 2' }}>
+    + </div>
+    + <div className="profile-detail-item">
+    + </div>
+    + <div className="profile-detail-item">
+    + </div>
+    + <div className="profile-detail-item">
+    + </div>
+    + </div>
+    + </div>
+    + <form onSubmit={handleUpdateProfile} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    + <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+    + <div>
+    + {profileErrors.name && <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px' }}>{profileErrors.name}</div>}
+    + </div>
+    + <div>
+    + {profileErrors.email && <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px' }}>{profileErrors.email}</div>}
+    + </div>
+    + </div>
+    + <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+    + <div>
+    + {profileErrors.phone && <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px' }}>{profileErrors.phone}</div>}
+    + </div>
+    + <div>
+    + </div>
+    + </div>
+    + <div>
+    + </div>
+    + <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '12px' }}>
+    + </div>
+    + </form>
+    + <form onSubmit={handleChangePasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    + <div>
+    + {passwordErrors.current_password && <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px' }}>{passwordErrors.current_password}</div>}
+    + </div>
+    + <div>
+    + {passwordErrors.new_password && <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px' }}>{passwordErrors.new_password}</div>}
+    + <div style={{ marginTop: '8px', padding: '10px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
+    + <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Password complexity requirements:</div>
+    + <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontSize: '0.75rem' }}>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: passwordForm.new_password.length >= 8 ? '#10b981' : 'var(--text-muted)' }}>
+    + </div>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: /[A-Z]/.test(passwordForm.new_password) ? '#10b981' : 'var(--text-muted)' }}>
+    + </div>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: /[a-z]/.test(passwordForm.new_password) ? '#10b981' : 'var(--text-muted)' }}>
+    + </div>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: /[0-9]/.test(passwordForm.new_password) ? '#10b981' : 'var(--text-muted)' }}>
+    + </div>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: /[!@#$%^&*()_+={}\[\]|\\\\:;\"\'<>,.?\/~`\-]/.test(passwordForm.new_password) ? '#10b981' : 'var(--text-muted)' }}>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + <div>
+    + {passwordErrors.confirm_password && <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px' }}>{passwordErrors.confirm_password}</div>}
+    + </div>
+    + <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '12px' }}>
+    + </div>
+    + </form>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
+    + <div>
+    + </div>
+    + </div>
+    + <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '24px' }}>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    + <div className="profile-detail-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+    + <div className="profile-detail-item">
+    + </div>
+    + <div className="profile-detail-item">
+    + </div>
+    + <div className="profile-detail-item">
+    + </div>
+    + <div className="profile-detail-item">
+    + </div>
+    + </div>
+    + <div style={{
+    + <div style={{
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+    + <div style={{
+    + <div style={{ display: 'flex', flexDirection: 'column' }}>
+    + </div>
+    + </div>
+    + <div style={{
+    + <div style={{ display: 'flex', flexDirection: 'column' }}>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', borderLeft: '1px solid var(--border-color)', paddingLeft: '24px' }}>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+    + <div key={plan.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '6px' }}>
+    + <div>
+    + <div style={{ fontSize: '0.85rem', fontWeight: 700 }}>{plan.name}</div>
+    + <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Duration: {plan.duration_days} Days</div>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + <div className={`app-layout ${isDarkMode ? 'dark-theme' : ''}`}>
+    + <div style={{
+    + </div>
+    + <div className="toast-in-out"
+    + </div>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px', padding: '0 8px' }}>
+    + <div style={{
+    + </div>
+    + <div>
+    + </div>
+    + </div>
+    + <div className="sidebar-nav">
+    + </div>
+    + <div
+    + <div style={{
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    + </div>
+    + </div>
+    + <div className="main-wrapper">
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+    + <div style={{ height: '24px', width: '1px', backgroundColor: 'var(--border-color)' }} />
+    + </div>
+    + <div className="content-body">
+    + <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    + <div className="stats-grid">
+    + <div className="erp-card">
+    + <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px' }}>{superStats.total_schools}</div>
+    + </div>
+    + <div className="erp-card">
+    + <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px', color: '#ef4444' }}>{superStats.inactive_schools}</div>
+    + </div>
+    + <div className="erp-card">
+    + <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px' }}>{superStats.total_students}</div>
+    + </div>
+    + <div className="erp-card">
+    + <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px', color: '#10b981' }}>${superStats.total_revenue.toLocaleString()}</div>
+    + </div>
+    + </div>
+    + <div className="erp-card">
+    + <div className="erp-table-container">
+    + </div>
+    + </div>
+    + </div>
+    + <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    + </div>
+    + <div className="erp-card">
+    + <div className="erp-table-container">
+    + <div style={{ fontWeight: 'bold', color: 'var(--color-primary)' }} title="Click to view details">
+    + </div>
+    + <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+    + <div className="menu-dropdown" style={{ right: 0, top: '24px' }}>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    + <div>
+    + </div>
+    + </div>
+    + <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    + <div className="erp-table-container">
+    + <div style={{ display: 'flex', gap: '8px' }}>
+    + </div>
+    + </div>
+    + </div>
+    + <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    + <div className="erp-table-container">
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + <div className="modal-overlay" onClick={() => setShowInviteModal(false)}>
+    + <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+    + </div>
+    + <form onSubmit={handleInviteSchoolSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + </form>
+    + </div>
+    + </div>
+    + <div className="modal-overlay" onClick={() => setShowExtendModal(null)}>
+    + <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+    + </div>
+    + <form onSubmit={handleExtendSubscription} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+    + <div>
+    + </div>
+    + </form>
+    + </div>
+    + </div>
+    + <div className="modal-overlay" onClick={() => setShowAddPlanModal(false)}>
+    + <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+    + </div>
+    + <form onSubmit={handleSavePlan} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+    + <div>
+    + </div>
+    + <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + </div>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + </form>
+    + </div>
+    + </div>
+    + <div className="modal-overlay" onClick={() => setShowEditPlanModal(null)}>
+    + <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+    + </div>
+    + <form onSubmit={handleSavePlan} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+    + <div>
+    + </div>
+    + <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + </div>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + </form>
+    + </div>
+    + </div>
+    + <div className="modal-overlay" onClick={() => setShowManualSubModal(null)}>
+    + <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+    + <div>
+    + </div>
+    + </div>
+    + <form onSubmit={handleSaveManualSubscription} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + </form>
+    + </div>
+    + </div>
+    + <div className="modal-overlay" onClick={() => setShowLogoutConfirm(false)}>
+    + <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px', textAlign: 'center', padding: '32px' }}>
+    + <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+    + <div style={{
+    + </div>
+    + <div style={{ display: 'flex', gap: '12px', width: '100%', marginTop: '16px' }}>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + <div className="modal-overlay" onClick={() => { setDeleteConfirm(null); setDeletePassword(''); setDeleteError(''); }}>
+    + <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px', textAlign: 'center', padding: '32px' }}>
+    + <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+    + <div style={{
+    + </div>
+    + <div style={{ width: '100%', textAlign: 'left', marginTop: '12px' }}>
+    + <div style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '4px', fontWeight: 600 }}>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', gap: '12px', width: '100%', marginTop: '16px' }}>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + <div className="modal-overlay" onClick={() => { setSelectedViewSchool(null); setSchoolDetailsData(null); }}>
+    + <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '900px', width: '90%', maxHeight: '90vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
+    + <div style={{ padding: '24px 24px 16px 24px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+    + <div>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', gap: '8px' }}>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', background: 'rgba(255, 255, 255, 0.02)', padding: '0 24px' }}>
+    + </div>
+    + <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px 0' }}>
+    + <div style={{ height: '20px', width: '40%', background: 'rgba(255,255,255,0.05)', borderRadius: '4px' }}></div>
+    + <div style={{ height: '100px', width: '100%', background: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}></div>
+    + <div style={{ height: '150px', width: '100%', background: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}></div>
+    + </div>
+    + <>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    + <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+    + <div style={{ padding: '20px', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
+    + </div>
+    + <div style={{ padding: '20px', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
+    + </div>
+    + <div style={{ padding: '20px', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
+    + </div>
+    + </div>
+    + <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+    + <div style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '20px', background: 'rgba(255,255,255,0.01)' }}>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+    + <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+    + </div>
+    + <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+    + </div>
+    + <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+    + </div>
+    + <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+    + </div>
+    + </div>
+    + </div>
+    + <div style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '20px', background: 'rgba(255,255,255,0.01)' }}>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + <div>
+    + <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
+    + </div>
+    + <div className="table-responsive" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+    + </div>
+    + </div>
+    + <div>
+    + <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
+    + </div>
+    + <div className="table-responsive" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+    + </div>
+    + </div>
+    + <div>
+    + <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
+    + </div>
+    + <div className="table-responsive" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }} className="fade-in">
+    + <div>
+    + </div>
+    + <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr)', gap: '24px', alignItems: 'start' }}>
+    + <div className="erp-card" style={{ textAlign: 'center', background: 'rgba(255, 255, 255, 0.01)', padding: '20px' }}>
+    + <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '16px', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.8rem', textAlign: 'left', color: 'var(--text-secondary)' }}>
+    + <div><strong>Roll No.:</strong> {selectedMemberStudent.roll_number || 'N/A'}</div>
+    + <div><strong>SR No.:</strong> {selectedMemberStudent.sr_no || 'N/A'}</div>
+    + <div><strong>Class:</strong> {selectedMemberClass ? selectedMemberClass.name : (schoolDetailsData.classes.find(c => c.id === selectedMemberStudent.class_id)?.name || 'N/A')}</div>
+    + <div><strong>Section:</strong> {selectedMemberStudent.group_name || 'N/A'}</div>
+    + <div><strong>Gender:</strong> {selectedMemberStudent.gender || 'Male'}</div>
+    + <div><strong>Contact:</strong> {selectedMemberStudent.phone || 'N/A'}</div>
+    + <div><strong>Email:</strong> {selectedMemberStudent.email || 'N/A'}</div>
+    + <div><strong>Nationality:</strong> {selectedMemberStudent.nationality || 'Indian'}</div>
+    + <div><strong>Caste:</strong> {selectedMemberStudent.caste || 'N/A'}</div>
+    + <div><strong>Exit Date:</strong> {formatDate(selectedMemberStudent.exit_date)}</div>
+    + <div><strong>Date of Birth:</strong> {formatDate(selectedMemberStudent.date_of_birth)}</div>
+    + <div><strong>Admission Date:</strong> {formatDate(selectedMemberStudent.admission_date)}</div>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    + <div className="erp-card" style={{ padding: '16px' }}>
+    + <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.85rem' }}>
+    + <div><strong>Father's Name:</strong> {selectedMemberStudent.father_name || 'N/A'}</div>
+    + <div><strong>Mother's Name:</strong> {selectedMemberStudent.mother_name || 'N/A'}</div>
+    + <div><strong>Emergency Contact:</strong> {selectedMemberStudent.emergency_contact || 'N/A'}</div>
+    + <div><strong>Blood Group:</strong> {selectedMemberStudent.blood_group || 'N/A'}</div>
+    + <div><strong>Aadhaar Number:</strong> {selectedMemberStudent.aadhaar_number || 'N/A'}</div>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', gap: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px' }}>
+    + </div>
+    + <div className="erp-card" style={{ padding: '16px' }}>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+    + <div style={{ display: 'flex', gap: '12px', fontSize: '0.75rem' }}>
+    + </div>
+    + </div>
+    + <div className="table-responsive" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+    + </div>
+    + </div>
+    + <div className="erp-card" style={{ padding: '16px' }}>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+    + <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
+    + <div>
+    + <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{doc.name || `Document ${idx+1}`}</div>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }} className="fade-in">
+    + <div>
+    + </div>
+    + <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr)', gap: '24px', alignItems: 'start' }}>
+    + <div className="erp-card" style={{ textAlign: 'center', background: 'rgba(255, 255, 255, 0.01)', padding: '20px' }}>
+    + <div
+    + </div>
+    + <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '16px', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.8rem', textAlign: 'left', color: 'var(--text-secondary)' }}>
+    + <div><strong>Gender:</strong> {selectedMemberTeacher.gender || 'Male'}</div>
+    + <div><strong>Email:</strong> {selectedMemberTeacher.email || 'N/A'}</div>
+    + <div><strong>Phone:</strong> {selectedMemberTeacher.phone || 'N/A'}</div>
+    + <div><strong>Address:</strong> {selectedMemberTeacher.address || 'N/A'}</div>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    + <div className="erp-card" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', padding: '16px' }}>
+    + <div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+    + <div><strong>Joining Date:</strong> {selectedMemberTeacher.joining_date ? formatDate(selectedMemberTeacher.joining_date) : 'N/A'}</div>
+    + <div><strong>Exit Date:</strong> {selectedMemberTeacher.exit_date && selectedMemberTeacher.exit_date !== 'Active / None' ? formatDate(selectedMemberTeacher.exit_date) : 'Active / None'}</div>
+    + <div><strong>Assigned Classes:</strong> {selectedMemberTeacher.assigned_classes || 'None'}</div>
+    + <div><strong>Base Salary:</strong> {selectedViewSchool?.currency || 'INR'} {selectedMemberTeacher.salary_amount ? Math.round(selectedMemberTeacher.salary_amount).toLocaleString() : '0'}</div>
+    + </div>
+    + </div>
+    + <div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+    + <div><strong>Education:</strong> {selectedMemberTeacher.qualification || 'N/A'}</div>
+    + <div><strong>Experience:</strong> {selectedMemberTeacher.experience || 'N/A'}</div>
+    + <div><strong>Aadhaar Number:</strong> {selectedMemberTeacher.aadhaar_number || 'N/A'}</div>
+    + <div><strong>PAN Number:</strong> {selectedMemberTeacher.pan_number ? selectedMemberTeacher.pan_number.toUpperCase() : 'N/A'}</div>
+    + </div>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', gap: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px' }}>
+    + </div>
+    + <div className="erp-card" style={{ padding: '16px' }}>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+    + <div style={{ display: 'flex', gap: '12px', fontSize: '0.75rem' }}>
+    + </div>
+    + </div>
+    + <div className="table-responsive" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+    + </div>
+    + </div>
+    + <div className="erp-card" style={{ padding: '16px' }}>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+    + <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
+    + <div>
+    + <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{doc.name || `Document ${idx+1}`}</div>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }} className="fade-in">
+    + <div>
+    + </div>
+    + <div>
+    + <div className="table-responsive" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+    + </div>
+    + </div>
+    + </div>
+    + <>
+    + <div>
+    + <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
+    + <div
+    + <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{c.name}</div>
+    + </div>
+    + </div>
+    + </div>
+    + <div>
+    + <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '12px' }}>
+    + <div
+    + <div>
+    + <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{t.name}</div>
+    + </div>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + </>
+    + </div>
+    + </>
+    + </div>
+    + </div>
+    + </div>
+    + <div className="modal-overlay" onClick={() => setShowEditSchoolModal(null)}>
+    + <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+    + </div>
+    + <form onSubmit={handleEditSchoolSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + </form>
+    + </div>
+    + </div>
+    + <div className="modal-overlay" style={{ zIndex: 300000 }} onClick={() => setSelectedMemberStudent(null)}>
+    + <div className="modal-content fade-in" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '750px', width: '90%', maxHeight: '85vh', display: 'flex', flexDirection: 'column', padding: '24px' }}>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px', marginBottom: '20px' }}>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+    + <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(var(--color-primary-rgb), 0.1)', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
+    + </div>
+    + <div>
+    + </div>
+    + </div>
+    + </div>
+    + <div style={{ overflowY: 'auto', flex: 1, paddingRight: '4px' }}>
+    + <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '16px', marginBottom: '20px' }}>
+    + <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+    + <div style={{ display: 'flex', gap: '12px', fontSize: '0.8rem' }}>
+    + </div>
+    + </div>
+    + <div className="table-responsive" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+    + </div>
+    + </div>
+    + <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px', marginTop: '16px', display: 'flex', justifyContent: 'flex-end' }}>
+    + </div>
+    + </div>
+    + </div>
+    + <div className="modal-overlay" style={{ zIndex: 300000 }} onClick={() => setSelectedMemberTeacher(null)}>
+    + <div className="modal-content fade-in" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '750px', width: '90%', maxHeight: '85vh', display: 'flex', flexDirection: 'column', padding: '24px' }}>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px', marginBottom: '20px' }}>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+    + <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(var(--color-secondary-rgb), 0.1)', color: 'var(--color-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
+    + </div>
+    + <div>
+    + </div>
+    + </div>
+    + </div>
+    + <div style={{ overflowY: 'auto', flex: 1, paddingRight: '4px' }}>
+    + <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '16px', marginBottom: '20px' }}>
+    + <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+    + <div style={{ display: 'flex', gap: '12px', fontSize: '0.8rem' }}>
+    + </div>
+    + </div>
+    + <div className="table-responsive" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+    + </div>
+    + </div>
+    + <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px', marginTop: '16px', display: 'flex', justifyContent: 'flex-end' }}>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + <div className={`app-layout ${isDarkMode ? 'dark-theme' : ''}`} style={{
+    + <div style={{
+    + <div style={{
+    + </div>
+    + <div>
+    + </div>
+    + <div style={{ width: '100%' }}>
+    + <div style={{
+    + <div style={{ padding: '24px', border: '1px dashed var(--border-color)', borderRadius: '8px', color: 'var(--text-secondary)' }}>
+    + <div key={plan.id} style={{
+    + <div>
+    + <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-primary)' }}>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '20px', width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    + <div style={{ textAlign: 'left' }}>
+    + <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>bilalnashi6@gmail.com</div>
+    + </div>
+    + <div style={{ display: 'flex', gap: '12px' }}>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + <div className={`app-layout ${isDarkMode ? 'dark-theme' : ''}`}>
+    + <div style={{
+    + </div>
+    + <div className="toast-in-out"
+    + </div>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px', padding: '0 8px' }}>
+    + <div style={{
+    + </div>
+    + <div>
+    + </div>
+    + </div>
+    + <div className="sidebar-nav">
+    + </div>
+    + <div
+    + <div style={{
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    + </div>
+    + </div>
+    + <div className="main-wrapper">
+    + <div style={{
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+    + <div style={{ position: 'relative' }}>
+    + <div className="menu-dropdown notification-drawer-content" style={{ width: '300px', right: 0, padding: '12px' }}>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '250px', overflowY: 'auto' }}>
+    + <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', padding: '16px' }}>No new notifications</div>
+    + <div key={n.id} style={{ fontSize: '0.75rem', padding: '8px', borderRadius: '4px', backgroundColor: n.is_read ? 'transparent' : 'rgba(59,130,246,0.05)', borderLeft: '3px solid var(--color-primary)' }}>
+    + </div>
+    + </div>
+    + <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '8px', marginTop: '8px', textAlign: 'center' }}>
+    + </div>
+    + </div>
+    + </div>
+    + <div style={{ height: '24px', width: '1px', backgroundColor: 'var(--border-color)' }} />
+    + <div style={{
+    + <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+    + <div style={{ position: 'relative' }}>
+    + </div>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '8px' }}>
+    + </div>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+    + </div>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+    + <div style={{ position: 'relative' }}>
+    + <div className="menu-dropdown notification-drawer-content" style={{ width: '300px', right: 0, padding: '12px' }}>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '250px', overflowY: 'auto' }}>
+    + <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', padding: '16px' }}>No new notifications</div>
+    + <div key={n.id} style={{ fontSize: '0.75rem', padding: '8px', borderRadius: '4px', backgroundColor: n.is_read ? 'transparent' : 'rgba(59,130,246,0.05)', borderLeft: '3px solid var(--color-primary)' }}>
+    + </div>
+    + </div>
+    + <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '8px', marginTop: '8px', textAlign: 'center' }}>
+    + </div>
+    + </div>
+    + </div>
+    + <div style={{ height: '24px', width: '1px', backgroundColor: 'var(--border-color)' }} />
+    + </div>
+    + <div className="content-body">
+    + <div className="erp-card fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '64px 32px', gap: '24px', maxWidth: '600px', margin: '40px auto' }}>
+    + <div style={{
+    + </div>
+    + <div>
+    + </div>
+    + <>
+    + <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    + <div className="erp-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', padding: '20px' }}>
+    + <div>
+    + <div>
+    + <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
+    + <div className="loading-spinner"></div>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    + <div className="erp-card" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
+    + <div>
+    + <div style={{ fontSize: '1.1rem', fontWeight: 700, marginTop: '4px' }}>
+    + </div>
+    + <div>
+    + <div style={{ fontSize: '1.1rem', fontWeight: 700, marginTop: '4px' }}>
+    + </div>
+    + <div>
+    + <div style={{ fontSize: '1.1rem', fontWeight: 700, marginTop: '4px' }}>
+    + </div>
+    + <div>
+    + <div style={{ marginTop: '4px' }}>
+    + </div>
+    + <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
+    + <div className="erp-card" style={{ borderLeft: '4px solid #10b981' }}>
+    + <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '6px', color: '#10b981' }}>
+    + </div>
+    + </div>
+    + <div className="erp-card" style={{ borderLeft: '4px solid #ef4444' }}>
+    + <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '6px', color: '#ef4444' }}>
+    + </div>
+    + </div>
+    + <div className="erp-card" style={{ borderLeft: '4px solid #3b82f6' }}>
+    + <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '6px', color: '#3b82f6' }}>
+    + </div>
+    + </div>
+    + <div className="erp-card" style={{ borderLeft: '4px solid #f59e0b' }}>
+    + <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '6px', color: '#f59e0b' }}>
+    + </div>
+    + </div>
+    + </div>
+    + <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px' }}>
+    + <div className="erp-card">
+    + <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', textAlign: 'center', marginBottom: '20px' }}>
+    + <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '12px', borderRadius: '8px' }}>
+    + <div style={{ color: '#10b981', fontSize: '1.5rem', fontWeight: 800 }}>
+    + </div>
+    + </div>
+    + <div style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '12px', borderRadius: '8px' }}>
+    + <div style={{ color: '#ef4444', fontSize: '1.5rem', fontWeight: 800 }}>
+    + </div>
+    + </div>
+    + <div style={{ background: 'rgba(245, 158, 11, 0.1)', padding: '12px', borderRadius: '8px' }}>
+    + <div style={{ color: '#f59e0b', fontSize: '1.5rem', fontWeight: 800 }}>
+    + </div>
+    + </div>
+    + </div>
+    + <div>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '6px' }}>
+    + </div>
+    + <div style={{ height: '8px', background: 'var(--border-color)', borderRadius: '4px', overflow: 'hidden' }}>
+    + <div style={{
+    + }}></div>
+    + </div>
+    + </div>
+    + </div>
+    + <div className="erp-card">
+    + <div className="table-responsive" style={{ maxHeight: '180px', overflowY: 'auto' }}>
+    + </div>
+    + </div>
+    + <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px' }}>
+    + <div className="erp-card">
+    + <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+    + <div key={month} style={{ border: '1px solid var(--border-color)', borderRadius: '6px', padding: '10px', textAlign: 'center', backgroundColor: 'rgba(255,255,255,0.01)' }}>
+    + <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{month}</div>
+    + <div style={{ fontSize: '0.9rem', fontWeight: 700, marginTop: '4px', color: 'var(--color-primary)' }}>
+    + </div>
+    + </div>
+    + </div>
+    + <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+    + </div>
+    + <div className="erp-card">
+    + <div className="table-responsive" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+    + </div>
+    + </div>
+    + <div className="erp-card">
+    + <div className="table-responsive">
+    + </div>
+    + <div className="erp-card">
+    + <div className="table-responsive">
+    + <div className="erp-card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+    + </div>
+    + </div>
+    + <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    + <div className="erp-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px' }}>
+    + <div>
+    + </div>
+    + </div>
+    + <div className="stats-grid">
+    + <div className="erp-card">
+    + <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px' }}>{totalStudents}</div>
+    + </div>
+    + <div className="erp-card">
+    + <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px', color: '#10b981' }}>
+    + </div>
+    + </div>
+    + <div className="erp-card">
+    + <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px', color: '#ef4444' }}>
+    + </div>
+    + </div>
+    + <div className="erp-card">
+    + <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px', color: 'var(--color-primary)' }}>
+    + </div>
+    + </div>
+    + </div>
+    + <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px' }}>
+    + <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    + <div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+    + <div key={sched.period} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '10px', backgroundColor: 'rgba(255,255,255,0.01)' }}>
+    + <div>
+    + <div style={{ fontSize: '0.9rem', fontWeight: 700, marginTop: '2px' }}>{sched.subject}</div>
+    + </div>
+    + <div style={{ textAlign: 'right' }}>
+    + <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{sched.class_name}</div>
+    + </div>
+    + </div>
+    + </div>
+    + <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', border: '1px dashed var(--border-color)', borderRadius: '6px' }}>
+    + </div>
+    + </div>
+    + <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+    + <div key={sched.period} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '10px', backgroundColor: 'rgba(255,255,255,0.01)' }}>
+    + <div>
+    + <div style={{ fontSize: '0.9rem', fontWeight: 700, marginTop: '2px' }}>{sched.subject}</div>
+    + </div>
+    + <div style={{ textAlign: 'right' }}>
+    + <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{sched.class_name}</div>
+    + </div>
+    + </div>
+    + </div>
+    + <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', border: '1px dashed var(--border-color)', borderRadius: '6px' }}>
+    + </div>
+    + </div>
+    + </div>
+    + <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    + <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+    + <div key={month} style={{ border: '1px solid var(--border-color)', borderRadius: '6px', padding: '10px', textAlign: 'center', backgroundColor: 'rgba(255,255,255,0.01)' }}>
+    + <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{month}</div>
+    + <div style={{ fontSize: '0.90rem', fontWeight: 700, marginTop: '4px', color: 'var(--color-primary)' }}>
+    + </div>
+    + </div>
+    + </div>
+    + <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', border: '1px dashed var(--border-color)', borderRadius: '6px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    + </div>
+    + </div>
+    + </div>
+    + <div className="erp-card">
+    + <div className="table-responsive">
+    + <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+    + </div>
+    + </div>
+    + </div>
+    + <div className="erp-card">
+    + <div className="table-responsive">
+    + </div>
+    + </div>
+    + </div>
+    + <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    + <div className="stats-grid">
+    + <div className="erp-card">
+    + <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px' }}>{dashboardStats.total_students}</div>
+    + </div>
+    + <div className="erp-card">
+    + <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px' }}>{dashboardStats.total_teachers}</div>
+    + </div>
+    + <div
+    + <div style={{ fontSize: '2.0rem', fontWeight: 800, marginTop: '8px', color: '#ef4444' }}>
+    + </div>
+    + <div className="erp-card">
+    + <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px', color: '#10b981' }}>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    + <div className="erp-card">
+    + <div style={{ height: '320px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '10px 20px', borderBottom: '2px solid var(--border-color)' }}>
+    + <div key={f.month} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, gap: '8px' }}>
+    + <div style={{
+    + </div>
+    + </div>
+    + <div style={{ height: '320px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '10px 20px', borderBottom: '2px solid var(--border-color)' }}>
+    + <div key={s.month} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, gap: '8px' }}>
+    + <div
+    + </div>
+    + </div>
+    + <div className="erp-card">
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+    + </div>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+    + </div>
+    + <div style={{ display: 'flex', justifyContent: 'center', padding: '30px', color: 'var(--text-muted)' }}>
+    + </div>
+    + <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.01)', borderRadius: 'var(--radius-sm)', border: '1px dashed var(--border-color)' }}>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-muted)', paddingBottom: '6px', borderBottom: '1px solid var(--border-color)' }}>
+    + </div>
+    + <div className="dashboard-timetable-grid" style={{ gap: '16px', marginTop: '8px' }}>
+    + <div
+    + </div>
+    + </div>
+    + <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    + <div className="erp-card">
+    + <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '32px', alignItems: 'start' }}>
+    + <div className="erp-card" style={{ textAlign: 'center', background: 'rgba(2, 6, 23, 0.2)' }}>
+    + <div
+    + </div>
+    + <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '24px', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.85rem', textAlign: 'left', color: 'var(--text-secondary)' }}>
+    + <div><strong>Gender:</strong> {selectedTeacher.gender || 'Male'}</div>
+    + <div><strong>Email:</strong> {selectedTeacher.email || 'N/A'}</div>
+    + <div><strong>Phone:</strong> {selectedTeacher.phone || 'N/A'}</div>
+    + <div><strong>Address:</strong> {selectedTeacher.address || 'N/A'}</div>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    + <div className="erp-card" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+    + <div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+    + <div><strong>Joining Date:</strong> {selectedTeacher.joining_date || 'N/A'}</div>
+    + <div><strong>Exit Date:</strong> {selectedTeacher.exit_date || 'Active / None'}</div>
+    + <div>
+    + </div>
+    + <div><strong>Assigned Classes:</strong> {selectedTeacher.assigned_classes || 'None'}</div>
+    + <div style={{ marginTop: '8px' }}>
+    + </div>
+    + </div>
+    + </div>
+    + <div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+    + <div><strong>Education:</strong> {selectedTeacher.qualification || 'N/A'}</div>
+    + <div><strong>Experience:</strong> {selectedTeacher.experience || 'N/A'}</div>
+    + <div><strong>Aadhaar Number:</strong> {selectedTeacher.aadhaar_number || 'N/A'}</div>
+    + <div><strong>PAN Number:</strong> {selectedTeacher.pan_number ? selectedTeacher.pan_number.toUpperCase() : 'N/A'}</div>
+    + </div>
+    + </div>
+    + </div>
+    + <div className="erp-card">
+    + <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px', fontSize: '0.85rem' }}>
+    + </div>
+    + <div className="table-responsive">
+    + </div>
+    + </div>
+    + <div className="erp-card">
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+    + </div>
+    + <div className="salary-month-grid">
+    + <div key={sal.month} className={`salary-month-card ${sal.status === 'Pending' ? 'pending' : ''}`}>
+    + <div style={{ fontSize: '0.7rem', color: '#10b981' }}>
+    + </div>
+    + <div>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + <div>
+    + <div className="teacher-grid">
+    + <div
+    + <div style={{ position: 'absolute', top: '16px', right: '16px' }} onClick={(e) => e.stopPropagation()}>
+    + <div className="menu-dropdown" style={{ right: 0, top: '24px' }}>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
+    + <div
+    + </div>
+    + <div>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+    + <div><strong>Phone:</strong> {t.phone || 'N/A'}</div>
+    + <div><strong>Joined:</strong> {t.joining_date || 'N/A'}</div>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '24px 0', width: '100%', gap: '8px' }}>
+    + </div>
+    + <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-secondary)' }}>
+    + </div>
+    + </div>
+    + <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    + <div className="erp-card">
+    + <div style={{ display: 'grid', gridTemplateColumns: '320px minmax(0, 1fr)', gap: '32px', alignItems: 'start' }}>
+    + <div className="erp-card" style={{ textAlign: 'center', background: 'rgba(2, 6, 23, 0.2)' }}>
+    + <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginTop: '6px', marginBottom: '6px' }}>
+    + </div>
+    + <div style={{ display: 'flex', justifyContent: 'center', marginTop: '4px' }}>
+    + </div>
+    + <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '16px', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.85rem', textAlign: 'left', color: 'var(--text-secondary)' }}>
+    + <div><strong>Roll No.:</strong> {activeStudent.roll_number}</div>
+    + <div><strong>SR No.:</strong> {activeStudent.sr_no || 'N/A'}</div>
+    + <div><strong>Class:</strong> {getClassName(activeStudent.class_id)}</div>
+    + <div><strong>Section:</strong> {activeStudent.group_name || 'NA'}</div>
+    + <div><strong>Gender:</strong> {activeStudent.gender || 'Male'}</div>
+    + <div><strong>Contact:</strong> {activeStudent.phone || 'N/A'}</div>
+    + <div><strong>Email:</strong> {activeStudent.email || 'N/A'}</div>
+    + <div><strong>Country:</strong> {activeStudent.country || 'N/A'}</div>
+    + <div><strong>State:</strong> {activeStudent.state || 'N/A'}</div>
+    + <div><strong>City:</strong> {activeStudent.city || 'N/A'}</div>
+    + <div><strong>Address:</strong> {activeStudent.address || 'N/A'}</div>
+    + <div><strong>Nationality:</strong> {activeStudent.nationality || 'Indian'}</div>
+    + <div><strong>Caste:</strong> {activeStudent.caste || 'N/A'}</div>
+    + <div><strong>Status:</strong> <span className={`badge ${activeStudent.status === 'Inactive' ? 'badge-danger' : 'badge-success'}`} style={{ display: 'inline-block', padding: '2px 8px', fontSize: '0.75rem' }}>{activeStudent.status || 'Active'}</span></div>
+    + <div><strong>Exit Date:</strong> {formatDate(activeStudent.exit_date)}</div>
+    + <div><strong>Date of Birth:</strong> {formatDate(activeStudent.date_of_birth)}</div>
+    + <div><strong>Admission Date:</strong> {formatDate(activeStudent.admission_date)}</div>
+    + <>
+    + </>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    + <div className="erp-card">
+    + <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', fontSize: '0.9rem' }}>
+    + <div><strong>Father's Name:</strong> {activeStudent.father_name || 'N/A'}</div>
+    + <div><strong>Mother's Name:</strong> {activeStudent.mother_name || 'N/A'}</div>
+    + <div><strong>Emergency Contact:</strong> {activeStudent.emergency_contact || 'N/A'}</div>
+    + <div><strong>Blood Group:</strong> {activeStudent.blood_group || 'N/A'}</div>
+    + <div><strong>Aadhaar Number:</strong> {activeStudent.aadhaar_number || 'N/A'}</div>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', gap: '24px', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px' }}>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    + <div className="erp-card">
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+    + <div>
+    + </div>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+    + </div>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + <div className="erp-card">
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
+    + <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+    + </div>
+    + <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '32px 24px', fontSize: '0.85rem', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
+    + </div>
+    + <div className="erp-table-container" style={{ width: '100%', overflowX: 'auto' }}>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    + <div className="erp-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', gap: '16px', flexWrap: 'wrap' }}>
+    + <div>
+    + </div>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+    + </div>
+    + </div>
+    + <div className="erp-card">
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+    + <div>
+    + </div>
+    + <div style={{ display: 'flex', gap: '16px', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap' }}>
+    + <div style={{ flex: 1, minWidth: '260px', position: 'relative' }}>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+    + <div
+    + <div className="menu-dropdown" style={{ right: '8px', top: '34px', zIndex: 100 }}>
+    + </div>
+    + <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '16px', gap: '8px' }}>
+    + </div>
+    + <div>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+    + <div className="card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 24px', textAlign: 'center', background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', marginTop: '24px' }}>
+    + <div style={{ fontSize: '3.5rem', marginBottom: '16px' }}>🏫</div>
+    + </div>
+    + <div className="class-grid">
+    + <div style={{ position: 'absolute', top: '16px', right: '16px' }} onClick={(e) => e.stopPropagation()}>
+    + <div className="menu-dropdown" style={{ right: 0, top: '24px' }}>
+    + </div>
+    + </div>
+    + <div>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+    + </div>
+    + <div className="card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 24px', textAlign: 'center', background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', marginTop: '24px' }}>
+    + <div style={{ fontSize: '3.5rem', marginBottom: '16px' }}>🏫</div>
+    + </div>
+    + <div className="class-grid">
+    + <div
+    + </div>
+    + </div>
+    + </div>
+    + <div className="erp-card">
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+    + </div>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', gap: '16px', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap' }}>
+    + <div style={{ flex: 1, minWidth: '260px', position: 'relative' }}>
+    + </div>
+    + </div>
+    + <div style={{
+    + <div style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '8px' }}>
+    + </div>
+    + <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+    + <div className="erp-table-container">
+    + <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '16px', gap: '8px' }}>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + <div className="erp-card fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    + </div>
+    + <div className="erp-card">
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+    + <div>
+    + </div>
+    + </div>
+    + <div className="erp-table-container">
+    + </div>
+    + </div>
+    + <div className="erp-card">
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    + <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '220px' }}>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '220px' }}>
+    + </div>
+    + </div>
+    + <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px', background: 'rgba(255,255,255,0.01)', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+    + <div style={{ display: 'inline-flex', background: 'rgba(255,255,255,0.05)', padding: '4px', borderRadius: '8px', gap: '4px', alignSelf: 'flex-start' }}>
+    + </div>
+    + <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxWidth: '300px' }}>
+    + <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+    + </div>
+    + </div>
+    + <div className="fade-in" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px' }}>
+    + <div key={m} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+    + <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+    + <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', padding: '8px 16px', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(16, 185, 129, 0.2)', fontWeight: 600, fontSize: '0.9rem' }}>
+    + </div>
+    + </div>
+    + <div className="erp-card">
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    + <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', alignItems: 'start' }}>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', justifyContent: 'flex-end', height: '100%' }}>
+    + </div>
+    + </div>
+    + <div style={{ marginTop: '8px', padding: '16px', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
+    + <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px' }}>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '4px', fontSize: '0.8rem' }}>
+    + </div>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(245, 158, 11, 0.08)', border: '1px dashed rgba(245, 158, 11, 0.25)', borderRadius: '4px', fontSize: '0.8rem' }}>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + <div className="erp-card">
+    + <div className="erp-table-container" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+    + </div>
+    + </div>
+    + <div className="erp-card">
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', flexWrap: 'wrap', gap: '12px' }}>
+    + <div>
+    + </div>
+    + <div style={{ display: 'flex', gap: '8px' }}>
+    + <div style={{ display: 'flex', justifyContent: 'center', padding: '30px' }}>
+    + <div className="loading-spinner"></div>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    + <form
+    + <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', alignItems: 'end' }}>
+    + <div style={{ gridColumn: 'span 2' }}>
+    + <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '6px' }}>
+    + </div>
+    + <div>
+    + </div>
+    + </form>
+    + <div className="erp-table-container">
+    + <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+    + </div>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    + <form
+    + <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', alignItems: 'end' }}>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + <div>
+    + </div>
+    + <div>
+    + <div style={{ display: 'flex', gap: '8px' }}>
+    + </div>
+    + </form>
+    + <div className="erp-table-container">
+    + <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+    + </div>
+    + <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+    + </div>
+    + </div>
+    + </div>
+    + <div className="erp-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    + <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+    + <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+    + <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', justifyContent: 'center', minHeight: '220px' }}>
+    + <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid var(--border-color)', borderRadius: '6px' }}>
+    + </div>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid var(--border-color)', borderRadius: '6px' }}>
+    + </div>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid var(--border-color)', borderRadius: '6px' }}>
+    + </div>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 12px', background: 'rgba(16, 185, 129, 0.04)', border: '1px solid rgba(16, 185, 129, 0.15)', borderRadius: '6px' }}>
+    + </div>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid var(--border-color)', borderRadius: '6px' }}>
+    + </div>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid var(--border-color)', borderRadius: '6px' }}>
+    + </div>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 12px', background: 'rgba(239, 68, 68, 0.04)', border: '1px solid rgba(239, 68, 68, 0.15)', borderRadius: '6px' }}>
+    + </div>
+    + <div style={{
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', color: 'var(--text-muted)', flex: 1, padding: '20px 0' }}>
+    + </div>
+    + </div>
+    + <div className="erp-card">
+    + <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 0', color: 'var(--text-muted)', gap: '10px' }}>
+    + </div>
+    + <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
+    + <div key={report.id} className="erp-card fade-in" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px', border: '1px solid var(--border-color)', background: 'rgba(255, 255, 255, 0.01)', position: 'relative' }}>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+    + <>
+    + </>
+    + <>
+    + </>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', background: 'rgba(255, 255, 255, 0.02)', padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
+    + </div>
+    + <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+    + </div>
+    + </div>
+    + <div style={{
+    + </div>
+    + <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed var(--border-color)', paddingTop: '8px', marginTop: '2px' }}>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    + <div className="erp-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+    + <div>
+    + </div>
+    + <div style={{ display: 'flex', gap: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>
+    + <>
+    + </>
+    + <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+    + <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px', height: 'fit-content' }}>
+    + <form onSubmit={handleAddExpense} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+    + </div>
+    + </form>
+    + </div>
+    + <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    + <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 0', color: 'var(--text-muted)', gap: '10px' }}>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '450px', overflowY: 'auto', paddingRight: '4px' }}>
+    + <div key={exp.id} className="erp-card fade-in" style={{ padding: '14px', border: '1px solid var(--border-color)', background: 'rgba(255, 255, 255, 0.01)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+    + </div>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed var(--border-color)', paddingTop: '8px', marginTop: '4px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    + <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+    + <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: 1 }}>
+    + <form onSubmit={handleAddExtraFeeType} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+    + </div>
+    + </form>
+    + </div>
+    + <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1 }}>
+    + <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', maxHeight: '220px', overflowY: 'auto', paddingRight: '4px' }}>
+    + <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-color)', borderRadius: '20px', padding: '6px 14px', fontSize: '0.85rem' }}>
+    + </div>
+    + </div>
+    + <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
+    + <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: '180px' }}>
+    + <div style={{ position: 'relative' }}>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '140px' }}>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '160px' }}>
+    + </div>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '120px' }}>
+    + </div>
+    + </div>
+    + <div className="erp-table-container" style={{ maxHeight: '450px', overflowY: 'auto' }}>
+    + <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '16px', gap: '8px' }}>
+    + </div>
+    + <div className="erp-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '16px' }}>
+    + <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', flex: 1, alignItems: 'flex-end' }}>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '240px', flex: 1, position: 'relative' }}>
+    + <div style={{ position: 'relative' }}>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '180px' }}>
+    + </div>
+    + </div>
+    + <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 0', color: 'var(--text-muted)', gap: '10px' }}>
+    + <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+    + <div key={p.id} className="erp-card fade-in" style={cardStyle}>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+    + </div>
+    + <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+    + <div className="menu-dropdown" style={{ right: 0, top: '24px', zIndex: 10 }}>
+    + </div>
+    + </div>
+    + </div>
+    + <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '10px' }}>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+    + </div>
+    + <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+    + </div>
+    + </div>
+    + </div>
+    + <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    + <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px' }}>
+    + <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+    + </div>
+    + <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+    + </div>
+    + <div className="erp-card" style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: '240px' }}>
+    + <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '180px' }}>
+    + <div className="erp-card" style={{ padding: 0 }}>
+    + <div style={{ overflowX: 'auto' }}>
+    + <div style={{ display: 'inline-flex', gap: '8px', alignItems: 'center' }}>
+    + <>
+    + </>
+    + </div>
+    + </div>
+  Removed lines:
+    - <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+    - <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+    - <div style={{ width: '100%', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
+    - </div>
+    - <div className="erp-card" style={{ padding: '0', overflow: 'hidden' }}>
+    - <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.01)', padding: '0 16px' }}>
+    - <div style={{ padding: '24px' }}>
+    - <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    - <div className="profile-detail-grid">
+    - <div className="profile-detail-item">
+    - </div>
+    - <div className="profile-detail-item">
+    - </div>
+    - <div className="profile-detail-item">
+    - </div>
+    - <div className="profile-detail-item">
+    - </div>
+    - <div className="profile-detail-item" style={{ gridColumn: 'span 2' }}>
+    - </div>
+    - <div className="profile-detail-item">
+    - </div>
+    - <div className="profile-detail-item">
+    - <div className="profile-detail-item">
+    - <>
+    - <div className="profile-detail-grid">
+    - <div className="profile-detail-item">
+    - <div className="profile-detail-item">
+    - <div className="profile-detail-item">
+    - <div className="profile-detail-item" style={{ gridColumn: 'span 2' }}>
+    - </>
+    - </div>
+    - <form onSubmit={handleUpdateProfile} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    - <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+    - <div>
+    - {profileErrors.name && <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px' }}>{profileErrors.name}</div>}
+    - </div>
+    - <div>
+    - {profileErrors.email && <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px' }}>{profileErrors.email}</div>}
+    - </div>
+    - </div>
+    - <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+    - <div>
+    - {profileErrors.phone && <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px' }}>{profileErrors.phone}</div>}
+    - </div>
+    - <div>
+    - </div>
+    - </div>
+    - <div>
+    - </div>
+    - <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+    - <div>
+    - </div>
+    - <div>
+    - </div>
+    - <div>
+    - </div>
+    - </div>
+    - <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '12px' }}>
+    - </div>
+    - </form>
+    - <form onSubmit={handleChangePasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    - <div>
+    - {passwordErrors.current_password && <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px' }}>{passwordErrors.current_password}</div>}
+    - </div>
+    - <div>
+    - {passwordErrors.new_password && <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px' }}>{passwordErrors.new_password}</div>}
+    - <div style={{ marginTop: '8px', padding: '10px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
+    - <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Password complexity requirements:</div>
+    - <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontSize: '0.75rem' }}>
+    - <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: passwordForm.new_password.length >= 8 ? '#10b981' : 'var(--text-muted)' }}>
+    - <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: /[A-Z]/.test(passwordForm.new_password) ? '#10b981' : 'var(--text-muted)' }}>
+    - <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: /[a-z]/.test(passwordForm.new_password) ? '#10b981' : 'var(--text-muted)' }}>
+    - <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: /[0-9]/.test(passwordForm.new_password) ? '#10b981' : 'var(--text-muted)' }}>
+    - <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: /[!@#$%^&*()_+={}\[\]|\\\\:;\"\'<>,.?\/~`\-]/.test(passwordForm.new_password) ? '#10b981' : 'var(--text-muted)' }}>
+    - </div>
+    - <div>
+    - {passwordErrors.confirm_password && <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px' }}>{passwordErrors.confirm_password}</div>}
+    - </div>
+    - <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '12px' }}>
+    - </div>
+    - </form>
+    - </div>
+    - </div>
+    - </div>
+    - </div>
+    - <div className={`app-layout ${isDarkMode ? 'dark-theme' : ''}`}>
+    - <div style={{
+    - </div>
+    - <div className="toast-in-out" style={{
+    - </div>
+    - <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px', padding: '0 8px' }}>
+    - <div style={{
+    - </div>
+    - <div>
+    - </div>
+    - </div>
+    - <div className="sidebar-nav">
+    - </div>
+    - <div
+    - <div style={{
+    - </div>
+    - <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    - </div>
+    - </div>
+    - <div className="main-wrapper">
+    - <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+    - <div style={{ height: '24px', width: '1px', backgroundColor: 'var(--border-color)' }} />
+    - </div>
+    - <div className="content-body">
+    - <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    - <div className="stats-grid">
+    - <div className="erp-card">
+    - <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px' }}>{superStats.total_schools}</div>
+    - </div>
+    - <div className="erp-card">
+    - <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px', color: '#ef4444' }}>{superStats.inactive_schools}</div>
+    - <div className="erp-card">
+    - <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px' }}>{superStats.total_students}</div>
+    - <div className="erp-card">
+    - <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px', color: '#10b981' }}>${superStats.total_revenue.toLocaleString()}</div>
+    - <div className="erp-table-container">
+    - <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    - <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    - <div className="erp-card">
+    - <div className="erp-table-container">
+    - <div style={{ display: 'flex', gap: '8px' }}>
+    - </div>
+    - </div>
+    - </div>
+    - </div>
+    - <div className="modal-overlay" onClick={() => setShowInviteModal(false)}>
+    - <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+    - <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+    - </div>
+    - <form onSubmit={handleInviteSchoolSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+    - <div>
+    - </div>
+    - </form>
+    - </div>
+    - </div>
+    - <div className="modal-overlay" onClick={() => setShowExtendModal(null)}>
+    - <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+    - <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+    - </div>
+    - <form onSubmit={handleExtendSubscription} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+    - <div>
+    - </div>
+    - </form>
+    - </div>
+    - </div>
+    - <div className="modal-overlay" onClick={() => setShowLogoutConfirm(false)}>
+    - <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px', textAlign: 'center', padding: '32px' }}>
+    - <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+    - <div style={{
+    - </div>
+    - <div style={{ display: 'flex', gap: '12px', width: '100%', marginTop: '16px' }}>
+    - </div>
+    - </div>
+    - </div>
+    - </div>
+    - <div className="modal-overlay" onClick={() => { setDeleteConfirm(null); setDeletePassword(''); setDeleteError(''); }}>
+    - <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px', textAlign: 'center', padding: '32px' }}>
+    - <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+    - <div style={{
+    - </div>
+    - <div style={{ width: '100%', textAlign: 'left', marginTop: '12px' }}>
+    - <div style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '4px', fontWeight: 600 }}>
+    - </div>
+    - <div style={{ display: 'flex', gap: '12px', width: '100%', marginTop: '16px' }}>
+    - </div>
+    - </div>
+    - </div>
+    - </div>
+    - <div className={`app-layout ${isDarkMode ? 'dark-theme' : ''}`}>
+    - <div style={{
+    - </div>
+    - <div className="toast-in-out" style={{
+    - </div>
+    - <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px', padding: '0 8px' }}>
+    - <div style={{
+    - </div>
+    - <div>
+    - </div>
+    - </div>
+    - <div className="sidebar-nav">
+    - </div>
+    - <div
+    - <div style={{
+    - <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    - </div>
+    - </div>
+    - <div className="main-wrapper">
+    - <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+    - <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--border-color)' }} />
+    - <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+    - </div>
+    - </div>
+    - <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+    - <div style={{ position: 'relative' }}>
+    - <div className="menu-dropdown" style={{ width: '300px', right: 0, padding: '12px' }}>
+    - <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '250px', overflowY: 'auto' }}>
+    - <div key={n.id} style={{ fontSize: '0.75rem', padding: '8px', borderRadius: '4px', backgroundColor: n.is_read ? 'transparent' : 'rgba(59,130,246,0.05)', borderLeft: '3px solid var(--color-primary)' }}>
+    - </div>
+    - </div>
+    - </div>
+    - <div style={{ height: '24px', width: '1px', backgroundColor: 'var(--border-color)' }} />
+    - </div>
+    - <div className="content-body">
+    - <div className="erp-card fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '64px 32px', gap: '24px', maxWidth: '600px', margin: '40px auto' }}>
+    - <div style={{
+    - </div>
+    - <div>
+    - </div>
+    - </div>
+    - <>
+    - <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    - <div className="stats-grid">
+    - <div className="erp-card">
+    - <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px' }}>{dashboardStats.total_students}</div>
+    - </div>
+    - <div className="erp-card">
+    - <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px' }}>{dashboardStats.total_teachers}</div>
+    - </div>
+    - <div
+    - <div style={{ fontSize: '2.0rem', fontWeight: 800, marginTop: '8px', color: '#ef4444' }}>
+    - </div>
+    - <div className="erp-card">
+    - <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px', color: '#10b981' }}>
+    - </div>
+    - </div>
+    - </div>
+    - <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+    - <div className="erp-card">
+    - <div style={{ height: '220px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '10px 20px', borderBottom: '2px solid var(--border-color)' }}>
+    - <div key={f.month} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, gap: '8px' }}>
+    - <div style={{
+    - </div>
+    - </div>
+    - </div>
+    - <div className="erp-card">
+    - <div style={{ height: '220px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '10px 20px', borderBottom: '2px solid var(--border-color)' }}>
+    - <div key={s.month} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, gap: '8px' }}>
+    - <div style={{
+    - </div>
+    - </div>
+    - </div>
+    - <div className="erp-card">
+    - <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+    - <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+    - </div>
+    - <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+    - <div style={{ display: 'flex', justifyContent: 'center', padding: '30px', color: 'var(--text-muted)' }}>
+    - </div>
+    - <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.01)', borderRadius: 'var(--radius-sm)', border: '1px dashed var(--border-color)' }}>
+    - </div>
+    - <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+    - <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-muted)', paddingBottom: '6px', borderBottom: '1px solid var(--border-color)' }}>
+    - </div>
+    - <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px', marginTop: '8px' }}>
+    - <div
+    - </div>
+    - </div>
+    - </div>
+    - </div>
+    - </div>
+    - <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    - <div className="erp-card">
+    - <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '32px', alignItems: 'start' }}>
+    - <div className="erp-card" style={{ textAlign: 'center', background: 'rgba(2, 6, 23, 0.2)' }}>
+    - <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '24px', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.85rem', textAlign: 'left', color: 'var(--text-secondary)' }}>
+    - <div><strong>Gender:</strong> {selectedTeacher.gender || 'Male'}</div>
+    - <div><strong>Email:</strong> {selectedTeacher.email || 'N/A'}</div>
+    - <div><strong>Phone:</strong> {selectedTeacher.phone || 'N/A'}</div>
+    - <div><strong>Address:</strong> {selectedTeacher.address || 'N/A'}</div>
+    - <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
+    - </div>
+    - <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    - <div className="erp-card" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+    - <div>
+    - <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+    - <div><strong>Joining Date:</strong> {selectedTeacher.joining_date || 'N/A'}</div>
+    - <div><strong>Exit Date:</strong> {selectedTeacher.exit_date || 'Active / None'}</div>
+    - <div>
+    - </div>
+    - <div><strong>Assigned Classes:</strong> {selectedTeacher.assigned_classes || 'None'}</div>
+    - <div style={{ marginTop: '8px' }}>
+    - </div>
+    - </div>
+    - <div>
+    - <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+    - <div><strong>Education:</strong> {selectedTeacher.qualification || 'N/A'}</div>
+    - <div><strong>Experience:</strong> {selectedTeacher.experience || 'N/A'}</div>
+    - <div><strong>Aadhaar Number:</strong> {selectedTeacher.aadhaar_number || 'N/A'}</div>
+    - <div><strong>PAN Number:</strong> {selectedTeacher.pan_number || 'N/A'}</div>
+    - </div>
+    - <div className="erp-card">
+    - <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px', fontSize: '0.85rem' }}>
+    - </div>
+    - <div className="table-responsive">
+    - </div>
+    - </div>
+    - <div className="erp-card">
+    - <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+    - </div>
+    - <div className="salary-month-grid">
+    - <div key={sal.month} className={`salary-month-card ${sal.status === 'Pending' ? 'pending' : ''}`}>
+    - <div style={{ fontSize: '0.7rem', color: '#10b981' }}>
+    - </div>
+    - <div>
+    - </div>
+    - </div>
+    - </div>
+    - </div>
+    - </div>
+    - </div>
+    - </div>
+    - <div>
+    - <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+    - <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+    - <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '8px' }}>
+    - <div className="teacher-grid">
+    - <div style={{ position: 'absolute', top: '16px', right: '16px' }} onClick={(e) => e.stopPropagation()}>
+    - <div className="menu-dropdown" style={{ right: 0, top: '24px' }}>
+    - </div>
+    - </div>
+    - <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
+    - <div>
+    - </div>
+    - </div>
+    - <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+    - <div><strong>Phone:</strong> {t.phone || 'N/A'}</div>
+    - <div><strong>Joined:</strong> {t.joining_date || 'N/A'}</div>
+    - <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
+    - </div>
+    - </div>
+    - <div className="erp-card">
+    - <div style={{ display: 'grid', gridTemplateColumns: '320px minmax(0, 1fr)', gap: '32px', alignItems: 'start' }}>
+    - <div className="erp-card" style={{ textAlign: 'center', background: 'rgba(2, 6, 23, 0.2)' }}>
+    - <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '16px', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.85rem', textAlign: 'left', color: 'var(--text-secondary)' }}>
+    - <div><strong>Roll No.:</strong> {selectedStudent.roll_number}</div>
+    - <div><strong>SR No.:</strong> {selectedStudent.sr_no || 'N/A'}</div>
+    - <div><strong>Class:</strong> {getClassName(selectedStudent.class_id)}</div>
+    - <div><strong>Section:</strong> {selectedStudent.group_name || 'NA'}</div>
+    - <div><strong>Gender:</strong> {selectedStudent.gender || 'Male'}</div>
+    - <div><strong>Contact:</strong> {selectedStudent.phone || 'N/A'}</div>
+    - <div><strong>Email:</strong> {selectedStudent.email || 'N/A'}</div>
+    - <div><strong>Country:</strong> {selectedStudent.country || 'N/A'}</div>
+    - <div><strong>State:</strong> {selectedStudent.state || 'N/A'}</div>
+    - <div><strong>City:</strong> {selectedStudent.city || 'N/A'}</div>
+    - <div><strong>Address:</strong> {selectedStudent.address || 'N/A'}</div>
+    - <div><strong>Nationality:</strong> {selectedStudent.nationality || 'Indian'}</div>
+    - <div><strong>Caste:</strong> {selectedStudent.caste || 'N/A'}</div>
+    - <div><strong>Date of Birth:</strong> {formatDate(selectedStudent.date_of_birth)}</div>
+    - <div><strong>Admission Date:</strong> {formatDate(selectedStudent.admission_date)}</div>
+    - </div>
+    - <>
+    - </>
+    - <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    - <div className="erp-card">
+    - <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', fontSize: '0.9rem' }}>
+    - <div><strong>Father's Name:</strong> {selectedStudent.father_name || 'N/A'}</div>
+    - <div><strong>Mother's Name:</strong> {selectedStudent.mother_name || 'N/A'}</div>
+    - <div><strong>Emergency Contact:</strong> {selectedStudent.emergency_contact || 'N/A'}</div>
+    - <div><strong>Blood Group:</strong> {selectedStudent.blood_group || 'N/A'}</div>
+    - <div><strong>Aadhaar Number:</strong> {selectedStudent.aadhaar_number || 'N/A'}</div>
+    - </div>
+    - <div style={{ display: 'flex', gap: '24px', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px' }}>
+    - </div>
+    - <div className="erp-card">
+    - <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+    - <div>
+    - </div>
+    - <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+    - <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+    - </div>
+    - <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+    - </div>
+    - </div>
+    - </div>
+    - <div className="erp-card">
+    - <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
+    - <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+    - </div>
+    - <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '32px 24px', fontSize: '0.85rem', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
+    - <div className="erp-table-container" style={{ width: '100%', overflowX: 'auto' }}>
+    - <div className="erp-card">
+    - <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+    - </div>
+    - </div>
+    - <div style={{ display: 'flex', gap: '16px', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap' }}>
+    - <div style={{ flex: 1, minWidth: '260px', position: 'relative' }}>
+    - <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+    - <div
+    - <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '16px', gap: '8px' }}>
+    - </div>
+    - </div>
+    - <div>
+    - <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+    - </div>
+    - <div className="class-grid">
+    - <div
+    - </div>
+    - <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+    - </div>
+    - <div className="class-grid">
+    - <div
+    - </div>
+    - </div>
+    - <div className="erp-card">
+    - <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+    - <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+    - </div>
+    - <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+    - <div style={{ display: 'flex', gap: '16px', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap' }}>
+    - <div style={{ flex: 1, minWidth: '260px', position: 'relative' }}>
+    - </div>
+    - <div className="erp-table-container">
+    - </div>
+    - <div className="erp-card fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    - <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', flexWrap: 'wrap', gap: '16px' }}>
+    - <div style={{ display: 'flex', gap: '16px' }}>
+    - <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+    - <div className="erp-card">
+    - <div className="erp-table-container">
+    - <div className="erp-card">
+    - <div className="erp-table-container">
+    - <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+    - </div>
+    - <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+    - <div className="erp-card">
+    - <div className="erp-table-container">
+    - <div className="erp-card">
+    - <div className="erp-table-container">
+    - </div>
+    - <div className="erp-card">
+    - <div className="erp-table-container">
+    - </div>
+    - </div>
+    - <div className="erp-card">
+    - <div className="erp-table-container">
+    - </div>
+    - </div>
+    - <div className="erp-card fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    - <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    - </div>
+    - <div className="erp-card">
+    - <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+    - <div>
+    - </div>
+    - <div className="erp-table-container">
+    - </div>
+    - </div>
+    - <div className="erp-card">
+    - <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    - <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+    - <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '220px' }}>
+    - <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '220px' }}>
+    - <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'rgba(255,255,255,0.01)', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+    - <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px' }}>
+    - <div key={m} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+    - </div>
+    - </div>
+    - <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+    - </div>
+    - </div>
+    - </div>
+    - </div>
+    - <div className="erp-card">
+    - <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+    - <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '180px' }}>
+    - </div>
+    - </div>
+    - <div className="erp-card">
+    - <div className="erp-table-container" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+    - </div>

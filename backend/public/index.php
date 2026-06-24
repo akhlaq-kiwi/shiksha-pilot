@@ -9,6 +9,8 @@ use PHPMailer\PHPMailer\Exception;
 
 require __DIR__ . '/../vendor/autoload.php';
 
+date_default_timezone_set('Asia/Kolkata');
+
 // Helper to load local environment configuration
 function loadEnv($path) {
     if (!file_exists($path)) return;
@@ -215,6 +217,62 @@ function isClassroomLocked($pdo, $schoolId, $classId) {
         $stmt->execute(['class_id' => $classId, 'school_id' => $schoolId]);
         return ((int)$stmt->fetchColumn() > 0);
     } catch (\Exception $e) {
+        return false;
+    }
+}
+
+function encryptPassword($password) {
+    global $jwt_secret;
+    $method = 'aes-256-cbc';
+    $iv_length = openssl_cipher_iv_length($method);
+    $iv = openssl_random_pseudo_bytes($iv_length);
+    $ciphertext = openssl_encrypt($password, $method, $jwt_secret, 0, $iv);
+    return base64_encode($iv . $ciphertext);
+}
+
+function decryptPassword($encrypted) {
+    global $jwt_secret;
+    if (empty($encrypted)) return '';
+    $method = 'aes-256-cbc';
+    $data = base64_decode($encrypted);
+    $iv_length = openssl_cipher_iv_length($method);
+    if (strlen($data) < $iv_length) return '';
+    $iv = substr($data, 0, $iv_length);
+    $ciphertext = substr($data, $iv_length);
+    return openssl_decrypt($ciphertext, $method, $jwt_secret, 0, $iv) ?: '';
+}
+
+class OtpService {
+    public static function generateAndSend($phone, $pdo) {
+        $otp = '1234'; // Mock OTP - future providers can be integrated here
+        if ($pdo === null) {
+            return true;
+        }
+        $expiry = date('Y-m-d H:i:s', strtotime('+10 minutes'));
+        $stmt = $pdo->prepare("INSERT INTO phone_otps (phone, otp, expiry) VALUES (:phone, :otp, :expiry)
+                               ON DUPLICATE KEY UPDATE otp = :otp, expiry = :expiry");
+        $stmt->execute(['phone' => $phone, 'otp' => $otp, 'expiry' => $expiry]);
+        return true;
+    }
+    
+    public static function verify($phone, $otp, $pdo) {
+        if ($pdo === null) {
+            return $otp === '1234';
+        }
+        $now = date('Y-m-d H:i:s');
+        try {
+            $delExpired = $pdo->prepare("DELETE FROM phone_otps WHERE expiry < :now");
+            $delExpired->execute(['now' => $now]);
+        } catch (\Exception $e) {}
+
+        $stmt = $pdo->prepare("SELECT * FROM phone_otps WHERE phone = :phone AND otp = :otp AND expiry >= :now LIMIT 1");
+        $stmt->execute(['phone' => $phone, 'otp' => $otp, 'now' => $now]);
+        $record = $stmt->fetch();
+        if ($record) {
+            $del = $pdo->prepare("DELETE FROM phone_otps WHERE phone = :phone");
+            $del->execute(['phone' => $phone]);
+            return true;
+        }
         return false;
     }
 }
@@ -561,6 +619,19 @@ function migrateDb($pdo) {
         UNIQUE KEY uq_attendance (student_id, attendance_date)
     ) ENGINE=InnoDB;
 
+    CREATE TABLE IF NOT EXISTS school_leaves (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        school_id INT NOT NULL,
+        academic_year_id INT NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        leave_date DATE NOT NULL,
+        description VARCHAR(255) DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE,
+        FOREIGN KEY (academic_year_id) REFERENCES academic_years(id) ON DELETE CASCADE,
+        UNIQUE KEY uq_school_leave (school_id, academic_year_id, leave_date)
+    ) ENGINE=InnoDB;
+
     CREATE TABLE IF NOT EXISTS exams (
         id INT AUTO_INCREMENT PRIMARY KEY,
         school_id INT NOT NULL,
@@ -631,9 +702,27 @@ function migrateDb($pdo) {
         FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE,
         UNIQUE KEY uq_school_grade (school_id, grade_name)
     ) ENGINE=InnoDB;
+
+    CREATE TABLE IF NOT EXISTS phone_otps (
+        phone VARCHAR(50) PRIMARY KEY,
+        otp VARCHAR(10) NOT NULL,
+        expiry DATETIME NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB;
     ";
     
     $pdo->exec($schema);
+
+    // Check and add columns to school_leaves
+    $q = $pdo->query("SHOW COLUMNS FROM school_leaves LIKE 'title'");
+    if ($q->rowCount() == 0) {
+        $pdo->exec("ALTER TABLE school_leaves ADD COLUMN title VARCHAR(255) NOT NULL AFTER academic_year_id");
+    }
+    $q = $pdo->query("SHOW COLUMNS FROM school_leaves LIKE 'category'");
+    if ($q->rowCount() == 0) {
+        $pdo->exec("ALTER TABLE school_leaves ADD COLUMN category VARCHAR(50) NOT NULL DEFAULT 'School Holiday' AFTER title");
+    }
+    $pdo->exec("ALTER TABLE school_leaves MODIFY COLUMN description VARCHAR(255) DEFAULT NULL");
 
     // Check and add columns to financial_reports table if they don't exist
     $q = $pdo->query("SHOW COLUMNS FROM financial_reports LIKE 'extra_fees_collected'");
@@ -651,6 +740,10 @@ function migrateDb($pdo) {
     $q = $pdo->query("SHOW COLUMNS FROM financial_reports LIKE 'previous_year_recovery'");
     if ($q->rowCount() == 0) {
         $pdo->exec("ALTER TABLE financial_reports ADD COLUMN previous_year_recovery DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER extra_fees_collected");
+    }
+    $q = $pdo->query("SHOW COLUMNS FROM financial_reports LIKE 'previous_year_recovery_details'");
+    if ($q->rowCount() == 0) {
+        $pdo->exec("ALTER TABLE financial_reports ADD COLUMN previous_year_recovery_details TEXT DEFAULT NULL AFTER previous_year_recovery");
     }
 
     $q = $pdo->query("SHOW COLUMNS FROM fee_records LIKE 'paid_at'");
@@ -866,6 +959,10 @@ function migrateDb($pdo) {
     if ($q->rowCount() == 0) {
         $pdo->exec("ALTER TABLE users ADD COLUMN phone VARCHAR(50) DEFAULT NULL");
     }
+    $q = $pdo->query("SHOW COLUMNS FROM users LIKE 'plain_encrypted'");
+    if ($q->rowCount() == 0) {
+        $pdo->exec("ALTER TABLE users ADD COLUMN plain_encrypted VARCHAR(500) DEFAULT NULL");
+    }
     $q = $pdo->query("SHOW COLUMNS FROM users LIKE 'address'");
     if ($q->rowCount() == 0) {
         $pdo->exec("ALTER TABLE users ADD COLUMN address TEXT DEFAULT NULL");
@@ -1030,6 +1127,12 @@ function migrateDb($pdo) {
             $pdo->exec("ALTER TABLE classrooms ADD CONSTRAINT fk_classrooms_teacher FOREIGN KEY (class_teacher_id) REFERENCES teachers(id) ON DELETE SET NULL");
         } catch (\Exception $e) {}
     }
+    $q = $pdo->query("SHOW COLUMNS FROM classrooms LIKE 'class_teacher_assigned_at'");
+    if ($q->rowCount() == 0) {
+        try {
+            $pdo->exec("ALTER TABLE classrooms ADD COLUMN class_teacher_assigned_at DATE DEFAULT NULL AFTER class_teacher_id");
+        } catch (\Exception $e) {}
+    }
 
     // Modify notifications table
     $q = $pdo->query("SHOW COLUMNS FROM notifications LIKE 'target_class_id'");
@@ -1067,6 +1170,33 @@ function migrateDb($pdo) {
             $stmt = $pdo->prepare("INSERT IGNORE INTO role_permissions (role_id, permission_name) VALUES (:rid, :pname)");
             $stmt->execute(['rid' => $rId, 'pname' => $p]);
         }
+    }
+
+    // Examination module redesign migrations
+    $q = $pdo->query("SHOW COLUMNS FROM exams LIKE 'status'");
+    if ($q->rowCount() == 0) {
+        try {
+            $pdo->exec("ALTER TABLE exams ADD COLUMN description TEXT DEFAULT NULL AFTER name");
+            $pdo->exec("ALTER TABLE exams ADD COLUMN status ENUM('Draft', 'Published') DEFAULT 'Draft' AFTER description");
+        } catch (\Exception $e) {}
+    }
+
+    // Add published_at column to exams table if it doesn't exist
+    $q = $pdo->query("SHOW COLUMNS FROM exams LIKE 'published_at'");
+    if ($q->rowCount() == 0) {
+        try {
+            $pdo->exec("ALTER TABLE exams ADD COLUMN published_at DATETIME DEFAULT NULL AFTER status");
+        } catch (\Exception $e) {}
+    }
+
+    $q = $pdo->query("SHOW COLUMNS FROM exam_subjects LIKE 'exam_date'");
+    if ($q->rowCount() == 0) {
+        try {
+            $pdo->exec("ALTER TABLE exam_subjects ADD COLUMN exam_date DATE DEFAULT NULL");
+            $pdo->exec("ALTER TABLE exam_subjects ADD COLUMN start_time VARCHAR(50) DEFAULT NULL");
+            $pdo->exec("ALTER TABLE exam_subjects ADD COLUMN end_time VARCHAR(50) DEFAULT NULL");
+            $pdo->exec("ALTER TABLE exam_subjects ADD COLUMN instructions TEXT DEFAULT NULL");
+        } catch (\Exception $e) {}
     }
 }
 
@@ -1454,14 +1584,18 @@ function seedDb($pdo) {
 }
 
 // Helpers
-function generateJwt($userId, $email, $role, $schoolId = null, $setupCompleted = 1) {
+function generateJwt($userId, $email, $role, $schoolId = null, $setupCompleted = 1, $phone = null) {
     global $jwt_secret;
+    if ($phone === null && is_numeric($email)) {
+        $phone = $email;
+    }
     $payload = [
         'iss' => 'bn_school_erp',
         'iat' => time(),
         'exp' => time() + (3600 * 24), // 24 hours
         'sub' => $userId,
         'email' => $email,
+        'phone' => $phone,
         'role' => $role,
         'school_id' => $schoolId,
         'setup_completed' => $setupCompleted
@@ -1516,6 +1650,9 @@ function getAuthUser(Request $request) {
         try {
             $decoded = JWT::decode($token, new Key($jwt_secret, 'HS256'));
             $user = (array)$decoded;
+            if (!isset($user['phone']) && isset($user['email']) && is_numeric($user['email'])) {
+                $user['phone'] = $user['email'];
+            }
         } catch (\Exception $e) {
             $user = null;
         }
@@ -2715,8 +2852,134 @@ $app->put('/api/sandbox/setup-completed', function (Request $request, Response $
         }
         file_put_contents($mockUsersFile, json_encode($mockUsers, JSON_PRETTY_PRINT));
     }
-    
     return jsonResponse($response, ['success' => true]);
+});
+
+$app->post('/api/auth/identify', function (Request $request, Response $response) {
+    $data = getJsonData($request);
+    $identifier = trim($data['identifier'] ?? '');
+    
+    if (empty($identifier)) {
+        return jsonResponse($response, ['detail' => 'Email address or mobile number is required.'], 400);
+    }
+    
+    $isEmail = filter_var($identifier, FILTER_VALIDATE_EMAIL) !== false || strpos($identifier, '@') !== false;
+    
+    $pdo = null;
+    try {
+        $pdo = getDb();
+    } catch (\Exception $e) {
+        $pdo = null;
+    }
+    
+    if ($isEmail) {
+        if ($pdo === null) {
+            $mockUsersFile = __DIR__ . '/../mock_users.json';
+            if (file_exists($mockUsersFile)) {
+                $mockUsers = json_decode(file_get_contents($mockUsersFile), true) ?: [];
+                foreach ($mockUsers as $mu) {
+                    if (trim(strtolower($mu['email'] ?? '')) === trim(strtolower($identifier)) && $mu['role'] === 'School Admin') {
+                        return jsonResponse($response, [
+                            'exists' => true,
+                            'type' => 'email',
+                            'role' => 'School Admin'
+                        ]);
+                    }
+                }
+            }
+            if (trim(strtolower($identifier)) === 'admin@yopmail.com') {
+                return jsonResponse($response, [
+                    'exists' => true,
+                    'type' => 'email',
+                    'role' => 'School Admin'
+                ]);
+            }
+            return jsonResponse($response, [
+                'exists' => false,
+                'type' => 'email',
+                'detail' => 'No School Admin account found with this email address.'
+            ], 404);
+        }
+        
+        $stmt = $pdo->prepare("SELECT * FROM users WHERE email = :email AND role = 'School Admin' AND is_active = 1 LIMIT 1");
+        $stmt->execute(['email' => $identifier]);
+        $user = $stmt->fetch();
+        
+        if ($user) {
+            return jsonResponse($response, [
+                'exists' => true,
+                'type' => 'email',
+                'role' => 'School Admin'
+            ]);
+        }
+        
+        return jsonResponse($response, [
+            'exists' => false,
+            'type' => 'email',
+            'detail' => 'No School Admin account found with this email address.'
+        ], 404);
+        
+    } else {
+        if ($pdo === null) {
+            if ($identifier === '9876543210') {
+                return jsonResponse($response, [
+                    'exists' => true,
+                    'type' => 'phone',
+                    'role' => 'Parent'
+                ]);
+            }
+            
+            $mockUsersFile = __DIR__ . '/../mock_users.json';
+            if (file_exists($mockUsersFile)) {
+                $mockUsers = json_decode(file_get_contents($mockUsersFile), true) ?: [];
+                foreach ($mockUsers as $mu) {
+                    if (trim($mu['phone'] ?? '') === $identifier) {
+                        return jsonResponse($response, [
+                            'exists' => true,
+                            'type' => 'phone',
+                            'role' => $mu['role']
+                        ]);
+                    }
+                }
+            }
+            
+            return jsonResponse($response, [
+                'exists' => true,
+                'type' => 'phone',
+                'role' => 'Teacher'
+            ]);
+        }
+        
+        $stmt = $pdo->prepare("SELECT * FROM teachers WHERE phone = :phone AND status = 'Active' LIMIT 1");
+        $stmt->execute(['phone' => $identifier]);
+        $teacher = $stmt->fetch();
+        
+        if ($teacher) {
+            return jsonResponse($response, [
+                'exists' => true,
+                'type' => 'phone',
+                'role' => 'Teacher'
+            ]);
+        }
+        
+        $stmt = $pdo->prepare("SELECT * FROM students WHERE phone = :phone OR emergency_contact = :phone LIMIT 1");
+        $stmt->execute(['phone' => $identifier]);
+        $student = $stmt->fetch();
+        
+        if ($student) {
+            return jsonResponse($response, [
+                'exists' => true,
+                'type' => 'phone',
+                'role' => 'Parent'
+            ]);
+        }
+        
+        return jsonResponse($response, [
+            'exists' => false,
+            'type' => 'phone',
+            'detail' => 'No account found with this mobile number.'
+        ], 404);
+    }
 });
 
 // --- AUTHENTICATION ROUTE ---
@@ -2767,11 +3030,21 @@ $app->post('/api/auth/login', function (Request $request, Response $response) {
         if ($input === '9876543210' && ($password === 'Test@123' || $password === hash('sha256', 'Test@123'))) {
             return jsonResponse($response, [
                 'access_token' => 'mock-parent-token',
-                'email' => 'parent@yopmail.com',
                 'phone' => '9876543210',
                 'role' => 'Parent',
                 'permissions' => ['parent_portal'],
-                'linked_student_ids' => [1],
+                'linked_student_ids' => [1, 2],
+                'school_id' => 1,
+                'setup_completed' => 1,
+                'school_name' => "St. Xavier's International School"
+            ]);
+        }
+        if ($input === '9876543211' && ($password === 'Test@123' || $password === hash('sha256', 'Test@123'))) {
+            return jsonResponse($response, [
+                'access_token' => 'mock-teacher-token',
+                'phone' => '9876543211',
+                'role' => 'Teacher',
+                'permissions' => ['attendance', 'performance'],
                 'school_id' => 1,
                 'setup_completed' => 1,
                 'school_name' => "St. Xavier's International School"
@@ -2890,8 +3163,7 @@ $app->post('/api/auth/login', function (Request $request, Response $response) {
         $linkStmt->execute(['user_id' => $user['id']]);
         $linkedStudentIds = $linkStmt->fetchAll(PDO::FETCH_COLUMN);
     }
-
-    $token = generateJwt($user['id'], $user['email'] ?? '', $roleName, $school_id, $setup_completed);
+    $token = generateJwt($user['id'], $user['email'] ?? $user['phone'], $roleName, $school_id, $setup_completed);
     
     logAudit($pdo, $school_id, $user['email'] ?? $user['phone'], 'Login', 'User logged in successfully.');
     
@@ -2918,15 +3190,15 @@ $app->post('/api/auth/otp-login', function (Request $request, Response $response
         return jsonResponse($response, ['detail' => 'Mobile number and OTP are required.'], 400);
     }
     
-    if ($otp !== '1234') {
-        return jsonResponse($response, ['detail' => 'Invalid OTP. Please enter 1234.'], 401);
-    }
-    
     $pdo = null;
     try {
         $pdo = getDb();
     } catch (\Exception $e) {
         $pdo = null;
+    }
+    
+    if (!OtpService::verify($phone, $otp, $pdo)) {
+        return jsonResponse($response, ['detail' => 'Invalid OTP.'], 401);
     }
     
     if ($pdo === null) {
@@ -3112,7 +3384,7 @@ $app->post('/api/auth/forgot-password', function (Request $request, Response $re
         $pdo = null;
     }
     
-    $otp = sprintf('%04d', rand(1000, 9999));
+    $otp = '1234';
     
     if ($pdo === null) {
         // Sandbox Mode
@@ -5725,13 +5997,18 @@ $app->get('/api/classes', function (Request $request, Response $response) {
     if (!$auth || !$auth['school_id']) return jsonResponse($response, ['detail' => 'Unauthorized'], 401);
     
     $pdo = getDb();
-    $stmt = $pdo->prepare("SELECT * FROM classrooms WHERE school_id = :school_id");
+    $stmt = $pdo->prepare("
+        SELECT c.*, t.name AS class_teacher_name, t.phone AS class_teacher_contact 
+        FROM classrooms c
+        LEFT JOIN teachers t ON c.class_teacher_id = t.id
+        WHERE c.school_id = :school_id
+    ");
     $stmt->execute(['school_id' => $auth['school_id']]);
     $classes = $stmt->fetchAll();
     
-    // For backward-compatibility, attach an empty groups list
     foreach ($classes as &$c) {
         $c['groups'] = [];
+        $c['class_teacher_id'] = $c['class_teacher_id'] ? (int)$c['class_teacher_id'] : null;
     }
     
     return jsonResponse($response, $classes);
@@ -5842,6 +6119,369 @@ $app->put('/api/classes/{id}', function (Request $request, Response $response, a
     logAudit($pdo, $auth['school_id'], $auth['email'], 'Update Class', "Updated classroom name from '$oldName' to '$name'.");
     
     return jsonResponse($response, ['message' => 'Classroom updated successfully']);
+});
+
+// Class Teacher Management
+$app->post('/api/class-teacher', function (Request $request, Response $response) {
+    $auth = getAuthUser($request);
+    if (!$auth || !$auth['school_id']) return jsonResponse($response, ['detail' => 'Unauthorized'], 401);
+    
+    $data = getJsonData($request);
+    $classId = (int)($data['class_id'] ?? 0);
+    $teacherId = isset($data['teacher_id']) && $data['teacher_id'] !== '' ? (int)$data['teacher_id'] : null;
+    
+    if (!$classId) {
+        return jsonResponse($response, ['detail' => 'class_id is required.'], 400);
+    }
+    
+    $pdo = getDb();
+    
+    if ($teacherId !== null) {
+        // Verify teacher belongs to this school
+        $chk = $pdo->prepare("SELECT COUNT(*) FROM teachers WHERE id = :tid AND school_id = :sid");
+        $chk->execute(['tid' => $teacherId, 'sid' => $auth['school_id']]);
+        if ($chk->fetchColumn() == 0) {
+            return jsonResponse($response, ['detail' => 'Teacher not found.'], 404);
+        }
+
+        // Check if teacher already assigned to any other class
+        $chkTeach = $pdo->prepare("SELECT c.name FROM classrooms c JOIN teachers t ON c.class_teacher_id = t.id WHERE c.school_id = :sid AND c.class_teacher_id = :tid AND c.id != :cid");
+        $chkTeach->execute(['sid' => $auth['school_id'], 'tid' => $teacherId, 'cid' => $classId]);
+        $existingClassName = $chkTeach->fetchColumn();
+        if ($existingClassName) {
+            return jsonResponse($response, ['detail' => "This teacher is already assigned as Class Teacher for $existingClassName."], 400);
+        }
+        
+        $stmt = $pdo->prepare("UPDATE classrooms SET class_teacher_id = :tid, class_teacher_assigned_at = CURDATE() WHERE id = :cid AND school_id = :sid");
+        $stmt->execute([
+            'tid' => $teacherId,
+            'cid' => $classId,
+            'sid' => $auth['school_id']
+        ]);
+        
+        // Audit log
+        $tName = $pdo->query("SELECT name FROM teachers WHERE id = $teacherId")->fetchColumn();
+        $cName = $pdo->query("SELECT name FROM classrooms WHERE id = $classId")->fetchColumn();
+        logAudit($pdo, $auth['school_id'], $auth['email'] ?? $auth['phone'], 'Assign Class Teacher', "Assigned $tName as class teacher for $cName.");
+    } else {
+        // Audit log details
+        $cName = $pdo->query("SELECT name FROM classrooms WHERE id = $classId")->fetchColumn();
+        $stmt = $pdo->prepare("UPDATE classrooms SET class_teacher_id = NULL, class_teacher_assigned_at = NULL WHERE id = :cid AND school_id = :sid");
+        $stmt->execute([
+            'cid' => $classId,
+            'sid' => $auth['school_id']
+        ]);
+        logAudit($pdo, $auth['school_id'], $auth['email'] ?? $auth['phone'], 'Remove Class Teacher', "Removed class teacher assignment for $cName.");
+    }
+    
+    return jsonResponse($response, ['success' => true]);
+});
+
+// Teacher Portal API
+$app->get('/api/teacher/dashboard', function (Request $request, Response $response) {
+    $auth = getAuthUser($request);
+    if (!$auth || !$auth['school_id']) return jsonResponse($response, ['detail' => 'Unauthorized'], 401);
+    
+    $pdo = getDb();
+    
+    // Find teacher profile using their phone
+    $teachStmt = $pdo->prepare("SELECT * FROM teachers WHERE school_id = :sid AND phone = :phone LIMIT 1");
+    $teachStmt->execute(['sid' => $auth['school_id'], 'phone' => $auth['phone']]);
+    $teacher = $teachStmt->fetch(PDO::FETCH_ASSOC);
+    if (!$teacher) {
+        return jsonResponse($response, ['detail' => 'Teacher profile not found for phone: ' . $auth['phone']], 404);
+    }
+    
+    $teacherId = (int)$teacher['id'];
+    
+    // Find assigned class
+    $classStmt = $pdo->prepare("SELECT id, name FROM classrooms WHERE school_id = :sid AND class_teacher_id = :tid LIMIT 1");
+    $classStmt->execute(['sid' => $auth['school_id'], 'tid' => $teacherId]);
+    $assignedClass = $classStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    
+    // School timetable config
+    $schStmt = $pdo->prepare("SELECT total_periods FROM schools WHERE id = :sid LIMIT 1");
+    $schStmt->execute(['sid' => $auth['school_id']]);
+    $totalPeriods = (int)($schStmt->fetchColumn() ?: 8);
+    
+    // Today's schedule
+    $today = date('Y-m-d');
+    $schedStmt = $pdo->prepare("
+        SELECT cs.*, c.name AS class_name 
+        FROM class_schedules cs
+        JOIN classrooms c ON cs.class_id = c.id
+        WHERE cs.school_id = :sid 
+          AND cs.schedule_date = :today
+          AND cs.status IN ('Scheduled', 'Published')
+    ");
+    $schedStmt->execute(['sid' => $auth['school_id'], 'today' => $today]);
+    $schedules = $schedStmt->fetchAll();
+    
+    $todayTimetable = [];
+    for ($i = 0; $i < $totalPeriods; $i++) {
+        $todayTimetable[] = ['period' => $i + 1, 'status' => 'Free', 'subject' => '', 'class_name' => ''];
+    }
+    
+    foreach ($schedules as $s) {
+        $subjects = json_decode($s['subjects'], true) ?: [];
+        foreach ($subjects as $idx => $sub) {
+            if ($idx >= $totalPeriods) break;
+            
+            $subTeacherId = isset($sub['teacher_id']) ? (int)$sub['teacher_id'] : 0;
+            $backupTeacherId = isset($sub['backup_teacher_id']) ? (int)$sub['backup_teacher_id'] : 0;
+            
+            if ($subTeacherId === $teacherId || $backupTeacherId === $teacherId) {
+                $todayTimetable[$idx] = [
+                    'period' => $idx + 1,
+                    'status' => 'Busy',
+                    'subject' => is_array($sub) ? ($sub['subject'] ?? '') : $sub,
+                    'class_name' => $s['class_name'],
+                    'class_id' => $s['class_id'],
+                    'backup' => ($backupTeacherId === $teacherId)
+                ];
+            }
+        }
+    }
+    
+    // Upcoming schedule (next 5 days)
+    $upcomingTimetable = [];
+    for ($i = 1; $i <= 5; $i++) {
+        $futureDate = date('Y-m-d', strtotime("+$i days"));
+        $futureDay = date('l', strtotime("+$i days"));
+        
+        $futStmt = $pdo->prepare("
+            SELECT cs.*, c.name AS class_name 
+            FROM class_schedules cs
+            JOIN classrooms c ON cs.class_id = c.id
+            WHERE cs.school_id = :sid 
+              AND cs.schedule_date = :fdate
+              AND cs.status IN ('Scheduled', 'Published')
+        ");
+        $futStmt->execute(['sid' => $auth['school_id'], 'fdate' => $futureDate]);
+        $futSchedules = $futStmt->fetchAll();
+        
+        $dayPeriods = [];
+        foreach ($futSchedules as $s) {
+            $subjects = json_decode($s['subjects'], true) ?: [];
+            foreach ($subjects as $idx => $sub) {
+                $subTeacherId = isset($sub['teacher_id']) ? (int)$sub['teacher_id'] : 0;
+                $backupTeacherId = isset($sub['backup_teacher_id']) ? (int)$sub['backup_teacher_id'] : 0;
+                
+                if ($subTeacherId === $teacherId || $backupTeacherId === $teacherId) {
+                    $dayPeriods[] = [
+                        'period' => $idx + 1,
+                        'subject' => is_array($sub) ? ($sub['subject'] ?? '') : $sub,
+                        'class_name' => $s['class_name'],
+                        'backup' => ($backupTeacherId === $teacherId)
+                    ];
+                }
+            }
+        }
+        if (!empty($dayPeriods)) {
+            $upcomingTimetable[] = [
+                'date' => $futureDate,
+                'day' => $futureDay,
+                'periods' => $dayPeriods
+            ];
+        }
+    }
+    
+    // Read-only School-wide Finance Summary
+    $feesCollectedStmt = $pdo->prepare("SELECT SUM(amount) FROM fee_records WHERE school_id = :sid AND status = 'Paid'");
+    $feesCollectedStmt->execute(['sid' => $auth['school_id']]);
+    $feesCollected = (float)$feesCollectedStmt->fetchColumn() ?: 0.00;
+    
+    $feesOutstandingStmt = $pdo->prepare("SELECT SUM(amount) FROM fee_records WHERE school_id = :sid AND status = 'Pending'");
+    $feesOutstandingStmt->execute(['sid' => $auth['school_id']]);
+    $feesOutstanding = (float)$feesOutstandingStmt->fetchColumn() ?: 0.00;
+    
+    return jsonResponse($response, [
+        'teacher_profile' => $teacher,
+        'assigned_class' => $assignedClass,
+        'today_timetable' => $todayTimetable,
+        'upcoming_timetable' => $upcomingTimetable,
+        'finance_summary' => [
+            'total_fees_collected' => $feesCollected,
+            'total_fees_outstanding' => $feesOutstanding
+        ]
+    ]);
+});
+
+// Parent Portal APIs
+$app->get('/api/parent/dashboard', function (Request $request, Response $response) {
+    $auth = getAuthUser($request);
+    if (!$auth || !$auth['school_id']) return jsonResponse($response, ['detail' => 'Unauthorized'], 401);
+    
+    $pdo = getDb();
+    
+    // Retrieve linked children
+    $linkStmt = $pdo->prepare("
+        SELECT s.id, s.name, s.roll_number, c.name AS class_name 
+        FROM parent_student_mappings psm
+        JOIN students s ON psm.student_id = s.id
+        JOIN classrooms c ON s.class_id = c.id
+        WHERE psm.parent_user_id = :user_id AND s.school_id = :sid
+    ");
+    $linkStmt->execute(['user_id' => $auth['id'], 'sid' => $auth['school_id']]);
+    $students = $linkStmt->fetchAll();
+    
+    // If empty list, check if we can auto-link children sharing this phone number!
+    if (empty($students) && !empty($auth['phone'])) {
+        $stmtStud = $pdo->prepare("SELECT id FROM students WHERE school_id = :school_id AND (phone = :phone OR emergency_contact = :phone)");
+        $stmtStud->execute(['school_id' => $auth['school_id'], 'phone' => $auth['phone']]);
+        $linkedStudentIds = $stmtStud->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        
+        foreach ($linkedStudentIds as $sid) {
+            $insMap = $pdo->prepare("INSERT IGNORE INTO parent_student_mappings (parent_user_id, student_id) VALUES (:uid, :sid)");
+            $insMap->execute(['uid' => $auth['id'], 'sid' => $sid]);
+        }
+        
+        // Query again
+        $linkStmt->execute(['user_id' => $auth['id'], 'sid' => $auth['school_id']]);
+        $students = $linkStmt->fetchAll();
+    }
+    
+    return jsonResponse($response, [
+        'students' => $students
+    ]);
+});
+
+$app->get('/api/parent/student/{student_id}/summary', function (Request $request, Response $response, array $args) {
+    $auth = getAuthUser($request);
+    if (!$auth || !$auth['school_id']) return jsonResponse($response, ['detail' => 'Unauthorized'], 401);
+    
+    $studentId = (int)$args['student_id'];
+    $pdo = getDb();
+    
+    // Verify parent links to this child
+    $chk = $pdo->prepare("SELECT COUNT(*) FROM parent_student_mappings WHERE parent_user_id = :uid AND student_id = :sid");
+    $chk->execute(['uid' => $auth['id'], 'sid' => $studentId]);
+    if ($chk->fetchColumn() == 0) {
+        return jsonResponse($response, ['detail' => 'Access Denied'], 403);
+    }
+    
+    // Student info
+    $studStmt = $pdo->prepare("SELECT s.*, c.name as class_name FROM students s JOIN classrooms c ON s.class_id = c.id WHERE s.id = :sid");
+    $studStmt->execute(['sid' => $studentId]);
+    $student = $studStmt->fetch(PDO::FETCH_ASSOC);
+    
+    // Attendance Summary
+    $attStmt = $pdo->prepare("SELECT status, COUNT(*) as count FROM student_attendance WHERE school_id = :sid AND student_id = :stud_id GROUP BY status");
+    $attStmt->execute(['sid' => $auth['school_id'], 'stud_id' => $studentId]);
+    $attRows = $attStmt->fetchAll();
+    
+    $present = 0;
+    $absent = 0;
+    $leave = 0;
+    foreach ($attRows as $row) {
+        if ($row['status'] === 'Present') $present = (int)$row['count'];
+        if ($row['status'] === 'Absent') $absent = (int)$row['count'];
+        if ($row['status'] === 'Leave') $leave = (int)$row['count'];
+    }
+    $totalAtt = $present + $absent + $leave;
+    $attPercentage = $totalAtt > 0 ? round(($present / $totalAtt) * 100, 1) : 100.0;
+    
+    // Attendance history
+    $histStmt = $pdo->prepare("SELECT attendance_date, status, NULL AS remarks FROM student_attendance WHERE student_id = :stud_id ORDER BY attendance_date DESC LIMIT 30");
+    $histStmt->execute(['stud_id' => $studentId]);
+    $history = $histStmt->fetchAll();
+    
+    // Fee Summary
+    $tuitionPaidStmt = $pdo->prepare("SELECT SUM(amount) FROM fee_records WHERE student_id = :stud_id AND status = 'Paid'");
+    $tuitionPaidStmt->execute(['stud_id' => $studentId]);
+    $tuitionPaid = (float)$tuitionPaidStmt->fetchColumn() ?: 0.00;
+    
+    $tuitionPendingStmt = $pdo->prepare("SELECT SUM(amount) FROM fee_records WHERE student_id = :stud_id AND status = 'Pending'");
+    $tuitionPendingStmt->execute(['stud_id' => $studentId]);
+    $tuitionPending = (float)$tuitionPendingStmt->fetchColumn() ?: 0.00;
+    
+    $extraPaidStmt = $pdo->prepare("
+        SELECT SUM(eft.amount) 
+        FROM student_extra_fees sef
+        JOIN extra_fee_types eft ON sef.extra_fee_type_id = eft.id
+        WHERE sef.student_id = :stud_id AND sef.status = 'Paid'
+    ");
+    $extraPaidStmt->execute(['stud_id' => $studentId]);
+    $extraPaid = (float)$extraPaidStmt->fetchColumn() ?: 0.00;
+    
+    $extraPendingStmt = $pdo->prepare("
+        SELECT SUM(eft.amount) 
+        FROM student_extra_fees sef
+        JOIN extra_fee_types eft ON sef.extra_fee_type_id = eft.id
+        WHERE sef.student_id = :stud_id AND sef.status = 'Pending'
+    ");
+    $extraPendingStmt->execute(['stud_id' => $studentId]);
+    $extraPending = (float)$extraPendingStmt->fetchColumn() ?: 0.00;
+    
+    $cfdStmt = $pdo->prepare("SELECT SUM(amount), SUM(paid_amount) FROM carry_forward_dues WHERE student_id = :stud_id");
+    $cfdStmt->execute(['stud_id' => $studentId]);
+    $cfdRow = $cfdStmt->fetch(PDO::FETCH_NUM);
+    $cfdAmount = (float)($cfdRow[0] ?? 0.00);
+    $cfdPaid = (float)($cfdRow[1] ?? 0.00);
+    $cfdOutstanding = $cfdAmount - $cfdPaid;
+    
+    $feesPaid = $tuitionPaid + $extraPaid + $cfdPaid;
+    $feesPending = $tuitionPending + $extraPending;
+    $outstandingBalance = $feesPending + $cfdOutstanding;
+    
+    // Payment History
+    $payments = [];
+    $tPayStmt = $pdo->prepare("SELECT month AS item_name, amount, paid_at FROM fee_records WHERE student_id = :stud_id AND status = 'Paid' ORDER BY paid_at DESC");
+    $tPayStmt->execute(['stud_id' => $studentId]);
+    foreach ($tPayStmt->fetchAll() as $row) {
+        $payments[] = [
+            'item_name' => 'Tuition Fee - ' . $row['item_name'],
+            'amount' => (float)$row['amount'],
+            'paid_at' => $row['paid_at']
+        ];
+    }
+    
+    $ePayStmt = $pdo->prepare("
+        SELECT eft.name AS item_name, eft.amount, sef.paid_at 
+        FROM student_extra_fees sef
+        JOIN extra_fee_types eft ON sef.extra_fee_type_id = eft.id
+        WHERE sef.student_id = :stud_id AND sef.status = 'Paid'
+        ORDER BY sef.paid_at DESC
+    ");
+    $ePayStmt->execute(['stud_id' => $studentId]);
+    foreach ($ePayStmt->fetchAll() as $row) {
+        $payments[] = [
+            'item_name' => $row['item_name'],
+            'amount' => (float)$row['amount'],
+            'paid_at' => $row['paid_at']
+        ];
+    }
+    
+    $rPayStmt = $pdo->prepare("SELECT amount_recovered AS amount, paid_at FROM previous_year_recoveries WHERE student_id = :stud_id ORDER BY paid_at DESC");
+    $rPayStmt->execute(['stud_id' => $studentId]);
+    foreach ($rPayStmt->fetchAll() as $row) {
+        $payments[] = [
+            'item_name' => 'Previous Session Dues Recovery',
+            'amount' => (float)$row['amount'],
+            'paid_at' => $row['paid_at']
+        ];
+    }
+    
+    usort($payments, function ($a, $b) {
+        return strcmp($b['paid_at'], $a['paid_at']);
+    });
+    
+    return jsonResponse($response, [
+        'student' => $student,
+        'attendance_summary' => [
+            'present' => $present,
+            'absent' => $absent,
+            'leave' => $leave,
+            'percentage' => $attPercentage,
+            'history' => $history
+        ],
+        'fee_summary' => [
+            'fees_paid' => $feesPaid,
+            'fees_pending' => $feesPending,
+            'outstanding_balance' => $outstandingBalance,
+            'payment_history' => $payments
+        ]
+    ]);
 });
 
 // Teachers
@@ -7058,29 +7698,47 @@ $app->get('/api/finance/previous-dues', function (Request $request, Response $re
     $pdo = getDb();
     
     if ($active_year_id > 0) {
-        $stmt = $pdo->prepare("SELECT cfd.*, s.name AS student_name, c_orig.name AS class_name, ay.year_range AS original_academic_year, s.status AS student_status
+        $stmt = $pdo->prepare("SELECT cfd.*, s.name AS student_name, c_orig.name AS class_name, ay.year_range AS original_academic_year, s.status AS student_status, c_curr.name AS current_class_name
                                FROM carry_forward_dues cfd
                                JOIN students s ON cfd.student_id = s.id
                                JOIN academic_years ay ON cfd.original_academic_year_id = ay.id
                                LEFT JOIN students s_orig ON s_orig.school_id = s.school_id 
-                                                        AND s_orig.academic_year_id = cfd.original_academic_year_id
-                                                        AND s_orig.name = s.name 
-                                                        AND s_orig.roll_number = s.roll_number
+                                                         AND s_orig.academic_year_id = cfd.original_academic_year_id
+                                                         AND s_orig.name = s.name 
+                                                         AND s_orig.roll_number = s.roll_number
                                LEFT JOIN classrooms c_orig ON c_orig.id = COALESCE(s_orig.class_id, s.class_id)
-                               WHERE cfd.school_id = :school_id AND cfd.original_academic_year_id < :active_year_id
+                               LEFT JOIN classrooms c_curr ON c_curr.id = s.class_id
+                               WHERE cfd.school_id = :school_id 
+                                 AND cfd.original_academic_year_id < :active_year_id
+                                 AND NOT EXISTS (
+                                     SELECT 1 FROM students s2 
+                                     WHERE s2.school_id = s.school_id 
+                                       AND s2.name = s.name 
+                                       AND s2.roll_number = s.roll_number 
+                                       AND s2.academic_year_id > s.academic_year_id
+                                       AND s2.academic_year_id <= :active_year_id
+                                 )
                                ORDER BY cfd.id DESC");
         $stmt->execute(['school_id' => $auth['school_id'], 'active_year_id' => $active_year_id]);
     } else {
-        $stmt = $pdo->prepare("SELECT cfd.*, s.name AS student_name, c_orig.name AS class_name, ay.year_range AS original_academic_year, s.status AS student_status
+        $stmt = $pdo->prepare("SELECT cfd.*, s.name AS student_name, c_orig.name AS class_name, ay.year_range AS original_academic_year, s.status AS student_status, c_curr.name AS current_class_name
                                FROM carry_forward_dues cfd
                                JOIN students s ON cfd.student_id = s.id
                                JOIN academic_years ay ON cfd.original_academic_year_id = ay.id
                                LEFT JOIN students s_orig ON s_orig.school_id = s.school_id 
-                                                        AND s_orig.academic_year_id = cfd.original_academic_year_id
-                                                        AND s_orig.name = s.name 
-                                                        AND s_orig.roll_number = s.roll_number
+                                                         AND s_orig.academic_year_id = cfd.original_academic_year_id
+                                                         AND s_orig.name = s.name 
+                                                         AND s_orig.roll_number = s.roll_number
                                LEFT JOIN classrooms c_orig ON c_orig.id = COALESCE(s_orig.class_id, s.class_id)
+                               LEFT JOIN classrooms c_curr ON c_curr.id = s.class_id
                                WHERE cfd.school_id = :school_id
+                                 AND NOT EXISTS (
+                                     SELECT 1 FROM students s2 
+                                     WHERE s2.school_id = s.school_id 
+                                       AND s2.name = s.name 
+                                       AND s2.roll_number = s.roll_number 
+                                       AND s2.academic_year_id > s.academic_year_id
+                                 )
                                ORDER BY cfd.id DESC");
         $stmt->execute(['school_id' => $auth['school_id']]);
     }
@@ -7091,6 +7749,15 @@ $app->get('/api/finance/previous-dues', function (Request $request, Response $re
         $d['student_id'] = (int)$d['student_id'];
         $d['amount'] = (float)$d['amount'];
         $d['paid_amount'] = (float)$d['paid_amount'];
+        
+        $status = $d['student_status'] ?? 'Active';
+        if ($status === 'Alumni') {
+            $d['class_name'] = ($d['class_name'] ?? 'Class') . ' (Passout)';
+        } elseif ($status === 'Inactive') {
+            $d['class_name'] = ($d['class_name'] ?? 'Class') . ' (Inactive)';
+        } else {
+            $d['class_name'] = $d['current_class_name'] ?? $d['class_name'];
+        }
     }
     unset($d);
     
@@ -7538,6 +8205,103 @@ $app->delete('/api/roles/{id}', function (Request $request, Response $response, 
     return jsonResponse($response, ['success' => true]);
 });
 
+// --- Credentials Management Endpoints ---
+$app->get('/api/creds', function (Request $request, Response $response) {
+    $auth = getAuthUser($request);
+    if (!$auth || !$auth['school_id']) return jsonResponse($response, ['detail' => 'Unauthorized'], 401);
+    
+    $params = $request->getQueryParams();
+    $type = trim($params['type'] ?? '');
+    $phone = trim($params['phone'] ?? '');
+    
+    if (empty($type) || empty($phone)) {
+        return jsonResponse($response, ['detail' => 'Type and Phone are required.'], 400);
+    }
+    
+    $pdo = getDb();
+    $stmt = $pdo->prepare("SELECT * FROM users WHERE phone = :phone AND role = :role LIMIT 1");
+    $stmt->execute(['phone' => $phone, 'role' => $type]);
+    $user = $stmt->fetch();
+    
+    if ($user) {
+        $password = decryptPassword($user['plain_encrypted'] ?? '');
+        return jsonResponse($response, [
+            'exists' => true,
+            'phone' => $phone,
+            'password' => $password
+        ]);
+    }
+    
+    return jsonResponse($response, [
+        'exists' => false,
+        'phone' => $phone
+    ]);
+});
+
+$app->post('/api/creds', function (Request $request, Response $response) {
+    $auth = getAuthUser($request);
+    if (!$auth || !$auth['school_id']) return jsonResponse($response, ['detail' => 'Unauthorized'], 401);
+    
+    $data = getJsonData($request);
+    $type = trim($data['type'] ?? '');
+    $phone = trim($data['phone'] ?? '');
+    $password = trim($data['password'] ?? '');
+    
+    if (empty($type) || empty($phone) || empty($password)) {
+        return jsonResponse($response, ['detail' => 'Type, Phone, and Password are required.'], 400);
+    }
+    
+    $school_id = $auth['school_id'];
+    $pdo = getDb();
+    
+    $sha256_pass = hash('sha256', $password);
+    $pw_hash = password_hash($sha256_pass, PASSWORD_BCRYPT);
+    $plain_encrypted = encryptPassword($password);
+    
+    $stmt = $pdo->prepare("SELECT * FROM users WHERE phone = :phone AND role = :role LIMIT 1");
+    $stmt->execute(['phone' => $phone, 'role' => $type]);
+    $user = $stmt->fetch();
+    
+    if ($user) {
+        $upd = $pdo->prepare("UPDATE users SET password = :password, plain_encrypted = :encrypted WHERE id = :id");
+        $upd->execute([
+            'password' => $pw_hash,
+            'encrypted' => $plain_encrypted,
+            'id' => $user['id']
+        ]);
+        $userId = $user['id'];
+    } else {
+        $ins = $pdo->prepare("INSERT INTO users (school_id, phone, password, plain_encrypted, role, is_active) VALUES (:school_id, :phone, :password, :encrypted, :role, 1)");
+        $ins->execute([
+            'school_id' => $school_id,
+            'phone' => $phone,
+            'password' => $pw_hash,
+            'encrypted' => $plain_encrypted,
+            'role' => $type
+        ]);
+        $userId = $pdo->lastInsertId();
+    }
+    
+    if ($type === 'Parent') {
+        $stmtStud = $pdo->prepare("SELECT id FROM students WHERE school_id = :school_id AND (phone = :phone OR emergency_contact = :phone)");
+        $stmtStud->execute(['school_id' => $school_id, 'phone' => $phone]);
+        $linkedStudentIds = $stmtStud->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        
+        $del = $pdo->prepare("DELETE FROM parent_student_mappings WHERE parent_user_id = :uid");
+        $del->execute(['uid' => $userId]);
+        foreach ($linkedStudentIds as $sid) {
+            $insMap = $pdo->prepare("INSERT IGNORE INTO parent_student_mappings (parent_user_id, student_id) VALUES (:uid, :sid)");
+            $insMap->execute(['uid' => $userId, 'sid' => $sid]);
+        }
+    }
+    
+    return jsonResponse($response, [
+        'success' => true,
+        'phone' => $phone,
+        'password' => $password
+    ]);
+});
+
 // --- User Account Management Endpoints ---
 $app->get('/api/users', function (Request $request, Response $response) {
     $auth = getAuthUser($request);
@@ -7739,7 +8503,7 @@ $app->get('/api/parent/student/{id}/dashboard', function (Request $request, Resp
         FROM exam_marks m 
         JOIN exams e ON m.id = m.exam_id OR (m.exam_id = e.id)
         LEFT JOIN exam_subjects s ON e.id = s.exam_id AND m.subject_name = s.subject_name
-        WHERE m.student_id = :sid");
+        WHERE m.student_id = :sid AND e.status = 'Published'");
     $marksStmt->execute(['sid' => $studentId]);
     $examMarks = $marksStmt->fetchAll();
     
@@ -7788,6 +8552,7 @@ $app->get('/api/financial-reports', function (Request $request, Response $respon
         $r['extra_fees_collected'] = (float)$r['extra_fees_collected'];
         $r['previous_year_recovery'] = (float)($r['previous_year_recovery'] ?? 0.00);
         $r['previous_year_recoveries'] = $r['previous_year_recovery'];
+        $r['previous_year_recovery_details'] = json_decode($r['previous_year_recovery_details'] ?? '[]', true) ?: [];
         $r['salaries_paid'] = (float)$r['salaries_paid'];
         $r['school_expenses'] = (float)$r['school_expenses'];
         $r['net_profit'] = (float)$r['net_profit'];
@@ -7913,6 +8678,31 @@ $app->get('/api/financial-reports/preview', function (Request $request, Response
     ]);
     $previous_year_recovery = (float)$recoveryStmt->fetchColumn() ?: 0.00;
     
+    // Breakdown of previous year recoveries by original academic year
+    $breakdownSql = "SELECT SUM(pyr.amount_recovered) AS amount, ay.year_range 
+                     FROM previous_year_recoveries pyr
+                     JOIN carry_forward_dues cfd ON pyr.carry_forward_due_id = cfd.id
+                     JOIN academic_years ay ON cfd.original_academic_year_id = ay.id
+                     WHERE pyr.school_id = :school_id
+                       AND pyr.academic_year_id = :ay_id";
+    $breakdownSql .= $use_strict_greater ? " AND pyr.paid_at > :start_timestamp" : " AND pyr.paid_at >= :start_timestamp";
+    $breakdownSql .= " AND pyr.paid_at <= :end_timestamp";
+    $breakdownSql .= " GROUP BY cfd.original_academic_year_id ORDER BY ay.start_date ASC";
+    
+    $breakdownStmt = $pdo->prepare($breakdownSql);
+    $breakdownStmt->execute([
+        'school_id' => $auth['school_id'],
+        'ay_id' => $ay_id,
+        'start_timestamp' => $start_timestamp,
+        'end_timestamp' => $end_timestamp
+    ]);
+    $breakdown = $breakdownStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    
+    foreach ($breakdown as &$b) {
+        $b['amount'] = (float)$b['amount'];
+    }
+    unset($b);
+
     $total_income = $fees_collected + $extra_fees_collected + $previous_year_recovery;
     $total_expenses = $salaries_paid + $school_expenses;
     $net_profit = $total_income - $total_expenses;
@@ -7921,6 +8711,7 @@ $app->get('/api/financial-reports/preview', function (Request $request, Response
         'fees_collected' => $fees_collected,
         'extra_fees_collected' => $extra_fees_collected,
         'previous_year_recovery' => $previous_year_recovery,
+        'previous_year_recovery_details' => $breakdown,
         'total_income' => $total_income,
         'salaries_paid' => $salaries_paid,
         'school_expenses' => $school_expenses,
@@ -8047,8 +8838,34 @@ $app->post('/api/financial-reports', function (Request $request, Response $respo
     $total_expenses = $salaries_paid + $school_expenses;
     $net_profit = $total_income - $total_expenses;
     
-    $ins = $pdo->prepare("INSERT INTO financial_reports (school_id, academic_year_id, `from_date`, `to_date`, from_timestamp, to_timestamp, fees_collected, extra_fees_collected, previous_year_recovery, salaries_paid, school_expenses, net_profit, settlement_status) 
-                          VALUES (:school_id, :ay_id, :from_date, :to_date, :from_ts, :to_ts, :fees_collected, :extra_fees, :previous_year_recovery, :salaries, :expenses, :net_profit, 'Pending')");
+    // Breakdown of previous year recoveries by original academic year
+    $breakdownSql = "SELECT SUM(pyr.amount_recovered) AS amount, ay.year_range 
+                     FROM previous_year_recoveries pyr
+                     JOIN carry_forward_dues cfd ON pyr.carry_forward_due_id = cfd.id
+                     JOIN academic_years ay ON cfd.original_academic_year_id = ay.id
+                     WHERE pyr.school_id = :school_id
+                       AND pyr.academic_year_id = :ay_id";
+    $breakdownSql .= $use_strict_greater ? " AND pyr.paid_at > :start_timestamp" : " AND pyr.paid_at >= :start_timestamp";
+    $breakdownSql .= " AND pyr.paid_at <= :end_timestamp";
+    $breakdownSql .= " GROUP BY cfd.original_academic_year_id ORDER BY ay.start_date ASC";
+    
+    $breakdownStmt = $pdo->prepare($breakdownSql);
+    $breakdownStmt->execute([
+        'school_id' => $auth['school_id'],
+        'ay_id' => $ay_id,
+        'start_timestamp' => $start_timestamp,
+        'end_timestamp' => $end_timestamp
+    ]);
+    $breakdown = $breakdownStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    
+    foreach ($breakdown as &$b) {
+        $b['amount'] = (float)$b['amount'];
+    }
+    unset($b);
+    $breakdownJson = json_encode($breakdown);
+
+    $ins = $pdo->prepare("INSERT INTO financial_reports (school_id, academic_year_id, `from_date`, `to_date`, from_timestamp, to_timestamp, fees_collected, extra_fees_collected, previous_year_recovery, previous_year_recovery_details, salaries_paid, school_expenses, net_profit, settlement_status) 
+                          VALUES (:school_id, :ay_id, :from_date, :to_date, :from_ts, :to_ts, :fees_collected, :extra_fees, :previous_year_recovery, :previous_year_recovery_details, :salaries, :expenses, :net_profit, 'Pending')");
     $ins->execute([
         'school_id' => $auth['school_id'],
         'ay_id' => $ay_id,
@@ -8059,6 +8876,7 @@ $app->post('/api/financial-reports', function (Request $request, Response $respo
         'fees_collected' => $fees_collected,
         'extra_fees' => $extra_fees_collected,
         'previous_year_recovery' => $previous_year_recovery,
+        'previous_year_recovery_details' => $breakdownJson,
         'salaries' => $salaries_paid,
         'expenses' => $school_expenses,
         'net_profit' => $net_profit
@@ -9926,6 +10744,259 @@ $app->get('/api/schedules/whatsapp-reminders/history', function (Request $reques
     return jsonResponse($response, $results);
 });
 
+// Helper to generate system-prefilled Indian holidays dynamically for a given year range
+function getSystemHolidays($start_date, $end_date, $ay_id) {
+    if (!$start_date || !$end_date) return [];
+    
+    $start_dt = new DateTime($start_date);
+    $end_dt = new DateTime($end_date);
+    $start_year = (int)$start_dt->format('Y');
+    $end_year = (int)$end_dt->format('Y');
+    
+    $candidates = [
+        ['title' => "New Year's Day", 'month' => 1, 'day' => 1],
+        ['title' => 'Republic Day', 'month' => 1, 'day' => 26],
+        ['title' => 'Labour Day', 'month' => 5, 'day' => 1],
+        ['title' => 'Independence Day', 'month' => 8, 'day' => 15],
+        ['title' => 'Gandhi Jayanti', 'month' => 10, 'day' => 2],
+        ['title' => 'Christmas Day', 'month' => 12, 'day' => 25],
+    ];
+    
+    $systemHolidays = [];
+    foreach ($candidates as $c) {
+        for ($yr = $start_year; $yr <= $end_year; $yr++) {
+            $dateStr = sprintf('%04d-%02d-%02d', $yr, $c['month'], $c['day']);
+            $dt = new DateTime($dateStr);
+            if ($dt >= $start_dt && $dt <= $end_dt) {
+                $systemHolidays[] = [
+                    'id' => 'system-' . $c['month'] . '-' . $c['day'] . '-' . $yr,
+                    'school_id' => 1,
+                    'academic_year_id' => $ay_id,
+                    'title' => $c['title'],
+                    'leave_date' => $dateStr,
+                    'description' => 'System generated national/public holiday',
+                    'category' => 'System Holiday'
+                ];
+            }
+        }
+    }
+    return $systemHolidays;
+}
+
+// --- Leaves Routes ---
+$app->get('/api/leaves', function (Request $request, Response $response) {
+    $auth = getAuthUser($request);
+    if (!$auth || !$auth['school_id']) return jsonResponse($response, ['detail' => 'Unauthorized'], 401);
+    
+    $params = $request->getQueryParams();
+    $ayId = (int)($params['academic_year_id'] ?? 0);
+    if (!$ayId) {
+        return jsonResponse($response, ['detail' => 'academic_year_id is required.'], 400);
+    }
+    
+    $pdo = getDb();
+    
+    // Fetch manual leaves
+    $stmt = $pdo->prepare("SELECT * FROM school_leaves WHERE school_id = :school_id AND academic_year_id = :ay_id ORDER BY leave_date ASC");
+    $stmt->execute([
+        'school_id' => $auth['school_id'],
+        'ay_id' => $ayId
+    ]);
+    $leaves = $stmt->fetchAll();
+    foreach ($leaves as &$l) {
+        $l['id'] = (int)$l['id'];
+        $l['school_id'] = (int)$l['school_id'];
+        $l['academic_year_id'] = (int)$l['academic_year_id'];
+        if (empty($l['category'])) {
+            $l['category'] = 'School Holiday';
+        }
+    }
+    
+    // Generate system holidays
+    $yearStmt = $pdo->prepare("SELECT start_date, end_date FROM academic_years WHERE id = :id AND school_id = :sid");
+    $yearStmt->execute(['id' => $ayId, 'sid' => $auth['school_id']]);
+    $activeYear = $yearStmt->fetch();
+    
+    $systemHolidays = [];
+    if ($activeYear) {
+        $systemHolidays = getSystemHolidays($activeYear['start_date'], $activeYear['end_date'], $ayId);
+    }
+    
+    // Merge lists
+    $allLeaves = array_merge($leaves, $systemHolidays);
+    
+    // Sort by date ascending
+    usort($allLeaves, function ($a, $b) {
+        return strcmp($a['leave_date'], $b['leave_date']);
+    });
+    
+    return jsonResponse($response, $allLeaves);
+});
+
+$app->post('/api/leaves', function (Request $request, Response $response) {
+    $auth = getAuthUser($request);
+    if (!$auth || !$auth['school_id']) return jsonResponse($response, ['detail' => 'Unauthorized'], 401);
+    
+    $data = getJsonData($request);
+    $ayId = (int)($data['academic_year_id'] ?? 0);
+    $leaveDate = trim($data['leave_date'] ?? '');
+    $title = trim($data['title'] ?? '');
+    $description = trim($data['description'] ?? '');
+    
+    if (!$ayId || empty($leaveDate) || empty($title)) {
+        return jsonResponse($response, ['detail' => 'academic_year_id, leave_date, and title are required.'], 400);
+    }
+    
+    $pdo = getDb();
+    
+    // 1. Validate Academic Year Boundary
+    $yearStmt = $pdo->prepare("SELECT start_date, end_date FROM academic_years WHERE id = :id AND school_id = :sid");
+    $yearStmt->execute(['id' => $ayId, 'sid' => $auth['school_id']]);
+    $activeYear = $yearStmt->fetch();
+    if (!$activeYear) {
+        return jsonResponse($response, ['detail' => 'Invalid academic year.'], 400);
+    }
+    if ($leaveDate < $activeYear['start_date'] || $leaveDate > $activeYear['end_date']) {
+        return jsonResponse($response, ['detail' => 'Leave date must belong to the active academic session.'], 400);
+    }
+    
+    // 2. Validate Uniqueness (including System Holidays)
+    $systemHols = getSystemHolidays($activeYear['start_date'], $activeYear['end_date'], $ayId);
+    foreach ($systemHols as $sh) {
+        if ($sh['leave_date'] === $leaveDate) {
+            return jsonResponse($response, ['detail' => 'A leave has already been declared for this date.'], 400);
+        }
+    }
+    
+    $chkStmt = $pdo->prepare("SELECT COUNT(*) FROM school_leaves WHERE school_id = :sid AND academic_year_id = :ay_id AND leave_date = :ld");
+    $chkStmt->execute(['sid' => $auth['school_id'], 'ay_id' => $ayId, 'ld' => $leaveDate]);
+    if ($chkStmt->fetchColumn() > 0) {
+        return jsonResponse($response, ['detail' => 'A leave has already been declared for this date.'], 400);
+    }
+    
+    // 3. Insert Leave
+    $stmt = $pdo->prepare("INSERT INTO school_leaves (school_id, academic_year_id, title, category, leave_date, description) VALUES (:sid, :ay_id, :title, 'School Holiday', :ld, :desc)");
+    $stmt->execute([
+        'sid' => $auth['school_id'],
+        'ay_id' => $ayId,
+        'title' => $title,
+        'ld' => $leaveDate,
+        'desc' => !empty($description) ? $description : null
+    ]);
+    $leaveId = (int)$pdo->lastInsertId();
+    
+    // 4. Trigger Notifications
+    $formattedDate = date('j F Y', strtotime($leaveDate));
+    
+    // A. Teacher Notification
+    $tTitle = "New Holiday Declared";
+    $tContent = "School holiday added for {$formattedDate} – {$title}." . ($description ? " Description: {$description}" : "");
+    $insTeacher = $pdo->prepare("INSERT INTO notifications (school_id, title, content, type, timestamp, is_read) VALUES (:sid, :title, :content, 'Holiday', NOW(), 0)");
+    $insTeacher->execute([
+        'sid' => $auth['school_id'],
+        'title' => $tTitle,
+        'content' => $tContent
+    ]);
+    
+    // B. Parent Notification
+    $pTitle = "School Holiday Notice";
+    $pContent = "School Holiday Notice: {$title} has been declared for {$formattedDate}." . ($description ? " Description: {$description}" : "");
+    
+    $parentStmt = $pdo->prepare("
+        SELECT DISTINCT psm.parent_user_id 
+        FROM parent_student_mappings psm
+        JOIN students s ON psm.student_id = s.id
+        WHERE s.school_id = :sid AND s.status = 'Active'
+    ");
+    $parentStmt->execute(['sid' => $auth['school_id']]);
+    $parentIds = $parentStmt->fetchAll(PDO::FETCH_COLUMN);
+    
+    $insParent = $pdo->prepare("INSERT INTO notifications (school_id, title, content, type, timestamp, is_read, target_user_id) VALUES (:sid, :title, :content, 'Holiday', NOW(), 0, :puid)");
+    foreach ($parentIds as $puid) {
+        $insParent->execute([
+            'sid' => $auth['school_id'],
+            'title' => $pTitle,
+            'content' => $pContent,
+            'puid' => $puid
+        ]);
+    }
+    
+    return jsonResponse($response, [
+        'success' => true,
+        'id' => $leaveId,
+        'notifications_sent' => count($parentIds) + 1
+    ]);
+});
+
+$app->put('/api/leaves/{id}', function (Request $request, Response $response, array $args) {
+    $auth = getAuthUser($request);
+    if (!$auth || !$auth['school_id']) return jsonResponse($response, ['detail' => 'Unauthorized'], 401);
+    
+    $leaveId = (int)$args['id'];
+    $data = getJsonData($request);
+    $ayId = (int)($data['academic_year_id'] ?? 0);
+    $leaveDate = trim($data['leave_date'] ?? '');
+    $title = trim($data['title'] ?? '');
+    $description = trim($data['description'] ?? '');
+    
+    if (!$ayId || empty($leaveDate) || empty($title)) {
+        return jsonResponse($response, ['detail' => 'academic_year_id, leave_date, and title are required.'], 400);
+    }
+    
+    $pdo = getDb();
+    
+    // 1. Validate Academic Year Boundary
+    $yearStmt = $pdo->prepare("SELECT start_date, end_date FROM academic_years WHERE id = :id AND school_id = :sid");
+    $yearStmt->execute(['id' => $ayId, 'sid' => $auth['school_id']]);
+    $activeYear = $yearStmt->fetch();
+    if (!$activeYear) {
+        return jsonResponse($response, ['detail' => 'Invalid academic year.'], 400);
+    }
+    if ($leaveDate < $activeYear['start_date'] || $leaveDate > $activeYear['end_date']) {
+        return jsonResponse($response, ['detail' => 'Leave date must belong to the active academic session.'], 400);
+    }
+    
+    // 2. Validate Uniqueness (including System Holidays, excluding current leave ID)
+    $systemHols = getSystemHolidays($activeYear['start_date'], $activeYear['end_date'], $ayId);
+    foreach ($systemHols as $sh) {
+        if ($sh['leave_date'] === $leaveDate) {
+            return jsonResponse($response, ['detail' => 'A leave has already been declared for this date.'], 400);
+        }
+    }
+    
+    $chkStmt = $pdo->prepare("SELECT COUNT(*) FROM school_leaves WHERE school_id = :sid AND academic_year_id = :ay_id AND leave_date = :ld AND id != :id");
+    $chkStmt->execute(['sid' => $auth['school_id'], 'ay_id' => $ayId, 'ld' => $leaveDate, 'id' => $leaveId]);
+    if ($chkStmt->fetchColumn() > 0) {
+        return jsonResponse($response, ['detail' => 'A leave has already been declared for this date.'], 400);
+    }
+    
+    // 3. Update Leave
+    $stmt = $pdo->prepare("UPDATE school_leaves SET title = :title, leave_date = :ld, description = :desc WHERE id = :id AND school_id = :sid");
+    $stmt->execute([
+        'title' => $title,
+        'ld' => $leaveDate,
+        'desc' => !empty($description) ? $description : null,
+        'id' => $leaveId,
+        'sid' => $auth['school_id']
+    ]);
+    
+    return jsonResponse($response, ['success' => true]);
+});
+
+$app->delete('/api/leaves/{id}', function (Request $request, Response $response, array $args) {
+    $auth = getAuthUser($request);
+    if (!$auth || !$auth['school_id']) return jsonResponse($response, ['detail' => 'Unauthorized'], 401);
+    
+    $leaveId = (int)$args['id'];
+    $pdo = getDb();
+    $stmt = $pdo->prepare("DELETE FROM school_leaves WHERE id = :id AND school_id = :school_id");
+    $stmt->execute([
+        'id' => $leaveId,
+        'school_id' => $auth['school_id']
+    ]);
+    return jsonResponse($response, ['success' => true]);
+});
+
 // ==========================================
 // 🎓 STUDENT PERFORMANCE MODULE ENDPOINTS
 // ==========================================
@@ -10002,6 +11073,11 @@ $app->post('/api/attendance/bulk', function (Request $request, Response $respons
     $ayId = (int)($data['academic_year_id'] ?? 0);
     $date = $data['date'] ?? date('Y-m-d');
     $studentsList = $data['students'] ?? [];
+    
+    $todayStr = date('Y-m-d');
+    if ($date > $todayStr) {
+        return jsonResponse($response, ['detail' => 'Future attendance is not allowed.'], 400);
+    }
     
     if (!$classId || !$ayId || empty($studentsList)) {
         return jsonResponse($response, ['detail' => 'class_id, academic_year_id, and students list are required.'], 400);
@@ -10216,37 +11292,91 @@ $app->get('/api/attendance/report/monthly', function (Request $request, Response
     $stmt->execute($execParams);
     $students = $stmt->fetchAll();
     
-    // Aggregate attendance counts for the month
     $monthStart = $month . '-01';
     $monthEnd = date('Y-m-t', strtotime($monthStart));
     
-    $attStmt = $pdo->prepare("SELECT student_id, status, COUNT(*) as count 
+    // Fetch leaves for the month
+    $leaveStmt = $pdo->prepare("SELECT leave_date FROM school_leaves WHERE school_id = :sid AND academic_year_id = :ay_id AND leave_date BETWEEN :start AND :end");
+    $leaveStmt->execute([
+        'sid' => $auth['school_id'],
+        'ay_id' => $ayId,
+        'start' => $monthStart,
+        'end' => $monthEnd
+    ]);
+    $dbLeaveDates = $leaveStmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    
+    // Fetch active academic year details to generate system holidays
+    $yearStmt = $pdo->prepare("SELECT start_date, end_date FROM academic_years WHERE id = :id AND school_id = :sid");
+    $yearStmt->execute(['id' => $ayId, 'sid' => $auth['school_id']]);
+    $activeYear = $yearStmt->fetch();
+    
+    $systemHolidays = [];
+    if ($activeYear) {
+        $systemHolidays = getSystemHolidays($activeYear['start_date'], $activeYear['end_date'], $ayId);
+    }
+    
+    // Merge system holiday dates
+    $leaveDates = $dbLeaveDates;
+    foreach ($systemHolidays as $sh) {
+        if ($sh['leave_date'] >= $monthStart && $sh['leave_date'] <= $monthEnd) {
+            if (!in_array($sh['leave_date'], $leaveDates)) {
+                $leaveDates[] = $sh['leave_date'];
+            }
+        }
+    }
+    
+    // Calculate Study Days (working days)
+    $studyDays = 0;
+    $sundaysCount = 0;
+    $holidaysCount = 0;
+    $workingDatesMap = [];
+    $startDateTs = strtotime($monthStart);
+    $endDateTs = strtotime($monthEnd);
+    for ($ts = $startDateTs; $ts <= $endDateTs; $ts = strtotime('+1 day', $ts)) {
+        $curDate = date('Y-m-d', $ts);
+        $w = date('w', $ts); // 0 = Sunday
+        if ($w === '0') {
+            $sundaysCount++;
+            continue; // Exclude Sundays
+        }
+        if (in_array($curDate, $leaveDates)) {
+            $holidaysCount++;
+            continue; // Exclude Leaves
+        }
+        $studyDays++;
+        $workingDatesMap[$curDate] = true;
+    }
+    
+    // Fetch marked attendance for these students on working days in the month
+    $attStmt = $pdo->prepare("SELECT student_id, attendance_date, status 
                               FROM student_attendance 
-                              WHERE school_id = :school_id AND class_id = :class_id AND attendance_date BETWEEN :start AND :end
-                              GROUP BY student_id, status");
+                              WHERE school_id = :school_id AND class_id = :class_id AND attendance_date BETWEEN :start AND :end");
     $attStmt->execute([
         'school_id' => $auth['school_id'],
         'class_id' => $classId,
         'start' => $monthStart,
         'end' => $monthEnd
     ]);
-    $attData = $attStmt->fetchAll();
+    $attRows = $attStmt->fetchAll();
     
     $studentMap = [];
-    foreach ($attData as $row) {
+    foreach ($attRows as $row) {
+        $dateStr = $row['attendance_date'];
+        if (!isset($workingDatesMap[$dateStr])) {
+            continue; // Exclude weekend or holiday markings from report aggregation
+        }
         $sid = (int)$row['student_id'];
         if (!isset($studentMap[$sid])) {
             $studentMap[$sid] = ['Present' => 0, 'Absent' => 0, 'Leave' => 0];
         }
-        $studentMap[$sid][$row['status']] = (int)$row['count'];
+        $studentMap[$sid][$row['status']] = ($studentMap[$sid][$row['status']] ?? 0) + 1;
     }
     
     $result = [];
     foreach ($students as $student) {
         $sid = (int)$student['id'];
         $counts = $studentMap[$sid] ?? ['Present' => 0, 'Absent' => 0, 'Leave' => 0];
-        $total = $counts['Present'] + $counts['Absent'] + $counts['Leave'];
-        $pct = $total > 0 ? round(($counts['Present'] / $total) * 100, 1) : 0;
+        $pct = $studyDays > 0 ? round(($counts['Present'] / $studyDays) * 100, 2) : 0;
         
         $result[] = [
             'id' => $sid,
@@ -10260,7 +11390,12 @@ $app->get('/api/attendance/report/monthly', function (Request $request, Response
         ];
     }
     
-    return jsonResponse($response, $result);
+    return jsonResponse($response, [
+        'study_days' => $studyDays,
+        'sundays_count' => $sundaysCount,
+        'holidays_count' => $holidaysCount,
+        'report' => $result
+    ]);
 });
 
 
@@ -10279,7 +11414,7 @@ $app->get('/api/exams', function (Request $request, Response $response) {
     
     $pdo = getDb();
     
-    $sql = "SELECT e.*, c.name as class_name FROM exams e JOIN classrooms c ON e.class_id = c.id WHERE e.school_id = :school_id AND e.academic_year_id = :ay_id";
+    $sql = "SELECT e.*, c.name as class_name FROM exams e JOIN classrooms c ON e.class_id = c.id WHERE e.school_id = :school_id AND e.academic_year_id = :ay_id ORDER BY e.id DESC";
     $execParams = ['school_id' => $auth['school_id'], 'ay_id' => $ayId];
     
     if ($classId > 0) {
@@ -10297,7 +11432,7 @@ $app->get('/api/exams', function (Request $request, Response $response) {
         $exam['class_id'] = (int)$exam['class_id'];
         
         // Load subjects
-        $subStmt = $pdo->prepare("SELECT subject_name, max_marks FROM exam_subjects WHERE exam_id = :exam_id");
+        $subStmt = $pdo->prepare("SELECT subject_name, max_marks, exam_date, start_time, end_time, instructions FROM exam_subjects WHERE exam_id = :exam_id");
         $subStmt->execute(['exam_id' => $exam['id']]);
         $exam['subjects'] = $subStmt->fetchAll();
     }
@@ -10312,6 +11447,8 @@ $app->post('/api/exams', function (Request $request, Response $response) {
     
     $data = getJsonData($request);
     $name = trim($data['name'] ?? '');
+    $description = trim($data['description'] ?? '');
+    $status = trim($data['status'] ?? 'Draft');
     $ayId = (int)($data['academic_year_id'] ?? 0);
     $classId = (int)($data['class_id'] ?? 0);
     $groupName = trim($data['group_name'] ?? '');
@@ -10326,28 +11463,40 @@ $app->post('/api/exams', function (Request $request, Response $response) {
     $pdo = getDb();
     $pdo->beginTransaction();
     try {
-        $stmt = $pdo->prepare("INSERT INTO exams (school_id, academic_year_id, class_id, group_name, name, start_date, end_date) 
-                               VALUES (:school_id, :ay_id, :class_id, :group_name, :name, :start_date, :end_date)");
+        $stmt = $pdo->prepare("INSERT INTO exams (school_id, academic_year_id, class_id, group_name, name, description, status, start_date, end_date, published_at) 
+                               VALUES (:school_id, :ay_id, :class_id, :group_name, :name, :description, :status, :start_date, :end_date, :published_at)");
         $stmt->execute([
             'school_id' => $auth['school_id'],
             'ay_id' => $ayId,
             'class_id' => $classId,
             'group_name' => $groupName ?: null,
             'name' => $name,
+            'description' => $description ?: null,
+            'status' => $status,
             'start_date' => $startDate,
-            'end_date' => $endDate
+            'end_date' => $endDate,
+            'published_at' => $status === 'Published' ? date('Y-m-d H:i:s') : null
         ]);
         $examId = (int)$pdo->lastInsertId();
         
-        $subStmt = $pdo->prepare("INSERT INTO exam_subjects (exam_id, subject_name, max_marks) VALUES (:exam_id, :sub_name, :max_m)");
+        $subStmt = $pdo->prepare("INSERT INTO exam_subjects (exam_id, subject_name, max_marks, exam_date, start_time, end_time, instructions) 
+                                   VALUES (:exam_id, :sub_name, :max_m, :ex_date, :s_time, :e_time, :inst)");
         foreach ($subjects as $sub) {
             $subName = trim($sub['subject_name'] ?? '');
             $maxMarks = (int)($sub['max_marks'] ?? 100);
+            $examDate = $sub['exam_date'] ?? null;
+            $startTime = $sub['start_time'] ?? null;
+            $endTime = $sub['end_time'] ?? null;
+            $inst = $sub['instructions'] ?? null;
             if (!empty($subName)) {
                 $subStmt->execute([
                     'exam_id' => $examId,
                     'sub_name' => $subName,
-                    'max_m' => $maxMarks
+                    'max_m' => $maxMarks,
+                    'ex_date' => $examDate ?: null,
+                    's_time' => $startTime ?: null,
+                    'e_time' => $endTime ?: null,
+                    'inst' => $inst ?: null
                 ]);
             }
         }
@@ -10371,6 +11520,74 @@ $app->delete('/api/exams/{id}', function (Request $request, Response $response, 
     $stmt->execute(['id' => $examId, 'school_id' => $auth['school_id']]);
     
     return jsonResponse($response, ['success' => true]);
+});
+
+$app->put('/api/exams/{id}', function (Request $request, Response $response, array $args) {
+    $auth = getAuthUser($request);
+    if (!$auth || !$auth['school_id']) return jsonResponse($response, ['detail' => 'Unauthorized'], 401);
+    
+    $examId = (int)$args['id'];
+    $data = getJsonData($request);
+    $name = trim($data['name'] ?? '');
+    $description = trim($data['description'] ?? '');
+    $status = trim($data['status'] ?? 'Draft');
+    $startDate = $data['start_date'] ?? null;
+    $endDate = $data['end_date'] ?? null;
+    $subjects = $data['subjects'] ?? [];
+    
+    if (empty($name)) {
+        return jsonResponse($response, ['detail' => 'Exam Name is required.'], 400);
+    }
+    
+    $pdo = getDb();
+    $pdo->beginTransaction();
+    try {
+        $stmt = $pdo->prepare("UPDATE exams SET name = :name, description = :description, status = :status, start_date = :start_date, end_date = :end_date,
+                               published_at = CASE WHEN :status2 = 'Published' AND published_at IS NULL THEN NOW() ELSE published_at END 
+                               WHERE id = :id AND school_id = :school_id");
+        $stmt->execute([
+            'id' => $examId,
+            'school_id' => $auth['school_id'],
+            'name' => $name,
+            'description' => $description ?: null,
+            'status' => $status,
+            'status2' => $status,
+            'start_date' => $startDate,
+            'end_date' => $endDate
+        ]);
+        
+        // Delete old subjects and re-insert them
+        $delStmt = $pdo->prepare("DELETE FROM exam_subjects WHERE exam_id = :exam_id");
+        $delStmt->execute(['exam_id' => $examId]);
+        
+        $subStmt = $pdo->prepare("INSERT INTO exam_subjects (exam_id, subject_name, max_marks, exam_date, start_time, end_time, instructions) 
+                                   VALUES (:exam_id, :sub_name, :max_m, :ex_date, :s_time, :e_time, :inst)");
+        foreach ($subjects as $sub) {
+            $subName = trim($sub['subject_name'] ?? '');
+            $maxMarks = (int)($sub['max_marks'] ?? 100);
+            $examDate = $sub['exam_date'] ?? null;
+            $startTime = $sub['start_time'] ?? null;
+            $endTime = $sub['end_time'] ?? null;
+            $inst = $sub['instructions'] ?? null;
+            if (!empty($subName)) {
+                $subStmt->execute([
+                    'exam_id' => $examId,
+                    'sub_name' => $subName,
+                    'max_m' => $maxMarks,
+                    'ex_date' => $examDate ?: null,
+                    's_time' => $startTime ?: null,
+                    'e_time' => $endTime ?: null,
+                    'inst' => $inst ?: null
+                ]);
+            }
+        }
+        
+        $pdo->commit();
+        return jsonResponse($response, ['success' => true]);
+    } catch (\Exception $e) {
+        $pdo->rollBack();
+        return jsonResponse($response, ['detail' => 'Failed to update exam: ' . $e->getMessage()], 500);
+    }
 });
 
 $app->get('/api/exams/{exam_id}/marks', function (Request $request, Response $response, array $args) {
@@ -10708,7 +11925,7 @@ $app->get('/api/students/{id}/performance-summary', function (Request $request, 
         $examId = (int)$exam['id'];
         
         // Load subjects
-        $subStmt = $pdo->prepare("SELECT subject_name, max_marks FROM exam_subjects WHERE exam_id = :exam_id");
+        $subStmt = $pdo->prepare("SELECT subject_name, max_marks, exam_date, start_time, end_time, instructions FROM exam_subjects WHERE exam_id = :exam_id");
         $subStmt->execute(['exam_id' => $examId]);
         $subjects = $subStmt->fetchAll();
         
