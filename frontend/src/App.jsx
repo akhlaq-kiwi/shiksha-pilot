@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import LoginForm from './features/auth/components/LoginForm';
 import { 
   BookOpen, 
   Users, 
@@ -1061,7 +1062,7 @@ export default function App() {
   const [salaryDrilldownData, setSalaryDrilldownData] = useState([]);
   const [isDrilldownLoading, setIsDrilldownLoading] = useState(false);
   const [teacherProfileBackTab, setTeacherProfileBackTab] = useState(null);
-  const skipERPFetchRef = useRef(false);
+  const skipSPFetchRef = useRef(false);
   const autoSaveTimerRef = useRef(null);
   const [activeTeacherMenuId, setActiveTeacherMenuId] = useState(null);
   const [activeClassMenuId, setActiveClassMenuId] = useState(null);
@@ -1417,7 +1418,7 @@ export default function App() {
   // If container does not have a scrollbar but we have more records, load more to enable scrollbar
   useEffect(() => {
     if (!selectedClassId) return;
-    const container = document.querySelector('.erp-table-container');
+    const container = document.querySelector('.sp-table-container');
     if (!container) return;
     
     const classStudents = students.filter(s => s.class_id === selectedClassId);
@@ -2589,17 +2590,17 @@ export default function App() {
   }, [activeTab, classes, activeYearId, facultySelectedDate]);
 
   useEffect(() => {
-    if (skipERPFetchRef.current) {
-      skipERPFetchRef.current = false;
+    if (skipSPFetchRef.current) {
+      skipSPFetchRef.current = false;
       return;
     }
     if (activeTab === 'students') {
-      fetchERPData();
+      fetchSPData();
     } else if (activeTab === 'dashboard') {
       if (role === 'Super Admin') {
         fetchSuperAdminData(null, false);
       } else {
-        fetchERPData();
+        fetchSPData();
       }
     } else if (activeTab === 'settings') {
       fetchRolesAndUsers();
@@ -3515,7 +3516,7 @@ export default function App() {
   };
 
   // Fetch School Admin Data
-  const fetchERPData = async (customToken, customSchoolId) => {
+  const fetchSPData = async (customToken, customSchoolId) => {
     const activeToken = customToken || token;
     if (!activeToken) return;
     setLoading(true);
@@ -4066,7 +4067,7 @@ export default function App() {
         // Set new active year
         setActiveYearId(wizardTargetYear.id);
         // Refresh all data
-        await fetchERPData(token, schoolId);
+        await fetchSPData(token, schoolId);
       } else {
         const err = await res.json();
         showToast(err.detail || 'Activation failed.', 'danger');
@@ -4403,7 +4404,7 @@ export default function App() {
                 window.history.replaceState({ loggedIn: true, role: 'School Admin' }, '', '/setup');
                 setCurrentPath('/setup');
               } else {
-                await fetchERPData(storedToken, storedSchoolId);
+                await fetchSPData(storedToken, storedSchoolId);
                 window.history.replaceState({ loggedIn: true, role: 'School Admin' }, '', '/dashboard');
                 setCurrentPath('/dashboard');
               }
@@ -4424,7 +4425,7 @@ export default function App() {
                 setApiConnectionError(`Server responded with status ${res.status}`);
                 window.history.replaceState({ loggedIn: true, role: 'School Admin' }, '', '/dashboard');
                 setCurrentPath('/dashboard');
-                await fetchERPData(storedToken, storedSchoolId);
+                await fetchSPData(storedToken, storedSchoolId);
               }
             }
           }
@@ -4480,7 +4481,7 @@ export default function App() {
             } else {
               window.history.replaceState({ loggedIn: true, role: 'School Admin' }, '', '/dashboard');
               setCurrentPath('/dashboard');
-              await fetchERPData(storedToken, storedSchoolId);
+              await fetchSPData(storedToken, storedSchoolId);
             }
           }
         }
@@ -4568,7 +4569,7 @@ export default function App() {
 
   useEffect(() => {
     if (token && role === 'School Admin' && setupCompleted === 1 && !isInitializing) {
-      fetchERPData(token, schoolId);
+      fetchSPData(token, schoolId);
     }
   }, [token, activeYearId, isInitializing, setupCompleted, role, schoolId]);
 
@@ -4997,7 +4998,7 @@ export default function App() {
           } else {
             window.history.replaceState({ loggedIn: true, role: 'School Admin' }, '', '/dashboard');
             setCurrentPath('/dashboard');
-            await fetchERPData(data.access_token, data.school_id);
+            await fetchSPData(data.access_token, data.school_id);
           }
         }
       } else {
@@ -5215,7 +5216,7 @@ export default function App() {
         
         window.history.replaceState({ loggedIn: true, role: data.role }, '', '/dashboard');
         setCurrentPath('/dashboard');
-        await fetchERPData(data.access_token, data.school_id);
+        await fetchSPData(data.access_token, data.school_id);
       } else {
         const err = await res.json();
         setLoginError(err.detail || 'Failed to login via OTP.');
@@ -6011,7 +6012,7 @@ export default function App() {
         showToast('School Setup Completed!', 'success');
         window.history.replaceState({ loggedIn: true, role: 'School Admin' }, '', '/dashboard');
         setCurrentPath('/dashboard');
-        await fetchERPData(data.access_token, data.school_id);
+        await fetchSPData(data.access_token, data.school_id);
       } else {
         if (res.status === 500) {
           throw new Error('Database offline. Triggering mock fallback.');
@@ -6093,7 +6094,7 @@ export default function App() {
         body: JSON.stringify({ name, room, groups })
       });
       if (res.ok) {
-        await fetchERPData();
+        await fetchSPData();
         showToast('Classroom created successfully', 'success');
       } else {
         const err = await res.json();
@@ -6142,7 +6143,7 @@ export default function App() {
         setClassFeeStructure(null);
       }
 
-      await fetchERPData();
+      await fetchSPData();
       showToast('Classroom and associated data deleted successfully (Sandbox Mode)', 'success');
       return;
     }
@@ -6158,7 +6159,7 @@ export default function App() {
           setSelectedFeeClassId('');
           setClassFeeStructure(null);
         }
-        await fetchERPData();
+        await fetchSPData();
         showToast('Classroom and associated data deleted successfully', 'success');
       } else {
         const err = await res.json().catch(() => ({}));
@@ -6191,7 +6192,7 @@ export default function App() {
         body: JSON.stringify({ name })
       });
       if (res.ok) {
-        await fetchERPData();
+        await fetchSPData();
         showToast('Classroom updated successfully', 'success');
       } else {
         const err = await res.json();
@@ -6234,7 +6235,7 @@ export default function App() {
         body: JSON.stringify({ name })
       });
       if (res.ok) {
-        await fetchERPData();
+        await fetchSPData();
         showToast('Group added successfully', 'success');
       } else {
         const err = await res.json();
@@ -6280,7 +6281,7 @@ export default function App() {
         body: JSON.stringify({ name })
       });
       if (res.ok) {
-        await fetchERPData();
+        await fetchSPData();
         showToast('Group updated successfully', 'success');
       } else {
         const err = await res.json();
@@ -6328,7 +6329,7 @@ export default function App() {
         headers: getHeaders()
       });
       if (res.ok) {
-        await fetchERPData();
+        await fetchSPData();
         showToast('Group deleted successfully', 'success');
       } else {
         const err = await res.json();
@@ -6432,7 +6433,7 @@ export default function App() {
         if (res.ok) {
           setShowAddTeacherModal(false);
           setEditingTeacher(null);
-          await fetchERPData();
+          await fetchSPData();
           if (selectedTeacher && selectedTeacher.id === editingTeacher.id) {
             setSelectedTeacher({ ...selectedTeacher, ...finalForm });
           }
@@ -6467,7 +6468,7 @@ export default function App() {
       });
       if (res.ok) {
         setShowAddTeacherModal(false);
-        await fetchERPData();
+        await fetchSPData();
         setTForm({ name: '', subject: '', phone: '', email: '', qualification: '', experience: '', address: '', joining_date: '', exit_date: '', salary_amount: 3000.0, assigned_classes: '', gender: 'Male', aadhaar_number: '', pan_number: '', profile_image: '', documents: [] });
         showToast('Teacher profile added', 'success');
       } else {
@@ -6499,7 +6500,7 @@ export default function App() {
         body: JSON.stringify({ status: nextStatus })
       });
       if (res.ok) {
-        await fetchERPData();
+        await fetchSPData();
         if (selectedTeacher && selectedTeacher.id === teacherId) {
           setSelectedTeacher({ ...selectedTeacher, status: nextStatus });
         }
@@ -6533,7 +6534,7 @@ export default function App() {
       });
       if (res.ok) {
         setSelectedTeacher(null);
-        await fetchERPData();
+        await fetchSPData();
         showToast('Teacher profile deleted', 'success');
       }
     } catch (err) {
@@ -6680,7 +6681,7 @@ export default function App() {
           setSelectedStudent(updatedStud);
         }
         setEditingStudent(null);
-        await fetchERPData();
+        await fetchSPData();
         setSForm({
           name: '',
           roll_number: '',
@@ -6769,7 +6770,7 @@ export default function App() {
       });
       if (res.ok) {
         setSelectedStudent(null);
-        await fetchERPData();
+        await fetchSPData();
         showToast('Student deleted successfully', 'success');
       }
     } catch (err) {
@@ -8526,7 +8527,7 @@ export default function App() {
         await fetchCarryForwardDues(studentId);
         await fetchPreviousYearRecoveries();
         await fetchPreviousDues();
-        await fetchERPData();
+        await fetchSPData();
         showToast("Past year due payment recorded (Sandbox Mode)", "success");
         setShowPayRecoveryModal(false);
       } catch (err) {
@@ -8547,7 +8548,7 @@ export default function App() {
         await fetchCarryForwardDues(studentId);
         await fetchPreviousYearRecoveries();
         await fetchPreviousDues();
-        await fetchERPData();
+        await fetchSPData();
         showToast("Past year due payment recorded successfully.", "success");
         setShowPayRecoveryModal(false);
       } else {
@@ -8600,7 +8601,7 @@ export default function App() {
       }
       await fetchPreviousYearRecoveries();
       await fetchPreviousDues();
-      await fetchERPData();
+      await fetchSPData();
       showToast("Recovery reverted successfully (Sandbox Mode)", "success");
       return;
     }
@@ -8616,7 +8617,7 @@ export default function App() {
         }
         await fetchPreviousYearRecoveries();
         await fetchPreviousDues();
-        await fetchERPData();
+        await fetchSPData();
         showToast("Recovery reverted successfully.", "success");
       } else {
         const data = await res.json();
@@ -8641,7 +8642,7 @@ export default function App() {
       const updated = current.map(s => s.month === month ? { ...s, status: "Paid", payment_date: new Date().toISOString().split('T')[0], paid_at: new Date().toISOString() } : s);
       setTeacherSalaries(updated);
       localStorage.setItem(storageKey, JSON.stringify(updated));
-      await fetchERPData();
+      await fetchSPData();
       showToast('Salary disbursed (Sandbox Mode)', 'success');
       return;
     }
@@ -8653,7 +8654,7 @@ export default function App() {
       });
       if (res.ok) {
         await fetchTeacherSalaryRecords(teacherId);
-        await fetchERPData();
+        await fetchSPData();
         showToast('Salary disbursed successfully', 'success');
       } else {
         const data = await res.json();
@@ -8719,7 +8720,7 @@ export default function App() {
       });
       setStudentFees(updated);
       localStorage.setItem(storageKey, JSON.stringify(updated));
-      await fetchERPData();
+      await fetchSPData();
       showToast('Tuition fee payments recorded (Sandbox Mode)', 'success');
       
       const paidRecords = updated.filter(f => months.includes(f.month));
@@ -8754,7 +8755,7 @@ export default function App() {
         const resData = await res.json();
         
         await fetchStudentFeesRecords(studentId, selectedStudent?.class_id);
-        await fetchERPData();
+        await fetchSPData();
         showToast('Tuition fee payments recorded', 'success');
 
         const paidRecords = resData.records || [];
@@ -8814,7 +8815,7 @@ export default function App() {
       const updated = current.map(f => f.month === month ? { ...f, status: "Paid", payment_date: new Date().toISOString().split('T')[0], paid_at: new Date().toISOString() } : f);
       setStudentFees(updated);
       localStorage.setItem(storageKey, JSON.stringify(updated));
-      await fetchERPData();
+      await fetchSPData();
       showToast('Tuition fee payment recorded (Sandbox Mode)', 'success');
       return;
     }
@@ -8826,7 +8827,7 @@ export default function App() {
       });
       if (res.ok) {
         await fetchStudentFeesRecords(studentId, selectedStudent?.class_id);
-        await fetchERPData();
+        await fetchSPData();
         showToast('Tuition fee payment recorded', 'success');
       } else {
         const data = await res.json();
@@ -8874,7 +8875,7 @@ export default function App() {
       const updated = current.map(f => f.month === month ? { ...f, status: "Pending", payment_date: null, paid_at: null } : f);
       setStudentFees(updated);
       localStorage.setItem(storageKey, JSON.stringify(updated));
-      await fetchERPData();
+      await fetchSPData();
       showToast('Fee status reverted to Unpaid (Sandbox Mode)', 'success');
       return;
     }
@@ -8886,7 +8887,7 @@ export default function App() {
       });
       if (res.ok) {
         await fetchStudentFeesRecords(studentId, selectedStudent?.class_id);
-        await fetchERPData();
+        await fetchSPData();
         showToast('Fee status reverted to Unpaid', 'success');
       } else {
         const data = await res.json();
@@ -9778,7 +9779,7 @@ export default function App() {
         list = [{
           id: 1,
           school_id: parseInt(schoolId) || 1,
-          title: 'Welcome to ERP Portal',
+          title: 'Welcome to SP Portal',
           content: 'Complete school setup configuration to access rosters and ledgers.',
           type: 'System',
           is_read: 0,
@@ -10186,7 +10187,7 @@ export default function App() {
         });
       }
       
-      await fetchERPData();
+      await fetchSPData();
       showToast('Fee Structure has been successfully locked and can no longer be modified.', 'success');
       return;
     }
@@ -10204,7 +10205,7 @@ export default function App() {
       });
       if (res.ok) {
         setClassFeeStructure(structureToSave);
-        await fetchERPData();
+        await fetchSPData();
         showToast('Fee Structure has been successfully locked and can no longer be modified.', 'success');
       } else {
         const errData = await res.json().catch(() => ({}));
@@ -10752,7 +10753,7 @@ export default function App() {
       });
       if (res.ok) {
         setSelectedStudent(prev => ({ ...prev, documents: updatedDocs }));
-        await fetchERPData();
+        await fetchSPData();
         showToast('Documents updated successfully', 'success');
       } else {
         showToast('Failed to update student documents', 'error');
@@ -11028,7 +11029,7 @@ export default function App() {
           </div>
         )}
 
-        <div className="erp-card fade-in" style={{ 
+        <div className="sp-card fade-in" style={{ 
           width: '100%', 
           maxWidth: '500px', 
           padding: '40px 32px', 
@@ -11211,359 +11212,47 @@ export default function App() {
           </div>
         )}
 
-        <div className="erp-card fade-in" style={{ width: '100%', maxWidth: '420px', padding: '40px 32px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)' }}>
-          
-          <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-            <div style={{
-              background: forgotPasswordStep > 0
-                ? 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%)'
-                : isSuperAdminLoginPage
-                  ? 'linear-gradient(135deg, var(--color-secondary) 0%, #ec4899 100%)'
-                  : 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%)',
-              padding: '12px', borderRadius: '14px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px', boxShadow: '0 0 20px rgba(59,130,246,0.3)'
-            }}>
-              {forgotPasswordStep === 1 && <Key size={36} color="white" />}
-              {forgotPasswordStep === 2 && <Shield size={36} color="white" />}
-              {forgotPasswordStep === 3 && <Lock size={36} color="white" />}
-              {forgotPasswordStep === 0 && (isSuperAdminLoginPage ? <Sliders size={36} color="white" /> : <GraduationCap size={36} color="white" />)}
-            </div>
-            <h2 style={{ fontSize: '1.6rem', fontWeight: 800 }}>
-              {forgotPasswordStep === 1 && 'Forgot Password'}
-              {forgotPasswordStep === 2 && 'Verify OTP'}
-              {forgotPasswordStep === 3 && 'Reset Password'}
-              {forgotPasswordStep === 0 && (isSuperAdminLoginPage ? 'Super Admin Portal' : 'BN College Portal')}
-            </h2>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '4px' }}>
-              {forgotPasswordStep === 1 && 'Enter your registered email address.'}
-              {forgotPasswordStep === 2 && 'Enter the 4-digit code sent to your email.'}
-              {forgotPasswordStep === 3 && 'Enter and confirm your new password.'}
-              {forgotPasswordStep === 0 && (isSuperAdminLoginPage ? 'Platform Administration Log-in' : 'Administrative Sign-in Required')}
-            </p>
-          </div>
+        <div className="sp-card fade-in" style={{ width: '100%', maxWidth: '420px', padding: '40px 32px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)' }}>
+          <LoginForm
+            onLoginSuccess={(authData) => {
+              setToken(authData.access_token);
+              setUsername(authData.email);
+              setRole(authData.role);
+              setSchoolId(authData.school_id);
+              setSetupCompleted(authData.setup_completed);
+              setPermissions(authData.permissions);
+              setLinkedStudentIds(authData.linked_student_ids);
+              setSchoolName(authData.school_name);
 
-          {/* Error & Success Messages */}
-          {forgotPasswordStep > 0 && forgotError && (
-            <div style={{
-              padding: '10px 12px', borderRadius: 'var(--radius-sm)', backgroundColor: 'rgba(239, 68, 68, 0.1)',
-              border: '1px solid rgba(239, 68, 68, 0.2)', color: '#f87171', fontSize: '0.8rem', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px'
-            }}>
-              <AlertTriangle size={14} />
-              <span>{forgotError}</span>
-            </div>
-          )}
-
-          {forgotPasswordStep > 0 && forgotSuccess && (
-            <div style={{
-              padding: '10px 12px', borderRadius: 'var(--radius-sm)', backgroundColor: 'rgba(16, 185, 129, 0.1)',
-              border: '1px solid rgba(16, 185, 129, 0.2)', color: '#34d399', fontSize: '0.8rem', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px'
-            }}>
-              <CheckCircle2 size={14} />
-              <span>{forgotSuccess}</span>
-            </div>
-          )}
-
-          {forgotPasswordStep === 0 && loginError && (
-            <div style={{
-              padding: '10px 12px', borderRadius: 'var(--radius-sm)', backgroundColor: 'rgba(239, 68, 68, 0.1)',
-              border: '1px solid rgba(239, 68, 68, 0.2)', color: '#f87171', fontSize: '0.8rem', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px'
-            }}>
-              <AlertTriangle size={14} />
-              <span>{loginError}</span>
-            </div>
-          )}
-
-          {/* Step 0: Login Form */}
-          {forgotPasswordStep === 0 && (
-            <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div>
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <Mail size={16} style={{ position: 'absolute', left: '14px', color: 'var(--text-muted)' }} />
-                  <input 
-                    id="login-email"
-                    type="text" 
-                    placeholder="Email Address" 
-                    value={loginUser}
-                    onChange={(e) => setLoginUser(e.target.value)}
-                    className="erp-input"
-                    style={{ paddingLeft: '40px' }}
-                    autoComplete="off"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <Lock size={16} style={{ position: 'absolute', left: '14px', color: 'var(--text-muted)' }} />
-                  <input 
-                    id="login-password"
-                    type={showPassword ? 'text' : 'password'} 
-                    placeholder="Password" 
-                    value={loginPass}
-                    onChange={(e) => setLoginPass(e.target.value)}
-                    className="erp-input"
-                    style={{ paddingLeft: '40px', paddingRight: '40px' }}
-                    autoComplete="new-password"
-                    required
-                  />
-                  <button
-                    type="button"
-                    id="password-visibility-toggle"
-                    onClick={() => setShowPassword(!showPassword)}
-                    style={{
-                      position: 'absolute', right: '12px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
-                    }}
-                  >
-                    {showPassword ? <Eye size={18} /> : <EyeOff size={18} />}
-                  </button>
-                </div>
-
-                {!isSuperAdminLoginPage && (
-                  <div style={{ textAlign: 'right', marginTop: '8px' }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setForgotPasswordStep(1);
-                        setForgotError('');
-                        setForgotSuccess('');
-                        setForgotEmail('');
-                        setForgotOtp('');
-                      }}
-                      style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
-                    >
-                      Forgot Password?
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <button 
-                id="btn-login-submit" 
-                type="submit" 
-                className="btn-primary" 
-                style={{ width: '100%', justifyContent: 'center', padding: '12px', marginTop: '10px', background: isSuperAdminLoginPage ? 'linear-gradient(135deg, var(--color-secondary) 0%, #ec4899 100%)' : 'var(--color-primary)' }}
-                disabled={isLoggingIn}
-              >
-                {isLoggingIn ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <RefreshCw className="animate-spin" size={18} />
-                    <span>Signing In...</span>
-                  </div>
-                ) : (
-                  'Sign In'
-                )}
-              </button>
-            </form>
-          )}
-
-          {/* Step 1: Forgot Password (Email submission) */}
-          {forgotPasswordStep === 1 && (
-            <form onSubmit={handleForgotPasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div>
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <Mail size={16} style={{ position: 'absolute', left: '14px', color: 'var(--text-muted)' }} />
-                  <input 
-                    id="forgot-email"
-                    type="email" 
-                    placeholder="Registered Email Address" 
-                    value={forgotEmail}
-                    onChange={(e) => setForgotEmail(e.target.value)}
-                    className="erp-input"
-                    style={{ paddingLeft: '40px' }}
-                    autoComplete="off"
-                    required
-                  />
-                </div>
-              </div>
-
-              <button 
-                id="btn-forgot-submit" 
-                type="submit" 
-                className="btn-primary" 
-                style={{ width: '100%', justifyContent: 'center', padding: '12px', marginTop: '10px', background: 'var(--color-primary)' }}
-                disabled={isForgotLoading}
-              >
-                {isForgotLoading ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <RefreshCw className="animate-spin" size={18} />
-                    <span>Sending OTP...</span>
-                  </div>
-                ) : (
-                  'Send OTP'
-                )}
-              </button>
-
-              <div style={{ textAlign: 'center', marginTop: '8px' }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setForgotPasswordStep(0);
-                    setForgotError('');
-                    setForgotSuccess('');
-                  }}
-                  style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
-                >
-                  Back to Login
-                </button>
-              </div>
-            </form>
-          )}
-
-          {/* Step 2: Verify OTP */}
-          {forgotPasswordStep === 2 && (
-            <form onSubmit={handleVerifyOtpSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div>
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <input 
-                    id="forgot-otp"
-                    type="text" 
-                    placeholder="Enter 4-Digit OTP" 
-                    maxLength={4}
-                    value={forgotOtp}
-                    onChange={(e) => setForgotOtp(e.target.value.replace(/\D/g, ''))}
-                    className="erp-input"
-                    style={{ letterSpacing: '4px', fontWeight: 'bold', fontSize: '1.1rem', textAlign: 'center' }}
-                    autoComplete="off"
-                    required
-                  />
-                </div>
-              </div>
-
-              <button 
-                id="btn-verify-otp-submit" 
-                type="submit" 
-                className="btn-primary" 
-                style={{ width: '100%', justifyContent: 'center', padding: '12px', marginTop: '10px', background: 'var(--color-primary)' }}
-                disabled={isForgotLoading}
-              >
-                {isForgotLoading ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <RefreshCw className="animate-spin" size={18} />
-                    <span>Verifying OTP...</span>
-                  </div>
-                ) : (
-                  'Verify OTP'
-                )}
-              </button>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setForgotPasswordStep(1);
-                    setForgotError('');
-                    setForgotSuccess('');
-                  }}
-                  style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
-                >
-                  Back to Email
-                </button>
-                
-                <button
-                  type="button"
-                  onClick={handleForgotPasswordSubmit}
-                  style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
-                  disabled={isForgotLoading}
-                >
-                  Resend OTP
-                </button>
-              </div>
-            </form>
-          )}
-
-          {/* Step 3: Reset Password */}
-          {forgotPasswordStep === 3 && (
-            <form onSubmit={handleResetPasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div>
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <Lock size={16} style={{ position: 'absolute', left: '14px', color: 'var(--text-muted)' }} />
-                  <input 
-                    id="reset-new-password"
-                    type={showNewPassword ? 'text' : 'password'} 
-                    placeholder="New Password" 
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="erp-input"
-                    style={{ paddingLeft: '40px', paddingRight: '40px' }}
-                    autoComplete="new-password"
-                    required
-                  />
-                  <button
-                    type="button"
-                    id="new-password-visibility-toggle"
-                    onClick={() => setShowNewPassword(!showNewPassword)}
-                    style={{
-                      position: 'absolute', right: '12px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
-                    }}
-                  >
-                    {showNewPassword ? <Eye size={18} /> : <EyeOff size={18} />}
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <Lock size={16} style={{ position: 'absolute', left: '14px', color: 'var(--text-muted)' }} />
-                  <input 
-                    id="reset-confirm-password"
-                    type={showConfirmNewPassword ? 'text' : 'password'} 
-                    placeholder="Confirm Password" 
-                    value={confirmNewPassword}
-                    onChange={(e) => setConfirmNewPassword(e.target.value)}
-                    className="erp-input"
-                    style={{ paddingLeft: '40px', paddingRight: '40px' }}
-                    autoComplete="new-password"
-                    required
-                  />
-                  <button
-                    type="button"
-                    id="confirm-password-visibility-toggle"
-                    onClick={() => setShowConfirmNewPassword(!showConfirmNewPassword)}
-                    style={{
-                      position: 'absolute', right: '12px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
-                    }}
-                  >
-                    {showConfirmNewPassword ? <Eye size={18} /> : <EyeOff size={18} />}
-                  </button>
-                </div>
-              </div>
-
-              <button 
-                id="btn-reset-password-submit" 
-                type="submit" 
-                className="btn-primary" 
-                style={{ width: '100%', justifyContent: 'center', padding: '12px', marginTop: '10px', background: 'var(--color-primary)' }}
-                disabled={isForgotLoading}
-              >
-                {isForgotLoading ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <RefreshCw className="animate-spin" size={18} />
-                    <span>Resetting Password...</span>
-                  </div>
-                ) : (
-                  'Reset Password'
-                )}
-              </button>
-
-              <div style={{ textAlign: 'center', marginTop: '8px' }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setForgotPasswordStep(0);
-                    setForgotError('');
-                    setForgotSuccess('');
-                    setNewPassword('');
-                    setConfirmNewPassword('');
-                  }}
-                  style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
-                >
-                  Cancel & Login
-                </button>
-              </div>
-            </form>
-          )}
-
-          {forgotPasswordStep === 0 && isSuperAdminLoginPage && (
+              if (authData.role === 'Super Admin') {
+                window.history.replaceState({ loggedIn: true, role: 'Super Admin' }, '', '/super-admin');
+                setCurrentPath('/super-admin');
+                fetchSuperAdminData(authData.access_token, true);
+              } else if (authData.role === 'Teacher') {
+                window.history.replaceState({ loggedIn: true, role: 'Teacher' }, '', '/dashboard');
+                setCurrentPath('/dashboard');
+                setActiveTab('teacher_portal');
+                fetchTeacherDashboard(authData.email || authData.phone);
+              } else if (authData.role === 'Parent') {
+                window.history.replaceState({ loggedIn: true, role: 'Parent' }, '', '/dashboard');
+                setCurrentPath('/dashboard');
+                setActiveTab('parent_portal');
+                fetchParentDashboard(authData.email || authData.phone);
+              } else {
+                if (authData.setup_completed === 0) {
+                  window.history.replaceState({ loggedIn: true, role: 'School Admin' }, '', '/setup');
+                  setCurrentPath('/setup');
+                } else {
+                  window.history.replaceState({ loggedIn: true, role: 'School Admin' }, '', '/dashboard');
+                  setCurrentPath('/dashboard');
+                  fetchSPData(authData.access_token, authData.school_id);
+                }
+              }
+            }}
+            isSuperAdminLoginPage={isSuperAdminLoginPage}
+            showToast={showToast}
+          />
+          {isSuperAdminLoginPage && (
             <div style={{ textAlign: 'center', marginTop: '24px' }}>
               <button
                 onClick={() => {
@@ -11578,7 +11267,6 @@ export default function App() {
               </button>
             </div>
           )}
-
         </div>
         {expiredModalInfo && renderExpiredPopupModal()}
       </div>
@@ -11589,7 +11277,7 @@ export default function App() {
   if (role === 'School Admin' && Number(setupCompleted) === 0) {
     return (
       <div className={`app-layout ${isDarkMode ? 'dark-theme' : ''}`} style={{ background: 'var(--bg-app)', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', display: 'flex' }}>
-        <div className="erp-card fade-in" style={{ width: '100%', maxWidth: '550px', padding: '40px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)' }}>
+        <div className="sp-card fade-in" style={{ width: '100%', maxWidth: '550px', padding: '40px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)' }}>
           
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -11614,7 +11302,7 @@ export default function App() {
                     placeholder="e.g. Lincoln High School" 
                     value={wizardForm.name} 
                     onChange={(e) => setWizardForm({ ...wizardForm, name: e.target.value })} 
-                    className="erp-input"
+                    className="sp-input"
                     required
                   />
                 </div>
@@ -11661,7 +11349,7 @@ export default function App() {
                     placeholder="e.g. 101 Education Way, New York, NY 10001" 
                     value={wizardForm.address} 
                     onChange={(e) => setWizardForm({ ...wizardForm, address: e.target.value })} 
-                    className="erp-input"
+                    className="sp-input"
                     style={{ resize: 'none' }}
                     required
                   />
@@ -11683,7 +11371,7 @@ export default function App() {
                       placeholder="e.g. Principal John Doe" 
                       value={wizardForm.contact_person} 
                       onChange={(e) => setWizardForm({ ...wizardForm, contact_person: e.target.value })} 
-                      className="erp-input"
+                      className="sp-input"
                       required
                     />
                   </div>
@@ -11695,7 +11383,7 @@ export default function App() {
                       placeholder="e.g. +1 (555) 019-9988" 
                       value={wizardForm.contact_number} 
                       onChange={(e) => setWizardForm({ ...wizardForm, contact_number: e.target.value })} 
-                      className="erp-input"
+                      className="sp-input"
                       required
                     />
                   </div>
@@ -11707,7 +11395,7 @@ export default function App() {
             {wizardStep === 5 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>Step 5: Review & Save</h3>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Confirm that the settings are correct before launching the ERP portal.</p>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Confirm that the settings are correct before launching the SP portal.</p>
                 <div style={{ padding: '16px', borderRadius: 'var(--radius-md)', backgroundColor: 'rgba(2, 6, 23, 0.4)', fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <div><strong>School Name:</strong> {wizardForm.name || 'N/A'}</div>
                   <div><strong>Contact Person:</strong> {wizardForm.contact_person || 'N/A'} ({wizardForm.contact_number})</div>
@@ -11770,7 +11458,7 @@ export default function App() {
                   style={{ padding: '8px 20px' }}
                   disabled={loading}
                 >
-                  {loading ? 'Initializing ERP...' : 'Finish Setup & Launch'}
+                  {loading ? 'Initializing SP...' : 'Finish Setup & Launch'}
                 </button>
               )}
             </div>
@@ -12060,7 +11748,7 @@ export default function App() {
         </div>
 
         {attendanceMode !== 'leaves' && (
-          <div className="erp-card" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', padding: '16px' }}>
+          <div className="sp-card" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', padding: '16px' }}>
             <div>
               <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Class</label>
               <select
@@ -12181,7 +11869,7 @@ export default function App() {
 
         {attendanceMode === 'mark' ? (
           isSelectedDateSunday() ? (
-            <div className="erp-card" style={{ padding: '48px 24px', textAlign: 'center', background: 'rgba(255,255,255,0.02)', border: '1px dashed var(--border-color)', borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+            <div className="sp-card" style={{ padding: '48px 24px', textAlign: 'center', background: 'rgba(255,255,255,0.02)', border: '1px dashed var(--border-color)', borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
               <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(239, 68, 68, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444' }}>
                 <Info size={28} />
               </div>
@@ -12196,7 +11884,7 @@ export default function App() {
               </span>
             </div>
           ) : getSelectedDateHoliday() ? (
-            <div className="erp-card" style={{ 
+            <div className="sp-card" style={{ 
               padding: '48px 24px', 
               textAlign: 'center', 
               background: 'rgba(16, 185, 129, 0.05)', 
@@ -12238,7 +11926,7 @@ export default function App() {
               )}
             </div>
           ) : !attendanceClassId ? (
-            <div className="erp-card" style={{ padding: '32px', fontStyle: 'italic', color: 'var(--text-muted)', textAlign: 'center' }}>
+            <div className="sp-card" style={{ padding: '32px', fontStyle: 'italic', color: 'var(--text-muted)', textAlign: 'center' }}>
               Please select a class to load student attendance.
             </div>
           ) : isFetchingAttendance ? (
@@ -12247,7 +11935,7 @@ export default function App() {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div className="erp-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', gap: '16px', flexWrap: 'wrap', background: 'rgba(255,255,255,0.015)' }}>
+              <div className="sp-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', gap: '16px', flexWrap: 'wrap', background: 'rgba(255,255,255,0.015)' }}>
                 {/* Left side sequence */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                   {/* Status Badge */}
@@ -12291,7 +11979,7 @@ export default function App() {
               </div>
 
               {attendanceStudents.length === 0 ? (
-                <div className="erp-card" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                <div className="sp-card" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic' }}>
                   No active students enrolled in this class/section.
                 </div>
               ) : (
@@ -12303,7 +11991,7 @@ export default function App() {
                       return (
                         <div 
                           key={student.id} 
-                          className="erp-card" 
+                          className="sp-card" 
                           style={{ 
                             padding: '16px', 
                             display: 'flex', 
@@ -12442,7 +12130,7 @@ export default function App() {
           <div style={{ display: 'flex', gap: '24px', flexDirection: 'row', flexWrap: 'wrap', marginTop: '10px' }}>
             {/* Left Column: Add/Edit Leave Form */}
             <div style={{ flex: '1 1 350px', maxWidth: '450px' }}>
-              <div className="erp-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div className="sp-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
                   {editingLeave ? (
                     <>
@@ -12478,7 +12166,7 @@ export default function App() {
                         min={years.find(y => y.id === activeYearId)?.start_date || ''}
                         max={years.find(y => y.id === activeYearId)?.end_date || ''}
                         onChange={(e) => setLeaveForm(prev => ({ ...prev, date: e.target.value }))}
-                        className="erp-input"
+                        className="sp-input"
                         style={{ width: '100%', paddingRight: '36px' }}
                       />
                       <Calendar 
@@ -12513,7 +12201,7 @@ export default function App() {
                       placeholder="e.g. Independence Day, Winter Vacation"
                       value={leaveForm.title}
                       onChange={(e) => setLeaveForm(prev => ({ ...prev, title: e.target.value }))}
-                      className="erp-input"
+                      className="sp-input"
                       style={{ width: '100%' }}
                     />
                   </div>
@@ -12548,7 +12236,7 @@ export default function App() {
 
             {/* Right Column: Holiday List */}
             <div style={{ flex: '2 2 500px' }}>
-              <div className="erp-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', height: '100%' }}>
+              <div className="sp-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', height: '100%' }}>
                 <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
                   School Holidays List
                 </h3>
@@ -12564,7 +12252,7 @@ export default function App() {
                       .map(leave => (
                         <div 
                           key={leave.id} 
-                          className="erp-card" 
+                          className="sp-card" 
                           style={{ 
                             padding: '12px 16px', 
                             display: 'flex', 
@@ -12641,7 +12329,7 @@ export default function App() {
           </div>
         ) : (
           !attendanceClassId ? (
-            <div className="erp-card" style={{ padding: '32px', fontStyle: 'italic', color: 'var(--text-muted)', textAlign: 'center' }}>
+            <div className="sp-card" style={{ padding: '32px', fontStyle: 'italic', color: 'var(--text-muted)', textAlign: 'center' }}>
               Please select a class to generate report.
             </div>
           ) : isFetchingAttendanceReport ? (
@@ -12686,22 +12374,22 @@ export default function App() {
                 marginTop: '4px',
                 marginBottom: '8px'
               }}>
-                <div className="erp-card" style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '4px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)' }}>
+                <div className="sp-card" style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '4px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)' }}>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Study Days</span>
                   <span style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'var(--color-primary)' }}>{attendanceReportStudyDays} Days</span>
                 </div>
-                <div className="erp-card" style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '4px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)' }}>
+                <div className="sp-card" style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '4px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)' }}>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Sundays</span>
                   <span style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#f59e0b' }}>{attendanceReportSundays} Days</span>
                 </div>
-                <div className="erp-card" style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '4px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)' }}>
+                <div className="sp-card" style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '4px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)' }}>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>School Holidays</span>
                   <span style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#10b981' }}>{attendanceReportHolidays} Days</span>
                 </div>
               </div>
 
-              <div className="erp-card" style={{ padding: 0, overflowX: 'auto' }}>
-                <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <div className="sp-card" style={{ padding: 0, overflowX: 'auto' }}>
+                <table className="sp-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                       <th style={{ padding: '12px 16px' }}>Roll No</th>
@@ -12823,7 +12511,7 @@ export default function App() {
             <select
               value={examStatusFilter}
               onChange={(e) => setExamStatusFilter(e.target.value)}
-              className="erp-input"
+              className="sp-input"
               style={{ padding: '4px 8px', fontSize: '0.8rem', width: '120px', minHeight: 'auto', height: '30px' }}
             >
               <option value="All">All Statuses</option>
@@ -12863,12 +12551,12 @@ export default function App() {
             <RefreshCw className="spin" size={24} style={{ marginRight: '8px' }} /> Loading exams...
           </div>
         ) : processedExams.length === 0 ? (
-          <div className="erp-card" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+          <div className="sp-card" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic' }}>
             No exams match your filters/criteria.
           </div>
         ) : (
-          <div className="erp-card" style={{ padding: 0, overflowX: 'auto' }}>
-            <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div className="sp-card" style={{ padding: 0, overflowX: 'auto' }}>
+            <table className="sp-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                   <th style={{ padding: '12px 16px' }}>Exam Name</th>
@@ -13034,7 +12722,7 @@ export default function App() {
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        <div className="erp-card" style={{ padding: '16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+        <div className="sp-card" style={{ padding: '16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
           <div>
             <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Select Class *</label>
             <select
@@ -13068,18 +12756,18 @@ export default function App() {
         </div>
 
         {!marksSelectedClassId || !marksSelectedExamId ? (
-          <div className="erp-card" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+          <div className="sp-card" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic' }}>
             Please select a Class and an Exam to record grades.
           </div>
         ) : isFetchingExamMarks ? (
-          <div className="erp-card" style={{ padding: '48px 32px', textAlign: 'center', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+          <div className="sp-card" style={{ padding: '48px 32px', textAlign: 'center', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
             <RefreshCw className="spin" size={24} style={{ color: 'var(--color-primary)' }} />
             <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Loading student status...</span>
           </div>
         ) : (
           <div>
             {classStudents.length === 0 ? (
-              <div className="erp-card" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+              <div className="sp-card" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic' }}>
                 No active students found in this classroom.
               </div>
             ) : (
@@ -13094,7 +12782,7 @@ export default function App() {
                   return (
                     <div
                       key={student.id}
-                      className="erp-card"
+                      className="sp-card"
                       style={{
                         padding: '20px',
                         display: 'flex',
@@ -13206,7 +12894,7 @@ export default function App() {
   const renderActualReportCard = (student, examId) => {
     if (!studentPerformanceSummary) {
       return (
-        <div className="erp-card" style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>
+        <div className="sp-card" style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>
           <RefreshCw className="spin" size={20} style={{ marginRight: '8px' }} /> Loading performance data...
         </div>
       );
@@ -13279,7 +12967,7 @@ export default function App() {
       const activeExam = exams.find(e => parseInt(e.id) === parseInt(examId));
       if (!activeExam) {
         return (
-          <div className="erp-card" style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+          <div className="sp-card" style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>
             Exam data not found for this student.
           </div>
         );
@@ -13594,7 +13282,7 @@ export default function App() {
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        <div className="erp-card" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', padding: '16px' }}>
+        <div className="sp-card" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', padding: '16px' }}>
           <div>
             <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Class</label>
             <select
@@ -13669,7 +13357,7 @@ export default function App() {
         </div>
 
         {!reportCardStudentId ? (
-          <div className="erp-card" style={{ padding: '32px', fontStyle: 'italic', color: 'var(--text-muted)', textAlign: 'center' }}>
+          <div className="sp-card" style={{ padding: '32px', fontStyle: 'italic', color: 'var(--text-muted)', textAlign: 'center' }}>
             Please select a class and student to generate report card views.
           </div>
         ) : (
@@ -13687,7 +13375,7 @@ export default function App() {
             {renderActualReportCard(selectedStudentObj, reportCardExamId)}
 
             {reportCardExamId !== 'overall' && (
-              <div className="erp-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(255,255,255,0.015)' }}>
+              <div className="sp-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(255,255,255,0.015)' }}>
                 <h4 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
                   Teacher Evaluative Remarks
                 </h4>
@@ -13777,7 +13465,7 @@ export default function App() {
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 2.5fr', gap: '24px', alignItems: 'flex-start' }}>
           {/* Left Card: Avatar & Brief Info */}
-          <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', textAlign: 'center' }}>
+          <div className="sp-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', textAlign: 'center' }}>
             <div style={{ position: 'relative', width: '120px', height: '120px' }}>
               {adminProfile?.role === 'School Admin' && adminProfile?.school_logo_path ? (
                 <div style={{ width: '120px', height: '120px', borderRadius: '16px', overflow: 'hidden', border: '3px solid var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffffff', padding: '8px' }}>
@@ -13858,7 +13546,7 @@ export default function App() {
           </div>
 
           {/* Right Card: Tab views */}
-          <div className="erp-card" style={{ padding: '0', overflow: 'hidden' }}>
+          <div className="sp-card" style={{ padding: '0', overflow: 'hidden' }}>
             {/* Sub-tabs header */}
             <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.01)', padding: '0 16px' }}>
               <button 
@@ -14023,7 +13711,7 @@ export default function App() {
                       <label className="form-label">Full Name *</label>
                       <input 
                         type="text" 
-                        className="erp-input" 
+                        className="sp-input" 
                         value={adminProfileForm.name} 
                         onChange={(e) => setAdminProfileForm({ ...adminProfileForm, name: e.target.value })}
                       />
@@ -14033,7 +13721,7 @@ export default function App() {
                       <label className="form-label">Email Address *</label>
                       <input 
                         type="email" 
-                        className="erp-input" 
+                        className="sp-input" 
                         value={adminProfileForm.email} 
                         onChange={(e) => setAdminProfileForm({ ...adminProfileForm, email: e.target.value })}
                       />
@@ -14046,7 +13734,7 @@ export default function App() {
                       <label className="form-label">Phone Number</label>
                       <input 
                         type="text" 
-                        className="erp-input" 
+                        className="sp-input" 
                         placeholder="e.g. 9876543210" 
                         value={adminProfileForm.phone || ''} 
                         onChange={(e) => setAdminProfileForm({ ...adminProfileForm, phone: e.target.value })}
@@ -14056,7 +13744,7 @@ export default function App() {
                     <div>
                       <label className="form-label">Time Zone</label>
                       <select 
-                        className="erp-input" 
+                        className="sp-input" 
                         value={adminProfileForm.timezone} 
                         onChange={(e) => setAdminProfileForm({ ...adminProfileForm, timezone: e.target.value })}
                       >
@@ -14073,7 +13761,7 @@ export default function App() {
                   <div>
                     <label className="form-label">Home Address</label>
                     <textarea 
-                      className="erp-input" 
+                      className="sp-input" 
                       rows={2} 
                       style={{ resize: 'vertical' }}
                       value={adminProfileForm.address || ''} 
@@ -14086,7 +13774,7 @@ export default function App() {
                       <label className="form-label">City</label>
                       <input 
                         type="text" 
-                        className="erp-input" 
+                        className="sp-input" 
                         value={adminProfileForm.city || ''} 
                         onChange={(e) => setAdminProfileForm({ ...adminProfileForm, city: e.target.value })}
                       />
@@ -14095,7 +13783,7 @@ export default function App() {
                       <label className="form-label">State</label>
                       <input 
                         type="text" 
-                        className="erp-input" 
+                        className="sp-input" 
                         value={adminProfileForm.state || ''} 
                         onChange={(e) => setAdminProfileForm({ ...adminProfileForm, state: e.target.value })}
                       />
@@ -14104,7 +13792,7 @@ export default function App() {
                       <label className="form-label">Country</label>
                       <input 
                         type="text" 
-                        className="erp-input" 
+                        className="sp-input" 
                         value={adminProfileForm.country || ''} 
                         onChange={(e) => setAdminProfileForm({ ...adminProfileForm, country: e.target.value })}
                       />
@@ -14136,7 +13824,7 @@ export default function App() {
                     <label className="form-label">Current Password *</label>
                     <input 
                       type="password" 
-                      className="erp-input" 
+                      className="sp-input" 
                       value={passwordForm.current_password} 
                       onChange={(e) => setPasswordForm({ ...passwordForm, current_password: e.target.value })}
                     />
@@ -14147,7 +13835,7 @@ export default function App() {
                     <label className="form-label">New Password *</label>
                     <input 
                       type="password" 
-                      className="erp-input" 
+                      className="sp-input" 
                       value={passwordForm.new_password} 
                       onChange={(e) => setPasswordForm({ ...passwordForm, new_password: e.target.value })}
                     />
@@ -14180,7 +13868,7 @@ export default function App() {
                     <label className="form-label">Confirm New Password *</label>
                     <input 
                       type="password" 
-                      className="erp-input" 
+                      className="sp-input" 
                       value={passwordForm.confirm_password} 
                       onChange={(e) => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })}
                     />
@@ -14510,32 +14198,32 @@ export default function App() {
             {activeTab === 'dashboard' && superStats && (
               <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                 <div className="stats-grid">
-                  <div className="erp-card">
+                  <div className="sp-card">
                     <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600 }}>Total Schools Onboarded</span>
                     <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px' }}>{superStats.total_schools}</div>
                     <span className="badge badge-primary" style={{ marginTop: '8px' }}>Active Tenants: {superStats.active_schools}</span>
                   </div>
-                  <div className="erp-card">
+                  <div className="sp-card">
                     <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600 }}>Deactivated Schools</span>
                     <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px', color: '#ef4444' }}>{superStats.inactive_schools}</div>
                     <span className="badge badge-danger" style={{ marginTop: '8px' }}>Action Required</span>
                   </div>
-                  <div className="erp-card">
+                  <div className="sp-card">
                     <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600 }}>Total Platform Students</span>
                     <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px' }}>{superStats.total_students}</div>
                     <span className="badge badge-success" style={{ marginTop: '8px' }}>Average 200/School</span>
                   </div>
-                  <div className="erp-card">
+                  <div className="sp-card">
                     <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600 }}>Total Platform Revenue</span>
                     <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px', color: '#10b981' }}>${superStats.total_revenue.toLocaleString()}</div>
                     <span className="badge badge-success" style={{ marginTop: '8px' }}>Tuition Collected</span>
                   </div>
                 </div>
 
-                <div className="erp-card">
+                <div className="sp-card">
                   <h3 style={{ fontSize: '1.1rem', marginBottom: '16px' }}>Recently Registered Schools</h3>
-                  <div className="erp-table-container">
-                    <table className="erp-table">
+                  <div className="sp-table-container">
+                    <table className="sp-table">
                       <thead>
                         <tr>
                           <th>School Name</th>
@@ -14591,9 +14279,9 @@ export default function App() {
                   </button>
                 </div>
 
-                <div className="erp-card">
-                  <div className="erp-table-container">
-                    <table className="erp-table">
+                <div className="sp-card">
+                  <div className="sp-table-container">
+                    <table className="sp-table">
                       <thead>
                         <tr>
                           <th>School Name</th>
@@ -14712,10 +14400,10 @@ export default function App() {
                 </div>
 
                 {/* Plan Settings Card */}
-                <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div className="sp-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <h4 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0 }}>Subscription Plan Configurations</h4>
-                  <div className="erp-table-container">
-                    <table className="erp-table">
+                  <div className="sp-table-container">
+                    <table className="sp-table">
                       <thead>
                         <tr>
                           <th>Plan Name</th>
@@ -14779,10 +14467,10 @@ export default function App() {
                 </div>
 
                 {/* Tenant subscriptions view */}
-                <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div className="sp-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <h4 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0 }}>School Tenant Subscription Directory</h4>
-                  <div className="erp-table-container">
-                    <table className="erp-table">
+                  <div className="sp-table-container">
+                    <table className="sp-table">
                       <thead>
                         <tr>
                           <th>School Name</th>
@@ -14865,13 +14553,13 @@ export default function App() {
               <form onSubmit={handleInviteSchoolSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div>
                   <label htmlFor="inv-email" className="form-label">Admin Email Address</label>
-                  <input id="inv-email" type="email" className="erp-input" value={inviteForm.email} onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })} required placeholder="school.admin@domain.com" />
+                  <input id="inv-email" type="email" className="sp-input" value={inviteForm.email} onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })} required placeholder="school.admin@domain.com" />
                 </div>
                 <div>
                   <label htmlFor="inv-plan" className="form-label">Subscription Plan</label>
                   <select 
                     id="inv-plan"
-                    className="erp-input"
+                    className="sp-input"
                     value={inviteForm.plan_id} 
                     onChange={(e) => setInviteForm({ ...inviteForm, plan_id: e.target.value })}
                     required
@@ -14908,7 +14596,7 @@ export default function App() {
                     id="extend-months"
                     value={extendMonths} 
                     onChange={(e) => setExtendMonths(e.target.value)} 
-                    className="erp-input"
+                    className="sp-input"
                   >
                     <option value={3}>3 Months</option>
                     <option value={6}>6 Months</option>
@@ -14934,28 +14622,28 @@ export default function App() {
               <form onSubmit={handleSavePlan} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div>
                   <label htmlFor="plan-name" className="form-label">Plan Name</label>
-                  <input id="plan-name" type="text" className="erp-input" value={planForm.name} onChange={(e) => setPlanForm({ ...planForm, name: e.target.value })} required placeholder="e.g. 1 Year Plan" />
+                  <input id="plan-name" type="text" className="sp-input" value={planForm.name} onChange={(e) => setPlanForm({ ...planForm, name: e.target.value })} required placeholder="e.g. 1 Year Plan" />
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
                     <label htmlFor="plan-duration" className="form-label">Duration (Days)</label>
-                    <input id="plan-duration" type="number" className="erp-input" value={planForm.duration_days} onChange={(e) => setPlanForm({ ...planForm, duration_days: e.target.value })} required placeholder="365" />
+                    <input id="plan-duration" type="number" className="sp-input" value={planForm.duration_days} onChange={(e) => setPlanForm({ ...planForm, duration_days: e.target.value })} required placeholder="365" />
                   </div>
                   <div>
                     <label htmlFor="plan-price" className="form-label">Price (INR)</label>
-                    <input id="plan-price" type="number" step="0.01" className="erp-input" value={planForm.price} onChange={(e) => setPlanForm({ ...planForm, price: e.target.value })} required placeholder="12000" />
+                    <input id="plan-price" type="number" step="0.01" className="sp-input" value={planForm.price} onChange={(e) => setPlanForm({ ...planForm, price: e.target.value })} required placeholder="12000" />
                   </div>
                 </div>
                 <div>
                   <label htmlFor="plan-status" className="form-label">Status</label>
-                  <select id="plan-status" className="erp-input" value={planForm.is_active} onChange={(e) => setPlanForm({ ...planForm, is_active: parseInt(e.target.value) })}>
+                  <select id="plan-status" className="sp-input" value={planForm.is_active} onChange={(e) => setPlanForm({ ...planForm, is_active: parseInt(e.target.value) })}>
                     <option value={1}>Active</option>
                     <option value={0}>Inactive</option>
                   </select>
                 </div>
                 <div>
                   <label htmlFor="plan-desc" className="form-label">Description</label>
-                  <textarea id="plan-desc" className="erp-input" style={{ minHeight: '80px', resize: 'vertical' }} value={planForm.description} onChange={(e) => setPlanForm({ ...planForm, description: e.target.value })} placeholder="Write plan details..."></textarea>
+                  <textarea id="plan-desc" className="sp-input" style={{ minHeight: '80px', resize: 'vertical' }} value={planForm.description} onChange={(e) => setPlanForm({ ...planForm, description: e.target.value })} placeholder="Write plan details..."></textarea>
                 </div>
                 <button type="submit" className="btn-primary" style={{ marginTop: '10px', justifyContent: 'center' }} disabled={isSavingPlan}>
                   {isSavingPlan ? 'Saving...' : 'Create Plan'}
@@ -14977,28 +14665,28 @@ export default function App() {
               <form onSubmit={handleSavePlan} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div>
                   <label htmlFor="edit-plan-name" className="form-label">Plan Name</label>
-                  <input id="edit-plan-name" type="text" className="erp-input" value={planForm.name} onChange={(e) => setPlanForm({ ...planForm, name: e.target.value })} required />
+                  <input id="edit-plan-name" type="text" className="sp-input" value={planForm.name} onChange={(e) => setPlanForm({ ...planForm, name: e.target.value })} required />
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
                     <label htmlFor="edit-plan-duration" className="form-label">Duration (Days)</label>
-                    <input id="edit-plan-duration" type="number" className="erp-input" value={planForm.duration_days} onChange={(e) => setPlanForm({ ...planForm, duration_days: e.target.value })} required />
+                    <input id="edit-plan-duration" type="number" className="sp-input" value={planForm.duration_days} onChange={(e) => setPlanForm({ ...planForm, duration_days: e.target.value })} required />
                   </div>
                   <div>
                     <label htmlFor="edit-plan-price" className="form-label">Price (INR)</label>
-                    <input id="edit-plan-price" type="number" step="0.01" className="erp-input" value={planForm.price} onChange={(e) => setPlanForm({ ...planForm, price: e.target.value })} required />
+                    <input id="edit-plan-price" type="number" step="0.01" className="sp-input" value={planForm.price} onChange={(e) => setPlanForm({ ...planForm, price: e.target.value })} required />
                   </div>
                 </div>
                 <div>
                   <label htmlFor="edit-plan-status" className="form-label">Status</label>
-                  <select id="edit-plan-status" className="erp-input" value={planForm.is_active} onChange={(e) => setPlanForm({ ...planForm, is_active: parseInt(e.target.value) })}>
+                  <select id="edit-plan-status" className="sp-input" value={planForm.is_active} onChange={(e) => setPlanForm({ ...planForm, is_active: parseInt(e.target.value) })}>
                     <option value={1}>Active</option>
                     <option value={0}>Inactive</option>
                   </select>
                 </div>
                 <div>
                   <label htmlFor="edit-plan-desc" className="form-label">Description</label>
-                  <textarea id="edit-plan-desc" className="erp-input" style={{ minHeight: '80px', resize: 'vertical' }} value={planForm.description} onChange={(e) => setPlanForm({ ...planForm, description: e.target.value })}></textarea>
+                  <textarea id="edit-plan-desc" className="sp-input" style={{ minHeight: '80px', resize: 'vertical' }} value={planForm.description} onChange={(e) => setPlanForm({ ...planForm, description: e.target.value })}></textarea>
                 </div>
                 <button type="submit" className="btn-primary" style={{ marginTop: '10px', justifyContent: 'center' }} disabled={isSavingPlan}>
                   {isSavingPlan ? 'Saving...' : 'Save Plan Settings'}
@@ -15025,7 +14713,7 @@ export default function App() {
                   <label htmlFor="manual-action" className="form-label">Action Type</label>
                   <select 
                     id="manual-action" 
-                    className="erp-input" 
+                    className="sp-input" 
                     value={manualSubForm.action_type} 
                     onChange={(e) => setManualSubForm({ ...manualSubForm, action_type: e.target.value })}
                   >
@@ -15042,7 +14730,7 @@ export default function App() {
                     <label htmlFor="manual-plan" className="form-label">Subscription Plan</label>
                     <select 
                       id="manual-plan" 
-                      className="erp-input" 
+                      className="sp-input" 
                       value={manualSubForm.plan_id} 
                       onChange={(e) => setManualSubForm({ ...manualSubForm, plan_id: e.target.value })}
                       required
@@ -15145,7 +14833,7 @@ export default function App() {
                     id="delete-pwd-sa"
                     type="password"
                     autoComplete="new-password"
-                    className="erp-input"
+                    className="sp-input"
                     value={deletePassword}
                     onChange={(e) => {
                       setDeletePassword(e.target.value);
@@ -15352,7 +15040,7 @@ export default function App() {
                           </div>
                         ) : (
                           <div className="table-responsive" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
-                            <table className="erp-table">
+                            <table className="sp-table">
                               <thead>
                                 <tr>
                                   <th>Action</th>
@@ -15386,7 +15074,7 @@ export default function App() {
                           </div>
                         ) : (
                           <div className="table-responsive" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
-                            <table className="erp-table">
+                            <table className="sp-table">
                               <thead>
                                 <tr>
                                   <th>Transaction ID</th>
@@ -15426,7 +15114,7 @@ export default function App() {
                           </div>
                         ) : (
                           <div className="table-responsive" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
-                            <table className="erp-table">
+                            <table className="sp-table">
                               <thead>
                                 <tr>
                                   <th style={{ width: '180px' }}>Timestamp</th>
@@ -15472,7 +15160,7 @@ export default function App() {
                             <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr)', gap: '24px', alignItems: 'start' }}>
                               
                               {/* Left Column Profile Card */}
-                              <div className="erp-card" style={{ textAlign: 'center', background: 'rgba(255, 255, 255, 0.01)', padding: '20px' }}>
+                              <div className="sp-card" style={{ textAlign: 'center', background: 'rgba(255, 255, 255, 0.01)', padding: '20px' }}>
                                 <img 
                                   src={getStudentAvatar(selectedMemberStudent)} 
                                   alt={selectedMemberStudent.name} 
@@ -15511,7 +15199,7 @@ export default function App() {
 
                               {/* Right Column: Family Details & Ledger */}
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                                <div className="erp-card" style={{ padding: '16px' }}>
+                                <div className="sp-card" style={{ padding: '16px' }}>
                                   <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '12px', color: 'var(--text-primary)' }}>Family & Identification</h4>
                                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.85rem' }}>
                                     <div><strong>Father's Name:</strong> {selectedMemberStudent.father_name || 'N/A'}</div>
@@ -15560,7 +15248,7 @@ export default function App() {
                                 </div>
 
                                 {memberDetailTab === 'fees' ? (
-                                  <div className="erp-card" style={{ padding: '16px' }}>
+                                  <div className="sp-card" style={{ padding: '16px' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                                       <h4 style={{ fontSize: '0.95rem', fontWeight: 700 }}>Monthly Fee Record</h4>
                                       <div style={{ display: 'flex', gap: '12px', fontSize: '0.75rem' }}>
@@ -15570,7 +15258,7 @@ export default function App() {
                                     </div>
 
                                     <div className="table-responsive" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
-                                      <table className="erp-table">
+                                      <table className="sp-table">
                                         <thead>
                                           <tr>
                                             <th>Month</th>
@@ -15613,7 +15301,7 @@ export default function App() {
                                     </div>
                                   </div>
                                 ) : (
-                                  <div className="erp-card" style={{ padding: '16px' }}>
+                                  <div className="sp-card" style={{ padding: '16px' }}>
                                     <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '12px' }}>Attached Documents</h4>
                                     {(() => {
                                       const docsList = typeof selectedMemberStudent.documents === 'string' ? JSON.parse(selectedMemberStudent.documents) : (selectedMemberStudent.documents || []);
@@ -15662,7 +15350,7 @@ export default function App() {
                             <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr)', gap: '24px', alignItems: 'start' }}>
                               
                               {/* Left Column Profile Card */}
-                              <div className="erp-card" style={{ textAlign: 'center', background: 'rgba(255, 255, 255, 0.01)', padding: '20px' }}>
+                              <div className="sp-card" style={{ textAlign: 'center', background: 'rgba(255, 255, 255, 0.01)', padding: '20px' }}>
                                 {selectedMemberTeacher.profile_image ? (
                                   <img 
                                     src={selectedMemberTeacher.profile_image} 
@@ -15703,7 +15391,7 @@ export default function App() {
 
                               {/* Right Column: Qualifications & Ledger */}
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                                <div className="erp-card" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', padding: '16px' }}>
+                                <div className="sp-card" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', padding: '16px' }}>
                                   <div>
                                     <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '10px', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px', color: 'var(--text-primary)' }}>Employment Information</h4>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
@@ -15763,7 +15451,7 @@ export default function App() {
                                 </div>
 
                                 {memberDetailTab === 'fees' ? (
-                                  <div className="erp-card" style={{ padding: '16px' }}>
+                                  <div className="sp-card" style={{ padding: '16px' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                                       <h4 style={{ fontSize: '0.95rem', fontWeight: 700 }}>Monthly Salary Record</h4>
                                       <div style={{ display: 'flex', gap: '12px', fontSize: '0.75rem' }}>
@@ -15773,7 +15461,7 @@ export default function App() {
                                     </div>
 
                                     <div className="table-responsive" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
-                                      <table className="erp-table">
+                                      <table className="sp-table">
                                         <thead>
                                           <tr>
                                             <th>Month</th>
@@ -15812,7 +15500,7 @@ export default function App() {
                                     </div>
                                   </div>
                                 ) : (
-                                  <div className="erp-card" style={{ padding: '16px' }}>
+                                  <div className="sp-card" style={{ padding: '16px' }}>
                                     <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '12px' }}>Attached Documents</h4>
                                     {(() => {
                                       const docsList = typeof selectedMemberTeacher.documents === 'string' ? JSON.parse(selectedMemberTeacher.documents) : (selectedMemberTeacher.documents || []);
@@ -15866,7 +15554,7 @@ export default function App() {
                                 }
                                 return (
                                   <div className="table-responsive" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
-                                    <table className="erp-table">
+                                    <table className="sp-table">
                                       <thead>
                                         <tr>
                                           <th>Roll No</th>
@@ -15991,23 +15679,23 @@ export default function App() {
               <form onSubmit={handleEditSchoolSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div>
                   <label htmlFor="edit-sch-name" className="form-label">School Name</label>
-                  <input id="edit-sch-name" type="text" className="erp-input" value={editSchoolForm.name} onChange={(e) => setEditSchoolForm({ ...editSchoolForm, name: e.target.value })} required />
+                  <input id="edit-sch-name" type="text" className="sp-input" value={editSchoolForm.name} onChange={(e) => setEditSchoolForm({ ...editSchoolForm, name: e.target.value })} required />
                 </div>
                 <div>
                   <label htmlFor="edit-sch-contact" className="form-label">Contact Person</label>
-                  <input id="edit-sch-contact" type="text" className="erp-input" value={editSchoolForm.contact_person} onChange={(e) => setEditSchoolForm({ ...editSchoolForm, contact_person: e.target.value })} required />
+                  <input id="edit-sch-contact" type="text" className="sp-input" value={editSchoolForm.contact_person} onChange={(e) => setEditSchoolForm({ ...editSchoolForm, contact_person: e.target.value })} required />
                 </div>
                 <div>
                   <label htmlFor="edit-sch-phone" className="form-label">Contact Phone</label>
-                  <input id="edit-sch-phone" type="text" className="erp-input" value={editSchoolForm.contact_number} onChange={(e) => setEditSchoolForm({ ...editSchoolForm, contact_number: e.target.value })} required />
+                  <input id="edit-sch-phone" type="text" className="sp-input" value={editSchoolForm.contact_number} onChange={(e) => setEditSchoolForm({ ...editSchoolForm, contact_number: e.target.value })} required />
                 </div>
                 <div>
                   <label htmlFor="edit-sch-sub-end" className="form-label">Subscription End Date</label>
-                  <input id="edit-sch-sub-end" type="date" className="erp-input" value={editSchoolForm.subscription_end} onChange={(e) => setEditSchoolForm({ ...editSchoolForm, subscription_end: e.target.value })} required />
+                  <input id="edit-sch-sub-end" type="date" className="sp-input" value={editSchoolForm.subscription_end} onChange={(e) => setEditSchoolForm({ ...editSchoolForm, subscription_end: e.target.value })} required />
                 </div>
                 <div>
                   <label htmlFor="edit-sch-status" className="form-label">License Status</label>
-                  <select id="edit-sch-status" className="erp-input" value={editSchoolForm.status} onChange={(e) => setEditSchoolForm({ ...editSchoolForm, status: e.target.value })}>
+                  <select id="edit-sch-status" className="sp-input" value={editSchoolForm.status} onChange={(e) => setEditSchoolForm({ ...editSchoolForm, status: e.target.value })}>
                     <option value="Active">Active</option>
                     <option value="Inactive">Inactive / Suspended</option>
                   </select>
@@ -16083,7 +15771,7 @@ export default function App() {
 
                 {/* Month ledger table */}
                 <div className="table-responsive" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
-                  <table className="erp-table">
+                  <table className="sp-table">
                     <thead>
                       <tr>
                         <th>Month</th>
@@ -16206,7 +15894,7 @@ export default function App() {
 
                 {/* Month ledger table */}
                 <div className="table-responsive" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
-                  <table className="erp-table">
+                  <table className="sp-table">
                     <thead>
                       <tr>
                         <th>Month</th>
@@ -16261,7 +15949,7 @@ export default function App() {
     );
   }
 
-  // 5. School Admin Portal (Standard ERP View)
+  // 5. School Admin Portal (Standard SP View)
   const isSubscriptionExpired = adminProfile && adminProfile.subscription &&
     (adminProfile.subscription.status === 'Expired' || 
      adminProfile.subscription.status === 'Trial Expired' || 
@@ -16628,7 +16316,7 @@ export default function App() {
                         setSelectedClassId(null);
                         setSelectedStudent(null);
                       }} 
-                      className="erp-input" 
+                      className="sp-input" 
                       style={{ width: '180px', padding: '6px 12px', fontSize: '0.85rem' }}
                     >
                       {years.map(y => (
@@ -16735,7 +16423,7 @@ export default function App() {
                     placeholder="Search teachers by name..."
                     value={teacherSearchQuery}
                     onChange={(e) => setTeacherSearchQuery(e.target.value)}
-                    className="erp-input"
+                    className="sp-input"
                     style={{ width: '220px', paddingLeft: '36px', paddingRight: teacherSearchQuery ? '32px' : '12px', height: '38px', fontSize: '0.85rem' }}
                   />
                   <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
@@ -16767,7 +16455,7 @@ export default function App() {
                   id="filter-teacher-subject"
                   value={subjectFilter} 
                   onChange={(e) => setSubjectFilter(e.target.value)} 
-                  className="erp-input" 
+                  className="sp-input" 
                   style={{ width: '160px' }}
                 >
                   <option value="all">All Subjects</option>
@@ -16783,7 +16471,7 @@ export default function App() {
                   id="filter-teacher-status"
                   value={statusFilter} 
                   onChange={(e) => setStatusFilter(e.target.value)} 
-                  className="erp-input" 
+                  className="sp-input" 
                   style={{ width: '140px' }}
                 >
                   <option value="all">All Status</option>
@@ -16798,7 +16486,7 @@ export default function App() {
                     type="date"
                     value={facultySelectedDate}
                     onChange={(e) => handleFacultyDateChange(e.target.value)}
-                    className="erp-input"
+                    className="sp-input"
                     style={{ width: '150px', padding: '6px 12px' }}
                   />
                   {facultySelectedDate !== getTodayDateStr() && (
@@ -16847,7 +16535,7 @@ export default function App() {
                       setSelectedClassId(null);
                       setSelectedStudent(null);
                     }} 
-                    className="erp-input" 
+                    className="sp-input" 
                     style={{ width: '180px', padding: '6px 12px', fontSize: '0.85rem' }}
                   >
                     {years.map(y => (
@@ -16939,7 +16627,7 @@ export default function App() {
         {/* Content body */}
         <div className="content-body">
           {years.length === 0 && activeTab !== 'settings' ? (
-            <div className="erp-card fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '64px 32px', gap: '24px', maxWidth: '600px', margin: '40px auto' }}>
+            <div className="sp-card fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '64px 32px', gap: '24px', maxWidth: '600px', margin: '40px auto' }}>
               <div style={{
                 width: '80px',
                 height: '80px',
@@ -16955,7 +16643,7 @@ export default function App() {
               <div>
                 <h3 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0 }}>Register Your First Academic Year</h3>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '12px', lineHeight: '1.6' }}>
-                  Welcome to BN School ERP! To begin managing classrooms, enrolling students, planning timetables, or tracking fee balances, you must first register and activate an Academic Year session.
+                  Welcome to BN Shiksha Pilot (SP)! To begin managing classrooms, enrolling students, planning timetables, or tracking fee balances, you must first register and activate an Academic Year session.
                 </p>
               </div>
               <button 
@@ -16971,14 +16659,14 @@ export default function App() {
               {/* --- 1. DASHBOARD TAB --- */}
               {activeTab === 'dashboard' && role === 'Parent' && (
                 <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                  <div className="erp-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', padding: '20px' }}>
+                  <div className="sp-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', padding: '20px' }}>
                     <div>
                       <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)' }}>Parent Portal</h2>
                       <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Select a child to view academic performance, attendance, and fee details.</p>
                     </div>
                     <div>
                       <select
-                        className="erp-input"
+                        className="sp-input"
                         style={{ minWidth: '200px' }}
                         value={selectedParentStudentId || ''}
                         onChange={(e) => setSelectedParentStudentId(Number(e.target.value))}
@@ -17000,7 +16688,7 @@ export default function App() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                       
                       {/* Child Profile Details */}
-                      <div className="erp-card" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
+                      <div className="sp-card" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
                         <div>
                           <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 600 }}>Student Name</span>
                           <div style={{ fontSize: '1.1rem', fontWeight: 700, marginTop: '4px' }}>
@@ -17039,25 +16727,25 @@ export default function App() {
 
                         return (
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
-                            <div className="erp-card" style={{ borderLeft: '4px solid #10b981' }}>
+                            <div className="sp-card" style={{ borderLeft: '4px solid #10b981' }}>
                               <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 600 }}>Submitted Fees</span>
                               <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '6px', color: '#10b981' }}>
                                 {formatMoney(totalPaid)}
                               </div>
                             </div>
-                            <div className="erp-card" style={{ borderLeft: '4px solid #ef4444' }}>
+                            <div className="sp-card" style={{ borderLeft: '4px solid #ef4444' }}>
                               <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 600 }}>Pending Fees</span>
                               <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '6px', color: '#ef4444' }}>
                                 {formatMoney(totalPending)}
                               </div>
                             </div>
-                            <div className="erp-card" style={{ borderLeft: '4px solid #3b82f6' }}>
+                            <div className="sp-card" style={{ borderLeft: '4px solid #3b82f6' }}>
                               <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 600 }}>Additional Fees</span>
                               <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '6px', color: '#3b82f6' }}>
                                 {formatMoney(totalExtra)}
                               </div>
                             </div>
-                            <div className="erp-card" style={{ borderLeft: '4px solid #f59e0b' }}>
+                            <div className="sp-card" style={{ borderLeft: '4px solid #f59e0b' }}>
                               <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 600 }}>Previous Year Dues</span>
                               <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '6px', color: '#f59e0b' }}>
                                 {formatMoney(totalPrevious)}
@@ -17071,7 +16759,7 @@ export default function App() {
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px' }}>
                         
                         {/* Attendance summary */}
-                        <div className="erp-card">
+                        <div className="sp-card">
                           <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '16px' }}>Attendance Summary</h3>
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', textAlign: 'center', marginBottom: '20px' }}>
                             <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '12px', borderRadius: '8px' }}>
@@ -17117,10 +16805,10 @@ export default function App() {
                         </div>
 
                         {/* Recent logs */}
-                        <div className="erp-card">
+                        <div className="sp-card">
                           <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '16px' }}>Recent Attendance Logs</h3>
                           <div className="table-responsive" style={{ maxHeight: '180px', overflowY: 'auto' }}>
-                            <table className="erp-table">
+                            <table className="sp-table">
                               <thead>
                                 <tr>
                                   <th>Date</th>
@@ -17152,7 +16840,7 @@ export default function App() {
                       {/* Scheme & Timetable Section */}
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px' }}>
                         {/* Scheme (Monthly Tuition Fee Structure) */}
-                        <div className="erp-card">
+                        <div className="sp-card">
                           <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '16px' }}>Class Scheme (Tuition Fee Structure)</h3>
                           <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '16px' }}>
                             Monthly tuition fees set by school administration for {parentDashboardData.student.class_name}:
@@ -17178,13 +16866,13 @@ export default function App() {
                         </div>
 
                         {/* Additional Fees list */}
-                        <div className="erp-card">
+                        <div className="sp-card">
                           <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '16px' }}>Additional Assigned Fees</h3>
                           <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '16px' }}>
                             One-off extra fees assigned to this student:
                           </p>
                           <div className="table-responsive" style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                            <table className="erp-table">
+                            <table className="sp-table">
                               <thead>
                                 <tr>
                                   <th>Description</th>
@@ -17217,10 +16905,10 @@ export default function App() {
                       </div>
 
                       {/* Fee Schedule */}
-                      <div className="erp-card">
+                      <div className="sp-card">
                         <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '16px' }}>Fee Schedule & Status</h3>
                         <div className="table-responsive">
-                          <table className="erp-table">
+                          <table className="sp-table">
                             <thead>
                               <tr>
                                 <th>Due Date</th>
@@ -17257,10 +16945,10 @@ export default function App() {
                       </div>
 
                       {/* Exam Performance */}
-                      <div className="erp-card">
+                      <div className="sp-card">
                         <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '16px' }}>Exam Grades & Report Cards</h3>
                         <div className="table-responsive">
-                          <table className="erp-table">
+                          <table className="sp-table">
                             <thead>
                               <tr>
                                 <th>Exam Name</th>
@@ -17292,7 +16980,7 @@ export default function App() {
 
                     </div>
                   ) : (
-                    <div className="erp-card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    <div className="sp-card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
                       No data loaded. Please check your connection.
                     </div>
                   )}
@@ -17346,7 +17034,7 @@ export default function App() {
 
                     return (
                       <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                        <div className="erp-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px' }}>
+                        <div className="sp-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px' }}>
                           <div>
                             <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)' }}>
                               Class Teacher Dashboard
@@ -17363,13 +17051,13 @@ export default function App() {
                         </div>
 
                         <div className="stats-grid">
-                          <div className="erp-card">
+                          <div className="sp-card">
                             <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600 }}>Class Strength</span>
                             <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px' }}>{totalStudents}</div>
                             <span className="badge badge-primary" style={{ marginTop: '8px' }}>Total Students</span>
                           </div>
                           
-                          <div className="erp-card">
+                          <div className="sp-card">
                             <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600 }}>Present Today</span>
                             <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px', color: '#10b981' }}>
                               {markedToday > 0 ? presentToday : '-'}
@@ -17379,7 +17067,7 @@ export default function App() {
                             </span>
                           </div>
 
-                          <div className="erp-card">
+                          <div className="sp-card">
                             <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600 }}>Absent Today</span>
                             <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px', color: '#ef4444' }}>
                               {markedToday > 0 ? absentToday : '-'}
@@ -17389,7 +17077,7 @@ export default function App() {
                             </span>
                           </div>
 
-                          <div className="erp-card">
+                          <div className="sp-card">
                             <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600 }}>Attendance Rate</span>
                             <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px', color: 'var(--color-primary)' }}>
                               {markedToday > 0 ? `${attendancePercentage}%` : '-'}
@@ -17399,7 +17087,7 @@ export default function App() {
                         </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px' }}>
-                          <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                          <div className="sp-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                             <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>Your Schedule & Timetable</h3>
                             
                             <div>
@@ -17457,7 +17145,7 @@ export default function App() {
                             </div>
                           </div>
 
-                          <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                          <div className="sp-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                             <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>Class Scheme (Tuition Fee Structure)</h3>
                             <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '8px' }}>
                               Monthly tuition fees configured for your class {assignedClass ? assignedClass.name : ''}:
@@ -17483,10 +17171,10 @@ export default function App() {
                           </div>
                         </div>
 
-                        <div className="erp-card">
+                        <div className="sp-card">
                           <h3 style={{ fontSize: '1.0rem', fontWeight: 700, marginBottom: '16px' }}>Weekly timetable schedule</h3>
                           <div className="table-responsive">
-                            <table className="erp-table">
+                            <table className="sp-table">
                               <thead>
                                 <tr>
                                   <th>Day</th>
@@ -17521,10 +17209,10 @@ export default function App() {
                           </div>
                         </div>
 
-                        <div className="erp-card">
+                        <div className="sp-card">
                           <h3 style={{ fontSize: '1.0rem', fontWeight: 700, marginBottom: '16px' }}>Student Fee Status Overview</h3>
                           <div className="table-responsive">
-                            <table className="erp-table">
+                            <table className="sp-table">
                               <thead>
                                 <tr>
                                   <th>Student Name</th>
@@ -17586,18 +17274,18 @@ export default function App() {
                   <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                     {/* Metric stats grid */}
                     <div className="stats-grid">
-                <div className="erp-card">
+                <div className="sp-card">
                   <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600 }}>Total Students</span>
                   <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px' }}>{dashboardStats.total_students}</div>
                   <span className="badge badge-success" style={{ marginTop: '8px' }}>Active Year: {getActiveYearRange()}</span>
                 </div>
-                <div className="erp-card">
+                <div className="sp-card">
                   <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600 }}>Faculty Members</span>
                   <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px' }}>{dashboardStats.total_teachers}</div>
                   <span className="badge badge-primary" style={{ marginTop: '8px' }}>Full-time</span>
                 </div>
                  <div 
-                    className="erp-card hoverable-card" 
+                    className="sp-card hoverable-card" 
                     style={{ cursor: 'pointer', transition: 'all 0.2s ease-in-out' }}
                     title="View students with overdue fee balances"
                     onClick={() => {
@@ -17616,7 +17304,7 @@ export default function App() {
                       );
                     })()}
                   </div>
-                 <div className="erp-card">
+                 <div className="sp-card">
                   <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600 }}>Total Revenue</span>
                   <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px', color: '#10b981' }}>
                     {formatMoney(dashboardStats.monthly_revenue)}
@@ -17629,7 +17317,7 @@ export default function App() {
               {/* Chart panels */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                 {/* SVG Tuition Collection Chart */}
-                <div className="erp-card">
+                <div className="sp-card">
                   <h3 style={{ fontSize: '1.1rem', marginBottom: '20px' }}>Tuition Collection History</h3>
                   <div style={{ height: '320px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '10px 20px', borderBottom: '2px solid var(--border-color)' }}>
                     {(() => {
@@ -17653,7 +17341,7 @@ export default function App() {
                 </div>
 
                 {/* SVG Salary Expense Chart */}
-                <div className="erp-card">
+                <div className="sp-card">
                   <h3 style={{ fontSize: '1.1rem', marginBottom: '20px' }}>Salary Disbursements</h3>
                   <div style={{ height: '320px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '10px 20px', borderBottom: '2px solid var(--border-color)' }}>
                     {(() => {
@@ -17685,7 +17373,7 @@ export default function App() {
               </div>
 
               {/* Today's Timetable Subjects Widget */}
-              <div className="erp-card">
+              <div className="sp-card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Clock size={20} className="gradient-text" />
@@ -17701,7 +17389,7 @@ export default function App() {
                         const val = e.target.value ? parseInt(e.target.value) : null;
                         setDashboardPlannerClassId(val);
                       }}
-                      className="erp-input"
+                      className="sp-input"
                       style={{ padding: '4px 8px', fontSize: '0.8rem', minWidth: '130px' }}
                     >
                       {classes.map(c => (
@@ -17776,14 +17464,14 @@ export default function App() {
             <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               {selectedTeacher ? (
                 /* Teacher detail sub-view */
-                <div className="erp-card">
+                <div className="sp-card">
                   <button 
                     id="btn-teacher-back"
                     onClick={() => { 
                       setSelectedTeacher(null); 
                       setTeacherSalaries([]); 
                       if (teacherProfileBackTab === 'dashboard') {
-                        skipERPFetchRef.current = true;
+                        skipSPFetchRef.current = true;
                         setActiveTab('dashboard');
                       }
                       setTeacherProfileBackTab(null);
@@ -17797,7 +17485,7 @@ export default function App() {
                   <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '32px', alignItems: 'start' }}>
                     
                     {/* Left Column Profile Card */}
-                    <div className="erp-card" style={{ textAlign: 'center', background: 'rgba(2, 6, 23, 0.2)' }}>
+                    <div className="sp-card" style={{ textAlign: 'center', background: 'rgba(2, 6, 23, 0.2)' }}>
                       {selectedTeacher.profile_image ? (
                         <img 
                           src={selectedTeacher.profile_image} 
@@ -17866,7 +17554,7 @@ export default function App() {
                     {/* Right Column Details & LEDGER */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                       {/* Detailed Grid */}
-                      <div className="erp-card" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                      <div className="sp-card" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
                         <div>
                           <h4 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '14px', borderBottom: '1px solid var(--border-color)', paddingBottom: '6px', color: 'var(--text-primary)' }}>Employment Information</h4>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
@@ -17911,7 +17599,7 @@ export default function App() {
                       </div>
 
                       {/* Attached Documents Table */}
-                      <div className="erp-card">
+                      <div className="sp-card">
                         <h4 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '16px', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', color: 'var(--text-primary)' }}>Attached Documents</h4>
                         {(() => {
                           const docsList = typeof selectedTeacher.documents === 'string' ? JSON.parse(selectedTeacher.documents) : (selectedTeacher.documents || []);
@@ -17924,7 +17612,7 @@ export default function App() {
                           }
                           return (
                             <div className="table-responsive">
-                              <table className="erp-table" style={{ fontSize: '0.85rem' }}>
+                              <table className="sp-table" style={{ fontSize: '0.85rem' }}>
                                 <thead>
                                   <tr>
                                     <th>Document Type</th>
@@ -17973,7 +17661,7 @@ export default function App() {
                       </div>
 
                       {/* Salaries monthly checklist */}
-                      <div className="erp-card">
+                      <div className="sp-card">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                           <h4 style={{ fontSize: '1.1rem' }}>Salary Registry ({getActiveYearRange()})</h4>
                           <span className="badge badge-warning">April to March</span>
@@ -18161,7 +17849,7 @@ export default function App() {
               
               {selectedStudent ? (
                 /* Student detail view */
-                <div className="erp-card">
+                <div className="sp-card">
                   <button 
                     id="btn-student-back"
                     onClick={() => { 
@@ -18180,7 +17868,7 @@ export default function App() {
                   <div style={{ display: 'grid', gridTemplateColumns: '320px minmax(0, 1fr)', gap: '32px', alignItems: 'start' }}>
                     
                     {/* Left Column Profile Card */}
-                    <div className="erp-card" style={{ textAlign: 'center', background: 'rgba(2, 6, 23, 0.2)' }}>
+                    <div className="sp-card" style={{ textAlign: 'center', background: 'rgba(2, 6, 23, 0.2)' }}>
                       <img 
                         src={getStudentAvatar(activeStudent)} 
                         alt={activeStudent.name} 
@@ -18308,7 +17996,7 @@ export default function App() {
 
                     {/* Right Column details and Month-wise Tuition Ledger */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                      <div className="erp-card">
+                      <div className="sp-card">
                         <h4 style={{ fontSize: '1.1rem', marginBottom: '16px' }}>Family & Identification</h4>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', fontSize: '0.9rem' }}>
                           <div><strong>Father's Name:</strong> {activeStudent.father_name || 'N/A'}</div>
@@ -18372,7 +18060,7 @@ export default function App() {
                         /* Fee ledger section split into Current Session and Past Years Dues */
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                           {/* Current Session Dues */}
-                          <div className="erp-card">
+                          <div className="sp-card">
                             <h4 style={{ fontSize: '1.1rem', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <span>Current Session Fees ({getActiveYearRange()})</span>
                               {isCurrentYearActive() && role !== 'Teacher' && (
@@ -18455,7 +18143,7 @@ export default function App() {
 
                       {studentDetailTab === 'documents' && (
                         /* Documents section */
-                        <div className="erp-card">
+                        <div className="sp-card">
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
                             <h4 style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>Attached Documents</h4>
                             
@@ -18464,7 +18152,7 @@ export default function App() {
                               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                                 <select
                                   id="detail-upload-doc-type"
-                                  className="erp-input"
+                                  className="sp-input"
                                   style={{ padding: '4px 8px', fontSize: '0.75rem', width: '160px', height: '30px' }}
                                   defaultValue=""
                                 >
@@ -18556,8 +18244,8 @@ export default function App() {
                               );
                             }
                             return (
-                              <div className="erp-table-container" style={{ width: '100%', overflowX: 'auto' }}>
-                                <table className="erp-table" style={{ fontSize: '0.85rem', tableLayout: 'auto', width: '100%' }}>
+                              <div className="sp-table-container" style={{ width: '100%', overflowX: 'auto' }}>
+                                <table className="sp-table" style={{ fontSize: '0.85rem', tableLayout: 'auto', width: '100%' }}>
                                   <thead>
                                     <tr>
                                       <th>Document Type</th>
@@ -18625,7 +18313,7 @@ export default function App() {
 
                       {studentDetailTab === 'performance' && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                          <div className="erp-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', gap: '16px', flexWrap: 'wrap' }}>
+                          <div className="sp-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', gap: '16px', flexWrap: 'wrap' }}>
                             <div>
                               <h4 style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>Academic Progress Analytics</h4>
                               <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '2px' }}>
@@ -18690,7 +18378,7 @@ export default function App() {
                   const visibleStudents = filteredStudents.slice(0, visibleCount);
                   
                   return (
-                    <div className="erp-card">
+                    <div className="sp-card">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                         <button 
                           id="btn-class-back"
@@ -18753,7 +18441,7 @@ export default function App() {
                           <input 
                             type="text"
                             placeholder="Search students..."
-                            className="erp-input"
+                            className="sp-input"
                             style={{ width: '100%', paddingLeft: '36px', paddingRight: searchQuery ? '32px' : '12px' }}
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
@@ -18791,7 +18479,7 @@ export default function App() {
                           </label>
                           <select 
                             id="student-status-filter"
-                            className="erp-input"
+                            className="sp-input"
                             style={{ width: '150px', padding: '6px 12px' }}
                             value={studentStatusFilter}
                             onChange={(e) => setStudentStatusFilter(e.target.value)}
@@ -18810,7 +18498,7 @@ export default function App() {
                             </label>
                             <select 
                               id="group-filter"
-                              className="erp-input"
+                              className="sp-input"
                               style={{ width: '200px', padding: '6px 12px' }}
                               value={groupFilter}
                               onChange={(e) => setGroupFilter(e.target.value)}
@@ -18826,7 +18514,7 @@ export default function App() {
 
                       {/* Scrollable Table Container */}
                       <div 
-                        className="erp-table-container" 
+                        className="sp-table-container" 
                         style={{ maxHeight: 'calc(100vh - 290px)', overflowY: 'auto' }}
                         onScroll={(e) => {
                           const target = e.target;
@@ -18841,7 +18529,7 @@ export default function App() {
                           }
                         }}
                       >
-                        <table className="erp-table">
+                        <table className="sp-table">
                           <thead>
                             <tr>
                               <th>Name</th>
@@ -19151,7 +18839,7 @@ export default function App() {
                   )}
                 </div>
               ) : (
-                <div className="erp-card">
+                <div className="sp-card">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <button 
@@ -19172,7 +18860,7 @@ export default function App() {
                         <select
                           value={feesStatusFilter}
                           onChange={(e) => setFeesStatusFilter(e.target.value)}
-                          className="erp-input"
+                          className="sp-input"
                           style={{ padding: '6px 12px', fontSize: '0.85rem', minWidth: '160px', width: 'auto' }}
                         >
                           <option value="All">All</option>
@@ -19188,7 +18876,7 @@ export default function App() {
                         <select
                           value={feesSortField}
                           onChange={(e) => setFeesSortField(e.target.value)}
-                          className="erp-input"
+                          className="sp-input"
                           style={{ padding: '6px 12px', fontSize: '0.85rem', minWidth: '160px', width: 'auto' }}
                         >
                           <option value="dues_desc">Dues (Highest First)</option>
@@ -19208,7 +18896,7 @@ export default function App() {
                       <input 
                         type="text"
                         placeholder="Search students..."
-                        className="erp-input"
+                        className="sp-input"
                         style={{ width: '100%', paddingLeft: '36px', paddingRight: searchQuery ? '32px' : '12px' }}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
@@ -19312,8 +19000,8 @@ export default function App() {
                     }
 
                     return (
-                      <div className="erp-table-container">
-                        <table className="erp-table">
+                      <div className="sp-table-container">
+                        <table className="sp-table">
                           <thead>
                             <tr>
                               <th>Roll Number</th>
@@ -19399,14 +19087,14 @@ export default function App() {
 
           {/* --- 6. SETTINGS / AUDITS TAB --- */}
           {activeTab === 'settings' && (
-            <div className="erp-card fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <div className="sp-card fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={{ fontSize: '1.25rem' }}>System Audit Logs & Settings</h3>
                 <span className="badge badge-secondary">Security Operator: {username}</span>
               </div>
 
               {/* Academic Sessions Master Management */}
-              <div className="erp-card">
+              <div className="sp-card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
                   <div>
                     <h4 style={{ fontSize: '1.1rem', margin: 0, fontWeight: 700 }}>Academic Sessions Manager</h4>
@@ -19423,8 +19111,8 @@ export default function App() {
                   </button>
                 </div>
                 
-                <div className="erp-table-container">
-                  <table className="erp-table">
+                <div className="sp-table-container">
+                  <table className="sp-table">
                     <thead>
                       <tr>
                         <th>Session Range</th>
@@ -19499,7 +19187,7 @@ export default function App() {
               {(() => {
                 const isLocked = classFeeStructure && (classFeeStructure.is_locked === 1 || classFeeStructure.is_locked === true || classFeeStructure.is_locked === '1');
                 return (
-                  <div className="erp-card">
+                  <div className="sp-card">
                     <h4 style={{ fontSize: '1.1rem', margin: 0, fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
                       Class-wise Tuition Fee Configuration
                       {isLocked && (
@@ -19522,7 +19210,7 @@ export default function App() {
                               setSelectedFeeClassId(val);
                               fetchClassFeeStructure(val);
                             }}
-                            className="erp-input"
+                            className="sp-input"
                             disabled={isLocked}
                           >
                             <option value="">-- Choose Class --</option>
@@ -19574,7 +19262,7 @@ export default function App() {
                                 showToast(`Default currency updated to ${val} (Offline Mode) successfully.`, "success");
                               }
                             }}
-                            className="erp-input"
+                            className="sp-input"
                           >
                             {Object.values(currencyMap).map(c => (
                               <option key={c.code} value={c.code}>{c.label}</option>
@@ -19647,7 +19335,7 @@ export default function App() {
                                     const val = e.target.value;
                                     setSameMonthlyFee(val === '' ? 0 : (parseFloat(val) || 0));
                                   }}
-                                  className="erp-input"
+                                  className="sp-input"
                                   style={{ padding: '8px 12px 8px 28px', fontSize: '0.9rem', width: '100%' }}
                                   required
                                   min="0"
@@ -19678,7 +19366,7 @@ export default function App() {
                                           [m]: val === '' ? 0 : (parseFloat(val) || 0)
                                         }));
                                       }}
-                                      className="erp-input"
+                                      className="sp-input"
                                       style={{ padding: '8px 12px 8px 28px', fontSize: '0.9rem', width: '100%' }}
                                       required
                                       min="0"
@@ -19709,7 +19397,7 @@ export default function App() {
               })()}
 
               {/* School settings configuration */}
-              <div className="erp-card">
+              <div className="sp-card">
                 <h4 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '12px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                   School Settings & Timetable Configuration
                   {hasUnsavedChanges && (
@@ -19738,7 +19426,7 @@ export default function App() {
                             setDraftSchoolStartTime(formatMinutesToTime(mins));
                           }
                         }}
-                        className="erp-input"
+                        className="sp-input"
                         style={{ padding: '6px 12px' }}
                       />
                       <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Selected: {draftSchoolStartTime}</span>
@@ -19753,7 +19441,7 @@ export default function App() {
                         min="1"
                         value={draftPeriodDuration || ''}
                         onChange={(e) => setDraftPeriodDuration(parseInt(e.target.value) !== undefined ? (parseInt(e.target.value) || 0) : 40)}
-                        className={`erp-input ${periodDurationError ? 'input-error' : ''}`}
+                        className={`sp-input ${periodDurationError ? 'input-error' : ''}`}
                         style={{ padding: '6px 12px' }}
                       />
                       {periodDurationError && <span style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: 500 }}>{periodDurationError}</span>}
@@ -19768,7 +19456,7 @@ export default function App() {
                         min="0"
                         value={draftIntervalDuration !== undefined ? draftIntervalDuration : ''}
                         onChange={(e) => setDraftIntervalDuration(parseInt(e.target.value) !== undefined ? (parseInt(e.target.value) || 0) : 0)}
-                        className={`erp-input ${intervalDurationError ? 'input-error' : ''}`}
+                        className={`sp-input ${intervalDurationError ? 'input-error' : ''}`}
                         style={{ padding: '6px 12px' }}
                       />
                       {intervalDurationError && <span style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: 500 }}>{intervalDurationError}</span>}
@@ -19783,7 +19471,7 @@ export default function App() {
                         min="0"
                         value={draftIntervalAfterPeriod !== undefined ? draftIntervalAfterPeriod : ''}
                         onChange={(e) => setDraftIntervalAfterPeriod(parseInt(e.target.value) !== undefined ? (parseInt(e.target.value) || 0) : 0)}
-                        className={`erp-input ${intervalAfterPeriodError ? 'input-error' : ''}`}
+                        className={`sp-input ${intervalAfterPeriodError ? 'input-error' : ''}`}
                         style={{ padding: '6px 12px' }}
                       />
                       {intervalAfterPeriodError && <span style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: 500 }}>{intervalAfterPeriodError}</span>}
@@ -19799,7 +19487,7 @@ export default function App() {
                         max="15"
                         value={draftTotalPeriods || ''}
                         onChange={(e) => setDraftTotalPeriods(parseInt(e.target.value) !== undefined ? (parseInt(e.target.value) || 0) : 8)}
-                        className={`erp-input ${totalPeriodsError ? 'input-error' : ''}`}
+                        className={`sp-input ${totalPeriodsError ? 'input-error' : ''}`}
                         style={{ padding: '6px 12px' }}
                       />
                       {totalPeriodsError && <span style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: 500 }}>{totalPeriodsError}</span>}
@@ -19867,10 +19555,10 @@ export default function App() {
               </div>
 
               {/* Audit Logs Table */}
-              <div className="erp-card">
+              <div className="sp-card">
                 <h4 style={{ fontSize: '1.1rem', marginBottom: '16px' }}>Operations Audit Ledger</h4>
-                <div className="erp-table-container" style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                  <table className="erp-table">
+                <div className="sp-table-container" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                  <table className="sp-table">
                     <thead>
                       <tr>
                         <th>Operator</th>
@@ -19896,7 +19584,7 @@ export default function App() {
               </div>
 
               {/* Dynamic User Roles & Permissions Configuration */}
-              <div className="erp-card">
+              <div className="sp-card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', flexWrap: 'wrap', gap: '12px' }}>
                   <div>
                     <h4 style={{ fontSize: '1.1rem', margin: 0, fontWeight: 700 }}>🛡️ Access Control & Dynamic Roles Manager</h4>
@@ -19940,7 +19628,7 @@ export default function App() {
                         setRoleFormName('');
                         setRoleFormPerms([]);
                       }}
-                      className="erp-card"
+                      className="sp-card"
                       style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', padding: '16px' }}
                     >
                       <h5 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', fontWeight: 700 }}>Create New Access Role</h5>
@@ -19949,7 +19637,7 @@ export default function App() {
                           <label className="erp-label">Role Name</label>
                           <input
                             type="text"
-                            className="erp-input"
+                            className="sp-input"
                             placeholder="e.g. Accountant, Coordinator"
                             value={roleFormName}
                             onChange={(e) => setRoleFormName(e.target.value)}
@@ -19993,8 +19681,8 @@ export default function App() {
                     </form>
 
                     {/* Roles Table */}
-                    <div className="erp-table-container">
-                      <table className="erp-table">
+                    <div className="sp-table-container">
+                      <table className="sp-table">
                         <thead>
                           <tr>
                             <th>Role Name</th>
@@ -20072,7 +19760,7 @@ export default function App() {
                         setUserFormClassId('');
                         setUserFormChildIds([]);
                       }}
-                      className="erp-card"
+                      className="sp-card"
                       style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', padding: '16px' }}
                     >
                       <h5 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', fontWeight: 700 }}>
@@ -20083,7 +19771,7 @@ export default function App() {
                           <label className="erp-label">Email or Mobile Number</label>
                           <input
                             type="text"
-                            className="erp-input"
+                            className="sp-input"
                             placeholder="e.g. user@school.com or 9876543210"
                             value={userFormEmail}
                             onChange={(e) => setUserFormEmail(e.target.value)}
@@ -20093,7 +19781,7 @@ export default function App() {
                           <label className="erp-label">Password {editingUser && '(Leave blank to keep current)'}</label>
                           <input
                             type="password"
-                            className="erp-input"
+                            className="sp-input"
                             placeholder={editingUser ? '••••••••' : 'Min 8 characters'}
                             value={userFormPass}
                             onChange={(e) => setUserFormPass(e.target.value)}
@@ -20102,7 +19790,7 @@ export default function App() {
                         <div>
                           <label className="erp-label">Assigned Role</label>
                           <select
-                            className="erp-input"
+                            className="sp-input"
                             value={userFormRole}
                             onChange={(e) => setUserFormRole(e.target.value)}
                           >
@@ -20116,7 +19804,7 @@ export default function App() {
                           <div>
                             <label className="erp-label">Assigned Classroom (Optional)</label>
                             <select
-                              className="erp-input"
+                              className="sp-input"
                               value={userFormClassId}
                               onChange={(e) => setUserFormClassId(e.target.value)}
                             >
@@ -20133,7 +19821,7 @@ export default function App() {
                             <label className="erp-label">Linked Student IDs (Comma Separated)</label>
                             <input
                               type="text"
-                              className="erp-input"
+                              className="sp-input"
                               placeholder="e.g. 4, 5"
                               value={userFormChildIds.join(', ')}
                               onChange={(e) => {
@@ -20169,8 +19857,8 @@ export default function App() {
                     </form>
 
                     {/* Users Table */}
-                    <div className="erp-table-container">
-                      <table className="erp-table">
+                    <div className="sp-table-container">
+                      <table className="sp-table">
                         <thead>
                           <tr>
                             <th>User Email / Mobile</th>
@@ -20258,7 +19946,7 @@ export default function App() {
           {/* --- 6.1 FINANCIAL REPORTS TAB --- */}
           {activeTab === 'financial' && (
             <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <div className="erp-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+              <div className="sp-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
                 <div>
                   <h3 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <FileSpreadsheet size={22} className="gradient-text" />
@@ -20276,7 +19964,7 @@ export default function App() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
                   
                   {/* Inputs Card */}
-                  <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  <div className="sp-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                     <h4 style={{ fontSize: '1.05rem', fontWeight: 700, borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', color: 'var(--text-primary)' }}>
                       New Report Parameters
                     </h4>
@@ -20288,7 +19976,7 @@ export default function App() {
                           type="date"
                           value={reportFromDate}
                           onChange={(e) => setReportFromDate(e.target.value)}
-                          className="erp-input"
+                          className="sp-input"
                         />
                       </div>
 
@@ -20298,7 +19986,7 @@ export default function App() {
                           type="date"
                           value={reportToDate}
                           onChange={(e) => setReportToDate(e.target.value)}
-                          className="erp-input"
+                          className="sp-input"
                         />
                       </div>
                     </div>
@@ -20327,7 +20015,7 @@ export default function App() {
                   </div>
 
                   {/* Preview Card */}
-                  <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', justifyContent: 'center', minHeight: '220px' }}>
+                  <div className="sp-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', justifyContent: 'center', minHeight: '220px' }}>
                     <h4 style={{ fontSize: '1.05rem', fontWeight: 700, borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', color: 'var(--text-primary)', margin: 0 }}>
                       Financial Statement Preview
                     </h4>
@@ -20402,7 +20090,7 @@ export default function App() {
                 </div>
 
                 {/* Financial History Section */}
-                <div className="erp-card">
+                <div className="sp-card">
                   <h4 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     Financial Statements History
                     <span className="badge" style={{ background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
@@ -20420,7 +20108,7 @@ export default function App() {
                       {financialReports.map((report) => {
                         const isProfit = parseFloat(report.net_profit) >= 0;
                         return (
-                          <div key={report.id} className="erp-card fade-in" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px', border: '1px solid var(--border-color)', background: 'rgba(255, 255, 255, 0.01)', position: 'relative' }}>
+                          <div key={report.id} className="sp-card fade-in" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px', border: '1px solid var(--border-color)', background: 'rgba(255, 255, 255, 0.01)', position: 'relative' }}>
                             
                             {/* Header ID & Status */}
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -20547,7 +20235,7 @@ export default function App() {
           {/* --- 6.2 FINANCE MANAGEMENT TAB --- */}
           {activeTab === 'finance_management' && (
             <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <div className="erp-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+              <div className="sp-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
                 <div>
                   <h3 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Briefcase size={22} className="gradient-text" />
@@ -20636,7 +20324,7 @@ export default function App() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
                   
                   {/* Add Expense Card */}
-                  <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px', height: 'fit-content' }}>
+                  <div className="sp-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px', height: 'fit-content' }}>
                     <h4 style={{ fontSize: '1.05rem', fontWeight: 700, borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', color: 'var(--text-primary)' }}>
                       Record Operational Expense
                     </h4>
@@ -20649,7 +20337,7 @@ export default function App() {
                           placeholder="e.g. Electricity Bill, Stationery"
                           value={expenseDesc}
                           onChange={(e) => setExpenseDesc(e.target.value)}
-                          className="erp-input"
+                          className="sp-input"
                           required
                         />
                       </div>
@@ -20661,7 +20349,7 @@ export default function App() {
                           placeholder="e.g. 2500"
                           value={expenseAmount}
                           onChange={(e) => setExpenseAmount(e.target.value)}
-                          className="erp-input"
+                          className="sp-input"
                           min="1"
                           required
                         />
@@ -20674,7 +20362,7 @@ export default function App() {
                   </div>
 
                   {/* Expenses History List Card */}
-                  <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div className="sp-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     <h4 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0', display: 'flex', alignItems: 'center', gap: '8px' }}>
                       Operational Expenses Log
                       <span className="badge" style={{ background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
@@ -20690,7 +20378,7 @@ export default function App() {
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '450px', overflowY: 'auto', paddingRight: '4px' }}>
                         {expenses.map((exp) => (
-                          <div key={exp.id} className="erp-card fade-in" style={{ padding: '14px', border: '1px solid var(--border-color)', background: 'rgba(255, 255, 255, 0.01)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <div key={exp.id} className="sp-card fade-in" style={{ padding: '14px', border: '1px solid var(--border-color)', background: 'rgba(255, 255, 255, 0.01)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                               <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>{exp.description}</strong>
                               <span style={{ fontWeight: 700, color: '#ef4444', fontSize: '1.05rem' }}>{formatMoney(exp.amount)}</span>
@@ -20718,7 +20406,7 @@ export default function App() {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
                     
                     {/* Add Fee Type Card */}
-                    <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: 1 }}>
+                    <div className="sp-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: 1 }}>
                       <h4 style={{ fontSize: '1.05rem', fontWeight: 700, borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', color: 'var(--text-primary)' }}>
                         Configure Additional Fee Type
                       </h4>
@@ -20734,7 +20422,7 @@ export default function App() {
                             placeholder="e.g. Admission Fee, Examination Fee"
                             value={newTypeName}
                             onChange={(e) => setNewTypeName(e.target.value)}
-                            className="erp-input"
+                            className="sp-input"
                             required
                           />
                         </div>
@@ -20746,7 +20434,7 @@ export default function App() {
                             placeholder="e.g. 500"
                             value={newTypeAmount}
                             onChange={(e) => setNewTypeAmount(e.target.value)}
-                            className="erp-input"
+                            className="sp-input"
                             min="1"
                             required
                           />
@@ -20759,7 +20447,7 @@ export default function App() {
                     </div>
 
                     {/* Configured Fee Types List Card */}
-                    <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1 }}>
+                    <div className="sp-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1 }}>
                       <h4 style={{ fontSize: '1.05rem', fontWeight: 700, borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', color: 'var(--text-primary)' }}>
                         Configured Fee Types
                       </h4>
@@ -20794,7 +20482,7 @@ export default function App() {
                   </div>
 
                   {/* Student Additional Fees Ledger Card (Full Width Below) */}
-                  <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
+                  <div className="sp-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
                     <h4 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0', display: 'flex', alignItems: 'center', gap: '8px' }}>
                       Student Additional Fee Ledger
                     </h4>
@@ -20809,7 +20497,7 @@ export default function App() {
                             placeholder="Search student name..."
                             value={extraFeeSearch}
                             onChange={(e) => setExtraFeeSearch(e.target.value)}
-                            className="erp-input"
+                            className="sp-input"
                             style={{ height: '36px', fontSize: '0.85rem', paddingRight: extraFeeSearch ? '56px' : '28px' }}
                           />
                           <Search size={14} style={{ position: 'absolute', right: '10px', top: '11px', color: 'var(--text-muted)' }} />
@@ -20844,7 +20532,7 @@ export default function App() {
                         <select
                           value={extraFeeClassFilter}
                           onChange={(e) => setExtraFeeClassFilter(e.target.value)}
-                          className="erp-input"
+                          className="sp-input"
                           style={{ height: '36px', fontSize: '0.85rem' }}
                         >
                           <option value="All">All Classes</option>
@@ -20859,7 +20547,7 @@ export default function App() {
                         <select
                           value={extraFeeTypeFilter}
                           onChange={(e) => setExtraFeeTypeFilter(e.target.value)}
-                          className="erp-input"
+                          className="sp-input"
                           style={{ height: '36px', fontSize: '0.85rem' }}
                         >
                           <option value="All">All Fee Types</option>
@@ -20874,7 +20562,7 @@ export default function App() {
                         <select
                           value={extraFeeStatusFilter}
                           onChange={(e) => setExtraFeeStatusFilter(e.target.value)}
-                          className="erp-input"
+                          className="sp-input"
                           style={{ height: '36px', fontSize: '0.85rem' }}
                         >
                           <option value="All">All Statuses</option>
@@ -20884,8 +20572,8 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div className="erp-table-container" style={{ maxHeight: '450px', overflowY: 'auto' }}>
-                      <table className="erp-table">
+                    <div className="sp-table-container" style={{ maxHeight: '450px', overflowY: 'auto' }}>
+                      <table className="sp-table">
                         <thead>
                           <tr>
                             <th>Student Name</th>
@@ -21028,7 +20716,7 @@ export default function App() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                   
                   {/* Filter & Actions Row */}
-                  <div className="erp-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '16px' }}>
+                  <div className="sp-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '16px' }}>
                     <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', flex: 1, alignItems: 'flex-end' }}>
                       
                       {/* Student Name Search */}
@@ -21040,7 +20728,7 @@ export default function App() {
                             placeholder="Search student name..."
                             value={promiseSearch}
                             onChange={(e) => setPromiseSearch(e.target.value)}
-                            className="erp-input"
+                            className="sp-input"
                             style={{ width: '100%', paddingLeft: '32px', height: '38px', fontSize: '0.85rem' }}
                           />
                           <Search size={14} style={{ position: 'absolute', left: '10px', top: '12px', color: 'var(--text-muted)' }} />
@@ -21072,7 +20760,7 @@ export default function App() {
                         <select
                           value={promiseClassFilter}
                           onChange={(e) => setPromiseClassFilter(e.target.value)}
-                          className="erp-input"
+                          className="sp-input"
                           style={{ height: '38px', fontSize: '0.85rem' }}
                         >
                           <option value="All">All Classes</option>
@@ -21122,7 +20810,7 @@ export default function App() {
 
                     if (sortedPromises.length === 0) {
                       return (
-                        <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 0', color: 'var(--text-muted)', gap: '10px' }}>
+                        <div className="sp-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 0', color: 'var(--text-muted)', gap: '10px' }}>
                           <span style={{ fontSize: '2rem' }}>📅</span>
                           <p style={{ fontSize: '0.9rem', fontStyle: 'italic', margin: 0 }}>No payment promises found.</p>
                         </div>
@@ -21160,7 +20848,7 @@ export default function App() {
                           };
 
                           return (
-                            <div key={p.id} className="erp-card fade-in" style={cardStyle}>
+                            <div key={p.id} className="sp-card fade-in" style={cardStyle}>
                               
                               {/* Card Header */}
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -21311,13 +20999,13 @@ export default function App() {
                 <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                   {/* Summary Cards */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px' }}>
-                    <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div className="sp-card" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Total Dues Recovered</span>
                       <strong style={{ fontSize: '1.8rem', color: '#10b981' }}>
                         {formatMoney(previousYearRecoveries.reduce((sum, r) => sum + parseFloat(r.amount_recovered), 0))}
                       </strong>
                     </div>
-                    <div className="erp-card" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div className="sp-card" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Total Recovery Dues</span>
                       <strong style={{ fontSize: '1.8rem', color: '#f59e0b' }}>
                         {formatMoney(previousDues.reduce((sum, d) => sum + (d.status !== 'Paid' ? (parseFloat(d.amount) - parseFloat(d.paid_amount)) : 0), 0))}
@@ -21326,13 +21014,13 @@ export default function App() {
                   </div>
 
                   {/* Filters Row */}
-                  <div className="erp-card" style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <div className="sp-card" style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: '240px' }}>
                       <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Search Student</label>
                       <input 
                         type="text" 
                         placeholder="Search student name..."
-                        className="erp-input"
+                        className="sp-input"
                         onChange={(e) => setRecoverySearchQuery(e.target.value)}
                         value={recoverySearchQuery}
                       />
@@ -21340,7 +21028,7 @@ export default function App() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '180px' }}>
                       <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Original Year</label>
                       <select 
-                        className="erp-input"
+                        className="sp-input"
                         value={recoveryYearFilter}
                         onChange={(e) => setRecoveryYearFilter(e.target.value)}
                       >
@@ -21353,9 +21041,9 @@ export default function App() {
                   </div>
 
                   {/* Logs Table */}
-                  <div className="erp-card" style={{ padding: 0 }}>
+                  <div className="sp-card" style={{ padding: 0 }}>
                     <div style={{ overflowX: 'auto' }}>
-                      <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <table className="sp-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <thead>
                           <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>
                             <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 700 }}>Student Name</th>
@@ -21525,7 +21213,7 @@ export default function App() {
                   <span style={{ fontSize: '0.85rem' }}>This academic session is not active. Modifying timetable schedules or publishing periods is disabled.</span>
                 </div>
               )}
-              <div className="erp-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+              <div className="sp-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
                 <div>
                   <h3 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Calendar size={22} className="gradient-text" />
@@ -21568,7 +21256,7 @@ export default function App() {
               </div>
 
               {/* Selector, Week Picker & Status bar */}
-              <div className="erp-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', padding: '16px 24px' }}>
+              <div className="sp-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', padding: '16px 24px' }}>
                 <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '24px' }}>
                   {/* Class selector */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -21580,7 +21268,7 @@ export default function App() {
                         const val = e.target.value ? parseInt(e.target.value) : null;
                         setPlannerClassId(val);
                       }}
-                      className="erp-input"
+                      className="sp-input"
                       style={{ padding: '6px 12px', minWidth: '150px' }}
                     >
                       {classes.length === 0 ? (
@@ -21623,7 +21311,7 @@ export default function App() {
                               setWeekStartDate(`${yyyy}-${mm}-${dd}`);
                             }
                           }}
-                          className="erp-input"
+                          className="sp-input"
                           style={{ padding: '6px 12px' }}
                         />
 
@@ -21740,7 +21428,7 @@ export default function App() {
                   return (
                     <div 
                       key={day} 
-                      className="erp-card" 
+                      className="sp-card" 
                       draggable={!isPast}
                       onDragStart={(e) => {
                         e.dataTransfer.setData('text/plain', day);
@@ -22091,7 +21779,7 @@ export default function App() {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: 'auto', paddingTop: '10px', borderTop: '1px solid var(--border-color)' }}>
                           <div style={{ display: 'flex', gap: '6px' }}>
                             <select
-                              className="erp-input"
+                              className="sp-input"
                               style={{ flex: 1, padding: '4px 8px', fontSize: '0.8rem' }}
                               value={selectedDaySubject[day] || ''}
                               onChange={(e) => {
@@ -22106,7 +21794,7 @@ export default function App() {
                             </select>
 
                             <select
-                              className="erp-input"
+                              className="sp-input"
                               style={{ flex: 1, padding: '4px 8px', fontSize: '0.8rem' }}
                               value={selectedDayTeacher[day] || ''}
                               onChange={(e) => {
@@ -22283,7 +21971,7 @@ export default function App() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
                   <label htmlFor="t-name" className="form-label">Full Name</label>
-                  <input id="t-name" type="text" className="erp-input" value={tForm.name} onChange={(e) => setTForm({...tForm, name: e.target.value})} required />
+                  <input id="t-name" type="text" className="sp-input" value={tForm.name} onChange={(e) => setTForm({...tForm, name: e.target.value})} required />
                 </div>
                 <div>
                   <label htmlFor="t-gender" className="form-label">Gender</label>
@@ -22291,7 +21979,7 @@ export default function App() {
                     id="t-gender"
                     value={tForm.gender}
                     onChange={(e) => setTForm({...tForm, gender: e.target.value})}
-                    className="erp-input"
+                    className="sp-input"
                   >
                     <option value="Male">Male</option>
                     <option value="Female">Female</option>
@@ -22303,61 +21991,61 @@ export default function App() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
                   <label htmlFor="t-subject" className="form-label">Subject Dept</label>
-                  <input id="t-subject" type="text" className="erp-input" placeholder="e.g. Mathematics" value={tForm.subject} onChange={(e) => setTForm({...tForm, subject: e.target.value})} required />
+                  <input id="t-subject" type="text" className="sp-input" placeholder="e.g. Mathematics" value={tForm.subject} onChange={(e) => setTForm({...tForm, subject: e.target.value})} required />
                 </div>
                 <div>
                   <label htmlFor="t-phone" className="form-label">Phone Number</label>
-                  <input id="t-phone" type="text" className="erp-input" value={tForm.phone} onChange={(e) => setTForm({...tForm, phone: e.target.value})} />
+                  <input id="t-phone" type="text" className="sp-input" value={tForm.phone} onChange={(e) => setTForm({...tForm, phone: e.target.value})} />
                 </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
                   <label htmlFor="t-email" className="form-label">Email Address</label>
-                  <input id="t-email" type="email" className="erp-input" value={tForm.email} onChange={(e) => setTForm({...tForm, email: e.target.value})} />
+                  <input id="t-email" type="email" className="sp-input" value={tForm.email} onChange={(e) => setTForm({...tForm, email: e.target.value})} />
                 </div>
                 <div>
                   <label htmlFor="t-qual" className="form-label">Qualification</label>
-                  <input id="t-qual" type="text" className="erp-input" value={tForm.qualification} onChange={(e) => setTForm({...tForm, qualification: e.target.value})} />
+                  <input id="t-qual" type="text" className="sp-input" value={tForm.qualification} onChange={(e) => setTForm({...tForm, qualification: e.target.value})} />
                 </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
                   <label htmlFor="t-experience" className="form-label">Experience</label>
-                  <input id="t-experience" type="text" className="erp-input" placeholder="e.g. 5 Years" value={tForm.experience || ''} onChange={(e) => setTForm({...tForm, experience: e.target.value})} />
+                  <input id="t-experience" type="text" className="sp-input" placeholder="e.g. 5 Years" value={tForm.experience || ''} onChange={(e) => setTForm({...tForm, experience: e.target.value})} />
                 </div>
                 <div>
                   <label htmlFor="t-salary" className="form-label">Base Salary ($)</label>
-                  <input id="t-salary" type="number" className="erp-input" value={tForm.salary_amount} onChange={(e) => setTForm({...tForm, salary_amount: parseFloat(e.target.value) || 0})} />
+                  <input id="t-salary" type="number" className="sp-input" value={tForm.salary_amount} onChange={(e) => setTForm({...tForm, salary_amount: parseFloat(e.target.value) || 0})} />
                 </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
                   <label htmlFor="t-aadhaar" className="form-label">Aadhaar Number (12 digits)</label>
-                  <input id="t-aadhaar" type="text" placeholder="123456789012" className="erp-input" value={tForm.aadhaar_number} onChange={(e) => setTForm({...tForm, aadhaar_number: e.target.value})} />
+                  <input id="t-aadhaar" type="text" placeholder="123456789012" className="sp-input" value={tForm.aadhaar_number} onChange={(e) => setTForm({...tForm, aadhaar_number: e.target.value})} />
                 </div>
                 <div>
                   <label htmlFor="t-pan" className="form-label">PAN Number (e.g. ABCDE1234F)</label>
-                  <input id="t-pan" type="text" placeholder="ABCDE1234F" className="erp-input" value={tForm.pan_number} onChange={(e) => setTForm({...tForm, pan_number: e.target.value})} />
+                  <input id="t-pan" type="text" placeholder="ABCDE1234F" className="sp-input" value={tForm.pan_number} onChange={(e) => setTForm({...tForm, pan_number: e.target.value})} />
                 </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
                   <label htmlFor="t-join" className="form-label">Joining Date *</label>
-                  <input id="t-join" type="date" className="erp-input" value={tForm.joining_date} onChange={(e) => setTForm({...tForm, joining_date: e.target.value})} required />
+                  <input id="t-join" type="date" className="sp-input" value={tForm.joining_date} onChange={(e) => setTForm({...tForm, joining_date: e.target.value})} required />
                 </div>
                 <div>
                   <label htmlFor="t-exit" className="form-label">Exit Date (Optional)</label>
-                  <input id="t-exit" type="date" className="erp-input" value={tForm.exit_date} onChange={(e) => setTForm({...tForm, exit_date: e.target.value})} />
+                  <input id="t-exit" type="date" className="sp-input" value={tForm.exit_date} onChange={(e) => setTForm({...tForm, exit_date: e.target.value})} />
                 </div>
               </div>
 
               <div>
                 <label htmlFor="t-address" className="form-label">Home Address</label>
-                <input id="t-address" type="text" className="erp-input" value={tForm.address} onChange={(e) => setTForm({...tForm, address: e.target.value})} />
+                <input id="t-address" type="text" className="sp-input" value={tForm.address} onChange={(e) => setTForm({...tForm, address: e.target.value})} />
               </div>
 
               {/* Document Management Section */}
@@ -22370,7 +22058,7 @@ export default function App() {
                     <label className="form-label" style={{ fontSize: '0.75rem' }}>Select Document Type</label>
                     <select
                       id="upload-doc-type"
-                      className="erp-input"
+                      className="sp-input"
                       style={{ padding: '6px 10px', fontSize: '0.8rem' }}
                       defaultValue=""
                     >
@@ -22393,7 +22081,7 @@ export default function App() {
                       id="upload-doc-file"
                       type="file"
                       accept=".pdf,.jpg,.jpeg,.png"
-                      className="erp-input"
+                      className="sp-input"
                       style={{ padding: '4px 10px', fontSize: '0.8rem' }}
                       onChange={async (e) => {
                         const file = e.target.files[0];
@@ -22435,8 +22123,8 @@ export default function App() {
 
                 {/* Uploaded Documents List */}
                 {tForm.documents && tForm.documents.length > 0 ? (
-                  <div className="erp-table-container" style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
-                    <table className="erp-table" style={{ fontSize: '0.8rem' }}>
+                  <div className="sp-table-container" style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
+                    <table className="sp-table" style={{ fontSize: '0.8rem' }}>
                       <thead>
                         <tr>
                           <th>Document Type</th>
@@ -22542,7 +22230,7 @@ export default function App() {
                   <label className="form-label">Exam Name *</label>
                   <input
                     type="text"
-                    className="erp-input"
+                    className="sp-input"
                     placeholder="e.g. Unit Test 1, Annual Exam"
                     value={examForm.name}
                     onChange={(e) => setExamForm({ ...examForm, name: e.target.value })}
@@ -22552,7 +22240,7 @@ export default function App() {
                 <div>
                   <label className="form-label">Applicable Class *</label>
                   <select
-                    className="erp-input"
+                    className="sp-input"
                     value={examForm.class_id}
                     onChange={(e) => setExamForm({ ...examForm, class_id: e.target.value })}
                     required
@@ -22571,7 +22259,7 @@ export default function App() {
                   <label className="form-label">Description / Remarks (Optional)</label>
                   <input
                     type="text"
-                    className="erp-input"
+                    className="sp-input"
                     placeholder="e.g. Surprise test or mid-term"
                     value={examForm.description}
                     onChange={(e) => setExamForm({ ...examForm, description: e.target.value })}
@@ -22580,7 +22268,7 @@ export default function App() {
                 <div>
                   <label className="form-label">Publish Status</label>
                   <select
-                    className="erp-input"
+                    className="sp-input"
                     value={examForm.status}
                     onChange={(e) => setExamForm({ ...examForm, status: e.target.value })}
                   >
@@ -22614,7 +22302,7 @@ export default function App() {
                     <div key={sIdx} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr auto', gap: '12px', alignItems: 'center' }}>
                       <input
                         type="text"
-                        className="erp-input"
+                        className="sp-input"
                         placeholder="Subject Name (e.g. Mathematics)"
                         value={sub.subject_name}
                         onChange={(e) => {
@@ -22627,7 +22315,7 @@ export default function App() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <input
                           type="number"
-                          className="erp-input"
+                          className="sp-input"
                           placeholder="Max Marks"
                           min="1"
                           value={sub.max_marks}
@@ -22783,7 +22471,7 @@ export default function App() {
                           });
                           setExamMarks(updated);
                         }}
-                        className="erp-input"
+                        className="sp-input"
                         placeholder="0.00"
                         style={{ padding: '6px' }}
                       />
@@ -22833,7 +22521,7 @@ export default function App() {
                       [marksEntryStudent.id]: val
                     }));
                   }}
-                  className="erp-input"
+                  className="sp-input"
                   placeholder={isMarksReadOnly ? 'No remarks recorded.' : 'e.g. Excellent performance'}
                   style={{ width: '100%', padding: '8px' }}
                 />
@@ -23034,7 +22722,7 @@ export default function App() {
                     <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1.5fr 2fr 2fr auto', gap: '8px', alignItems: 'center' }}>
                       <input
                         type="text"
-                        className="erp-input"
+                        className="sp-input"
                         value={scale.grade_name}
                         onChange={(e) => {
                           const updated = [...gradingScales];
@@ -23048,7 +22736,7 @@ export default function App() {
                         <input
                           type="number"
                           step="0.01"
-                          className="erp-input"
+                          className="sp-input"
                           value={scale.min_percentage}
                           onChange={(e) => {
                             const updated = [...gradingScales];
@@ -23063,7 +22751,7 @@ export default function App() {
                         <input
                           type="number"
                           step="0.01"
-                          className="erp-input"
+                          className="sp-input"
                           value={scale.max_percentage}
                           onChange={(e) => {
                             const updated = [...gradingScales];
@@ -23700,7 +23388,7 @@ export default function App() {
                   <input 
                     id="s-name" 
                     type="text" 
-                    className="erp-input" 
+                    className="sp-input" 
                     value={sForm.name} 
                     onChange={(e) => {
                       setSForm({...sForm, name: e.target.value, class_id: selectedClassId});
@@ -23715,7 +23403,7 @@ export default function App() {
                   <input 
                     id="s-roll" 
                     type="text" 
-                    className="erp-input" 
+                    className="sp-input" 
                     value={sForm.roll_number || ''}
                     onChange={(e) => {
                       setSForm({...sForm, roll_number: e.target.value.replace(/\D/g, '')});
@@ -23734,7 +23422,7 @@ export default function App() {
                   <input 
                     id="s-father" 
                     type="text" 
-                    className="erp-input" 
+                    className="sp-input" 
                     value={sForm.father_name || ''} 
                     onChange={(e) => {
                       setSForm({...sForm, father_name: e.target.value});
@@ -23749,7 +23437,7 @@ export default function App() {
                   <input 
                     id="s-mother" 
                     type="text" 
-                    className="erp-input" 
+                    className="sp-input" 
                     value={sForm.mother_name || ''} 
                     onChange={(e) => {
                       setSForm({...sForm, mother_name: e.target.value});
@@ -23768,7 +23456,7 @@ export default function App() {
                   <input 
                     id="s-admission-date" 
                     type="date" 
-                    className="erp-input" 
+                    className="sp-input" 
                     value={sForm.admission_date || ''} 
                     onChange={(e) => {
                       setSForm({...sForm, admission_date: e.target.value});
@@ -23783,7 +23471,7 @@ export default function App() {
                   <input 
                     id="s-dob" 
                     type="date" 
-                    className="erp-input" 
+                    className="sp-input" 
                     value={sForm.date_of_birth || ''} 
                     onChange={(e) => {
                       setSForm({...sForm, date_of_birth: e.target.value});
@@ -23798,7 +23486,7 @@ export default function App() {
                   <input 
                     id="s-exit-date" 
                     type="date" 
-                    className="erp-input" 
+                    className="sp-input" 
                     value={sForm.exit_date || ''} 
                     onChange={(e) => {
                       setSForm({...sForm, exit_date: e.target.value});
@@ -23813,7 +23501,7 @@ export default function App() {
                   <label htmlFor="s-gender" className="form-label">Gender</label>
                   <select 
                     id="s-gender" 
-                    className="erp-input" 
+                    className="sp-input" 
                     value={sForm.gender || 'Male'} 
                     onChange={(e) => setSForm({...sForm, gender: e.target.value})}
                     required
@@ -23827,7 +23515,7 @@ export default function App() {
                   <label htmlFor="s-blood" className="form-label">Blood Group</label>
                   <select 
                     id="s-blood" 
-                    className="erp-input" 
+                    className="sp-input" 
                     value={sForm.blood_group || ''} 
                     onChange={(e) => setSForm({...sForm, blood_group: e.target.value})}
                   >
@@ -23851,7 +23539,7 @@ export default function App() {
                   <input 
                     id="s-phone" 
                     type="text" 
-                    className="erp-input" 
+                    className="sp-input" 
                     value={sForm.phone || ''} 
                     onChange={(e) => {
                       setSForm({...sForm, phone: e.target.value});
@@ -23865,7 +23553,7 @@ export default function App() {
                   <input 
                     id="s-email" 
                     type="email" 
-                    className="erp-input" 
+                    className="sp-input" 
                     value={sForm.email || ''} 
                     onChange={(e) => {
                       setSForm({...sForm, email: e.target.value});
@@ -23883,7 +23571,7 @@ export default function App() {
                   <input 
                     id="s-contact" 
                     type="text" 
-                    className="erp-input" 
+                    className="sp-input" 
                     value={sForm.emergency_contact || ''} 
                     onChange={(e) => {
                       setSForm({...sForm, emergency_contact: e.target.value});
@@ -23897,7 +23585,7 @@ export default function App() {
                   <input 
                     id="s-aadhaar" 
                     type="text" 
-                    className="erp-input" 
+                    className="sp-input" 
                     value={sForm.aadhaar_number || ''} 
                     onChange={(e) => {
                       setSForm({...sForm, aadhaar_number: e.target.value});
@@ -23915,7 +23603,7 @@ export default function App() {
                   <label htmlFor="s-address" className="form-label">Home Address</label>
                   <textarea 
                     id="s-address" 
-                    className="erp-input" 
+                    className="sp-input" 
                     value={sForm.address || ''} 
                     onChange={(e) => {
                       setSForm({...sForm, address: e.target.value});
@@ -23941,7 +23629,7 @@ export default function App() {
                   <input 
                     id="s-sr-no" 
                     type="text" 
-                    className="erp-input" 
+                    className="sp-input" 
                     value={sForm.sr_no || ''} 
                     onChange={(e) => {
                       setSForm({...sForm, sr_no: e.target.value});
@@ -23960,7 +23648,7 @@ export default function App() {
                   <label htmlFor="s-nationality" className="form-label">Nationality</label>
                   <select
                     id="s-nationality"
-                    className="erp-input"
+                    className="sp-input"
                     value={sForm.nationality || 'Indian'}
                     onChange={(e) => {
                       setSForm({...sForm, nationality: e.target.value});
@@ -24003,7 +23691,7 @@ export default function App() {
                     id="s-caste"
                     type="text"
                     placeholder="Enter caste"
-                    className="erp-input"
+                    className="sp-input"
                     value={sForm.caste || ''}
                     onChange={(e) => {
                       setSForm({...sForm, caste: e.target.value});
@@ -24021,7 +23709,7 @@ export default function App() {
                   <label htmlFor="s-country" className="form-label">Country</label>
                   <select
                     id="s-country"
-                    className="erp-input"
+                    className="sp-input"
                     value={sForm.country || ''}
                     onChange={(e) => {
                       const country = e.target.value;
@@ -24042,7 +23730,7 @@ export default function App() {
                   <label htmlFor="s-state" className="form-label">State</label>
                   <select
                     id="s-state"
-                    className="erp-input"
+                    className="sp-input"
                     value={sForm.state || ''}
                     disabled={!sForm.country}
                     onChange={(e) => {
@@ -24064,7 +23752,7 @@ export default function App() {
                   <label htmlFor="s-city" className="form-label">City</label>
                   <select
                     id="s-city"
-                    className="erp-input"
+                    className="sp-input"
                     value={sForm.city || ''}
                     disabled={!sForm.state}
                     onChange={(e) => {
@@ -24089,7 +23777,7 @@ export default function App() {
                   id="s-group-name" 
                   type="text" 
                   placeholder="e.g. Section A, Section B" 
-                  className="erp-input" 
+                  className="sp-input" 
                   value={sForm.group_name || ''} 
                   onChange={(e) => setSForm({...sForm, group_name: e.target.value})} 
                 />
@@ -24105,7 +23793,7 @@ export default function App() {
                     <label className="form-label" style={{ fontSize: '0.75rem' }}>Select Document Type</label>
                     <select
                       id="upload-student-doc-type"
-                      className="erp-input"
+                      className="sp-input"
                       style={{ padding: '6px 10px', fontSize: '0.8rem' }}
                       defaultValue=""
                     >
@@ -24131,7 +23819,7 @@ export default function App() {
                       id="upload-student-doc-file"
                       type="file"
                       accept=".pdf,.jpg,.jpeg,.png"
-                      className="erp-input"
+                      className="sp-input"
                       style={{ padding: '4px 10px', fontSize: '0.8rem' }}
                       onChange={async (e) => {
                         const file = e.target.files[0];
@@ -24190,8 +23878,8 @@ export default function App() {
 
                 {/* Uploaded Documents List */}
                 {sForm.documents && sForm.documents.length > 0 ? (
-                  <div className="erp-table-container" style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
-                    <table className="erp-table" style={{ fontSize: '0.8rem' }}>
+                  <div className="sp-table-container" style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
+                    <table className="sp-table" style={{ fontSize: '0.8rem' }}>
                       <thead>
                         <tr>
                           <th>Document Type</th>
@@ -24374,7 +24062,7 @@ export default function App() {
                   step="0.01"
                   required
                   placeholder="Enter amount to pay"
-                  className="erp-input" 
+                  className="sp-input" 
                   value={recoveryAmount}
                   onChange={(e) => setRecoveryAmount(e.target.value)}
                 />
@@ -24385,7 +24073,7 @@ export default function App() {
                 <input 
                   type="date" 
                   required
-                  className="erp-input" 
+                  className="sp-input" 
                   value={recoveryDate}
                   onChange={(e) => setRecoveryDate(e.target.value)}
                 />
@@ -24433,7 +24121,7 @@ export default function App() {
                   id="c-name" 
                   type="text" 
                   placeholder="e.g. Class 1 or BCA 1st Year"
-                  className="erp-input" 
+                  className="sp-input" 
                   value={newClassForm.name} 
                   onChange={(e) => setNewClassForm({...newClassForm, name: e.target.value})} 
                   required 
@@ -24452,7 +24140,7 @@ export default function App() {
                     id="new-group-name"
                     type="text" 
                     placeholder="Type section name..." 
-                    className="erp-input"
+                    className="sp-input"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
@@ -24531,7 +24219,7 @@ export default function App() {
                   id="edit-c-name" 
                   type="text" 
                   placeholder="e.g. Class 1 or BCA 1st Year"
-                  className="erp-input" 
+                  className="sp-input" 
                   value={editClassForm.name} 
                   onChange={(e) => setEditClassForm({...editClassForm, name: e.target.value})} 
                   required 
@@ -24710,7 +24398,7 @@ export default function App() {
                   placeholder="e.g. Admission Fee, Examination Fee"
                   value={editExtraFeeTypeName}
                   onChange={(e) => setEditExtraFeeTypeName(e.target.value)}
-                  className="erp-input"
+                  className="sp-input"
                   required
                 />
               </div>
@@ -24722,7 +24410,7 @@ export default function App() {
                   placeholder="e.g. 500"
                   value={editExtraFeeTypeAmount}
                   onChange={(e) => setEditExtraFeeTypeAmount(e.target.value)}
-                  className="erp-input"
+                  className="sp-input"
                   min="1"
                   required
                 />
@@ -24764,7 +24452,7 @@ export default function App() {
                       setPromiseStudentId('');
                     }
                   }}
-                  className="erp-input"
+                  className="sp-input"
                   required
                 />
                 
@@ -24845,7 +24533,7 @@ export default function App() {
                   type="date"
                   value={promiseDate}
                   onChange={(e) => setPromiseDate(e.target.value)}
-                  className="erp-input"
+                  className="sp-input"
                   required
                 />
               </div>
@@ -24857,7 +24545,7 @@ export default function App() {
                   placeholder="Parent promised to deposit pending fee after..."
                   value={promiseDescription}
                   onChange={(e) => setPromiseDescription(e.target.value)}
-                  className="erp-input"
+                  className="sp-input"
                   style={{ minHeight: '100px', resize: 'vertical', padding: '10px', fontSize: '0.9rem', lineHeight: '1.4' }}
                 />
               </div>
@@ -24868,7 +24556,7 @@ export default function App() {
                 <select
                   value={promiseStatus}
                   onChange={(e) => setPromiseStatus(e.target.value)}
-                  className="erp-input"
+                  className="sp-input"
                 >
                   <option value="Pending">Pending</option>
                   <option value="Fulfilled">Fulfilled</option>
@@ -25063,7 +24751,7 @@ export default function App() {
                           Initializing delivery channel...
                         </div>
                       ) : (
-                        <table className="erp-table" style={{ fontSize: '0.8rem' }}>
+                        <table className="sp-table" style={{ fontSize: '0.8rem' }}>
                           <thead>
                             <tr>
                               <th>Student</th>
@@ -25147,7 +24835,7 @@ export default function App() {
                           id="delete-pwd"
                           type="password"
                           autoComplete="new-password"
-                          className="erp-input"
+                          className="sp-input"
                           value={deletePassword}
                           onChange={(e) => {
                             setDeletePassword(e.target.value);
@@ -25295,7 +24983,7 @@ export default function App() {
                           placeholder="Subject Name (e.g. Chemistry)"
                           value={newSubjectName}
                           onChange={(e) => setNewSubjectName(e.target.value)}
-                          className="erp-input"
+                          className="sp-input"
                           style={{ flex: 1 }}
                           required
                         />
@@ -25331,7 +25019,7 @@ export default function App() {
                                     type="text"
                                     value={editingSubjectName}
                                     onChange={(e) => setEditingSubjectName(e.target.value)}
-                                    className="erp-input"
+                                    className="sp-input"
                                     style={{ flex: 1, padding: '4px 8px', fontSize: '0.85rem' }}
                                     required
                                     autoFocus
@@ -25606,7 +25294,7 @@ export default function App() {
                     value={newYearForm.year_range}
                     onChange={(e) => setNewYearForm({ ...newYearForm, year_range: e.target.value })}
                     placeholder="e.g. 2026-2027" 
-                    className="erp-input" 
+                    className="sp-input" 
                     required 
                   />
                   <small style={{ color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>Auto-generated based on the latest year range, but can be customized.</small>
@@ -25619,7 +25307,7 @@ export default function App() {
                       type="date" 
                       value={newYearForm.start_date}
                       onChange={(e) => setNewYearForm({ ...newYearForm, start_date: e.target.value })}
-                      className="erp-input" 
+                      className="sp-input" 
                       required 
                     />
                   </div>
@@ -25630,7 +25318,7 @@ export default function App() {
                       type="date" 
                       value={newYearForm.end_date}
                       onChange={(e) => setNewYearForm({ ...newYearForm, end_date: e.target.value })}
-                      className="erp-input" 
+                      className="sp-input" 
                       required 
                     />
                   </div>
@@ -25642,7 +25330,7 @@ export default function App() {
                     value={newYearForm.description}
                     onChange={(e) => setNewYearForm({ ...newYearForm, description: e.target.value })}
                     placeholder="Enter short details about this session..." 
-                    className="erp-input" 
+                    className="sp-input" 
                     rows="3"
                   />
                 </div>
@@ -25671,14 +25359,14 @@ export default function App() {
                 <div>
                   <label className="form-label" style={{ fontWeight: 600 }}>Classroom</label>
                   {editingAssignmentClassId ? (
-                    <div className="erp-input" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', height: '42px', padding: '0 12px' }}>
+                    <div className="sp-input" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', height: '42px', padding: '0 12px' }}>
                       {classes.find(c => Number(c.id) === Number(editingAssignmentClassId))?.class_name || 'Selected Class'}
                     </div>
                   ) : (
                     <select 
                       value={assignTeacherClassId} 
                       onChange={(e) => setAssignTeacherClassId(e.target.value)} 
-                      className="erp-input"
+                      className="sp-input"
                     >
                       <option value="">Select Classroom</option>
                       {classes.filter(c => c.class_teacher_id === null).map(c => (
@@ -25693,7 +25381,7 @@ export default function App() {
                   <select 
                     value={assignTeacherId} 
                     onChange={(e) => setAssignTeacherId(e.target.value)} 
-                    className="erp-input"
+                    className="sp-input"
                   >
                     <option value="">Select Teacher</option>
                     {teachers.filter(t => {
@@ -25747,7 +25435,7 @@ export default function App() {
                       type="text" 
                       value={credsPhone} 
                       disabled 
-                      className="erp-input"
+                      className="sp-input"
                       style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}
                     />
                   </div>
@@ -25760,7 +25448,7 @@ export default function App() {
                         value={credsPassword} 
                         onChange={(e) => setCredsPassword(e.target.value)}
                         placeholder="Enter or generate password" 
-                        className="erp-input"
+                        className="sp-input"
                       />
                       <button 
                         onClick={() => setCredsPassword(Math.random().toString(36).slice(-8))} 
@@ -25837,7 +25525,7 @@ export default function App() {
                           <select
                             value={wizardClassMappings[cls.id] || ''}
                             onChange={(e) => setWizardClassMappings({ ...wizardClassMappings, [cls.id]: e.target.value })}
-                            className="erp-input"
+                            className="sp-input"
                             style={{ width: '200px', padding: '6px 10px', fontSize: '0.85rem' }}
                           >
                             <option value="Alumni">Alumni / Graduated</option>
@@ -25933,7 +25621,7 @@ export default function App() {
                     </span>
                   </div>
 
-                  <div className="erp-card" style={{ background: 'rgba(2, 6, 23, 0.4)' }}>
+                  <div className="sp-card" style={{ background: 'rgba(2, 6, 23, 0.4)' }}>
                     <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '12px' }}>Transition Impact Summary</h4>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.85rem' }}>
                       <div>Total Students in active session: <strong>{students.filter(s => s.status === 'Active').length}</strong></div>
@@ -25951,7 +25639,7 @@ export default function App() {
                       placeholder="CONFIRM" 
                       value={wizardConfirmText} 
                       onChange={(e) => setWizardConfirmText(e.target.value)} 
-                      className="erp-input"
+                      className="sp-input"
                       style={{ border: wizardConfirmText === 'CONFIRM' ? '1px solid #10b981' : '1px solid var(--border-color)' }}
                     />
                   </div>
@@ -26102,8 +25790,8 @@ export default function App() {
                 </div>
               ) : (
                 <>
-                  <div className="erp-table-container" style={{ maxHeight: '380px', overflowY: 'auto', marginBottom: '20px' }}>
-                    <table className="erp-table">
+                  <div className="sp-table-container" style={{ maxHeight: '380px', overflowY: 'auto', marginBottom: '20px' }}>
+                    <table className="sp-table">
                       <thead>
                         <tr>
                           <th>Teacher</th>
@@ -26359,7 +26047,7 @@ export default function App() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Select Faculty Member</label>
                 <select
-                  className="erp-input"
+                  className="sp-input"
                   style={{ width: '100%', padding: '8px 12px', fontSize: '0.9rem' }}
                   value={selectedModalTeacherId}
                   onChange={(e) => setSelectedModalTeacherId(e.target.value)}

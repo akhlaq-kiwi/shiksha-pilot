@@ -28,14 +28,19 @@ function loadEnv($path) {
 }
 loadEnv(__DIR__ . '/../.env');
 
+$container = App\Bootstrap\Container::build();
+AppFactory::setContainer($container);
 $app = AppFactory::create();
 
+// Register modular routes
+App\Bootstrap\Routes::register($app);
+
 // Global Configuration
-$db_host = '127.0.0.1';
-$db_user = 'root';
-$db_pass = 'admin123';
-$db_name = 'bn_school_erp';
-$jwt_secret = 'super_secret_erp_key_2026';
+$db_host = getenv('DB_HOST') ?: '127.0.0.1';
+$db_user = getenv('DB_USER') ?: 'root';
+$db_pass = getenv('DB_PASS') ?: 'admin123';
+$db_name = getenv('DB_NAME') ?: 'bn_school_sp';
+$jwt_secret = getenv('JWT_SECRET') ?: 'super_secret_erp_key_2026';
 
 // Database Connection Helper
 function getDb() {
@@ -1590,7 +1595,7 @@ function generateJwt($userId, $email, $role, $schoolId = null, $setupCompleted =
         $phone = $email;
     }
     $payload = [
-        'iss' => 'bn_school_erp',
+        'iss' => 'bn_school_sp',
         'iat' => time(),
         'exp' => time() + (3600 * 24), // 24 hours
         'sub' => $userId,
@@ -1780,7 +1785,7 @@ function sendCredentialsEmail($toEmail, $schoolName, $plainPassword) {
     $smtpPort = (int)($_ENV['SMTP_PORT'] ?? getenv('SMTP_PORT') ?: 587);
     $smtpUser = $_ENV['SMTP_USER'] ?? getenv('SMTP_USER') ?: '';
     $smtpPass = $_ENV['SMTP_PASS'] ?? getenv('SMTP_PASS') ?: '';
-    $fromName = $_ENV['SMTP_FROM_NAME'] ?? getenv('SMTP_FROM_NAME') ?: 'BN School ERP Control Panel';
+    $fromName = $_ENV['SMTP_FROM_NAME'] ?? getenv('SMTP_FROM_NAME') ?: 'BN Shiksha Pilot (SP) Control Panel';
     
     // If SMTP_USER or SMTP_PASS is empty or has placeholders, log to sent_emails.log file
     if (empty($smtpUser) || empty($smtpPass) || $smtpUser === 'your_email@gmail.com') {
@@ -1803,7 +1808,7 @@ function sendCredentialsEmail($toEmail, $schoolName, $plainPassword) {
         $mail->addAddress($toEmail);
         
         $mail->isHTML(true);
-        $mail->Subject = "Welcome to BN College Portal – Your School ERP Account is Ready";
+        $mail->Subject = "Welcome to BN College Portal – Your Shiksha Pilot (SP) Account is Ready";
         
         $portalUrl = "https://portal.bncollegeportal.com/login";
         
@@ -1828,7 +1833,7 @@ function sendCredentialsEmail($toEmail, $schoolName, $plainPassword) {
                                 <span style='font-size: 24px; color: #ffffff;'>🎓</span>
                             </div>
                             <h1 style='color: #ffffff; margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;'>BN College Portal</h1>
-                            <p style='color: #94a3b8; margin: 4px 0 0 0; font-size: 13px; font-weight: 500; text-transform: uppercase; letter-spacing: 1px;'>Enterprise School ERP</p>
+                            <p style='color: #94a3b8; margin: 4px 0 0 0; font-size: 13px; font-weight: 500; text-transform: uppercase; letter-spacing: 1px;'>Enterprise Shiksha Pilot (SP)</p>
                         </td>
                     </tr>
                     
@@ -1838,7 +1843,7 @@ function sendCredentialsEmail($toEmail, $schoolName, $plainPassword) {
                             
                             <!-- Main Heading -->
                             <h2 style='margin: 0 0 8px 0; font-size: 20px; font-weight: 700; color: #0f172a; text-align: center;'>Welcome to BN College Portal</h2>
-                            <p style='margin: 0 0 32px 0; font-size: 14px; color: #64748b; text-align: center; line-height: 1.5;'>Your school ERP account has been successfully created and is ready for setup.</p>
+                            <p style='margin: 0 0 32px 0; font-size: 14px; color: #64748b; text-align: center; line-height: 1.5;'>Your Shiksha Pilot (SP) account has been successfully created and is ready for setup.</p>
                             
                             <!-- Greeting -->
                             <p style='margin: 0 0 16px 0; font-size: 15px; font-weight: 600; color: #0f172a;'>Dear School Administrator,</p>
@@ -1846,7 +1851,7 @@ function sendCredentialsEmail($toEmail, $schoolName, $plainPassword) {
                                 Thank you for choosing <strong>BN College Portal</strong>.
                             </p>
                             <p style='margin: 0 0 24px 0; font-size: 15px; line-height: 1.6; color: #334155;'>
-                                Your institution has been successfully onboarded to our ERP platform. Please use the credentials below to access your school dashboard and complete the initial setup.
+                                Your institution has been successfully onboarded to our SP platform. Please use the credentials below to access your school dashboard and complete the initial setup.
                             </p>
                             
                             <!-- Account Information Card -->
@@ -1982,7 +1987,7 @@ function sendSubscriptionReminderEmail($toEmail, $subject, $message, $isHTML = f
     $smtpPort = (int)($_ENV['SMTP_PORT'] ?? getenv('SMTP_PORT') ?: 587);
     $smtpUser = $_ENV['SMTP_USER'] ?? getenv('SMTP_USER') ?: '';
     $smtpPass = $_ENV['SMTP_PASS'] ?? getenv('SMTP_PASS') ?: '';
-    $fromName = $_ENV['SMTP_FROM_NAME'] ?? getenv('SMTP_FROM_NAME') ?: 'BN School ERP Control Panel';
+    $fromName = $_ENV['SMTP_FROM_NAME'] ?? getenv('SMTP_FROM_NAME') ?: 'BN Shiksha Pilot (SP) Control Panel';
     
     // Always write to log file for verification/mock purposes
     $logMessage = "[" . date('Y-m-d H:i:s') . "] Outgoing subscription email: To: $toEmail | Subject: $subject | Message: $message\n";
@@ -2024,7 +2029,7 @@ function sendForgotPasswordOTPEmail($toEmail, $otp) {
     $smtpPort = (int)($_ENV['SMTP_PORT'] ?? getenv('SMTP_PORT') ?: 587);
     $smtpUser = $_ENV['SMTP_USER'] ?? getenv('SMTP_USER') ?: '';
     $smtpPass = $_ENV['SMTP_PASS'] ?? getenv('SMTP_PASS') ?: '';
-    $fromName = $_ENV['SMTP_FROM_NAME'] ?? getenv('SMTP_FROM_NAME') ?: 'BN School ERP Control Panel';
+    $fromName = $_ENV['SMTP_FROM_NAME'] ?? getenv('SMTP_FROM_NAME') ?: 'BN Shiksha Pilot (SP) Control Panel';
     
     // If SMTP_USER or SMTP_PASS is empty or has placeholders, log to sent_emails.log file
     if (empty($smtpUser) || empty($smtpPass) || $smtpUser === 'your_email@gmail.com') {
@@ -2150,7 +2155,7 @@ function sendReportEmail($toEmail, $reportId, $fromDate, $toDate, $xlsxPath) {
     $smtpPort = (int)($_ENV['SMTP_PORT'] ?? getenv('SMTP_PORT') ?: 587);
     $smtpUser = $_ENV['SMTP_USER'] ?? getenv('SMTP_USER') ?: '';
     $smtpPass = $_ENV['SMTP_PASS'] ?? getenv('SMTP_PASS') ?: '';
-    $fromName = $_ENV['SMTP_FROM_NAME'] ?? getenv('SMTP_FROM_NAME') ?: 'BN School ERP Control Panel';
+    $fromName = $_ENV['SMTP_FROM_NAME'] ?? getenv('SMTP_FROM_NAME') ?: 'BN Shiksha Pilot (SP) Control Panel';
     
     // If SMTP_USER or SMTP_PASS is empty or has placeholders, log to sent_emails.log file
     if (empty($smtpUser) || empty($smtpPass) || $smtpUser === 'your_email@gmail.com') {
@@ -2855,787 +2860,13 @@ $app->put('/api/sandbox/setup-completed', function (Request $request, Response $
     return jsonResponse($response, ['success' => true]);
 });
 
-$app->post('/api/auth/identify', function (Request $request, Response $response) {
-    $data = getJsonData($request);
-    $identifier = trim($data['identifier'] ?? '');
-    
-    if (empty($identifier)) {
-        return jsonResponse($response, ['detail' => 'Email address or mobile number is required.'], 400);
-    }
-    
-    $isEmail = filter_var($identifier, FILTER_VALIDATE_EMAIL) !== false || strpos($identifier, '@') !== false;
-    
-    $pdo = null;
-    try {
-        $pdo = getDb();
-    } catch (\Exception $e) {
-        $pdo = null;
-    }
-    
-    if ($isEmail) {
-        if ($pdo === null) {
-            $mockUsersFile = __DIR__ . '/../mock_users.json';
-            if (file_exists($mockUsersFile)) {
-                $mockUsers = json_decode(file_get_contents($mockUsersFile), true) ?: [];
-                foreach ($mockUsers as $mu) {
-                    if (trim(strtolower($mu['email'] ?? '')) === trim(strtolower($identifier)) && $mu['role'] === 'School Admin') {
-                        return jsonResponse($response, [
-                            'exists' => true,
-                            'type' => 'email',
-                            'role' => 'School Admin'
-                        ]);
-                    }
-                }
-            }
-            if (trim(strtolower($identifier)) === 'admin@yopmail.com') {
-                return jsonResponse($response, [
-                    'exists' => true,
-                    'type' => 'email',
-                    'role' => 'School Admin'
-                ]);
-            }
-            return jsonResponse($response, [
-                'exists' => false,
-                'type' => 'email',
-                'detail' => 'No School Admin account found with this email address.'
-            ], 404);
-        }
-        
-        $stmt = $pdo->prepare("SELECT * FROM users WHERE email = :email AND role = 'School Admin' AND is_active = 1 LIMIT 1");
-        $stmt->execute(['email' => $identifier]);
-        $user = $stmt->fetch();
-        
-        if ($user) {
-            return jsonResponse($response, [
-                'exists' => true,
-                'type' => 'email',
-                'role' => 'School Admin'
-            ]);
-        }
-        
-        return jsonResponse($response, [
-            'exists' => false,
-            'type' => 'email',
-            'detail' => 'No School Admin account found with this email address.'
-        ], 404);
-        
-    } else {
-        if ($pdo === null) {
-            if ($identifier === '9876543210') {
-                return jsonResponse($response, [
-                    'exists' => true,
-                    'type' => 'phone',
-                    'role' => 'Parent'
-                ]);
-            }
-            
-            $mockUsersFile = __DIR__ . '/../mock_users.json';
-            if (file_exists($mockUsersFile)) {
-                $mockUsers = json_decode(file_get_contents($mockUsersFile), true) ?: [];
-                foreach ($mockUsers as $mu) {
-                    if (trim($mu['phone'] ?? '') === $identifier) {
-                        return jsonResponse($response, [
-                            'exists' => true,
-                            'type' => 'phone',
-                            'role' => $mu['role']
-                        ]);
-                    }
-                }
-            }
-            
-            return jsonResponse($response, [
-                'exists' => true,
-                'type' => 'phone',
-                'role' => 'Teacher'
-            ]);
-        }
-        
-        $stmt = $pdo->prepare("SELECT * FROM teachers WHERE phone = :phone AND status = 'Active' LIMIT 1");
-        $stmt->execute(['phone' => $identifier]);
-        $teacher = $stmt->fetch();
-        
-        if ($teacher) {
-            return jsonResponse($response, [
-                'exists' => true,
-                'type' => 'phone',
-                'role' => 'Teacher'
-            ]);
-        }
-        
-        $stmt = $pdo->prepare("SELECT * FROM students WHERE phone = :phone OR emergency_contact = :phone LIMIT 1");
-        $stmt->execute(['phone' => $identifier]);
-        $student = $stmt->fetch();
-        
-        if ($student) {
-            return jsonResponse($response, [
-                'exists' => true,
-                'type' => 'phone',
-                'role' => 'Parent'
-            ]);
-        }
-        
-        return jsonResponse($response, [
-            'exists' => false,
-            'type' => 'phone',
-            'detail' => 'No account found with this mobile number.'
-        ], 404);
-    }
-});
+// Auth identify route migrated to AuthController
 
-// --- AUTHENTICATION ROUTE ---
-$app->post('/api/auth/login', function (Request $request, Response $response) {
-    $data = getJsonData($request);
-    $input = trim($data['email'] ?? '');
-    $password = $data['password'] ?? '';
-    
-    if (trim(strtolower($input)) === 'test@yopmail.com') {
-        $input = 'bilalnashi6@gmail.com';
-    }
-    
-    if (empty($input) || empty($password)) {
-        return jsonResponse($response, ['detail' => 'Email/Mobile and password are required.'], 400);
-    }
-    
-    $isEmail = filter_var($input, FILTER_VALIDATE_EMAIL) !== false;
-    $pdo = null;
-    try {
-        $pdo = getDb();
-    } catch (\Exception $e) {
-        $pdo = null;
-    }
-    
-    if ($pdo === null) {
-        // Database connection failed, trigger mock login checking
-        if ($input === 'Bilal@yopmail.com' && ($password === 'Bilal@123' || $password === hash('sha256', 'Bilal@123'))) {
-            return jsonResponse($response, [
-                'access_token' => 'mock-super-token',
-                'email' => $input,
-                'role' => 'Super Admin',
-                'permissions' => ['attendance', 'performance', 'planner', 'finance', 'reports', 'administration'],
-                'school_id' => null,
-                'setup_completed' => 1
-            ]);
-        }
-        if ($input === 'Admin@yopmail.com' && ($password === 'Admin@123' || $password === hash('sha256', 'Admin@123'))) {
-            return jsonResponse($response, [
-                'access_token' => 'mock-token',
-                'email' => $input,
-                'role' => 'School Admin',
-                'permissions' => ['attendance', 'performance', 'planner', 'finance', 'reports', 'administration'],
-                'school_id' => 1,
-                'setup_completed' => 1,
-                'school_name' => "St. Xavier's International School"
-            ]);
-        }
-        if ($input === '9876543210' && ($password === 'Test@123' || $password === hash('sha256', 'Test@123'))) {
-            return jsonResponse($response, [
-                'access_token' => 'mock-parent-token',
-                'phone' => '9876543210',
-                'role' => 'Parent',
-                'permissions' => ['parent_portal'],
-                'linked_student_ids' => [1, 2],
-                'school_id' => 1,
-                'setup_completed' => 1,
-                'school_name' => "St. Xavier's International School"
-            ]);
-        }
-        if ($input === '9876543211' && ($password === 'Test@123' || $password === hash('sha256', 'Test@123'))) {
-            return jsonResponse($response, [
-                'access_token' => 'mock-teacher-token',
-                'phone' => '9876543211',
-                'role' => 'Teacher',
-                'permissions' => ['attendance', 'performance'],
-                'school_id' => 1,
-                'setup_completed' => 1,
-                'school_name' => "St. Xavier's International School"
-            ]);
-        }
-        
-        // Check dynamic mock users in mock_users.json
-        $mockUsersFile = __DIR__ . '/../mock_users.json';
-        if (file_exists($mockUsersFile)) {
-            $mockUsers = json_decode(file_get_contents($mockUsersFile), true) ?: [];
-            foreach ($mockUsers as $u) {
-                if (trim(strtolower($u['email'] ?? '')) === trim(strtolower($input)) || trim($u['phone'] ?? '') === trim($input)) {
-                    $verify = password_verify($password, $u['password']);
-                    if ($verify) {
-                        $roleName = $u['role'];
-                        $perms = [];
-                        if ($roleName === 'Super Admin' || $roleName === 'School Admin') {
-                            $perms = ['attendance', 'performance', 'planner', 'finance', 'reports', 'administration'];
-                        } else if ($roleName === 'Parent') {
-                            $perms = ['parent_portal'];
-                        } else {
-                            $perms = ['attendance', 'performance'];
-                        }
-                        return jsonResponse($response, [
-                            'access_token' => 'mock-token-' . $u['school_id'] . '-' . str_replace('/', '_', base64_encode($u['email'] ?? $u['phone'])),
-                            'email' => $u['email'] ?? '',
-                            'phone' => $u['phone'] ?? '',
-                            'role' => $roleName,
-                            'permissions' => $perms,
-                            'linked_student_ids' => $u['linked_student_ids'] ?? [],
-                            'school_id' => $u['school_id'],
-                            'setup_completed' => (int)$u['setup_completed'],
-                            'school_name' => $u['school_name'] ?? 'BN School'
-                        ]);
-                    }
-                }
-            }
-        }
-        
-        return jsonResponse($response, ['detail' => 'Invalid credentials. Please verify and try again.'], 401);
-    }
-    
-    if ($isEmail) {
-        $stmt = $pdo->prepare("SELECT * FROM users WHERE email = :input LIMIT 1");
-    } else {
-        $stmt = $pdo->prepare("SELECT * FROM users WHERE phone = :input LIMIT 1");
-    }
-    $stmt->execute(['input' => $input]);
-    $user = $stmt->fetch();
-    
-    if (!$user || !password_verify($password, $user['password'])) {
-        return jsonResponse($response, ['detail' => 'Invalid credentials. Please verify and try again.'], 401);
-    }
-    
-    if (!$user['is_active']) {
-        return jsonResponse($response, ['detail' => 'Account deactivated. Please contact administrator.'], 403);
-    }
-    
-    $school_id = $user['school_id'];
-    $setup_completed = 1;
-    $school_name = 'BN School';
-    
-    if ($school_id) {
-        $schStmt = $pdo->prepare("SELECT * FROM schools WHERE id = :id LIMIT 1");
-        $schStmt->execute(['id' => $school_id]);
-        $school = $schStmt->fetch();
-        
-        if ($school) {
-            if ($school['status'] === 'Inactive') {
-                return jsonResponse($response, ['detail' => 'School subscription or account has been deactivated.'], 403);
-            }
-            
-            // Check subscription expiry
-            $today = date('Y-m-d');
-            if ($school['subscription_end'] < $today) {
-                return jsonResponse($response, ['detail' => 'Your school subscription has expired. Please contact the platform Super Admin.'], 403);
-            }
-            
-            $setup_completed = (int)$school['setup_completed'];
-            $school_name = $school['name'];
-        }
-    }
-    
-    $updateLoginStmt = $pdo->prepare("UPDATE users SET last_login_at = NOW() WHERE id = :id");
-    $updateLoginStmt->execute(['id' => $user['id']]);
+// Auth login route migrated to AuthController
 
-    // Determine dynamic permissions
-    $permissions = [];
-    $roleName = $user['role'];
-    $roleId = $user['role_id'];
-    
-    if ($roleId) {
-        $permStmt = $pdo->prepare("SELECT permission_name FROM role_permissions WHERE role_id = :role_id");
-        $permStmt->execute(['role_id' => $roleId]);
-        $permissions = $permStmt->fetchAll(PDO::FETCH_COLUMN);
-        
-        $roleInfoStmt = $pdo->prepare("SELECT name FROM roles WHERE id = :role_id");
-        $roleInfoStmt->execute(['role_id' => $roleId]);
-        $customRoleName = $roleInfoStmt->fetchColumn();
-        if ($customRoleName) {
-            $roleName = $customRoleName;
-        }
-    } else {
-        if ($roleName === 'Super Admin' || $roleName === 'School Admin') {
-            $permissions = ['attendance', 'performance', 'planner', 'finance', 'reports', 'administration'];
-        } else if ($roleName === 'Parent') {
-            $permissions = ['parent_portal'];
-        } else {
-            $permissions = ['attendance', 'performance'];
-        }
-    }
+// Auth otp-login and hash-defaults routes migrated to AuthController
 
-    $linkedStudentIds = [];
-    if ($roleName === 'Parent' || in_array('parent_portal', $permissions)) {
-        $linkStmt = $pdo->prepare("SELECT student_id FROM parent_student_mappings WHERE parent_user_id = :user_id");
-        $linkStmt->execute(['user_id' => $user['id']]);
-        $linkedStudentIds = $linkStmt->fetchAll(PDO::FETCH_COLUMN);
-    }
-    $token = generateJwt($user['id'], $user['email'] ?? $user['phone'], $roleName, $school_id, $setup_completed);
-    
-    logAudit($pdo, $school_id, $user['email'] ?? $user['phone'], 'Login', 'User logged in successfully.');
-    
-    return jsonResponse($response, [
-        'access_token' => $token,
-        'email' => $user['email'] ?? $user['phone'],
-        'phone' => $user['phone'] ?? '',
-        'role' => $roleName,
-        'permissions' => $permissions,
-        'linked_student_ids' => $linkedStudentIds,
-        'school_id' => $school_id,
-        'setup_completed' => (int)$setup_completed,
-        'school_name' => $school_name
-    ]);
-});
-
-// --- OTP AUTHENTICATION ROUTE ---
-$app->post('/api/auth/otp-login', function (Request $request, Response $response) {
-    $data = getJsonData($request);
-    $phone = trim($data['phone'] ?? '');
-    $otp = trim($data['otp'] ?? '');
-    
-    if (empty($phone) || empty($otp)) {
-        return jsonResponse($response, ['detail' => 'Mobile number and OTP are required.'], 400);
-    }
-    
-    $pdo = null;
-    try {
-        $pdo = getDb();
-    } catch (\Exception $e) {
-        $pdo = null;
-    }
-    
-    if (!OtpService::verify($phone, $otp, $pdo)) {
-        return jsonResponse($response, ['detail' => 'Invalid OTP.'], 401);
-    }
-    
-    if ($pdo === null) {
-        // Fallback for mock/sandbox offline mode
-        if ($phone === '9876543210') {
-            return jsonResponse($response, [
-                'access_token' => 'mock-parent-token',
-                'phone' => '9876543210',
-                'role' => 'Parent',
-                'permissions' => ['parent_portal'],
-                'linked_student_ids' => [4, 5],
-                'school_id' => 1,
-                'setup_completed' => 1,
-                'school_name' => "St. Xavier's International School"
-            ]);
-        }
-        
-        // Check dynamic mock users in mock_users.json
-        $mockUsersFile = __DIR__ . '/../mock_users.json';
-        if (file_exists($mockUsersFile)) {
-            $mockUsers = json_decode(file_get_contents($mockUsersFile), true) ?: [];
-            foreach ($mockUsers as $mu) {
-                if (trim($mu['phone'] ?? '') === $phone) {
-                    $roleName = $mu['role'];
-                    $perms = $roleName === 'Parent' ? ['parent_portal'] : ['attendance', 'performance'];
-                    return jsonResponse($response, [
-                        'access_token' => 'mock-token-' . $mu['school_id'] . '-' . base64_encode($phone),
-                        'phone' => $phone,
-                        'role' => $roleName,
-                        'permissions' => $perms,
-                        'linked_student_ids' => $mu['linked_student_ids'] ?? [],
-                        'school_id' => $mu['school_id'],
-                        'setup_completed' => (int)$mu['setup_completed'],
-                        'school_name' => $mu['school_name'] ?? 'St. Xavier\'s International School'
-                    ]);
-                }
-            }
-        }
-        
-        // If not found, return mock teacher login default
-        return jsonResponse($response, [
-            'access_token' => 'mock-teacher-token',
-            'phone' => $phone,
-            'role' => 'Teacher',
-            'permissions' => ['attendance', 'performance'],
-            'school_id' => 1,
-            'setup_completed' => 1,
-            'school_name' => "St. Xavier's International School"
-        ]);
-    }
-    
-    // Live database mode
-    // 1. Check if phone belongs to a teacher
-    $stmt = $pdo->prepare("SELECT * FROM teachers WHERE phone = :phone AND status = 'Active' LIMIT 1");
-    $stmt->execute(['phone' => $phone]);
-    $teacher = $stmt->fetch();
-    
-    if ($teacher) {
-        $school_id = $teacher['school_id'];
-        
-        // Retrieve school details
-        $schStmt = $pdo->prepare("SELECT * FROM schools WHERE id = :id LIMIT 1");
-        $schStmt->execute(['id' => $school_id]);
-        $school = $schStmt->fetch();
-        $school_name = $school ? $school['name'] : 'BN School';
-        $setup_completed = $school ? (int)$school['setup_completed'] : 1;
-        
-        // Check/create user account for teacher if not exists
-        $uStmt = $pdo->prepare("SELECT * FROM users WHERE phone = :phone LIMIT 1");
-        $uStmt->execute(['phone' => $phone]);
-        $user = $uStmt->fetch();
-        
-        if (!$user) {
-            $pw = password_hash(hash('sha256', '1234'), PASSWORD_BCRYPT);
-            $ins = $pdo->prepare("INSERT INTO users (school_id, phone, password, role, is_active) VALUES (:sid, :phone, :pw, 'Teacher', 1)");
-            $ins->execute(['sid' => $school_id, 'phone' => $phone, 'pw' => $pw]);
-            
-            $uStmt->execute(['phone' => $phone]);
-            $user = $uStmt->fetch();
-        }
-        
-        // Audit log
-        logAudit($pdo, $school_id, $phone, 'OTP Login', 'Class Teacher logged in via OTP successfully.');
-        
-        $token = generateJwt($user['id'], $phone, 'Teacher', $school_id, $setup_completed);
-        
-        return jsonResponse($response, [
-            'access_token' => $token,
-            'phone' => $phone,
-            'role' => 'Teacher',
-            'permissions' => ['attendance', 'performance'],
-            'school_id' => $school_id,
-            'setup_completed' => $setup_completed,
-            'school_name' => $school_name
-        ]);
-    }
-    
-    // 2. Check if phone belongs to a student (parent contact number)
-    $stmt = $pdo->prepare("SELECT * FROM students WHERE phone = :phone OR emergency_contact = :phone LIMIT 1");
-    $stmt->execute(['phone' => $phone]);
-    $student = $stmt->fetch();
-    
-    if ($student) {
-        $school_id = $student['school_id'];
-        
-        // Retrieve school details
-        $schStmt = $pdo->prepare("SELECT * FROM schools WHERE id = :id LIMIT 1");
-        $schStmt->execute(['id' => $school_id]);
-        $school = $schStmt->fetch();
-        $school_name = $school ? $school['name'] : 'BN School';
-        $setup_completed = $school ? (int)$school['setup_completed'] : 1;
-        
-        // Find all student IDs for this parent phone
-        $idsStmt = $pdo->prepare("SELECT id FROM students WHERE phone = :phone OR emergency_contact = :phone");
-        $idsStmt->execute(['phone' => $phone]);
-        $linkedStudentIds = $idsStmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
-        
-        // Check/create user account for parent if not exists
-        $uStmt = $pdo->prepare("SELECT * FROM users WHERE phone = :phone LIMIT 1");
-        $uStmt->execute(['phone' => $phone]);
-        $user = $uStmt->fetch();
-        
-        if (!$user) {
-            $pw = password_hash(hash('sha256', '1234'), PASSWORD_BCRYPT);
-            $ins = $pdo->prepare("INSERT INTO users (school_id, phone, password, role, is_active) VALUES (:sid, :phone, :pw, 'Parent', 1)");
-            $ins->execute(['sid' => $school_id, 'phone' => $phone, 'pw' => $pw]);
-            
-            $uStmt->execute(['phone' => $phone]);
-            $user = $uStmt->fetch();
-        }
-        
-        // Make sure parent student mapping is populated
-        $del = $pdo->prepare("DELETE FROM parent_student_mappings WHERE parent_user_id = :uid");
-        $del->execute(['uid' => $user['id']]);
-        foreach ($linkedStudentIds as $sid) {
-            $insMap = $pdo->prepare("INSERT IGNORE INTO parent_student_mappings (parent_user_id, student_id) VALUES (:uid, :sid)");
-            $insMap->execute(['uid' => $user['id'], 'sid' => $sid]);
-        }
-        
-        logAudit($pdo, $school_id, $phone, 'OTP Login', 'Parent logged in via OTP successfully.');
-        
-        $token = generateJwt($user['id'], $phone, 'Parent', $school_id, $setup_completed);
-        
-        return jsonResponse($response, [
-            'access_token' => $token,
-            'phone' => $phone,
-            'role' => 'Parent',
-            'permissions' => ['parent_portal'],
-            'linked_student_ids' => $linkedStudentIds,
-            'school_id' => $school_id,
-            'setup_completed' => $setup_completed,
-            'school_name' => $school_name
-        ]);
-    }
-    
-    return jsonResponse($response, ['detail' => 'Mobile number not registered in school records. Please contact school admin.'], 404);
-});
-
-$app->get('/api/auth/hash-defaults', function (Request $request, Response $response) {
-    return jsonResponse($response, [
-        'super' => password_hash(hash('sha256', 'Bilal@123'), PASSWORD_BCRYPT),
-        'admin' => password_hash(hash('sha256', 'Admin@123'), PASSWORD_BCRYPT)
-    ]);
-});
-
-// --- FORGOT PASSWORD ENDPOINTS ---
-$app->post('/api/auth/forgot-password', function (Request $request, Response $response) {
-    $data = getJsonData($request);
-    $email = trim($data['email'] ?? '');
-    
-    if (trim(strtolower($email)) === 'test@yopmail.com') {
-        $email = 'bilalnashi6@gmail.com';
-    }
-    
-    if (empty($email)) {
-        return jsonResponse($response, ['detail' => 'Email address is required.'], 400);
-    }
-    
-    $pdo = null;
-    try {
-        $pdo = getDb();
-    } catch (\Exception $e) {
-        $pdo = null;
-    }
-    
-    $otp = '1234';
-    
-    if ($pdo === null) {
-        // Sandbox Mode
-        // Check dynamic mock users
-        $mockUsersFile = __DIR__ . '/../mock_users.json';
-        $emailExists = false;
-        if (file_exists($mockUsersFile)) {
-            $mockUsers = json_decode(file_get_contents($mockUsersFile), true) ?: [];
-            foreach ($mockUsers as $u) {
-                if (trim(strtolower($u['email'])) === trim(strtolower($email))) {
-                    $emailExists = true;
-                    break;
-                }
-            }
-        }
-        
-        // Check default mock users
-        if (trim(strtolower($email)) === 'bilal@yopmail.com' || trim(strtolower($email)) === 'admin@yopmail.com') {
-            $emailExists = true;
-        }
-        
-        if (!$emailExists) {
-            return jsonResponse($response, ['detail' => 'Email address is not registered.'], 404);
-        }
-        
-        // Save sandbox OTP
-        $otpsFile = __DIR__ . '/../sandbox_otps.json';
-        $otps = [];
-        if (file_exists($otpsFile)) {
-            $otps = json_decode(file_get_contents($otpsFile), true) ?: [];
-        }
-        $otps[trim(strtolower($email))] = [
-            'otp' => $otp,
-            'expiry' => time() + 900 // 15 minutes
-        ];
-        file_put_contents($otpsFile, json_encode($otps, JSON_PRETTY_PRINT));
-        
-        // Write to log file for verification
-        $logMessage = "[" . date('Y-m-d H:i:s') . "] Sandbox Password Reset OTP for $email: $otp\n";
-        file_put_contents(__DIR__ . '/../sent_emails.log', $logMessage, FILE_APPEND);
-        
-        // Send actual email if SMTP is configured, else log
-        sendForgotPasswordOTPEmail($email, $otp);
-        
-        return jsonResponse($response, [
-            'success' => true, 
-            'message' => 'OTP sent successfully.',
-            'otp' => $otp
-        ]);
-    } else {
-        // Database Mode
-        $stmt = $pdo->prepare("SELECT id FROM users WHERE LOWER(email) = LOWER(:email) LIMIT 1");
-        $stmt->execute(['email' => $email]);
-        $user = $stmt->fetch();
-        
-        if (!$user) {
-            return jsonResponse($response, ['detail' => 'Email address is not registered.'], 404);
-        }
-        
-        $upd = $pdo->prepare("UPDATE users SET reset_otp = :otp, reset_otp_expiry = DATE_ADD(NOW(), INTERVAL 15 MINUTE) WHERE id = :id");
-        $upd->execute(['otp' => $otp, 'id' => $user['id']]);
-        
-        $logMessage = "[" . date('Y-m-d H:i:s') . "] Password Reset OTP for $email: $otp\n";
-        file_put_contents(__DIR__ . '/../sent_emails.log', $logMessage, FILE_APPEND);
-        
-        sendForgotPasswordOTPEmail($email, $otp);
-        
-        return jsonResponse($response, [
-            'success' => true,
-            'message' => 'OTP sent successfully.'
-        ]);
-    }
-});
-
-$app->post('/api/auth/verify-otp', function (Request $request, Response $response) {
-    $data = getJsonData($request);
-    $email = trim($data['email'] ?? '');
-    $otp = trim($data['otp'] ?? '');
-    
-    if (trim(strtolower($email)) === 'test@yopmail.com') {
-        $email = 'bilalnashi6@gmail.com';
-    }
-    
-    if (empty($email) || empty($otp)) {
-        return jsonResponse($response, ['detail' => 'Email and OTP are required.'], 400);
-    }
-    
-    $pdo = null;
-    try {
-        $pdo = getDb();
-    } catch (\Exception $e) {
-        $pdo = null;
-    }
-    
-    if ($pdo === null) {
-        // Sandbox Mode
-        $otpsFile = __DIR__ . '/../sandbox_otps.json';
-        if (!file_exists($otpsFile)) {
-            return jsonResponse($response, ['detail' => 'Invalid or expired OTP.'], 400);
-        }
-        $otps = json_decode(file_get_contents($otpsFile), true) ?: [];
-        $key = trim(strtolower($email));
-        if (!isset($otps[$key]) || $otps[$key]['otp'] !== $otp || $otps[$key]['expiry'] < time()) {
-            return jsonResponse($response, ['detail' => 'Invalid or expired OTP.'], 400);
-        }
-        return jsonResponse($response, ['success' => true, 'message' => 'OTP verified successfully.']);
-    } else {
-        // Database Mode
-        $stmt = $pdo->prepare("SELECT id FROM users WHERE LOWER(email) = LOWER(:email) AND reset_otp = :otp AND reset_otp_expiry >= NOW() LIMIT 1");
-        $stmt->execute(['email' => $email, 'otp' => $otp]);
-        if (!$stmt->fetch()) {
-            return jsonResponse($response, ['detail' => 'Invalid or expired OTP.'], 400);
-        }
-        return jsonResponse($response, ['success' => true, 'message' => 'OTP verified successfully.']);
-    }
-});
-
-$app->post('/api/auth/reset-password', function (Request $request, Response $response) {
-    $data = getJsonData($request);
-    $email = trim($data['email'] ?? '');
-    $otp = trim($data['otp'] ?? '');
-    $password = $data['password'] ?? '';
-    
-    if (trim(strtolower($email)) === 'test@yopmail.com') {
-        $email = 'bilalnashi6@gmail.com';
-    }
-    
-    if (empty($email) || empty($otp) || empty($password)) {
-        return jsonResponse($response, ['detail' => 'Email, OTP, and Password are required.'], 400);
-    }
-    
-    $pdo = null;
-    try {
-        $pdo = getDb();
-    } catch (\Exception $e) {
-        $pdo = null;
-    }
-    
-    if ($pdo === null) {
-        // Sandbox Mode
-        // Verify OTP again
-        $otpsFile = __DIR__ . '/../sandbox_otps.json';
-        if (!file_exists($otpsFile)) {
-            return jsonResponse($response, ['detail' => 'Invalid or expired OTP session.'], 400);
-        }
-        $otps = json_decode(file_get_contents($otpsFile), true) ?: [];
-        $key = trim(strtolower($email));
-        if (!isset($otps[$key]) || $otps[$key]['otp'] !== $otp || $otps[$key]['expiry'] < time()) {
-            return jsonResponse($response, ['detail' => 'Invalid or expired OTP session.'], 400);
-        }
-        
-        // Remove active OTP
-        unset($otps[$key]);
-        file_put_contents($otpsFile, json_encode($otps, JSON_PRETTY_PRINT));
-        
-        // Update mock users
-        $mockUsersFile = __DIR__ . '/../mock_users.json';
-        if (file_exists($mockUsersFile)) {
-            $mockUsers = json_decode(file_get_contents($mockUsersFile), true) ?: [];
-            $found = false;
-            foreach ($mockUsers as &$u) {
-                if (trim(strtolower($u['email'])) === trim(strtolower($email))) {
-                    $u['password'] = password_hash($password, PASSWORD_BCRYPT);
-                    $found = true;
-                    break;
-                }
-            }
-            if ($found) {
-                file_put_contents($mockUsersFile, json_encode($mockUsers, JSON_PRETTY_PRINT));
-            }
-        }
-        
-        return jsonResponse($response, ['success' => true, 'message' => 'Password reset successfully.']);
-    } else {
-        // Database Mode
-        $stmt = $pdo->prepare("SELECT id FROM users WHERE LOWER(email) = LOWER(:email) AND reset_otp = :otp AND reset_otp_expiry >= NOW() LIMIT 1");
-        $stmt->execute(['email' => $email, 'otp' => $otp]);
-        $user = $stmt->fetch();
-        if (!$user) {
-            return jsonResponse($response, ['detail' => 'Invalid or expired OTP session.'], 400);
-        }
-        
-        $hashed = password_hash($password, PASSWORD_BCRYPT);
-        $upd = $pdo->prepare("UPDATE users SET password = :password, reset_otp = NULL, reset_otp_expiry = NULL WHERE id = :id");
-        $upd->execute(['password' => $hashed, 'id' => $user['id']]);
-        
-        return jsonResponse($response, ['success' => true, 'message' => 'Password reset successfully.']);
-    }
-});
-
-// --- VERIFY PASSWORD FOR DELETIONS ---
-$app->post('/api/auth/verify-password', function (Request $request, Response $response) {
-    $auth = getAuthUser($request);
-    if (!$auth) {
-        return jsonResponse($response, ['detail' => 'Unauthorized Access.'], 403);
-    }
-    
-    $data = getJsonData($request);
-    $password = $data['password'] ?? '';
-    
-    if (empty($password)) {
-        return jsonResponse($response, ['detail' => 'Password is required.'], 400);
-    }
-    
-    $pdo = null;
-    try {
-        $pdo = getDb();
-    } catch (\Exception $e) {
-        $pdo = null;
-    }
-    
-    $email = $auth['email'];
-    if ($pdo === null) {
-        // Mock fallback verification
-        if ($email === 'Bilal@yopmail.com' && ($password === 'Bilal@123' || $password === hash('sha256', 'Bilal@123'))) {
-            return jsonResponse($response, ['success' => true]);
-        }
-        if ($email === 'Admin@yopmail.com' && ($password === 'Admin@123' || $password === hash('sha256', 'Admin@123'))) {
-            return jsonResponse($response, ['success' => true]);
-        }
-        
-        $mockUsersFile = __DIR__ . '/../mock_users.json';
-        if (file_exists($mockUsersFile)) {
-            $mockUsers = json_decode(file_get_contents($mockUsersFile), true) ?: [];
-            foreach ($mockUsers as $u) {
-                if (trim(strtolower($u['email'])) === trim(strtolower($email))) {
-                    if (password_verify($password, $u['password']) || $u['password'] === $password) {
-                        return jsonResponse($response, ['success' => true]);
-                    }
-                }
-            }
-        }
-        
-        return jsonResponse($response, ['detail' => 'Invalid password.'], 400);
-    }
-    
-    // Database mode verification
-    if ($email === 'Bilal@yopmail.com' && ($password === 'Bilal@123' || $password === hash('sha256', 'Bilal@123'))) {
-        return jsonResponse($response, ['success' => true]);
-    }
-    
-    $stmt = $pdo->prepare("SELECT password FROM users WHERE id = :id");
-    $stmt->execute(['id' => $auth['sub']]);
-    $user = $stmt->fetch();
-    
-    if ($user && password_verify($password, $user['password'])) {
-        return jsonResponse($response, ['success' => true]);
-    }
-    
-    return jsonResponse($response, ['detail' => 'Invalid password.'], 400);
-});
+// Auth forgot-password, verify-otp, reset-password and verify-password routes migrated to AuthController
 
 // --- PLANS MANAGEMENT API (SUPER ADMIN) ---
 
@@ -7963,7 +7194,7 @@ $app->get('/api/notifications', function (Request $request, Response $response) 
     $chk = $pdo->prepare("SELECT COUNT(*) FROM notifications WHERE school_id = :sid");
     $chk->execute(['sid' => $auth['school_id']]);
     if ($chk->fetchColumn() == 0) {
-        $ins = $pdo->prepare("INSERT INTO notifications (school_id, title, content, type, timestamp, is_read) VALUES (:sid, 'Welcome to ERP Portal', 'Complete school setup configuration to access rosters and ledgers.', 'System', NOW(), 0)");
+        $ins = $pdo->prepare("INSERT INTO notifications (school_id, title, content, type, timestamp, is_read) VALUES (:sid, 'Welcome to SP Portal', 'Complete school setup configuration to access rosters and ledgers.', 'System', NOW(), 0)");
         $ins->execute(['sid' => $auth['school_id']]);
     }
 

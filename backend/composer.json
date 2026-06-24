@@ -1,12 +1,13 @@
 {
-    "name": "bn-school/erp-backend",
-    "description": "Multi-Tenant School Management ERP Backend",
+    "name": "bn-school/sp-backend",
+    "description": "Multi-Tenant Shiksha Pilot (SP) Backend",
     "type": "project",
     "require": {
         "slim/slim": "^4.12",
         "slim/psr7": "^1.6",
         "firebase/php-jwt": "^6.10",
-        "phpmailer/phpmailer": "^7.1"
+        "phpmailer/phpmailer": "^7.1",
+        "php-di/php-di": "^7.0"
     },
     "autoload": {
         "psr-4": {

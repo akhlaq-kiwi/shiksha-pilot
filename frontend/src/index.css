@@ -1,4 +1,8 @@
-/* Professional ERP Theme Variables */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Professional SP Theme Variables */
 :root {
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-display: 'Outfit', var(--font-sans);
@@ -193,7 +197,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Cards */
-.erp-card {
+.sp-card {
   background-color: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
@@ -202,7 +206,7 @@ h1, h2, h3, h4, h5, h6 {
   transition: all var(--transition-normal);
 }
 
-.erp-card:hover {
+.sp-card:hover {
   box-shadow: var(--shadow-md);
   border-color: var(--text-muted);
 }
@@ -225,18 +229,18 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Custom Table */
-.erp-table-container {
+.sp-table-container {
   width: 100%;
   overflow-x: auto;
 }
 
-.erp-table {
+.sp-table {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
 }
 
-.erp-table th {
+.sp-table th {
   position: sticky;
   top: 0;
   z-index: 2;
@@ -251,14 +255,14 @@ h1, h2, h3, h4, h5, h6 {
   white-space: nowrap;
 }
 
-.erp-table td {
+.sp-table td {
   padding: 16px;
   border-bottom: 1px solid var(--border-color);
   font-size: 0.9rem;
   color: var(--text-primary);
 }
 
-.erp-table tr:hover {
+.sp-table tr:hover {
   background-color: rgba(var(--color-primary-rgb), 0.02);
 }
 
@@ -427,7 +431,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Inputs */
-.erp-input {
+.sp-input {
   background-color: var(--bg-surface);
   border: 1px solid var(--border-color);
   color: var(--text-primary);
@@ -439,7 +443,7 @@ h1, h2, h3, h4, h5, h6 {
   transition: border-color var(--transition-fast);
 }
 
-.erp-input:focus {
+.sp-input:focus {
   border-color: var(--color-primary);
 }
 
@@ -617,7 +621,7 @@ input:-webkit-autofill:active {
 }
 
 /* Custom styles for select elements in the portal */
-select.erp-input {
+select.sp-input {
   cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
@@ -629,7 +633,7 @@ select.erp-input {
   padding-right: 40px;
 }
 
-.dark-theme select.erp-input {
+.dark-theme select.sp-input {
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>");
 }
 
@@ -646,7 +650,7 @@ select.erp-input {
 }
 
 /* Scrollable select lists */
-select.erp-input option {
+select.sp-input option {
   background-color: var(--bg-surface);
   color: var(--text-primary);
   padding: 8px;
@@ -667,7 +671,7 @@ select.erp-input option {
   transition: color var(--transition-fast);
 }
 
-.erp-input::placeholder {
+.sp-input::placeholder {
   color: var(--text-muted);
   opacity: 0.8;
 }
@@ -899,7 +903,7 @@ select.erp-input option {
   }
 
   /* Enable table horizontal scroll wrap securely if conversion not requested */
-  .erp-table-container {
+  .sp-table-container {
     width: 100% !important;
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch !important;
