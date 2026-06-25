@@ -1,6 +1,6 @@
 {
-    "name": "bn-school/backend",
-    "description": "Slim PHP backend for BN School SaaS Management Platform",
+    "name": "shiksha-pilot/backend",
+    "description": "Slim PHP backend for Shiksha Pilot School Management Platform",
     "type": "project",
     "require": {
         "php": ">=8.0",

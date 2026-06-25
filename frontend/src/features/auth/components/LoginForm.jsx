@@ -101,7 +101,7 @@ export default function LoginForm({ onLoginSuccess }) {
           <div className="mx-auto h-12 w-12 bg-zinc-900 text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900 rounded-xl flex items-center justify-center border shadow-xs mb-3">
             <Shield className="h-6 w-6" />
           </div>
-          <CardTitle className="text-xl font-bold font-display">BN School Portal Login</CardTitle>
+          <CardTitle className="text-xl font-bold font-display">Shiksha Pilot Portal Login</CardTitle>
           <CardDescription>Enter credentials to access your isolated workspace</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

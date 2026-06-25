@@ -1215,7 +1215,7 @@ export default function TeacherPortal() {
         </div>
         <div>
           <h1 className="text-base font-bold text-text-primary tracking-tight font-display">Teacher Workspace</h1>
-          <p className="text-xs text-text-muted">BN School Management Platform</p>
+          <p className="text-xs text-text-muted">Shiksha Pilot</p>
         </div>
       </div>
 

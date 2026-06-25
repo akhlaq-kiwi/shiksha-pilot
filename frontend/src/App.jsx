@@ -61,7 +61,7 @@ export default function App() {
           </div>
           <div>
             <h1 className="font-extrabold text-sm sm:text-lg leading-tight font-display tracking-tight text-text-primary flex items-center gap-1">
-              BN School <span className="text-[9px] font-bold px-1.5 py-0.5 bg-primary text-white rounded-full uppercase tracking-wider">WORKSPACE</span>
+              Shiksha Pilot <span className="text-[9px] font-bold px-1.5 py-0.5 bg-primary text-white rounded-full uppercase tracking-wider">WORKSPACE</span>
             </h1>
             <p className="text-[9px] text-text-muted hidden sm:block">Cloud-Native ERP platform Isolation Active</p>
           </div>
@@ -139,7 +139,7 @@ export default function App() {
       </main>
 
       <footer className="border-t border-border bg-surface/30 py-4 px-6 text-center text-xs text-text-muted flex-shrink-0">
-        <p>&copy; 2026 BN School Management Platform. ERP Workspaces Isolation Enabled.</p>
+        <p>&copy; 2026 Shiksha Pilot. ERP Workspaces Isolation Enabled.</p>
       </footer>
 
     </div>

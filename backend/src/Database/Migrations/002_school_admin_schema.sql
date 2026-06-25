@@ -1,7 +1,7 @@
 -- Migration 002: School Admin Schema
 -- Adds school_id to users and creates all school management tables
 
-ALTER TABLE users ADD COLUMN IF NOT EXISTS school_id INT NULL DEFAULT NULL;
+ALTER TABLE users ADD COLUMN school_id INT NULL DEFAULT NULL;
 
 -- Academic Years
 CREATE TABLE IF NOT EXISTS academic_years (

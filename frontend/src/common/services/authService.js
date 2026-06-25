@@ -8,9 +8,9 @@ export const authService = {
   async login(phone, password) {
     const data = await apiClient.post('/api/auth/login', { phone, password });
     if (data.token) {
-      localStorage.setItem('bn_school_token', data.token);
-      localStorage.setItem('bn_school_role', data.user.role);
-      localStorage.setItem('bn_school_user', JSON.stringify(data.user));
+      localStorage.setItem('shiksha_pilot_token', data.token);
+      localStorage.setItem('shiksha_pilot_role', data.user.role);
+      localStorage.setItem('shiksha_pilot_user', JSON.stringify(data.user));
       window.dispatchEvent(new Event('auth-change'));
     }
     return data;
@@ -19,9 +19,9 @@ export const authService = {
   async otpLogin(phone, otp, role) {
     const data = await apiClient.post('/api/auth/otp-login', { phone, otp, role });
     if (data.token) {
-      localStorage.setItem('bn_school_token', data.token);
-      localStorage.setItem('bn_school_role', data.user.role || role);
-      localStorage.setItem('bn_school_user', JSON.stringify(data.user));
+      localStorage.setItem('shiksha_pilot_token', data.token);
+      localStorage.setItem('shiksha_pilot_role', data.user.role || role);
+      localStorage.setItem('shiksha_pilot_user', JSON.stringify(data.user));
       window.dispatchEvent(new Event('auth-change'));
     }
     return data;
@@ -40,18 +40,18 @@ export const authService = {
   },
 
   logout() {
-    localStorage.removeItem('bn_school_token');
-    localStorage.removeItem('bn_school_role');
-    localStorage.removeItem('bn_school_user');
+    localStorage.removeItem('shiksha_pilot_token');
+    localStorage.removeItem('shiksha_pilot_role');
+    localStorage.removeItem('shiksha_pilot_user');
     window.dispatchEvent(new Event('auth-change'));
   },
 
   isAuthenticated() {
-    return !!localStorage.getItem('bn_school_token');
+    return !!localStorage.getItem('shiksha_pilot_token');
   },
 
   getCurrentUser() {
-    const userStr = localStorage.getItem('bn_school_user');
+    const userStr = localStorage.getItem('shiksha_pilot_user');
     try {
       return userStr ? JSON.parse(userStr) : null;
     } catch {
@@ -60,6 +60,6 @@ export const authService = {
   },
 
   getUserRole() {
-    return localStorage.getItem('bn_school_role') || '';
+    return localStorage.getItem('shiksha_pilot_role') || '';
   }
 };

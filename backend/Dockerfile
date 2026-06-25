@@ -31,8 +31,11 @@ COPY . .
 # Generate autoloader
 RUN composer dump-autoload --optimize
 
+# Copy and register entrypoint
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 # Expose port
 EXPOSE 8000
 
-# Start Apache in foreground
-CMD ["apache2-foreground"]
+ENTRYPOINT ["docker-entrypoint.sh"]

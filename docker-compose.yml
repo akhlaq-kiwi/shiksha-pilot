@@ -7,7 +7,7 @@ services:
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: admin123
-      MYSQL_DATABASE: bn_school_sp
+      MYSQL_DATABASE: shiksha_pilot
     ports:
       - "2001:3306"
     volumes:
@@ -28,7 +28,7 @@ services:
       - DB_HOST=db
       - DB_USER=root
       - DB_PASS=admin123
-      - DB_NAME=bn_school_sp
+      - DB_NAME=shiksha_pilot
     depends_on:
       - db
 

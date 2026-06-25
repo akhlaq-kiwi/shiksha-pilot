@@ -4,12 +4,12 @@ const ThemeContext = createContext();
 
 export const ThemeProvider = ({ children }) => {
   const [theme, setTheme] = useState(() => {
-    const saved = localStorage.getItem('bn_school_theme');
+    const saved = localStorage.getItem('shiksha_pilot_theme');
     return saved || 'light'; // Default to light mode as requested
   });
 
   const [brandPreset, setBrandPreset] = useState(() => {
-    return localStorage.getItem('bn_school_brand') || 'default';
+    return localStorage.getItem('shiksha_pilot_brand') || 'default';
   });
 
   useEffect(() => {
@@ -19,7 +19,7 @@ export const ThemeProvider = ({ children }) => {
     } else {
       root.classList.remove('dark');
     }
-    localStorage.setItem('bn_school_theme', theme);
+    localStorage.setItem('shiksha_pilot_theme', theme);
   }, [theme]);
 
   useEffect(() => {
@@ -45,7 +45,7 @@ export const ThemeProvider = ({ children }) => {
       root.style.setProperty('--color-primary-rgb', '13, 148, 136');
       root.style.setProperty('--color-secondary', '#f43f5e');
     }
-    localStorage.setItem('bn_school_brand', brandPreset);
+    localStorage.setItem('shiksha_pilot_brand', brandPreset);
   }, [brandPreset]);
 
   const toggleTheme = () => {

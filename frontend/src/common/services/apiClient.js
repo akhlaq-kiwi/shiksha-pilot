@@ -1,7 +1,7 @@
 const BASE_URL = '';
 
 async function request(endpoint, options = {}) {
-  const token = localStorage.getItem('bn_school_token');
+  const token = localStorage.getItem('shiksha_pilot_token');
   
   const headers = {
     'Accept': 'application/json',
@@ -27,9 +27,9 @@ async function request(endpoint, options = {}) {
   const response = await fetch(`${BASE_URL}${endpoint}`, config);
 
   if (response.status === 401) {
-    localStorage.removeItem('bn_school_token');
-    localStorage.removeItem('bn_school_role');
-    localStorage.removeItem('bn_school_user');
+    localStorage.removeItem('shiksha_pilot_token');
+    localStorage.removeItem('shiksha_pilot_role');
+    localStorage.removeItem('shiksha_pilot_user');
     window.dispatchEvent(new Event('auth-change'));
     throw new Error('Unauthorized session expired');
   }

@@ -4,60 +4,67 @@ declare(strict_types=1);
 
 require __DIR__ . '/../../vendor/autoload.php';
 
-use App\Database\Connection;
+$host   = getenv('DB_HOST') ?: 'db';
+$dbname = getenv('DB_NAME') ?: 'shiksha_pilot';
+$user   = getenv('DB_USER') ?: 'root';
+$pass   = getenv('DB_PASS') ?: 'admin123';
 
-$host = getenv('DB_HOST') ?: 'db';
-$dbname = getenv('DB_NAME') ?: 'bn_school_sp';
-$user = getenv('DB_USER') ?: 'root';
-$pass = getenv('DB_PASS') ?: 'admin123';
-
-echo "Starting database migration...\n";
+echo "=== Shiksha Pilot — Database Migration ===\n\n";
 
 try {
-    // 1. Connect without db name to create it if missing
-    $dsn = "mysql:host={$host};charset=utf8mb4";
-    $pdo = new PDO($dsn, $user, $pass, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+    // Connect without DB name so we can create it if missing
+    $pdo = new PDO("mysql:host={$host};charset=utf8mb4", $user, $pass, [
+        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
     ]);
 
-    echo "Creating database {$dbname} if it does not exist...\n";
+    echo "Creating database '{$dbname}' if it does not exist...\n";
     $pdo->exec("CREATE DATABASE IF NOT EXISTS `{$dbname}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;");
     $pdo->exec("USE `{$dbname}`;");
 
-    // 2. Load and run Migration SQL
-    $sqlFile = __DIR__ . '/Migrations/001_initial_schema.sql';
-    if (!file_exists($sqlFile)) {
-        throw new Exception("Migration file not found at {$sqlFile}");
+    // Discover and run all migration files in numeric order
+    $migrationDir = __DIR__ . '/Migrations';
+    $files = glob($migrationDir . '/*.sql');
+    natsort($files);
+
+    foreach ($files as $file) {
+        $filename = basename($file);
+        echo "Running {$filename}...\n";
+
+        $sql = file_get_contents($file);
+        if (empty(trim($sql))) {
+            echo "  (empty — skipped)\n";
+            continue;
+        }
+
+        // Split on semicolons to execute statement by statement
+        $statements = array_filter(
+            array_map('trim', explode(';', $sql)),
+            fn(string $s) => $s !== ''
+        );
+
+        foreach ($statements as $statement) {
+            try {
+                $pdo->exec($statement);
+            } catch (PDOException $e) {
+                // $e->getCode() is the SQLSTATE string; MySQL-specific error number is in errorInfo[1]
+                // Ignorable: 1050 table exists, 1060 duplicate column, 1061 duplicate key name, 1062 duplicate entry
+                $mysqlCode = (int) ($e->errorInfo[1] ?? 0);
+                $ignorable  = [1050, 1060, 1061, 1062];
+                if (in_array($mysqlCode, $ignorable, true)) {
+                    echo "  (skipped — already applied: {$e->getMessage()})\n";
+                    continue;
+                }
+                throw $e;
+            }
+        }
+
+        echo "  ✓ Done\n";
     }
 
-    $queries = file_get_contents($sqlFile);
-    echo "Running migration queries...\n";
-    $pdo->exec($queries);
-
-    // 3. Seed Default Super Admin User
-    $phone = '9876543210';
-    $checkUser = $pdo->prepare("SELECT id FROM users WHERE phone = :phone");
-    $checkUser->execute(['phone' => $phone]);
-    
-    if (!$checkUser->fetch()) {
-        echo "Seeding default Super Admin user...\n";
-        $passwordHash = password_hash('admin', PASSWORD_BCRYPT);
-        $insert = $pdo->prepare("
-            INSERT INTO users (phone, password, role, name, status) 
-            VALUES (:phone, :password, 'SUPER_ADMIN', 'Sarah Connor', 'ACTIVE')
-        ");
-        $insert->execute([
-            'phone' => $phone,
-            'password' => $passwordHash
-        ]);
-        echo "Super Admin seeded successfully. Phone: {$phone}, Password: admin\n";
-    } else {
-        echo "Super Admin already exists.\n";
-    }
-
-    echo "Migration completed successfully!\n";
+    echo "\nAll migrations completed successfully.\n";
 
 } catch (Exception $e) {
-    echo "Migration failed: " . $e->getMessage() . "\n";
+    echo "\nMigration failed: " . $e->getMessage() . "\n";
     exit(1);
 }
