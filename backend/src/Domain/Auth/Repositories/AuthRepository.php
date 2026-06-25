@@ -30,4 +30,15 @@ class AuthRepository extends BaseRepository
 
         return $this->create($data);
     }
+
+    /**
+     * Update password and clear force_password_change flag.
+     */
+    public function updatePassword(int $userId, string $newPassword): void
+    {
+        $this->update($userId, [
+            'password'              => password_hash($newPassword, PASSWORD_BCRYPT),
+            'force_password_change' => 0,
+        ]);
+    }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Platform\Services;
 
+use App\Domain\Auth\Repositories\AuthRepository;
 use App\Domain\Platform\Repositories\AuditLogRepository;
 use App\Domain\Platform\Repositories\SchoolRepository;
 use App\Shared\BaseService;
@@ -23,6 +24,7 @@ class PlatformService extends BaseService
     public function __construct(
         private SchoolRepository   $schools,
         private AuditLogRepository $auditLogs,
+        private AuthRepository     $users,
         ?LoggerInterface $logger = null,
     ) {
         parent::__construct($logger);
@@ -53,7 +55,7 @@ class PlatformService extends BaseService
             );
         }
 
-        $id = $this->schools->create([
+        $schoolId = $this->schools->create([
             'name'          => $data['name'],
             'subdomain'     => $subdomain,
             'plan'          => $data['plan'] ?? 'Premium',
@@ -62,14 +64,27 @@ class PlatformService extends BaseService
             'contact_email' => $data['contact_email'] ?? '',
         ]);
 
+        // Create school admin user if credentials provided
+        if (!empty($data['admin_phone'])) {
+            $this->users->createUser([
+                'phone'                 => (string) $data['admin_phone'],
+                'password'              => (string) ($data['admin_password'] ?? 'changeme123'),
+                'name'                  => (string) ($data['name'] . ' Admin'),
+                'role'                  => 'SCHOOL_ADMIN',
+                'status'                => 'ACTIVE',
+                'school_id'             => $schoolId,
+                'force_password_change' => 1,
+            ]);
+        }
+
         $this->auditLogs->log(
-            'Provision school tenant',
+            'Create school',
             (string) $data['name'],
             (string) ($actor['name'] ?? $actor['email'] ?? 'system'),
             (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'),
         );
 
-        $school = $this->schools->findById($id);
+        $school = $this->schools->findById($schoolId);
 
         if ($school === null) {
             throw new \RuntimeException('Failed to retrieve created school.');
@@ -145,6 +160,56 @@ class PlatformService extends BaseService
             (string) ($actor['name'] ?? $actor['email'] ?? 'system'),
             (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'),
         );
+    }
+
+    // -------------------------------------------------------------------------
+    // Platform Admins (SUPER_ADMIN users)
+    // -------------------------------------------------------------------------
+
+    public function getAdmins(): array
+    {
+        $pdo  = $this->schools->getPdo();
+        $stmt = $pdo->prepare(
+            "SELECT id, name, phone, role, status, created_at FROM users WHERE role = 'SUPER_ADMIN' ORDER BY id ASC"
+        );
+        $stmt->execute();
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function createAdmin(array $data, array $actor): array
+    {
+        Validator::make($data, [
+            'name'     => 'required',
+            'phone'    => 'required|numeric',
+            'password' => 'required|min:6',
+        ])->validate();
+
+        if ($this->users->findByPhone((string) $data['phone']) !== null) {
+            throw new \App\Shared\Exceptions\ValidationException(
+                ['phone' => 'Phone number already registered.'],
+                'Phone number already registered.',
+            );
+        }
+
+        $id = $this->users->createUser([
+            'name'                  => (string) $data['name'],
+            'phone'                 => (string) $data['phone'],
+            'password'              => (string) $data['password'],
+            'role'                  => 'SUPER_ADMIN',
+            'status'                => 'ACTIVE',
+            'force_password_change' => 0,
+        ]);
+
+        $this->auditLogs->log(
+            'Create admin user',
+            (string) $data['name'],
+            (string) ($actor['name'] ?? 'system'),
+            (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'),
+        );
+
+        $admin = $this->users->findById($id);
+        unset($admin['password']);
+        return $admin;
     }
 
     // -------------------------------------------------------------------------

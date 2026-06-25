@@ -30,7 +30,7 @@ async function request(endpoint, options = {}) {
     localStorage.removeItem('shiksha_pilot_token');
     localStorage.removeItem('shiksha_pilot_role');
     localStorage.removeItem('shiksha_pilot_user');
-    window.dispatchEvent(new Event('auth-change'));
+    window.location.replace('/login');
     throw new Error('Unauthorized session expired');
   }
 
@@ -46,7 +46,8 @@ async function request(endpoint, options = {}) {
     throw new Error(data.message || data.error || 'API Request failed');
   }
 
-  return data;
+  // Unwrap uniform envelope {status, message, data} → return data field if present
+  return Object.prototype.hasOwnProperty.call(data, 'data') ? data.data : data;
 }
 
 export const apiClient = {

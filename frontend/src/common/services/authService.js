@@ -6,14 +6,13 @@ export const authService = {
   },
 
   async login(phone, password) {
-    const data = await apiClient.post('/api/auth/login', { phone, password });
-    if (data.token) {
-      localStorage.setItem('shiksha_pilot_token', data.token);
-      localStorage.setItem('shiksha_pilot_role', data.user.role);
-      localStorage.setItem('shiksha_pilot_user', JSON.stringify(data.user));
-      window.dispatchEvent(new Event('auth-change'));
+    const payload = await apiClient.post('/api/auth/login', { phone, password });
+    if (payload?.token) {
+      localStorage.setItem('shiksha_pilot_token', payload.token);
+      localStorage.setItem('shiksha_pilot_role', payload.user.role);
+      localStorage.setItem('shiksha_pilot_user', JSON.stringify(payload.user));
     }
-    return data;
+    return payload;
   },
 
   async otpLogin(phone, otp, role) {
@@ -39,11 +38,15 @@ export const authService = {
     return apiClient.post('/api/auth/reset-password', { phone, otp, new_password: newPassword });
   },
 
+  async changePassword(newPassword) {
+    return apiClient.post('/api/auth/change-password', { new_password: newPassword });
+  },
+
   logout() {
     localStorage.removeItem('shiksha_pilot_token');
     localStorage.removeItem('shiksha_pilot_role');
     localStorage.removeItem('shiksha_pilot_user');
-    window.dispatchEvent(new Event('auth-change'));
+    window.location.replace('/login');
   },
 
   isAuthenticated() {

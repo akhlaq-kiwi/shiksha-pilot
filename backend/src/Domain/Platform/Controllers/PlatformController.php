@@ -78,6 +78,29 @@ class PlatformController extends BaseController
     }
 
     // -------------------------------------------------------------------------
+    // Platform Admins
+    // -------------------------------------------------------------------------
+
+    public function getAdmins(Request $request, Response $response): Response
+    {
+        $actor = $this->authenticate($request);
+        $this->requireRole($actor, ['SUPER_ADMIN']);
+
+        return $this->success($response, $this->service->getAdmins());
+    }
+
+    public function createAdmin(Request $request, Response $response): Response
+    {
+        $actor = $this->authenticate($request);
+        $this->requireRole($actor, ['SUPER_ADMIN']);
+
+        $data  = RequestParser::body($request);
+        $admin = $this->service->createAdmin($data, $actor);
+
+        return $this->success($response, $admin, 'Administrator created successfully.', 201);
+    }
+
+    // -------------------------------------------------------------------------
     // Plans
     // -------------------------------------------------------------------------
 

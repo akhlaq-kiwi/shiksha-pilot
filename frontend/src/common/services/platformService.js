@@ -6,7 +6,6 @@ export const platformService = {
   },
 
   async createSchool(schoolData) {
-    // Both endpoints are common (invitation or direct creation depending on flow)
     return apiClient.post('/api/platform/schools', schoolData);
   },
 
@@ -40,5 +39,13 @@ export const platformService = {
 
   async getStats() {
     return apiClient.get('/api/platform/stats');
-  }
+  },
+
+  async getAdmins() {
+    return apiClient.get('/api/platform/admins');
+  },
+
+  async createAdmin(data) {
+    return apiClient.post('/api/platform/admins', data);
+  },
 };

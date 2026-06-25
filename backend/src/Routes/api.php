@@ -15,6 +15,7 @@ return function (App $app) {
     // Auth Domain
     $app->post('/api/auth/identify', [AuthController::class, 'identify']);
     $app->post('/api/auth/login', [AuthController::class, 'login']);
+    $app->post('/api/auth/change-password', [AuthController::class, 'changePassword']);
     
     // Platform / Super Admin Domain
     $app->get('/api/platform/schools', [PlatformController::class, 'getSchools']);
@@ -26,6 +27,8 @@ return function (App $app) {
     $app->get('/api/platform/subscriptions', [PlatformController::class, 'getSubscriptions']);
     $app->get('/api/platform/subscription/audit-logs', [PlatformController::class, 'getAuditLogs']);
     $app->get('/api/platform/stats', [PlatformController::class, 'getStats']);
+    $app->get('/api/platform/admins', [PlatformController::class, 'getAdmins']);
+    $app->post('/api/platform/admins', [PlatformController::class, 'createAdmin']);
 
     // School Admin Domain
     $app->get('/api/school/stats', [SchoolAdminController::class, 'getDashboardStats']);

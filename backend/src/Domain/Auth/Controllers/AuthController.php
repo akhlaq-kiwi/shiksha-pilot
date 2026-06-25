@@ -56,4 +56,22 @@ class AuthController extends BaseController
 
         return $this->success($response, $result, 'Login successful.');
     }
+
+    /**
+     * POST /api/auth/change-password
+     *
+     * Body: { "new_password": "..." }
+     * Requires a valid auth token.
+     */
+    public function changePassword(Request $request, Response $response): Response
+    {
+        $claims = $this->authenticate($request);
+
+        $body = RequestParser::body($request);
+        RequestParser::required($body, ['new_password']);
+
+        $this->authService->changePassword((int) $claims['id'], (string) $body['new_password']);
+
+        return $this->success($response, null, 'Password updated successfully.');
+    }
 }

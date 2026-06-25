@@ -156,6 +156,7 @@ class App
                 return new PlatformService(
                     $c->get(SchoolRepository::class),
                     $c->get(AuditLogRepository::class),
+                    $c->get(AuthRepository::class),
                 );
             },
 

@@ -79,4 +79,19 @@ class AuthService extends BaseService
             'user'  => $safeUser,
         ];
     }
+
+    /**
+     * Change authenticated user's password and clear force_password_change flag.
+     *
+     * @throws ValidationException when the new password is too short.
+     */
+    public function changePassword(int $userId, string $newPassword): void
+    {
+        if (strlen($newPassword) < 6) {
+            throw new ValidationException(['password' => 'Password must be at least 6 characters.']);
+        }
+
+        $this->repo->updatePassword($userId, $newPassword);
+        $this->log('Password changed', ['id' => $userId]);
+    }
 }
