@@ -5,10 +5,10 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3000,
-    host: true, // Listen on all network interfaces, useful inside Docker
+    host: true,
     proxy: {
       '/api': {
-        target: process.env.VITE_API_URL || 'http://127.0.0.1:8000',
+        target: process.env.VITE_API_URL || 'http://localhost:8001',
         changeOrigin: true,
       }
     }

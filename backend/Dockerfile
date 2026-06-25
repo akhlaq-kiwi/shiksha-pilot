@@ -1,31 +1,38 @@
-FROM php:8.3-cli
+FROM php:8.1-apache
 
-# Install system dependencies and PHP extensions
-RUN apt-get update && apt-get install -y \
-    git \
-    unzip \
-    libzip-dev \
-    libpng-dev \
-    libjpeg-dev \
-    libfreetype6-dev \
-    && docker-php-ext-install pdo pdo_mysql zip
+# Install PDO MySQL extension and unzip
+RUN apt-get update && apt-get install -y unzip && rm -rf /var/lib/apt/lists/*
+RUN docker-php-ext-install pdo pdo_mysql
+
+# Enable Apache mod_rewrite
+RUN a2enmod rewrite
+
+# Change Apache document root to public/ folder for Slim framework routing
+ENV APACHE_DOCUMENT_ROOT /var/www/html/public
+RUN sed -i 's/Listen 80/Listen 8000/' /etc/apache2/ports.conf
+RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
+RUN sed -ri -e 's!<VirtualHost \*:80>!<VirtualHost \*:8000>!g' /etc/apache2/sites-available/*.conf
+RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
+RUN sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
+# Set working directory
 WORKDIR /var/www/html
 
-# Copy composer files first to cache dependencies
+# Copy composer files and run install
 COPY composer.json composer.lock* ./
-RUN composer update --no-scripts --no-autoloader
+RUN composer install --no-interaction --no-scripts --no-autoloader --prefer-dist
 
-# Copy application source
+# Copy application files
 COPY . .
 
-# Generate optimized autoloader
+# Generate autoloader
 RUN composer dump-autoload --optimize
 
+# Expose port
 EXPOSE 8000
 
-# Start php development server on 0.0.0.0 so it is reachable from host and frontend container
-CMD ["php", "-S", "0.0.0.0:8000", "-t", "public"]
+# Start Apache in foreground
+CMD ["apache2-foreground"]

@@ -9,7 +9,7 @@ services:
       MYSQL_ROOT_PASSWORD: admin123
       MYSQL_DATABASE: bn_school_sp
     ports:
-      - "3306:3306"
+      - "2001:3306"
     volumes:
       - db_data:/var/lib/mysql
 
@@ -20,7 +20,7 @@ services:
     container_name: sp-backend
     restart: always
     ports:
-      - "8001:8000"
+      - "2002:8000"
     volumes:
       - ./backend:/var/www/html
       - /var/www/html/vendor
@@ -39,7 +39,7 @@ services:
     container_name: sp-frontend
     restart: always
     ports:
-      - "3000:3000"
+      - "2003:3000"
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -47,6 +47,19 @@ services:
       - VITE_API_URL=http://backend:8000
     depends_on:
       - backend
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: sp-phpmyadmin
+    restart: always
+    ports:
+      - "2004:80"
+    environment:
+      PMA_HOST: db
+      PMA_USER: root
+      PMA_PASSWORD: admin123
+    depends_on:
+      - db
 
 volumes:
   db_data:
