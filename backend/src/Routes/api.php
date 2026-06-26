@@ -50,9 +50,13 @@ return function (App $app) {
     $app->get('/api/school/exam-marks', [SchoolAdminController::class, 'getExamMarks']);
     $app->post('/api/school/exam-marks', [SchoolAdminController::class, 'enterMarks']);
     $app->get('/api/school/fee-structures', [SchoolAdminController::class, 'getFeeStructures']);
+    $app->post('/api/school/fee-structures', [SchoolAdminController::class, 'createFeeStructure']);
     $app->get('/api/school/fee-payments', [SchoolAdminController::class, 'getFeePayments']);
+    $app->post('/api/school/fee-payments', [SchoolAdminController::class, 'createFeePayment']);
     $app->get('/api/school/timetable', [SchoolAdminController::class, 'getTimetable']);
     $app->get('/api/school/subjects', [SchoolAdminController::class, 'getSubjects']);
+    $app->get('/api/school/profile', [SchoolAdminController::class, 'getSchoolProfile']);
+    $app->post('/api/school/profile', [SchoolAdminController::class, 'updateSchoolProfile']);
 
     // Teacher Domain
     $app->get('/api/teacher/classes', [TeacherController::class, 'getMyClasses']);

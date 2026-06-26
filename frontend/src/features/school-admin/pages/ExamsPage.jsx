@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
@@ -6,6 +6,7 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '.
 import { Input } from '../../../common/ui/input';
 import { Select } from '../../../common/ui/select';
 import { Dialog } from '../../../common/ui/dialog';
+import { schoolService } from '../../../common/services/schoolService';
 
 const statusBadge = (status) => {
   const map = {
@@ -20,20 +21,78 @@ const statusBadge = (status) => {
   );
 };
 
-export default function ExamsPage({ exams, setExams, students }) {
+export default function ExamsPage() {
+  const [exams, setExams] = useState([]);
+  const [classes, setClasses] = useState([]);
+  const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [isAddExamOpen, setIsAddExamOpen] = useState(false);
-  const [newExam, setNewExam] = useState({ name: '', class: 'Class 10', term: 'Term 1', date: '', total_marks: 100 });
+  const [newExam, setNewExam] = useState({ name: '', class_id: '', term: 'Term 1', date: '', total_marks: 100 });
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleAddExam = (e) => {
+  const loadData = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [exData, clsData, stuData] = await Promise.all([
+        schoolService.getExams(),
+        schoolService.getClasses(),
+        schoolService.getStudents()
+      ]);
+      setExams(exData || []);
+      setClasses(clsData || []);
+      setStudents(stuData || []);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to load exams.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px] w-full">
+        <div className="flex flex-col items-center gap-3">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <p className="text-xs font-bold text-text-muted uppercase tracking-wider">Loading Exams...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const getExamStatus = (examDate) => {
+    if (!examDate) return 'Upcoming';
+    const today = new Date().toISOString().split('T')[0];
+    return examDate < today ? 'Completed' : 'Upcoming';
+  };
+
+  const upcomingCount = exams.filter(e => getExamStatus(e.exam_date) === 'Upcoming').length;
+  const completedCount = exams.filter(e => getExamStatus(e.exam_date) === 'Completed').length;
+
+  const handleAddExam = async (e) => {
     e.preventDefault();
     if (!newExam.name || !newExam.date) return;
     setSubmitting(true);
+    setError('');
     try {
-      const id = exams.length + 1;
-      setExams(prev => [...prev, { ...newExam, id, status: 'Upcoming' }]);
+      await schoolService.createExam({
+        name: newExam.name,
+        class_id: newExam.class_id ? parseInt(newExam.class_id) : null,
+        exam_date: newExam.date,
+        max_marks: parseFloat(newExam.total_marks)
+      });
       setIsAddExamOpen(false);
-      setNewExam({ name: '', class: 'Class 10', term: 'Term 1', date: '', total_marks: 100 });
+      setNewExam({ name: '', class_id: '', term: 'Term 1', date: '', total_marks: 100 });
+      loadData();
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Failed to create exam.');
     } finally {
       setSubmitting(false);
     }
@@ -51,11 +110,17 @@ export default function ExamsPage({ exams, setExams, students }) {
         </Button>
       </div>
 
+      {error && (
+        <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-lg text-xs font-semibold">
+          {error}
+        </div>
+      )}
+
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: 'Upcoming', value: exams.filter(e => e.status === 'Upcoming').length, color: 'text-blue-600' },
-          { label: 'Completed', value: exams.filter(e => e.status === 'Completed').length, color: 'text-zinc-600' },
-          { label: 'Published', value: exams.filter(e => e.status === 'Published').length, color: 'text-green-600' },
+          { label: 'Upcoming', value: upcomingCount, color: 'text-blue-600' },
+          { label: 'Completed', value: completedCount, color: 'text-zinc-600' },
+          { label: 'Published', value: 0, color: 'text-green-600' },
         ].map(c => (
           <Card key={c.label} className="shadow-sm">
             <CardContent className="p-5 text-center">
@@ -82,24 +147,27 @@ export default function ExamsPage({ exams, setExams, students }) {
           <TableBody>
             {exams.length === 0 ? (
               <TableRow><TableCell colSpan={7} className="text-center py-8 text-text-muted">No exams scheduled.</TableCell></TableRow>
-            ) : exams.map(e => (
-              <TableRow key={e.id}>
-                <TableCell className="font-semibold text-text-primary">{e.name}</TableCell>
-                <TableCell className="text-xs text-text-secondary">{e.class}</TableCell>
-                <TableCell className="text-xs text-text-secondary">{e.term}</TableCell>
-                <TableCell className="text-xs font-mono text-text-muted">{e.date}</TableCell>
-                <TableCell className="text-xs font-mono">{e.total_marks}</TableCell>
-                <TableCell>{statusBadge(e.status)}</TableCell>
-                <TableCell>
-                  <div className="flex gap-2">
-                    <Button variant="outline" className="h-7 px-2 text-xs">Marks</Button>
-                    {e.status === 'Completed' && (
-                      <Button variant="outline" className="h-7 px-2 text-xs text-green-600 border-green-200">Publish</Button>
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
+            ) : exams.map(e => {
+              const status = getExamStatus(e.exam_date);
+              return (
+                <TableRow key={e.id}>
+                  <TableCell className="font-semibold text-text-primary">{e.name}</TableCell>
+                  <TableCell className="text-xs text-text-secondary">{e.class_name || '-'}</TableCell>
+                  <TableCell className="text-xs text-text-secondary">Term 1</TableCell>
+                  <TableCell className="text-xs font-mono text-text-muted">{e.exam_date || '-'}</TableCell>
+                  <TableCell className="text-xs font-mono">{e.max_marks || e.total_marks || '-'}</TableCell>
+                  <TableCell>{statusBadge(status)}</TableCell>
+                  <TableCell>
+                    <div className="flex gap-2">
+                      <Button variant="outline" className="h-7 px-2 text-xs">Marks</Button>
+                      {status === 'Completed' && (
+                        <Button variant="outline" className="h-7 px-2 text-xs text-green-600 border-green-200">Publish</Button>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </Card>
@@ -147,9 +215,18 @@ export default function ExamsPage({ exams, setExams, students }) {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-text-secondary uppercase">Class</label>
-              <Select value={newExam.class} onChange={e => setNewExam(p => ({ ...p, class: e.target.value }))}>
-                <option>Class 9</option><option>Class 10</option><option>Class 11</option><option>Class 12</option>
-              </Select>
+              {classes.length === 0 ? (
+                <div className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-950/20 p-2 rounded">
+                  No classes defined. Create classes in Academic page first.
+                </div>
+              ) : (
+                <Select value={newExam.class_id} onChange={e => setNewExam(p => ({ ...p, class_id: e.target.value }))} required>
+                  <option value="">Select class...</option>
+                  {classes.map(c => (
+                    <option key={c.id} value={c.id}>{c.name} {c.section ? `(${c.section})` : ''}</option>
+                  ))}
+                </Select>
+              )}
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-text-secondary uppercase">Term</label>

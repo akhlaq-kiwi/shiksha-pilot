@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Search, Edit } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle } from '../../../common/ui/card';
@@ -6,6 +6,7 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '.
 import { Input } from '../../../common/ui/input';
 import { Select } from '../../../common/ui/select';
 import { Dialog } from '../../../common/ui/dialog';
+import { schoolService } from '../../../common/services/schoolService';
 
 const statusBadge = (status) => {
   const map = {
@@ -19,28 +20,78 @@ const statusBadge = (status) => {
   );
 };
 
-export default function StaffPage({ staff, setStaff }) {
+export default function StaffPage() {
+  const [staff, setStaff] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [staffSearch, setStaffSearch] = useState('');
+  const [selectedDeptFilter, setSelectedDeptFilter] = useState('');
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
-  const [newStaff, setNewStaff] = useState({ name: '', role: 'TEACHER', department: 'Mathematics', email: '', phone: '' });
+  const [newStaff, setNewStaff] = useState({ name: '', role: 'Teacher', department: 'Mathematics', email: '', phone: '' });
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const loadStaff = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await schoolService.getStaff();
+      setStaff(data || []);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to load staff list.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadStaff();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px] w-full">
+        <div className="flex flex-col items-center gap-3">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <p className="text-xs font-bold text-text-muted uppercase tracking-wider">Loading Staff...</p>
+        </div>
+      </div>
+    );
+  }
 
   const totalStaff = staff.length;
+  const activeStaffCount = staff.filter(s => s.status === 'ACTIVE').length;
 
-  const filteredStaff = staff.filter(s =>
-    s.name.toLowerCase().includes(staffSearch.toLowerCase()) ||
-    s.department.toLowerCase().includes(staffSearch.toLowerCase())
-  );
+  const filteredStaff = staff.filter(s => {
+    const matchesSearch = s.name.toLowerCase().includes(staffSearch.toLowerCase()) ||
+      (s.department && s.department.toLowerCase().includes(staffSearch.toLowerCase()));
+    const matchesDept = !selectedDeptFilter || s.department === selectedDeptFilter;
+    return matchesSearch && matchesDept;
+  });
 
-  const handleAddStaff = (e) => {
+  const handleAddStaff = async (e) => {
     e.preventDefault();
     if (!newStaff.name) return;
     setSubmitting(true);
+    setError('');
     try {
-      const id = staff.length + 1;
-      setStaff(prev => [...prev, { ...newStaff, id, status: 'ACTIVE', joining: new Date().toISOString().split('T')[0] }]);
+      const employee_id = `EMP-${Date.now().toString().slice(-4)}`;
+      await schoolService.createStaff({
+        name: newStaff.name,
+        role: newStaff.role.toUpperCase(),
+        department: newStaff.department,
+        email: newStaff.email || `${newStaff.name.toLowerCase().replace(/\s+/g, '')}@shiksha.edu`,
+        phone: newStaff.phone || null,
+        employee_id,
+        status: 'ACTIVE',
+        joining_date: new Date().toISOString().split('T')[0]
+      });
       setIsAddStaffOpen(false);
-      setNewStaff({ name: '', role: 'TEACHER', department: 'Mathematics', email: '', phone: '' });
+      setNewStaff({ name: '', role: 'Teacher', department: 'Mathematics', email: '', phone: '' });
+      loadStaff();
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Failed to add staff member.');
     } finally {
       setSubmitting(false);
     }
@@ -51,21 +102,30 @@ export default function StaffPage({ staff, setStaff }) {
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">Staff Management</h2>
-          <p className="text-text-secondary text-sm mt-1">{totalStaff} staff members · {staff.filter(s => s.status === 'ACTIVE').length} on duty</p>
+          <p className="text-text-secondary text-sm mt-1">{totalStaff} staff members · {activeStaffCount} on duty</p>
         </div>
         <Button className="flex items-center gap-2" onClick={() => setIsAddStaffOpen(true)}>
           <Plus className="h-4 w-4" /> Add Staff
         </Button>
       </div>
 
+      {error && (
+        <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-lg text-xs font-semibold">
+          {error}
+        </div>
+      )}
+
       <div className="bg-surface border border-border rounded-xl p-4 flex flex-col md:flex-row gap-4">
         <div className="relative w-full md:w-80">
           <Search className="absolute left-3 top-3 h-4 w-4 text-text-muted" />
           <Input placeholder="Search staff..." className="pl-9" value={staffSearch} onChange={e => setStaffSearch(e.target.value)} />
         </div>
-        <Select className="w-full md:w-48">
+        <Select className="w-full md:w-48" value={selectedDeptFilter} onChange={e => setSelectedDeptFilter(e.target.value)}>
           <option value="">All Departments</option>
-          <option>Mathematics</option><option>Science</option><option>English</option><option>Administration</option>
+          <option value="Mathematics">Mathematics</option>
+          <option value="Science">Science</option>
+          <option value="English">English</option>
+          <option value="Administration">Administration</option>
         </Select>
       </div>
 
@@ -73,6 +133,7 @@ export default function StaffPage({ staff, setStaff }) {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Employee ID</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Role</TableHead>
               <TableHead>Department</TableHead>
@@ -84,9 +145,10 @@ export default function StaffPage({ staff, setStaff }) {
           </TableHeader>
           <TableBody>
             {filteredStaff.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="text-center py-8 text-text-muted">No staff found.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center py-8 text-text-muted">No staff found.</TableCell></TableRow>
             ) : filteredStaff.map(s => (
               <TableRow key={s.id}>
+                <TableCell className="font-mono text-xs text-text-muted">{s.employee_id || '-'}</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2.5">
                     <div className="w-7 h-7 rounded-full bg-teal-500/10 text-teal-600 flex items-center justify-center text-[10px] font-black flex-shrink-0">
@@ -96,9 +158,9 @@ export default function StaffPage({ staff, setStaff }) {
                   </div>
                 </TableCell>
                 <TableCell className="text-text-secondary text-xs">{s.role}</TableCell>
-                <TableCell className="text-text-secondary text-xs">{s.department}</TableCell>
-                <TableCell className="text-text-muted text-xs font-mono">{s.email}</TableCell>
-                <TableCell className="text-text-muted text-xs">{s.joining}</TableCell>
+                <TableCell className="text-text-secondary text-xs">{s.department || '-'}</TableCell>
+                <TableCell className="text-text-muted text-xs font-mono">{s.email || '-'}</TableCell>
+                <TableCell className="text-text-muted text-xs">{s.joining_date || s.joining || '-'}</TableCell>
                 <TableCell>{statusBadge(s.status)}</TableCell>
                 <TableCell>
                   <button className="text-text-muted hover:text-primary transition-colors"><Edit className="h-3.5 w-3.5" /></button>
@@ -152,7 +214,10 @@ export default function StaffPage({ staff, setStaff }) {
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-text-secondary uppercase">Role</label>
               <Select value={newStaff.role} onChange={e => setNewStaff(p => ({ ...p, role: e.target.value }))}>
-                <option>Teacher</option><option>Admin</option><option>Accountant</option><option>Librarian</option>
+                <option value="Teacher">Teacher</option>
+                <option value="Admin">Admin</option>
+                <option value="Accountant">Accountant</option>
+                <option value="Librarian">Librarian</option>
               </Select>
             </div>
             <div className="space-y-1.5">

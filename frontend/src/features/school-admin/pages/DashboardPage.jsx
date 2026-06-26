@@ -1,12 +1,88 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Users, UserCog, Banknote, FileText, UserPlus, ClipboardCheck,
   CreditCard, BookMarked, PieChart
 } from 'lucide-react';
 import { Card, CardContent } from '../../../common/ui/card';
+import { schoolService } from '../../../common/services/schoolService';
 
-export default function DashboardPage({ stats, students, staff, exams, auditLogs, onNavigate }) {
-  const { totalStudents, activeStudents, totalStaff, totalFeeCollected, pendingFees } = stats;
+const MOCK_AUDIT_LOGS = [
+  { id: 1, action: 'Student Enrolled', user: 'admin@school.edu', detail: 'Aryan Mehta enrolled in Class 10A', date: '2026-06-20 09:12' },
+  { id: 2, action: 'Fee Collected', user: 'accounts@school.edu', detail: '₹25,000 received from Aryan Mehta', date: '2026-06-20 11:45' },
+  { id: 3, action: 'Exam Created', user: 'admin@school.edu', detail: 'Unit Test 1 created for Class 10', date: '2026-06-18 14:00' },
+  { id: 4, action: 'Staff Added', user: 'admin@school.edu', detail: 'Mr. Vivek Tiwari added as Social Studies teacher', date: '2026-06-15 10:30' },
+  { id: 5, action: 'Timetable Updated', user: 'admin@school.edu', detail: 'Monday schedule updated for Class 10A', date: '2026-06-12 16:20' },
+];
+
+export default function DashboardPage({ onNavigate }) {
+  const [students, setStudents] = useState([]);
+  const [staff, setStaff] = useState([]);
+  const [exams, setExams] = useState([]);
+  const [feePayments, setFeePayments] = useState([]);
+  const [dbStats, setDbStats] = useState({
+    students_count: 0,
+    staff_count: 0,
+    classes_count: 0,
+    pending_fees: 0,
+    total_collected: 0
+  });
+  const [loading, setLoading] = useState(true);
+  const [auditLogs] = useState(MOCK_AUDIT_LOGS);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        const [stuData, stfData, exData, fpData, statsData] = await Promise.all([
+          schoolService.getStudents(),
+          schoolService.getStaff(),
+          schoolService.getExams(),
+          schoolService.getFeePayments(),
+          schoolService.getStats()
+        ]);
+        setStudents(stuData || []);
+        setStaff(stfData || []);
+        setExams(exData || []);
+        setFeePayments(fpData || []);
+        setDbStats(statsData || {
+          students_count: 0,
+          staff_count: 0,
+          classes_count: 0,
+          pending_fees: 0,
+          total_collected: 0
+        });
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDashboardData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px] w-full">
+        <div className="flex flex-col items-center gap-3">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <p className="text-xs font-bold text-text-muted uppercase tracking-wider">Loading Dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const totalStudents = students.length;
+  const activeStudents = students.filter(s => s.status === 'ACTIVE').length;
+  const totalStaff = staff.length;
+  const totalFeeCollected = dbStats.total_collected || feePayments.filter(f => f.status === 'PAID').reduce((sum, f) => sum + parseFloat(f.amount_paid || 0), 0);
+  const pendingFees = dbStats.pending_fees || feePayments.filter(f => f.status === 'Pending').length;
+
+  const stats = {
+    totalStudents,
+    activeStudents,
+    totalStaff,
+    totalFeeCollected,
+    pendingFees,
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">

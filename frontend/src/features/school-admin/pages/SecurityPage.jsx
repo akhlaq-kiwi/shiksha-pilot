@@ -14,7 +14,24 @@ const statusBadge = (status) => {
   );
 };
 
-export default function SecurityPage({ auditLogs, loginHistory }) {
+const MOCK_AUDIT_LOGS = [
+  { id: 1, action: 'Student Enrolled', user: 'admin@school.edu', detail: 'Aryan Mehta enrolled in Class 10A', date: '2026-06-20 09:12' },
+  { id: 2, action: 'Fee Collected', user: 'accounts@school.edu', detail: '₹25,000 received from Aryan Mehta', date: '2026-06-20 11:45' },
+  { id: 3, action: 'Exam Created', user: 'admin@school.edu', detail: 'Unit Test 1 created for Class 10', date: '2026-06-18 14:00' },
+  { id: 4, action: 'Staff Added', user: 'admin@school.edu', detail: 'Mr. Vivek Tiwari added as Social Studies teacher', date: '2026-06-15 10:30' },
+  { id: 5, action: 'Timetable Updated', user: 'admin@school.edu', detail: 'Monday schedule updated for Class 10A', date: '2026-06-12 16:20' },
+];
+
+const MOCK_LOGIN_HISTORY = [
+  { id: 1, user: 'admin@school.edu', role: 'SCHOOL_ADMIN', ip: '192.168.1.10', date: '2026-06-25 08:02', status: 'Success' },
+  { id: 2, user: 'accounts@school.edu', role: 'Accountant', ip: '192.168.1.22', date: '2026-06-25 08:45', status: 'Success' },
+  { id: 3, user: 'unknown@hacker.com', role: '-', ip: '45.33.32.156', date: '2026-06-24 23:11', status: 'Failed' },
+  { id: 4, user: 'admin@school.edu', role: 'SCHOOL_ADMIN', ip: '192.168.1.10', date: '2026-06-24 17:55', status: 'Success' },
+];
+
+export default function SecurityPage() {
+  const auditLogs = MOCK_AUDIT_LOGS;
+  const loginHistory = MOCK_LOGIN_HISTORY;
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       <div>

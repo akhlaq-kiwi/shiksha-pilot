@@ -1,9 +1,59 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Users, ClipboardCheck, Award, PieChart, UserCog, BarChart2 } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
+import { schoolService } from '../../../common/services/schoolService';
 
-export default function ReportsPage({ stats }) {
+export default function ReportsPage() {
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchReportsData = async () => {
+      try {
+        const [statsData, students, exams, feePayments] = await Promise.all([
+          schoolService.getStats(),
+          schoolService.getStudents(),
+          schoolService.getExams(),
+          schoolService.getFeePayments()
+        ]);
+        
+        const totalStudents = students.length;
+        const activeStudents = students.filter(s => s.status === 'ACTIVE').length;
+
+        const totalFeeCollected = statsData?.total_collected || feePayments.filter(f => f.status === 'PAID').reduce((sum, f) => sum + parseFloat(f.amount_paid || 0), 0);
+        const pendingFees = statsData?.pending_fees || feePayments.filter(f => f.status === 'Pending').length;
+
+        setStats({
+          totalStudents,
+          activeStudents,
+          totalFeeCollected,
+          pendingFees,
+          examsCompleted: exams.filter(e => e.status === 'Completed').length,
+          feeCollectionRate: feePayments.length > 0 
+            ? `${Math.round((feePayments.filter(f => f.status === 'PAID').length / feePayments.length) * 100)}%`
+            : '0%',
+        });
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchReportsData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px] w-full">
+        <div className="flex flex-col items-center gap-3">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <p className="text-xs font-bold text-text-muted uppercase tracking-wider">Loading Reports...</p>
+        </div>
+      </div>
+    );
+  }
+
   const { totalStudents, examsCompleted, feeCollectionRate } = stats || {};
 
   return (

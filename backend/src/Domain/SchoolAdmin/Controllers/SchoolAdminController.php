@@ -244,4 +244,47 @@ class SchoolAdminController extends BaseController
 
         return $this->success($response, $data);
     }
+
+    public function createFeeStructure(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body      = RequestParser::body($request);
+        $structure = $this->service->createFeeStructure($user, $body);
+
+        return $this->success($response, $structure, 'Fee structure created', 201);
+    }
+
+    public function createFeePayment(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body    = RequestParser::body($request);
+        $payment = $this->service->createFeePayment($user, $body);
+
+        return $this->success($response, $payment, 'Fee payment recorded', 201);
+    }
+
+    public function getSchoolProfile(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $data = $this->service->getSchoolProfile($user);
+
+        return $this->success($response, $data);
+    }
+
+    public function updateSchoolProfile(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body    = RequestParser::body($request);
+        $profile = $this->service->updateSchoolProfile($user, $body);
+
+        return $this->success($response, $profile, 'School profile updated');
+    }
 }

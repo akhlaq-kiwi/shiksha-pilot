@@ -67,9 +67,10 @@ class AuthService extends BaseService
         $safeUser = array_diff_key($user, ['password' => true]);
 
         $token = $this->tokenService->encode([
-            'id'    => $user['id'],
-            'role'  => $user['role'] ?? null,
-            'phone' => $user['phone'] ?? null,
+            'id'        => $user['id'],
+            'role'      => $user['role'] ?? null,
+            'phone'     => $user['phone'] ?? null,
+            'school_id' => isset($user['school_id']) ? (int) $user['school_id'] : null,
         ]);
 
         $this->log('User logged in', ['id' => $user['id']]);

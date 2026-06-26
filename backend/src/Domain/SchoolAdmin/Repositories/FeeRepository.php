@@ -55,4 +55,49 @@ class FeeRepository extends BaseRepository
 
         return (int) $stmt->fetchColumn();
     }
+
+    public function getTotalCollectedBySchool(int $schoolId): float
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT SUM(amount_paid) FROM fee_payments WHERE school_id = :sid AND status = 'PAID'"
+        );
+        $stmt->execute([':sid' => $schoolId]);
+        return (float) ($stmt->fetchColumn() ?: 0.0);
+    }
+
+    public function createPayment(array $data): int
+    {
+        $columns      = array_keys($data);
+        $placeholders = array_map(static fn($col) => ":{$col}", $columns);
+
+        $colList  = implode(', ', $columns);
+        $valList  = implode(', ', $placeholders);
+
+        $sql  = "INSERT INTO fee_payments ({$colList}) VALUES ({$valList})";
+        $stmt = $this->pdo->prepare($sql);
+
+        $bound = [];
+        foreach ($data as $col => $value) {
+            $bound[":{$col}"] = $value;
+        }
+
+        $stmt->execute($bound);
+
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    public function findPaymentById(int $id): ?array
+    {
+        $stmt = $this->pdo->prepare("
+            SELECT fp.*, s.name AS student_name, fs.name AS fee_structure_name
+            FROM fee_payments fp
+            LEFT JOIN students      s  ON fp.student_id       = s.id
+            LEFT JOIN fee_structures fs ON fp.fee_structure_id = fs.id
+            WHERE fp.id = :id
+            LIMIT 1
+        ");
+        $stmt->execute([':id' => $id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row !== false ? $row : null;
+    }
 }
