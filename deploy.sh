@@ -10,12 +10,7 @@ SSH_PORT="65002"
 SSH_PASS='Ga@1219!'
 REMOTE_PATH="/home/u554613359/domains/qa.shikshapilot.com/public_html"
 
-DB_HOST="127.0.0.1"
-DB_NAME="u554613359_qa_sp_db"
-DB_USER="u554613359_qa_sp_user"
-DB_PASS='/Q5GYsafK5Vs'
-
-# Free Gmail SMTP Configuration
+# SMTP Configuration (not stored in .qa.env)
 SMTP_HOST="smtp.gmail.com"
 SMTP_PORT="587"
 SMTP_USER="bilalnashi6@gmail.com"
@@ -28,7 +23,17 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-echo -e "${YELLOW}Starting deployment preparation...${NC}"
+echo -e "${YELLOW}Starting QA deployment...${NC}"
+
+# Validate .qa.env files exist
+if [ ! -f "frontend/.qa.env" ]; then
+    echo -e "${RED}Error: frontend/.qa.env not found.${NC}"
+    exit 1
+fi
+if [ ! -f "backend/.qa.env" ]; then
+    echo -e "${RED}Error: backend/.qa.env not found.${NC}"
+    exit 1
+fi
 
 # Check prerequisites
 if ! command -v npm &> /dev/null; then
@@ -36,15 +41,6 @@ if ! command -v npm &> /dev/null; then
     exit 1
 fi
 
-HAS_COMPOSER=true
-if ! command -v composer &> /dev/null; then
-    echo -e "${YELLOW}Warning: composer is not installed locally. Will use the existing backend/vendor directory if present.${NC}"
-    HAS_COMPOSER=false
-    if [ ! -d "backend/vendor" ]; then
-        echo -e "${RED}Error: backend/vendor directory does not exist and composer is not available to install it.${NC}"
-        exit 1
-    fi
-fi
 
 # Check for sshpass
 SSHPASS_CMD=""
@@ -55,27 +51,22 @@ else
     echo -e "${YELLOW}Warning: sshpass is not installed. You will be prompted to enter the SSH password twice during deployment.${NC}"
 fi
 
-# 1. Build frontend
-echo -e "${YELLOW}Building frontend...${NC}"
+# 1. Build frontend using frontend/.qa.env (via Vite --mode qa)
+echo -e "${YELLOW}Building frontend with frontend/.qa.env...${NC}"
+cp frontend/.qa.env frontend/.env.qa
 cd frontend
 npm install
-npm run build
+npm run build -- --mode qa
 cd ..
+rm -f frontend/.env.qa
 
-# 2. Install backend dependencies locally
-if [ "$HAS_COMPOSER" = true ]; then
-    echo -e "${YELLOW}Installing production backend dependencies...${NC}"
-    cd backend
-    composer install --no-dev --optimize-autoloader
-    cd ..
-else
-    echo -e "${YELLOW}Skipping composer install (using existing backend/vendor)...${NC}"
-fi
-
-# 3. Create temporary deployment structure
+# 2. Create temporary deployment structure
 echo -e "${YELLOW}Creating deployment package...${NC}"
-TEMP_DIR="deploy_temp"
-rm -rf "$TEMP_DIR" deploy.tar.gz
+BUILD_DIR=".builds"
+TEMP_DIR="$BUILD_DIR/deploy_temp"
+TAR_FILE="$BUILD_DIR/deploy.tar.gz"
+mkdir -p "$BUILD_DIR"
+rm -rf "$TEMP_DIR" "$TAR_FILE"
 mkdir -p "$TEMP_DIR"
 
 # Copy frontend build
@@ -84,15 +75,14 @@ cp -r frontend/dist/* "$TEMP_DIR/"
 # Copy backend files into api/ directory
 mkdir -p "$TEMP_DIR/api"
 cp -r backend/src "$TEMP_DIR/api/"
-cp -r backend/vendor "$TEMP_DIR/api/"
 cp -r backend/public "$TEMP_DIR/api/"
+cp backend/composer.json "$TEMP_DIR/api/"
+cp backend/composer.lock "$TEMP_DIR/api/"
 
-# Copy and update backend production .env
-cat <<EOT > "$TEMP_DIR/api/.env"
-DB_HOST=$DB_HOST
-DB_USER=$DB_USER
-DB_PASS=$DB_PASS
-DB_NAME=$DB_NAME
+# Build backend .env from backend/.qa.env + append secrets not in .qa.env
+cp backend/.qa.env "$TEMP_DIR/api/.env"
+echo "" >> "$TEMP_DIR/api/.env"
+cat <<EOT >> "$TEMP_DIR/api/.env"
 JWT_SECRET=super_secret_erp_key_2026
 SMTP_HOST=$SMTP_HOST
 SMTP_PORT=$SMTP_PORT
@@ -128,27 +118,26 @@ EOT
 
 # 4. Archive deployment package
 echo -e "${YELLOW}Archiving deployment package...${NC}"
-tar -czf deploy.tar.gz -C "$TEMP_DIR" .
+COPYFILE_DISABLE=1 tar -czf "$TAR_FILE" -C "$TEMP_DIR" .
 rm -rf "$TEMP_DIR"
 
 # 5. Upload to shared hosting
 echo -e "${YELLOW}Uploading package to remote server...${NC}"
 if [ -n "$SSHPASS_CMD" ]; then
-    eval $SSHPASS_CMD scp -P $SSH_PORT deploy.tar.gz $SSH_USER@$SSH_HOST:$REMOTE_PATH/
+    eval $SSHPASS_CMD scp -P $SSH_PORT "$TAR_FILE" $SSH_USER@$SSH_HOST:$REMOTE_PATH/
 else
-    scp -P $SSH_PORT deploy.tar.gz $SSH_USER@$SSH_HOST:$REMOTE_PATH/
+    scp -P $SSH_PORT "$TAR_FILE" $SSH_USER@$SSH_HOST:$REMOTE_PATH/
 fi
 
-# 6. Extract package on remote server
+# 6. Extract package on remote server and run migrations
 echo -e "${YELLOW}Extracting package on remote server and running database migrations...${NC}"
-EXTRACT_CMD="cd $REMOTE_PATH && rm -rf assets api index.html && tar -xzf deploy.tar.gz && rm deploy.tar.gz && export \$(grep -v '^#' api/.env | xargs) && php api/src/Database/migrate.php"
+EXTRACT_CMD="cd $REMOTE_PATH && rm -rf assets api index.html && tar --warning=no-unknown-keyword -xzf deploy.tar.gz && rm deploy.tar.gz && echo 'Running composer install...' && composer install --no-dev --optimize-autoloader --working-dir=$REMOTE_PATH/api && echo 'Running migrations...' && php api/src/Database/migrate.php"
 if [ -n "$SSHPASS_CMD" ]; then
     eval $SSHPASS_CMD ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "$EXTRACT_CMD"
 else
     ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "$EXTRACT_CMD"
 fi
 
-# Clean up local archive
-rm -f deploy.tar.gz
+# Local build artifacts are kept in .builds/ (gitignored)
 
-echo -e "${GREEN}Deployment completed successfully!${NC}"
+echo -e "${GREEN}QA deployment completed successfully!${NC}"

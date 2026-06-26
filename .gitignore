@@ -10,3 +10,5 @@ backend/vendor/
 database/*
 scratch/*
 .env
+.qa.env
+.builds/
