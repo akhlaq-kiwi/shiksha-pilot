@@ -141,7 +141,7 @@ fi
 
 # 6. Extract package on remote server
 echo -e "${YELLOW}Extracting package on remote server and running database migrations...${NC}"
-EXTRACT_CMD="cd $REMOTE_PATH && rm -rf assets api index.html && tar -xzf deploy.tar.gz && rm deploy.tar.gz && php api/src/Database/migrate.php"
+EXTRACT_CMD="cd $REMOTE_PATH && rm -rf assets api index.html && tar -xzf deploy.tar.gz && rm deploy.tar.gz && export \$(grep -v '^#' api/.env | xargs) && php api/src/Database/migrate.php"
 if [ -n "$SSHPASS_CMD" ]; then
     eval $SSHPASS_CMD ssh -p $SSH_PORT $SSH_USER@$SSH_HOST "$EXTRACT_CMD"
 else
