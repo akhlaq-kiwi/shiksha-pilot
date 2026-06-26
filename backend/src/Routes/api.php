@@ -24,9 +24,12 @@ return function (App $app) {
     $app->put('/api/platform/schools/{id}', [PlatformController::class, 'updateSchool']);
     $app->delete('/api/platform/schools/{id}', [PlatformController::class, 'deleteSchool']);
     $app->get('/api/platform/plans', [PlatformController::class, 'getPlans']);
+    $app->post('/api/platform/plans', [PlatformController::class, 'createPlan']);
+    $app->put('/api/platform/plans/{id}', [PlatformController::class, 'updatePlan']);
     $app->get('/api/platform/subscriptions', [PlatformController::class, 'getSubscriptions']);
     $app->get('/api/platform/subscription/audit-logs', [PlatformController::class, 'getAuditLogs']);
     $app->get('/api/platform/stats', [PlatformController::class, 'getStats']);
+    $app->get('/api/platform/growth-chart', [PlatformController::class, 'getGrowthChart']);
     $app->get('/api/platform/schools/{id}/stats', [PlatformController::class, 'getSchoolStats']);
     $app->get('/api/platform/admins', [PlatformController::class, 'getAdmins']);
     $app->post('/api/platform/admins', [PlatformController::class, 'createAdmin']);

@@ -29,6 +29,14 @@ export const platformService = {
     return apiClient.get('/api/platform/plans');
   },
 
+  async createPlan(data) {
+    return apiClient.post('/api/platform/plans', data);
+  },
+
+  async updatePlan(id, data) {
+    return apiClient.put(`/api/platform/plans/${id}`, data);
+  },
+
   async getSubscriptions() {
     return apiClient.get('/api/platform/subscriptions');
   },
@@ -39,6 +47,10 @@ export const platformService = {
 
   async getStats() {
     return apiClient.get('/api/platform/stats');
+  },
+
+  async getGrowthChart() {
+    return apiClient.get('/api/platform/growth-chart');
   },
 
   async getSchoolStats(id) {

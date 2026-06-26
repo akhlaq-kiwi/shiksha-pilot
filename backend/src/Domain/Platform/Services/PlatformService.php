@@ -6,6 +6,7 @@ namespace App\Domain\Platform\Services;
 
 use App\Domain\Auth\Repositories\AuthRepository;
 use App\Domain\Platform\Repositories\AuditLogRepository;
+use App\Domain\Platform\Repositories\PlansRepository;
 use App\Domain\Platform\Repositories\SchoolRepository;
 use App\Shared\BaseService;
 use App\Shared\Exceptions\NotFoundException;
@@ -15,33 +16,33 @@ use Psr\Log\LoggerInterface;
 
 class PlatformService extends BaseService
 {
-    private const PLAN_PRICES = [
-        'Standard'   => 7999,
-        'Premium'    => 19999,
-        'Enterprise' => 39999,
-    ];
-
     public function __construct(
         private SchoolRepository   $schools,
         private AuditLogRepository $auditLogs,
         private AuthRepository     $users,
+        private PlansRepository    $plans,
         ?LoggerInterface $logger = null,
     ) {
         parent::__construct($logger);
     }
 
-    private function actorName(array $actor): string
+    private function actorInfo(array $actor): array
     {
-        if (!empty($actor['name'])) {
-            return (string) $actor['name'];
-        }
-        if (!empty($actor['id'])) {
+        $name = $actor['name'] ?? null;
+        $role = $actor['role'] ?? null;
+
+        if (!$name && !empty($actor['id'])) {
             $user = $this->users->findById((int) $actor['id']);
-            if ($user && !empty($user['name'])) {
-                return (string) $user['name'];
+            if ($user) {
+                $name = $user['name'] ?? null;
+                $role = $role ?? $user['role'] ?? null;
             }
         }
-        return $actor['phone'] ?? $actor['email'] ?? 'system';
+
+        return [
+            'name' => $name ?? $actor['phone'] ?? $actor['email'] ?? 'system',
+            'role' => $role,
+        ];
     }
 
     // -------------------------------------------------------------------------
@@ -91,11 +92,13 @@ class PlatformService extends BaseService
             ]);
         }
 
+        $actorInfo = $this->actorInfo($actor);
         $this->auditLogs->log(
             'Create school',
             (string) $data['name'],
-            $this->actorName($actor),
+            $actorInfo['name'],
             (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'),
+            $actorInfo['role'],
         );
 
         $school = $this->schools->findById($schoolId);
@@ -143,11 +146,13 @@ class PlatformService extends BaseService
             ? "Update school status to {$newStatus}"
             : 'Update school details';
 
+        $actorInfo = $this->actorInfo($actor);
         $this->auditLogs->log(
             $action,
             $newName,
-            $this->actorName($actor),
+            $actorInfo['name'],
             (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'),
+            $actorInfo['role'],
         );
 
         $updated = $this->schools->findById($id);
@@ -169,11 +174,13 @@ class PlatformService extends BaseService
 
         $this->schools->delete($id);
 
+        $actorInfo = $this->actorInfo($actor);
         $this->auditLogs->log(
             'Delete school tenant',
             (string) $school['name'],
-            $this->actorName($actor),
+            $actorInfo['name'],
             (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'),
+            $actorInfo['role'],
         );
     }
 
@@ -215,11 +222,13 @@ class PlatformService extends BaseService
             'force_password_change' => 0,
         ]);
 
+        $actorInfo = $this->actorInfo($actor);
         $this->auditLogs->log(
             'Create admin user',
             (string) $data['name'],
-            (string) ($actor['name'] ?? 'system'),
+            $actorInfo['name'],
             (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'),
+            $actorInfo['role'],
         );
 
         $admin = $this->users->findById($id);
@@ -233,11 +242,49 @@ class PlatformService extends BaseService
 
     public function getPlans(): array
     {
-        return array_map(
-            static fn(string $id, int $price) => ['id' => $id, 'name' => $id, 'price' => $price],
-            array_keys(self::PLAN_PRICES),
-            self::PLAN_PRICES,
-        );
+        return $this->plans->allActive();
+    }
+
+    public function createPlan(array $data): array
+    {
+        Validator::make($data, [
+            'name'  => 'required',
+            'price' => 'required|numeric',
+        ])->validate();
+
+        $type = $data['type'] ?? 'custom';
+
+        $id = $this->plans->create([
+            'name'           => (string) $data['name'],
+            'price'          => (int) $data['price'],
+            'student_limit'  => isset($data['student_limit']) && $data['student_limit'] !== '' ? (int) $data['student_limit'] : null,
+            'description'    => $data['description'] ?? null,
+            'type'           => in_array($type, ['standard', 'trial', 'custom']) ? $type : 'custom',
+            'trial_duration' => isset($data['trial_duration']) ? (int) $data['trial_duration'] : null,
+            'trial_unit'     => $data['trial_unit'] ?? null,
+            'is_active'      => 1,
+        ]);
+
+        return $this->plans->findById($id);
+    }
+
+    public function updatePlan(int $id, array $data): array
+    {
+        $plan = $this->plans->findById($id);
+        if ($plan === null) {
+            throw new NotFoundException('Plan not found.');
+        }
+
+        $this->plans->update($id, [
+            'name'          => $data['name']          ?? $plan['name'],
+            'price'         => isset($data['price']) ? (int) $data['price'] : $plan['price'],
+            'student_limit' => array_key_exists('student_limit', $data)
+                ? ($data['student_limit'] !== '' && $data['student_limit'] !== null ? (int) $data['student_limit'] : null)
+                : $plan['student_limit'],
+            'description'   => $data['description']  ?? $plan['description'],
+        ]);
+
+        return $this->plans->findById($id);
     }
 
     // -------------------------------------------------------------------------
@@ -276,11 +323,15 @@ class PlatformService extends BaseService
         $activeSchools    = $this->schools->countByStatus('ACTIVE');
         $suspendedSchools = $this->schools->countByStatus('SUSPENDED');
 
-        $planCounts = $this->schools->countByPlan();
-        $mrr        = 0;
-
+        $planCounts  = $this->schools->countByPlan();
+        $allPlans    = $this->plans->allActive();
+        $priceByName = [];
+        foreach ($allPlans as $p) {
+            $priceByName[$p['name']] = (int) $p['price'];
+        }
+        $mrr = 0;
         foreach ($planCounts as $row) {
-            $price = self::PLAN_PRICES[$row['plan']] ?? self::PLAN_PRICES['Premium'];
+            $price = $priceByName[$row['plan']] ?? 0;
             $mrr  += $price * (int) $row['count'];
         }
 
@@ -304,6 +355,36 @@ class PlatformService extends BaseService
             'total_admins'      => $roleCounts['SCHOOL_ADMIN'] ?? 0,
             'total_users'       => array_sum($roleCounts),
         ];
+    }
+
+    public function getGrowthChart(): array
+    {
+        $pdo  = $this->schools->getPdo();
+        $stmt = $pdo->query(
+            "SELECT DATE_FORMAT(created_at, '%b') AS month,
+                    DATE_FORMAT(created_at, '%Y-%m') AS month_key,
+                    COUNT(*) AS count
+               FROM schools
+              WHERE created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+              GROUP BY month_key, month
+              ORDER BY month_key ASC
+              LIMIT 6"
+        );
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Fill in the last 6 months in order, with 0 for missing months
+        $result = [];
+        for ($i = 5; $i >= 0; $i--) {
+            $key   = date('Y-m', strtotime("-{$i} months"));
+            $label = date('M', strtotime("-{$i} months"));
+            $found = array_filter($rows, fn($r) => $r['month_key'] === $key);
+            $result[] = [
+                'month' => $label,
+                'count' => $found ? (int) array_values($found)[0]['count'] : 0,
+            ];
+        }
+
+        return $result;
     }
 
     public function getSchoolStats(int $id): array

@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Building2, CreditCard, Activity, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '../../../common/ui/card';
 import { Button } from '../../../common/ui/button';
+import { platformService } from '../../../common/services/platformService';
 
 const getSchoolColor = (name) => {
   const colors = [
@@ -22,6 +23,15 @@ const getSchoolColor = (name) => {
 export default function DashboardPage({ schools, auditLogs, stats }) {
   const nav = useNavigate();
   const recentSignups = schools.slice(0, 2);
+  const [chartData, setChartData] = useState([]);
+
+  useEffect(() => {
+    platformService.getGrowthChart()
+      .then(d => setChartData(Array.isArray(d) ? d : []))
+      .catch(() => {});
+  }, []);
+
+  const maxCount = Math.max(...chartData.map(d => d.count), 1);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
@@ -92,24 +102,54 @@ export default function DashboardPage({ schools, auditLogs, stats }) {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Chart */}
         <div className="lg:col-span-8 bg-surface border border-border rounded-2xl p-6 sm:p-8">
-          <h3 className="text-base font-bold text-text-primary mb-6">Active Subscriptions Growth</h3>
-          <div className="h-64 relative flex items-end justify-between px-2 sm:px-6 border-b border-border pb-2">
-            {/* Grid Lines */}
-            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-8 pt-4">
-              <div className="border-b border-zinc-100 dark:border-zinc-800/40 w-full"></div>
-              <div className="border-b border-zinc-100 dark:border-zinc-800/40 w-full"></div>
-              <div className="border-b border-zinc-100 dark:border-zinc-800/40 w-full"></div>
-              <div className="border-b border-zinc-100 dark:border-zinc-800/40 w-full"></div>
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-base font-bold text-text-primary">School Registrations — Last 6 Months</h3>
+            <span className="text-xs font-bold text-text-muted bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded-lg">
+              {chartData.reduce((s, d) => s + d.count, 0)} total
+            </span>
+          </div>
+          <div className="relative" style={{ height: '220px' }}>
+            {/* Horizontal grid lines */}
+            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="border-b border-zinc-100 dark:border-zinc-800 w-full" />
+              ))}
             </div>
-            {/* Chart bars */}
-            {[45, 60, 55, 78, 92, 100].map((h, i) => (
-              <div key={i} className="flex-1 flex flex-col items-center group cursor-pointer z-10">
-                <div
-                  className="w-8 sm:w-12 bg-primary/10 border-t-2 border-primary rounded-t group-hover:bg-primary/20 transition-all"
-                  style={{ height: `${h * 1.8}px` }}
-                ></div>
-                <span className="mt-2 text-xs text-text-muted font-medium">{['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'][i]}</span>
-              </div>
+
+            {/* Bars */}
+            <div className="absolute inset-0 flex items-end gap-3 px-2 pb-0">
+              {chartData.length === 0 ? (
+                <div className="flex-1 flex items-center justify-center text-xs text-text-muted pb-8">Loading…</div>
+              ) : chartData.map((d, i) => {
+                const BAR_COLORS = [
+                  'bg-violet-500', 'bg-blue-500', 'bg-cyan-500',
+                  'bg-teal-500',  'bg-emerald-500', 'bg-primary',
+                ];
+                const HOVER_COLORS = [
+                  'hover:bg-violet-400', 'hover:bg-blue-400', 'hover:bg-cyan-400',
+                  'hover:bg-teal-400',   'hover:bg-emerald-400', 'hover:bg-primary/80',
+                ];
+                const heightPx = Math.max(8, (d.count / maxCount) * 180);
+                return (
+                  <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative">
+                    {/* Tooltip */}
+                    <div className="absolute bottom-full mb-2 bg-zinc-900 dark:bg-zinc-700 text-zinc-50 text-[10px] font-bold px-2 py-1 rounded shadow opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20">
+                      {d.count} school{d.count !== 1 ? 's' : ''}
+                    </div>
+                    <div
+                      className={`w-full rounded-t-lg transition-all duration-200 ${BAR_COLORS[i % BAR_COLORS.length]} ${HOVER_COLORS[i % HOVER_COLORS.length]}`}
+                      style={{ height: `${heightPx}px` }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Month labels */}
+          <div className="flex gap-3 px-2 mt-2">
+            {chartData.map((d, i) => (
+              <div key={i} className="flex-1 text-center text-xs text-text-muted font-semibold">{d.month}</div>
             ))}
           </div>
         </div>

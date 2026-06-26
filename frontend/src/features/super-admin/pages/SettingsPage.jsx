@@ -215,7 +215,13 @@ export default function SettingsPage({ auditLogs }) {
                     </div>
                   </TableCell>
                   <TableCell className="font-mono text-xs">{log.target_school || 'Platform'}</TableCell>
-                  <TableCell className="text-xs">{log.user || 'System'}</TableCell>
+                  <TableCell className="text-xs">
+                    {log.user
+                      ? log.user_role
+                        ? `${log.user} (${log.user_role.replace('_', ' ')})`
+                        : log.user
+                      : 'System'}
+                  </TableCell>
                   <TableCell className="font-mono text-xs text-text-muted">{log.created_at || log.date}</TableCell>
                   <TableCell>
                     <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-green-500/10 text-green-600">

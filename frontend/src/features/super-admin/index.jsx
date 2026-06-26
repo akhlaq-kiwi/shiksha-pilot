@@ -108,11 +108,35 @@ export default function SuperAdminPortal() {
     setCreating(true);
     setError('');
     try {
+      let effectivePlan = newSchool.plan;
+
+      if (newSchool.plan === 'Custom') {
+        const created = await platformService.createPlan({
+          name:          newSchool.custom_plan_name || 'Custom',
+          price:         parseInt(newSchool.custom_price, 10) || 0,
+          student_limit: newSchool.custom_limit ? parseInt(newSchool.custom_limit, 10) : null,
+          description:   newSchool.custom_desc || null,
+          type:          'custom',
+        });
+        effectivePlan = created.name;
+      } else if (newSchool.plan === 'Trial') {
+        const created = await platformService.createPlan({
+          name:           `Trial (${newSchool.trial_duration} ${newSchool.trial_unit})`,
+          price:          0,
+          student_limit:  null,
+          description:    `Free trial for ${newSchool.trial_duration} ${newSchool.trial_unit}(s).`,
+          type:           'trial',
+          trial_duration: parseInt(newSchool.trial_duration, 10),
+          trial_unit:     newSchool.trial_unit,
+        });
+        effectivePlan = created.name;
+      }
+
       await platformService.inviteSchool({
         school_name:    newSchool.name,
         subdomain:      newSchool.subdomain.toLowerCase(),
         contact_phone:  newSchool.contact_phone || '',
-        plan:           newSchool.plan,
+        plan:           effectivePlan,
         admin_phone:    newSchool.admin_phone || '',
         admin_password: newSchool.admin_password || '',
       });

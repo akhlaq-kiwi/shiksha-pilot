@@ -21,9 +21,10 @@ const PRESET_PLANS = [
 const EMPTY = {
   name: '', subdomain: '', plan: 'Premium',
   contact_phone: '', admin_phone: '', admin_password: '',
-  // trial / custom fields
+  // trial fields
   trial_duration: '1', trial_unit: 'month',
-  custom_plan_name: '', custom_price: '',
+  // custom plan fields
+  custom_plan_name: '', custom_price: '', custom_limit: '', custom_desc: '',
 };
 
 export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating }) {
@@ -128,6 +129,14 @@ export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating
                 <label className="text-xs text-text-secondary font-semibold">Monthly Price (₹)</label>
                 <Input type="number" min="0" placeholder="e.g. 14999" value={form.custom_price} onChange={set('custom_price')} required={isCustom} />
               </div>
+              <div className="space-y-1">
+                <label className="text-xs text-text-secondary font-semibold">Student Limit</label>
+                <Input type="number" min="0" placeholder="Leave blank for unlimited" value={form.custom_limit} onChange={set('custom_limit')} />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-text-secondary font-semibold">Description</label>
+              <Input placeholder="Brief description of this plan" value={form.custom_desc} onChange={set('custom_desc')} />
             </div>
           </div>
         )}

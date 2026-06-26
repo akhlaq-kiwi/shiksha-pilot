@@ -112,6 +112,29 @@ class PlatformController extends BaseController
         return $this->success($response, $this->service->getPlans());
     }
 
+    public function createPlan(Request $request, Response $response): Response
+    {
+        $actor = $this->authenticate($request);
+        $this->requireRole($actor, ['SUPER_ADMIN']);
+
+        $data = RequestParser::body($request);
+        $plan = $this->service->createPlan($data);
+
+        return $this->success($response, $plan, 'Plan created successfully.', 201);
+    }
+
+    public function updatePlan(Request $request, Response $response, array $args): Response
+    {
+        $actor = $this->authenticate($request);
+        $this->requireRole($actor, ['SUPER_ADMIN']);
+
+        $id   = (int) ($args['id'] ?? 0);
+        $data = RequestParser::body($request);
+        $plan = $this->service->updatePlan($id, $data);
+
+        return $this->success($response, $plan, 'Plan updated successfully.');
+    }
+
     // -------------------------------------------------------------------------
     // Subscriptions
     // -------------------------------------------------------------------------
@@ -146,6 +169,14 @@ class PlatformController extends BaseController
         $this->requireRole($actor, ['SUPER_ADMIN']);
 
         return $this->success($response, $this->service->getStats());
+    }
+
+    public function getGrowthChart(Request $request, Response $response): Response
+    {
+        $actor = $this->authenticate($request);
+        $this->requireRole($actor, ['SUPER_ADMIN']);
+
+        return $this->success($response, $this->service->getGrowthChart());
     }
 
     public function getSchoolStats(Request $request, Response $response, array $args): Response
