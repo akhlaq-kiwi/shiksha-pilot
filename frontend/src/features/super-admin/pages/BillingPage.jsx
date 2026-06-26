@@ -180,7 +180,7 @@ export default function BillingPage({ schools, stats }) {
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-bold text-text-primary">Pricing Tiers</h3>
           <button
-            onClick={() => setShowNewPlan(true)}
+            onClick={() => document.getElementById('all-plans-table')?.scrollIntoView({ behavior: 'smooth' })}
             className="text-xs font-bold text-primary hover:underline"
           >
             View all plans ({plans.length}) →
@@ -221,7 +221,7 @@ export default function BillingPage({ schools, stats }) {
       </div>
 
       {/* All Plans Table */}
-      <Card>
+      <Card id="all-plans-table">
         <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-bold text-text-primary">All Plans</CardTitle>
           <Button variant="outline" size="sm" className="text-xs" onClick={() => setShowNewPlan(true)}>
