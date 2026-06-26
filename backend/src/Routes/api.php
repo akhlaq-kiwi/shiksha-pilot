@@ -27,6 +27,7 @@ return function (App $app) {
     $app->get('/api/platform/subscriptions', [PlatformController::class, 'getSubscriptions']);
     $app->get('/api/platform/subscription/audit-logs', [PlatformController::class, 'getAuditLogs']);
     $app->get('/api/platform/stats', [PlatformController::class, 'getStats']);
+    $app->get('/api/platform/schools/{id}/stats', [PlatformController::class, 'getSchoolStats']);
     $app->get('/api/platform/admins', [PlatformController::class, 'getAdmins']);
     $app->post('/api/platform/admins', [PlatformController::class, 'createAdmin']);
 

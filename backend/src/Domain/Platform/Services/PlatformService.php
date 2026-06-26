@@ -30,6 +30,20 @@ class PlatformService extends BaseService
         parent::__construct($logger);
     }
 
+    private function actorName(array $actor): string
+    {
+        if (!empty($actor['name'])) {
+            return (string) $actor['name'];
+        }
+        if (!empty($actor['id'])) {
+            $user = $this->users->findById((int) $actor['id']);
+            if ($user && !empty($user['name'])) {
+                return (string) $user['name'];
+            }
+        }
+        return $actor['phone'] ?? $actor['email'] ?? 'system';
+    }
+
     // -------------------------------------------------------------------------
     // Schools
     // -------------------------------------------------------------------------
@@ -80,7 +94,7 @@ class PlatformService extends BaseService
         $this->auditLogs->log(
             'Create school',
             (string) $data['name'],
-            (string) ($actor['name'] ?? $actor['email'] ?? 'system'),
+            $this->actorName($actor),
             (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'),
         );
 
@@ -122,6 +136,7 @@ class PlatformService extends BaseService
             'status'        => $newStatus,
             'contact_phone' => $data['contact_phone'] ?? $school['contact_phone'],
             'contact_email' => $data['contact_email'] ?? $school['contact_email'],
+            'portal_theme'  => $data['portal_theme']  ?? $school['portal_theme'] ?? 'default',
         ]);
 
         $action = ($school['status'] !== $newStatus)
@@ -131,7 +146,7 @@ class PlatformService extends BaseService
         $this->auditLogs->log(
             $action,
             $newName,
-            (string) ($actor['name'] ?? $actor['email'] ?? 'system'),
+            $this->actorName($actor),
             (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'),
         );
 
@@ -157,7 +172,7 @@ class PlatformService extends BaseService
         $this->auditLogs->log(
             'Delete school tenant',
             (string) $school['name'],
-            (string) ($actor['name'] ?? $actor['email'] ?? 'system'),
+            $this->actorName($actor),
             (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'),
         );
     }
@@ -269,16 +284,53 @@ class PlatformService extends BaseService
             $mrr  += $price * (int) $row['count'];
         }
 
-        $pdo        = $this->schools->getPdo();
-        $stmt       = $pdo->query("SELECT COUNT(*) AS count FROM users");
-        $usersCount = (int) $stmt->fetch(PDO::FETCH_ASSOC)['count'];
+        $pdo = $this->schools->getPdo();
+
+        $roleStmt = $pdo->query(
+            "SELECT role, COUNT(*) AS count FROM users GROUP BY role"
+        );
+        $roleCounts = [];
+        foreach ($roleStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $roleCounts[$row['role']] = (int) $row['count'];
+        }
 
         return [
-            'schools_count'    => $totalSchools,
-            'active_schools'   => $activeSchools,
+            'schools_count'     => $totalSchools,
+            'active_schools'    => $activeSchools,
             'suspended_schools' => $suspendedSchools,
-            'billing_mrr'      => $mrr,
-            'total_users'      => ($activeSchools * 1250) + $usersCount,
+            'billing_mrr'       => $mrr,
+            'total_students'    => $roleCounts['STUDENT']      ?? 0,
+            'total_teachers'    => $roleCounts['TEACHER']      ?? 0,
+            'total_admins'      => $roleCounts['SCHOOL_ADMIN'] ?? 0,
+            'total_users'       => array_sum($roleCounts),
+        ];
+    }
+
+    public function getSchoolStats(int $id): array
+    {
+        $school = $this->schools->findById($id);
+        if ($school === null) {
+            throw new \App\Shared\Exceptions\NotFoundException('School not found.');
+        }
+
+        $pdo  = $this->schools->getPdo();
+        $stmt = $pdo->prepare(
+            "SELECT role, COUNT(*) AS count FROM users WHERE school_id = :id GROUP BY role"
+        );
+        $stmt->execute(['id' => $id]);
+
+        $counts = ['STUDENT' => 0, 'TEACHER' => 0, 'SCHOOL_ADMIN' => 0];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $counts[$row['role']] = (int) $row['count'];
+        }
+
+        return [
+            'students'     => $counts['STUDENT'],
+            'teachers'     => $counts['TEACHER'],
+            'school_admins' => $counts['SCHOOL_ADMIN'],
+            'total_staff'  => $counts['TEACHER'] + $counts['SCHOOL_ADMIN'],
+            'plan'         => $school['plan'],
+            'status'       => $school['status'],
         ];
     }
 }

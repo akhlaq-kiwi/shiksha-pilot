@@ -147,4 +147,13 @@ class PlatformController extends BaseController
 
         return $this->success($response, $this->service->getStats());
     }
+
+    public function getSchoolStats(Request $request, Response $response, array $args): Response
+    {
+        $actor = $this->authenticate($request);
+        $this->requireRole($actor, ['SUPER_ADMIN']);
+
+        $id = (int) ($args['id'] ?? 0);
+        return $this->success($response, $this->service->getSchoolStats($id));
+    }
 }

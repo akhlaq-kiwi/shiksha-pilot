@@ -42,15 +42,15 @@ export default function DashboardPage({ schools, auditLogs, stats }) {
       </div>
 
       {/* Dashboard Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <Card className="shadow-sm">
           <CardContent className="p-6">
             <div className="flex justify-between items-start mb-4">
               <div className="p-2.5 bg-primary/10 rounded-xl text-primary"><Building2 className="h-5 w-5" /></div>
-              <span className="text-green-600 text-xs font-bold bg-green-500/10 px-2 py-0.5 rounded-full">+{schools.length} total</span>
+              <span className="text-green-600 text-xs font-bold bg-green-500/10 px-2 py-0.5 rounded-full">{stats.active_schools || 0} active</span>
             </div>
             <p className="text-text-muted text-xs uppercase tracking-wider font-semibold">Total Schools</p>
-            <p className="text-3xl font-black text-text-primary mt-1 font-display">{schools.length || stats.schools_count}</p>
+            <p className="text-3xl font-black text-text-primary mt-1 font-display">{schools.length || stats.schools_count || 0}</p>
           </CardContent>
         </Card>
 
@@ -58,10 +58,10 @@ export default function DashboardPage({ schools, auditLogs, stats }) {
           <CardContent className="p-6">
             <div className="flex justify-between items-start mb-4">
               <div className="p-2.5 bg-teal-500/10 rounded-xl text-teal-600"><CreditCard className="h-5 w-5" /></div>
-              <span className="text-green-600 text-xs font-bold bg-green-500/10 px-2 py-0.5 rounded-full">Normal cycle</span>
+              <span className="text-green-600 text-xs font-bold bg-green-500/10 px-2 py-0.5 rounded-full">MRR</span>
             </div>
             <p className="text-text-muted text-xs uppercase tracking-wider font-semibold">Monthly Revenue</p>
-            <p className="text-3xl font-black text-text-primary mt-1 font-display">₹{(stats.billing_mrr).toLocaleString()}</p>
+            <p className="text-3xl font-black text-text-primary mt-1 font-display">₹{(stats.billing_mrr || 0).toLocaleString()}</p>
           </CardContent>
         </Card>
 
@@ -69,10 +69,21 @@ export default function DashboardPage({ schools, auditLogs, stats }) {
           <CardContent className="p-6">
             <div className="flex justify-between items-start mb-4">
               <div className="p-2.5 bg-amber-500/10 rounded-xl text-amber-600"><Activity className="h-5 w-5" /></div>
-              <span className="text-blue-600 text-xs font-bold bg-blue-500/10 px-2 py-0.5 rounded-full">Active isolation</span>
+              <span className="text-amber-600 text-xs font-bold bg-amber-500/10 px-2 py-0.5 rounded-full">Registered</span>
             </div>
-            <p className="text-text-muted text-xs uppercase tracking-wider font-semibold">Simulated Users</p>
-            <p className="text-3xl font-black text-text-primary mt-1 font-display">{(stats.total_users).toLocaleString()}</p>
+            <p className="text-text-muted text-xs uppercase tracking-wider font-semibold">Total Students</p>
+            <p className="text-3xl font-black text-text-primary mt-1 font-display">{(stats.total_students || 0).toLocaleString()}</p>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm">
+          <CardContent className="p-6">
+            <div className="flex justify-between items-start mb-4">
+              <div className="p-2.5 bg-indigo-500/10 rounded-xl text-indigo-600"><Activity className="h-5 w-5" /></div>
+              <span className="text-indigo-600 text-xs font-bold bg-indigo-500/10 px-2 py-0.5 rounded-full">Across schools</span>
+            </div>
+            <p className="text-text-muted text-xs uppercase tracking-wider font-semibold">Total Teachers</p>
+            <p className="text-3xl font-black text-text-primary mt-1 font-display">{(stats.total_teachers || 0).toLocaleString()}</p>
           </CardContent>
         </Card>
       </div>

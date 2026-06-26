@@ -195,7 +195,7 @@ export default function SettingsPage({ auditLogs }) {
             <TableRow>
               <TableHead>Action</TableHead>
               <TableHead>Target</TableHead>
-              <TableHead>Actor</TableHead>
+              <TableHead>Performed By</TableHead>
               <TableHead>Date & Time</TableHead>
               <TableHead>Status</TableHead>
             </TableRow>

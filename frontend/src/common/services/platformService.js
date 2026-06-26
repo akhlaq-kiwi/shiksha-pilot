@@ -41,6 +41,10 @@ export const platformService = {
     return apiClient.get('/api/platform/stats');
   },
 
+  async getSchoolStats(id) {
+    return apiClient.get(`/api/platform/schools/${id}/stats`);
+  },
+
   async getAdmins() {
     return apiClient.get('/api/platform/admins');
   },

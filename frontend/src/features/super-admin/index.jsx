@@ -27,9 +27,9 @@ export default function SuperAdminPortal() {
   const [schools,   setSchools]   = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
   const [plans,     setPlans]     = useState([]);
-  const [stats,     setStats]     = useState({
+  const [stats, setStats] = useState({
     schools_count: 0, active_schools: 0, suspended_schools: 0,
-    billing_mrr: 1200000, total_users: 7260,
+    billing_mrr: 0, total_students: 0, total_teachers: 0, total_users: 0,
   });
   const [error,   setError]   = useState('');
   const [isCreateSchoolOpen, setIsCreateSchoolOpen] = useState(false);
@@ -158,14 +158,6 @@ export default function SuperAdminPortal() {
               );
             })}
           </nav>
-        </div>
-        <div className="hidden md:block bg-zinc-50 border border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800 rounded-xl p-4">
-          <p className="text-xs font-bold text-primary mb-1">Infrastructure Health</p>
-          <p className="text-[11px] text-text-muted mb-3">All systems operational.</p>
-          <div className="flex items-center gap-1.5 text-[10px] text-green-600 font-bold">
-            <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
-            <span>99.98% Uptime</span>
-          </div>
         </div>
       </aside>
 
