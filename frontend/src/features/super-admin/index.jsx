@@ -163,7 +163,7 @@ export default function SuperAdminPortal() {
     <div className="flex flex-col md:flex-row gap-8 w-full min-h-[calc(100vh-140px)]">
 
       {/* Sidebar */}
-      <aside className="w-full md:w-[240px] flex-shrink-0 flex flex-col justify-between border-r border-border pr-6 py-2 space-y-6">
+      <aside className="w-full md:w-[240px] flex-shrink-0 flex flex-col justify-between border-r border-border pr-6 py-2 space-y-6 md:sticky md:top-24 md:h-[calc(100vh-180px)] md:overflow-y-auto scrollbar-none">
         <div>
           <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-4 px-3">Management</p>
           <nav className="flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 scrollbar-none">

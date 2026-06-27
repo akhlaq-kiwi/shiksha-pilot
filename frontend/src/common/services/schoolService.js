@@ -21,6 +21,22 @@ export const schoolService = {
     return apiClient.post('/api/school/students', studentData);
   },
 
+  getStudentById(id) {
+    return apiClient.get(`/api/school/students/${id}`);
+  },
+
+  updateStudent(id, studentData) {
+    return apiClient.put(`/api/school/students/${id}`, studentData);
+  },
+
+  uploadDocument(formData) {
+    return apiClient.post('/api/school/upload', formData);
+  },
+
+  getAcademicYears() {
+    return apiClient.get('/api/school/academic-years');
+  },
+
   getStaff() {
     return apiClient.get('/api/school/staff');
   },

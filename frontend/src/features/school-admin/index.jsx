@@ -8,7 +8,7 @@ import {
 import DashboardPage from './pages/DashboardPage';
 import ProfilePage from './pages/ProfilePage';
 import AcademicPage from './pages/AcademicPage';
-import StudentsPage from './pages/StudentsPage';
+import ClassesPage from './pages/ClassesPage';
 import StaffPage from './pages/StaffPage';
 import TimetablePage from './pages/TimetablePage';
 import AttendancePage from './pages/AttendancePage';
@@ -23,7 +23,7 @@ const NAV_ITEMS = [
   { path: '/school-admin',            label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { path: '/school-admin/profile',    label: 'School Profile', icon: School },
   { path: '/school-admin/academic',   label: 'Academic', icon: BookOpen },
-  { path: '/school-admin/students',   label: 'Students', icon: Users },
+  { path: '/school-admin/classes',    label: 'Classes', icon: Users },
   { path: '/school-admin/staff',      label: 'Staff', icon: UserCog },
   { path: '/school-admin/timetable',  label: 'Timetable', icon: Clock },
   { path: '/school-admin/attendance', label: 'Attendance', icon: ClipboardCheck },
@@ -51,7 +51,7 @@ export default function SchoolAdminPortal() {
       <button
         key={item.path}
         onClick={() => nav(item.path)}
-        className={`flex items-center gap-3 pl-1 pr-3 py-2 rounded-lg text-sm font-semibold transition-all flex-shrink-0 w-full text-left ${active ? 'bg-zinc-900 text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900' : 'text-text-secondary hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800'}`}
+        className={`flex items-center gap-3 px-2.5 py-2.5 rounded-lg text-sm font-semibold transition-all flex-shrink-0 w-full text-left ${active ? 'bg-zinc-900 text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900' : 'text-text-secondary hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800'}`}
       >
         <Icon className="h-4 w-4 flex-shrink-0" />
         <span>{item.label}</span>
@@ -60,10 +60,10 @@ export default function SchoolAdminPortal() {
   };
 
   return (
-    <div className="flex flex-col md:flex-row gap-8 w-full min-h-[calc(100vh-140px)]">
+    <div className="flex flex-col md:flex-row gap-6 w-full min-h-[calc(100vh-140px)]">
 
       {/* Sidebar */}
-      <aside className="w-full md:w-[200px] flex-shrink-0 flex flex-col justify-between border-r border-border pr-2 py-2 space-y-6">
+      <aside className="w-full md:w-[240px] flex-shrink-0 flex flex-col justify-between border-r border-border pr-4 py-2 space-y-6 md:sticky md:top-24 md:h-[calc(100vh-180px)] md:overflow-y-auto scrollbar-none">
         <div>
           <nav className="flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 scrollbar-none">
             {NAV_ITEMS.map(navBtn)}
@@ -81,7 +81,7 @@ export default function SchoolAdminPortal() {
           <Route index element={<DashboardPage onNavigate={(p) => nav(`/school-admin/${p}`)} />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="academic" element={<AcademicPage />} />
-          <Route path="students" element={<StudentsPage />} />
+          <Route path="classes" element={<ClassesPage />} />
           <Route path="staff" element={<StaffPage />} />
           <Route path="timetable" element={<TimetablePage />} />
           <Route path="attendance" element={<AttendancePage />} />

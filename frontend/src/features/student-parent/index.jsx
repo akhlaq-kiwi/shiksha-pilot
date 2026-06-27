@@ -161,7 +161,7 @@ function AppSidebar({ currentPage, onNavigate, isParent, user, selectedChild, on
   ];
 
   return (
-    <aside className="w-full md:w-[240px] flex-shrink-0 flex flex-col justify-between border-r border-border pr-6 py-2 space-y-6">
+    <aside className="w-full md:w-[240px] flex-shrink-0 flex flex-col justify-between border-r border-border pr-6 py-2 space-y-6 md:sticky md:top-24 md:h-[calc(100vh-180px)] md:overflow-y-auto scrollbar-none">
       <div>
         {/* Identity card */}
         <div className="mb-5 p-4 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-border">

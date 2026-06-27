@@ -37,7 +37,10 @@ return function (App $app) {
     // School Admin Domain
     $app->get('/api/school/stats', [SchoolAdminController::class, 'getDashboardStats']);
     $app->get('/api/school/students', [SchoolAdminController::class, 'getStudents']);
+    $app->get('/api/school/students/{id}', [SchoolAdminController::class, 'getStudentById']);
     $app->post('/api/school/students', [SchoolAdminController::class, 'createStudent']);
+    $app->put('/api/school/students/{id}', [SchoolAdminController::class, 'updateStudent']);
+    $app->post('/api/school/upload', [SchoolAdminController::class, 'uploadDocument']);
     $app->get('/api/school/staff', [SchoolAdminController::class, 'getStaff']);
     $app->post('/api/school/staff', [SchoolAdminController::class, 'createStaff']);
     $app->get('/api/school/classes', [SchoolAdminController::class, 'getClasses']);

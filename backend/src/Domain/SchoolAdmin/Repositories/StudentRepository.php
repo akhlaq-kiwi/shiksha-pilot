@@ -21,22 +21,58 @@ class StudentRepository extends BaseRepository
             $bindings[':class_id'] = $filters['class_id'];
         }
 
-        if (!empty($filters['status'])) {
+        if (!empty($filters['status']) && $filters['status'] !== 'All') {
             $where .= ' AND s.status = :status';
             $bindings[':status'] = $filters['status'];
         }
 
+        if (!empty($filters['search'])) {
+            $where .= ' AND (s.name LIKE :search OR s.admission_no LIKE :search OR s.sr_no LIKE :search OR s.first_name LIKE :search OR s.last_name LIKE :search)';
+            $bindings[':search'] = '%' . $filters['search'] . '%';
+        }
+
+        // Handle sorting
+        $allowedSort = ['s.id', 's.name', 's.sr_no', 's.roll_no'];
+        $sortBy = 's.id';
+        if (!empty($filters['sort_by']) && in_array('s.' . $filters['sort_by'], $allowedSort, true)) {
+            $sortBy = 's.' . $filters['sort_by'];
+        } elseif (!empty($filters['sort_by']) && in_array($filters['sort_by'], $allowedSort, true)) {
+            $sortBy = $filters['sort_by'];
+        }
+        
+        $sortOrder = 'DESC';
+        if (!empty($filters['sort_order']) && in_array(strtoupper($filters['sort_order']), ['ASC', 'DESC'], true)) {
+            $sortOrder = strtoupper($filters['sort_order']);
+        }
+
         $sql  = "
-            SELECT s.*, c.name AS class_name, c.section
+            SELECT s.*, c.name AS class_name, c.section, ay.name AS academic_year_name
             FROM students s
             LEFT JOIN classes c ON s.class_id = c.id
+            LEFT JOIN academic_years ay ON s.academic_year_id = ay.id
             WHERE {$where}
-            ORDER BY s.id DESC
+            ORDER BY {$sortBy} {$sortOrder}
         ";
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($bindings);
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function findDetailById(int $schoolId, int $id): ?array
+    {
+        $sql = "
+            SELECT s.*, c.name AS class_name, c.section, ay.name AS academic_year_name
+            FROM students s
+            LEFT JOIN classes c ON s.class_id = c.id
+            LEFT JOIN academic_years ay ON s.academic_year_id = ay.id
+            WHERE s.school_id = :school_id AND s.id = :id
+            LIMIT 1
+        ";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([':school_id' => $schoolId, ':id' => $id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row !== false ? $row : null;
     }
 
     public function countBySchool(int $schoolId, string $status = 'ACTIVE'): int

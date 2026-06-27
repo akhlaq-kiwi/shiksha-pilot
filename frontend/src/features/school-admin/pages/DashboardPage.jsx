@@ -476,49 +476,58 @@ export default function DashboardPage({ onNavigate }) {
             <h3 className="text-sm font-bold text-text-primary">Monthly Fee Collection</h3>
           </div>
           <div className="w-full overflow-x-auto scrollbar-none">
-            <div className="min-w-[760px] h-64 relative flex items-end justify-between px-2 pb-6 pt-10">
-              {/* Y-Axis Gridlines */}
-              <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-12 pt-10 px-2">
+            <div className="min-w-[760px] flex items-stretch h-64 pt-6 pb-2">
+              {/* Y-Axis Labels Column */}
+              <div className="flex flex-col justify-between text-right pr-3 pb-8 w-16 select-none pointer-events-none">
                 {[200000, 150000, 100000, 50000].map(v => (
-                  <div key={v} className="flex items-center gap-4">
-                    <span className="text-[9px] text-text-muted w-14 text-right">₹{v.toLocaleString()}</span>
-                    <div className="flex-1 border-b border-zinc-100 dark:border-zinc-800/40"></div>
-                  </div>
+                  <span key={v} className="text-[9px] text-text-muted font-bold">₹{v.toLocaleString()}</span>
                 ))}
+                <span className="text-[9px] text-text-muted font-bold">₹0</span>
               </div>
 
-              {/* Bars */}
-              {FEE_DATA.map((item, i) => {
-                const maxVal = 200000;
-                const percentage = (item.amount / maxVal) * 100;
-                return (
-                  <div key={i} className="flex-1 flex flex-col items-center group cursor-pointer z-10 relative">
-                    {/* Amount Label on top of bar */}
-                    <span className="text-[9px] font-bold text-text-muted mb-1.5 select-none transition-opacity duration-300 opacity-80 group-hover:opacity-100 text-center whitespace-nowrap">
-                      ₹{item.amount.toLocaleString()}
-                    </span>
+              {/* Chart Grid & Bars Area */}
+              <div className="flex-1 relative flex items-end justify-around pb-8 border-b border-border pr-2">
+                {/* Y-Axis Horizontal Gridlines */}
+                <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-8 pt-1">
+                  {[200000, 150000, 100000, 50000].map(v => (
+                    <div key={v} className="w-full border-b border-zinc-100 dark:border-zinc-800/40"></div>
+                  ))}
+                  <div></div>
+                </div>
 
-                    {/* Bar */}
-                    <div 
-                      className="w-10 bg-primary/15 border-t-2 border-primary rounded-t-md hover:bg-primary/25 transition-all duration-700 ease-out"
-                      style={{ height: isAnimated ? `${percentage * 1.6}px` : '0px' }}
-                    ></div>
+                {/* Bars */}
+                {FEE_DATA.map((item, i) => {
+                  const maxVal = 200000;
+                  const percentage = (item.amount / maxVal) * 100;
+                  return (
+                    <div key={i} className="flex-1 flex flex-col items-center group cursor-pointer z-10 relative">
+                      {/* Amount Label on top of bar */}
+                      <span className="text-[9px] font-bold text-text-muted mb-1.5 select-none transition-opacity duration-300 opacity-80 group-hover:opacity-100 text-center whitespace-nowrap">
+                        ₹{item.amount.toLocaleString()}
+                      </span>
 
-                    {/* X-Axis Label */}
-                    <span className="absolute -bottom-6 text-[10px] font-semibold text-text-muted mt-2">{item.month}</span>
+                      {/* Bar */}
+                      <div 
+                        className="w-10 bg-primary/15 border-t-2 border-primary rounded-t-md hover:bg-primary/25 transition-all duration-700 ease-out"
+                        style={{ height: isAnimated ? `${percentage}%` : '0%' }}
+                      ></div>
 
-                    {/* Tooltip Popover */}
-                    <div className="absolute bottom-full mb-3 hidden group-hover:flex flex-col items-center pointer-events-none z-30 animate-in fade-in slide-in-from-bottom-1 duration-200">
-                      <div className="bg-zinc-950 text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900 text-[10px] font-semibold p-2.5 rounded-lg shadow-lg whitespace-nowrap flex flex-col gap-0.5 border border-border/10">
-                        <span className="font-bold border-b border-zinc-800 dark:border-zinc-200 pb-0.5 mb-1">{item.label}</span>
-                        <span>Fee Collected: ₹{item.amount.toLocaleString()}</span>
-                        <span>Students Paid: {item.studentsPaid}</span>
+                      {/* X-Axis Label */}
+                      <span className="absolute -bottom-6 text-[10px] font-semibold text-text-muted mt-2">{item.month}</span>
+
+                      {/* Tooltip Popover */}
+                      <div className="absolute bottom-full mb-3 hidden group-hover:flex flex-col items-center pointer-events-none z-30 animate-in fade-in slide-in-from-bottom-1 duration-200">
+                        <div className="bg-zinc-950 text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900 text-[10px] font-semibold p-2.5 rounded-lg shadow-lg whitespace-nowrap flex flex-col gap-0.5 border border-border/10">
+                          <span className="font-bold border-b border-zinc-800 dark:border-zinc-200 pb-0.5 mb-1">{item.label}</span>
+                          <span>Fee Collected: ₹{item.amount.toLocaleString()}</span>
+                          <span>Students Paid: {item.studentsPaid}</span>
+                        </div>
+                        <div className="w-1.5 h-1.5 bg-zinc-950 dark:bg-zinc-50 rotate-45 -mt-1"></div>
                       </div>
-                      <div className="w-1.5 h-1.5 bg-zinc-950 dark:bg-zinc-50 rotate-45 -mt-1"></div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
@@ -529,57 +538,66 @@ export default function DashboardPage({ onNavigate }) {
             <h3 className="text-sm font-bold text-text-primary">Salary Disbursement</h3>
           </div>
           <div className="w-full overflow-x-auto scrollbar-none">
-            <div className="min-w-[760px] h-64 relative flex items-end justify-between px-2 pb-6 pt-10">
-              {/* Y-Axis Gridlines */}
-              <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-12 pt-10 px-2">
+            <div className="min-w-[760px] flex items-stretch h-64 pt-6 pb-2">
+              {/* Y-Axis Labels Column */}
+              <div className="flex flex-col justify-between text-right pr-3 pb-8 w-16 select-none pointer-events-none">
                 {[100000, 75000, 50000, 25000].map(v => (
-                  <div key={v} className="flex items-center gap-4">
-                    <span className="text-[9px] text-text-muted w-14 text-right">₹{v.toLocaleString()}</span>
-                    <div className="flex-1 border-b border-zinc-100 dark:border-zinc-800/40"></div>
-                  </div>
+                  <span key={v} className="text-[9px] text-text-muted font-bold">₹{v.toLocaleString()}</span>
                 ))}
+                <span className="text-[9px] text-text-muted font-bold">₹0</span>
               </div>
 
-              {/* Bars */}
-              {SALARY_DATA.map((item, i) => {
-                const maxVal = 100000;
-                const percentage = (item.amount / maxVal) * 100;
-                return (
-                  <div 
-                    key={i} 
-                    onClick={() => {
-                      setSelectedSalaryMonth(item.month);
-                      setSelectedSalaryMonthLabel(item.label);
-                      setIsSalaryDialogOpen(true);
-                    }}
-                    className="flex-1 flex flex-col items-center group cursor-pointer z-10 relative"
-                  >
-                    {/* Amount Label on top of bar */}
-                    <span className="text-[9px] font-bold text-text-muted mb-1.5 select-none transition-opacity duration-300 opacity-80 group-hover:opacity-100 text-center whitespace-nowrap">
-                      ₹{item.amount.toLocaleString()}
-                    </span>
+              {/* Chart Grid & Bars Area */}
+              <div className="flex-1 relative flex items-end justify-around pb-8 border-b border-border pr-2">
+                {/* Y-Axis Gridlines */}
+                <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-8 pt-1">
+                  {[100000, 75000, 50000, 25000].map(v => (
+                    <div key={v} className="w-full border-b border-zinc-100 dark:border-zinc-800/40"></div>
+                  ))}
+                  <div></div>
+                </div>
 
-                    {/* Bar */}
+                {/* Bars */}
+                {SALARY_DATA.map((item, i) => {
+                  const maxVal = 100000;
+                  const percentage = (item.amount / maxVal) * 100;
+                  return (
                     <div 
-                      className="w-10 bg-indigo-500/10 border-t-2 border-indigo-500 rounded-t-md hover:bg-indigo-500/25 transition-all duration-700 ease-out"
-                      style={{ height: isAnimated ? `${percentage * 1.6}px` : '0px' }}
-                    ></div>
+                      key={i} 
+                      onClick={() => {
+                        setSelectedSalaryMonth(item.month);
+                        setSelectedSalaryMonthLabel(item.label);
+                        setIsSalaryDialogOpen(true);
+                      }}
+                      className="flex-1 flex flex-col items-center group cursor-pointer z-10 relative"
+                    >
+                      {/* Amount Label on top of bar */}
+                      <span className="text-[9px] font-bold text-text-muted mb-1.5 select-none transition-opacity duration-300 opacity-80 group-hover:opacity-100 text-center whitespace-nowrap">
+                        ₹{item.amount.toLocaleString()}
+                      </span>
 
-                    {/* X-Axis Label */}
-                    <span className="absolute -bottom-6 text-[10px] font-semibold text-text-muted mt-2">{item.month}</span>
+                      {/* Bar */}
+                      <div 
+                        className="w-10 bg-indigo-500/10 border-t-2 border-indigo-500 rounded-t-md hover:bg-indigo-500/25 transition-all duration-700 ease-out"
+                        style={{ height: isAnimated ? `${percentage}%` : '0%' }}
+                      ></div>
 
-                    {/* Tooltip Popover */}
-                    <div className="absolute bottom-full mb-3 hidden group-hover:flex flex-col items-center pointer-events-none z-30 animate-in fade-in slide-in-from-bottom-1 duration-200">
-                      <div className="bg-zinc-950 text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900 text-[10px] font-semibold p-2.5 rounded-lg shadow-lg whitespace-nowrap flex flex-col gap-0.5 border border-border/10">
-                        <span className="font-bold border-b border-zinc-800 dark:border-zinc-200 pb-0.5 mb-1">{item.label}</span>
-                        <span>Salary Disbursed: ₹{item.amount.toLocaleString()}</span>
-                        <span className="text-[9px] text-indigo-400 font-medium">Click to view staff list</span>
+                      {/* X-Axis Label */}
+                      <span className="absolute -bottom-6 text-[10px] font-semibold text-text-muted mt-2">{item.month}</span>
+
+                      {/* Tooltip Popover */}
+                      <div className="absolute bottom-full mb-3 hidden group-hover:flex flex-col items-center pointer-events-none z-30 animate-in fade-in slide-in-from-bottom-1 duration-200">
+                        <div className="bg-zinc-950 text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900 text-[10px] font-semibold p-2.5 rounded-lg shadow-lg whitespace-nowrap flex flex-col gap-0.5 border border-border/10">
+                          <span className="font-bold border-b border-zinc-800 dark:border-zinc-200 pb-0.5 mb-1">{item.label}</span>
+                          <span>Salary Disbursed: ₹{item.amount.toLocaleString()}</span>
+                          <span className="text-[9px] text-indigo-400 font-medium">Click to view staff list</span>
+                        </div>
+                        <div className="w-1.5 h-1.5 bg-zinc-950 dark:bg-zinc-50 rotate-45 -mt-1"></div>
                       </div>
-                      <div className="w-1.5 h-1.5 bg-zinc-950 dark:bg-zinc-50 rotate-45 -mt-1"></div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
@@ -591,7 +609,7 @@ export default function DashboardPage({ onNavigate }) {
         onClose={() => setIsSalaryDialogOpen(false)}
         title={`Salary Disbursement — ${selectedSalaryMonthLabel}`}
         description=""
-        className="max-w-2xl"
+        className="w-[90vw] md:max-w-3xl"
       >
         <Table>
           <TableHeader>
@@ -626,7 +644,7 @@ export default function DashboardPage({ onNavigate }) {
                       onClick={() => handleDownloadSalarySlip(staff, selectedSalaryMonthLabel)}
                       className="text-xs text-primary hover:underline font-semibold text-teal-600 dark:text-teal-400"
                     >
-                      Download PDF
+                      Download Salary Slip
                     </button>
                   ) : (
                     <span className="text-xs text-text-muted">--</span>

@@ -60,6 +60,51 @@ class SchoolAdminController extends BaseController
         return $this->success($response, $student, 'Student created', 201);
     }
 
+    public function getStudentById(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int) ($args['id'] ?? 0);
+        $student = $this->service->getStudentById($user, $id);
+
+        return $this->success($response, $student);
+    }
+
+    public function updateStudent(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int) ($args['id'] ?? 0);
+        $body = RequestParser::body($request);
+        $student = $this->service->updateStudent($user, $id, $body);
+
+        return $this->success($response, $student, 'Student updated successfully');
+    }
+
+    public function uploadDocument(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $uploadedFiles = $request->getUploadedFiles();
+        if (empty($uploadedFiles)) {
+            return $this->error($response, 'No files uploaded', 400);
+        }
+
+        $fileKey = array_key_first($uploadedFiles);
+        $uploadedFile = $uploadedFiles[$fileKey];
+
+        if ($uploadedFile->getError() !== UPLOAD_ERR_OK) {
+            return $this->error($response, 'Failed to upload file', 400);
+        }
+
+        $url = $this->service->handleFileUpload($uploadedFile);
+
+        return $this->success($response, ['url' => $url], 'File uploaded successfully');
+    }
+
     // -------------------------------------------------------------------------
     // Staff
     // -------------------------------------------------------------------------
