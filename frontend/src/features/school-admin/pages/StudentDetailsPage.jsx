@@ -107,7 +107,7 @@ function DocumentViewerModal({ docName, docPath, onClose }) {
 }
 
 // Receipt Modal View Component
-function ReceiptModal({ receipt, student, onClose }) {
+function ReceiptModal({ receipt, student, schoolName, allPayments = [], onClose }) {
   const handlePrint = () => {
     const printContent = document.getElementById('receipt-print-area').innerHTML;
     const originalContent = document.body.innerHTML;
@@ -117,12 +117,35 @@ function ReceiptModal({ receipt, student, onClose }) {
     window.location.reload(); // reload to re-bind React events cleanly
   };
 
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '—';
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return dateStr;
+    const options = { day: 'numeric', month: 'short', year: 'numeric' };
+    return date.toLocaleDateString('en-GB', options);
+  };
+
+  const groupPayments = allPayments.length 
+    ? allPayments.filter(p => p.receipt_no === receipt.receipt_no) 
+    : [receipt];
+
+  const academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+  
+  const sortedGroup = [...groupPayments].sort((a, b) => {
+    const idxA = academicMonths.indexOf(a.fee_month);
+    const idxB = academicMonths.indexOf(b.fee_month);
+    return idxA - idxB;
+  });
+
+  const totalAmountPaid = sortedGroup.reduce((sum, p) => sum + parseFloat(p.amount_paid || 0), 0);
+  const displaySchoolName = schoolName || 'SHIKSHA PILOT SCHOOL';
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
       <div className="bg-surface border border-border rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-zinc-50 dark:bg-zinc-900/50">
-          <h3 className="font-extrabold text-text-primary text-base tracking-tight">Fee Payment Receipt</h3>
+          <h3 className="font-extrabold text-text-primary text-base tracking-tight font-display">Fee Payment Receipt</h3>
           <button onClick={onClose} className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg transition-colors">
             <X className="h-4 w-4 text-text-secondary" />
           </button>
@@ -131,26 +154,36 @@ function ReceiptModal({ receipt, student, onClose }) {
         {/* Printable area */}
         <div className="p-8 space-y-6" id="receipt-print-area">
           <div className="text-center space-y-1">
-            <h2 className="text-xl font-black tracking-tight text-text-primary font-display">SHIKSHA PILOT SCHOOL</h2>
+            <h2 className="text-xl font-black tracking-tight text-text-primary font-display uppercase">{displaySchoolName}</h2>
             <p className="text-[10px] uppercase font-bold tracking-widest text-primary">Fee Payment Receipt</p>
           </div>
 
           <div className="border-y border-dashed border-border py-4 space-y-2 text-xs">
             <div className="flex justify-between"><span className="text-text-muted">Receipt No:</span> <span className="font-mono font-bold text-text-primary">{receipt.receipt_no}</span></div>
-            <div className="flex justify-between"><span className="text-text-muted">Date:</span> <span className="font-bold text-text-primary">{receipt.payment_date}</span></div>
+            <div className="flex justify-between"><span className="text-text-muted">Payment Date:</span> <span className="font-bold text-text-primary">{formatDate(receipt.payment_date)}</span></div>
+            <div className="flex justify-between"><span className="text-text-muted">Academic Session:</span> <span className="font-bold text-text-primary">{student.academic_year_name || student.academic_year || '2025–2026'}</span></div>
             <div className="flex justify-between"><span className="text-text-muted">Student Name:</span> <span className="font-extrabold text-text-primary uppercase">{student.name}</span></div>
-            <div className="flex justify-between"><span className="text-text-muted">Roll No / Class:</span> <span className="font-bold text-text-primary">{student.roll_no || '-'} / {student.class_name}</span></div>
+            <div className="flex justify-between"><span className="text-text-muted">Class & Section:</span> <span className="font-bold text-text-primary">{student.class_name} {student.section ? ` - Section ${student.section}` : ''}</span></div>
+            <div className="flex justify-between"><span className="text-text-muted">Roll Number / SR No:</span> <span className="font-bold text-text-primary">{student.roll_no || '—'} / {student.sr_no || '—'}</span></div>
           </div>
 
           <div className="space-y-4">
             <div className="bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-xl border border-border flex justify-between items-center">
               <div>
-                <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Fee Month</p>
-                <p className="text-sm font-black text-text-primary mt-0.5">{receipt.fee_month}</p>
+                <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">
+                  {sortedGroup.length > 1 ? 'Billing Months' : 'Billing Month'}
+                </p>
+                <p className="text-sm font-black text-text-primary mt-0.5 max-w-[200px] break-words">
+                  {sortedGroup.map(p => p.fee_month).join(', ')}
+                </p>
               </div>
               <div className="text-right">
-                <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Amount Paid</p>
-                <p className="text-lg font-black text-primary mt-0.5">₹{parseFloat(receipt.amount_paid).toLocaleString()}</p>
+                <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">
+                  {sortedGroup.length > 1 ? 'Total Amount' : 'Amount Paid'}
+                </p>
+                <p className="text-lg font-black text-primary mt-0.5">
+                  ₹{totalAmountPaid.toLocaleString()}
+                </p>
               </div>
             </div>
           </div>
@@ -327,13 +360,18 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [showRemovePhotoConfirm, setShowRemovePhotoConfirm] = useState(false);
   const [showPhotoMenu, setShowPhotoMenu] = useState(false);
+  const [schoolProfile, setSchoolProfile] = useState(null);
 
   const loadDetails = async () => {
     setLoading(true);
     setError('');
     try {
-      const details = await schoolService.getStudentById(studentId);
+      const [details, profile] = await Promise.all([
+        schoolService.getStudentById(studentId),
+        schoolService.getSchoolProfile()
+      ]);
       setData(details);
+      setSchoolProfile(profile);
     } catch (err) {
       console.error(err);
       setError('Failed to load student profile details.');
@@ -419,6 +457,28 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
     }
   };
 
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '—';
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return dateStr;
+    const options = { day: 'numeric', month: 'short', year: 'numeric' };
+    return date.toLocaleDateString('en-GB', options);
+  };
+
+  const handleRevertPayment = async (receipt) => {
+    if (!receipt || !receipt.id) return;
+    if (window.confirm(`Are you sure you want to revert the payment for ${receipt.fee_month}? This will delete the payment record and receipt.`)) {
+      try {
+        await schoolService.revertFeePayment(receipt.id);
+        await loadDetails();
+      } catch (err) {
+        console.error(err);
+        alert(err.message || 'Failed to revert payment.');
+      }
+    }
+  };
+
   const statusBadge = (status) => {
     const map = {
       ACTIVE: 'bg-green-500/10 text-green-600 border border-green-500/20',
@@ -431,47 +491,21 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
     );
   };
 
-  // Calculate Month-wise Fee Statuses relative to current month (June 2026)
+  // Calculate Month-wise Fee Statuses
   const getMonthWiseFees = () => {
     const academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
-    const currentMonthIndex = 2; // June is index 2
 
     const paymentsList = fee_summary.payments || [];
     const paidMonths = paymentsList.map(p => p.fee_month);
 
-    return academicMonths.map((m, idx) => {
+    return academicMonths.map((m) => {
       const isPaid = paidMonths.includes(m);
       const receipt = paymentsList.find(p => p.fee_month === m);
       
-      let status = 'Pending';
-      let statusClass = 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800/80 border-zinc-200 dark:border-zinc-700';
-
-      if (isPaid) {
-        status = 'Paid';
-        statusClass = 'bg-green-500/10 text-green-600 border-green-500/20';
-      } else if (idx <= currentMonthIndex) {
-        // Calculate consecutive unpaid months up to current month (idx)
-        let unpaidCount = 0;
-        for (let j = idx; j >= 0; j--) {
-          if (!paidMonths.includes(academicMonths[j])) {
-            unpaidCount++;
-          }
-        }
-
-        if (unpaidCount === 1) {
-          status = 'Pending';
-          statusClass = 'bg-amber-500/10 text-amber-600 border-amber-500/20';
-        } else if (unpaidCount === 2) {
-          status = 'Overdue';
-          statusClass = 'bg-orange-500/10 text-orange-600 border-orange-500/20';
-        } else if (unpaidCount === 3) {
-          status = 'Critical';
-          statusClass = 'bg-rose-500/10 text-rose-600 border-rose-500/20';
-        } else {
-          status = 'Default';
-          statusClass = 'bg-red-500/10 text-red-600 border-red-500/20';
-        }
-      }
+      const status = isPaid ? 'PAID' : 'UNPAID';
+      const statusClass = isPaid 
+        ? 'bg-green-500/10 text-green-600 border-green-500/20'
+        : 'bg-red-500/10 text-red-600 border-red-500/20';
 
       return {
         month: m,
@@ -632,6 +666,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                     <p><span className="text-text-muted block font-medium">Religion</span> <span className="font-semibold text-text-primary text-sm">{student.religion || '-'}</span></p>
                     <p><span className="text-text-muted block font-medium">Student Mobile</span> <span className="font-semibold font-mono text-text-primary text-sm">{student.student_mobile || '-'}</span></p>
                     <p><span className="text-text-muted block font-medium">Student Email</span> <span className="font-semibold text-text-primary text-sm">{student.student_email || '-'}</span></p>
+                    <p><span className="text-text-muted block font-medium">Class Assigned</span> <span className="font-semibold text-text-primary text-sm">{student.class_name || 'Not Assigned'}{student.section ? ` - ${student.section}` : ''}</span></p>
                     <p><span className="text-text-muted block font-medium">Exit Date</span> <span className="font-semibold text-text-primary text-sm">{student.exit_date || 'Not Assigned'}</span></p>
                   </div>
                 </CardContent>
@@ -852,6 +887,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                       <TableRow>
                         <TableHead>Month</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead>Payment Date</TableHead>
                         <TableHead className="text-right">Action</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -864,18 +900,30 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                               {mw.status}
                             </span>
                           </TableCell>
+                          <TableCell className="text-xs text-text-secondary">
+                            {mw.status === 'PAID' && mw.receipt?.payment_date ? formatDate(mw.receipt.payment_date) : '—'}
+                          </TableCell>
                           <TableCell className="text-right">
-                            {mw.status === 'Paid' ? (
-                              <Button 
-                                variant="secondary" 
-                                className="h-7 text-[10px] px-2.5 font-bold"
-                                onClick={() => setViewingReceipt(mw.receipt)}
-                              >
-                                Receipt
-                              </Button>
+                            {mw.status === 'PAID' ? (
+                              <div className="flex justify-end gap-2">
+                                <Button 
+                                  variant="secondary" 
+                                  className="h-7 w-20 text-[10px] px-0 font-bold"
+                                  onClick={() => handleRevertPayment(mw.receipt)}
+                                >
+                                  Revert
+                                </Button>
+                                <Button 
+                                  variant="secondary" 
+                                  className="h-7 w-20 text-[10px] px-0 font-bold"
+                                  onClick={() => setViewingReceipt(mw.receipt)}
+                                >
+                                  Receipt
+                                </Button>
+                              </div>
                             ) : (
                               <Button 
-                                className="h-7 text-[10px] px-2.5 font-bold"
+                                className="h-7 w-20 text-[10px] px-0 font-bold"
                                 onClick={() => setShowDepositModal(true)}
                               >
                                 Deposit
@@ -910,6 +958,8 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
         <ReceiptModal 
           receipt={viewingReceipt} 
           student={student} 
+          schoolName={schoolProfile?.name}
+          allPayments={fee_summary.payments}
           onClose={() => setViewingReceipt(null)} 
         />
       )}

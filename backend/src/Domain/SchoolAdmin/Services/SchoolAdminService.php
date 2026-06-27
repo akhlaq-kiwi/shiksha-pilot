@@ -134,7 +134,8 @@ class SchoolAdminService extends BaseService
             'student' => $student,
             'fee_summary' => [
                 'total_paid' => (float)$feeSummary['total_paid'],
-                'payment_count' => (int)$feeSummary['payment_count']
+                'payment_count' => (int)$feeSummary['payment_count'],
+                'payments' => $feeSummary['payments'] ?? []
             ],
             'attendance_summary' => [
                 'total_marked' => (int)$attSummary['total_marked'],
@@ -232,7 +233,9 @@ class SchoolAdminService extends BaseService
 
         // Parse and create class if it doesn't exist
         $classId = null;
-        if (!empty($data['class_name'])) {
+        if (!empty($data['class_id'])) {
+            $classId = (int)$data['class_id'];
+        } elseif (!empty($data['class_name'])) {
             $classNameInput = trim((string)$data['class_name']);
             $section = null;
             $finalName = $classNameInput;
@@ -444,7 +447,9 @@ class SchoolAdminService extends BaseService
 
         // Parse and query/create class dynamically
         $classId = null;
-        if (!empty($data['class_name'])) {
+        if (!empty($data['class_id'])) {
+            $classId = (int)$data['class_id'];
+        } elseif (!empty($data['class_name'])) {
             $classNameInput = trim((string)$data['class_name']);
             $section = null;
             $finalName = $classNameInput;
@@ -628,16 +633,19 @@ class SchoolAdminService extends BaseService
         $schoolId = $this->getSchoolId($user);
 
         $id = $this->staffRepo->create([
-            'school_id'    => $schoolId,
-            'name'         => $data['name'],
-            'employee_id'  => $data['employee_id'] ?? null,
-            'role'         => $data['role'],
-            'department'   => $data['department'] ?? null,
-            'phone'        => $data['phone'] ?? null,
-            'email'        => $data['email'] ?? null,
-            'status'       => $data['status'] ?? 'ACTIVE',
-            'salary'       => $data['salary'] ?? null,
-            'joining_date' => $data['joining_date'] ?? null,
+            'school_id'        => $schoolId,
+            'name'             => $data['name'],
+            'employee_id'      => $data['employee_id'] ?? null,
+            'role'             => $data['role'],
+            'department'       => $data['department'] ?? null,
+            'phone'            => $data['phone'] ?? null,
+            'email'            => $data['email'] ?? null,
+            'status'           => $data['status'] ?? 'ACTIVE',
+            'salary'           => $data['salary'] ?? null,
+            'joining_date'     => $data['joining_date'] ?? null,
+            'photo_path'       => $data['photo_path'] ?? null,
+            'assigned_periods' => isset($data['assigned_periods']) ? (int)$data['assigned_periods'] : 0,
+            'max_periods'      => isset($data['max_periods']) ? (int)$data['max_periods'] : 8,
         ]);
 
         $member = $this->staffRepo->findById($id);
@@ -649,6 +657,36 @@ class SchoolAdminService extends BaseService
         $this->log('Staff member created', ['id' => $id, 'school_id' => $schoolId]);
 
         return $member;
+    }
+
+    public function updateStaff(array $user, int $id, array $data): array
+    {
+        if (empty($data['name']) || empty($data['role'])) {
+            throw new ValidationException(['fields' => 'Staff name and role are required']);
+        }
+
+        $schoolId = $this->getSchoolId($user);
+        $member   = $this->staffRepo->findById($id);
+
+        if ($member === null || (int)$member['school_id'] !== $schoolId) {
+            throw new NotFoundException('Staff member not found');
+        }
+
+        $this->staffRepo->update($id, [
+            'name'             => $data['name'],
+            'role'             => $data['role'],
+            'department'       => $data['department'] ?? null,
+            'phone'            => $data['phone'] ?? null,
+            'email'            => $data['email'] ?? null,
+            'status'           => $data['status'] ?? $member['status'],
+            'salary'           => $data['salary'] ?? $member['salary'],
+            'joining_date'     => $data['joining_date'] ?? $member['joining_date'],
+            'photo_path'       => $data['photo_path'] ?? $member['photo_path'],
+            'assigned_periods' => isset($data['assigned_periods']) ? (int)$data['assigned_periods'] : (int)($member['assigned_periods'] ?? 0),
+            'max_periods'      => isset($data['max_periods']) ? (int)$data['max_periods'] : (int)($member['max_periods'] ?? 8),
+        ]);
+
+        return $this->staffRepo->findById($id);
     }
 
     // -------------------------------------------------------------------------
@@ -1013,6 +1051,7 @@ class SchoolAdminService extends BaseService
 
         // 6. Insert payments
         $lastPayment = null;
+        $receiptNo = 'REC-' . time() . '-' . rand(1000, 9999);
         foreach ($monthsToPay as $m) {
             $id = $this->feeRepo->createPayment([
                 'school_id'        => $schoolId,
@@ -1020,7 +1059,7 @@ class SchoolAdminService extends BaseService
                 'fee_structure_id' => $feeStructureId,
                 'amount_paid'      => $amountPaid,
                 'payment_date'     => date('Y-m-d'),
-                'receipt_no'       => 'REC-' . time() . '-' . rand(1000, 9999),
+                'receipt_no'       => $receiptNo,
                 'status'           => 'PAID',
                 'fee_month'        => $m
             ]);
@@ -1097,4 +1136,165 @@ class SchoolAdminService extends BaseService
 
         return $this->getSchoolProfile($user);
     }
+
+    public function updateClass(array $user, array $data): array
+    {
+        if (empty($data['oldName'])) {
+            throw new ValidationException(['oldName' => 'Old class name is required']);
+        }
+        if (empty($data['name'])) {
+            throw new ValidationException(['name' => 'New class name is required']);
+        }
+
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->classRepo->getPdo();
+
+        $oldName = trim((string)$data['oldName']);
+        $newName = trim((string)$data['name']);
+
+        // Parse sections
+        $newSections = [];
+        if (!empty($data['sections'])) {
+            if (is_array($data['sections'])) {
+                $newSections = $data['sections'];
+            } else {
+                $newSections = array_filter(array_map('trim', explode(',', (string)$data['sections'])));
+            }
+        }
+        if (empty($newSections)) {
+            $newSections = [null];
+        }
+
+        // Get currently active academic year
+        $academicYearId = null;
+        $stmtYear = $pdo->prepare("SELECT id FROM academic_years WHERE school_id = :school_id AND is_current = 1 LIMIT 1");
+        $stmtYear->execute([':school_id' => $schoolId]);
+        $yearId = $stmtYear->fetchColumn();
+        if ($yearId !== false) {
+            $academicYearId = (int)$yearId;
+        } else {
+            $stmt2 = $pdo->prepare("SELECT id FROM academic_years WHERE school_id = :school_id ORDER BY start_date DESC LIMIT 1");
+            $stmt2->execute([':school_id' => $schoolId]);
+            $yearId = $stmt2->fetchColumn();
+            $academicYearId = $yearId !== false ? (int)$yearId : null;
+        }
+
+        // Get all existing classes for oldName
+        $stmtOld = $pdo->prepare("SELECT * FROM classes WHERE school_id = :school_id AND name = :name");
+        $stmtOld->execute([':school_id' => $schoolId, ':name' => $oldName]);
+        $oldClasses = $stmtOld->fetchAll();
+
+        $oldSectionsMap = [];
+        foreach ($oldClasses as $oc) {
+            $sec = $oc['section'] !== null ? trim((string)$oc['section']) : '';
+            $oldSectionsMap[$sec] = $oc;
+        }
+
+        // Process sections
+        $processedIds = [];
+        $lastClass = null;
+
+        foreach ($newSections as $sec) {
+            $secVal = $sec !== null ? trim((string)$sec) : '';
+            $dbSecVal = $secVal === '' ? null : $secVal;
+
+            if (isset($oldSectionsMap[$secVal])) {
+                // Section exists - update the name
+                $oc = $oldSectionsMap[$secVal];
+                $stmtUpdate = $pdo->prepare("UPDATE classes SET name = :name, section = :section WHERE id = :id");
+                $stmtUpdate->execute([
+                    ':name' => $newName,
+                    ':section' => $dbSecVal,
+                    ':id' => $oc['id']
+                ]);
+                $processedIds[] = (int)$oc['id'];
+                $lastClass = $this->classRepo->findById((int)$oc['id']);
+            } else {
+                // Check if there is an existing one under the new name already to prevent duplicates
+                $stmtCheck = $pdo->prepare("
+                    SELECT id FROM classes 
+                    WHERE school_id = :school_id AND name = :name 
+                    AND (section = :section OR (section IS NULL AND :section_null = 1)) 
+                    LIMIT 1
+                ");
+                $stmtCheck->execute([
+                    ':school_id' => $schoolId,
+                    ':name' => $newName,
+                    ':section' => $dbSecVal,
+                    ':section_null' => $dbSecVal === null ? 1 : 0
+                ]);
+                $existsId = $stmtCheck->fetchColumn();
+
+                if ($existsId !== false) {
+                    $processedIds[] = (int)$existsId;
+                    $lastClass = $this->classRepo->findById((int)$existsId);
+                } else {
+                    // Create new section
+                    $id = $this->classRepo->create([
+                        'school_id'        => $schoolId,
+                        'name'             => $newName,
+                        'section'          => $dbSecVal,
+                        'academic_year_id' => $academicYearId,
+                    ]);
+                    $processedIds[] = $id;
+                    $lastClass = $this->classRepo->findById($id);
+                    $this->log('Class section added on edit', ['id' => $id, 'school_id' => $schoolId]);
+                }
+            }
+        }
+
+        // Delete old sections that were removed
+        foreach ($oldClasses as $oc) {
+            if (!in_array((int)$oc['id'], $processedIds, true)) {
+                $oldClassId = (int)$oc['id'];
+                
+                if (!empty($processedIds)) {
+                    $targetClassId = (int)$processedIds[0];
+                    $tablesToMigrate = ['students', 'subjects', 'attendance', 'exams', 'fee_structures'];
+                    foreach ($tablesToMigrate as $tbl) {
+                        $stmtMigrate = $pdo->prepare("UPDATE {$tbl} SET class_id = :target_id WHERE class_id = :old_id");
+                        $stmtMigrate->execute([
+                            ':target_id' => $targetClassId,
+                            ':old_id' => $oldClassId
+                        ]);
+                    }
+                }
+
+                $this->classRepo->delete($oldClassId);
+                $this->log('Class section deleted on edit', ['id' => $oldClassId, 'school_id' => $schoolId]);
+            }
+        }
+
+        if ($lastClass === null) {
+            throw new NotFoundException('Class not found after update');
+        }
+
+        return $lastClass;
+    }
+
+    public function deleteFeePayment(array $user, int $id): bool
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->feeRepo->getPdo();
+
+        // Check if the payment exists and belongs to this school
+        $stmt = $pdo->prepare("SELECT id, receipt_no FROM fee_payments WHERE id = :id AND school_id = :school_id LIMIT 1");
+        $stmt->execute([':id' => $id, ':school_id' => $schoolId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($row === false) {
+            throw new NotFoundException('Fee payment not found');
+        }
+
+        $receiptNo = $row['receipt_no'];
+
+        if (!empty($receiptNo)) {
+            // Delete all payments in this transaction
+            $stmtDel = $pdo->prepare("DELETE FROM fee_payments WHERE receipt_no = :receipt_no AND school_id = :school_id");
+            return $stmtDel->execute([':receipt_no' => $receiptNo, ':school_id' => $schoolId]);
+        }
+
+        return $this->feeRepo->deletePayment($id);
+    }
 }
+

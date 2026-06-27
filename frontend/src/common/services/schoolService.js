@@ -45,6 +45,14 @@ export const schoolService = {
     return apiClient.post('/api/school/staff', staffData);
   },
 
+  updateStaff(id, staffData) {
+    return apiClient.put(`/api/school/staff/${id}`, staffData);
+  },
+
+  getAvailableStaff() {
+    return this.getStaff().then(list => (list || []).filter(s => (s.assigned_periods || 0) < (s.max_periods || 8)));
+  },
+
   getClasses() {
     return apiClient.get('/api/school/classes');
   },
@@ -99,5 +107,14 @@ export const schoolService = {
 
   updateSchoolProfile(data) {
     return apiClient.post('/api/school/profile', data);
+  },
+
+  updateClass(classData) {
+    return apiClient.put('/api/school/classes', classData);
+  },
+
+  revertFeePayment(id) {
+    return apiClient.delete(`/api/school/fee-payments/${id}`);
   }
 };
+

@@ -100,4 +100,11 @@ class FeeRepository extends BaseRepository
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row !== false ? $row : null;
     }
+
+    public function deletePayment(int $id): bool
+    {
+        $stmt = $this->pdo->prepare("DELETE FROM fee_payments WHERE id = :id");
+        return $stmt->execute([':id' => $id]);
+    }
 }
+

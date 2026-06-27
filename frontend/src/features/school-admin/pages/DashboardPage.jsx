@@ -453,7 +453,7 @@ export default function DashboardPage({ onNavigate }) {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
           { label: 'Total Students', value: totalStudents },
-          { label: 'Total Staff', value: totalStaff },
+          { label: 'Total Teachers', value: totalStaff },
           { label: 'Fee Collected', value: `₹${(totalFeeCollected / 1000).toFixed(0)}K` },
           { label: 'Dues Pending', value: exams.filter(e => e.status === 'Upcoming').length },
         ].map(card => {

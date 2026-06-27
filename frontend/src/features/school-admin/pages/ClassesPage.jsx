@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Users, User, X } from 'lucide-react';
+import { Plus, Search, Users, User, X, MoreVertical } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardContent } from '../../../common/ui/card';
 import { Input } from '../../../common/ui/input';
@@ -44,6 +44,11 @@ export default function ClassesPage() {
   const [sectionsInput, setSectionsInput] = useState('');
   const [savingClass, setSavingClass] = useState(false);
   const [classFormError, setClassFormError] = useState('');
+  
+  // Class Editing & Dropdown menu states
+  const [openMenuClass, setOpenMenuClass] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editOldClassName, setEditOldClassName] = useState('');
 
   // Roster Search and Filters
   const [rosterSearch, setRosterSearch] = useState('');
@@ -72,6 +77,24 @@ export default function ClassesPage() {
     loadData();
   }, []);
 
+  const handleOpenEditClass = (gc) => {
+    setIsEditing(true);
+    setEditOldClassName(gc.name);
+    setClassNameInput(gc.name);
+    setSectionsInput(gc.sections.join(', '));
+    setClassFormError('');
+    setShowCreateForm(true);
+  };
+
+  const handleCloseClassForm = () => {
+    setShowCreateForm(false);
+    setIsEditing(false);
+    setEditOldClassName('');
+    setClassNameInput('');
+    setSectionsInput('');
+    setClassFormError('');
+  };
+
   const handleCreateClass = async (e) => {
     e.preventDefault();
     if (!classNameInput.trim()) {
@@ -82,17 +105,27 @@ export default function ClassesPage() {
     setSavingClass(true);
     setClassFormError('');
     try {
-      await schoolService.createClass({
-        name: classNameInput.trim(),
-        sections: sectionsInput.trim()
-      });
+      if (isEditing) {
+        await schoolService.updateClass({
+          oldName: editOldClassName,
+          name: classNameInput.trim(),
+          sections: sectionsInput.trim()
+        });
+      } else {
+        await schoolService.createClass({
+          name: classNameInput.trim(),
+          sections: sectionsInput.trim()
+        });
+      }
       setClassNameInput('');
       setSectionsInput('');
+      setIsEditing(false);
+      setEditOldClassName('');
       setShowCreateForm(false);
       await loadData();
     } catch (err) {
       console.error(err);
-      setClassFormError(err.message || 'Failed to create class.');
+      setClassFormError(err.message || 'Failed to save class.');
     } finally {
       setSavingClass(false);
     }
@@ -187,6 +220,8 @@ export default function ClassesPage() {
     const filteredRoster = rosterStudents.filter(s => {
       const term = rosterSearch.toLowerCase();
       const matchesSearch = !rosterSearch || 
+                            (s.first_name || '').toLowerCase().includes(term) || 
+                            (s.last_name || '').toLowerCase().includes(term) || 
                             (s.name || '').toLowerCase().includes(term) || 
                             (s.roll_no || '').toLowerCase().includes(term);
       
@@ -228,7 +263,7 @@ export default function ClassesPage() {
             >
               Back
             </button>
-            <h2 className="text-2xl font-black text-text-primary tracking-tight font-display">{selectedClassName} ({rosterStudents.length} Students)</h2>
+            <h2 className="text-2xl font-black text-text-primary tracking-tight font-display">{selectedClassName} ({rosterStudents.length})</h2>
           </div>
           <Button className="flex items-center gap-2 font-bold" onClick={() => { setView('enroll'); setSelectedStudentId(null); }}>
             <Plus className="h-4 w-4" /> Enroll Student
@@ -236,7 +271,7 @@ export default function ClassesPage() {
         </div>
 
         {/* Combined Filter Toolbar */}
-        <div className="bg-surface border border-border rounded-xl p-4 shadow-xs flex flex-col md:flex-row gap-4 items-center">
+        <div className="bg-surface border border-border rounded-xl p-4 shadow-xs flex flex-col md:flex-row gap-4 items-center justify-between">
           <div className="relative w-full md:max-w-xs">
             <Search className="absolute left-3 top-3 h-4 w-4 text-text-muted" />
             <Input 
@@ -247,33 +282,35 @@ export default function ClassesPage() {
             />
           </div>
 
-          {/* Section Filter (Only if sections exist for class) */}
-          {rosterSections.length > 0 && (
+          <div className="flex flex-col md:flex-row gap-4 items-center w-full md:w-auto justify-end">
+            {/* Section Filter (Only if sections exist for class) */}
+            {rosterSections.length > 0 && (
+              <div className="w-full md:w-40">
+                <select
+                  value={rosterSectionFilter}
+                  onChange={e => setRosterSectionFilter(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-zinc-200 bg-surface px-3 py-1.5 text-sm text-text-primary shadow-xs transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-950 dark:border-zinc-800"
+                >
+                  <option value="All">All Sections</option>
+                  {rosterSections.map(sec => (
+                    <option key={sec} value={sec}>Section {sec}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Student Status Filter */}
             <div className="w-full md:w-40">
               <select
-                value={rosterSectionFilter}
-                onChange={e => setRosterSectionFilter(e.target.value)}
+                value={rosterStatusFilter}
+                onChange={e => setRosterStatusFilter(e.target.value)}
                 className="flex h-9 w-full rounded-md border border-zinc-200 bg-surface px-3 py-1.5 text-sm text-text-primary shadow-xs transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-950 dark:border-zinc-800"
               >
-                <option value="All">All Sections</option>
-                {rosterSections.map(sec => (
-                  <option key={sec} value={sec}>Section {sec}</option>
-                ))}
+                <option value="All">All Statuses</option>
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
               </select>
             </div>
-          )}
-
-          {/* Student Status Filter */}
-          <div className="w-full md:w-40">
-            <select
-              value={rosterStatusFilter}
-              onChange={e => setRosterStatusFilter(e.target.value)}
-              className="flex h-9 w-full rounded-md border border-zinc-200 bg-surface px-3 py-1.5 text-sm text-text-primary shadow-xs transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-950 dark:border-zinc-800"
-            >
-              <option value="All">All Statuses</option>
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
-            </select>
           </div>
         </div>
 
@@ -344,23 +381,68 @@ export default function ClassesPage() {
             <div 
               key={gc.name}
               onClick={() => { setSelectedClassName(gc.name); setRosterSearch(''); setView('roster'); }}
-              className="flex flex-col items-center justify-center p-7 bg-surface border border-border hover:border-primary/50 hover:shadow-md rounded-2xl cursor-pointer transition-all duration-200 min-h-[140px] text-center"
+              className="relative flex flex-col items-center justify-center p-7 bg-surface border border-border hover:border-primary/50 hover:shadow-md rounded-2xl cursor-pointer transition-all duration-200 min-h-[140px] text-center"
             >
+              {/* 3-dot dropdown menu */}
+              <div className="absolute top-3 right-3 z-10">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpenMenuClass(openMenuClass === gc.name ? null : gc.name);
+                  }}
+                  className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg text-text-muted hover:text-text-primary transition-colors focus:outline-none"
+                >
+                  <MoreVertical className="h-4 w-4" />
+                </button>
+                
+                {openMenuClass === gc.name && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-20" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenMenuClass(null);
+                      }}
+                    ></div>
+                    <div className="absolute top-7 right-0 bg-surface border border-border rounded-xl shadow-lg py-1 z-30 animate-in fade-in slide-in-from-top-1 duration-150 text-xs">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenMenuClass(null);
+                          handleOpenEditClass(gc);
+                        }}
+                        className="block w-full text-left px-4 py-2 font-semibold text-text-primary hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors whitespace-nowrap"
+                      >
+                        Edit Class
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+
               <h3 className="font-extrabold text-text-primary text-xl tracking-tight font-display">{gc.name}</h3>
             </div>
           ))}
         </div>
       )}
 
-      {/* Create Class Modal Overlay Popup */}
+      {/* Create/Edit Class Modal Overlay Popup */}
       {showCreateForm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-surface border border-border rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col">
             
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-zinc-50 dark:bg-zinc-900/50">
-              <h3 className="font-extrabold text-text-primary text-base tracking-tight">Create Class</h3>
-              <button onClick={() => setShowCreateForm(false)} className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg transition-colors">
+              <h3 className="font-extrabold text-text-primary text-base tracking-tight">
+                {isEditing ? 'Edit Class' : 'Create Class'}
+              </h3>
+              <button 
+                type="button" 
+                onClick={handleCloseClassForm} 
+                className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+              >
                 <X className="h-4 w-4 text-text-secondary" />
               </button>
             </div>
@@ -397,7 +479,7 @@ export default function ClassesPage() {
 
               {/* Action Buttons */}
               <div className="flex gap-2 justify-end pt-2">
-                <Button type="button" variant="secondary" onClick={() => setShowCreateForm(false)}>Cancel</Button>
+                <Button type="button" variant="secondary" onClick={handleCloseClassForm}>Cancel</Button>
                 <Button type="submit" disabled={savingClass}>
                   {savingClass ? 'Saving...' : 'Save'}
                 </Button>

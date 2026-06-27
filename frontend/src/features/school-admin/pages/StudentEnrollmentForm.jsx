@@ -562,6 +562,29 @@ export default function StudentEnrollmentForm({ studentId, onCancel, onSuccess }
                       />
                       {errors.sr_no && <p className="text-[10px] text-red-500 font-semibold">{errors.sr_no}</p>}
                     </div>
+
+                    {studentId && (
+                      <div className="space-y-1.5 animate-in slide-in-from-left-1 duration-150">
+                        <label className="text-xs font-bold text-text-secondary uppercase">Exit Date</label>
+                        <div className="relative">
+                          <Input 
+                            type="date" 
+                            name="exit_date" 
+                            value={formData.exit_date} 
+                            onChange={(e) => {
+                              const { value } = e.target;
+                              setFormData(prev => ({
+                                ...prev,
+                                exit_date: value,
+                                status: value ? 'Inactive' : 'ACTIVE'
+                              }));
+                            }} 
+                            className="pr-10 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-10 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer font-normal text-text-primary"
+                          />
+                          <Calendar className="absolute right-3 top-2.5 h-4 w-4 text-text-muted pointer-events-none" />
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                 </div>

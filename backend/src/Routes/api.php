@@ -43,8 +43,10 @@ return function (App $app) {
     $app->post('/api/school/upload', [SchoolAdminController::class, 'uploadDocument']);
     $app->get('/api/school/staff', [SchoolAdminController::class, 'getStaff']);
     $app->post('/api/school/staff', [SchoolAdminController::class, 'createStaff']);
+    $app->put('/api/school/staff/{id}', [SchoolAdminController::class, 'updateStaff']);
     $app->get('/api/school/classes', [SchoolAdminController::class, 'getClasses']);
     $app->post('/api/school/classes', [SchoolAdminController::class, 'createClass']);
+    $app->put('/api/school/classes', [SchoolAdminController::class, 'updateClass']);
     $app->get('/api/school/academic-years', [SchoolAdminController::class, 'getAcademicYears']);
     $app->get('/api/school/attendance', [SchoolAdminController::class, 'getAttendance']);
     $app->post('/api/school/attendance', [SchoolAdminController::class, 'markAttendance']);
@@ -56,6 +58,8 @@ return function (App $app) {
     $app->post('/api/school/fee-structures', [SchoolAdminController::class, 'createFeeStructure']);
     $app->get('/api/school/fee-payments', [SchoolAdminController::class, 'getFeePayments']);
     $app->post('/api/school/fee-payments', [SchoolAdminController::class, 'createFeePayment']);
+    $app->delete('/api/school/fee-payments/{id}', [SchoolAdminController::class, 'deleteFeePayment']);
+
     $app->get('/api/school/timetable', [SchoolAdminController::class, 'getTimetable']);
     $app->get('/api/school/subjects', [SchoolAdminController::class, 'getSubjects']);
     $app->get('/api/school/profile', [SchoolAdminController::class, 'getSchoolProfile']);

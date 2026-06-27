@@ -21,10 +21,8 @@ import SecurityPage from './pages/SecurityPage';
 
 const NAV_ITEMS = [
   { path: '/school-admin',            label: 'Dashboard', icon: LayoutDashboard, exact: true },
-  { path: '/school-admin/profile',    label: 'School Profile', icon: School },
-  { path: '/school-admin/academic',   label: 'Academic', icon: BookOpen },
   { path: '/school-admin/classes',    label: 'Classes', icon: Users },
-  { path: '/school-admin/staff',      label: 'Staff', icon: UserCog },
+  { path: '/school-admin/staff',      label: 'Teachers', icon: UserCog },
   { path: '/school-admin/timetable',  label: 'Timetable', icon: Clock },
   { path: '/school-admin/attendance', label: 'Attendance', icon: ClipboardCheck },
   { path: '/school-admin/exams',      label: 'Examinations', icon: FileText },
@@ -51,7 +49,7 @@ export default function SchoolAdminPortal() {
       <button
         key={item.path}
         onClick={() => nav(item.path)}
-        className={`flex items-center gap-3 px-2.5 py-2.5 rounded-lg text-sm font-semibold transition-all flex-shrink-0 w-full text-left ${active ? 'bg-zinc-900 text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900' : 'text-text-secondary hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800'}`}
+        className={`flex items-center justify-start gap-3 pl-1 pr-3 py-2 rounded-lg text-sm font-semibold transition-all flex-shrink-0 w-full text-left ${active ? 'bg-zinc-900 text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900' : 'text-text-secondary hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800'}`}
       >
         <Icon className="h-4 w-4 flex-shrink-0" />
         <span>{item.label}</span>
@@ -63,15 +61,20 @@ export default function SchoolAdminPortal() {
     <div className="flex flex-col md:flex-row gap-6 w-full min-h-[calc(100vh-140px)]">
 
       {/* Sidebar */}
-      <aside className="w-full md:w-[240px] flex-shrink-0 flex flex-col justify-between border-r border-border pr-4 py-2 space-y-6 md:sticky md:top-24 md:h-[calc(100vh-180px)] md:overflow-y-auto scrollbar-none">
-        <div>
+      <aside className="w-full md:w-[240px] flex-shrink-0 flex flex-col justify-between border-r border-border pr-4 md:pr-10 pb-6 pt-2 md:sticky md:top-24 md:h-[calc(100vh-180px)]">
+        <div className="overflow-y-auto scrollbar-none flex-1">
           <nav className="flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 scrollbar-none">
             {NAV_ITEMS.map(navBtn)}
           </nav>
         </div>
-        <div className="hidden md:block bg-zinc-50 border border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800 rounded-xl p-4">
-          <p className="text-xs font-bold text-primary mb-1">Academic Year</p>
-          <p className="text-[11px] text-text-muted">2025–2026 (Current)</p>
+        <div className="hidden md:block mt-4 flex-shrink-0">
+          <button
+            onClick={() => nav('/school-admin/profile')}
+            className={`flex items-center justify-start gap-3 pl-1 pr-3 py-2.5 rounded-lg text-sm font-bold transition-all w-full text-left border uppercase tracking-wider ${isActive('/school-admin/profile') ? 'bg-zinc-900 text-zinc-50 border-zinc-900 dark:bg-zinc-50 dark:text-zinc-900 dark:border-zinc-50' : 'text-text-secondary border-zinc-200 bg-surface hover:bg-zinc-50 hover:text-zinc-900 dark:border-zinc-800 dark:hover:bg-zinc-900'}`}
+          >
+            <UserCog className="h-4 w-4 flex-shrink-0 text-text-secondary" />
+            <span>PROFILE</span>
+          </button>
         </div>
       </aside>
 
@@ -80,7 +83,6 @@ export default function SchoolAdminPortal() {
         <Routes>
           <Route index element={<DashboardPage onNavigate={(p) => nav(`/school-admin/${p}`)} />} />
           <Route path="profile" element={<ProfilePage />} />
-          <Route path="academic" element={<AcademicPage />} />
           <Route path="classes" element={<ClassesPage />} />
           <Route path="staff" element={<StaffPage />} />
           <Route path="timetable" element={<TimetablePage />} />

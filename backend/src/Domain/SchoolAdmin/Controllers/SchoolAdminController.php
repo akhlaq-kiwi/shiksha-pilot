@@ -130,6 +130,18 @@ class SchoolAdminController extends BaseController
         return $this->success($response, $member, 'Staff member created', 201);
     }
 
+    public function updateStaff(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id     = (int)$args['id'];
+        $body   = RequestParser::body($request);
+        $member = $this->service->updateStaff($user, $id, $body);
+
+        return $this->success($response, $member, 'Staff member updated');
+    }
+
     // -------------------------------------------------------------------------
     // Classes
     // -------------------------------------------------------------------------
@@ -332,4 +344,27 @@ class SchoolAdminController extends BaseController
 
         return $this->success($response, $profile, 'School profile updated');
     }
+
+    public function updateClass(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body  = RequestParser::body($request);
+        $class = $this->service->updateClass($user, $body);
+
+        return $this->success($response, $class, 'Class updated');
+    }
+
+    public function deleteFeePayment(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int)$args['id'];
+        $this->service->deleteFeePayment($user, $id);
+
+        return $this->success($response, null, 'Payment reverted successfully');
+    }
 }
+
