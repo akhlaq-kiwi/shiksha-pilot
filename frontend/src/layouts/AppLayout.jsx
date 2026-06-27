@@ -50,31 +50,23 @@ const AppLayout = ({ children }) => {
               <div className="flex items-center justify-center w-8 h-8 rounded-md bg-zinc-900 dark:bg-zinc-50 flex-shrink-0">
                 <GraduationCap className="w-4 h-4 text-zinc-50 dark:text-zinc-900" />
               </div>
-              <div className="flex flex-col min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-black text-text-primary font-display tracking-tight leading-none">
-                    Shiksha Pilot
-                  </span>
-                  <span className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-zinc-900 text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900 leading-none">
-                    SaaS
-                  </span>
-                </div>
-                <span className="text-[10px] text-text-muted leading-none mt-0.5 hidden sm:block">
-                  Cloud-Native School Management
-                </span>
-              </div>
+              <span className="text-sm font-black text-text-primary font-display tracking-tight leading-none">
+                Shiksha Pilot
+              </span>
             </div>
 
             {/* Right controls */}
             <div className="flex items-center gap-1.5">
               {/* User info */}
               <div className="hidden sm:flex flex-col items-end mr-2">
-                <span className="text-xs font-semibold text-text-primary leading-none">
+                <span className={`font-semibold text-text-primary leading-none ${role === 'SCHOOL_ADMIN' ? 'text-sm font-bold' : 'text-xs'}`}>
                   {displayName}
                 </span>
-                <span className="text-[10px] text-text-muted leading-none mt-0.5 uppercase tracking-wide">
-                  {roleLabel}
-                </span>
+                {role !== 'SCHOOL_ADMIN' && (
+                  <span className="text-[10px] text-text-muted leading-none mt-0.5 uppercase tracking-wide">
+                    {roleLabel}
+                  </span>
+                )}
               </div>
 
               {/* Dark/light toggle */}
