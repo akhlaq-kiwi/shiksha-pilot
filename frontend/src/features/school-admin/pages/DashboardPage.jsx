@@ -145,6 +145,283 @@ export default function DashboardPage({ onNavigate }) {
     });
   };
 
+  const handleDownloadSalarySlip = (staff, monthName) => {
+    const printWindow = window.open('', '_blank');
+    const today = new Date().toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+    
+    const basic = Math.round(staff.salary * 0.7);
+    const allowances = Math.round(staff.salary * 0.25);
+    const bonus = monthName === 'December' ? 13000 : 0;
+    const deductions = Math.round(staff.salary * 0.05);
+    const netPaid = basic + allowances + bonus - deductions;
+    
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Salary Slip - ${staff.name} - ${monthName} 2026</title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet" />
+        <style>
+          body {
+            font-family: 'Inter', sans-serif;
+            color: #1f2937;
+            background-color: #ffffff;
+            margin: 0;
+            padding: 40px;
+            font-size: 14px;
+            line-height: 1.5;
+          }
+          @page {
+            size: A4;
+            margin: 20mm;
+          }
+          .header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+          }
+          .logo-school {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+          }
+          .logo-icon {
+            width: 40px;
+            height: 40px;
+            background-color: #111827;
+            color: #ffffff;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 20px;
+          }
+          .school-name {
+            font-size: 20px;
+            font-weight: 800;
+            color: #111827;
+            margin: 0;
+          }
+          .school-info {
+            font-size: 12px;
+            color: #4b5563;
+            margin: 2px 0 0 0;
+          }
+          .slip-title {
+            text-align: right;
+          }
+          .slip-title h2 {
+            font-size: 24px;
+            font-weight: 800;
+            color: #111827;
+            margin: 0;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+          }
+          .slip-title p {
+            font-size: 12px;
+            color: #6b7280;
+            margin: 4px 0 0 0;
+          }
+          .details-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-bottom: 35px;
+            background-color: #f9fafb;
+            border: 1px solid #f3f4f6;
+            border-radius: 8px;
+            padding: 20px;
+          }
+          .details-col p {
+            margin: 6px 0;
+            font-size: 13px;
+          }
+          .details-col p strong {
+            color: #374151;
+            font-weight: 600;
+            display: inline-block;
+            width: 130px;
+          }
+          .details-col p span {
+            color: #4b5563;
+          }
+          .table-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 40px;
+          }
+          th {
+            background-color: #f3f4f6;
+            color: #374151;
+            font-weight: 700;
+            text-align: left;
+            padding: 12px;
+            border-bottom: 2px solid #e5e7eb;
+            font-size: 12px;
+            text-transform: uppercase;
+          }
+          td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+            color: #4b5563;
+          }
+          .text-right {
+            text-align: right;
+          }
+          .font-mono {
+            font-family: monospace;
+            font-size: 14px;
+          }
+          .total-row {
+            font-weight: 700;
+            background-color: #f9fafb;
+          }
+          .total-row td {
+            color: #111827;
+            border-top: 2px solid #e5e7eb;
+            border-bottom: 2px solid #e5e7eb;
+          }
+          .footer-container {
+            margin-top: 60px;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+          }
+          .footer-note {
+            font-size: 11px;
+            color: #9ca3af;
+            max-width: 60%;
+          }
+          .seal-placeholder {
+            width: 100px;
+            height: 100px;
+            border: 2px dashed #d1d5db;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 8px;
+            color: #9ca3af;
+            text-align: center;
+            font-weight: 600;
+            padding: 10px;
+            box-sizing: border-box;
+            background-color: #f9fafb;
+          }
+          @media print {
+            body {
+              padding: 0;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header-container">
+          <div class="logo-school">
+            <div class="logo-icon">S</div>
+            <div>
+              <h1 class="school-name">Shiksha Pilot Academy</h1>
+              <p class="school-info">123 Education Enclave, New Delhi, India</p>
+              <p class="school-info">Contact: +91 98765 43210 | info@shikshapilot.edu</p>
+            </div>
+          </div>
+          <div class="slip-title">
+            <h2>Salary Slip</h2>
+            <p>Academic Year 2025-2026</p>
+          </div>
+        </div>
+
+        <div class="details-grid">
+          <div class="details-col">
+            <p><strong>Employee Name:</strong> <span>${staff.name}</span></p>
+            <p><strong>Employee ID:</strong> <span>SP-2026-0${Math.floor(Math.random() * 90) + 10}</span></p>
+            <p><strong>Designation:</strong> <span>${staff.designation}</span></p>
+          </div>
+          <div class="details-col">
+            <p><strong>Department:</strong> <span>Academics</span></p>
+            <p><strong>Payment Month:</strong> <span>${monthName} 2026</span></p>
+            <p><strong>Payment Date:</strong> <span>${staff.date}</span></p>
+          </div>
+        </div>
+
+        <div class="table-title">Earnings & Deductions Statement</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Description</th>
+              <th class="text-right">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Basic Salary</td>
+              <td class="text-right font-mono">₹${basic.toLocaleString()}</td>
+            </tr>
+            <tr>
+              <td>Allowances (HRA, TA, Medical)</td>
+              <td class="text-right font-mono">₹${allowances.toLocaleString()}</td>
+            </tr>
+            <tr>
+              <td>Bonus${bonus > 0 ? ' (Festival Bonus)' : ''}</td>
+              <td class="text-right font-mono">₹${bonus.toLocaleString()}</td>
+            </tr>
+            <tr>
+              <td>Deductions (Provident Fund, Tax)</td>
+              <td class="text-right font-mono">₹${deductions.toLocaleString()}</td>
+            </tr>
+            <tr class="total-row">
+              <td>Net Salary Paid</td>
+              <td class="text-right font-mono">₹${netPaid.toLocaleString()}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="footer-container">
+          <div class="footer-note">
+            <p style="margin: 0 0 4px 0;"><strong>Note:</strong> This is a system-generated salary slip and does not require a physical signature.</p>
+            <p style="margin: 0;">Generated on: ${today}</p>
+          </div>
+          <div class="seal-placeholder">
+            <div>SHIKSHA PILOT</div>
+            <div style="font-size: 6px; margin-top: 2px;">OFFICIAL SEAL</div>
+          </div>
+        </div>
+
+        <script>
+          window.onload = function() {
+            window.print();
+          };
+        </script>
+      </body>
+      </html>
+    `;
+    
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px] w-full">
@@ -189,13 +466,14 @@ export default function DashboardPage({ onNavigate }) {
             </Card>
           );
         })}
-      </div>      {/* Charts Row */}
+      </div>
+
+      {/* Charts Row */}
       <div className="grid grid-cols-1 gap-6">
         {/* Monthly Fee Collection */}
         <div className="bg-surface border border-border rounded-2xl p-6 shadow-sm">
-          <div className="flex flex-col gap-1 mb-6">
+          <div className="mb-6">
             <h3 className="text-sm font-bold text-text-primary">Monthly Fee Collection</h3>
-            <p className="text-xs text-text-secondary">Fees received across the current academic session (April - March)</p>
           </div>
           <div className="w-full overflow-x-auto scrollbar-none">
             <div className="min-w-[760px] h-64 relative flex items-end justify-between px-2 pb-6 pt-10">
@@ -214,9 +492,9 @@ export default function DashboardPage({ onNavigate }) {
                 const maxVal = 200000;
                 const percentage = (item.amount / maxVal) * 100;
                 return (
-                  <div key={i} className="flex-1 flex flex-col items-center group cursor-pointer z-10 ml-8 relative">
+                  <div key={i} className="flex-1 flex flex-col items-center group cursor-pointer z-10 relative">
                     {/* Amount Label on top of bar */}
-                    <span className="text-[9px] font-bold text-text-muted mb-1.5 select-none transition-opacity duration-300 opacity-80 group-hover:opacity-100">
+                    <span className="text-[9px] font-bold text-text-muted mb-1.5 select-none transition-opacity duration-300 opacity-80 group-hover:opacity-100 text-center whitespace-nowrap">
                       ₹{item.amount.toLocaleString()}
                     </span>
 
@@ -247,9 +525,8 @@ export default function DashboardPage({ onNavigate }) {
 
         {/* Salary Disbursement */}
         <div className="bg-surface border border-border rounded-2xl p-6 shadow-sm">
-          <div className="flex flex-col gap-1 mb-6">
+          <div className="mb-6">
             <h3 className="text-sm font-bold text-text-primary">Salary Disbursement</h3>
-            <p className="text-xs text-text-secondary">Monthly staff payroll distribution (Click a month's bar to view details)</p>
           </div>
           <div className="w-full overflow-x-auto scrollbar-none">
             <div className="min-w-[760px] h-64 relative flex items-end justify-between px-2 pb-6 pt-10">
@@ -275,10 +552,10 @@ export default function DashboardPage({ onNavigate }) {
                       setSelectedSalaryMonthLabel(item.label);
                       setIsSalaryDialogOpen(true);
                     }}
-                    className="flex-1 flex flex-col items-center group cursor-pointer z-10 ml-8 relative"
+                    className="flex-1 flex flex-col items-center group cursor-pointer z-10 relative"
                   >
                     {/* Amount Label on top of bar */}
-                    <span className="text-[9px] font-bold text-text-muted mb-1.5 select-none transition-opacity duration-300 opacity-80 group-hover:opacity-100">
+                    <span className="text-[9px] font-bold text-text-muted mb-1.5 select-none transition-opacity duration-300 opacity-80 group-hover:opacity-100 text-center whitespace-nowrap">
                       ₹{item.amount.toLocaleString()}
                     </span>
 
@@ -312,28 +589,29 @@ export default function DashboardPage({ onNavigate }) {
       <Dialog
         isOpen={isSalaryDialogOpen}
         onClose={() => setIsSalaryDialogOpen(false)}
-        title={`Salary Disbursement Details — ${selectedSalaryMonthLabel}`}
-        description={`List of staff salary payments for ${selectedSalaryMonthLabel} 2026.`}
+        title={`Salary Disbursement — ${selectedSalaryMonthLabel}`}
+        description=""
         className="max-w-2xl"
       >
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Staff Name</TableHead>
-              <TableHead>Designation</TableHead>
-              <TableHead>Salary Amount</TableHead>
-              <TableHead>Payment Date</TableHead>
-              <TableHead>Payment Status</TableHead>
+              <TableHead className="whitespace-nowrap">Staff Name</TableHead>
+              <TableHead className="whitespace-nowrap">Designation</TableHead>
+              <TableHead className="whitespace-nowrap">Salary Amount</TableHead>
+              <TableHead className="whitespace-nowrap">Payment Date</TableHead>
+              <TableHead className="whitespace-nowrap">Payment Status</TableHead>
+              <TableHead className="whitespace-nowrap">Salary Slip</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {getStaffPaymentsForMonth(selectedSalaryMonth).map((staff, idx) => (
               <TableRow key={idx}>
-                <TableCell className="font-semibold text-text-primary text-sm">{staff.name}</TableCell>
-                <TableCell className="text-xs">{staff.designation}</TableCell>
-                <TableCell className="font-mono text-sm font-semibold">₹{staff.salary.toLocaleString()}</TableCell>
-                <TableCell className="font-mono text-xs">{staff.date}</TableCell>
-                <TableCell>
+                <TableCell className="font-semibold text-text-primary text-sm whitespace-nowrap">{staff.name}</TableCell>
+                <TableCell className="text-xs whitespace-nowrap">{staff.designation}</TableCell>
+                <TableCell className="font-mono text-sm font-semibold whitespace-nowrap">₹{staff.salary.toLocaleString()}</TableCell>
+                <TableCell className="font-mono text-xs whitespace-nowrap">{staff.date}</TableCell>
+                <TableCell className="whitespace-nowrap">
                   <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
                     staff.status === 'Paid' 
                       ? 'bg-green-500/10 text-green-600 border border-green-500/20' 
@@ -341,6 +619,18 @@ export default function DashboardPage({ onNavigate }) {
                   }`}>
                     {staff.status}
                   </span>
+                </TableCell>
+                <TableCell className="whitespace-nowrap">
+                  {staff.status === 'Paid' ? (
+                    <button 
+                      onClick={() => handleDownloadSalarySlip(staff, selectedSalaryMonthLabel)}
+                      className="text-xs text-primary hover:underline font-semibold text-teal-600 dark:text-teal-400"
+                    >
+                      Download PDF
+                    </button>
+                  ) : (
+                    <span className="text-xs text-text-muted">--</span>
+                  )}
                 </TableCell>
               </TableRow>
             ))}

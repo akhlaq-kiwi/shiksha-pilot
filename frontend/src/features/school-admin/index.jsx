@@ -51,7 +51,7 @@ export default function SchoolAdminPortal() {
       <button
         key={item.path}
         onClick={() => nav(item.path)}
-        className={`flex items-center gap-2.5 px-1.5 py-2 rounded-lg text-sm font-semibold transition-all flex-shrink-0 w-full text-left ${active ? 'bg-zinc-900 text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900' : 'text-text-secondary hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800'}`}
+        className={`flex items-center gap-3 pl-1 pr-3 py-2 rounded-lg text-sm font-semibold transition-all flex-shrink-0 w-full text-left ${active ? 'bg-zinc-900 text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900' : 'text-text-secondary hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800'}`}
       >
         <Icon className="h-4 w-4 flex-shrink-0" />
         <span>{item.label}</span>
@@ -63,7 +63,7 @@ export default function SchoolAdminPortal() {
     <div className="flex flex-col md:flex-row gap-8 w-full min-h-[calc(100vh-140px)]">
 
       {/* Sidebar */}
-      <aside className="w-full md:w-[220px] flex-shrink-0 flex flex-col justify-between border-r border-border pr-4 py-2 space-y-6">
+      <aside className="w-full md:w-[200px] flex-shrink-0 flex flex-col justify-between border-r border-border pr-2 py-2 space-y-6">
         <div>
           <nav className="flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 scrollbar-none">
             {NAV_ITEMS.map(navBtn)}
