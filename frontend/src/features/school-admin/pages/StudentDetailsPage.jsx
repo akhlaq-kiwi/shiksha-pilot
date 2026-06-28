@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '../../../common/ui/button';
 import { Card, CardContent } from '../../../common/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
 import { schoolService } from '../../../common/services/schoolService';
+import html2pdf from 'html2pdf.js';
 import { 
   User, BookOpen, Users, Home, Calendar, FileText, 
   Download, Printer, AlertCircle, Eye, ChevronDown, ChevronUp, X 
@@ -110,11 +112,68 @@ function DocumentViewerModal({ docName, docPath, onClose }) {
 function ReceiptModal({ receipt, student, schoolName, allPayments = [], onClose }) {
   const handlePrint = () => {
     const printContent = document.getElementById('receipt-print-area').innerHTML;
-    const originalContent = document.body.innerHTML;
-    document.body.innerHTML = printContent;
-    window.print();
-    document.body.innerHTML = originalContent;
-    window.location.reload(); // reload to re-bind React events cleanly
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+    
+    const doc = iframe.contentWindow.document;
+    doc.open();
+    doc.write('<html><head><title>Print Receipt</title>');
+    // Copy stylesheets from parent to preserve styling in print
+    Array.from(document.querySelectorAll('link[rel="stylesheet"], style')).forEach(el => {
+      doc.write(el.outerHTML);
+    });
+    doc.write(`
+      <style>
+        @page {
+          size: auto;
+          margin: 0mm;
+        }
+        body {
+          background-color: white !important;
+          color: black !important;
+          padding: 40px !important;
+        }
+      </style>
+    </head>
+    <body class="bg-white text-black">
+      <div class="space-y-6">
+        ${printContent}
+      </div>
+    </body>
+    </html>
+    `);
+    doc.close();
+    
+    iframe.contentWindow.focus();
+    setTimeout(() => {
+      iframe.contentWindow.print();
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+      }, 1000);
+    }, 500);
+  };
+
+  const handleDownload = () => {
+    const element = document.getElementById('receipt-print-area');
+    const cleanName = student.name.split(/\s+/).join('');
+    const cleanYear = (student.academic_year_name || student.academic_year || '2025-2026').replace(/[–]/g, '-');
+    const filename = `FeeReceipt_${cleanName}_${cleanYear}.pdf`;
+
+    const opt = {
+      margin:       15,
+      filename:     filename,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true },
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    html2pdf().set(opt).from(element).save();
   };
 
   const formatDate = (dateStr) => {
@@ -159,12 +218,12 @@ function ReceiptModal({ receipt, student, schoolName, allPayments = [], onClose 
           </div>
 
           <div className="border-y border-dashed border-border py-4 space-y-2 text-xs">
-            <div className="flex justify-between"><span className="text-text-muted">Receipt No:</span> <span className="font-mono font-bold text-text-primary">{receipt.receipt_no}</span></div>
-            <div className="flex justify-between"><span className="text-text-muted">Payment Date:</span> <span className="font-bold text-text-primary">{formatDate(receipt.payment_date)}</span></div>
-            <div className="flex justify-between"><span className="text-text-muted">Academic Session:</span> <span className="font-bold text-text-primary">{student.academic_year_name || student.academic_year || '2025–2026'}</span></div>
             <div className="flex justify-between"><span className="text-text-muted">Student Name:</span> <span className="font-extrabold text-text-primary uppercase">{student.name}</span></div>
             <div className="flex justify-between"><span className="text-text-muted">Class & Section:</span> <span className="font-bold text-text-primary">{student.class_name} {student.section ? ` - Section ${student.section}` : ''}</span></div>
             <div className="flex justify-between"><span className="text-text-muted">Roll Number / SR No:</span> <span className="font-bold text-text-primary">{student.roll_no || '—'} / {student.sr_no || '—'}</span></div>
+            <div className="flex justify-between"><span className="text-text-muted">Receipt No:</span> <span className="font-mono font-bold text-text-primary">{receipt.receipt_no}</span></div>
+            <div className="flex justify-between"><span className="text-text-muted">Academic Session:</span> <span className="font-bold text-text-primary">{student.academic_year_name || student.academic_year || '2025–2026'}</span></div>
+            <div className="flex justify-between"><span className="text-text-muted">Payment Date:</span> <span className="font-bold text-text-primary">{formatDate(receipt.payment_date)}</span></div>
           </div>
 
           <div className="space-y-4">
@@ -196,8 +255,11 @@ function ReceiptModal({ receipt, student, schoolName, allPayments = [], onClose 
         {/* Footer actions */}
         <div className="px-6 py-4 border-t border-border bg-surface flex justify-end gap-3">
           <Button variant="secondary" onClick={onClose}>Close</Button>
+          <Button className="flex items-center gap-1.5 font-bold" onClick={handleDownload}>
+            <Download className="h-4 w-4" /> Download
+          </Button>
           <Button className="flex items-center gap-1.5 font-bold" onClick={handlePrint}>
-            <Printer className="h-4 w-4" /> Print Receipt
+            <Printer className="h-4 w-4" /> Print
           </Button>
         </div>
       </div>
@@ -206,12 +268,21 @@ function ReceiptModal({ receipt, student, schoolName, allPayments = [], onClose 
 }
 
 // Deposit Modal Component (Supports consecutive payments selection)
-function DepositModal({ student, availableMonths, paidMonths, onSave, onClose }) {
+function DepositModal({ student, availableMonths, paidMonths, classFeeConfig, onSave, onClose }) {
   const [selectedMonths, setSelectedMonths] = useState([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   const academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+
+  const getMonthAmount = (m) => {
+    if (classFeeConfig && classFeeConfig.monthly_fees && classFeeConfig.monthly_fees[m]) {
+      return parseFloat(classFeeConfig.monthly_fees[m]);
+    }
+    const paymentsList = student?.payments || [];
+    const firstPaidAmount = paymentsList[0]?.amount_paid ? parseFloat(paymentsList[0].amount_paid) : 2000;
+    return firstPaidAmount;
+  };
 
   // Resolve the earliest unpaid month in the academic cycle
   const getEarliestUnpaid = () => {
@@ -318,7 +389,7 @@ function DepositModal({ student, availableMonths, paidMonths, onSave, onClose })
                       onChange={() => handleMonthToggle(m)}
                       className="rounded border-zinc-300 text-primary focus:ring-primary h-4 w-4 disabled:opacity-50"
                     />
-                    <span>{m}</span>
+                    <span>{m} <span className="text-[10px] text-text-muted font-normal lowercase">(₹{getMonthAmount(m).toLocaleString()})</span></span>
                   </label>
                   <div>
                     {isPaid ? (
@@ -337,7 +408,7 @@ function DepositModal({ student, availableMonths, paidMonths, onSave, onClose })
         <div className="px-6 py-4 border-t border-border bg-surface flex justify-end gap-3">
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
           <Button className="font-bold animate-pulse" disabled={saving || selectedMonths.length === 0} onClick={handleSave}>
-            {saving ? 'Depositing...' : `Deposit ${selectedMonths.length > 0 ? `(${selectedMonths.length} Months)` : ''}`}
+            {saving ? 'Depositing...' : `Deposit ${selectedMonths.length > 0 ? `(₹${selectedMonths.reduce((sum, m) => sum + getMonthAmount(m), 0).toLocaleString()})` : ''}`}
           </Button>
         </div>
       </div>
@@ -346,10 +417,11 @@ function DepositModal({ student, availableMonths, paidMonths, onSave, onClose })
 }
 
 export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
+  const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeSubTab, setActiveSubTab] = useState('profile'); // 'profile', 'academic', 'finance'
+  const [activeSubTab, setActiveSubTab] = useState('finance'); // 'finance', 'profile', 'academic'
   
   // Accordion toggle for Documents (closed by default)
   const [docsOpen, setDocsOpen] = useState(false);
@@ -507,11 +579,22 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
         ? 'bg-green-500/10 text-green-600 border-green-500/20'
         : 'bg-red-500/10 text-red-600 border-red-500/20';
 
+      let amount = 2000;
+      if (isPaid && receipt) {
+        amount = parseFloat(receipt.amount_paid);
+      } else if (data && data.class_fee_config && data.class_fee_config.monthly_fees && data.class_fee_config.monthly_fees[m]) {
+        amount = parseFloat(data.class_fee_config.monthly_fees[m]);
+      } else {
+        const firstPaid = paymentsList[0]?.amount_paid ? parseFloat(paymentsList[0].amount_paid) : 2000;
+        amount = firstPaid;
+      }
+
       return {
         month: m,
         status,
         statusClass,
-        receipt
+        receipt,
+        amount
       };
     });
   };
@@ -533,9 +616,11 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
           </button>
           <h2 className="text-2xl font-black text-text-primary tracking-tight font-display">Student Profile</h2>
         </div>
-        <Button onClick={() => onEdit(student.id)} className="font-bold">
-          Edit Profile
-        </Button>
+        {student.status !== 'Alumni' && student.status !== 'Archived' && (
+          <Button onClick={() => onEdit(student.id)} className="font-bold">
+            Edit Profile
+          </Button>
+        )}
       </div>
 
       {/* Main Profile Grid */}
@@ -549,8 +634,12 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
               {/* Profile Image (Self-healing avatar) with Click Popover Menu */}
               <div className="relative -mt-10 z-20">
                 <button 
-                  onClick={() => setShowPhotoMenu(prev => !prev)}
-                  className="w-20 h-20 rounded-full border-4 border-surface bg-zinc-50 flex items-center justify-center overflow-hidden shadow-xs hover:ring-2 hover:ring-primary/20 transition-all focus:outline-none cursor-pointer"
+                  onClick={() => {
+                    if (student.status !== 'Alumni' && student.status !== 'Archived') {
+                      setShowPhotoMenu(prev => !prev);
+                    }
+                  }}
+                  className={`w-20 h-20 rounded-full border-4 border-surface bg-zinc-50 flex items-center justify-center overflow-hidden shadow-xs transition-all focus:outline-none ${student.status !== 'Alumni' && student.status !== 'Archived' ? 'hover:ring-2 hover:ring-primary/20 cursor-pointer' : ''}`}
                 >
                   <StudentAvatar src={student.photo_path} name={student.name} updatedAt={student.updated_at} />
                 </button>
@@ -633,9 +722,9 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
           {/* Sub tabs nav (Finance tab renamed to "Finance") */}
           <div className="flex border-b border-border text-sm overflow-x-auto whitespace-nowrap scrollbar-none gap-6">
             {[
+              { id: 'finance', label: 'Finance' },
               { id: 'profile', label: 'Student & Parents' },
-              { id: 'academic', label: 'Academic Results' },
-              { id: 'finance', label: 'Finance' }
+              { id: 'academic', label: 'Academic Results' }
             ].map(tab => (
               <button
                 key={tab.id}
@@ -849,94 +938,134 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
           {/* Sub-tab 3: Finance */}
           {activeSubTab === 'finance' && (
             <div className="space-y-6 animate-in fade-in duration-200">
-              
-              {/* Fee summary card */}
-              {(() => {
-                const monthlyFee = fee_summary.payments?.[0]?.amount_paid ? parseFloat(fee_summary.payments[0].amount_paid) : 2000;
-                const totalSessionFee = 12 * monthlyFee;
-                const totalDuesInSession = Math.max(0, totalSessionFee - parseFloat(fee_summary.total_paid));
-                return (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                    <Card className="shadow-xs p-5 bg-surface border-border flex flex-col justify-between">
-                      <div>
-                        <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Total Paid in Session</p>
-                        <p className="text-2xl font-black text-teal-600 mt-1 font-display">₹{parseFloat(fee_summary.total_paid).toLocaleString()}</p>
-                      </div>
-                    </Card>
+              {(!data || !data.class_fee_config) ? (
+                <div className="bg-surface border border-border rounded-2xl p-8 flex flex-col items-center text-center space-y-4 max-w-md mx-auto shadow-2xs">
+                  <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-600">
+                    <AlertCircle className="h-6 w-6" />
+                  </div>
+                  <h3 className="font-extrabold text-text-primary text-base">Fee Structure Not Configured</h3>
+                  <p className="text-xs text-text-secondary leading-relaxed">
+                    The monthly fee structure for <strong className="text-text-primary uppercase">{student.class_name || 'this class'}</strong> has not been configured for the current Academic Year. <br />
+                    Please configure the class fee before collecting or managing student fees.
+                  </p>
+                  <Button 
+                    onClick={() => navigate('/school-admin/audits-settings', { state: { preselectClassId: student.class_id } })}
+                    className="font-bold bg-primary text-primary-foreground hover:bg-primary/95 flex items-center gap-1.5 text-xs h-9 px-4 rounded-lg shadow-2xs mt-2"
+                  >
+                    Configure Class Fee
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  {/* Fee summary card */}
+                  {(() => {
+                    let totalSessionFee = 0;
+                    const academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
                     
-                    <Card className="shadow-xs p-5 bg-surface border-border flex flex-col justify-between">
-                      <div>
-                        <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Total Dues In Session</p>
-                        <p className="text-2xl font-black text-amber-600 mt-1 font-display">₹{totalDuesInSession.toLocaleString()}</p>
+                    if (data && data.class_fee_config && data.class_fee_config.monthly_fees) {
+                      academicMonths.forEach(m => {
+                        totalSessionFee += parseFloat(data.class_fee_config.monthly_fees[m] || 0);
+                      });
+                    } else {
+                      const monthlyFee = fee_summary.payments?.[0]?.amount_paid ? parseFloat(fee_summary.payments[0].amount_paid) : 2000;
+                      totalSessionFee = 12 * monthlyFee;
+                    }
+                    const totalDuesInSession = Math.max(0, totalSessionFee - parseFloat(fee_summary.total_paid));
+                    return (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                        <Card className="shadow-xs p-5 bg-surface border-border flex flex-col justify-between">
+                          <div>
+                            <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Total Paid in Session</p>
+                            <p className="text-2xl font-black text-teal-600 mt-1 font-display">₹{parseFloat(fee_summary.total_paid).toLocaleString()}</p>
+                          </div>
+                        </Card>
+                        
+                        <Card className="shadow-xs p-5 bg-surface border-border flex flex-col justify-between">
+                          <div>
+                            <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Total Dues In Session</p>
+                            <p className="text-2xl font-black text-amber-600 mt-1 font-display">₹{totalDuesInSession.toLocaleString()}</p>
+                          </div>
+                        </Card>
                       </div>
-                    </Card>
-                  </div>
-                );
-              })()}
+                    );
+                  })()}
 
-              {/* Month-wise Fee Management panel */}
-              <Card className="shadow-xs">
-                <CardContent className="p-6 space-y-4">
-                  <div className="flex items-center gap-2 border-b border-border pb-2.5">
-                    <FileText className="h-4 w-4 text-primary" />
-                    <h4 className="text-xs font-bold text-text-primary uppercase tracking-wider">Month-wise Fee Record</h4>
-                  </div>
+                  {/* Month-wise Fee Management panel */}
+                  <Card className="shadow-xs">
+                    <CardContent className="p-6 space-y-4">
+                      <div className="flex items-center gap-2 border-b border-border pb-2.5">
+                        <FileText className="h-4 w-4 text-primary" />
+                        <h4 className="text-xs font-bold text-text-primary uppercase tracking-wider">Month-wise Fee Record</h4>
+                      </div>
 
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Month</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Payment Date</TableHead>
-                        <TableHead className="text-right">Action</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {monthWiseList.map(mw => (
-                        <TableRow key={mw.month}>
-                          <TableCell className="font-extrabold text-text-primary text-xs uppercase tracking-wider">{mw.month}</TableCell>
-                          <TableCell>
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase border ${mw.statusClass}`}>
-                              {mw.status}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-xs text-text-secondary">
-                            {mw.status === 'PAID' && mw.receipt?.payment_date ? formatDate(mw.receipt.payment_date) : '—'}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {mw.status === 'PAID' ? (
-                              <div className="flex justify-end gap-2">
-                                <Button 
-                                  variant="secondary" 
-                                  className="h-7 w-20 text-[10px] px-0 font-bold"
-                                  onClick={() => handleRevertPayment(mw.receipt)}
-                                >
-                                  Revert
-                                </Button>
-                                <Button 
-                                  variant="secondary" 
-                                  className="h-7 w-20 text-[10px] px-0 font-bold"
-                                  onClick={() => setViewingReceipt(mw.receipt)}
-                                >
-                                  Receipt
-                                </Button>
-                              </div>
-                            ) : (
-                              <Button 
-                                className="h-7 w-20 text-[10px] px-0 font-bold"
-                                onClick={() => setShowDepositModal(true)}
-                              >
-                                Deposit
-                              </Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Month</TableHead>
+                            <TableHead>Amount</TableHead>
+                            <TableHead>Payment Date</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Action</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {monthWiseList.map(mw => (
+                            <TableRow key={mw.month}>
+                              <TableCell className="font-extrabold text-text-primary text-xs uppercase tracking-wider">
+                                {mw.month}
+                              </TableCell>
+                              <TableCell className="text-xs text-text-primary">
+                                ₹{mw.amount.toLocaleString()}
+                              </TableCell>
+                              <TableCell className="text-xs text-text-secondary">
+                                {mw.status === 'PAID' && mw.receipt?.payment_date ? formatDate(mw.receipt.payment_date) : '—'}
+                              </TableCell>
+                              <TableCell>
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase border ${mw.statusClass}`}>
+                                  {mw.status}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {mw.status === 'PAID' ? (
+                                  <div className="flex justify-end gap-2">
+                                    {student.status !== 'Alumni' && student.status !== 'Archived' && (
+                                      <Button 
+                                        variant="secondary" 
+                                        className="h-7 w-20 text-[10px] px-0 font-bold"
+                                        onClick={() => handleRevertPayment(mw.receipt)}
+                                      >
+                                        Revert
+                                      </Button>
+                                    )}
+                                    <Button 
+                                      variant="secondary" 
+                                      className="h-7 w-20 text-[10px] px-0 font-bold"
+                                      onClick={() => setViewingReceipt(mw.receipt)}
+                                    >
+                                      Receipt
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  student.status !== 'Alumni' && student.status !== 'Archived' ? (
+                                    <Button 
+                                      className="h-7 w-20 text-[10px] px-0 font-bold"
+                                      onClick={() => setShowDepositModal(true)}
+                                    >
+                                      Deposit
+                                    </Button>
+                                  ) : (
+                                    <span className="text-[10px] text-text-muted font-bold">—</span>
+                                  )
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
             </div>
           )}
 
@@ -969,6 +1098,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
         <DepositModal 
           student={student} 
           paidMonths={paidMonthsList} 
+          classFeeConfig={data?.class_fee_config}
           onSave={async () => {
             setShowDepositModal(false);
             await loadDetails();

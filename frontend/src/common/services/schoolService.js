@@ -115,6 +115,46 @@ export const schoolService = {
 
   revertFeePayment(id) {
     return apiClient.delete(`/api/school/fee-payments/${id}`);
+  },
+
+  getClassFeeConfigurations(params = {}) {
+    return apiClient.get(buildUrl('/api/school/class-fee-configurations', params));
+  },
+
+  saveClassFeeConfiguration(payload) {
+    return apiClient.post('/api/school/class-fee-configurations', payload);
+  },
+
+  lockClassFeeConfiguration(payload) {
+    return apiClient.post('/api/school/class-fee-configurations/lock', payload);
+  },
+
+  checkSrNoExists(params) {
+    return apiClient.get(buildUrl('/api/school/students/check-sr-no', params));
+  },
+
+  createAcademicYear(data) {
+    return apiClient.post('/api/school/academic-years', data);
+  },
+
+  activateAcademicYear(id, data) {
+    return apiClient.post(`/api/school/academic-years/${id}/activate`, data);
+  },
+
+  getNextRollNo(classId) {
+    return apiClient.get(`/api/school/classes/${classId}/next-roll-no`);
+  },
+
+  getStaffPayments(params) {
+    return apiClient.get(buildUrl('/api/school/staff-payments', params));
+  },
+
+  payStaffSalary(data) {
+    return apiClient.post('/api/school/staff-payments', data);
+  },
+
+  revertStaffSalary(id) {
+    return apiClient.delete(`/api/school/staff-payments/${id}`);
   }
 };
 

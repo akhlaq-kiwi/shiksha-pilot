@@ -37,6 +37,7 @@ return function (App $app) {
     // School Admin Domain
     $app->get('/api/school/stats', [SchoolAdminController::class, 'getDashboardStats']);
     $app->get('/api/school/students', [SchoolAdminController::class, 'getStudents']);
+    $app->get('/api/school/students/check-sr-no', [SchoolAdminController::class, 'checkSrNo']);
     $app->get('/api/school/students/{id}', [SchoolAdminController::class, 'getStudentById']);
     $app->post('/api/school/students', [SchoolAdminController::class, 'createStudent']);
     $app->put('/api/school/students/{id}', [SchoolAdminController::class, 'updateStudent']);
@@ -44,10 +45,16 @@ return function (App $app) {
     $app->get('/api/school/staff', [SchoolAdminController::class, 'getStaff']);
     $app->post('/api/school/staff', [SchoolAdminController::class, 'createStaff']);
     $app->put('/api/school/staff/{id}', [SchoolAdminController::class, 'updateStaff']);
+    $app->get('/api/school/staff-payments', [SchoolAdminController::class, 'getStaffPayments']);
+    $app->post('/api/school/staff-payments', [SchoolAdminController::class, 'payStaffSalary']);
+    $app->delete('/api/school/staff-payments/{id}', [SchoolAdminController::class, 'revertStaffSalary']);
     $app->get('/api/school/classes', [SchoolAdminController::class, 'getClasses']);
     $app->post('/api/school/classes', [SchoolAdminController::class, 'createClass']);
     $app->put('/api/school/classes', [SchoolAdminController::class, 'updateClass']);
+    $app->get('/api/school/classes/{class_id}/next-roll-no', [SchoolAdminController::class, 'getNextRollNo']);
     $app->get('/api/school/academic-years', [SchoolAdminController::class, 'getAcademicYears']);
+    $app->post('/api/school/academic-years', [SchoolAdminController::class, 'createAcademicYear']);
+    $app->post('/api/school/academic-years/{id}/activate', [SchoolAdminController::class, 'activateAcademicYear']);
     $app->get('/api/school/attendance', [SchoolAdminController::class, 'getAttendance']);
     $app->post('/api/school/attendance', [SchoolAdminController::class, 'markAttendance']);
     $app->get('/api/school/exams', [SchoolAdminController::class, 'getExams']);
@@ -59,6 +66,10 @@ return function (App $app) {
     $app->get('/api/school/fee-payments', [SchoolAdminController::class, 'getFeePayments']);
     $app->post('/api/school/fee-payments', [SchoolAdminController::class, 'createFeePayment']);
     $app->delete('/api/school/fee-payments/{id}', [SchoolAdminController::class, 'deleteFeePayment']);
+
+    $app->get('/api/school/class-fee-configurations', [SchoolAdminController::class, 'getClassFeeConfigurations']);
+    $app->post('/api/school/class-fee-configurations', [SchoolAdminController::class, 'saveClassFeeConfiguration']);
+    $app->post('/api/school/class-fee-configurations/lock', [SchoolAdminController::class, 'lockClassFeeConfiguration']);
 
     $app->get('/api/school/timetable', [SchoolAdminController::class, 'getTimetable']);
     $app->get('/api/school/subjects', [SchoolAdminController::class, 'getSubjects']);

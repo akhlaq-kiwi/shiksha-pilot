@@ -169,8 +169,21 @@ export default function ClassesPage() {
 
   // Nested Navigation Handling
   if (view === 'enroll') {
+    const rosterClassRows = classes.filter(c => c.name === selectedClassName);
+    let defaultClassId = '';
+    if (rosterClassRows.length > 0) {
+      if (rosterSectionFilter !== 'All') {
+        const match = rosterClassRows.find(c => c.section === rosterSectionFilter);
+        if (match) defaultClassId = match.id;
+      } else {
+        defaultClassId = rosterClassRows[0].id;
+      }
+    }
+
     return (
       <StudentEnrollmentForm 
+        currentClassName={selectedClassName}
+        currentClassId={defaultClassId}
         onCancel={() => setView('roster')} 
         onSuccess={async () => {
           setView('roster');
@@ -181,9 +194,22 @@ export default function ClassesPage() {
   }
 
   if (view === 'edit') {
+    const rosterClassRows = classes.filter(c => c.name === selectedClassName);
+    let defaultClassId = '';
+    if (rosterClassRows.length > 0) {
+      if (rosterSectionFilter !== 'All') {
+        const match = rosterClassRows.find(c => c.section === rosterSectionFilter);
+        if (match) defaultClassId = match.id;
+      } else {
+        defaultClassId = rosterClassRows[0].id;
+      }
+    }
+
     return (
       <StudentEnrollmentForm 
         studentId={selectedStudentId} 
+        currentClassName={selectedClassName}
+        currentClassId={defaultClassId}
         onCancel={() => setView('roster')} 
         onSuccess={async () => {
           setView('roster');

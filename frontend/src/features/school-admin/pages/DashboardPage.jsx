@@ -26,40 +26,88 @@ export default function DashboardPage({ onNavigate }) {
     staff_count: 0,
     classes_count: 0,
     pending_fees: 0,
-    total_collected: 0
+    total_collected: 0,
+    fee_collection_chart: [],
+    salary_disbursement_chart: []
   });
   const [loading, setLoading] = useState(true);
   const [auditLogs] = useState(MOCK_AUDIT_LOGS);
 
+  const [staffPaymentsList, setStaffPaymentsList] = useState([]);
+  const [loadingSalary, setLoadingSalary] = useState(false);
+
+  const fetchDashboardData = async () => {
+    try {
+      const [stuData, stfData, exData, fpData, statsData] = await Promise.all([
+        schoolService.getStudents(),
+        schoolService.getStaff(),
+        schoolService.getExams(),
+        schoolService.getFeePayments(),
+        schoolService.getStats()
+      ]);
+      setStudents(stuData || []);
+      setStaff(stfData || []);
+      setExams(exData || []);
+      setFeePayments(fpData || []);
+      setDbStats(statsData || {
+        students_count: 0,
+        staff_count: 0,
+        classes_count: 0,
+        pending_fees: 0,
+        total_collected: 0,
+        fee_collection_chart: [],
+        salary_disbursement_chart: []
+      });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        const [stuData, stfData, exData, fpData, statsData] = await Promise.all([
-          schoolService.getStudents(),
-          schoolService.getStaff(),
-          schoolService.getExams(),
-          schoolService.getFeePayments(),
-          schoolService.getStats()
-        ]);
-        setStudents(stuData || []);
-        setStaff(stfData || []);
-        setExams(exData || []);
-        setFeePayments(fpData || []);
-        setDbStats(statsData || {
-          students_count: 0,
-          staff_count: 0,
-          classes_count: 0,
-          pending_fees: 0,
-          total_collected: 0
-        });
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchDashboardData();
   }, []);
+
+  const fetchSalaryPayments = async (monthLabel) => {
+    if (!monthLabel) return;
+    setLoadingSalary(true);
+    try {
+      const list = await schoolService.getStaffPayments({ month: monthLabel });
+      setStaffPaymentsList(list || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingSalary(false);
+    }
+  };
+
+  const handlePaySalary = async (staffId) => {
+    try {
+      await schoolService.payStaffSalary({
+        staff_id: staffId,
+        month: selectedSalaryMonthLabel
+      });
+      await fetchSalaryPayments(selectedSalaryMonthLabel);
+      await fetchDashboardData();
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.message || 'Failed to pay salary.');
+    }
+  };
+
+  const handleRevertSalary = async (paymentId) => {
+    if (window.confirm('Are you sure you want to revert this salary payment?')) {
+      try {
+        await schoolService.revertStaffSalary(paymentId);
+        await fetchSalaryPayments(selectedSalaryMonthLabel);
+        await fetchDashboardData();
+      } catch (err) {
+        console.error(err);
+        alert(err.response?.data?.message || 'Failed to revert salary payment.');
+      }
+    }
+  };
 
   const [isSalaryDialogOpen, setIsSalaryDialogOpen] = useState(false);
   const [selectedSalaryMonth, setSelectedSalaryMonth] = useState('');
@@ -71,79 +119,8 @@ export default function DashboardPage({ onNavigate }) {
     return () => clearTimeout(timer);
   }, []);
 
-  const FEE_DATA = [
-    { month: 'Apr', label: 'April', amount: 125000, studentsPaid: 25 },
-    { month: 'May', label: 'May', amount: 140000, studentsPaid: 28 },
-    { month: 'Jun', label: 'June', amount: 135000, studentsPaid: 27 },
-    { month: 'Jul', label: 'July', amount: 150000, studentsPaid: 30 },
-    { month: 'Aug', label: 'August', amount: 110000, studentsPaid: 22 },
-    { month: 'Sep', label: 'September', amount: 120000, studentsPaid: 24 },
-    { month: 'Oct', label: 'October', amount: 160000, studentsPaid: 32 },
-    { month: 'Nov', label: 'November', amount: 145000, studentsPaid: 29 },
-    { month: 'Dec', label: 'December', amount: 130000, studentsPaid: 26 },
-    { month: 'Jan', label: 'January', amount: 155000, studentsPaid: 31 },
-    { month: 'Feb', label: 'February', amount: 165000, studentsPaid: 33 },
-    { month: 'Mar', label: 'March', amount: 180000, studentsPaid: 36 },
-  ];
-
-  const SALARY_DATA = [
-    { month: 'Apr', label: 'April', amount: 82000 },
-    { month: 'May', label: 'May', amount: 82000 },
-    { month: 'Jun', label: 'June', amount: 82000 },
-    { month: 'Jul', label: 'July', amount: 82000 },
-    { month: 'Aug', label: 'August', amount: 82000 },
-    { month: 'Sep', label: 'September', amount: 82000 },
-    { month: 'Oct', label: 'October', amount: 82000 },
-    { month: 'Nov', label: 'November', amount: 82000 },
-    { month: 'Dec', label: 'December', amount: 95000 },
-    { month: 'Jan', label: 'January', amount: 82000 },
-    { month: 'Feb', label: 'February', amount: 82000 },
-    { month: 'Mar', label: 'March', amount: 82000 },
-  ];
-
-  const getStaffPaymentsForMonth = (month) => {
-    const baseStaff = [
-      { name: 'Karan Sharma', designation: 'Senior Science Teacher', salary: 25000 },
-      { name: 'Priya Patel', designation: 'Mathematics HOD', salary: 22000 },
-      { name: 'Amit Verma', designation: 'English Lecturer', salary: 20000 },
-      { name: 'Sunita Rao', designation: 'Head Librarian', salary: 15000 },
-    ];
-    
-    if (month === 'Dec') {
-      baseStaff.push({ name: 'Rajesh Kumar', designation: 'Guest Lecturer', salary: 13000 });
-    }
-    
-    const monthNumMap = {
-      'Apr': '04', 'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08', 'Sep': '09',
-      'Oct': '10', 'Nov': '11', 'Dec': '12', 'Jan': '01', 'Feb': '02', 'Mar': '03'
-    };
-    
-    const mNum = monthNumMap[month] || '06';
-    const year = ['Jan', 'Feb', 'Mar'].includes(month) ? '2027' : '2026';
-    
-    return baseStaff.map((s, idx) => {
-      let status = 'Paid';
-      let date = `${year}-${mNum}-28`;
-      
-      if (month === 'Jun') {
-        if (idx >= 2) {
-          status = 'Pending';
-          date = '-';
-        } else {
-          date = `${year}-${mNum}-26`;
-        }
-      } else if (['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'].includes(month)) {
-        status = 'Pending';
-        date = '-';
-      }
-      
-      return {
-        ...s,
-        status,
-        date
-      };
-    });
-  };
+  const FEE_DATA = dbStats.fee_collection_chart || [];
+  const SALARY_DATA = dbStats.salary_disbursement_chart || [];
 
   const handleDownloadSalarySlip = (staff, monthName) => {
     const printWindow = window.open('', '_blank');
@@ -433,11 +410,19 @@ export default function DashboardPage({ onNavigate }) {
     );
   }
 
+  const formatCurrency = (val) => {
+    const num = parseFloat(val || 0);
+    if (num >= 100000) {
+      return `₹${(num / 100000).toFixed(2).replace(/\.00$/, '')}L`;
+    }
+    return `₹${num.toLocaleString('en-IN')}`;
+  };
+
   const totalStudents = students.length;
   const activeStudents = students.filter(s => s.status === 'ACTIVE').length;
   const totalStaff = staff.length;
   const totalFeeCollected = dbStats.total_collected || feePayments.filter(f => f.status === 'PAID').reduce((sum, f) => sum + parseFloat(f.amount_paid || 0), 0);
-  const pendingFees = dbStats.pending_fees || feePayments.filter(f => f.status === 'Pending').length;
+  const pendingFees = dbStats.pending_fees || 0;
 
   const stats = {
     totalStudents,
@@ -454,8 +439,8 @@ export default function DashboardPage({ onNavigate }) {
         {[
           { label: 'Total Students', value: totalStudents },
           { label: 'Total Teachers', value: totalStaff },
-          { label: 'Fee Collected', value: `₹${(totalFeeCollected / 1000).toFixed(0)}K` },
-          { label: 'Dues Pending', value: exams.filter(e => e.status === 'Upcoming').length },
+          { label: 'Fee Collected', value: formatCurrency(totalFeeCollected) },
+          { label: 'Dues Pending', value: formatCurrency(pendingFees) },
         ].map(card => {
           return (
             <Card key={card.label} className="shadow-sm">
@@ -477,27 +462,11 @@ export default function DashboardPage({ onNavigate }) {
           </div>
           <div className="w-full overflow-x-auto scrollbar-none">
             <div className="min-w-[760px] flex items-stretch h-64 pt-6 pb-2">
-              {/* Y-Axis Labels Column */}
-              <div className="flex flex-col justify-between text-right pr-3 pb-8 w-16 select-none pointer-events-none">
-                {[200000, 150000, 100000, 50000].map(v => (
-                  <span key={v} className="text-[9px] text-text-muted font-bold">₹{v.toLocaleString()}</span>
-                ))}
-                <span className="text-[9px] text-text-muted font-bold">₹0</span>
-              </div>
-
               {/* Chart Grid & Bars Area */}
               <div className="flex-1 relative flex items-end justify-around pb-8 border-b border-border pr-2">
-                {/* Y-Axis Horizontal Gridlines */}
-                <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-8 pt-1">
-                  {[200000, 150000, 100000, 50000].map(v => (
-                    <div key={v} className="w-full border-b border-zinc-100 dark:border-zinc-800/40"></div>
-                  ))}
-                  <div></div>
-                </div>
-
                 {/* Bars */}
                 {FEE_DATA.map((item, i) => {
-                  const maxVal = 200000;
+                  const maxVal = Math.max(...FEE_DATA.map(d => d.amount), 10000);
                   const percentage = (item.amount / maxVal) * 100;
                   return (
                     <div key={i} className="flex-1 flex flex-col items-center group cursor-pointer z-10 relative">
@@ -519,8 +488,8 @@ export default function DashboardPage({ onNavigate }) {
                       <div className="absolute bottom-full mb-3 hidden group-hover:flex flex-col items-center pointer-events-none z-30 animate-in fade-in slide-in-from-bottom-1 duration-200">
                         <div className="bg-zinc-950 text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900 text-[10px] font-semibold p-2.5 rounded-lg shadow-lg whitespace-nowrap flex flex-col gap-0.5 border border-border/10">
                           <span className="font-bold border-b border-zinc-800 dark:border-zinc-200 pb-0.5 mb-1">{item.label}</span>
-                          <span>Fee Collected: ₹{item.amount.toLocaleString()}</span>
-                          <span>Students Paid: {item.studentsPaid}</span>
+                          <span>Total Collection: ₹{item.amount.toLocaleString()}</span>
+                          <span>{item.studentsPaid} Fee Transactions</span>
                         </div>
                         <div className="w-1.5 h-1.5 bg-zinc-950 dark:bg-zinc-50 rotate-45 -mt-1"></div>
                       </div>
@@ -539,27 +508,11 @@ export default function DashboardPage({ onNavigate }) {
           </div>
           <div className="w-full overflow-x-auto scrollbar-none">
             <div className="min-w-[760px] flex items-stretch h-64 pt-6 pb-2">
-              {/* Y-Axis Labels Column */}
-              <div className="flex flex-col justify-between text-right pr-3 pb-8 w-16 select-none pointer-events-none">
-                {[100000, 75000, 50000, 25000].map(v => (
-                  <span key={v} className="text-[9px] text-text-muted font-bold">₹{v.toLocaleString()}</span>
-                ))}
-                <span className="text-[9px] text-text-muted font-bold">₹0</span>
-              </div>
-
               {/* Chart Grid & Bars Area */}
               <div className="flex-1 relative flex items-end justify-around pb-8 border-b border-border pr-2">
-                {/* Y-Axis Gridlines */}
-                <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-8 pt-1">
-                  {[100000, 75000, 50000, 25000].map(v => (
-                    <div key={v} className="w-full border-b border-zinc-100 dark:border-zinc-800/40"></div>
-                  ))}
-                  <div></div>
-                </div>
-
                 {/* Bars */}
                 {SALARY_DATA.map((item, i) => {
-                  const maxVal = 100000;
+                  const maxVal = Math.max(...SALARY_DATA.map(d => d.amount), 10000);
                   const percentage = (item.amount / maxVal) * 100;
                   return (
                     <div 
@@ -567,6 +520,7 @@ export default function DashboardPage({ onNavigate }) {
                       onClick={() => {
                         setSelectedSalaryMonth(item.month);
                         setSelectedSalaryMonthLabel(item.label);
+                        fetchSalaryPayments(item.label);
                         setIsSalaryDialogOpen(true);
                       }}
                       className="flex-1 flex flex-col items-center group cursor-pointer z-10 relative"
@@ -590,6 +544,7 @@ export default function DashboardPage({ onNavigate }) {
                         <div className="bg-zinc-950 text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900 text-[10px] font-semibold p-2.5 rounded-lg shadow-lg whitespace-nowrap flex flex-col gap-0.5 border border-border/10">
                           <span className="font-bold border-b border-zinc-800 dark:border-zinc-200 pb-0.5 mb-1">{item.label}</span>
                           <span>Salary Disbursed: ₹{item.amount.toLocaleString()}</span>
+                          <span>{item.teachersPaid} Teachers Paid</span>
                           <span className="text-[9px] text-indigo-400 font-medium">Click to view staff list</span>
                         </div>
                         <div className="w-1.5 h-1.5 bg-zinc-950 dark:bg-zinc-50 rotate-45 -mt-1"></div>
@@ -609,51 +564,81 @@ export default function DashboardPage({ onNavigate }) {
         onClose={() => setIsSalaryDialogOpen(false)}
         title={`Salary Disbursement — ${selectedSalaryMonthLabel}`}
         description=""
-        className="w-[90vw] md:max-w-3xl"
+        className="w-[90vw] md:max-w-4xl"
       >
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="whitespace-nowrap">Staff Name</TableHead>
-              <TableHead className="whitespace-nowrap">Designation</TableHead>
-              <TableHead className="whitespace-nowrap">Salary Amount</TableHead>
-              <TableHead className="whitespace-nowrap">Payment Date</TableHead>
-              <TableHead className="whitespace-nowrap">Payment Status</TableHead>
-              <TableHead className="whitespace-nowrap">Salary Slip</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {getStaffPaymentsForMonth(selectedSalaryMonth).map((staff, idx) => (
-              <TableRow key={idx}>
-                <TableCell className="font-semibold text-text-primary text-sm whitespace-nowrap">{staff.name}</TableCell>
-                <TableCell className="text-xs whitespace-nowrap">{staff.designation}</TableCell>
-                <TableCell className="font-mono text-sm font-semibold whitespace-nowrap">₹{staff.salary.toLocaleString()}</TableCell>
-                <TableCell className="font-mono text-xs whitespace-nowrap">{staff.date}</TableCell>
-                <TableCell className="whitespace-nowrap">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                    staff.status === 'Paid' 
-                      ? 'bg-green-500/10 text-green-600 border border-green-500/20' 
-                      : 'bg-amber-500/10 text-amber-600 border border-amber-500/20'
-                  }`}>
-                    {staff.status}
-                  </span>
-                </TableCell>
-                <TableCell className="whitespace-nowrap">
-                  {staff.status === 'Paid' ? (
-                    <button 
-                      onClick={() => handleDownloadSalarySlip(staff, selectedSalaryMonthLabel)}
-                      className="text-xs text-primary hover:underline font-semibold text-teal-600 dark:text-teal-400"
-                    >
-                      Download Salary Slip
-                    </button>
-                  ) : (
-                    <span className="text-xs text-text-muted">--</span>
-                  )}
-                </TableCell>
+        {loadingSalary ? (
+          <div className="flex flex-col items-center justify-center py-12 gap-3">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+            <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Loading staff records...</p>
+          </div>
+        ) : staffPaymentsList.length === 0 ? (
+          <div className="text-center py-12 text-xs text-text-secondary">
+            No active staff records found for this period.
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="whitespace-nowrap">Staff Name</TableHead>
+                <TableHead className="whitespace-nowrap">Designation</TableHead>
+                <TableHead className="whitespace-nowrap">Salary Amount</TableHead>
+                <TableHead className="whitespace-nowrap">Payment Date</TableHead>
+                <TableHead className="whitespace-nowrap">Payment Status</TableHead>
+                <TableHead className="whitespace-nowrap">Salary Slip</TableHead>
+                <TableHead className="text-right whitespace-nowrap">Action</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {staffPaymentsList.map((staff, idx) => (
+                <TableRow key={idx}>
+                  <TableCell className="font-semibold text-text-primary text-sm whitespace-nowrap">{staff.name}</TableCell>
+                  <TableCell className="text-xs whitespace-nowrap">{staff.designation}</TableCell>
+                  <TableCell className="font-mono text-sm font-semibold whitespace-nowrap">₹{staff.salary.toLocaleString()}</TableCell>
+                  <TableCell className="font-mono text-xs whitespace-nowrap">{staff.date}</TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                      staff.status === 'Paid' 
+                        ? 'bg-green-500/10 text-green-600 border border-green-500/20' 
+                        : 'bg-amber-500/10 text-amber-600 border border-amber-500/20'
+                    }`}>
+                      {staff.status}
+                    </span>
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {staff.status === 'Paid' ? (
+                      <button 
+                        onClick={() => handleDownloadSalarySlip(staff, selectedSalaryMonthLabel)}
+                        className="text-xs text-primary hover:underline font-semibold text-teal-600 dark:text-teal-400"
+                      >
+                        Download Salary Slip
+                      </button>
+                    ) : (
+                      <span className="text-xs text-text-muted">--</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right whitespace-nowrap">
+                    {staff.status === 'Paid' ? (
+                      <Button 
+                        variant="secondary"
+                        onClick={() => handleRevertSalary(staff.payment_id)}
+                        className="h-7 text-[10px] font-bold px-3 border border-red-500/20 hover:border-red-500/50 hover:bg-red-50 text-red-600 dark:hover:bg-red-950/20"
+                      >
+                        Revert Payout
+                      </Button>
+                    ) : (
+                      <Button 
+                        onClick={() => handlePaySalary(staff.id)}
+                        className="h-7 text-[10px] font-bold px-3"
+                      >
+                        Pay Salary
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Dialog>
     </div>
   );

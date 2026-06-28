@@ -366,5 +366,109 @@ class SchoolAdminController extends BaseController
 
         return $this->success($response, null, 'Payment reverted successfully');
     }
+
+    public function createAcademicYear(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body = RequestParser::body($request);
+        $data = $this->service->createAcademicYear($user, $body);
+
+        return $this->success($response, $data, 'Academic year created', 201);
+    }
+
+    public function activateAcademicYear(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int)$args['id'];
+        $body = RequestParser::body($request);
+        $data = $this->service->activateAcademicYear($user, $id, $body);
+
+        return $this->success($response, $data, 'Academic year activated');
+    }
+
+    public function getClassFeeConfigurations(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $params = $request->getQueryParams();
+        $classId = isset($params['class_id']) && $params['class_id'] !== '' ? (int)$params['class_id'] : null;
+        $academicYearId = isset($params['academic_year_id']) && $params['academic_year_id'] !== '' ? (int)$params['academic_year_id'] : null;
+
+        $data = $this->service->getClassFeeConfigurations($user, $classId, $academicYearId);
+
+        return $this->success($response, $data);
+    }
+
+    public function saveClassFeeConfiguration(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body = RequestParser::body($request);
+        $data = $this->service->saveClassFeeConfiguration($user, $body);
+
+        return $this->success($response, $data, 'Class fee configuration saved');
+    }
+
+    public function lockClassFeeConfiguration(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body = RequestParser::body($request);
+        $data = $this->service->lockClassFeeConfiguration($user, $body);
+
+        return $this->success($response, $data, 'Class fee configuration locked successfully');
+    }
+
+    public function getNextRollNo(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $classId = (int)($args['class_id'] ?? 0);
+        $data = $this->service->getNextRollNo($user, $classId);
+
+        return $this->success($response, $data);
+    }
+
+    public function getStaffPayments(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $params = $request->getQueryParams();
+        $month = $params['month'] ?? '';
+        $data = $this->service->getStaffPayments($user, $month);
+
+        return $this->success($response, $data);
+    }
+
+    public function payStaffSalary(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body = RequestParser::body($request);
+        $data = $this->service->payStaffSalary($user, $body);
+
+        return $this->success($response, $data, 'Staff salary paid successfully', 201);
+    }
+
+    public function revertStaffSalary(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int)$args['id'];
+        $data = $this->service->revertStaffSalary($user, $id);
+
+        return $this->success($response, $data, 'Staff salary payment reverted');
+    }
 }
 

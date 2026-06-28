@@ -5,7 +5,222 @@ import { Card, CardContent } from '../../../common/ui/card';
 import { schoolService } from '../../../common/services/schoolService';
 import { ArrowLeft, Upload, Check, AlertCircle, Calendar } from 'lucide-react';
 
-export default function StudentEnrollmentForm({ studentId, onCancel, onSuccess }) {
+const INDIAN_STATES_AND_CITIES = {
+  "Andhra Pradesh": [
+    "Anantapur", "Chittoor", "Eluru", "Guntur", "Kadapa", "Kakinada", "Kurnool", 
+    "Machilipatnam", "Nellore", "Ongole", "Rajahmundry", "Srikakulam", "Tirupati", 
+    "Vijayawada", "Visakhapatnam", "Vizianagaram"
+  ],
+  "Arunachal Pradesh": [
+    "Along", "Bomdila", "Itanagar", "Naharlagun", "Pasighat", "Tawang", "Ziro"
+  ],
+  "Assam": [
+    "Barpeta", "Bongaigaon", "Dibrugarh", "Guwahati", "Jorhat", "Karimganj", 
+    "Nagaon", "Sibsagar", "Silchar", "Tezpur", "Tinsukia"
+  ],
+  "Bihar": [
+    "Arrah", "Begusarai", "Bettiah", "Bhagalpur", "Bihar Sharif", "Chhapra", 
+    "Darbhanga", "Gaya", "Hajipur", "Katihar", "Munger", "Muzaffarpur", "Patna", 
+    "Purnia", "Saharsa", "Sasaram"
+  ],
+  "Chhattisgarh": [
+    "Ambikapur", "Bhilai", "Bilaspur", "Dhamtari", "Jagdalpur", "Korba", 
+    "Raigarh", "Raipur", "Rajnandgaon"
+  ],
+  "Goa": [
+    "Margao", "Marmagao", "Panaji", "Mapusa", "Ponda"
+  ],
+  "Gujarat": [
+    "Ahmedabad", "Amreli", "Anand", "Bharuch", "Bhavnagar", "Bhuj", "Dahod", 
+    "Gandhidham", "Gandhinagar", "Godhra", "Jamnagar", "Junagadh", "Morbi", 
+    "Nadiad", "Navsari", "Patan", "Porbandar", "Rajkot", "Surat", "Surendranagar", 
+    "Vadodara", "Valsad", "Vapi"
+  ],
+  "Haryana": [
+    "Ambala", "Bahadurgarh", "Bhiwani", "Faridabad", "Gurugram", "Hisar", 
+    "Jind", "Kaithal", "Karnal", "Panchkula", "Panipat", "Rewari", "Rohtak", 
+    "Sirsa", "Sonipat", "Yamunanagar"
+  ],
+  "Himachal Pradesh": [
+    "Bilaspur", "Chamba", "Dharamshala", "Hamirpur", "Kullu", "Mandi", "Nahan", 
+    "Shimla", "Solan", "Una"
+  ],
+  "Jharkhand": [
+    "Bokaro Steel City", "Chaibasa", "Deoghar", "Dhanbad", "Dumka", "Giridih", 
+    "Hazaribagh", "Jamshedpur", "Medininagar", "Phusro", "Ramgarh", "Ranchi"
+  ],
+  "Karnataka": [
+    "Bagalkot", "Ballari", "Belagavi", "Bengaluru", "Bhadravati", "Bidar", 
+    "Chikkamagaluru", "Chitradurga", "Davangere", "Dharwad", "Gadag", "Hassan", 
+    "Hosapete", "Hubballi", "Kalaburagi", "Kolar", "Mandya", "Mangaluru", "Mysuru", 
+    "Raichur", "Shivamogga", "Tumakuru", "Udupi", "Vijayapura"
+  ],
+  "Kerala": [
+    "Alappuzha", "Kochi", "Kollam", "Kottayam", "Kozhikode", "Palakkad", 
+    "Thalassery", "Thiruvananthapuram", "Thrissur"
+  ],
+  "Madhya Pradesh": [
+    "Betul", "Bhind", "Bhopal", "Chhindwara", "Dewas", "Guna", "Gwalior", 
+    "Indore", "Jabalpur", "Khandwa", "Khargone", "Mandsaur", "Morena", "Murwara", 
+    "Ratlam", "Rewa", "Sagar", "Satna", "Sehore", "Shivpuri", "Singrauli", "Ujjain", 
+    "Vidisha"
+  ],
+  "Maharashtra": [
+    "Ahmednagar", "Akola", "Amravati", "Aurangabad", "Baramati", "Bhandara", 
+    "Bhiwandi", "Bhusawal", "Chandrapur", "Dhule", "Gondia", "Ichalkaranji", 
+    "Jalgaon", "Jalna", "Kalyan-Dombivli", "Kolhapur", "Latur", "Mumbai", "Nagpur", 
+    "Nanded", "Nandurbar", "Nashik", "Navi Mumbai", "Osmanabad", "Parbhani", "Pune", 
+    "Sangli", "Satara", "Solapur", "Thane", "Ulhasnagar", "Vasai-Virar", "Wardha", 
+    "Yavatmal"
+  ],
+  "Manipur": [
+    "Bishnupur", "Churachandpur", "Imphal", "Senapati", "Thoubal"
+  ],
+  "Meghalaya": [
+    "Jowai", "Nongstoin", "Shillong", "Tura"
+  ],
+  "Mizoram": [
+    "Aizawl", "Champhai", "Kolasib", "Lunglei", "Saiha"
+  ],
+  "Nagaland": [
+    "Dimapur", "Kohima", "Mokokchung", "Tuensang", "Wokha"
+  ],
+  "Odisha": [
+    "Balangir", "Baleshwar", "Baripada", "Bhadrak", "Bhawanipatna", "Bhubaneswar", 
+    "Cuttack", "Dhenkanal", "Jeypore", "Jharsuguda", "Puri", "Raurkela", "Sambalpur"
+  ],
+  "Punjab": [
+    "Abohar", "Amritsar", "Barnala", "Bathinda", "Firozpur", "Hoshiarpur", 
+    "Jalandhar", "Khanna", "Ludhiana", "Malerkotla", "Moga", "Mohali", "Muktsar", 
+    "Pathankot", "Patiala", "Phagwara", "Sri Muktsar Sahib"
+  ],
+  "Rajasthan": [
+    "Ajmer", "Alwar", "Bharatpur", "Bhilwara", "Bikaner", "Chittorgarh", 
+    "Hanumangarh", "Jaipur", "Jaisalmer", "Jhalawar", "Jhunjhunu", "Jodhpur", 
+    "Kishangarh", "Kota", "Pali", "Sikar", "Sri Ganganagar", "Tonk", "Udaipur"
+  ],
+  "Sikkim": [
+    "Gangtok", "Gyalshing", "Mangan", "Namchi"
+  ],
+  "Tamil Nadu": [
+    "Ambattur", "Avadi", "Chennai", "Coimbatore", "Dindigul", "Erode", 
+    "Kancheepuram", "Karur", "Madurai", "Nagercoil", "Salem", "Thanjavur", 
+    "Tiruchirappalli", "Tirunelveli", "Tiruppur", "Thoothukudi", "Vellore"
+  ],
+  "Telangana": [
+    "Adilabad", "Hyderabad", "Karimnagar", "Khammam", "Mahbubnagar", "Miryalaguda", 
+    "Nalgonda", "Nizamabad", "Ramagundam", "Secunderabad", "Suryapet", "Warangal"
+  ],
+  "Tripura": [
+    "Agartala", "Belonia", "Dharmanagar", "Kailasahar", "Khowai", "Udaipur"
+  ],
+  "Uttar Pradesh": [
+    "Agra", "Aligarh", "Allahabad (Prayagraj)", "Amroha", "Auraiya", "Azamgarh", 
+    "Baghpat", "Bahraich", "Ballia", "Balrampur", "Banda", "Barabanki", "Bareilly", 
+    "Basti", "Bijnor", "Budaun", "Bulandshahr", "Chandauli", "Deoria", "Etah", 
+    "Etawah", "Farrukhabad", "Fatehpur", "Firozabad", "Gautam Buddha Nagar", 
+    "Ghaziabad", "Ghazipur", "Gonda", "Gorakhpur", "Hamirpur", "Hapur", "Hardoi", 
+    "Hathras", "Jalaun", "Jaunpur", "Jhansi", "Kannauj", "Kanpur", "Kasganj", 
+    "Kaushambi", "Kushinagar", "Lakhimpur Kheri", "Lalitpur", "Lucknow", "Maharajganj", 
+    "Mahoba", "Mainpuri", "Mathura", "Mau", "Meerut", "Mirzapur", "Moradabad", 
+    "Muzaffarnagar", "Pilibhit", "Pratapgarh", "Rae Bareli", "Rampur", "Saharanpur", 
+    "Sambhal", "Sant Kabir Nagar", "Shahjahanpur", "Shamli", "Shravasti", 
+    "Siddharthnagar", "Sitapur", "Sonbhadra", "Sultanpur", "Unnao", "Varanasi"
+  ],
+  "Uttarakhand": [
+    "Dehradun", "Haldwani", "Haridwar", "Kashipur", "Mussoorie", "Nainital", 
+    "Pithoragarh", "Rishikesh", "Roorkee", "Rudrapur"
+  ],
+  "West Bengal": [
+    "Asansol", "Baharampur", "Bally", "Baranagar", "Bardhaman", "Bhatpara", 
+    "Gopalpur", "Habra", "Howrah", "Kamarhati", "Kharagpur", "Kolkata", 
+    "Kulti", "Madhyamgram", "Maheshtala", "Malda", "Midnapore", "Naihati", 
+    "Panihati", "Rajpur Sonarpur", "Siliguri", "South Dumdum", "Uluberia"
+  ],
+  "Andaman and Nicobar Islands": ["Port Blair"],
+  "Chandigarh": ["Chandigarh"],
+  "Dadra and Nagar Haveli and Daman and Diu": ["Daman", "Diu", "Silvassa"],
+  "Delhi": [
+    "Delhi", "New Delhi", "Noida", "Gurugram", "Faridabad", "Ghaziabad", 
+    "Dwarka", "Rohini", "Narela", "Saket"
+  ],
+  "Jammu and Kashmir": [
+    "Anantnag", "Baramulla", "Jammu", "Kathua", "Srinagar", "Udhampur"
+  ],
+  "Ladakh": ["Kargil", "Leh"],
+  "Lakshadweep": ["Kavaratti"],
+  "Puducherry": ["Karaikal", "Mahe", "Puducherry", "Yanam"]
+};
+
+function SearchableSelect({ label, placeholder, value, onChange, options, disabled, required, error }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const containerRef = React.useRef(null);
+
+  useEffect(() => {
+    setSearch(value || '');
+  }, [value]);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+        setSearch(value || '');
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [value]);
+
+  const filteredOptions = options.filter(opt =>
+    opt.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div ref={containerRef} className="space-y-1.5 relative w-full">
+      <label className="text-xs font-bold text-text-secondary uppercase">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      <input
+        type="text"
+        placeholder={placeholder}
+        value={search}
+        onChange={e => {
+          setSearch(e.target.value);
+          setIsOpen(true);
+        }}
+        onFocus={() => setIsOpen(true)}
+        disabled={disabled}
+        className="flex h-9 w-full rounded-md border border-zinc-200 bg-surface px-3 py-1 text-sm shadow-xs transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-zinc-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-800 dark:bg-zinc-950 dark:ring-offset-zinc-950 dark:placeholder:text-zinc-400 dark:focus-visible:ring-zinc-300"
+      />
+      {isOpen && !disabled && (
+        <div className="absolute left-0 right-0 top-[60px] max-h-40 overflow-y-auto bg-surface border border-border rounded-md shadow-lg z-50 py-1 bg-white dark:bg-zinc-950 animate-in fade-in slide-in-from-top-1 duration-200">
+          {filteredOptions.length === 0 ? (
+            <div className="px-3 py-2 text-xs text-text-muted">No options found</div>
+          ) : (
+            filteredOptions.map(opt => (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => {
+                  onChange(opt);
+                  setSearch(opt);
+                  setIsOpen(false);
+                }}
+                className={`w-full text-left px-3 py-2 text-xs font-bold hover:bg-primary/10 transition-colors ${opt === value ? 'bg-primary/5 text-primary' : 'text-text-primary'}`}
+              >
+                {opt}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+      {error && <p className="text-[10px] text-red-500 font-semibold">{error}</p>}
+    </div>
+  );
+}
+
+export default function StudentEnrollmentForm({ studentId, currentClassName, currentClassId, onCancel, onSuccess }) {
   const [academicYears, setAcademicYears] = useState([]);
   const [classesList, setClassesList] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -13,14 +228,23 @@ export default function StudentEnrollmentForm({ studentId, onCancel, onSuccess }
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
   const [uploadStates, setUploadStates] = useState({});
+  const [backupPermanentAddress, setBackupPermanentAddress] = useState({
+    permanent_address_line_1: '',
+    permanent_address_line_2: '',
+    permanent_city: '',
+    permanent_state: '',
+    permanent_country: 'India',
+    permanent_pin_code: ''
+  });
   
   // Selection helpers for Class and Section
-  const [selectedClassName, setSelectedClassName] = useState('');
+  const [selectedClassName, setSelectedClassName] = useState(currentClassName || '');
   const [selectedSectionName, setSelectedSectionName] = useState('');
   const [availableSections, setAvailableSections] = useState([]);
 
   const [formData, setFormData] = useState({
     // Student Info
+    student_name: '',
     first_name: '',
     middle_name: '',
     last_name: '',
@@ -49,11 +273,15 @@ export default function StudentEnrollmentForm({ studentId, onCancel, onSuccess }
     parent_occupation: '',
 
     // Address
+    current_address_line_1: '',
+    current_address_line_2: '',
     current_address_line: '',
     current_city: '',
     current_state: '',
     current_country: '',
     current_pin_code: '',
+    permanent_address_line_1: '',
+    permanent_address_line_2: '',
     permanent_address_line: '',
     permanent_city: '',
     permanent_state: '',
@@ -89,8 +317,19 @@ export default function StudentEnrollmentForm({ studentId, onCancel, onSuccess }
           const detail = await schoolService.getStudentById(studentId);
           if (detail && detail.student) {
             const studentData = detail.student;
+            const combinedName = [
+              studentData.first_name || '',
+              studentData.middle_name || '',
+              studentData.last_name || ''
+            ].filter(Boolean).join(' ');
+
             setFormData({
               ...studentData,
+              student_name: combinedName,
+              current_address_line_1: studentData.current_address_line || '',
+              current_address_line_2: '',
+              permanent_address_line_1: studentData.permanent_address_line || '',
+              permanent_address_line_2: '',
               exit_date: studentData.exit_date || '',
               class_name: studentData.class_name || '',
               parent_occupation: studentData.father_occupation || ''
@@ -128,6 +367,38 @@ export default function StudentEnrollmentForm({ studentId, onCancel, onSuccess }
     loadFormDependencies();
   }, [studentId]);
 
+  // Pre-fetch next available roll number for the class
+  useEffect(() => {
+    const fetchNextRollNo = async () => {
+      if (formData.class_id && !studentId) {
+        try {
+          const res = await schoolService.getNextRollNo(formData.class_id);
+          if (res && res.next_roll_no) {
+            setFormData(prev => ({
+              ...prev,
+              roll_no: String(res.next_roll_no)
+            }));
+          }
+        } catch (err) {
+          console.error('Failed to fetch next roll number:', err);
+        }
+      }
+    };
+    fetchNextRollNo();
+  }, [formData.class_id, studentId]);
+
+  // Set default class fields from props for new student
+  useEffect(() => {
+    if (!studentId && currentClassName) {
+      setSelectedClassName(currentClassName);
+      setFormData(prev => ({
+        ...prev,
+        class_name: currentClassName,
+        class_id: currentClassId || ''
+      }));
+    }
+  }, [studentId, currentClassName, currentClassId]);
+
   // Determine if manual SR entry is allowed
   const isFirstYear = academicYears.length <= 1 || (formData.academic_year_id && 
     parseInt(formData.academic_year_id) === academicYears[0]?.id);
@@ -154,6 +425,42 @@ export default function StudentEnrollmentForm({ studentId, onCancel, onSuccess }
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: null }));
     }
+  };
+
+  const handleCurrentStateChange = (stateName) => {
+    setFormData(prev => ({
+      ...prev,
+      current_state: stateName,
+      current_city: ''
+    }));
+    if (errors.current_state) {
+      setErrors(prev => ({ ...prev, current_state: null }));
+    }
+  };
+
+  const handleCurrentCityChange = (cityName) => {
+    setFormData(prev => ({
+      ...prev,
+      current_city: cityName
+    }));
+    if (errors.current_city) {
+      setErrors(prev => ({ ...prev, current_city: null }));
+    }
+  };
+
+  const handlePermanentStateChange = (stateName) => {
+    setFormData(prev => ({
+      ...prev,
+      permanent_state: stateName,
+      permanent_city: ''
+    }));
+  };
+
+  const handlePermanentCityChange = (cityName) => {
+    setFormData(prev => ({
+      ...prev,
+      permanent_city: cityName
+    }));
   };
 
   // Handles dynamic dropdown changes for Classes and Sections
@@ -216,13 +523,32 @@ export default function StudentEnrollmentForm({ studentId, onCancel, onSuccess }
     setFormData(prev => {
       const updated = { ...prev, [name]: value };
       
-      // If Same as Current Address is checked, clone address details
-      if (name === 'same_as_current' && checked) {
-        updated.permanent_address_line = prev.current_address_line;
-        updated.permanent_city = prev.current_city;
-        updated.permanent_state = prev.current_state;
-        updated.permanent_country = prev.current_country;
-        updated.permanent_pin_code = prev.current_pin_code;
+      // If Same as Current Address is checked, clone address details after backing up existing values
+      if (name === 'same_as_current') {
+        if (checked) {
+          setBackupPermanentAddress({
+            permanent_address_line_1: prev.permanent_address_line_1 || '',
+            permanent_address_line_2: prev.permanent_address_line_2 || '',
+            permanent_city: prev.permanent_city || '',
+            permanent_state: prev.permanent_state || '',
+            permanent_country: prev.permanent_country || 'India',
+            permanent_pin_code: prev.permanent_pin_code || ''
+          });
+
+          updated.permanent_address_line_1 = prev.current_address_line_1;
+          updated.permanent_address_line_2 = prev.current_address_line_2;
+          updated.permanent_city = prev.current_city;
+          updated.permanent_state = prev.current_state;
+          updated.permanent_country = prev.current_country;
+          updated.permanent_pin_code = prev.current_pin_code;
+        } else {
+          updated.permanent_address_line_1 = backupPermanentAddress.permanent_address_line_1;
+          updated.permanent_address_line_2 = backupPermanentAddress.permanent_address_line_2;
+          updated.permanent_city = backupPermanentAddress.permanent_city;
+          updated.permanent_state = backupPermanentAddress.permanent_state;
+          updated.permanent_country = backupPermanentAddress.permanent_country;
+          updated.permanent_pin_code = backupPermanentAddress.permanent_pin_code;
+        }
       }
       return updated;
     });
@@ -249,8 +575,9 @@ export default function StudentEnrollmentForm({ studentId, onCancel, onSuccess }
   const validateTab = (tabNum) => {
     const errs = {};
     if (tabNum === 1) {
-      if (!formData.first_name) errs.first_name = 'First name is required';
-      if (!formData.last_name) errs.last_name = 'Last name is required';
+      if (!formData.student_name) errs.student_name = 'Student Name is required';
+      if (!formData.father_name) errs.father_name = 'Father name is required';
+      if (!formData.mother_name) errs.mother_name = 'Mother name is required';
       if (!formData.gender) errs.gender = 'Gender is required';
       if (!formData.dob) errs.dob = 'Date of birth is required';
       
@@ -269,12 +596,10 @@ export default function StudentEnrollmentForm({ studentId, onCancel, onSuccess }
         errs.sr_no = 'Only numeric digits are allowed.';
       }
 
-      if (formData.student_mobile && !/^\d+$/.test(formData.student_mobile)) {
+      if (!formData.student_mobile) {
+        errs.student_mobile = 'Contact Number is required.';
+      } else if (!/^\d+$/.test(formData.student_mobile)) {
         errs.student_mobile = 'Only numeric digits are allowed.';
-      }
-
-      if (formData.roll_no && !/^\d+$/.test(formData.roll_no)) {
-        errs.roll_no = 'Only numeric digits are allowed.';
       }
 
       if (formData.aadhaar_no && !/^\d+$/.test(formData.aadhaar_no)) {
@@ -283,26 +608,82 @@ export default function StudentEnrollmentForm({ studentId, onCancel, onSuccess }
     }
     
     if (tabNum === 2) {
-      if (!formData.father_name) errs.father_name = 'Father name is required';
-      if (!formData.mother_name) errs.mother_name = 'Mother name is required';
-      if (!formData.current_address_line) errs.current_address_line = 'Current address is required';
+      if (!formData.current_address_line_1) errs.current_address_line_1 = 'Current address is required';
       if (!formData.current_city) errs.current_city = 'Current city is required';
       if (!formData.current_state) errs.current_state = 'Current state is required';
       if (!formData.current_pin_code) errs.current_pin_code = 'Current PIN Code is required';
+
+      if (formData.same_as_current === 0) {
+        if (!formData.permanent_address_line_1) errs.permanent_address_line_1 = 'Permanent address is required.';
+        if (!formData.permanent_city) errs.permanent_city = 'Permanent city is required.';
+        if (!formData.permanent_state) errs.permanent_state = 'Permanent state is required.';
+        if (!formData.permanent_pin_code) errs.permanent_pin_code = 'Permanent PIN Code is required.';
+      }
     }
 
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
-  const handleNext = () => {
-    if (validateTab(activeTab)) {
-      setActiveTab(prev => prev + 1);
+  const handleNext = async () => {
+    if (activeTab === 1) {
+      const ok = validateTab(1);
+      if (!ok) return;
+
+      if (formData.sr_no) {
+        try {
+          const isEdit = !!studentId;
+          const res = await schoolService.checkSrNoExists({
+            sr_no: formData.sr_no,
+            exclude_id: isEdit ? studentId : undefined
+          });
+          if (res && res.exists) {
+            setErrors(prev => ({
+              ...prev,
+              sr_no: 'SR Number already exists in this school. Please enter a unique SR Number.'
+            }));
+            return;
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      }
+    } else {
+      const ok = validateTab(activeTab);
+      if (!ok) return;
     }
+
+    setActiveTab(prev => prev + 1);
   };
 
   const handlePrev = () => {
     setActiveTab(prev => prev - 1);
+  };
+
+  const splitName = (fullName) => {
+    const parts = (fullName || '').trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) {
+      return { first_name: '', middle_name: '', last_name: '' };
+    }
+    if (parts.length === 1) {
+      return {
+        first_name: parts[0],
+        middle_name: '',
+        last_name: '.' // fallback to satisfy backend validation
+      };
+    }
+    if (parts.length === 2) {
+      return {
+        first_name: parts[0],
+        middle_name: '',
+        last_name: parts[1]
+      };
+    }
+    return {
+      first_name: parts[0],
+      middle_name: parts.slice(1, parts.length - 1).join(' '),
+      last_name: parts[parts.length - 1]
+    };
   };
 
   const handleSubmit = async (e) => {
@@ -314,11 +695,35 @@ export default function StudentEnrollmentForm({ studentId, onCancel, onSuccess }
 
     setSubmitting(true);
     setErrors({});
+
+    const nameParts = splitName(formData.student_name);
+    const isSame = formData.same_as_current === 1;
+    const currentAddress = (formData.current_address_line_1 || '').trim() + 
+      (formData.current_address_line_2 ? ', ' + formData.current_address_line_2.trim() : '');
+    const permanentAddress = isSame 
+      ? currentAddress 
+      : ((formData.permanent_address_line_1 || '').trim() + 
+         (formData.permanent_address_line_2 ? ', ' + formData.permanent_address_line_2.trim() : ''));
+
+    const submitPayload = {
+      ...formData,
+      first_name: nameParts.first_name,
+      middle_name: nameParts.middle_name,
+      last_name: nameParts.last_name,
+      current_address_line: currentAddress,
+      permanent_address_line: permanentAddress,
+      permanent_city: isSame ? formData.current_city : formData.permanent_city,
+      permanent_state: isSame ? formData.current_state : formData.permanent_state,
+      permanent_country: isSame ? (formData.current_country || 'India') : (formData.permanent_country || 'India'),
+      permanent_pin_code: isSame ? formData.current_pin_code : formData.permanent_pin_code,
+      class_name: selectedClassName
+    };
+
     try {
       if (studentId) {
-        await schoolService.updateStudent(studentId, formData);
+        await schoolService.updateStudent(studentId, submitPayload);
       } else {
-        await schoolService.createStudent(formData);
+        await schoolService.createStudent(submitPayload);
       }
       onSuccess();
     } catch (err) {
@@ -371,8 +776,8 @@ export default function StudentEnrollmentForm({ studentId, onCancel, onSuccess }
       {/* Tabs list (4 steps sequence) */}
       <div className="flex border-b border-border text-sm overflow-x-auto whitespace-nowrap scrollbar-none gap-4">
         {[
-          { num: 1, label: '1. Student & Academic' },
-          { num: 2, label: '2. Parents & Address' },
+          { num: 1, label: '1. Basic Details' },
+          { num: 2, label: '2. Address' },
           { num: 3, label: '3. Document Uploads' },
           { num: 4, label: '4. Review & Submit' }
         ].map(t => (
@@ -398,30 +803,36 @@ export default function StudentEnrollmentForm({ studentId, onCancel, onSuccess }
         <Card className="shadow-sm">
           <CardContent className="p-6">
             
-            {/* Tab 1: Student & Academic */}
+            {/* Tab 1: Basic Details */}
             {activeTab === 1 && (
-              <div className="space-y-6">
+              <div className="space-y-6 animate-in fade-in duration-200">
                 <div>
-                  <h3 className="text-sm font-bold text-text-primary uppercase tracking-wide border-b border-border pb-2 mb-4">Student Information</h3>
+                  <h3 className="text-sm font-bold text-text-primary uppercase tracking-wide border-b border-border pb-2 mb-4">Basic Details</h3>
                   
-                  {/* Continuous inputs grid: Student Details and Academic Details merged directly together */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Row 1 */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-text-secondary uppercase">First Name <span className="text-red-500">*</span></label>
-                      <Input name="first_name" value={formData.first_name} onChange={handleTextChange} placeholder="First name" required />
-                      {errors.first_name && <p className="text-[10px] text-red-500 font-semibold">{errors.first_name}</p>}
+                      <label className="text-xs font-bold text-text-secondary uppercase">Student Name <span className="text-red-500">*</span></label>
+                      <Input name="student_name" value={formData.student_name} onChange={handleTextChange} placeholder="Student Name" required />
+                      {errors.student_name && <p className="text-[10px] text-red-500 font-semibold">{errors.student_name}</p>}
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-text-secondary uppercase">Middle Name (Optional)</label>
-                      <Input name="middle_name" value={formData.middle_name} onChange={handleTextChange} placeholder="Middle name" />
+                      <label className="text-xs font-bold text-text-secondary uppercase">Father Name <span className="text-red-500">*</span></label>
+                      <Input name="father_name" value={formData.father_name} onChange={handleTextChange} placeholder="Father Name" required />
+                      {errors.father_name && <p className="text-[10px] text-red-500 font-semibold">{errors.father_name}</p>}
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-text-secondary uppercase">Last Name <span className="text-red-500">*</span></label>
-                      <Input name="last_name" value={formData.last_name} onChange={handleTextChange} placeholder="Last name" required />
-                      {errors.last_name && <p className="text-[10px] text-red-500 font-semibold">{errors.last_name}</p>}
+                      <label className="text-xs font-bold text-text-secondary uppercase">Mother Name <span className="text-red-500">*</span></label>
+                      <Input name="mother_name" value={formData.mother_name} onChange={handleTextChange} placeholder="Mother Name" required />
+                      {errors.mother_name && <p className="text-[10px] text-red-500 font-semibold">{errors.mother_name}</p>}
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-text-secondary uppercase">Parent Occupation</label>
+                      <Input name="parent_occupation" value={formData.parent_occupation} onChange={handleTextChange} placeholder="e.g. Government Employee" />
                     </div>
                   </div>
 
+                  {/* Row 2 */}
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-text-secondary uppercase">Gender <span className="text-red-500">*</span></label>
@@ -448,7 +859,7 @@ export default function StudentEnrollmentForm({ studentId, onCancel, onSuccess }
                           value={formData.dob} 
                           onChange={handleTextChange} 
                           required 
-                          className="pr-10 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-10 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer font-normal text-text-primary"
+                          className="pr-10 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-10 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer text-text-primary"
                         />
                         <Calendar className="absolute right-3 top-2.5 h-4 w-4 text-text-muted pointer-events-none" />
                       </div>
@@ -486,6 +897,7 @@ export default function StudentEnrollmentForm({ studentId, onCancel, onSuccess }
                     </div>
                   </div>
 
+                  {/* Row 3 */}
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-text-secondary uppercase">Religion</label>
@@ -497,8 +909,8 @@ export default function StudentEnrollmentForm({ studentId, onCancel, onSuccess }
                       {errors.aadhaar_no && <p className="text-[10px] text-red-500 font-semibold">{errors.aadhaar_no}</p>}
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-text-secondary uppercase">Student Mobile</label>
-                      <Input name="student_mobile" value={formData.student_mobile} onChange={handleNumericChange} placeholder="Contact number" />
+                      <label className="text-xs font-bold text-text-secondary uppercase">Contact Number <span className="text-red-500">*</span></label>
+                      <Input name="student_mobile" value={formData.student_mobile} onChange={handleNumericChange} placeholder="Contact number" required />
                       {errors.student_mobile && <p className="text-[10px] text-red-500 font-semibold">{errors.student_mobile}</p>}
                     </div>
                     <div className="space-y-1.5">
@@ -508,48 +920,8 @@ export default function StudentEnrollmentForm({ studentId, onCancel, onSuccess }
                     </div>
                   </div>
 
-                  {/* Dynamic Class & Section Selection */}
+                  {/* Row 4 */}
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-text-secondary uppercase">Class <span className="text-red-500">*</span></label>
-                      <select
-                        value={selectedClassName}
-                        onChange={handleClassChange}
-                        required
-                        className="flex h-9 w-full rounded-md border border-zinc-200 bg-surface px-3 py-1.5 text-sm text-text-primary shadow-xs transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-950 dark:border-zinc-800 dark:focus:ring-zinc-300"
-                      >
-                        <option value="">Select Class...</option>
-                        {uniqueClassNames.map(name => (
-                          <option key={name} value={name}>{name}</option>
-                        ))}
-                      </select>
-                      {errors.class_name && <p className="text-[10px] text-red-500 font-semibold">{errors.class_name}</p>}
-                    </div>
-
-                    {availableSections.length > 0 && (
-                      <div className="space-y-1.5 animate-in slide-in-from-left-1 duration-150">
-                        <label className="text-xs font-bold text-text-secondary uppercase">Section <span className="text-red-500">*</span></label>
-                        <select
-                          value={selectedSectionName}
-                          onChange={handleSectionChange}
-                          required
-                          className="flex h-9 w-full rounded-md border border-zinc-200 bg-surface px-3 py-1.5 text-sm text-text-primary shadow-xs transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-950 dark:border-zinc-800 dark:focus:ring-zinc-300"
-                        >
-                          <option value="">Select Section...</option>
-                          {availableSections.map(sec => (
-                            <option key={sec} value={sec}>{sec}</option>
-                          ))}
-                        </select>
-                        {errors.section_name && <p className="text-[10px] text-red-500 font-semibold">{errors.section_name}</p>}
-                      </div>
-                    )}
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-text-secondary uppercase">Roll Number</label>
-                      <Input name="roll_no" value={formData.roll_no} onChange={handleNumericChange} placeholder="e.g. 21" />
-                      {errors.roll_no && <p className="text-[10px] text-red-500 font-semibold">{errors.roll_no}</p>}
-                    </div>
-
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-text-secondary uppercase">SR Number {isFirstYear && <span className="text-red-500">*</span>}</label>
                       <Input 
@@ -562,7 +934,6 @@ export default function StudentEnrollmentForm({ studentId, onCancel, onSuccess }
                       />
                       {errors.sr_no && <p className="text-[10px] text-red-500 font-semibold">{errors.sr_no}</p>}
                     </div>
-
                     {studentId && (
                       <div className="space-y-1.5 animate-in slide-in-from-left-1 duration-150">
                         <label className="text-xs font-bold text-text-secondary uppercase">Exit Date</label>
@@ -579,7 +950,7 @@ export default function StudentEnrollmentForm({ studentId, onCancel, onSuccess }
                                 status: value ? 'Inactive' : 'ACTIVE'
                               }));
                             }} 
-                            className="pr-10 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-10 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer font-normal text-text-primary"
+                            className="pr-10 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-10 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer text-text-primary"
                           />
                           <Calendar className="absolute right-3 top-2.5 h-4 w-4 text-text-muted pointer-events-none" />
                         </div>
@@ -591,56 +962,48 @@ export default function StudentEnrollmentForm({ studentId, onCancel, onSuccess }
               </div>
             )}
 
-            {/* Tab 2: Parents & Address */}
+            {/* Tab 2: Address */}
             {activeTab === 2 && (
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-sm font-bold text-text-primary uppercase tracking-wide border-b border-border pb-2 mb-4">Parent Information</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-text-secondary uppercase">Father Name <span className="text-red-500">*</span></label>
-                      <Input name="father_name" value={formData.father_name} onChange={handleTextChange} placeholder="Father name" required />
-                      {errors.father_name && <p className="text-[10px] text-red-500 font-semibold">{errors.father_name}</p>}
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-text-secondary uppercase">Mother Name <span className="text-red-500">*</span></label>
-                      <Input name="mother_name" value={formData.mother_name} onChange={handleTextChange} placeholder="Mother name" required />
-                      {errors.mother_name && <p className="text-[10px] text-red-500 font-semibold">{errors.mother_name}</p>}
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-text-secondary uppercase">Parent Occupation</label>
-                      <Input name="parent_occupation" value={formData.parent_occupation} onChange={handleTextChange} placeholder="e.g. Government Employee" />
-                    </div>
-                  </div>
-                </div>
-
+              <div className="space-y-6 animate-in fade-in duration-200">
                 <div>
                   <h3 className="text-sm font-bold text-text-primary uppercase tracking-wide border-b border-border pb-2 mb-4">Current Address</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-text-secondary uppercase">Address Line <span className="text-red-500">*</span></label>
-                      <Input name="current_address_line" value={formData.current_address_line} onChange={handleTextChange} placeholder="House no, street, locality..." required />
-                      {errors.current_address_line && <p className="text-[10px] text-red-500 font-semibold">{errors.current_address_line}</p>}
+                      <label className="text-xs font-bold text-text-secondary uppercase">Address Line 1 <span className="text-red-500">*</span></label>
+                      <Input name="current_address_line_1" value={formData.current_address_line_1} onChange={handleTextChange} placeholder="House no, street, locality..." required />
+                      {errors.current_address_line_1 && <p className="text-[10px] text-red-500 font-semibold">{errors.current_address_line_1}</p>}
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-text-secondary uppercase">Address Line 2</label>
+                      <Input name="current_address_line_2" value={formData.current_address_line_2} onChange={handleTextChange} placeholder="Apartment, suite, unit, etc. (optional)" />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-3">
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-text-secondary uppercase">City <span className="text-red-500">*</span></label>
-                      <Input name="current_city" value={formData.current_city} onChange={handleTextChange} placeholder="City" required />
-                      {errors.current_city && <p className="text-[10px] text-red-500 font-semibold">{errors.current_city}</p>}
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-text-secondary uppercase">State <span className="text-red-500">*</span></label>
-                      <Input name="current_state" value={formData.current_state} onChange={handleTextChange} placeholder="State" required />
-                      {errors.current_state && <p className="text-[10px] text-red-500 font-semibold">{errors.current_state}</p>}
-                    </div>
+                    <SearchableSelect
+                      label="State"
+                      placeholder="Select or Search State..."
+                      value={formData.current_state}
+                      onChange={handleCurrentStateChange}
+                      options={Object.keys(INDIAN_STATES_AND_CITIES)}
+                      required
+                      error={errors.current_state}
+                    />
+                    <SearchableSelect
+                      label="City"
+                      placeholder="Select or Search City..."
+                      value={formData.current_city}
+                      onChange={handleCurrentCityChange}
+                      options={formData.current_state ? (INDIAN_STATES_AND_CITIES[formData.current_state] || []) : []}
+                      required
+                      error={errors.current_city}
+                    />
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-text-secondary uppercase">Country</label>
                       <Input name="current_country" value={formData.current_country || 'India'} onChange={handleTextChange} placeholder="Country" />
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-text-secondary uppercase">PIN Code <span className="text-red-500">*</span></label>
-                      <Input name="current_pin_code" value={formData.current_pin_code} onChange={handleNumericChange} placeholder="ZIP/PIN" required />
+                      <Input name="current_pin_code" value={formData.current_pin_code} onChange={handleNumericChange} placeholder="ZIP/PIN Code" required />
                       {errors.current_pin_code && <p className="text-[10px] text-red-500 font-semibold">{errors.current_pin_code}</p>}
                     </div>
                   </div>
@@ -661,28 +1024,44 @@ export default function StudentEnrollmentForm({ studentId, onCancel, onSuccess }
 
                   {formData.same_as_current === 0 && (
                     <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
-                      <div className="grid grid-cols-1 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1.5">
-                          <label className="text-xs font-bold text-text-secondary uppercase">Permanent Address Line</label>
-                          <Input name="permanent_address_line" value={formData.permanent_address_line} onChange={handleTextChange} placeholder="House no, street, locality..." />
+                          <label className="text-xs font-bold text-text-secondary uppercase">Permanent Address Line 1 <span className="text-red-500">*</span></label>
+                          <Input name="permanent_address_line_1" value={formData.permanent_address_line_1} onChange={handleTextChange} placeholder="House no, street, locality..." required />
+                          {errors.permanent_address_line_1 && <p className="text-[10px] text-red-500 font-semibold">{errors.permanent_address_line_1}</p>}
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-text-secondary uppercase">Permanent Address Line 2</label>
+                          <Input name="permanent_address_line_2" value={formData.permanent_address_line_2} onChange={handleTextChange} placeholder="Apartment, suite, unit, etc. (optional)" />
                         </div>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-bold text-text-secondary uppercase">City</label>
-                          <Input name="permanent_city" value={formData.permanent_city} onChange={handleTextChange} placeholder="City" />
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-bold text-text-secondary uppercase">State</label>
-                          <Input name="permanent_state" value={formData.permanent_state} onChange={handleTextChange} placeholder="State" />
-                        </div>
+                        <SearchableSelect
+                          label="State"
+                          placeholder="Select or Search State..."
+                          value={formData.permanent_state}
+                          onChange={handlePermanentStateChange}
+                          options={Object.keys(INDIAN_STATES_AND_CITIES)}
+                          required
+                          error={errors.permanent_state}
+                        />
+                        <SearchableSelect
+                          label="City"
+                          placeholder="Select or Search City..."
+                          value={formData.permanent_city}
+                          onChange={handlePermanentCityChange}
+                          options={formData.permanent_state ? (INDIAN_STATES_AND_CITIES[formData.permanent_state] || []) : []}
+                          required
+                          error={errors.permanent_city}
+                        />
                         <div className="space-y-1.5">
                           <label className="text-xs font-bold text-text-secondary uppercase">Country</label>
-                          <Input name="permanent_country" value={formData.permanent_country} onChange={handleTextChange} placeholder="Country" />
+                          <Input name="permanent_country" value={formData.permanent_country || 'India'} onChange={handleTextChange} placeholder="Country" />
                         </div>
                         <div className="space-y-1.5">
-                          <label className="text-xs font-bold text-text-secondary uppercase">PIN Code</label>
-                          <Input name="permanent_pin_code" value={formData.permanent_pin_code} onChange={handleNumericChange} placeholder="ZIP/PIN" />
+                          <label className="text-xs font-bold text-text-secondary uppercase">PIN Code <span className="text-red-500">*</span></label>
+                          <Input name="permanent_pin_code" value={formData.permanent_pin_code} onChange={handleNumericChange} placeholder="ZIP/PIN Code" required />
+                          {errors.permanent_pin_code && <p className="text-[10px] text-red-500 font-semibold">{errors.permanent_pin_code}</p>}
                         </div>
                       </div>
                     </div>
@@ -757,7 +1136,7 @@ export default function StudentEnrollmentForm({ studentId, onCancel, onSuccess }
                     <div className="space-y-3">
                       <p className="border-l-2 border-primary pl-2.5 font-bold text-text-primary uppercase text-xs tracking-wider">Student Profile</p>
                       <div className="space-y-1 text-xs">
-                        <p><span className="text-text-muted font-semibold inline-block w-28">Full Name:</span> <span className="font-bold text-text-primary">{formData.first_name} {formData.middle_name} {formData.last_name}</span></p>
+                        <p><span className="text-text-muted font-semibold inline-block w-28">Full Name:</span> <span className="font-bold text-text-primary">{formData.student_name || `${formData.first_name || ''} ${formData.middle_name || ''} ${formData.last_name || ''}`.trim()}</span></p>
                         <p><span className="text-text-muted font-semibold inline-block w-28">Gender / DOB:</span> <span>{formData.gender} / {formData.dob}</span></p>
                         <p><span className="text-text-muted font-semibold inline-block w-28">Aadhaar No:</span> <span className="font-mono">{formData.aadhaar_no || '-'}</span></p>
                         <p><span className="text-text-muted font-semibold inline-block w-28">Mobile:</span> <span>{formData.student_mobile || '-'}</span></p>
@@ -784,10 +1163,19 @@ export default function StudentEnrollmentForm({ studentId, onCancel, onSuccess }
                         <p><span className="text-text-muted font-semibold inline-block w-28">Occupation:</span> <span className="font-semibold text-text-primary">{formData.parent_occupation || '-'}</span></p>
                       </div>
 
-                      <p className="border-l-2 border-indigo-500 pl-2.5 font-bold text-text-primary uppercase text-xs tracking-wider mt-4">Address</p>
+                      <p className="border-l-2 border-indigo-500 pl-2.5 font-bold text-text-primary uppercase text-xs tracking-wider mt-4">Current Address</p>
                       <p className="text-xs text-text-secondary bg-zinc-50 dark:bg-zinc-900/50 p-2.5 rounded-lg leading-relaxed border border-border">
-                        {formData.current_address_line}, {formData.current_city}, {formData.current_state} - {formData.current_pin_code}
+                        {((formData.current_address_line_1 || '') + (formData.current_address_line_2 ? ', ' + formData.current_address_line_2 : '')).trim() || formData.current_address_line}, {formData.current_city}, {formData.current_state} - {formData.current_pin_code}
                       </p>
+
+                      {formData.same_as_current === 0 && (formData.permanent_address_line_1 || '').trim() !== '' && (
+                        <>
+                          <p className="border-l-2 border-indigo-500 pl-2.5 font-bold text-text-primary uppercase text-xs tracking-wider mt-3">Permanent Address</p>
+                          <p className="text-xs text-text-secondary bg-zinc-50 dark:bg-zinc-900/50 p-2.5 rounded-lg leading-relaxed border border-border">
+                            {((formData.permanent_address_line_1 || '') + (formData.permanent_address_line_2 ? ', ' + formData.permanent_address_line_2 : '')).trim() || formData.permanent_address_line}, {formData.permanent_city}, {formData.permanent_state} - {formData.permanent_pin_code}
+                          </p>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -818,7 +1206,7 @@ export default function StudentEnrollmentForm({ studentId, onCancel, onSuccess }
               </Button>
             ) : (
               <Button key="submit-btn" type="submit" disabled={submitting} className="font-bold">
-                {submitting ? 'Saving...' : (studentId ? 'Save Changes' : 'Save Student')}
+                {submitting ? 'Saving...' : (studentId ? 'Save Changes' : 'Submit')}
               </Button>
             )}
           </div>
