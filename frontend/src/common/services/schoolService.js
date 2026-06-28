@@ -141,6 +141,10 @@ export const schoolService = {
     return apiClient.post(`/api/school/academic-years/${id}/activate`, data);
   },
 
+  migrateAcademicYear(id, data) {
+    return apiClient.post(`/api/school/academic-years/${id}/migrate`, data);
+  },
+
   getNextRollNo(classId) {
     return apiClient.get(`/api/school/classes/${classId}/next-roll-no`);
   },

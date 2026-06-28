@@ -28,6 +28,11 @@ export default function AuditsSettingsPage() {
   const [createYearStartDate, setCreateYearStartDate] = useState('');
   const [createYearEndDate, setCreateYearEndDate] = useState('');
 
+  // Warning & Direct Activation Modal States
+  const [showNoDraftWarning, setShowNoDraftWarning] = useState(false);
+  const [activateTargetYear, setActivateTargetYear] = useState(null);
+  const [showActivateConfirm, setShowActivateConfirm] = useState(false);
+
   // Class Fee Configuration States
   const [selectedClassId, setSelectedClassId] = useState('');
   const [feeMode, setFeeMode] = useState('SAME'); // 'SAME' or 'DIFFERENT'
@@ -390,9 +395,9 @@ export default function AuditsSettingsPage() {
         student_migrations: studentMigrations,
       };
 
-      await schoolService.activateAcademicYear(targetYear.id, payload);
+      await schoolService.migrateAcademicYear(targetYear.id, payload);
 
-      setSuccess(`Academic Year ${targetYear.name} activated and migration executed successfully.`);
+      setSuccess(`Academic Year ${targetYear.name} migration executed successfully.`);
       setIsWizardOpen(false);
       setShowConfirmExecute(false);
       loadData();
@@ -403,9 +408,39 @@ export default function AuditsSettingsPage() {
       }, 1500);
     } catch (err) {
       console.error(err);
-      alert(err.message || 'Activation failed. Please check validation rules.');
+      alert(err.message || 'Migration failed. Please check validation rules.');
     } finally {
       setExecuting(false);
+    }
+  };
+
+  const handleMigrateClick = (year) => {
+    const draftYear = academicYears.find(y => y.status === 'Draft');
+    if (!draftYear) {
+      setShowNoDraftWarning(true);
+    } else {
+      startActivation(draftYear);
+    }
+  };
+
+  const handleActivateDirectClick = (year) => {
+    setActivateTargetYear(year);
+    setShowActivateConfirm(true);
+  };
+
+  const handleActivateConfirm = async () => {
+    if (!activateTargetYear) return;
+    try {
+      await schoolService.activateAcademicYear(activateTargetYear.id, {});
+      setSuccess(`Academic Year ${activateTargetYear.name} is now ACTIVE.`);
+      setShowActivateConfirm(false);
+      loadData();
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Activation failed.');
     }
   };
 
@@ -499,10 +534,18 @@ export default function AuditsSettingsPage() {
                     <TableCell className="text-right">
                       {year.status === 'Draft' && (
                         <Button 
-                          onClick={() => startActivation(year)}
+                          onClick={() => handleActivateDirectClick(year)}
                           className="h-7 px-3 text-[10px] font-bold bg-green-600 hover:bg-green-700 text-white"
                         >
                           Activate
+                        </Button>
+                      )}
+                      {(year.status === 'ACTIVE' || year.is_current) && (
+                        <Button 
+                          onClick={() => handleMigrateClick(year)}
+                          className="h-7 px-3 text-[10px] font-bold bg-primary hover:bg-primary/95 text-white"
+                        >
+                          Migrate
                         </Button>
                       )}
                     </TableCell>
@@ -741,8 +784,8 @@ export default function AuditsSettingsPage() {
       <Dialog 
         isOpen={isWizardOpen} 
         onClose={() => setIsWizardOpen(false)}
-        title="Activate Academic Year"
-        description={`Configure migrations and operationalize ${targetYear?.name || ''} operational session.`}
+        title="Academic Year Rollover Migration"
+        description={`Migrate teachers, classes, and promote students into the ${targetYear?.name || ''} Draft session.`}
       >
         <div className="space-y-6 pt-4">
           
@@ -940,10 +983,10 @@ export default function AuditsSettingsPage() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-surface border border-border rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col p-6 space-y-4">
             <h3 className="font-extrabold text-text-primary text-base tracking-tight text-center font-display">
-              Confirm Activation
+              Confirm Migration
             </h3>
             <p className="text-xs text-text-secondary text-center leading-relaxed">
-              Activating this Academic Year will archive the currently Active Academic Year and make this Academic Year the current active session. This action will also execute the Academic Year Promotion process. Do you want to continue?
+              Migrating to this Academic Year will copy classes, subjects, timetables, and execute student promotions into the Draft session. The target session will remain in Draft status. Do you want to continue?
             </p>
             <div className="flex gap-3 justify-center pt-2">
               <Button variant="secondary" onClick={() => setShowConfirmExecute(false)} disabled={executing}>
@@ -952,15 +995,69 @@ export default function AuditsSettingsPage() {
               <Button 
                 onClick={executeActivation} 
                 disabled={executing}
-                className="font-bold bg-green-600 hover:bg-green-700 text-white flex items-center gap-1.5"
+                className="font-bold bg-primary hover:bg-primary/95 text-white flex items-center gap-1.5"
               >
                 {executing ? (
                   <>
                     <RefreshCw className="h-4 w-4 animate-spin" /> Processing...
                   </>
                 ) : (
-                  'Activate'
+                  'Migrate'
                 )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* No Draft Warning Modal */}
+      {showNoDraftWarning && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-surface border border-border rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col p-6 space-y-4">
+            <h3 className="font-extrabold text-text-primary text-base tracking-tight text-center font-display">
+              No Draft Academic Year Found
+            </h3>
+            <p className="text-xs text-text-secondary text-center leading-relaxed">
+              Please create the next Academic Year before migrating students and teachers.
+            </p>
+            <div className="flex gap-3 justify-center pt-2">
+              <Button variant="secondary" onClick={() => setShowNoDraftWarning(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={() => {
+                  setShowNoDraftWarning(false);
+                  openCreateModal();
+                }}
+                className="font-bold bg-primary text-primary-foreground hover:bg-primary/95"
+              >
+                Create Academic Year
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Activate Confirm Modal */}
+      {showActivateConfirm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-surface border border-border rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col p-6 space-y-4">
+            <h3 className="font-extrabold text-text-primary text-base tracking-tight text-center font-display">
+              Confirm Activation
+            </h3>
+            <p className="text-xs text-text-secondary text-center leading-relaxed">
+              Are you sure you want to activate the academic year <strong>{activateTargetYear?.name}</strong>? <br />
+              This will set it as the official Active session and Archive the previous Active academic year.
+            </p>
+            <div className="flex gap-3 justify-center pt-2">
+              <Button variant="secondary" onClick={() => setShowActivateConfirm(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleActivateConfirm}
+                className="font-bold bg-green-600 hover:bg-green-700 text-white"
+              >
+                Activate
               </Button>
             </div>
           </div>

@@ -40,6 +40,32 @@ const NAV_ITEMS = [
   { path: '/school-admin/security',   label: 'Security', icon: Shield },
 ];
 
+// Onboarding content screen when no active academic year is present
+function OnboardingScreen() {
+  const nav = useNavigate();
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] w-full px-4 py-12">
+      <Card className="max-w-md w-full shadow-lg border border-border bg-surface p-6 text-center animate-in fade-in duration-300">
+        <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+          <School className="h-6 w-6 text-primary" />
+        </div>
+        <h3 className="text-xl font-black text-text-primary tracking-tight font-display">Welcome to Shiksha Pilot</h3>
+        <p className="text-xs text-text-secondary mt-3 leading-relaxed">
+          Before you begin managing your school, please create your first Academic Year.
+        </p>
+        <p className="text-xs text-text-secondary mt-2 leading-relaxed">
+          An Academic Year is required before adding classes, students, teachers, attendance, examinations, and finance records.
+        </p>
+        <div className="mt-6">
+          <Button onClick={() => nav('/school-admin/audits-settings')} className="font-bold w-full py-2.5 shadow-sm">
+            Create Academic Year
+          </Button>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 // ─── Portal Root ──────────────────────────────────────────────────────────────
 
 export default function SchoolAdminPortal() {
@@ -48,10 +74,6 @@ export default function SchoolAdminPortal() {
 
   const [academicYears, setAcademicYears] = useState([]);
   const [loadingYears, setLoadingYears] = useState(true);
-  const [showOnboardingModal, setShowOnboardingModal] = useState(false);
-  const [onboardingYearName, setOnboardingYearName] = useState('');
-  const [submittingOnboarding, setSubmittingOnboarding] = useState(false);
-  const [modalError, setModalError] = useState('');
 
   const loadAcademicYears = async () => {
     try {
@@ -67,45 +89,6 @@ export default function SchoolAdminPortal() {
   useEffect(() => {
     loadAcademicYears();
   }, []);
-
-  const handleCreateFirstYear = async () => {
-    setModalError('');
-    if (!onboardingYearName.trim()) {
-      setModalError('Academic Year name is required.');
-      return;
-    }
-    if (!/^\d{4}[-–—]\d{4}$/.test(onboardingYearName.trim())) {
-      setModalError('Name must be in YYYY–YYYY format (e.g. 2026–2027).');
-      return;
-    }
-    const parts = onboardingYearName.trim().split(/[-–—]/);
-    const start = parseInt(parts[0], 10);
-    const end = parseInt(parts[1], 10);
-    if (end !== start + 1) {
-      setModalError('Session must span exactly one year (e.g. 2026–2027).');
-      return;
-    }
-
-    setSubmittingOnboarding(true);
-    try {
-      await apiClient.post('/api/school/academic-years/promote', {
-        name: onboardingYearName.trim(),
-        teacher_migrations: [],
-        student_migrations: []
-      });
-      setShowOnboardingModal(false);
-      const list = await schoolService.getAcademicYears();
-      setAcademicYears(list || []);
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
-    } catch (err) {
-      console.error(err);
-      setModalError(err.message || 'Failed to create academic year.');
-    } finally {
-      setSubmittingOnboarding(false);
-    }
-  };
 
   const isActive = (path, exact) => {
     if (exact) return location.pathname === path;
@@ -136,70 +119,7 @@ export default function SchoolAdminPortal() {
     );
   }
 
-  if (academicYears.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] w-full px-4 py-12">
-        <Card className="max-w-md w-full shadow-lg border border-border bg-surface p-6 text-center animate-in fade-in duration-300">
-          <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-            <School className="h-6 w-6 text-primary" />
-          </div>
-          <h3 className="text-xl font-black text-text-primary tracking-tight font-display">Welcome to Shiksha Pilot</h3>
-          <p className="text-xs text-text-secondary mt-3 leading-relaxed">
-            Before you begin managing your school, please create your first Academic Year.
-          </p>
-          <p className="text-xs text-text-secondary mt-2 leading-relaxed">
-            An Academic Year is required before adding classes, students, teachers, attendance, examinations, and finance records.
-          </p>
-          <div className="mt-6">
-            <Button onClick={() => setShowOnboardingModal(true)} className="font-bold w-full py-2.5 shadow-sm">
-              Create Academic Year
-            </Button>
-          </div>
-        </Card>
-
-        {/* Create Academic Year Modal */}
-        {showOnboardingModal && (
-          <Dialog
-            isOpen={showOnboardingModal}
-            onClose={() => setShowOnboardingModal(false)}
-            title="Create First Academic Year"
-            description="Enter the name for your initial school session (e.g. 2026–2027)."
-          >
-            <div className="space-y-4 pt-4">
-              {modalError && (
-                <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-lg text-xs font-semibold">
-                  {modalError}
-                </div>
-              )}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-text-secondary uppercase">Academic Year</label>
-                <Input 
-                  placeholder="e.g. 2026–2027" 
-                  value={onboardingYearName} 
-                  onChange={e => setOnboardingYearName(e.target.value)} 
-                  className="font-semibold text-sm"
-                />
-              </div>
-              <div className="flex justify-end gap-3 pt-4 border-t border-border bg-surface">
-                <Button variant="secondary" onClick={() => setShowOnboardingModal(false)} disabled={submittingOnboarding}>
-                  Cancel
-                </Button>
-                <Button onClick={handleCreateFirstYear} disabled={submittingOnboarding} className="font-bold flex items-center gap-1.5">
-                  {submittingOnboarding ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 animate-spin" /> Creating...
-                    </>
-                  ) : (
-                    'Save'
-                  )}
-                </Button>
-              </div>
-            </div>
-          </Dialog>
-        )}
-      </div>
-    );
-  }
+  const hasYear = academicYears.length > 0;
 
   return (
     <div className="flex flex-col md:flex-row gap-6 w-full min-h-[calc(100vh-140px)]">
@@ -224,20 +144,24 @@ export default function SchoolAdminPortal() {
 
       {/* Main Area */}
       <div className="flex-1 min-w-0">
-        <Routes>
-          <Route index element={<DashboardPage onNavigate={(p) => nav(`/school-admin/${p}`)} />} />
-          <Route path="profile" element={<ProfilePage />} />
-          <Route path="classes" element={<ClassesPage />} />
-          <Route path="staff" element={<StaffPage />} />
-          <Route path="timetable" element={<TimetablePage />} />
-          <Route path="attendance" element={<AttendancePage />} />
-          <Route path="exams" element={<ExamsPage />} />
-          <Route path="finance" element={<FinancePage />} />
-          <Route path="reports" element={<ReportsPage />} />
-          <Route path="audits-settings" element={<AuditsSettingsPage />} />
-          <Route path="security" element={<SecurityPage />} />
-          <Route path="*" element={<Navigate to="/school-admin" replace />} />
-        </Routes>
+        {!hasYear && location.pathname !== '/school-admin/audits-settings' ? (
+          <OnboardingScreen />
+        ) : (
+          <Routes>
+            <Route index element={<DashboardPage onNavigate={(p) => nav(`/school-admin/${p}`)} />} />
+            <Route path="profile" element={<ProfilePage />} />
+            <Route path="classes" element={<ClassesPage />} />
+            <Route path="staff" element={<StaffPage />} />
+            <Route path="timetable" element={<TimetablePage />} />
+            <Route path="attendance" element={<AttendancePage />} />
+            <Route path="exams" element={<ExamsPage />} />
+            <Route path="finance" element={<FinancePage />} />
+            <Route path="reports" element={<ReportsPage />} />
+            <Route path="audits-settings" element={<AuditsSettingsPage />} />
+            <Route path="security" element={<SecurityPage />} />
+            <Route path="*" element={<Navigate to="/school-admin" replace />} />
+          </Routes>
+        )}
       </div>
     </div>
   );

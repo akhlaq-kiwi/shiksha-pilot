@@ -390,6 +390,18 @@ class SchoolAdminController extends BaseController
         return $this->success($response, $data, 'Academic year activated');
     }
 
+    public function migrateAcademicYear(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int)$args['id'];
+        $body = RequestParser::body($request);
+        $data = $this->service->migrateAcademicYear($user, $id, $body);
+
+        return $this->success($response, $data, 'Academic year rollover migration executed');
+    }
+
     public function getClassFeeConfigurations(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);

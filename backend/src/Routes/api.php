@@ -55,6 +55,7 @@ return function (App $app) {
     $app->get('/api/school/academic-years', [SchoolAdminController::class, 'getAcademicYears']);
     $app->post('/api/school/academic-years', [SchoolAdminController::class, 'createAcademicYear']);
     $app->post('/api/school/academic-years/{id}/activate', [SchoolAdminController::class, 'activateAcademicYear']);
+    $app->post('/api/school/academic-years/{id}/migrate', [SchoolAdminController::class, 'migrateAcademicYear']);
     $app->get('/api/school/attendance', [SchoolAdminController::class, 'getAttendance']);
     $app->post('/api/school/attendance', [SchoolAdminController::class, 'markAttendance']);
     $app->get('/api/school/exams', [SchoolAdminController::class, 'getExams']);

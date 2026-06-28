@@ -1034,7 +1034,7 @@ class SchoolAdminService extends BaseService
         }
 
         // Parse and validate the name
-        if (!preg_match('/^(\d{4})[-–—](\d{4})$/', trim($body['name']), $matches)) {
+        if (!preg_match('/^(\d{4})[-–—](\d{4})$/u', trim($body['name']), $matches)) {
             throw new ValidationException(['name' => 'Academic Year name must be in YYYY–YYYY format (e.g., 2027–2028).']);
         }
 
@@ -1062,6 +1062,13 @@ class SchoolAdminService extends BaseService
             throw new ValidationException(['name' => 'This academic year already exists.']);
         }
 
+        // Check if a Draft academic year already exists for this school
+        $stmtDraftCheck = $pdo->prepare("SELECT id FROM academic_years WHERE school_id = :sid AND status = 'Draft' LIMIT 1");
+        $stmtDraftCheck->execute([':sid' => $schoolId]);
+        if ($stmtDraftCheck->fetchColumn() !== false) {
+            throw new ValidationException(['name' => 'Only one Draft Academic Year can exist at a time. Please activate or delete the existing Draft Academic Year before creating another one.']);
+        }
+
         // Create new academic year with status = 'Draft'
         $stmtInsert = $pdo->prepare("INSERT INTO academic_years (school_id, name, start_date, end_date, is_current, status) VALUES (:school_id, :name, :start_date, :end_date, 0, 'Draft')");
         $stmtInsert->execute([
@@ -1076,7 +1083,7 @@ class SchoolAdminService extends BaseService
         return ['id' => $newYearId, 'name' => $body['name'], 'status' => 'Draft'];
     }
 
-    public function activateAcademicYear(array $user, int $newYearId, array $body): array
+    public function migrateAcademicYear(array $user, int $newYearId, array $body): array
     {
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->classRepo->getPdo();
@@ -1096,14 +1103,6 @@ class SchoolAdminService extends BaseService
 
         $pdo->beginTransaction();
         try {
-            // Set the target academic year to ACTIVE and current active session
-            $stmtUpdate = $pdo->prepare("UPDATE academic_years SET is_current = 1, status = 'ACTIVE' WHERE id = :id AND school_id = :sid");
-            $stmtUpdate->execute([':id' => $newYearId, ':sid' => $schoolId]);
-
-            // Archive all other academic years for the school
-            $stmtArchive = $pdo->prepare("UPDATE academic_years SET is_current = 0, status = 'Archived' WHERE school_id = :sid AND id != :new_id");
-            $stmtArchive->execute([':sid' => $schoolId, ':new_id' => $newYearId]);
-
             // If there's a previous active academic year, run the promotion migration
             if ($prevYearId !== false) {
                 $prevYearId = (int)$prevYearId;
@@ -1386,7 +1385,40 @@ class SchoolAdminService extends BaseService
             }
 
             $pdo->commit();
-            $this->log('Academic year activated and promoted', ['id' => $newYearId, 'school_id' => $schoolId]);
+            $this->log('Academic year rollover migration executed', ['id' => $newYearId, 'school_id' => $schoolId]);
+            return ['id' => $newYearId, 'status' => 'Draft', 'migrated' => true];
+
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+    }
+
+    public function activateAcademicYear(array $user, int $newYearId, array $body): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->classRepo->getPdo();
+
+        // Fetch the target academic year
+        $stmtYear = $pdo->prepare("SELECT * FROM academic_years WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtYear->execute([':id' => $newYearId, ':sid' => $schoolId]);
+        $targetYear = $stmtYear->fetch(PDO::FETCH_ASSOC);
+        if (!$targetYear) {
+            throw new NotFoundException('Academic year not found.');
+        }
+
+        $pdo->beginTransaction();
+        try {
+            // Set the target academic year to ACTIVE and current active session
+            $stmtUpdate = $pdo->prepare("UPDATE academic_years SET is_current = 1, status = 'ACTIVE' WHERE id = :id AND school_id = :sid");
+            $stmtUpdate->execute([':id' => $newYearId, ':sid' => $schoolId]);
+
+            // Archive all other academic years for the school
+            $stmtArchive = $pdo->prepare("UPDATE academic_years SET is_current = 0, status = 'Archived' WHERE school_id = :sid AND id != :new_id");
+            $stmtArchive->execute([':sid' => $schoolId, ':new_id' => $newYearId]);
+
+            $pdo->commit();
+            $this->log('Academic year activated', ['id' => $newYearId, 'school_id' => $schoolId]);
             return ['id' => $newYearId, 'status' => 'ACTIVE'];
 
         } catch (Exception $e) {
@@ -2203,7 +2235,12 @@ class SchoolAdminService extends BaseService
         $stmtYear->execute([':sid' => $schoolId]);
         $academicYearId = (int)$stmtYear->fetchColumn();
         if (!$academicYearId) {
-            throw new ValidationException(['message' => 'No active academic year found.']);
+            $stmt2 = $pdo->prepare("SELECT id FROM academic_years WHERE school_id = :sid ORDER BY start_date DESC LIMIT 1");
+            $stmt2->execute([':sid' => $schoolId]);
+            $academicYearId = (int)$stmt2->fetchColumn();
+            if (!$academicYearId) {
+                throw new ValidationException(['message' => 'No active academic year found.']);
+            }
         }
 
         $salary = (float)($staff['salary'] ?? 0.0);
