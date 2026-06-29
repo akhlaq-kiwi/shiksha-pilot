@@ -8,6 +8,7 @@ use App\Domain\SchoolAdmin\Repositories\AttendanceRepository;
 use App\Domain\SchoolAdmin\Repositories\ClassRepository;
 use App\Domain\SchoolAdmin\Repositories\ExamRepository;
 use App\Domain\SchoolAdmin\Repositories\FeeRepository;
+use App\Domain\SchoolAdmin\Repositories\FinancialReportRepository;
 use App\Domain\SchoolAdmin\Repositories\StaffRepository;
 use App\Domain\SchoolAdmin\Repositories\StudentRepository;
 use App\Shared\BaseService;
@@ -25,6 +26,7 @@ class SchoolAdminService extends BaseService
         private readonly AttendanceRepository $attendanceRepo,
         private readonly ExamRepository       $examRepo,
         private readonly FeeRepository        $feeRepo,
+        private readonly FinancialReportRepository $financialReportRepo,
         ?LoggerInterface $logger = null,
     ) {
         parent::__construct($logger);
@@ -854,72 +856,269 @@ class SchoolAdminService extends BaseService
 
     public function getStaff(array $user): array
     {
-        return $this->staffRepo->findBySchool($this->getSchoolId($user));
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->staffRepo->getPdo();
+        
+        $stmt = $pdo->prepare("SELECT * FROM staff WHERE school_id = :sid ORDER BY id DESC");
+        $stmt->execute([':sid' => $schoolId]);
+        $staffList = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        // For each staff member, fetch documents count
+        foreach ($staffList as &$s) {
+            $stmtDocs = $pdo->prepare("SELECT COUNT(*) FROM staff_documents WHERE staff_id = :sid");
+            $stmtDocs->execute([':sid' => $s['id']]);
+            $s['documents_count'] = (int)$stmtDocs->fetchColumn();
+        }
+
+        return $staffList;
     }
 
-    public function createStaff(array $user, array $data): array
+    public function getStaffDetails(array $user, int $id): array
     {
-        if (empty($data['name']) || empty($data['role'])) {
-            throw new ValidationException(['fields' => 'Staff name and role are required']);
-        }
-
         $schoolId = $this->getSchoolId($user);
+        $pdo = $this->staffRepo->getPdo();
 
-        $id = $this->staffRepo->create([
-            'school_id'        => $schoolId,
-            'name'             => $data['name'],
-            'employee_id'      => $data['employee_id'] ?? null,
-            'role'             => $data['role'],
-            'department'       => $data['department'] ?? null,
-            'phone'            => $data['phone'] ?? null,
-            'email'            => $data['email'] ?? null,
-            'status'           => $data['status'] ?? 'ACTIVE',
-            'salary'           => $data['salary'] ?? null,
-            'joining_date'     => $data['joining_date'] ?? null,
-            'photo_path'       => $data['photo_path'] ?? null,
-            'assigned_periods' => isset($data['assigned_periods']) ? (int)$data['assigned_periods'] : 0,
-            'max_periods'      => isset($data['max_periods']) ? (int)$data['max_periods'] : 8,
-        ]);
+        $stmt = $pdo->prepare("SELECT * FROM staff WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmt->execute([':id' => $id, ':sid' => $schoolId]);
+        $member = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        $member = $this->staffRepo->findById($id);
-
-        if ($member === null) {
-            throw new NotFoundException('Staff member not found after creation');
+        if (!$member) {
+            throw new NotFoundException('Teacher profile not found');
         }
 
-        $this->log('Staff member created', ['id' => $id, 'school_id' => $schoolId]);
+        // Fetch documents
+        $stmtDocs = $pdo->prepare("SELECT * FROM staff_documents WHERE staff_id = :sid ORDER BY id ASC");
+        $stmtDocs->execute([':sid' => $id]);
+        $member['documents'] = $stmtDocs->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
         return $member;
     }
 
-    public function updateStaff(array $user, int $id, array $data): array
+    public function createStaff(array $user, array $data): array
     {
-        if (empty($data['name']) || empty($data['role'])) {
-            throw new ValidationException(['fields' => 'Staff name and role are required']);
-        }
-
         $schoolId = $this->getSchoolId($user);
-        $member   = $this->staffRepo->findById($id);
+        $pdo = $this->staffRepo->getPdo();
 
-        if ($member === null || (int)$member['school_id'] !== $schoolId) {
-            throw new NotFoundException('Staff member not found');
+        // 1. Validations
+        if (empty($data['name']) || strlen(trim($data['name'])) < 3 || strlen(trim($data['name'])) > 100) {
+            throw new ValidationException(['name' => 'Name must be between 3 and 100 characters.']);
+        }
+        if (empty($data['father_name']) || strlen(trim($data['father_name'])) < 3) {
+            throw new ValidationException(['father_name' => 'Father name must be at least 3 characters.']);
+        }
+        if (empty($data['mother_name']) || strlen(trim($data['mother_name'])) < 3 || strlen(trim($data['mother_name'])) > 100) {
+            throw new ValidationException(['mother_name' => 'Mother name must be between 3 and 100 characters.']);
+        }
+        if (empty($data['phone']) || !preg_match('/^[0-9]{10}$/', trim($data['phone']))) {
+            throw new ValidationException(['phone' => 'Contact number must be exactly 10 digits.']);
+        }
+        if (empty($data['emergency_phone']) || !preg_match('/^[0-9]{10}$/', trim($data['emergency_phone']))) {
+            throw new ValidationException(['emergency_phone' => 'Emergency contact number must be exactly 10 digits.']);
+        }
+        if (trim($data['emergency_phone']) === trim($data['phone'])) {
+            throw new ValidationException(['emergency_phone' => 'Emergency contact number must be different from contact number.']);
+        }
+        if (empty($data['email']) || !filter_var(trim($data['email']), FILTER_VALIDATE_EMAIL)) {
+            throw new ValidationException(['email' => 'Invalid email address format.']);
+        }
+        if (empty($data['joining_date']) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', trim($data['joining_date']))) {
+            throw new ValidationException(['joining_date' => 'Joining date is required.']);
+        }
+        if (strtotime($data['joining_date']) > time()) {
+            throw new ValidationException(['joining_date' => 'Joining date cannot be a future date.']);
+        }
+        if (!empty($data['exit_date'])) {
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', trim($data['exit_date']))) {
+                throw new ValidationException(['exit_date' => 'Invalid exit date format.']);
+            }
+            if (strtotime($data['exit_date']) < strtotime($data['joining_date'])) {
+                throw new ValidationException(['exit_date' => 'Exit date cannot be earlier than joining date.']);
+            }
         }
 
-        $this->staffRepo->update($id, [
-            'name'             => $data['name'],
-            'role'             => $data['role'],
-            'department'       => $data['department'] ?? null,
-            'phone'            => $data['phone'] ?? null,
-            'email'            => $data['email'] ?? null,
-            'status'           => $data['status'] ?? $member['status'],
-            'salary'           => $data['salary'] ?? $member['salary'],
-            'joining_date'     => $data['joining_date'] ?? $member['joining_date'],
-            'photo_path'       => $data['photo_path'] ?? $member['photo_path'],
-            'assigned_periods' => isset($data['assigned_periods']) ? (int)$data['assigned_periods'] : (int)($member['assigned_periods'] ?? 0),
-            'max_periods'      => isset($data['max_periods']) ? (int)$data['max_periods'] : (int)($member['max_periods'] ?? 8),
+        // 2. Uniqueness Checks
+        $stmtCheckContact = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND phone = :phone LIMIT 1");
+        $stmtCheckContact->execute([':sid' => $schoolId, ':phone' => trim($data['phone'])]);
+        if ($stmtCheckContact->fetchColumn() !== false) {
+            throw new ValidationException(['phone' => 'This contact number is already registered.']);
+        }
+
+        $stmtCheckEmail = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND email = :email LIMIT 1");
+        $stmtCheckEmail->execute([':sid' => $schoolId, ':email' => trim($data['email'])]);
+        if ($stmtCheckEmail->fetchColumn() !== false) {
+            throw new ValidationException(['email' => 'This email address already exists.']);
+        }
+
+        // 3. Status Mapping
+        $status = !empty($data['exit_date']) ? 'Inactive' : 'ACTIVE';
+
+        // 4. Save
+        $id = $this->staffRepo->create([
+            'school_id'               => $schoolId,
+            'name'                    => $data['name'],
+            'employee_id'             => $data['employee_id'] ?? null,
+            'role'                    => $data['role'] ?? 'Teacher',
+            'department'              => $data['department'] ?? null,
+            'phone'                   => $data['phone'],
+            'email'                   => $data['email'],
+            'status'                  => $status,
+            'salary'                  => $data['salary'] ?? null,
+            'joining_date'            => $data['joining_date'],
+            'photo_path'              => $data['photo_path'] ?? null,
+            'father_name'             => $data['father_name'],
+            'mother_name'             => $data['mother_name'],
+            'parent_occupation'       => $data['parent_occupation'] ?? null,
+            'emergency_phone'         => $data['emergency_phone'],
+            'exit_date'               => !empty($data['exit_date']) ? $data['exit_date'] : null,
+            'current_address_line'    => $data['current_address_line'] ?? null,
+            'current_city'            => $data['current_city'] ?? null,
+            'current_state'           => $data['current_state'] ?? null,
+            'current_country'         => $data['current_country'] ?? null,
+            'current_pin_code'        => $data['current_pin_code'] ?? null,
+            'permanent_address_line'  => $data['permanent_address_line'] ?? null,
+            'permanent_city'          => $data['permanent_city'] ?? null,
+            'permanent_state'         => $data['permanent_state'] ?? null,
+            'permanent_country'       => $data['permanent_country'] ?? null,
+            'permanent_pin_code'      => $data['permanent_pin_code'] ?? null,
+            'same_as_current'         => isset($data['same_as_current']) ? (int)$data['same_as_current'] : 0,
+            'assigned_periods'        => 0,
+            'max_periods'             => 8,
         ]);
 
-        return $this->staffRepo->findById($id);
+        // Save documents
+        if (!empty($data['documents']) && is_array($data['documents'])) {
+            $stmtDoc = $pdo->prepare("
+                INSERT INTO staff_documents (school_id, staff_id, category, file_name, file_path, file_size)
+                VALUES (:sid, :staff_id, :category, :file_name, :file_path, :file_size)
+            ");
+            foreach ($data['documents'] as $doc) {
+                $stmtDoc->execute([
+                    ':sid' => $schoolId,
+                    ':staff_id' => $id,
+                    ':category' => $doc['category'],
+                    ':file_name' => $doc['file_name'],
+                    ':file_path' => $doc['file_path'],
+                    ':file_size' => (int)$doc['file_size']
+                ]);
+            }
+        }
+
+        $this->log('Staff member created', ['id' => $id, 'school_id' => $schoolId]);
+        return $this->getStaffDetails($user, $id);
+    }
+
+    public function updateStaff(array $user, int $id, array $data): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->staffRepo->getPdo();
+
+        $member = $this->staffRepo->findById($id);
+        if ($member === null || (int)$member['school_id'] !== $schoolId) {
+            throw new NotFoundException('Teacher profile not found');
+        }
+
+        // 1. Validations
+        if (empty($data['name']) || strlen(trim($data['name'])) < 3 || strlen(trim($data['name'])) > 100) {
+            throw new ValidationException(['name' => 'Name must be between 3 and 100 characters.']);
+        }
+        if (empty($data['father_name']) || strlen(trim($data['father_name'])) < 3) {
+            throw new ValidationException(['father_name' => 'Father name must be at least 3 characters.']);
+        }
+        if (empty($data['mother_name']) || strlen(trim($data['mother_name'])) < 3 || strlen(trim($data['mother_name'])) > 100) {
+            throw new ValidationException(['mother_name' => 'Mother name must be between 3 and 100 characters.']);
+        }
+        if (empty($data['phone']) || !preg_match('/^[0-9]{10}$/', trim($data['phone']))) {
+            throw new ValidationException(['phone' => 'Contact number must be exactly 10 digits.']);
+        }
+        if (empty($data['emergency_phone']) || !preg_match('/^[0-9]{10}$/', trim($data['emergency_phone']))) {
+            throw new ValidationException(['emergency_phone' => 'Emergency contact number must be exactly 10 digits.']);
+        }
+        if (trim($data['emergency_phone']) === trim($data['phone'])) {
+            throw new ValidationException(['emergency_phone' => 'Emergency contact number must be different from contact number.']);
+        }
+        if (empty($data['email']) || !filter_var(trim($data['email']), FILTER_VALIDATE_EMAIL)) {
+            throw new ValidationException(['email' => 'Invalid email address format.']);
+        }
+        if (empty($data['joining_date']) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', trim($data['joining_date']))) {
+            throw new ValidationException(['joining_date' => 'Joining date is required.']);
+        }
+        if (strtotime($data['joining_date']) > time()) {
+            throw new ValidationException(['joining_date' => 'Joining date cannot be a future date.']);
+        }
+        if (!empty($data['exit_date'])) {
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', trim($data['exit_date']))) {
+                throw new ValidationException(['exit_date' => 'Invalid exit date format.']);
+            }
+            if (strtotime($data['exit_date']) < strtotime($data['joining_date'])) {
+                throw new ValidationException(['exit_date' => 'Exit date cannot be earlier than joining date.']);
+            }
+        }
+
+        // 2. Uniqueness Checks
+        $stmtCheckContact = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND phone = :phone AND id != :id LIMIT 1");
+        $stmtCheckContact->execute([':sid' => $schoolId, ':phone' => trim($data['phone']), ':id' => $id]);
+        if ($stmtCheckContact->fetchColumn() !== false) {
+            throw new ValidationException(['phone' => 'This contact number is already registered.']);
+        }
+
+        $stmtCheckEmail = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND email = :email AND id != :id LIMIT 1");
+        $stmtCheckEmail->execute([':sid' => $schoolId, ':email' => trim($data['email']), ':id' => $id]);
+        if ($stmtCheckEmail->fetchColumn() !== false) {
+            throw new ValidationException(['email' => 'This email address already exists.']);
+        }
+
+        // 3. Status Mapping
+        $status = !empty($data['exit_date']) ? 'Inactive' : 'ACTIVE';
+
+        // 4. Update
+        $this->staffRepo->update($id, [
+            'name'                    => $data['name'],
+            'role'                    => $data['role'] ?? 'Teacher',
+            'department'              => $data['department'] ?? null,
+            'phone'                   => $data['phone'],
+            'email'                   => $data['email'],
+            'status'                  => $status,
+            'salary'                  => $data['salary'] ?? null,
+            'joining_date'            => $data['joining_date'],
+            'photo_path'              => $data['photo_path'] ?? null,
+            'father_name'             => $data['father_name'],
+            'mother_name'             => $data['mother_name'],
+            'parent_occupation'       => $data['parent_occupation'] ?? null,
+            'emergency_phone'         => $data['emergency_phone'],
+            'exit_date'               => !empty($data['exit_date']) ? $data['exit_date'] : null,
+            'current_address_line'    => $data['current_address_line'] ?? null,
+            'current_city'            => $data['current_city'] ?? null,
+            'current_state'           => $data['current_state'] ?? null,
+            'current_country'         => $data['current_country'] ?? null,
+            'current_pin_code'        => $data['current_pin_code'] ?? null,
+            'permanent_address_line'  => $data['permanent_address_line'] ?? null,
+            'permanent_city'          => $data['permanent_city'] ?? null,
+            'permanent_state'         => $data['permanent_state'] ?? null,
+            'permanent_country'       => $data['permanent_country'] ?? null,
+            'permanent_pin_code'      => $data['permanent_pin_code'] ?? null,
+            'same_as_current'         => isset($data['same_as_current']) ? (int)$data['same_as_current'] : 0,
+        ]);
+
+        // Save documents
+        $pdo->prepare("DELETE FROM staff_documents WHERE staff_id = :sid")->execute([':sid' => $id]);
+        if (!empty($data['documents']) && is_array($data['documents'])) {
+            $stmtDoc = $pdo->prepare("
+                INSERT INTO staff_documents (school_id, staff_id, category, file_name, file_path, file_size)
+                VALUES (:sid, :staff_id, :category, :file_name, :file_path, :file_size)
+            ");
+            foreach ($data['documents'] as $doc) {
+                $stmtDoc->execute([
+                    ':sid' => $schoolId,
+                    ':staff_id' => $id,
+                    ':category' => $doc['category'],
+                    ':file_name' => $doc['file_name'],
+                    ':file_path' => $doc['file_path'],
+                    ':file_size' => (int)$doc['file_size']
+                ]);
+            }
+        }
+
+        return $this->getStaffDetails($user, $id);
     }
 
     // -------------------------------------------------------------------------
@@ -2273,6 +2472,412 @@ class SchoolAdminService extends BaseService
         $stmt->execute([':id' => $id, ':sid' => $schoolId]);
 
         return ['success' => true];
+    }
+
+    public function getFinancialPreview(array $user, string $from, string $to): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->financialReportRepo->getPdo();
+
+        // 1. Total Student Tuition Fees Collected
+        $stmtFees = $pdo->prepare("
+            SELECT COALESCE(SUM(amount_paid), 0) 
+            FROM fee_payments 
+            WHERE school_id = :sid AND payment_date BETWEEN :from AND :to
+        ");
+        $stmtFees->execute([':sid' => $schoolId, ':from' => $from, ':to' => $to]);
+        $tuitionCollected = (float)$stmtFees->fetchColumn();
+
+        // 2. Total Additional Paid Fees (Additional Fee Ledger - Paid records only)
+        $stmtAddFees = $pdo->prepare("
+            SELECT COALESCE(SUM(amount), 0) 
+            FROM additional_fee_payments 
+            WHERE school_id = :sid AND status = 'Paid' AND payment_date BETWEEN :from AND :to
+        ");
+        $stmtAddFees->execute([':sid' => $schoolId, ':from' => $from, ':to' => $to]);
+        $addFeesCollected = (float)$stmtAddFees->fetchColumn();
+
+        $totalFees = $tuitionCollected + $addFeesCollected;
+
+        // 3. Total Teacher Salaries Paid
+        $stmtSalaries = $pdo->prepare("
+            SELECT COALESCE(SUM(amount_paid), 0) 
+            FROM staff_payments 
+            WHERE school_id = :sid AND payment_date BETWEEN :from AND :to
+        ");
+        $stmtSalaries->execute([':sid' => $schoolId, ':from' => $from, ':to' => $to]);
+        $salariesPaid = (float)$stmtSalaries->fetchColumn();
+
+        // 4. Total School Expenses Logged
+        $stmtExpenses = $pdo->prepare("
+            SELECT COALESCE(SUM(amount), 0) 
+            FROM school_expenses 
+            WHERE school_id = :sid AND expense_date BETWEEN :from AND :to
+        ");
+        $stmtExpenses->execute([':sid' => $schoolId, ':from' => $from, ':to' => $to]);
+        $expensesPaid = (float)$stmtExpenses->fetchColumn();
+
+        $totalExpenses = $salariesPaid + $expensesPaid;
+        $profitLoss = $totalFees - $totalExpenses;
+
+        return [
+            'from_date' => $from,
+            'to_date' => $to,
+            'fees_collected' => $totalFees,
+            'salary_paid' => $totalExpenses,
+            'profit_loss' => $profitLoss
+        ];
+    }
+
+    public function getFinancialReports(array $user): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->financialReportRepo->getPdo();
+
+        // 1. Fetch generated reports
+        $reports = $this->financialReportRepo->findBySchool($schoolId);
+
+        // 2. Format float values and dates
+        $reports = array_map(function($r) {
+            $r['id'] = (int)$r['id'];
+            $r['fees_collected'] = (float)$r['fees_collected'];
+            $r['salary_paid'] = (float)$r['salary_paid'];
+            $r['profit_loss'] = (float)$r['profit_loss'];
+            return $r;
+        }, $reports);
+
+        // 3. Determine next suggested start date
+        $suggestedStartDate = '';
+        $stmtLatest = $pdo->prepare("SELECT to_date FROM financial_reports WHERE school_id = :sid ORDER BY to_date DESC LIMIT 1");
+        $stmtLatest->execute([':sid' => $schoolId]);
+        $latestToDate = $stmtLatest->fetchColumn();
+
+        if ($latestToDate !== false) {
+            $suggestedStartDate = date('Y-m-d', strtotime($latestToDate . ' + 1 day'));
+        } else {
+            // Check active academic year start date
+            $stmtYear = $pdo->prepare("SELECT start_date FROM academic_years WHERE school_id = :sid AND is_current = 1 LIMIT 1");
+            $stmtYear->execute([':sid' => $schoolId]);
+            $yearStart = $stmtYear->fetchColumn();
+            if ($yearStart !== false) {
+                $suggestedStartDate = $yearStart;
+            } else {
+                $suggestedStartDate = date('Y-m-d', strtotime('-30 days'));
+            }
+        }
+
+        return [
+            'reports' => $reports,
+            'next_suggested_start_date' => $suggestedStartDate
+        ];
+    }
+
+    public function createFinancialReport(array $user, array $data): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->financialReportRepo->getPdo();
+
+        if (empty($data['from_date']) || empty($data['to_date'])) {
+            throw new ValidationException(['from_date' => 'From date and To date are required.']);
+        }
+
+        $from = trim($data['from_date']);
+        $to = trim($data['to_date']);
+
+        if (strtotime($to) < strtotime($from)) {
+            throw new ValidationException(['to_date' => 'To date cannot be earlier than From date.']);
+        }
+
+        // Recalculate profit loss for security
+        $preview = $this->getFinancialPreview($user, $from, $to);
+
+        // Generate report ID (REP-XXX)
+        $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM financial_reports WHERE school_id = :sid");
+        $stmtCount->execute([':sid' => $schoolId]);
+        $count = (int)$stmtCount->fetchColumn();
+        $reportId = 'REP-' . str_pad((string)($count + 1), 3, '0', STR_PAD_LEFT);
+
+        $id = $this->financialReportRepo->create([
+            'school_id' => $schoolId,
+            'report_id' => $reportId,
+            'from_date' => $from,
+            'to_date' => $to,
+            'fees_collected' => $preview['fees_collected'],
+            'salary_paid' => $preview['salary_paid'],
+            'profit_loss' => $preview['profit_loss'],
+            'status' => 'Pending'
+        ]);
+
+        return $this->financialReportRepo->findById($id);
+    }
+
+    public function updateFinancialReportStatus(array $user, int $id, array $data): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        
+        $report = $this->financialReportRepo->findById($id);
+        if ($report === null || (int)$report['school_id'] !== $schoolId) {
+            throw new NotFoundException('Financial report not found.');
+        }
+
+        $status = $data['status'] ?? 'Pending';
+        if (!in_array($status, ['Pending', 'Settled'])) {
+            throw new ValidationException(['status' => 'Invalid status value.']);
+        }
+
+        $this->financialReportRepo->update($id, [
+            'status' => $status
+        ]);
+
+        return $this->financialReportRepo->findById($id);
+    }
+
+    public function getSchoolExpenses(array $user): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->staffRepo->getPdo();
+
+        $stmt = $pdo->prepare("
+            SELECT se.*, u.name as creator_name 
+            FROM school_expenses se
+            JOIN users u ON u.id = se.created_by
+            WHERE se.school_id = :sid
+            ORDER BY se.expense_date DESC, se.id DESC
+        ");
+        $stmt->execute([':sid' => $schoolId]);
+        $expenses = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return array_map(function($e) {
+            $e['id'] = (int)$e['id'];
+            $e['amount'] = (float)$e['amount'];
+            $e['created_by'] = (int)$e['created_by'];
+            return $e;
+        }, $expenses);
+    }
+
+    public function createSchoolExpense(array $user, array $data): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->staffRepo->getPdo();
+
+        if (empty($data['description']) || strlen(trim($data['description'])) < 3) {
+            throw new ValidationException(['description' => 'Description must be at least 3 characters.']);
+        }
+        if (empty($data['amount']) || (float)$data['amount'] <= 0) {
+            throw new ValidationException(['amount' => 'Amount must be greater than 0.']);
+        }
+
+        $desc = trim($data['description']);
+        $amount = (float)$data['amount'];
+        $createdBy = (int)$user['id'];
+        $expenseDate = date('Y-m-d');
+
+        $stmt = $pdo->prepare("
+            INSERT INTO school_expenses (school_id, description, amount, created_by, expense_date)
+            VALUES (:sid, :desc, :amount, :created_by, :expense_date)
+        ");
+        $stmt->execute([
+            ':sid' => $schoolId,
+            ':desc' => $desc,
+            ':amount' => $amount,
+            ':created_by' => $createdBy,
+            ':expense_date' => $expenseDate
+        ]);
+
+        $id = (int)$pdo->lastInsertId();
+
+        $stmtGet = $pdo->prepare("
+            SELECT se.*, u.name as creator_name 
+            FROM school_expenses se
+            JOIN users u ON u.id = se.created_by
+            WHERE se.id = :id AND se.school_id = :sid
+            LIMIT 1
+        ");
+        $stmtGet->execute([':id' => $id, ':sid' => $schoolId]);
+        $expense = $stmtGet->fetch(PDO::FETCH_ASSOC);
+
+        if ($expense) {
+            $expense['id'] = (int)$expense['id'];
+            $expense['amount'] = (float)$expense['amount'];
+            $expense['created_by'] = (int)$expense['created_by'];
+        }
+
+        return $expense ?: [];
+    }
+
+    public function getAdditionalFeeTypes(array $user): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->staffRepo->getPdo();
+
+        $stmt = $pdo->prepare("
+            SELECT * FROM additional_fee_types 
+            WHERE school_id = :sid 
+            ORDER BY id DESC
+        ");
+        $stmt->execute([':sid' => $schoolId]);
+        $types = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return array_map(function($t) {
+            $t['id'] = (int)$t['id'];
+            $t['amount'] = (float)$t['amount'];
+            $t['academic_year_id'] = (int)$t['academic_year_id'];
+            return $t;
+        }, $types);
+    }
+
+    public function createAdditionalFeeType(array $user, array $data): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->staffRepo->getPdo();
+
+        if (empty($data['name']) || strlen(trim($data['name'])) < 3) {
+            throw new ValidationException(['name' => 'Fee type name must be at least 3 characters.']);
+        }
+        if (empty($data['amount']) || (float)$data['amount'] <= 0) {
+            throw new ValidationException(['amount' => 'Amount must be greater than 0.']);
+        }
+
+        $name = trim($data['name']);
+        $amount = (float)$data['amount'];
+
+        // Get currently active academic year
+        $stmtYear = $pdo->prepare("SELECT id FROM academic_years WHERE school_id = :school_id AND is_current = 1 LIMIT 1");
+        $stmtYear->execute([':school_id' => $schoolId]);
+        $yearId = $stmtYear->fetchColumn();
+        if ($yearId === false) {
+            throw new ValidationException(['academic_year' => 'No active academic year found. Please create and activate an Academic Year first.']);
+        }
+        $academicYearId = (int)$yearId;
+
+        // Start transaction
+        $pdo->beginTransaction();
+        try {
+            // 1. Insert fee type
+            $stmtType = $pdo->prepare("
+                INSERT INTO additional_fee_types (school_id, name, amount, academic_year_id)
+                VALUES (:sid, :name, :amount, :ayid)
+            ");
+            $stmtType->execute([
+                ':sid' => $schoolId,
+                ':name' => $name,
+                ':amount' => $amount,
+                ':ayid' => $academicYearId
+            ]);
+            $typeId = (int)$pdo->lastInsertId();
+
+            // 2. Query all active students in active academic year
+            $stmtStudents = $pdo->prepare("
+                SELECT id FROM students 
+                WHERE school_id = :sid AND status = 'ACTIVE' AND academic_year_id = :ayid
+            ");
+            $stmtStudents->execute([
+                ':sid' => $schoolId,
+                ':ayid' => $academicYearId
+            ]);
+            $students = $stmtStudents->fetchAll(PDO::FETCH_ASSOC);
+
+            // 3. Assign pending fee payments to each student
+            if (!empty($students)) {
+                $stmtInsertPay = $pdo->prepare("
+                    INSERT INTO additional_fee_payments (school_id, student_id, fee_type_id, amount, status)
+                    VALUES (:sid, :student_id, :type_id, :amount, 'Pending')
+                ");
+                foreach ($students as $student) {
+                    $stmtInsertPay->execute([
+                        ':sid' => $schoolId,
+                        ':student_id' => (int)$student['id'],
+                        ':type_id' => $typeId,
+                        ':amount' => $amount
+                    ]);
+                }
+            }
+
+            $pdo->commit();
+
+            return [
+                'id' => $typeId,
+                'name' => $name,
+                'amount' => $amount,
+                'academic_year_id' => $academicYearId,
+                'assigned_count' => count($students)
+            ];
+        } catch (\Exception $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+    }
+
+    public function getAdditionalFeePayments(array $user): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->staffRepo->getPdo();
+
+        $stmt = $pdo->prepare("
+            SELECT afp.*, s.name as student_name, c.name as class_name, aft.name as fee_name
+            FROM additional_fee_payments afp
+            JOIN students s ON s.id = afp.student_id
+            JOIN classes c ON c.id = s.class_id
+            JOIN additional_fee_types aft ON aft.id = afp.fee_type_id
+            WHERE afp.school_id = :sid
+            ORDER BY afp.id DESC
+        ");
+        $stmt->execute([':sid' => $schoolId]);
+        $payments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return array_map(function($p) {
+            $p['id'] = (int)$p['id'];
+            $p['student_id'] = (int)$p['student_id'];
+            $p['fee_type_id'] = (int)$p['fee_type_id'];
+            $p['amount'] = (float)$p['amount'];
+            return $p;
+        }, $payments);
+    }
+
+    public function collectAdditionalFeePayment(array $user, int $id): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->staffRepo->getPdo();
+
+        $stmtCheck = $pdo->prepare("SELECT id FROM additional_fee_payments WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtCheck->execute([':id' => $id, ':sid' => $schoolId]);
+        if ($stmtCheck->fetchColumn() === false) {
+            throw new NotFoundException('Fee record not found.');
+        }
+
+        $paymentDate = date('Y-m-d');
+        $stmtUpdate = $pdo->prepare("
+            UPDATE additional_fee_payments 
+            SET status = 'Paid', payment_date = :pdate 
+            WHERE id = :id AND school_id = :sid
+        ");
+        $stmtUpdate->execute([
+            ':id' => $id,
+            ':sid' => $schoolId,
+            ':pdate' => $paymentDate
+        ]);
+
+        // Fetch updated payment detail
+        $stmtGet = $pdo->prepare("
+            SELECT afp.*, s.name as student_name, c.name as class_name, aft.name as fee_name
+            FROM additional_fee_payments afp
+            JOIN students s ON s.id = afp.student_id
+            JOIN classes c ON c.id = s.class_id
+            JOIN additional_fee_types aft ON aft.id = afp.fee_type_id
+            WHERE afp.id = :id AND afp.school_id = :sid
+            LIMIT 1
+        ");
+        $stmtGet->execute([':id' => $id, ':sid' => $schoolId]);
+        $pay = $stmtGet->fetch(PDO::FETCH_ASSOC);
+
+        if ($pay) {
+            $pay['id'] = (int)$pay['id'];
+            $pay['student_id'] = (int)$pay['student_id'];
+            $pay['fee_type_id'] = (int)$pay['fee_type_id'];
+            $pay['amount'] = (float)$pay['amount'];
+        }
+
+        return $pay ?: [];
     }
 }
 

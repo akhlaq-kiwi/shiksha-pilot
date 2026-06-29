@@ -30,6 +30,7 @@ use App\Domain\SchoolAdmin\Repositories\ClassRepository;
 use App\Domain\SchoolAdmin\Repositories\AttendanceRepository;
 use App\Domain\SchoolAdmin\Repositories\ExamRepository;
 use App\Domain\SchoolAdmin\Repositories\FeeRepository;
+use App\Domain\SchoolAdmin\Repositories\FinancialReportRepository;
 use App\Domain\SchoolAdmin\Services\SchoolAdminService;
 use App\Domain\SchoolAdmin\Controllers\SchoolAdminController;
 
@@ -198,6 +199,10 @@ class App
                 return new FeeRepository($c->get(Connection::class)->getPdo());
             },
 
+            FinancialReportRepository::class => function ($c) {
+                return new FinancialReportRepository($c->get(Connection::class)->getPdo());
+            },
+
             SchoolAdminService::class => function ($c) {
                 return new SchoolAdminService(
                     $c->get(StudentRepository::class),
@@ -206,6 +211,7 @@ class App
                     $c->get(AttendanceRepository::class),
                     $c->get(ExamRepository::class),
                     $c->get(FeeRepository::class),
+                    $c->get(FinancialReportRepository::class),
                 );
             },
 

@@ -1,0 +1,411 @@
+import React, { useState, useEffect } from 'react';
+import { FileText, Calendar, DollarSign, ArrowRight, AlertCircle, RefreshCw, BarChart2, Sparkles } from 'lucide-react';
+import { Card, CardHeader, CardTitle } from '../../../common/ui/card';
+import { Button } from '../../../common/ui/button';
+import { Input } from '../../../common/ui/input';
+import { schoolService } from '../../../common/services/schoolService';
+
+const formatCurrency = (val) => {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0
+  }).format(val);
+};
+
+const formatDateFull = (dateStr) => {
+  if (!dateStr) return '—';
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+};
+
+const formatTime12h = (dateStr) => {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  let hours = d.getHours();
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  return `${hours}:${minutes} ${ampm}`;
+};
+
+export default function FinancialReportsPage() {
+  const [reports, setReports] = useState([]);
+  const [nextSuggestedStartDate, setNextSuggestedStartDate] = useState('');
+  const [loading, setLoading] = useState(true);
+  
+  // Date params
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  
+  // Preview states
+  const [previewData, setPreviewData] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState('');
+  
+  // Action states
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  const loadReports = async () => {
+    setLoading(true);
+    try {
+      const res = await schoolService.getFinancialReports();
+      setReports(res.reports || []);
+      
+      const suggestedStart = res.next_suggested_start_date || '';
+      setNextSuggestedStartDate(suggestedStart);
+      setFromDate(suggestedStart);
+      
+      // Default toDate to today
+      const today = new Date().toISOString().split('T')[0];
+      setToDate(today);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to load financial reports history.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadReports();
+  }, []);
+
+  const handlePreview = async () => {
+    if (!fromDate || !toDate) {
+      setPreviewError('Please select both From and To dates.');
+      return;
+    }
+    if (new Date(toDate) < new Date(fromDate)) {
+      setPreviewError('To Date cannot be earlier than From Date.');
+      return;
+    }
+    
+    setPreviewError('');
+    setPreviewLoading(true);
+    setPreviewData(null);
+    
+    try {
+      const data = await schoolService.getFinancialPreview({
+        from_date: fromDate,
+        to_date: toDate
+      });
+      setPreviewData(data);
+    } catch (err) {
+      console.error(err);
+      setPreviewError(err.message || 'Failed to fetch financial preview.');
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const handleGenerateReport = async () => {
+    if (!previewData) return;
+    setSubmitting(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      await schoolService.createFinancialReport({
+        from_date: previewData.from_date,
+        to_date: previewData.to_date
+      });
+      
+      setSuccess('Financial report generated and saved successfully.');
+      setPreviewData(null);
+      await loadReports();
+      
+      setTimeout(() => setSuccess(''), 4000);
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Failed to generate financial report.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleToggleSettle = async (reportId, currentStatus) => {
+    const nextStatus = currentStatus === 'Settled' ? 'Pending' : 'Settled';
+    try {
+      await schoolService.updateFinancialReportStatus(reportId, {
+        status: nextStatus
+      });
+      
+      setReports(prev => prev.map(r => {
+        if (r.id === reportId) {
+          return { ...r, status: nextStatus };
+        }
+        return r;
+      }));
+    } catch (err) {
+      console.error(err);
+      alert('Failed to update settlement status.');
+    }
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-300">
+      
+      {/* Title Header Card */}
+      <div className="bg-surface border border-border p-6 rounded-2xl shadow-2xs">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-primary/10 text-primary rounded-xl">
+            <FileText className="h-6 w-6" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-black text-text-primary tracking-tight font-display">Financial Reports</h2>
+            <p className="text-text-secondary text-xs mt-1">Preview current profit/loss statement and generate official accounts reports for the school owner.</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        {/* Left Panel: Report Parameters */}
+        <Card className="bg-surface border border-border p-6 rounded-2xl shadow-2xs space-y-4">
+          <CardHeader className="p-0 pb-2 border-b border-border">
+            <CardTitle className="text-sm font-black text-text-primary uppercase tracking-wider">New Report Parameters</CardTitle>
+          </CardHeader>
+          
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-text-secondary uppercase">From Date</label>
+              <div className="relative">
+                <Input 
+                  type="date" 
+                  value={fromDate} 
+                  onChange={e => setFromDate(e.target.value)} 
+                  className="w-full text-sm font-semibold pr-10 cursor-pointer"
+                />
+                <Calendar className="absolute right-3 top-2.5 h-4 w-4 text-text-muted pointer-events-none" />
+              </div>
+              {nextSuggestedStartDate && (
+                <p className="text-[10px] text-teal-600 font-extrabold uppercase flex items-center gap-1 mt-1">
+                  <Sparkles className="h-3 w-3" /> Auto-suggested start date (Last ending + 1 day)
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-text-secondary uppercase">To Date</label>
+              <div className="relative">
+                <Input 
+                  type="date" 
+                  value={toDate} 
+                  onChange={e => setToDate(e.target.value)} 
+                  className="w-full text-sm font-semibold pr-10 cursor-pointer"
+                />
+                <Calendar className="absolute right-3 top-2.5 h-4 w-4 text-text-muted pointer-events-none" />
+              </div>
+            </div>
+
+            {previewError && (
+              <p className="text-xs text-red-500 font-semibold flex items-center gap-1 bg-red-500/10 p-2.5 rounded-lg border border-red-500/20">
+                <AlertCircle className="h-4 w-4 flex-shrink-0" /> {previewError}
+              </p>
+            )}
+
+            <Button 
+              onClick={handlePreview} 
+              disabled={previewLoading}
+              className="w-full py-2.5 font-bold uppercase tracking-wider text-xs flex items-center justify-center gap-2"
+            >
+              {previewLoading ? (
+                <>
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Calculating Preview...
+                </>
+              ) : (
+                'Preview Report'
+              )}
+            </Button>
+          </div>
+        </Card>
+
+        {/* Right Panel: Financial Statement Preview */}
+        <Card className="bg-surface border border-border p-6 rounded-2xl shadow-2xs flex flex-col justify-between min-h-[300px]">
+          <CardHeader className="p-0 pb-2 border-b border-border">
+            <CardTitle className="text-sm font-black text-text-primary uppercase tracking-wider">Financial Statement Preview</CardTitle>
+          </CardHeader>
+          
+          <div className="flex-1 flex flex-col justify-center py-6">
+            {!previewData && !previewLoading && (
+              <div className="flex flex-col items-center justify-center text-center text-text-muted space-y-2 py-4">
+                <div className="w-12 h-12 rounded-full bg-zinc-50 dark:bg-zinc-900/50 flex items-center justify-center border border-border">
+                  <BarChart2 className="h-6 w-6 text-text-muted" />
+                </div>
+                <p className="text-xs font-bold text-text-secondary">Select date range and click Preview Report.</p>
+                <p className="text-[10px] text-text-muted max-w-[280px]">Previews are temporary and do not record history. Report ID and permanent ledgers are generated upon official approval.</p>
+              </div>
+            )}
+
+            {previewLoading && (
+              <div className="flex flex-col items-center justify-center text-center text-text-secondary space-y-3 py-4">
+                <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-primary"></div>
+                <p className="text-xs font-bold uppercase tracking-wider">Computing transactions ledgers...</p>
+              </div>
+            )}
+
+            {previewData && (
+              <div className="space-y-4 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between text-xs py-1">
+                  <span className="font-bold text-text-secondary uppercase">Report Period</span>
+                  <span className="font-semibold text-text-primary flex items-center gap-1">
+                    {formatDateFull(previewData.from_date)} <ArrowRight className="h-3 w-3 text-text-muted" /> {formatDateFull(previewData.to_date)}
+                  </span>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4 pt-2">
+                  <div className="bg-zinc-50 dark:bg-zinc-900/30 p-3.5 border border-border rounded-xl">
+                    <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Total Fees Collected</p>
+                    <p className="text-lg font-black text-text-primary mt-1 font-sans">{formatCurrency(previewData.fees_collected)}</p>
+                  </div>
+
+                  <div className="bg-zinc-50 dark:bg-zinc-900/30 p-3.5 border border-border rounded-xl">
+                    <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Total Expenses & Salaries</p>
+                    <p className="text-lg font-black text-text-primary mt-1 font-sans text-red-500">{formatCurrency(previewData.salary_paid)}</p>
+                  </div>
+                </div>
+
+                <hr className="border-border" />
+
+                <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-zinc-50 dark:bg-zinc-900/20">
+                  <div>
+                    <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Net Financial Outcome</p>
+                    <h4 className="text-2xl font-black font-sans mt-0.5">
+                      {previewData.profit_loss >= 0 ? (
+                        <span className="text-green-600 dark:text-green-400">Profit: {formatCurrency(previewData.profit_loss)}</span>
+                      ) : (
+                        <span className="text-red-500">Loss: {formatCurrency(Math.abs(previewData.profit_loss))}</span>
+                      )}
+                    </h4>
+                  </div>
+                  
+                  <div className={`p-2.5 rounded-full ${previewData.profit_loss >= 0 ? 'bg-green-500/10 text-green-600' : 'bg-red-500/10 text-red-500'}`}>
+                    <DollarSign className="h-5 w-5" />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {previewData && (
+            <Button 
+              onClick={handleGenerateReport} 
+              disabled={submitting}
+              className="w-full py-2.5 font-black uppercase tracking-wider text-xs bg-teal-600 hover:bg-teal-700 text-white shadow-sm flex items-center justify-center gap-1.5"
+            >
+              {submitting ? 'Generating Report...' : 'Generate Report'}
+            </Button>
+          )}
+        </Card>
+      </div>
+
+      {/* Success / Error notification */}
+      {error && (
+        <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl text-xs font-semibold">
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="p-3 bg-green-500/10 border border-green-500/20 text-green-600 rounded-xl text-xs font-semibold">
+          {success}
+        </div>
+      )}
+
+      {/* Bottom Panel: Financial Statements History */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-black text-text-primary uppercase tracking-wider">Financial Statements History</h3>
+          <span className="bg-zinc-100 text-text-secondary dark:bg-zinc-800 text-[10px] font-black px-2 py-0.5 rounded-md uppercase border border-border">
+            {reports.length} Reports
+          </span>
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+          </div>
+        ) : reports.length === 0 ? (
+          <Card className="p-12 text-center text-text-muted text-xs shadow-xs border border-border">
+            No financial statement history recorded. Create your first report above.
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {reports.map((r) => {
+              const isProfit = r.profit_loss >= 0;
+              return (
+                <Card key={r.id} className="bg-surface border border-border p-5 rounded-2xl shadow-2xs space-y-4 relative hover:shadow-xs transition-shadow">
+                  
+                  {/* Card Header ID & Settle Action */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-black text-text-primary font-mono">{r.report_id}</span>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[9px] font-black uppercase border ${
+                        r.status === 'Settled'
+                          ? 'bg-green-500/10 text-green-600 border-green-500/20'
+                          : 'bg-red-500/10 text-red-600 border-red-500/20'
+                      }`}>
+                        {r.status}
+                      </span>
+                    </div>
+
+                    <button
+                      onClick={() => handleToggleSettle(r.id, r.status)}
+                      className="text-[10px] font-extrabold uppercase tracking-tight text-primary hover:underline"
+                    >
+                      {r.status === 'Settled' ? 'Mark Pending' : 'Mark Settled'}
+                    </button>
+                  </div>
+
+                  {/* Period dates */}
+                  <div className="space-y-1">
+                    <p className="text-[9px] font-black text-text-muted uppercase tracking-wider">Report Period</p>
+                    <p className="text-xs font-semibold text-text-primary">
+                      {formatDateFull(r.from_date)} ➔ {formatDateFull(r.to_date)}
+                    </p>
+                  </div>
+
+                  <hr className="border-border" />
+
+                  {/* Amounts */}
+                  <div className="grid grid-cols-2 gap-4 text-xs">
+                    <div>
+                      <p className="text-[9px] font-black text-text-muted uppercase tracking-wider">Total Revenue</p>
+                      <p className="text-sm font-bold text-text-primary mt-0.5 font-sans">{formatCurrency(r.fees_collected)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-black text-text-muted uppercase tracking-wider font-sans">Salaries & Expenses</p>
+                      <p className="text-sm font-bold text-text-primary mt-0.5 font-sans text-red-500">{formatCurrency(r.salary_paid)}</p>
+                    </div>
+                  </div>
+
+                  {/* Financial Result outcome */}
+                  <div className={`p-3 rounded-xl border ${isProfit ? 'bg-green-500/5 border-green-500/10' : 'bg-red-500/5 border-red-500/10'}`}>
+                    <p className="text-[9px] font-black text-text-muted uppercase tracking-wider">Outcome</p>
+                    <p className={`text-base font-black font-sans mt-0.5 ${isProfit ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
+                      {isProfit ? `Profit: ${formatCurrency(r.profit_loss)}` : `Loss: ${formatCurrency(Math.abs(r.profit_loss))}`}
+                    </p>
+                  </div>
+
+                  {/* Generation details */}
+                  <div className="flex items-center justify-between text-[9px] text-text-muted border-t border-border pt-3">
+                    <span className="font-bold uppercase">Generated</span>
+                    <span className="font-mono">{formatDateFull(r.created_at)} at {formatTime12h(r.created_at)}</span>
+                  </div>
+
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+    </div>
+  );
+}

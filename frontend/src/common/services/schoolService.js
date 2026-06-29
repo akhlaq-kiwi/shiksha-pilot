@@ -41,6 +41,10 @@ export const schoolService = {
     return apiClient.get('/api/school/staff');
   },
 
+  getStaffDetails(id) {
+    return apiClient.get(`/api/school/staff/${id}`);
+  },
+
   createStaff(staffData) {
     return apiClient.post('/api/school/staff', staffData);
   },
@@ -50,7 +54,7 @@ export const schoolService = {
   },
 
   getAvailableStaff() {
-    return this.getStaff().then(list => (list || []).filter(s => (s.assigned_periods || 0) < (s.max_periods || 8)));
+    return this.getStaff().then(list => (list || []).filter(s => s.status === 'ACTIVE' && (s.assigned_periods || 0) < (s.max_periods || 8)));
   },
 
   getClasses() {
@@ -159,6 +163,46 @@ export const schoolService = {
 
   revertStaffSalary(id) {
     return apiClient.delete(`/api/school/staff-payments/${id}`);
+  },
+
+  getFinancialReports() {
+    return apiClient.get('/api/school/financial-reports');
+  },
+
+  getFinancialPreview(params) {
+    return apiClient.get(buildUrl('/api/school/financial-reports/preview', params));
+  },
+
+  createFinancialReport(data) {
+    return apiClient.post('/api/school/financial-reports', data);
+  },
+
+  updateFinancialReportStatus(id, data) {
+    return apiClient.put(`/api/school/financial-reports/${id}/settle`, data);
+  },
+
+  getSchoolExpenses() {
+    return apiClient.get('/api/school/expenses');
+  },
+
+  createSchoolExpense(data) {
+    return apiClient.post('/api/school/expenses', data);
+  },
+
+  getAdditionalFeeTypes() {
+    return apiClient.get('/api/school/additional-fees/types');
+  },
+
+  createAdditionalFeeType(data) {
+    return apiClient.post('/api/school/additional-fees/types', data);
+  },
+
+  getAdditionalFeePayments() {
+    return apiClient.get('/api/school/additional-fees/payments');
+  },
+
+  collectAdditionalFeePayment(id) {
+    return apiClient.post(`/api/school/additional-fees/payments/${id}/pay`);
   }
 };
 

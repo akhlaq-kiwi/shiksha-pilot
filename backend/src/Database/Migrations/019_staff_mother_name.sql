@@ -1,0 +1,1 @@
+ALTER TABLE staff ADD COLUMN mother_name VARCHAR(100) NULL;

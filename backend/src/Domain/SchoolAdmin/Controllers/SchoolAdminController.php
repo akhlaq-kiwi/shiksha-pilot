@@ -142,6 +142,17 @@ class SchoolAdminController extends BaseController
         return $this->success($response, $member, 'Staff member updated');
     }
 
+    public function getStaffDetails(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int)$args['id'];
+        $member = $this->service->getStaffDetails($user, $id);
+
+        return $this->success($response, $member);
+    }
+
     // -------------------------------------------------------------------------
     // Classes
     // -------------------------------------------------------------------------
@@ -481,6 +492,116 @@ class SchoolAdminController extends BaseController
         $data = $this->service->revertStaffSalary($user, $id);
 
         return $this->success($response, $data, 'Staff salary payment reverted');
+    }
+
+    public function getFinancialPreview(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $params = $request->getQueryParams();
+        $from = $params['from_date'] ?? '';
+        $to = $params['to_date'] ?? '';
+
+        $data = $this->service->getFinancialPreview($user, $from, $to);
+
+        return $this->success($response, $data);
+    }
+
+    public function getFinancialReports(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $data = $this->service->getFinancialReports($user);
+
+        return $this->success($response, $data);
+    }
+
+    public function createFinancialReport(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body = RequestParser::body($request);
+        $data = $this->service->createFinancialReport($user, $body);
+
+        return $this->success($response, $data, 'Financial report generated successfully', 201);
+    }
+
+    public function updateFinancialReportStatus(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int)$args['id'];
+        $body = RequestParser::body($request);
+        $data = $this->service->updateFinancialReportStatus($user, $id, $body);
+
+        return $this->success($response, $data, 'Financial report status updated');
+    }
+
+    public function getSchoolExpenses(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $data = $this->service->getSchoolExpenses($user);
+
+        return $this->success($response, $data);
+    }
+
+    public function createSchoolExpense(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body = RequestParser::body($request);
+        $data = $this->service->createSchoolExpense($user, $body);
+
+        return $this->success($response, $data, 'School expense recorded successfully', 201);
+    }
+
+    public function getAdditionalFeeTypes(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $data = $this->service->getAdditionalFeeTypes($user);
+
+        return $this->success($response, $data);
+    }
+
+    public function createAdditionalFeeType(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body = RequestParser::body($request);
+        $data = $this->service->createAdditionalFeeType($user, $body);
+
+        return $this->success($response, $data, 'Additional fee type created and assigned', 201);
+    }
+
+    public function getAdditionalFeePayments(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $data = $this->service->getAdditionalFeePayments($user);
+
+        return $this->success($response, $data);
+    }
+
+    public function collectAdditionalFeePayment(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int)$args['id'];
+        $data = $this->service->collectAdditionalFeePayment($user, $id);
+
+        return $this->success($response, $data, 'Additional fee payment collected successfully');
     }
 }
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, School, BookOpen, Users, UserCog, Clock,
-  ClipboardCheck, FileText, DollarSign, BarChart2, Shield, Settings, RefreshCw
+  ClipboardCheck, FileText, DollarSign, BarChart2, Shield, Settings, RefreshCw, Landmark
 } from 'lucide-react';
 
 import DashboardPage from './pages/DashboardPage';
@@ -15,6 +15,8 @@ import AttendancePage from './pages/AttendancePage';
 import ExamsPage from './pages/ExamsPage';
 import FinancePage from './pages/FinancePage';
 import ReportsPage from './pages/ReportsPage';
+import FinancialReportsPage from './pages/FinancialReportsPage';
+import FinanceManagementPage from './pages/FinanceManagementPage';
 import AuditsSettingsPage from './pages/AuditsSettingsPage';
 import SecurityPage from './pages/SecurityPage';
 
@@ -37,6 +39,8 @@ const NAV_ITEMS = [
   { path: '/school-admin/finance',    label: 'Finance', icon: DollarSign },
   { path: '/school-admin/reports',    label: 'Reports', icon: BarChart2 },
   { path: '/school-admin/audits-settings', label: 'Audits & Settings', icon: Settings },
+  { path: '/school-admin/financial-reports', label: 'Financial Reports', icon: FileText },
+  { path: '/school-admin/finance-management', label: 'Finance Management', icon: Landmark },
   { path: '/school-admin/security',   label: 'Security', icon: Shield },
 ];
 
@@ -158,6 +162,8 @@ export default function SchoolAdminPortal() {
             <Route path="finance" element={<FinancePage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="audits-settings" element={<AuditsSettingsPage />} />
+            <Route path="financial-reports" element={<FinancialReportsPage />} />
+            <Route path="finance-management" element={<FinanceManagementPage />} />
             <Route path="security" element={<SecurityPage />} />
             <Route path="*" element={<Navigate to="/school-admin" replace />} />
           </Routes>

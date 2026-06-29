@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Edit, User, UserCog, Upload, AlertCircle, ArrowLeft, Check } from 'lucide-react';
+import { Plus, Search, Edit, User, UserCog, Upload, AlertCircle, ArrowLeft, Check, Trash2, FileText, Download, Printer } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
 import { Input } from '../../../common/ui/input';
 import { Select } from '../../../common/ui/select';
 import { Dialog } from '../../../common/ui/dialog';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
 import { schoolService } from '../../../common/services/schoolService';
+import { SearchableSelect, INDIAN_STATES_AND_CITIES } from '../../../common/ui/SearchableSelect';
+import html2pdf from 'html2pdf.js';
 
 // Self-healing avatar image component to handle loading errors gracefully
 const TeacherAvatar = ({ src, name, updatedAt }) => {
@@ -36,6 +39,111 @@ const TeacherAvatar = ({ src, name, updatedAt }) => {
   );
 };
 
+const DOCUMENT_CATEGORIES = [
+  "Aadhaar Card",
+  "PAN Card",
+  "Qualification Certificates",
+  "Degree Certificates",
+  "Experience Certificates",
+  "Resume / CV",
+  "Appointment Letter",
+  "Identity Proof",
+  "Address Proof",
+  "Other Documents"
+];
+
+const formatBytes = (bytes) => {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
+
+const formatDateTime = (dateStr) => {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return '—';
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = months[d.getMonth()];
+  const year = d.getFullYear();
+  return `${day}-${month}-${year}`;
+};
+
+const formatDateFull = (dateStr) => {
+  if (!dateStr) return '—';
+  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  const day = d.getDate();
+  const month = months[d.getMonth()];
+  const year = d.getFullYear();
+  return `${day} ${month} ${year}`;
+};
+
+const calculateExperience = (joiningDate, exitDate) => {
+  if (!joiningDate || !exitDate) return '';
+  const start = new Date(joiningDate);
+  const end = new Date(exitDate);
+  if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) return '';
+
+  let years = end.getFullYear() - start.getFullYear();
+  let months = end.getMonth() - start.getMonth();
+  let days = end.getDate() - start.getDate();
+
+  if (days < 0) {
+    const prevMonth = new Date(end.getFullYear(), end.getMonth(), 0);
+    days += prevMonth.getDate();
+    months--;
+  }
+  if (months < 0) {
+    months += 12;
+    years--;
+  }
+
+  const parts = [];
+  if (years > 0) parts.push(`${years} Year${years > 1 ? 's' : ''}`);
+  if (months > 0) parts.push(`${months} Month${months > 1 ? 's' : ''}`);
+  if (days > 0) parts.push(`${days} Day${days > 1 ? 's' : ''}`);
+
+  return parts.join(' ') || '0 Days';
+};
+
+const printStyles = `
+  @media print {
+    body * {
+      visibility: hidden !important;
+    }
+    #experience-letter-print-area, #experience-letter-print-area * {
+      visibility: visible !important;
+    }
+    #experience-letter-print-area {
+      position: absolute !important;
+      left: 0 !important;
+      top: 0 !important;
+      width: 210mm !important;
+      height: 297mm !important;
+      margin: 0 !important;
+      padding: 20mm !important;
+      box-shadow: none !important;
+      background: white !important;
+      color: black !important;
+      font-size: 11pt !important;
+      line-height: 1.6 !important;
+    }
+    .no-print-section {
+      display: none !important;
+    }
+  }
+`;
+
 export default function StaffPage() {
   const [view, setView] = useState('list'); // 'list', 'details'
   const [selectedTeacherId, setSelectedTeacherId] = useState(null);
@@ -45,7 +153,15 @@ export default function StaffPage() {
   const [staffSearch, setStaffSearch] = useState('');
   const [selectedDeptFilter, setSelectedDeptFilter] = useState('');
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
+  const [isExpLetterOpen, setIsExpLetterOpen] = useState(false);
   
+  // School profile metadata
+  const [schoolProfile, setSchoolProfile] = useState(null);
+
+  // Full detailed state of selected teacher
+  const [teacherDetails, setTeacherDetails] = useState(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+
   const [newStaff, setNewStaff] = useState({ 
     id: null,
     name: '', 
@@ -54,13 +170,33 @@ export default function StaffPage() {
     email: '', 
     phone: '',
     photo_path: '',
-    assigned_periods: 0,
-    max_periods: 8
+    father_name: '',
+    mother_name: '',
+    emergency_phone: '',
+    joining_date: '',
+    exit_date: '',
+    parent_occupation: '',
+    current_address_line: '',
+    current_city: '',
+    current_state: '',
+    current_country: 'India',
+    current_pin_code: '',
+    permanent_address_line: '',
+    permanent_city: '',
+    permanent_state: '',
+    permanent_country: 'India',
+    permanent_pin_code: '',
+    same_as_current: 0,
+    documents: []
   });
   
+  const [docCategory, setDocCategory] = useState('Aadhaar Card');
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [uploadError, setUploadError] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [formErrors, setFormErrors] = useState({});
 
   const loadStaff = async () => {
     setLoading(true);
@@ -76,9 +212,37 @@ export default function StaffPage() {
     }
   };
 
+  const loadTeacherDetails = async (id) => {
+    setLoadingDetails(true);
+    try {
+      const data = await schoolService.getStaffDetails(id);
+      setTeacherDetails(data || null);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to load teacher profile details.');
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
+
   useEffect(() => {
     loadStaff();
+    const fetchSchool = async () => {
+      try {
+        const data = await schoolService.getSchoolProfile();
+        setSchoolProfile(data || null);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchSchool();
   }, []);
+
+  useEffect(() => {
+    if (selectedTeacherId && view === 'details') {
+      loadTeacherDetails(selectedTeacherId);
+    }
+  }, [selectedTeacherId, view]);
 
   if (loading) {
     return (
@@ -102,17 +266,22 @@ export default function StaffPage() {
     return matchesSearch && matchesDept;
   });
 
-  // Sort by assigned periods descending (highest workload first)
-  const sortedStaff = [...filteredStaff].sort((a, b) => {
-    const periodsA = a.assigned_periods || 0;
-    const periodsB = b.assigned_periods || 0;
-    return periodsB - periodsA;
-  });
+  const sortedStaff = [...filteredStaff].sort((a, b) => a.name.localeCompare(b.name));
 
   const handlePhotoUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    
+    if (file.size > 5 * 1024 * 1024) {
+      setFormErrors(prev => ({ ...prev, photo: "Maximum photo size is 5 MB." }));
+      return;
+    }
+    const allowed = ['jpg', 'jpeg', 'png'];
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!allowed.includes(ext)) {
+      setFormErrors(prev => ({ ...prev, photo: "Only JPG, JPEG, and PNG formats are supported." }));
+      return;
+    }
+
     const formData = new FormData();
     formData.append('file', file);
     
@@ -120,60 +289,245 @@ export default function StaffPage() {
       const res = await schoolService.uploadDocument(formData);
       if (res && res.url) {
         setNewStaff(prev => ({ ...prev, photo_path: res.url }));
-        setSuccess('Photo uploaded successfully.');
-        setTimeout(() => setSuccess(''), 2000);
+        setFormErrors(prev => {
+          const next = { ...prev };
+          delete next.photo;
+          return next;
+        });
       }
     } catch (err) {
       console.error(err);
-      setError('Failed to upload photo.');
+      setFormErrors(prev => ({ ...prev, photo: "Failed to upload photo." }));
     }
   };
 
+  const handleRemovePhoto = () => {
+    setNewStaff(prev => ({ ...prev, photo_path: '' }));
+  };
+
+  const handleDocUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      alert("Maximum file size is 10 MB.");
+      return;
+    }
+    const allowed = ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'];
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!allowed.includes(ext)) {
+      alert("This file type is not supported. Supported: PDF, JPG, PNG, DOC, DOCX.");
+      return;
+    }
+
+    setUploadingDoc(true);
+    setUploadError('');
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+      const res = await schoolService.uploadDocument(formData);
+      if (res && res.url) {
+        setNewStaff(prev => ({
+          ...prev,
+          documents: [
+            ...prev.documents,
+            {
+              category: docCategory || 'Other Documents',
+              file_name: file.name,
+              file_path: res.url,
+              file_size: file.size,
+              upload_date: new Date().toISOString()
+            }
+          ]
+        }));
+      } else {
+        setUploadError("Document upload failed. Please try again.");
+      }
+    } catch (err) {
+      console.error(err);
+      setUploadError("Document upload failed. Please try again.");
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
+  const handleRemoveDoc = (index) => {
+    setNewStaff(prev => ({
+      ...prev,
+      documents: prev.documents.filter((_, idx) => idx !== index)
+    }));
+  };
+
+  const handleCheckboxChange = (e) => {
+    const { checked } = e.target;
+    const same_as_current = checked ? 1 : 0;
+    setNewStaff(prev => ({
+      ...prev,
+      same_as_current,
+      permanent_address_line: '',
+      permanent_city: '',
+      permanent_state: '',
+      permanent_country: 'India',
+      permanent_pin_code: ''
+    }));
+  };
+
+  const handleTextChange = (e) => {
+    const { name, value } = e.target;
+    setNewStaff(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleStateChange = (stateType, val) => {
+    setNewStaff(prev => {
+      const next = { ...prev };
+      if (stateType === 'current') {
+        next.current_state = val;
+        next.current_city = '';
+      } else {
+        next.permanent_state = val;
+        next.permanent_city = '';
+      }
+      return next;
+    });
+  };
+
+  const handleCityChange = (cityType, val) => {
+    setNewStaff(prev => {
+      const next = { ...prev };
+      if (cityType === 'current') {
+        next.current_city = val;
+      } else {
+        next.permanent_city = val;
+      }
+      return next;
+    });
+  };
+
+  const validateForm = () => {
+    const errors = {};
+    if (!newStaff.name || newStaff.name.trim().length < 3 || newStaff.name.trim().length > 100) {
+      errors.name = "Name must be between 3 and 100 characters.";
+    }
+    if (!newStaff.father_name || newStaff.father_name.trim().length < 3) {
+      errors.father_name = "Father name must be at least 3 characters.";
+    }
+    if (!newStaff.mother_name || newStaff.mother_name.trim().length < 3 || newStaff.mother_name.trim().length > 100) {
+      errors.mother_name = "Mother name must be between 3 and 100 characters.";
+    }
+    if (!newStaff.phone || !/^[0-9]{10}$/.test(newStaff.phone.trim())) {
+      errors.phone = "Contact number must be exactly 10 digits.";
+    }
+    if (!newStaff.emergency_phone || !/^[0-9]{10}$/.test(newStaff.emergency_phone.trim())) {
+      errors.emergency_phone = "Emergency contact number must be exactly 10 digits.";
+    }
+    if (newStaff.emergency_phone.trim() === newStaff.phone.trim()) {
+      errors.emergency_phone = "Emergency contact number must be different from contact number.";
+    }
+    if (!newStaff.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newStaff.email.trim())) {
+      errors.email = "Invalid email address format.";
+    }
+    if (!newStaff.joining_date) {
+      errors.joining_date = "Joining date is required.";
+    } else {
+      const joinVal = new Date(newStaff.joining_date);
+      const today = new Date();
+      today.setHours(23, 59, 59, 999);
+      if (joinVal > today) {
+        errors.joining_date = "Joining date cannot be a future date.";
+      }
+    }
+    if (newStaff.exit_date) {
+      const exitVal = new Date(newStaff.exit_date);
+      const joinVal = new Date(newStaff.joining_date);
+      if (exitVal < joinVal) {
+        errors.exit_date = "Exit date cannot be earlier than joining date.";
+      }
+    }
+
+    // Address
+    if (!newStaff.current_address_line || newStaff.current_address_line.trim() === '') {
+      errors.current_address_line = "Current address is required.";
+    }
+    if (!newStaff.current_state) {
+      errors.current_state = "Current state is required.";
+    }
+    if (!newStaff.current_city) {
+      errors.current_city = "Current city is required.";
+    }
+    if (!newStaff.current_pin_code || !/^\d{6}$/.test(newStaff.current_pin_code.trim())) {
+      errors.current_pin_code = "PIN Code must be exactly 6 digits.";
+    }
+
+    if (newStaff.same_as_current === 0) {
+      if (!newStaff.permanent_address_line || newStaff.permanent_address_line.trim() === '') {
+        errors.permanent_address_line = "Permanent address is required.";
+      }
+      if (!newStaff.permanent_state) {
+        errors.permanent_state = "Permanent state is required.";
+      }
+      if (!newStaff.permanent_city) {
+        errors.permanent_city = "Permanent city is required.";
+      }
+      if (!newStaff.permanent_pin_code || !/^\d{6}$/.test(newStaff.permanent_pin_code.trim())) {
+        errors.permanent_pin_code = "PIN Code must be exactly 6 digits.";
+      }
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleAddStaff = async (e) => {
-    e.preventDefault();
-    if (!newStaff.name) return;
+    if (e) e.preventDefault();
+    if (!validateForm()) return;
     setSubmitting(true);
     setError('');
-    try {
-      const payload = {
-        name: newStaff.name,
-        role: newStaff.role.toUpperCase(),
-        department: newStaff.department,
-        email: newStaff.email || `${newStaff.name.toLowerCase().replace(/\s+/g, '')}@shiksha.edu`,
-        phone: newStaff.phone || null,
-        photo_path: newStaff.photo_path || null,
-        assigned_periods: parseInt(newStaff.assigned_periods, 10) || 0,
-        max_periods: parseInt(newStaff.max_periods, 10) || 8,
-        status: 'ACTIVE',
-      };
+    
+    const payload = {
+      name: newStaff.name.trim(),
+      role: 'Teacher',
+      department: newStaff.department,
+      email: newStaff.email.trim(),
+      phone: newStaff.phone.trim(),
+      photo_path: newStaff.photo_path || null,
+      father_name: newStaff.father_name.trim(),
+      mother_name: newStaff.mother_name.trim(),
+      parent_occupation: newStaff.parent_occupation.trim(),
+      emergency_phone: newStaff.emergency_phone.trim(),
+      joining_date: newStaff.joining_date,
+      exit_date: newStaff.exit_date || null,
+      current_address_line: newStaff.current_address_line.trim(),
+      current_city: newStaff.current_city,
+      current_state: newStaff.current_state,
+      current_country: newStaff.current_country,
+      current_pin_code: newStaff.current_pin_code.trim(),
+      permanent_address_line: newStaff.same_as_current === 1 ? newStaff.current_address_line.trim() : newStaff.permanent_address_line.trim(),
+      permanent_city: newStaff.same_as_current === 1 ? newStaff.current_city : newStaff.permanent_city,
+      permanent_state: newStaff.same_as_current === 1 ? newStaff.current_state : newStaff.permanent_state,
+      permanent_country: newStaff.same_as_current === 1 ? newStaff.current_country : newStaff.permanent_country,
+      permanent_pin_code: newStaff.same_as_current === 1 ? newStaff.current_pin_code.trim() : newStaff.permanent_pin_code.trim(),
+      same_as_current: newStaff.same_as_current,
+      documents: newStaff.documents
+    };
 
+    try {
       if (newStaff.id) {
         // Edit Mode
-        await schoolService.updateStaff(newStaff.id, payload);
+        const updated = await schoolService.updateStaff(newStaff.id, payload);
         setSuccess('Teacher profile updated successfully.');
+        setTeacherDetails(updated);
       } else {
         // Create Mode
         const employee_id = `EMP-${Date.now().toString().slice(-4)}`;
         await schoolService.createStaff({
           ...payload,
-          employee_id,
-          joining_date: new Date().toISOString().split('T')[0]
+          employee_id
         });
-        setSuccess('Teacher enrolled successfully.');
+        setSuccess('Teacher added successfully.');
       }
       
       setIsAddStaffOpen(false);
-      setNewStaff({ 
-        id: null,
-        name: '', 
-        role: 'Teacher', 
-        department: 'Mathematics', 
-        email: '', 
-        phone: '',
-        photo_path: '',
-        assigned_periods: 0,
-        max_periods: 8
-      });
       await loadStaff();
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
@@ -184,20 +538,77 @@ export default function StaffPage() {
     }
   };
 
+  const handleEditClick = (t) => {
+    setNewStaff({
+      id: t.id,
+      name: t.name,
+      role: t.role,
+      department: t.department || 'Mathematics',
+      email: t.email || '',
+      phone: t.phone || '',
+      photo_path: t.photo_path || '',
+      father_name: t.father_name || '',
+      mother_name: t.mother_name || '',
+      parent_occupation: t.parent_occupation || '',
+      emergency_phone: t.emergency_phone || '',
+      joining_date: t.joining_date || '',
+      exit_date: t.exit_date || '',
+      current_address_line: t.current_address_line || '',
+      current_city: t.current_city || '',
+      current_state: t.current_state || '',
+      current_country: t.current_country || 'India',
+      current_pin_code: t.current_pin_code || '',
+      permanent_address_line: t.permanent_address_line || '',
+      permanent_city: t.permanent_city || '',
+      permanent_state: t.permanent_state || '',
+      permanent_country: t.permanent_country || 'India',
+      permanent_pin_code: t.permanent_pin_code || '',
+      same_as_current: t.same_as_current ? 1 : 0,
+      documents: t.documents || []
+    });
+    setFormErrors({});
+    setUploadError('');
+    setIsAddStaffOpen(true);
+  };
+
+  const handleDownloadPDF = () => {
+    const element = document.getElementById('experience-letter-print-area');
+    if (!element) return;
+    
+    const opt = {
+      margin: 15,
+      filename: `Experience_Letter_${teacherDetails?.name || 'Teacher'}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+    
+    html2pdf().from(element).set(opt).save();
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       
       {/* Redesigned Details View */}
       {view === 'details' && (() => {
-        const t = staff.find(x => x.id === selectedTeacherId);
-        if (!t) {
-          setView('list');
-          return null;
+        const t = teacherDetails;
+        if (loadingDetails) {
+          return (
+            <div className="flex items-center justify-center min-h-[300px]">
+              <div className="flex flex-col items-center gap-3">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                <p className="text-xs font-semibold text-text-secondary uppercase">Loading details...</p>
+              </div>
+            </div>
+          );
         }
-        
-        const assignedPeriods = t.assigned_periods || 0;
-        const maxPeriods = t.max_periods || 8;
-        const isOccupied = assignedPeriods >= maxPeriods;
+        if (!t) {
+          return (
+            <div className="p-4 bg-red-500/10 text-red-600 rounded-lg text-xs font-bold text-center">
+              Failed to load profile. <Button variant="secondary" className="ml-2 h-7 font-bold text-xs" onClick={() => setView('list')}>Back to List</Button>
+            </div>
+          );
+        }
         
         return (
           <div className="space-y-6 animate-in fade-in duration-300">
@@ -212,78 +623,170 @@ export default function StaffPage() {
                 </button>
                 <h2 className="text-2xl font-black text-text-primary tracking-tight font-display">Teacher Profile</h2>
               </div>
-              <Button variant="outline" className="flex items-center gap-2 font-bold" onClick={() => {
-                setNewStaff({
-                  id: t.id,
-                  name: t.name,
-                  role: t.role,
-                  department: t.department,
-                  email: t.email,
-                  phone: t.phone,
-                  photo_path: t.photo_path || '',
-                  assigned_periods: t.assigned_periods || 0,
-                  max_periods: t.max_periods || 8
-                });
-                setIsAddStaffOpen(true);
-              }}>
-                <Edit className="h-4 w-4" /> Edit Profile
-              </Button>
+              <div className="flex items-center gap-3">
+                {t.exit_date && (
+                  <Button 
+                    onClick={() => setIsExpLetterOpen(true)}
+                    className="flex items-center gap-2 font-black bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
+                  >
+                    <FileText className="h-4 w-4" /> Experience Letter
+                  </Button>
+                )}
+                <Button variant="outline" className="flex items-center gap-2 font-bold" onClick={() => handleEditClick(t)}>
+                  <Edit className="h-4 w-4" /> Edit Profile
+                </Button>
+              </div>
             </div>
 
             {/* Profile Info Panel */}
-            <Card className="p-6 bg-surface border border-border rounded-2xl shadow-xs">
-              <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
-                {/* Photo / Avatar */}
-                <div className="w-24 h-24 rounded-full border border-border bg-zinc-50 dark:bg-zinc-900/50 flex items-center justify-center overflow-hidden shadow-2xs flex-shrink-0">
-                  <TeacherAvatar src={t.photo_path} name={t.name} updatedAt={t.updated_at} />
-                </div>
-
-                <div className="flex-1 space-y-4 text-center md:text-left">
-                  <div>
-                    <h3 className="text-2xl font-black text-text-primary tracking-tight font-display">{t.name}</h3>
-                    <p className="text-xs text-text-muted mt-1 font-bold uppercase tracking-wider">Employee ID: <span className="font-mono text-text-primary font-extrabold">{t.employee_id || '-'}</span></p>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              
+              {/* Left Column Card */}
+              <Card className="lg:col-span-1 p-6 bg-surface border border-border rounded-2xl shadow-xs space-y-6">
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-28 h-28 rounded-full border-2 border-primary/20 bg-zinc-50 dark:bg-zinc-900/50 flex items-center justify-center overflow-hidden shadow-sm flex-shrink-0 relative">
+                    <TeacherAvatar src={t.photo_path} name={t.name} updatedAt={t.updated_at} />
                   </div>
+                  
+                  <h3 className="text-xl font-black text-text-primary tracking-tight font-display mt-4">{t.name}</h3>
+                  <p className="text-xs text-text-muted mt-1.5 font-bold uppercase tracking-wider">Employee ID: <span className="font-mono text-text-primary font-extrabold">{t.employee_id || '-'}</span></p>
 
-                  <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
-                    <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-black uppercase border ${
-                      isOccupied 
-                        ? 'bg-red-500/10 text-red-600 border-red-500/20' 
-                        : 'bg-green-500/10 text-green-600 border-green-500/20'
+                  <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase border ${
+                      t.status === 'ACTIVE'
+                        ? 'bg-green-500/10 text-green-600 border-green-500/20'
+                        : 'bg-red-500/10 text-red-600 border-red-500/20'
                     }`}>
-                      {isOccupied ? 'Occupied' : 'Available'}
+                      {t.status}
                     </span>
-                    <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold bg-zinc-100 text-text-secondary dark:bg-zinc-800 uppercase">
-                      Assigned {assignedPeriods}/{maxPeriods} Periods
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-zinc-100 text-text-secondary dark:bg-zinc-800 uppercase">
+                      {t.department || 'General'}
                     </span>
                   </div>
                 </div>
-              </div>
 
-              <hr className="border-border my-6" />
+                <hr className="border-border" />
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-xs">
-                <div>
-                  <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Role</p>
-                  <p className="text-sm font-semibold text-text-primary mt-0.5">{t.role}</p>
+                <div className="space-y-4 text-xs">
+                  <div>
+                    <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Father's Name</p>
+                    <p className="text-sm font-semibold text-text-primary mt-0.5">{t.father_name || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Mother's Name</p>
+                    <p className="text-sm font-semibold text-text-primary mt-0.5">{t.mother_name || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Parent Occupation</p>
+                    <p className="text-sm font-semibold text-text-primary mt-0.5">{t.parent_occupation || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Contact Phone</p>
+                    <p className="text-sm font-semibold text-text-primary mt-0.5">{t.phone || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Emergency Contact</p>
+                    <p className="text-sm font-semibold text-text-primary mt-0.5">{t.emergency_phone || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Email Address</p>
+                    <p className="text-sm font-semibold text-text-primary mt-0.5 break-all">{t.email || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Joining Date</p>
+                    <p className="text-sm font-semibold text-text-primary mt-0.5">{formatDate(t.joining_date)}</p>
+                  </div>
+                  {t.exit_date && (
+                    <div>
+                      <p className="text-[10px] font-black text-red-500 uppercase tracking-wider">Exit Date</p>
+                      <p className="text-sm font-semibold text-text-primary mt-0.5">{formatDate(t.exit_date)}</p>
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Department</p>
-                  <p className="text-sm font-semibold text-text-primary mt-0.5">{t.department || '—'}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Joining Date</p>
-                  <p className="text-sm font-semibold text-text-primary mt-0.5">{t.joining_date || t.joining || '—'}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Email Address</p>
-                  <p className="text-sm font-semibold text-text-primary mt-0.5">{t.email || '—'}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Contact Phone</p>
-                  <p className="text-sm font-semibold text-text-primary mt-0.5">{t.phone || '—'}</p>
-                </div>
+              </Card>
+
+              {/* Right Column details */}
+              <div className="lg:col-span-2 space-y-6">
+                
+                {/* Address details */}
+                <Card className="p-6 bg-surface border border-border rounded-2xl shadow-xs">
+                  <h3 className="text-sm font-extrabold text-text-primary uppercase tracking-wider mb-4 border-b border-border pb-2">Address Details</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+                    <div className="space-y-2">
+                      <h4 className="font-bold text-text-secondary uppercase text-[10px] tracking-wider">Current Address</h4>
+                      <p className="text-sm text-text-primary leading-relaxed">
+                        {t.current_address_line || '—'}<br />
+                        {t.current_city ? `${t.current_city}, ` : ''}{t.current_state || ''}<br />
+                        {t.current_country || 'India'} - {t.current_pin_code || ''}
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <h4 className="font-bold text-text-secondary uppercase text-[10px] tracking-wider">Permanent Address</h4>
+                      {t.same_as_current === 1 ? (
+                        <p className="text-xs text-text-muted italic">Same as Current Address</p>
+                      ) : (
+                        <p className="text-sm text-text-primary leading-relaxed">
+                          {t.permanent_address_line || '—'}<br />
+                          {t.permanent_city ? `${t.permanent_city}, ` : ''}{t.permanent_state || ''}<br />
+                          {t.permanent_country || 'India'} - {t.permanent_pin_code || ''}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Documents details */}
+                <Card className="p-6 bg-surface border border-border rounded-2xl shadow-xs">
+                  <h3 className="text-sm font-extrabold text-text-primary uppercase tracking-wider mb-4 border-b border-border pb-2">Attached Documents</h3>
+                  
+                  {(!t.documents || t.documents.length === 0) ? (
+                    <p className="text-xs text-text-muted italic py-4">No documents uploaded.</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-xs uppercase font-extrabold text-text-secondary">Document</TableHead>
+                            <TableHead className="text-xs uppercase font-extrabold text-text-secondary">Upload Date</TableHead>
+                            <TableHead className="text-xs uppercase font-extrabold text-text-secondary">Size</TableHead>
+                            <TableHead className="text-xs uppercase font-extrabold text-text-secondary">View</TableHead>
+                            <TableHead className="text-right text-xs uppercase font-extrabold text-text-secondary">Action</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {t.documents.map((doc, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell className="font-semibold text-text-primary text-xs">{doc.category}</TableCell>
+                              <TableCell className="text-xs text-text-muted">{formatDateTime(doc.upload_date)}</TableCell>
+                              <TableCell className="text-xs text-text-muted font-mono">{formatBytes(doc.file_size)}</TableCell>
+                              <TableCell>
+                                <a 
+                                  href={doc.file_path.startsWith('http') ? doc.file_path : `http://localhost:8000${doc.file_path}`} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center text-[10px] font-black text-indigo-600 hover:text-indigo-700 bg-indigo-50 dark:bg-indigo-900/10 px-2 py-1 rounded"
+                                >
+                                  View
+                                </a>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <a 
+                                  href={doc.file_path.startsWith('http') ? doc.file_path : `http://localhost:8000${doc.file_path}`} 
+                                  download
+                                  className="inline-flex items-center gap-1 text-[10px] font-bold text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-50 border border-border px-2 py-1 rounded shadow-3xs"
+                                >
+                                  Download
+                                </a>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </Card>
               </div>
-            </Card>
+            </div>
           </div>
         );
       })()}
@@ -305,9 +808,27 @@ export default function StaffPage() {
                 email: '',
                 phone: '',
                 photo_path: '',
-                assigned_periods: 0,
-                max_periods: 8
+                father_name: '',
+                mother_name: '',
+                emergency_phone: '',
+                joining_date: '',
+                exit_date: '',
+                parent_occupation: '',
+                current_address_line: '',
+                current_city: '',
+                current_state: '',
+                current_country: 'India',
+                current_pin_code: '',
+                permanent_address_line: '',
+                permanent_city: '',
+                permanent_state: '',
+                permanent_country: 'India',
+                permanent_pin_code: '',
+                same_as_current: 0,
+                documents: []
               });
+              setFormErrors({});
+              setUploadError('');
               setIsAddStaffOpen(true);
             }}>
               <Plus className="h-4 w-4" /> Add Teacher
@@ -350,40 +871,36 @@ export default function StaffPage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {sortedStaff.map(t => {
-                const assignedPeriods = t.assigned_periods || 0;
-                const maxPeriods = t.max_periods || 8;
-                const isOccupied = assignedPeriods >= maxPeriods;
-
                 return (
                   <div 
                     key={t.id}
                     onClick={() => { setSelectedTeacherId(t.id); setView('details'); }}
-                    className="flex flex-col items-center justify-center p-6 bg-surface border border-border rounded-2xl hover:border-primary/50 hover:shadow-md cursor-pointer transition-all duration-200 text-center select-none"
+                    className="flex flex-col items-center justify-between p-6 bg-surface border border-border rounded-2xl hover:border-primary/50 hover:shadow-md cursor-pointer transition-all duration-200 text-center select-none min-h-[220px]"
                   >
-                    {/* Photo / Avatar */}
-                    <div className="w-20 h-20 rounded-full border border-border bg-zinc-50 dark:bg-zinc-900/50 flex items-center justify-center overflow-hidden mb-4 shadow-2xs">
-                      <TeacherAvatar src={t.photo_path} name={t.name} updatedAt={t.updated_at} />
+                    <div className="flex flex-col items-center w-full">
+                      {/* Photo / Avatar */}
+                      <div className="w-20 h-20 rounded-full border border-border bg-zinc-50 dark:bg-zinc-900/50 flex items-center justify-center overflow-hidden mb-4 shadow-2xs">
+                        <TeacherAvatar src={t.photo_path} name={t.name} updatedAt={t.updated_at} />
+                      </div>
+                      
+                      {/* Name */}
+                      <h3 className="font-extrabold text-text-primary text-base hover:text-primary transition-colors leading-tight truncate w-full px-1">
+                        {t.name}
+                      </h3>
+                      <p className="text-[10px] text-text-muted font-bold tracking-tight uppercase mt-1">{t.department || 'Mathematics'}</p>
                     </div>
                     
-                    {/* Name */}
-                    <h3 className="font-extrabold text-text-primary text-base hover:text-primary transition-colors leading-tight truncate w-full px-1">
-                      {t.name}
-                    </h3>
-                    
-                    {/* Bottom Status & Spacing */}
                     <div className="flex items-center justify-between w-full mt-4 text-xs">
-                      {/* Availability Badge */}
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black uppercase border ${
-                        isOccupied 
-                          ? 'bg-red-500/10 text-red-600 border-red-500/20' 
-                          : 'bg-green-500/10 text-green-600 border-green-500/20'
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[9px] font-black uppercase border ${
+                        t.status === 'ACTIVE' 
+                          ? 'bg-green-500/10 text-green-600 border-green-500/20'
+                          : 'bg-red-500/10 text-red-600 border-red-500/20'
                       }`}>
-                        {isOccupied ? 'Occupied' : 'Available'}
+                        {t.status}
                       </span>
                       
-                      {/* Workload */}
-                      <span className="text-[11px] text-text-muted font-bold tracking-tight">
-                        Assigned {assignedPeriods}/{maxPeriods}
+                      <span className="text-[10px] text-text-muted font-mono">
+                        {t.employee_id}
                       </span>
                     </div>
                   </div>
@@ -396,80 +913,480 @@ export default function StaffPage() {
 
       {/* Add / Edit Teacher Dialog */}
       <Dialog isOpen={isAddStaffOpen} onClose={() => setIsAddStaffOpen(false)}
-        title={newStaff.id ? "Edit Teacher details" : "Add Teacher Member"} description={newStaff.id ? "Update details of the selected teacher." : "Add a new teacher to the school."}
+        title={newStaff.id ? "Edit Teacher Profile" : "Add Teacher Profile"} 
+        description={newStaff.id ? "Update professional qualifications and profile files of selected teacher." : "Create teacher profile and associate address and certificates."}
+        className="w-[95vw] md:max-w-4xl"
         footer={<>
           <Button variant="secondary" onClick={() => setIsAddStaffOpen(false)}>Cancel</Button>
           <Button onClick={handleAddStaff} disabled={submitting}>{submitting ? 'Saving...' : (newStaff.id ? 'Save Changes' : 'Add Teacher')}</Button>
         </>}>
-        <form onSubmit={handleAddStaff} className="space-y-4">
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-text-secondary uppercase">Full Name</label>
-            <Input placeholder="e.g. Ms. Anita Sharma" value={newStaff.name} onChange={e => setNewStaff(p => ({ ...p, name: e.target.value }))} required />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">Role</label>
-              <Select value={newStaff.role} onChange={e => setNewStaff(p => ({ ...p, role: e.target.value }))}>
-                <option value="Teacher">Teacher</option>
-                <option value="Admin">Admin</option>
-                <option value="Accountant">Accountant</option>
-                <option value="Librarian">Librarian</option>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">Department</label>
-              <Select value={newStaff.department} onChange={e => setNewStaff(p => ({ ...p, department: e.target.value }))}>
-                <option value="Mathematics">Mathematics</option>
-                <option value="Science">Science</option>
-                <option value="English">English</option>
-                <option value="Social Studies">Social Studies</option>
-                <option value="Administration">Administration</option>
-              </Select>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">Email</label>
-              <Input type="email" placeholder="e.g. anita.sharma@school.edu" value={newStaff.email} onChange={e => setNewStaff(p => ({ ...p, email: e.target.value }))} />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">Phone</label>
-              <Input placeholder="Mobile number" value={newStaff.phone} onChange={e => setNewStaff(p => ({ ...p, phone: e.target.value }))} />
-            </div>
-          </div>
-
-          {/* Workload Inputs */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">Assigned Periods</label>
-              <Input type="number" min={0} max={newStaff.max_periods} value={newStaff.assigned_periods} onChange={e => setNewStaff(p => ({ ...p, assigned_periods: parseInt(e.target.value, 10) || 0 }))} />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">Max Allowed Periods</label>
-              <Input type="number" min={1} value={newStaff.max_periods} onChange={e => setNewStaff(p => ({ ...p, max_periods: parseInt(e.target.value, 10) || 8 }))} />
-            </div>
-          </div>
-
-          {/* Photo upload handling */}
-          <div className="space-y-1.5 pt-1">
-            <label className="text-xs font-bold text-text-secondary uppercase">Teacher Photo</label>
+        <div className="max-h-[70vh] overflow-y-auto pr-2 space-y-6 pt-2">
+          
+          {/* SECTION 1 — Teacher Photo upload only (no section heading) */}
+          <div className="space-y-2 border-b border-border pb-4">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full border border-border bg-zinc-50 dark:bg-zinc-900/50 flex items-center justify-center overflow-hidden flex-shrink-0">
+              <div className="w-16 h-16 rounded-full border border-border bg-zinc-50 dark:bg-zinc-900/50 flex items-center justify-center overflow-hidden flex-shrink-0">
                 <TeacherAvatar src={newStaff.photo_path} name={newStaff.name || 'Preview'} />
               </div>
-              <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs font-bold text-text-secondary bg-surface hover:bg-zinc-50 cursor-pointer shadow-2xs transition-all">
-                <Upload className="h-3.5 w-3.5" /> Upload File
-                <input 
-                  type="file" 
-                  accept="image/*" 
-                  onChange={handlePhotoUpload} 
-                  className="hidden" 
-                />
-              </label>
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs font-bold text-text-secondary bg-surface hover:bg-zinc-50 cursor-pointer shadow-2xs transition-all">
+                    <Upload className="h-3.5 w-3.5" /> Upload Photo
+                    <input 
+                      type="file" 
+                      accept="image/jpeg,image/jpg,image/png" 
+                      onChange={handlePhotoUpload} 
+                      className="hidden" 
+                    />
+                  </label>
+                  {newStaff.photo_path && (
+                    <Button 
+                      type="button" 
+                      variant="destructive" 
+                      onClick={handleRemovePhoto}
+                      className="h-8 font-bold text-xs bg-red-600 hover:bg-red-700 text-white"
+                    >
+                      Remove
+                    </Button>
+                  )}
+                </div>
+                {formErrors.photo && <p className="text-[10px] text-red-500 font-semibold">{formErrors.photo}</p>}
+              </div>
             </div>
           </div>
-        </form>
+
+          {/* Basic Details */}
+          <div className="space-y-4 border-b border-border pb-4">
+            <h3 className="text-sm font-black text-text-primary tracking-tight font-display">Basic Details</h3>
+            
+            {/* Row 1: Full Name, Father Name, Mother Name */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-text-secondary uppercase">Full Name <span className="text-red-500">*</span></label>
+                <Input name="name" value={newStaff.name} onChange={handleTextChange} placeholder="e.g. Ms. Anita Sharma" required />
+                {formErrors.name && <p className="text-[10px] text-red-500 font-semibold">{formErrors.name}</p>}
+              </div>
+              
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-text-secondary uppercase">Father Name <span className="text-red-500">*</span></label>
+                <Input name="father_name" value={newStaff.father_name} onChange={handleTextChange} placeholder="e.g. Shri Om Prakash Sharma" required />
+                {formErrors.father_name && <p className="text-[10px] text-red-500 font-semibold">{formErrors.father_name}</p>}
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-text-secondary uppercase">Mother Name <span className="text-red-500">*</span></label>
+                <Input name="mother_name" value={newStaff.mother_name} onChange={handleTextChange} placeholder="e.g. Shabana Begum" required />
+                {formErrors.mother_name && <p className="text-[10px] text-red-500 font-semibold">{formErrors.mother_name}</p>}
+              </div>
+            </div>
+
+            {/* Row 2: Contact Number, Emergency Contact Number, Email */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-text-secondary uppercase">Contact Number <span className="text-red-500">*</span></label>
+                <Input name="phone" value={newStaff.phone} onChange={handleTextChange} placeholder="10-digit mobile number" required />
+                {formErrors.phone && <p className="text-[10px] text-red-500 font-semibold">{formErrors.phone}</p>}
+              </div>
+              
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-text-secondary uppercase">Emergency Contact Number <span className="text-red-500">*</span></label>
+                <Input name="emergency_phone" value={newStaff.emergency_phone} onChange={handleTextChange} placeholder="Emergency number" required />
+                {formErrors.emergency_phone && <p className="text-[10px] text-red-500 font-semibold">{formErrors.emergency_phone}</p>}
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-text-secondary uppercase">Email Address <span className="text-red-500">*</span></label>
+                <Input name="email" type="email" value={newStaff.email} onChange={handleTextChange} placeholder="anita@school.com" required />
+                {formErrors.email && <p className="text-[10px] text-red-500 font-semibold">{formErrors.email}</p>}
+              </div>
+            </div>
+
+            {/* Conditional grid depending on Edit vs Add */}
+            {newStaff.id ? (
+              <>
+                {/* Edit Mode: Row 3 (Joining Date, Exit Date, Parent Occupation) */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-text-secondary uppercase">Joining Date <span className="text-red-500">*</span></label>
+                    <Input 
+                      type="date" 
+                      name="joining_date"
+                      value={newStaff.joining_date} 
+                      onChange={handleTextChange} 
+                      onKeyDown={e => e.preventDefault()}
+                      className="cursor-pointer w-full" 
+                      required 
+                    />
+                    {formErrors.joining_date && <p className="text-[10px] text-red-500 font-semibold">{formErrors.joining_date}</p>}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-text-secondary uppercase">Exit Date</label>
+                    <Input 
+                      type="date" 
+                      name="exit_date"
+                      value={newStaff.exit_date} 
+                      onChange={handleTextChange} 
+                      onKeyDown={e => e.preventDefault()}
+                      className="cursor-pointer w-full text-red-500 font-bold" 
+                    />
+                    {formErrors.exit_date && <p className="text-[10px] text-red-500 font-semibold">{formErrors.exit_date}</p>}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-text-secondary uppercase">Parent Occupation</label>
+                    <Input name="parent_occupation" value={newStaff.parent_occupation} onChange={handleTextChange} placeholder="e.g. Businessman" />
+                  </div>
+                </div>
+
+                {/* Edit Mode: Row 4 (Department, spacer, spacer) */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-text-secondary uppercase font-display">Department</label>
+                    <Select value={newStaff.department} onChange={e => setNewStaff(p => ({ ...p, department: e.target.value }))}>
+                      <option value="Mathematics">Mathematics</option>
+                      <option value="Science">Science</option>
+                      <option value="English">English</option>
+                      <option value="Social Studies">Social Studies</option>
+                      <option value="Administration">Administration</option>
+                    </Select>
+                  </div>
+                  <div></div>
+                  <div></div>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Add Mode: Row 3 (Joining Date, Parent Occupation, Department) */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-text-secondary uppercase">Joining Date <span className="text-red-500">*</span></label>
+                    <Input 
+                      type="date" 
+                      name="joining_date"
+                      value={newStaff.joining_date} 
+                      onChange={handleTextChange} 
+                      onKeyDown={e => e.preventDefault()}
+                      className="cursor-pointer w-full" 
+                      required 
+                    />
+                    {formErrors.joining_date && <p className="text-[10px] text-red-500 font-semibold">{formErrors.joining_date}</p>}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-text-secondary uppercase">Parent Occupation</label>
+                    <Input name="parent_occupation" value={newStaff.parent_occupation} onChange={handleTextChange} placeholder="e.g. Businessman" />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-text-secondary uppercase font-display">Department</label>
+                    <Select value={newStaff.department} onChange={e => setNewStaff(p => ({ ...p, department: e.target.value }))}>
+                      <option value="Mathematics">Mathematics</option>
+                      <option value="Science">Science</option>
+                      <option value="English">English</option>
+                      <option value="Social Studies">Social Studies</option>
+                      <option value="Administration">Administration</option>
+                    </Select>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Current Address */}
+          <div className="space-y-4 border-b border-border pb-4">
+            <h3 className="text-sm font-black text-text-primary tracking-tight font-display">Current Address</h3>
+            
+            <div className="space-y-4">
+              <div className="space-y-1.5 w-full p-px">
+                <label className="text-xs font-bold text-text-secondary uppercase">Address Line <span className="text-red-500">*</span></label>
+                <Input name="current_address_line" value={newStaff.current_address_line} onChange={handleTextChange} placeholder="House no, street, locality..." required />
+                {formErrors.current_address_line && <p className="text-[10px] text-red-500 font-semibold">{formErrors.current_address_line}</p>}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <SearchableSelect
+                  label="State"
+                  placeholder="Select State..."
+                  value={newStaff.current_state}
+                  onChange={(val) => handleStateChange('current', val)}
+                  options={Object.keys(INDIAN_STATES_AND_CITIES)}
+                  required
+                  error={formErrors.current_state}
+                />
+                <SearchableSelect
+                  label="City"
+                  placeholder="Select City..."
+                  value={newStaff.current_city}
+                  onChange={(val) => handleCityChange('current', val)}
+                  options={newStaff.current_state ? (INDIAN_STATES_AND_CITIES[newStaff.current_state] || []) : []}
+                  required
+                  error={formErrors.current_city}
+                />
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-text-secondary uppercase">Country</label>
+                  <Input name="current_country" value={newStaff.current_country} readOnly />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-text-secondary uppercase">PIN Code <span className="text-red-500">*</span></label>
+                  <Input name="current_pin_code" value={newStaff.current_pin_code} onChange={handleTextChange} placeholder="PIN Code" required />
+                  {formErrors.current_pin_code && <p className="text-[10px] text-red-500 font-semibold">{formErrors.current_pin_code}</p>}
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <div className="flex items-center gap-2 mb-4">
+                <input 
+                  type="checkbox" 
+                  id="same_as_current" 
+                  name="same_as_current" 
+                  checked={newStaff.same_as_current === 1}
+                  onChange={handleCheckboxChange}
+                  className="rounded border-zinc-300 text-primary focus:ring-primary h-4 w-4 cursor-pointer"
+                />
+                <label htmlFor="same_as_current" className="text-xs font-bold text-text-primary uppercase select-none cursor-pointer">Permanent Address Same as Current Address</label>
+              </div>
+
+              {newStaff.same_as_current === 0 && (
+                <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
+                  <h4 className="text-[11px] font-extrabold text-text-secondary uppercase tracking-tight">Permanent Address</h4>
+                  <div className="space-y-1.5 w-full p-px">
+                    <label className="text-xs font-bold text-text-secondary uppercase">Address Line <span className="text-red-500">*</span></label>
+                    <Input name="permanent_address_line" value={newStaff.permanent_address_line} onChange={handleTextChange} placeholder="House no, street, locality..." required />
+                    {formErrors.permanent_address_line && <p className="text-[10px] text-red-500 font-semibold">{formErrors.permanent_address_line}</p>}
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <SearchableSelect
+                      label="State"
+                      placeholder="Select State..."
+                      value={newStaff.permanent_state}
+                      onChange={(val) => handleStateChange('permanent', val)}
+                      options={Object.keys(INDIAN_STATES_AND_CITIES)}
+                      required
+                      error={formErrors.permanent_state}
+                    />
+                    <SearchableSelect
+                      label="City"
+                      placeholder="Select City..."
+                      value={newStaff.permanent_city}
+                      onChange={(val) => handleCityChange('permanent', val)}
+                      options={newStaff.permanent_state ? (INDIAN_STATES_AND_CITIES[newStaff.permanent_state] || []) : []}
+                      required
+                      error={formErrors.permanent_city}
+                    />
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-text-secondary uppercase">Country</label>
+                      <Input name="permanent_country" value={newStaff.permanent_country} readOnly />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-text-secondary uppercase">PIN Code <span className="text-red-500">*</span></label>
+                      <Input name="permanent_pin_code" value={newStaff.permanent_pin_code} onChange={handleTextChange} placeholder="PIN Code" required />
+                      {formErrors.permanent_pin_code && <p className="text-[10px] text-red-500 font-semibold">{formErrors.permanent_pin_code}</p>}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Upload Documents */}
+          <div className="space-y-4 pb-4">
+            <h3 className="text-sm font-black text-text-primary tracking-tight font-display">Upload Documents</h3>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end bg-zinc-50 dark:bg-zinc-900/20 p-4 rounded-xl border border-border">
+              <div className="space-y-1.5 col-span-1">
+                <label className="text-xs font-bold text-text-secondary uppercase">Document Category</label>
+                <Select value={docCategory} onChange={e => setDocCategory(e.target.value)}>
+                  {DOCUMENT_CATEGORIES.map((c, i) => (
+                    <option key={i} value={c}>{c}</option>
+                  ))}
+                </Select>
+              </div>
+
+              <div className="space-y-1.5 col-span-2">
+                <label className="text-xs font-bold text-text-secondary uppercase">Choose File (PDF, JPG, PNG, DOC, DOCX up to 10MB)</label>
+                <div className="flex items-center gap-2">
+                  <label className="flex-1 flex items-center justify-between px-3 py-1.5 rounded-lg border border-border text-xs font-bold text-text-secondary bg-surface hover:bg-zinc-50 cursor-pointer shadow-2xs transition-all">
+                    <span className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5" /> Select Document</span>
+                    <input 
+                      type="file" 
+                      disabled={uploadingDoc}
+                      accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                      onChange={handleDocUpload}
+                      className="hidden" 
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Document progress state */}
+            {uploadingDoc && (
+              <div className="flex items-center gap-2 text-xs text-text-muted mt-2 font-bold animate-pulse p-2 bg-indigo-50/20 dark:bg-indigo-950/10 rounded-lg">
+                <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-primary"></div>
+                <span>Uploading document... Please wait...</span>
+              </div>
+            )}
+
+            {uploadError && (
+              <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-lg text-xs font-semibold">
+                {uploadError}
+              </div>
+            )}
+
+            {/* Document list */}
+            {newStaff.documents.length > 0 && (
+              <div className="overflow-x-auto border border-border rounded-xl">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-xs uppercase font-extrabold text-text-secondary">Document</TableHead>
+                      <TableHead className="text-xs uppercase font-extrabold text-text-secondary">Upload Date</TableHead>
+                      <TableHead className="text-xs uppercase font-extrabold text-text-secondary">Size</TableHead>
+                      <TableHead className="text-xs uppercase font-extrabold text-text-secondary">View</TableHead>
+                      <TableHead className="text-right text-xs uppercase font-extrabold text-text-secondary">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {newStaff.documents.map((doc, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell className="font-semibold text-text-primary text-xs">{doc.category}</TableCell>
+                        <TableCell className="text-xs text-text-muted">{formatDateTime(doc.upload_date)}</TableCell>
+                        <TableCell className="text-xs text-text-muted font-mono">{formatBytes(doc.file_size)}</TableCell>
+                        <TableCell>
+                          <a 
+                            href={doc.file_path.startsWith('http') ? doc.file_path : `http://localhost:8000${doc.file_path}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center text-[10px] font-black text-indigo-600 hover:text-indigo-700 bg-indigo-50 dark:bg-indigo-900/10 px-2 py-1 rounded"
+                          >
+                            View
+                          </a>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button 
+                            type="button" 
+                            variant="destructive"
+                            onClick={() => handleRemoveDoc(idx)}
+                            className="h-7 w-7 p-0 flex items-center justify-center bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded ml-auto"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+        </div>
       </Dialog>
+
+      {/* Experience Letter Preview Dialog Modal */}
+      <Dialog 
+        isOpen={isExpLetterOpen} 
+        onClose={() => setIsExpLetterOpen(false)}
+        title="Experience Letter Preview" 
+        description="Verify calculations, dynamic date formatting, and school letterhead branding layout before printing."
+        className="w-[95vw] md:max-w-4xl"
+        footer={<div className="flex gap-3 justify-end w-full no-print-section">
+          <Button variant="secondary" onClick={() => setIsExpLetterOpen(false)}>Close</Button>
+          <Button onClick={handleDownloadPDF} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold flex items-center gap-1.5 shadow-2xs">
+            <Download className="h-4 w-4" /> Download PDF
+          </Button>
+          <Button onClick={() => window.print()} className="bg-primary hover:bg-primary/95 text-white font-bold flex items-center gap-1.5 shadow-2xs">
+            <Printer className="h-4 w-4" /> Print Letter
+          </Button>
+        </div>}
+      >
+        {/* Isolated style injector for media print margins override */}
+        <style dangerouslySetInnerHTML={{ __html: printStyles }} />
+        
+        <div className="max-h-[60vh] overflow-y-auto p-4 bg-zinc-100 dark:bg-zinc-900 border border-border rounded-xl flex items-center justify-center">
+          
+          {/* Printable Container in A4 Ratio */}
+          <div 
+            id="experience-letter-print-area" 
+            className="w-full max-w-[210mm] min-h-[297mm] bg-white p-[15mm] text-zinc-950 font-serif shadow-lg rounded-sm border border-border flex flex-col justify-between select-text"
+          >
+            {/* Header / School details */}
+            <div className="space-y-4">
+              <div className="flex items-start justify-between border-b-2 border-zinc-950 pb-4">
+                <div className="flex items-center gap-4">
+                  {/* Default academic crest logo */}
+                  <div className="w-16 h-16 bg-zinc-950 text-white rounded-md flex items-center justify-center font-bold text-3xl font-display flex-shrink-0 shadow-2xs select-none">
+                    {schoolProfile?.name ? schoolProfile.name.charAt(0).toUpperCase() : 'S'}
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-black font-display text-zinc-950 tracking-tight leading-none uppercase">{schoolProfile?.name || 'ABC Public School'}</h1>
+                    <p className="text-[10px] font-sans font-extrabold text-zinc-500 mt-1 uppercase tracking-wider">Official Certificate of Service</p>
+                  </div>
+                </div>
+                <div className="text-right text-[10px] font-sans text-zinc-600 leading-normal">
+                  <p className="font-bold text-zinc-950">{schoolProfile?.street_address || '123 Main Street'}</p>
+                  <p>{schoolProfile?.city || 'City'}, {schoolProfile?.state || 'State'} - {schoolProfile?.pin_code || ''}</p>
+                  <p>Email: {schoolProfile?.contact_email || 'contact@school.com'}</p>
+                  <p>Phone: {schoolProfile?.contact_phone || '—'}</p>
+                </div>
+              </div>
+
+              {/* Title */}
+              <div className="text-center py-6">
+                <h2 className="text-xl font-bold uppercase tracking-widest text-zinc-900 underline decoration-double underline-offset-4">To Whom It May Concern</h2>
+              </div>
+
+              {/* Ref No and Date */}
+              <div className="flex items-center justify-between text-xs font-sans text-zinc-700 px-1">
+                <p><strong>Ref No:</strong> <span className="font-mono text-zinc-900 font-extrabold">EXP-{new Date(teacherDetails?.exit_date || '').getFullYear()}-{String(teacherDetails?.id || '').padStart(5, '0')}</span></p>
+                <p><strong>Date:</strong> <span className="text-zinc-900 font-bold">{formatDateFull(new Date())}</span></p>
+              </div>
+
+              {/* Letter Body */}
+              <div className="text-sm text-zinc-800 leading-relaxed space-y-6 pt-6 text-justify">
+                <p>
+                  This is to certify that <strong>Mr./Ms. {teacherDetails?.name}</strong>, son/daughter of <strong>Mr. {teacherDetails?.father_name || 'Mohammad Akram'}</strong>, was employed with <strong>{schoolProfile?.name || 'ABC Public School'}</strong> as a <strong>Teacher</strong> in the department of <strong>{teacherDetails?.department || 'Mathematics'}</strong> from <strong>{formatDateFull(teacherDetails?.joining_date)}</strong> to <strong>{formatDateFull(teacherDetails?.exit_date)}</strong>.
+                </p>
+                <p>
+                  During his/her tenure of service, he/she carried out the assigned responsibilities sincerely, maintained professional conduct, demonstrated dedication toward students, and contributed positively to the academic environment of the school.
+                </p>
+                <p>
+                  His/Her total experience with our institution is calculated as <strong>{calculateExperience(teacherDetails?.joining_date, teacherDetails?.exit_date)}</strong>.
+                </p>
+                <p>
+                  We highly appreciate his/her valuable services and contribution during the tenure and wish him/her success in all future endeavors.
+                </p>
+              </div>
+            </div>
+
+            {/* Signatures & Seal */}
+            <div className="pt-20">
+              <div className="flex items-end justify-between px-2 text-xs font-sans text-zinc-700">
+                <div className="text-center w-40">
+                  <div className="border-b border-zinc-400 h-10 w-full mb-2"></div>
+                  <p className="font-bold text-zinc-900">Principal Signature</p>
+                  <p className="text-[10px] text-zinc-500">Authorized Official</p>
+                </div>
+                
+                {/* Visual Seal stamp */}
+                <div className="w-20 h-20 rounded-full border-2 border-dashed border-zinc-400 flex items-center justify-center text-[10px] font-bold text-zinc-400 uppercase tracking-widest text-center rotate-12 select-none pointer-events-none">
+                  School Seal
+                </div>
+
+                <div className="text-center w-40">
+                  <div className="border-b border-zinc-400 h-10 w-full mb-2"></div>
+                  <p className="font-bold text-zinc-900">Authorized Signatory</p>
+                  <p className="text-[10px] text-zinc-500">School Administration</p>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      </Dialog>
+
     </div>
   );
 }
