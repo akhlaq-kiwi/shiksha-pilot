@@ -2012,6 +2012,35 @@ class SchoolAdminService extends BaseService
         return $this->getSchoolProfile($user);
     }
 
+    public function uploadSchoolLogo(array $user, $uploadedFile): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->classRepo->getPdo();
+
+        $logoPath = $this->handleFileUpload($uploadedFile);
+
+        $stmt = $pdo->prepare("UPDATE schools SET logo_path = :logo_path WHERE id = :id");
+        $stmt->execute([
+            ':logo_path' => $logoPath,
+            ':id'        => $schoolId
+        ]);
+
+        return $this->getSchoolProfile($user);
+    }
+
+    public function removeSchoolLogo(array $user): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->classRepo->getPdo();
+
+        $stmt = $pdo->prepare("UPDATE schools SET logo_path = NULL WHERE id = :id");
+        $stmt->execute([
+            ':id' => $schoolId
+        ]);
+
+        return $this->getSchoolProfile($user);
+    }
+
     public function updateClass(array $user, array $data): array
     {
         if (empty($data['oldName'])) {

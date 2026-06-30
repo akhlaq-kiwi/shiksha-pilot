@@ -92,6 +92,8 @@ return function (App $app) {
     $app->get('/api/school/subjects', [SchoolAdminController::class, 'getSubjects']);
     $app->get('/api/school/profile', [SchoolAdminController::class, 'getSchoolProfile']);
     $app->post('/api/school/profile', [SchoolAdminController::class, 'updateSchoolProfile']);
+    $app->post('/api/school/profile/logo', [SchoolAdminController::class, 'uploadSchoolLogo']);
+    $app->delete('/api/school/profile/logo', [SchoolAdminController::class, 'removeSchoolLogo']);
 
     // Teacher Domain
     $app->get('/api/teacher/classes', [TeacherController::class, 'getMyClasses']);

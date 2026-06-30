@@ -113,6 +113,14 @@ export const schoolService = {
     return apiClient.post('/api/school/profile', data);
   },
 
+  uploadSchoolLogo(formData) {
+    return apiClient.post('/api/school/profile/logo', formData);
+  },
+
+  removeSchoolLogo() {
+    return apiClient.delete('/api/school/profile/logo');
+  },
+
   updateClass(classData) {
     return apiClient.put('/api/school/classes', classData);
   },

@@ -356,6 +356,50 @@ class SchoolAdminController extends BaseController
         return $this->success($response, $profile, 'School profile updated');
     }
 
+    public function uploadSchoolLogo(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $uploadedFiles = $request->getUploadedFiles();
+        if (empty($uploadedFiles)) {
+            return $this->error($response, 'No files uploaded', 400);
+        }
+
+        $fileKey = array_key_first($uploadedFiles);
+        $uploadedFile = $uploadedFiles[$fileKey];
+
+        if ($uploadedFile->getError() !== UPLOAD_ERR_OK) {
+            return $this->error($response, 'Failed to upload file', 400);
+        }
+
+        // Validate file size (max 5MB)
+        if ($uploadedFile->getSize() > 5 * 1024 * 1024) {
+            return $this->error($response, 'File size must be less than 5MB', 400);
+        }
+
+        // Validate file extension
+        $filename = $uploadedFile->getClientFilename();
+        $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+        if (!in_array($ext, ['png', 'jpg', 'jpeg'])) {
+            return $this->error($response, 'Only PNG, JPG, and JPEG files are accepted', 400);
+        }
+
+        $profile = $this->service->uploadSchoolLogo($user, $uploadedFile);
+
+        return $this->success($response, $profile, 'School logo uploaded successfully');
+    }
+
+    public function removeSchoolLogo(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $profile = $this->service->removeSchoolLogo($user);
+
+        return $this->success($response, $profile, 'School logo removed successfully');
+    }
+
     public function updateClass(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);

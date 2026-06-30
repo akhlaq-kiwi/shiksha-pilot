@@ -7,11 +7,12 @@ import { Input } from '../../../common/ui/input';
 import { schoolService } from '../../../common/services/schoolService';
 import { authService } from '../../../common/services/authService';
 
-export default function ProfilePage() {
-  const [activeTab, setActiveTab] = useState('details'); // 'details', 'password', 'plans'
+export default function ProfilePage({ mode = 'details' }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+  const [isRemoveConfirmOpen, setIsRemoveConfirmOpen] = useState(false);
+  const [logoError, setLogoError] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -47,6 +48,11 @@ export default function ProfilePage() {
   useEffect(() => {
     loadProfile();
   }, []);
+
+  // Reset logoError state whenever logo path changes
+  useEffect(() => {
+    setLogoError(false);
+  }, [profile?.logo_path]);
 
   if (loading) {
     return (
@@ -105,10 +111,13 @@ export default function ProfilePage() {
         // Update user fields
         ...updatedFields
       };
-      await schoolService.updateSchoolProfile(payload);
+      const updatedProfile = await schoolService.updateSchoolProfile(payload);
       closeDialog(false);
       setSuccessMsg('Profile details updated successfully.');
-      loadProfile();
+      setProfile(updatedProfile);
+
+      // Dispatch event to update AppLayout header immediately
+      window.dispatchEvent(new CustomEvent('school-profile-updated', { detail: updatedProfile }));
     } catch (err) {
       console.error(err);
       setError(err.message || 'Failed to update school profile.');
@@ -136,37 +145,96 @@ export default function ProfilePage() {
     }
   };
 
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate size and type
+    const validTypes = ['image/png', 'image/jpeg', 'image/jpg'];
+    if (!validTypes.includes(file.type)) {
+      alert('Only PNG, JPG, and JPEG images are accepted.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert('File size must be less than 5MB.');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('logo', file);
+
+    setLoading(true);
+    setError('');
+    setSuccessMsg('');
+    try {
+      const updatedProfile = await schoolService.uploadSchoolLogo(formData);
+      setProfile(updatedProfile);
+      setSuccessMsg('School logo uploaded successfully.');
+      
+      // Dispatch event to update AppLayout header immediately
+      window.dispatchEvent(new CustomEvent('school-profile-updated', { detail: updatedProfile }));
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Failed to upload school logo.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogoRemove = async () => {
+    setIsRemoveConfirmOpen(false);
+    setLoading(true);
+    setError('');
+    setSuccessMsg('');
+    try {
+      const updatedProfile = await schoolService.removeSchoolLogo();
+      setProfile(updatedProfile);
+      setSuccessMsg('School logo removed.');
+      
+      // Dispatch event to update AppLayout header immediately
+      window.dispatchEvent(new CustomEvent('school-profile-updated', { detail: updatedProfile }));
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Failed to remove school logo.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getInitials = () => {
+    if (profile?.name) {
+      return profile.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+    }
+    return 'SP';
+  };
+
+  const getHeaderInfo = () => {
+    switch (mode) {
+      case 'password':
+        return {
+          title: "Change Password",
+          desc: "Update your login credentials securely."
+        };
+      case 'plans':
+        return {
+          title: "Subscription Plans",
+          desc: "View your active billing plans and payment invoices."
+        };
+      default:
+        return {
+          title: "Profile Settings",
+          desc: "Manage school profile details and configurations."
+        };
+    }
+  };
+
+  const { title, desc } = getHeaderInfo();
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       <div>
-        <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">Profile Settings</h2>
-        <p className="text-text-secondary text-sm mt-1">Manage profile details, credentials, and view active subscription plans.</p>
-      </div>
-
-      {/* Tab Selector Nav */}
-      <div className="flex border-b border-border text-sm overflow-x-auto whitespace-nowrap scrollbar-none gap-6">
-        {[
-          { id: 'details', label: 'Profile Details', icon: School },
-          { id: 'password', label: 'Change Password', icon: KeyRound },
-          { id: 'plans', label: 'Subscription Plans', icon: CreditCard }
-        ].map(tab => {
-          const Icon = tab.icon;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => {
-                setActiveTab(tab.id);
-                setError('');
-                setSuccessMsg('');
-              }}
-              className={`flex items-center gap-2 pb-3 font-bold border-b-2 transition-all ${activeTab === tab.id ? 'border-primary text-primary font-black' : 'border-transparent text-text-muted hover:text-text-secondary hover:border-border/60'}`}
-            >
-              <Icon className="h-4 w-4" />
-              <span>{tab.label}</span>
-            </button>
-          );
-        })}
+        <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">{title}</h2>
+        <p className="text-text-secondary text-sm mt-1">{desc}</p>
       </div>
 
       {error && (
@@ -183,8 +251,8 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* ─── TAB 1: Profile Details ────────────────────────────────────────── */}
-      {activeTab === 'details' && (
+      {/* ─── SECTION 1: Profile Details ────────────────────────────────────────── */}
+      {mode === 'details' && (
         <div className="space-y-6">
           <Card className="shadow-xs border-border bg-surface">
             <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-row items-center justify-between">
@@ -197,6 +265,50 @@ export default function ProfilePage() {
             </CardHeader>
             <CardContent className="p-6 space-y-6">
               
+              {/* School Logo / Profile Image Upload Section */}
+              <div className="flex flex-col sm:flex-row items-center gap-6 p-4 bg-zinc-50/50 dark:bg-zinc-900/50 border border-border rounded-xl mb-6">
+                <div className="w-20 h-20 rounded-full border border-border flex items-center justify-center overflow-hidden bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100 text-xl font-black uppercase flex-shrink-0">
+                  {!logoError && profile?.logo_path ? (
+                    <img 
+                      src={profile.logo_path} 
+                      alt="School Logo" 
+                      className="w-full h-full object-cover" 
+                      onError={() => setLogoError(true)}
+                    />
+                  ) : (
+                    <span>{getInitials()}</span>
+                  )}
+                </div>
+
+                <div className="space-y-2 text-center sm:text-left flex-1">
+                  <h4 className="text-xs font-bold text-text-primary uppercase tracking-wide">Logo / Profile Image</h4>
+                  <p className="text-[10px] text-text-muted">PNG, JPG, JPEG. Max file size: 5MB.</p>
+                  
+                  <div className="flex flex-wrap gap-2 justify-center sm:justify-start items-center">
+                    <label className="cursor-pointer inline-flex items-center justify-center rounded-md text-xs font-bold transition-colors border border-input bg-background hover:bg-zinc-50 dark:hover:bg-zinc-900 h-8 px-3">
+                      <span>{profile?.logo_path ? 'Change Image' : 'Upload Image'}</span>
+                      <input 
+                        type="file" 
+                        accept=".png, .jpg, .jpeg" 
+                        onChange={handleLogoUpload}
+                        className="hidden" 
+                      />
+                    </label>
+
+                    {profile?.logo_path && (
+                      <Button 
+                        variant="destructive" 
+                        size="sm" 
+                        onClick={() => setIsRemoveConfirmOpen(true)}
+                        className="h-8 px-3 text-xs font-bold"
+                      >
+                        Remove Image
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               {/* School Information */}
               <div>
                 <h4 className="text-xs font-extrabold text-primary mb-3 uppercase tracking-wider">School Information</h4>
@@ -291,8 +403,8 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* ─── TAB 2: Change Password ────────────────────────────────────────── */}
-      {activeTab === 'password' && (
+      {/* ─── SECTION 2: Change Password ────────────────────────────────────────── */}
+      {mode === 'password' && (
         <Card className="max-w-md shadow-xs border-border bg-surface">
           <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
             <CardTitle className="text-sm font-bold text-text-primary flex items-center gap-2">
@@ -334,8 +446,8 @@ export default function ProfilePage() {
         </Card>
       )}
 
-      {/* ─── TAB 3: Subscription Plans ─────────────────────────────────────── */}
-      {activeTab === 'plans' && (
+      {/* ─── SECTION 3: Subscription Plans ─────────────────────────────────────── */}
+      {mode === 'plans' && (
         <div className="space-y-6">
           {/* Current plan card */}
           <Card className="shadow-xs border-border bg-surface">
@@ -424,6 +536,22 @@ export default function ProfilePage() {
           </div>
         </div>
       )}
+
+      {/* Custom Confirmation Modal for Logo Removal */}
+      <Dialog
+        isOpen={isRemoveConfirmOpen}
+        onClose={() => setIsRemoveConfirmOpen(false)}
+        title="Remove Profile Image"
+        description="This action will restore the default placeholder avatar."
+        footer={<>
+          <Button variant="secondary" onClick={() => setIsRemoveConfirmOpen(false)}>Cancel</Button>
+          <Button variant="destructive" onClick={handleLogoRemove}>Remove Image</Button>
+        </>}
+      >
+        <div className="text-xs text-text-secondary leading-relaxed py-2">
+          Are you sure you want to remove the current profile image?
+        </div>
+      </Dialog>
 
       {/* Dialog: Edit Profile Details */}
       <Dialog isOpen={isEditProfileOpen} onClose={() => setIsEditProfileOpen(false)}

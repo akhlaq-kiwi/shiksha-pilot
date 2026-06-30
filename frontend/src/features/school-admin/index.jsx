@@ -37,7 +37,6 @@ const NAV_ITEMS = [
   { path: '/school-admin/attendance', label: 'Attendance', icon: ClipboardCheck },
   { path: '/school-admin/exams',      label: 'Examinations', icon: FileText },
   { path: '/school-admin/finance',    label: 'Fees Portal', icon: DollarSign },
-  { path: '/school-admin/reports',    label: 'Reports', icon: BarChart2 },
   { path: '/school-admin/audits-settings', label: 'Audits & Settings', icon: Settings },
   { path: '/school-admin/financial-reports', label: 'Financial Reports', icon: FileText },
   { path: '/school-admin/finance-management', label: 'Finance Management', icon: Landmark },
@@ -133,19 +132,10 @@ export default function SchoolAdminPortal() {
 
       {/* Sidebar */}
       <aside className="w-full md:w-[240px] flex-shrink-0 flex flex-col justify-between border-r border-border pr-4 md:pr-10 pb-6 pt-2 md:sticky md:top-24 md:h-[calc(100vh-180px)]">
-        <div className="overflow-y-auto scrollbar-none flex-1">
+        <div className="overflow-y-auto scrollbar-none flex-1 min-h-0">
           <nav className="flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 scrollbar-none">
             {NAV_ITEMS.map(navBtn)}
           </nav>
-        </div>
-        <div className="hidden md:block mt-4 flex-shrink-0">
-          <button
-            onClick={() => nav('/school-admin/profile')}
-            className={`flex items-center justify-start gap-3 pl-1 pr-3 py-2.5 rounded-lg text-sm font-bold transition-all w-full text-left border uppercase tracking-wider ${isActive('/school-admin/profile') ? 'bg-zinc-900 text-zinc-50 border-zinc-900 dark:bg-zinc-50 dark:text-zinc-900 dark:border-zinc-50' : 'text-text-secondary border-zinc-200 bg-surface hover:bg-zinc-50 hover:text-zinc-900 dark:border-zinc-800 dark:hover:bg-zinc-900'}`}
-          >
-            <UserCog className="h-4 w-4 flex-shrink-0 text-text-secondary" />
-            <span>PROFILE</span>
-          </button>
         </div>
       </aside>
 
@@ -156,7 +146,9 @@ export default function SchoolAdminPortal() {
         ) : (
           <Routes>
             <Route index element={<DashboardPage onNavigate={(p) => nav(`/school-admin/${p}`)} />} />
-            <Route path="profile" element={<ProfilePage />} />
+            <Route path="profile" element={<ProfilePage mode="details" />} />
+            <Route path="profile/change-password" element={<ProfilePage mode="password" />} />
+            <Route path="profile/subscription" element={<ProfilePage mode="plans" />} />
             <Route path="classes" element={<ClassesPage />} />
             <Route path="staff" element={<StaffPage />} />
             <Route path="timetable" element={<TimetablePage />} />
