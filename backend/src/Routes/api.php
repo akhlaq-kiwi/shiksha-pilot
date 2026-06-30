@@ -59,6 +59,8 @@ return function (App $app) {
     $app->delete('/api/school/expenses/{id}', [SchoolAdminController::class, 'deleteSchoolExpense']);
     $app->get('/api/school/additional-fees/types', [SchoolAdminController::class, 'getAdditionalFeeTypes']);
     $app->post('/api/school/additional-fees/types', [SchoolAdminController::class, 'createAdditionalFeeType']);
+    $app->put('/api/school/additional-fees/types/{id}', [SchoolAdminController::class, 'updateAdditionalFeeType']);
+    $app->delete('/api/school/additional-fees/types/{id}', [SchoolAdminController::class, 'deleteAdditionalFeeType']);
     $app->get('/api/school/additional-fees/payments', [SchoolAdminController::class, 'getAdditionalFeePayments']);
     $app->post('/api/school/additional-fees/payments/{id}/pay', [SchoolAdminController::class, 'collectAdditionalFeePayment']);
     $app->post('/api/school/additional-fees/payments/{id}/revert', [SchoolAdminController::class, 'revertAdditionalFeePayment']);

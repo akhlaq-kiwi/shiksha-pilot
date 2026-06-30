@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Landmark, Plus, Search, Calendar, Clock, Eye, Edit, Trash2, MoreVertical, X, AlertTriangle, Check } from 'lucide-react';
+import { Landmark, Plus, Search, Calendar, Clock, Eye, Edit, Trash2, MoreVertical, X, AlertTriangle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
 import { Button } from '../../../common/ui/button';
 import { Input } from '../../../common/ui/input';
@@ -9,11 +9,13 @@ import { Dialog } from '../../../common/ui/dialog';
 import { schoolService } from '../../../common/services/schoolService';
 
 const formatCurrency = (val) => {
+  const num = parseFloat(val);
+  const safeNum = isNaN(num) ? 0 : num;
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'INR',
     maximumFractionDigits: 0
-  }).format(val);
+  }).format(safeNum);
 };
 
 const formatDateFull = (dateStr) => {
@@ -31,7 +33,7 @@ export default function FinanceManagementPage() {
   const [classes, setClasses] = useState([]);
   const [academicYears, setAcademicYears] = useState([]);
   const [expenses, setExpenses] = useState([]);
-  const [feePayments, setFeePayments] = useState([]);
+  const [feeTypes, setFeeTypes] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Status notifications
@@ -49,8 +51,6 @@ export default function FinanceManagementPage() {
 
   // Additional Fee Tab State & Filters
   const [feeSearch, setFeeSearch] = useState('');
-  const [selectedFeeClassId, setSelectedFeeClassId] = useState('ALL');
-  const [selectedFeeStatus, setSelectedFeeStatus] = useState('ALL');
 
   // Additional Fee Lazy Loading
   const [visibleFeesCount, setVisibleFeesCount] = useState(25);
@@ -59,6 +59,7 @@ export default function FinanceManagementPage() {
 
   // Three-dot Action Dropdowns State
   const [activeExpenseDropdownId, setActiveExpenseDropdownId] = useState(null);
+  const [activeFeeDropdownId, setActiveFeeDropdownId] = useState(null);
   const dropdownRef = useRef(null);
 
   // Dialog Modals State
@@ -75,8 +76,9 @@ export default function FinanceManagementPage() {
   // Delete Expense Confirmation
   const [deletingExpenseId, setDeletingExpenseId] = useState(null);
 
-  // Apply Additional Fee Form State
+  // Apply / Edit Additional Fee Form State
   const [isApplyFeeModalOpen, setIsApplyFeeModalOpen] = useState(false);
+  const [editingFeeType, setEditingFeeType] = useState(null); // null = add mode
   const [applyType, setApplyType] = useState('school'); // 'school' | 'classes'
   const [feeDescription, setFeeDescription] = useState('');
   const [feeSchoolAmount, setFeeSchoolAmount] = useState('');
@@ -84,17 +86,23 @@ export default function FinanceManagementPage() {
   const [feeDueDate, setFeeDueDate] = useState('');
   const [feeSubmitting, setFeeSubmitting] = useState(false);
 
+  // View Summary Detail Popup for Additional Fee Type
+  const [viewingFeeType, setViewingFeeType] = useState(null);
+
+  // Delete Additional Fee Confirmation
+  const [deletingFeeTypeId, setDeletingFeeTypeId] = useState(null);
+
   const loadData = async () => {
     setLoading(true);
     try {
-      const [clsList, ayList, paymentsList] = await Promise.all([
+      const [clsList, ayList, typesList] = await Promise.all([
         schoolService.getClasses(),
         schoolService.getAcademicYears(),
-        schoolService.getAdditionalFeePayments()
+        schoolService.getAdditionalFeeTypes()
       ]);
       setClasses(clsList || []);
       setAcademicYears(ayList || []);
-      setFeePayments(paymentsList || []);
+      setFeeTypes(typesList || []);
 
       // Fetch expenses
       await loadExpensesList();
@@ -136,6 +144,7 @@ export default function FinanceManagementPage() {
     const handleOutsideClick = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setActiveExpenseDropdownId(null);
+        setActiveFeeDropdownId(null);
       }
     };
     document.addEventListener('mousedown', handleOutsideClick);
@@ -235,6 +244,7 @@ export default function FinanceManagementPage() {
   const handleApplyFeeModalOpen = () => {
     setError('');
     setSuccess('');
+    setEditingFeeType(null);
     setFeeDescription('');
     setFeeSchoolAmount('');
     
@@ -250,6 +260,44 @@ export default function FinanceManagementPage() {
     setIsApplyFeeModalOpen(true);
   };
 
+  const handleEditFeeTypeClick = (ft) => {
+    setActiveFeeDropdownId(null);
+    setError('');
+    setSuccess('');
+    setEditingFeeType(ft);
+    setFeeDescription(ft.name);
+    setFeeDueDate(ft.due_date);
+    setFeeSchoolAmount(ft.amount);
+    setApplyType(ft.assigned_to === 'For All' ? 'school' : 'classes');
+    setIsApplyFeeModalOpen(true);
+  };
+
+  const handleDeleteFeeTypeClick = (ft) => {
+    setActiveFeeDropdownId(null);
+    if (ft.collected_students > 0) {
+      alert('Cannot delete this additional fee because some students have already paid.');
+      return;
+    }
+    setDeletingFeeTypeId(ft.id);
+  };
+
+  const handleDeleteFeeType = async () => {
+    if (!deletingFeeTypeId) return;
+    setError('');
+    setSuccess('');
+    try {
+      await schoolService.deleteAdditionalFeeType(deletingFeeTypeId);
+      setFeeTypes(prev => prev.filter(ft => ft.id !== deletingFeeTypeId));
+      setSuccess('Additional fee deleted successfully.');
+      setDeletingFeeTypeId(null);
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Failed to delete additional fee.');
+      setDeletingFeeTypeId(null);
+    }
+  };
+
   const handleApplyAdditionalFee = async (e) => {
     e.preventDefault();
     if (!feeDescription.trim() || !feeDueDate) {
@@ -263,53 +311,70 @@ export default function FinanceManagementPage() {
 
     const payload = {
       name: feeDescription.trim(),
-      due_date: feeDueDate,
-      // Default placeholder effective date to today since we removed it
-      effective_date: new Date().toISOString().split('T')[0],
-      apply_type: applyType
+      due_date: feeDueDate
     };
 
-    if (applyType === 'school') {
-      if (!feeSchoolAmount || parseFloat(feeSchoolAmount) <= 0) {
-        alert('Amount is mandatory and must be greater than 0.');
-        setFeeSubmitting(false);
-        return;
-      }
-      payload.amount = parseFloat(feeSchoolAmount);
-    } else {
-      // Find entered class amounts > 0
-      const activeClassAmounts = {};
-      let hasPositive = false;
-      Object.keys(classAmountsMap).forEach(classId => {
-        const val = classAmountsMap[classId];
-        if (val && val.trim() !== '') {
-          const amt = parseFloat(val);
-          if (amt > 0) {
-            activeClassAmounts[classId] = amt;
-            hasPositive = true;
-          } else if (amt <= 0) {
-            alert('Class fee amounts must be greater than zero.');
-            setFeeSubmitting(false);
-            return;
-          }
+    // Mode specific attributes
+    if (!editingFeeType) {
+      payload.effective_date = new Date().toISOString().split('T')[0];
+      payload.apply_type = applyType;
+      if (applyType === 'school') {
+        if (!feeSchoolAmount || parseFloat(feeSchoolAmount) <= 0) {
+          alert('Amount is mandatory and must be greater than 0.');
+          setFeeSubmitting(false);
+          return;
         }
-      });
+        payload.amount = parseFloat(feeSchoolAmount);
+      } else {
+        const activeClassAmounts = {};
+        let hasPositive = false;
+        Object.keys(classAmountsMap).forEach(classId => {
+          const val = classAmountsMap[classId];
+          if (val && val.trim() !== '') {
+            const amt = parseFloat(val);
+            if (amt > 0) {
+              activeClassAmounts[classId] = amt;
+              hasPositive = true;
+            } else if (amt <= 0) {
+              alert('Class fee amounts must be greater than zero.');
+              setFeeSubmitting(false);
+              return;
+            }
+          }
+        });
 
-      if (!hasPositive) {
-        alert('At least one class amount greater than zero is required.');
-        setFeeSubmitting(false);
-        return;
+        if (!hasPositive) {
+          alert('At least one class amount greater than zero is required.');
+          setFeeSubmitting(false);
+          return;
+        }
+        payload.class_amounts = activeClassAmounts;
       }
-      payload.class_amounts = activeClassAmounts;
+    } else {
+      // Editing Mode
+      if (editingFeeType.assigned_to === 'For All') {
+        if (!feeSchoolAmount || parseFloat(feeSchoolAmount) <= 0) {
+          alert('Amount is mandatory and must be greater than 0.');
+          setFeeSubmitting(false);
+          return;
+        }
+        payload.amount = parseFloat(feeSchoolAmount);
+      }
     }
 
     try {
-      const result = await schoolService.createAdditionalFeeType(payload);
-      setSuccess(`Fee successfully applied to ${result.assigned_count} active students.`);
+      if (editingFeeType) {
+        await schoolService.updateAdditionalFeeType(editingFeeType.id, payload);
+        setSuccess('Additional fee updated successfully.');
+      } else {
+        const result = await schoolService.createAdditionalFeeType(payload);
+        setSuccess(`Fee successfully applied to ${result.assigned_count} active students.`);
+      }
       setIsApplyFeeModalOpen(false);
+      setEditingFeeType(null);
       
-      const paymentsList = await schoolService.getAdditionalFeePayments();
-      setFeePayments(paymentsList || []);
+      const typesList = await schoolService.getAdditionalFeeTypes();
+      setFeeTypes(typesList || []);
       
       setTimeout(() => setSuccess(''), 4000);
     } catch (err) {
@@ -317,7 +382,7 @@ export default function FinanceManagementPage() {
       if (err.message && err.message.toLowerCase().includes('already been applied')) {
         setError('This additional fee has already been applied to the selected students.');
       } else {
-        setError(err.message || 'Failed to apply additional fee.');
+        setError(err.message || 'Failed to save additional fee.');
       }
     } finally {
       setFeeSubmitting(false);
@@ -342,7 +407,7 @@ export default function FinanceManagementPage() {
     if (isFetchingMoreFees) return;
     const target = e.target;
     if (target.scrollHeight - target.scrollTop <= target.clientHeight + 60) {
-      if (visibleFeesCount < filteredFeePayments.length) {
+      if (visibleFeesCount < filteredFeeTypes.length) {
         setIsFetchingMoreFees(true);
         setTimeout(() => {
           setVisibleFeesCount(prev => prev + 25);
@@ -352,20 +417,19 @@ export default function FinanceManagementPage() {
     }
   };
 
-  // Filter Fee Payments List
-  const filteredFeePayments = feePayments.filter(p => {
+  // Filter Fee Types List based on Description keyword match
+  const filteredFeeTypes = feeTypes.filter(ft => {
     const term = feeSearch.toLowerCase().trim();
-    const matchesSearch = !term || 
-      (p.student_name && p.student_name.toLowerCase().includes(term)) ||
-      (p.fee_name && p.fee_name.toLowerCase().includes(term));
-    const matchesClass = selectedFeeClassId === 'ALL' || String(p.class_id) === String(selectedFeeClassId);
-    const matchesStatus = selectedFeeStatus === 'ALL' || p.status === selectedFeeStatus;
+    if (!term) return true;
     
-    return matchesSearch && matchesClass && matchesStatus;
+    const words = term.split(/\s+/);
+    const feeName = (ft.name || '').toLowerCase();
+    
+    return words.every(word => feeName.includes(word));
   });
 
   const paginatedExpenses = expenses.slice(0, visibleExpensesCount);
-  const paginatedFees = filteredFeePayments.slice(0, visibleFeesCount);
+  const paginatedFees = filteredFeeTypes.slice(0, visibleFeesCount);
 
   // Compute dynamic monthly totals for expenses listing
   const filteredTotalExpensesAmount = expenses.reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
@@ -572,39 +636,14 @@ export default function FinanceManagementPage() {
           
           {/* Header Row consistent with Expenses */}
           <div className="flex-shrink-0 bg-surface border border-border p-5 rounded-2xl shadow-2xs space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
-              <div>
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="relative flex-1 max-w-md w-full">
                 <Input 
-                  placeholder="Search by Student or Fee..." 
+                  placeholder="Search by Fee Description..." 
                   value={feeSearch} 
                   onChange={e => setFeeSearch(e.target.value)} 
-                  className="text-xs"
+                  className="text-xs w-full"
                 />
-              </div>
-
-              <div>
-                <Select 
-                  value={selectedFeeClassId} 
-                  onChange={e => setSelectedFeeClassId(e.target.value)}
-                  className="text-xs cursor-pointer"
-                >
-                  <option value="ALL">All Classes</option>
-                  {classes.map(c => (
-                    <option key={c.id} value={c.id}>{c.name} {c.section ? `(${c.section})` : ''}</option>
-                  ))}
-                </Select>
-              </div>
-
-              <div>
-                <Select 
-                  value={selectedFeeStatus} 
-                  onChange={e => setSelectedFeeStatus(e.target.value)}
-                  className="text-xs cursor-pointer"
-                >
-                  <option value="ALL">All Statuses</option>
-                  <option value="Paid">Paid</option>
-                  <option value="Pending">Pending</option>
-                </Select>
               </div>
 
               <div className="flex justify-end">
@@ -612,68 +651,79 @@ export default function FinanceManagementPage() {
                   className="w-full md:w-auto font-bold uppercase tracking-wider text-xs flex items-center justify-center gap-1.5 shadow-2xs"
                   onClick={handleApplyFeeModalOpen}
                 >
-                  <Plus className="h-4 w-4" /> Apply Additional Fee
+                  <Plus className="h-4 w-4" /> Additional Fee
                 </Button>
               </div>
             </div>
           </div>
 
-          {/* Student Ledger Grid */}
+          {/* Additional Fee Types definitions list Table */}
           <div 
             ref={feesContainerRef}
             onScroll={handleFeesScroll}
-            className="flex-1 min-h-0 overflow-y-auto border border-border rounded-2xl bg-surface shadow-2xs"
+            className="flex-1 min-h-0 overflow-y-auto border border-border rounded-2xl bg-surface shadow-2xs relative"
           >
-            {filteredFeePayments.length === 0 ? (
+            {filteredFeeTypes.length === 0 ? (
               <div className="p-12 text-center text-text-muted text-xs font-bold leading-relaxed">
-                No ledger records found matching the filters.
+                No additional fees created.
               </div>
             ) : (
               <>
                 <Table>
                   <TableHeader className="sticky top-0 bg-surface z-10 border-b border-border shadow-3xs">
                     <TableRow>
-                      <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Student Name</TableHead>
-                      <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Class</TableHead>
                       <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Fee Description</TableHead>
-                      <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Amount</TableHead>
-                      <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Status</TableHead>
+                      <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Class</TableHead>
                       <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Due Date</TableHead>
-                      <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Payment Date</TableHead>
-                      <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Academic Year</TableHead>
-                      <TableHead className="text-right text-xs uppercase font-extrabold text-text-secondary bg-surface">Action</TableHead>
+                      <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Amount</TableHead>
+                      <TableHead className="text-right text-xs uppercase font-extrabold text-text-secondary bg-surface w-24">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedFees.map((p) => (
-                      <TableRow key={p.id}>
-                        <TableCell className="font-semibold text-text-primary text-xs truncate max-w-[120px] py-3.5">{p.student_name}</TableCell>
-                        <TableCell className="text-xs text-text-muted font-bold uppercase py-3.5">{p.class_name}</TableCell>
-                        <TableCell className="text-xs text-text-secondary font-bold py-3.5">{p.fee_name}</TableCell>
-                        <TableCell className="text-xs text-text-primary font-bold font-sans py-3.5">{formatCurrency(p.amount)}</TableCell>
-                        <TableCell className="py-3.5">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[9px] font-black uppercase border ${
-                            p.status === 'Paid'
-                              ? 'bg-green-500/10 text-green-600 border-green-500/20'
-                              : 'bg-red-500/10 text-red-600 border-red-500/20'
-                          }`}>
-                            {p.status}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-xs text-text-muted font-mono whitespace-nowrap py-3.5">{formatDateFull(p.due_date)}</TableCell>
-                        <TableCell className="text-xs text-text-muted font-mono whitespace-nowrap py-3.5">{p.payment_date ? formatDateFull(p.payment_date) : '—'}</TableCell>
-                        <TableCell className="text-xs text-text-muted font-bold font-mono py-3.5">{p.academic_year_name || '—'}</TableCell>
-                        <TableCell className="text-right py-3.5">
-                          {p.status === 'Pending' ? (
-                            <Button 
-                              size="xs"
-                              onClick={() => handleCollectPayment(p.id)}
-                              className="bg-green-600 hover:bg-green-700 text-white font-bold text-[9px] px-2.5 py-1 flex items-center gap-1 rounded ml-auto leading-none h-[22px]"
+                    {paginatedFees.map((ft) => (
+                      <TableRow key={ft.id}>
+                        <TableCell className="font-extrabold text-text-primary text-xs uppercase tracking-wider py-3.5 max-w-[200px] truncate">{ft.name}</TableCell>
+                        <TableCell className="text-xs text-text-secondary font-bold py-3.5 uppercase truncate max-w-[150px]">{ft.assigned_to}</TableCell>
+                        <TableCell className="text-xs text-text-muted font-mono whitespace-nowrap py-3.5">{formatDateFull(ft.due_date)}</TableCell>
+                        <TableCell className="text-xs text-text-primary font-bold font-sans py-3.5">{formatCurrency(ft.amount)}</TableCell>
+                        <TableCell className="text-right py-3.5 relative whitespace-nowrap">
+                          <button 
+                            onClick={(ev) => {
+                              ev.stopPropagation();
+                              setActiveFeeDropdownId(activeFeeDropdownId === ft.id ? null : ft.id);
+                            }}
+                            className="p-1.5 hover:bg-zinc-100 rounded-lg transition-all"
+                          >
+                            <MoreVertical className="h-4 w-4 text-text-muted" />
+                          </button>
+
+                          {/* Dropdown Menu Overlay */}
+                          {activeFeeDropdownId === ft.id && (
+                            <div 
+                              ref={dropdownRef}
+                              className="absolute right-4 top-10 w-32 bg-surface border border-border shadow-md rounded-xl py-1.5 z-20 text-left text-xs text-text-primary animate-in fade-in duration-100"
                             >
-                              <Check className="h-3 w-3" /> Collect Payment
-                            </Button>
-                          ) : (
-                            <span className="text-[10px] text-green-600 font-black uppercase tracking-wider flex justify-end">Paid</span>
+                              <button 
+                                onClick={() => { setViewingFeeType(ft); setActiveFeeDropdownId(null); }}
+                                className="w-full px-3 py-1.5 hover:bg-zinc-50 flex items-center gap-1.5 font-semibold"
+                              >
+                                <Eye className="h-3.5 w-3.5 text-text-muted" /> View Details
+                              </button>
+                              
+                              <button 
+                                onClick={() => handleEditFeeTypeClick(ft)}
+                                className="w-full px-3 py-1.5 hover:bg-zinc-50 border-t border-border flex items-center gap-1.5 font-semibold text-zinc-700"
+                              >
+                                <Edit className="h-3.5 w-3.5 text-text-muted" /> Edit
+                              </button>
+                              
+                              <button 
+                                onClick={() => handleDeleteFeeTypeClick(ft)}
+                                className="w-full px-3 py-1.5 hover:bg-zinc-50 flex items-center gap-1.5 font-semibold text-red-600"
+                              >
+                                <Trash2 className="h-3.5 w-3.5 text-red-400" /> Delete
+                              </button>
+                            </div>
                           )}
                         </TableCell>
                       </TableRow>
@@ -684,7 +734,7 @@ export default function FinanceManagementPage() {
                 {isFetchingMoreFees && (
                   <div className="py-4 flex flex-col items-center justify-center gap-2 border-t border-border bg-zinc-50/50 dark:bg-zinc-900/10">
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                    <span className="text-[10px] font-black text-text-muted uppercase tracking-wider">Loading more entries...</span>
+                    <span className="text-[10px] font-black text-text-muted uppercase tracking-wider">Loading more fees...</span>
                   </div>
                 )}
               </>
@@ -796,48 +846,67 @@ export default function FinanceManagementPage() {
         </div>
       </Dialog>
 
-      {/* Apply Additional Fee Modal */}
+      {/* Delete Additional Fee Confirmation */}
+      <Dialog
+        isOpen={deletingFeeTypeId !== null}
+        onClose={() => setDeletingFeeTypeId(null)}
+        title="Delete Additional Fee"
+        description="Verify fee definition reversal."
+        footer={<>
+          <Button variant="secondary" onClick={() => setDeletingFeeTypeId(null)}>Cancel</Button>
+          <Button variant="destructive" onClick={handleDeleteFeeType}>Delete</Button>
+        </>}
+      >
+        <div className="text-xs text-text-secondary leading-relaxed py-2">
+          Delete this additional fee definition and all assigned student pending payments? <br/>
+          <strong className="text-red-500 font-extrabold">This action cannot be undone.</strong>
+        </div>
+      </Dialog>
+
+      {/* Apply / Edit Additional Fee Modal */}
       <Dialog
         isOpen={isApplyFeeModalOpen}
         onClose={() => setIsApplyFeeModalOpen(false)}
-        title="Apply Additional Fee"
-        description="Assign custom school fees to specific classes or whole school."
+        title={editingFeeType ? "Edit Additional Fee" : "Apply Additional Fee"}
+        description={editingFeeType ? "Modify additional fee definition details." : "Assign custom school fees to specific classes or whole school."}
         footer={<>
           <Button variant="secondary" onClick={() => setIsApplyFeeModalOpen(false)}>Cancel</Button>
-          <Button onClick={handleApplyAdditionalFee} disabled={feeSubmitting}>{feeSubmitting ? 'Applying...' : 'Apply Fee'}</Button>
+          <Button onClick={handleApplyAdditionalFee} disabled={feeSubmitting}>{feeSubmitting ? 'Saving...' : (editingFeeType ? 'Save' : 'Apply Fee')}</Button>
         </>}
         className="w-[95vw] md:max-w-xl"
       >
         <form onSubmit={handleApplyAdditionalFee} className="space-y-4 text-xs">
           
-          {/* Apply Fee To Selection */}
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-text-secondary uppercase tracking-wider">Apply Fee To</label>
-            <div className="flex items-center gap-6 mt-1">
-              <label className="flex items-center gap-2 font-bold cursor-pointer">
-                <input 
-                  type="radio" 
-                  name="applyFeeType" 
-                  value="school" 
-                  checked={applyType === 'school'} 
-                  onChange={() => setApplyType('school')}
-                  className="cursor-pointer"
-                />
-                Entire School
-              </label>
-              <label className="flex items-center gap-2 font-bold cursor-pointer">
-                <input 
-                  type="radio" 
-                  name="applyFeeType" 
-                  value="classes" 
-                  checked={applyType === 'classes'} 
-                  onChange={() => setApplyType('classes')}
-                  className="cursor-pointer"
-                />
-                Selected Classes
-              </label>
+          {/* Apply Fee To Selection (Hide when editing) */}
+          {!editingFeeType && (
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-text-secondary uppercase tracking-wider">Apply Fee To</label>
+              <div className="flex items-center gap-6 mt-1">
+                <label className="flex items-center gap-2 font-bold cursor-pointer">
+                  <input 
+                    type="radio" 
+                    name="applyFeeType" 
+                    value="school" 
+                    checked={applyType === 'school'} 
+                    onChange={() => setApplyType('school')}
+                    className="cursor-pointer"
+                  />
+                  Entire School
+                </label>
+                <label className="flex items-center gap-2 font-bold cursor-pointer">
+                  <input 
+                    type="radio" 
+                    name="applyFeeType" 
+                    value="classes" 
+                    checked={applyType === 'classes'} 
+                    onChange={() => setApplyType('classes')}
+                    className="cursor-pointer"
+                  />
+                  Selected Classes
+                </label>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Description */}
           <div className="space-y-1.5">
@@ -861,13 +930,19 @@ export default function FinanceManagementPage() {
                 value={feeSchoolAmount} 
                 onChange={e => setFeeSchoolAmount(e.target.value)} 
                 required 
+                disabled={editingFeeType && editingFeeType.collected_students > 0}
                 className="text-xs"
               />
+              {editingFeeType && editingFeeType.collected_students > 0 && (
+                <p className="text-[9px] text-amber-600 mt-1 font-semibold leading-none">
+                  Amount cannot be changed as some students have already paid.
+                </p>
+              )}
             </div>
           )}
 
-          {/* Case 2: Selected Classes Table amount mapping */}
-          {applyType === 'classes' && (
+          {/* Case 2: Selected Classes Table amount mapping (Hide when editing) */}
+          {!editingFeeType && applyType === 'classes' && (
             <div className="space-y-2 animate-in slide-in-from-top-1 duration-200">
               <label className="text-[10px] font-black text-text-secondary uppercase tracking-wider">Class Dues Allocation</label>
               <div className="border border-border rounded-xl overflow-hidden max-h-[220px] overflow-y-auto bg-zinc-50/50 dark:bg-zinc-900/50">
@@ -899,6 +974,13 @@ export default function FinanceManagementPage() {
             </div>
           )}
 
+          {/* Edit Class Amounts Message */}
+          {editingFeeType && applyType === 'classes' && (
+            <div className="p-3 bg-zinc-50 dark:bg-zinc-900 border border-border rounded-xl text-text-secondary text-[11px] font-semibold leading-relaxed">
+              ℹ️ Class amounts cannot be modified during edit. Please delete and recreate the additional fee if you need to reconfigure class allocation dues.
+            </div>
+          )}
+
           {/* Due Date (Manual Input Disabled) */}
           <div className="space-y-1.5">
             <label className="text-[10px] font-black text-text-secondary uppercase tracking-wider">Due Date *</label>
@@ -916,6 +998,59 @@ export default function FinanceManagementPage() {
           </div>
 
         </form>
+      </Dialog>
+
+      {/* Additional Fee Summary Dialog View Popup */}
+      <Dialog
+        isOpen={viewingFeeType !== null}
+        onClose={() => setViewingFeeType(null)}
+        title="Additional Fee Summary"
+        description="Statistical overview of non-tuition operational dues collected."
+        footer={<Button onClick={() => setViewingFeeType(null)}>Dismiss</Button>}
+      >
+        {viewingFeeType && (
+          <div className="space-y-4 text-xs leading-relaxed">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <div>
+                <span className="text-[10px] text-text-muted font-black uppercase tracking-wider">Fee Description</span>
+                <p className="text-sm font-black text-text-primary mt-0.5 uppercase">{viewingFeeType.name}</p>
+              </div>
+              <span className="inline-flex px-3 py-1 bg-zinc-100 text-zinc-950 dark:bg-zinc-800 dark:text-zinc-50 border border-border font-black text-[10px] uppercase rounded-full tracking-wider">
+                {viewingFeeType.assigned_to}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-[10px] text-text-muted font-black uppercase tracking-wider">Due Date</p>
+                <p className="font-bold mt-0.5 text-text-primary">{formatDateFull(viewingFeeType.due_date)}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-text-muted font-black uppercase tracking-wider">Fee Amount</p>
+                <p className="font-bold mt-0.5 text-primary font-sans">{formatCurrency(viewingFeeType.amount)}</p>
+              </div>
+            </div>
+
+            <div className="border-t border-border pt-4 space-y-3">
+              <h4 className="text-[10px] text-text-muted font-black uppercase tracking-wider">Fee Collection Summary</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-xl border border-border">
+                <div>
+                  <p className="text-[9px] text-text-muted font-bold uppercase tracking-wider">Total Amount</p>
+                  <p className="text-sm font-black text-text-primary mt-0.5 font-sans">{formatCurrency(viewingFeeType.total_amount)}</p>
+                </div>
+                <div>
+                  <p className="text-[9px] text-text-muted font-bold uppercase tracking-wider">Collected Amount</p>
+                  <p className="text-sm font-black text-green-600 mt-0.5 font-sans">{formatCurrency(viewingFeeType.collected_amount)}</p>
+                </div>
+                <div>
+                  <p className="text-[9px] text-text-muted font-bold uppercase tracking-wider">Pending Amount</p>
+                  <p className="text-sm font-black text-red-500 mt-0.5 font-sans">{formatCurrency(viewingFeeType.pending_amount)}</p>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        )}
       </Dialog>
 
     </div>

@@ -205,6 +205,14 @@ export const schoolService = {
     return apiClient.post('/api/school/additional-fees/types', data);
   },
 
+  updateAdditionalFeeType(id, data) {
+    return apiClient.put(`/api/school/additional-fees/types/${id}`, data);
+  },
+
+  deleteAdditionalFeeType(id) {
+    return apiClient.delete(`/api/school/additional-fees/types/${id}`);
+  },
+
   getAdditionalFeePayments() {
     return apiClient.get('/api/school/additional-fees/payments');
   },

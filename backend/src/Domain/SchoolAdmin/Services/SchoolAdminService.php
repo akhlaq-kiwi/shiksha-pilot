@@ -314,7 +314,7 @@ class SchoolAdminService extends BaseService
 
         // Query Additional Fee Payments
         $addStmt = $pdo->prepare("
-            SELECT afp.*, aft.name as fee_name, aft.effective_date, aft.due_date
+            SELECT afp.*, aft.name as fee_name, aft.due_date
             FROM additional_fee_payments afp
             JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
             WHERE afp.student_id = :student_id
@@ -2891,31 +2891,77 @@ class SchoolAdminService extends BaseService
         if ($expTimestamp < $startY || $expTimestamp > $endY) {
             throw new ValidationException(['academic_year' => 'Cannot delete expenses from historical or inactive academic years.']);
         }
-
         $stmt = $pdo->prepare("DELETE FROM school_expenses WHERE id = :id AND school_id = :sid");
         $stmt->execute([':id' => $id, ':sid' => $schoolId]);
 
         return ['success' => true];
     }
 
-
     public function getAdditionalFeeTypes(array $user): array
     {
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->staffRepo->getPdo();
 
+        // Fetch all classes count to determine "Entire School" / "For All"
+        $stmtClasses = $pdo->prepare("SELECT COUNT(*) FROM classes WHERE school_id = :sid");
+        $stmtClasses->execute([':sid' => $schoolId]);
+        $totalClassesCount = (int)$stmtClasses->fetchColumn();
+
         $stmt = $pdo->prepare("
-            SELECT * FROM additional_fee_types 
-            WHERE school_id = :sid 
+            SELECT MIN(aft.id) as id, aft.name, MAX(aft.amount) as amount, aft.due_date, aft.academic_year_id,
+                   COUNT(afp.id) as total_students,
+                   SUM(CASE WHEN afp.status = 'Paid' THEN 1 ELSE 0 END) as collected_students,
+                   SUM(CASE WHEN afp.status = 'Pending' THEN 1 ELSE 0 END) as pending_students,
+                   SUM(CASE WHEN afp.status = 'Paid' THEN afp.amount ELSE 0 END) as collected_amount,
+                   SUM(CASE WHEN afp.status = 'Pending' THEN afp.amount ELSE 0 END) as pending_amount
+            FROM additional_fee_types aft
+            LEFT JOIN additional_fee_payments afp ON afp.fee_type_id = aft.id
+            WHERE aft.school_id = :sid
+            GROUP BY aft.name, aft.due_date, aft.academic_year_id
             ORDER BY id DESC
         ");
         $stmt->execute([':sid' => $schoolId]);
         $types = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        return array_map(function($t) {
+        // Fetch unique classes for each fee type definition (by name, due_date)
+        $stmtClassNames = $pdo->prepare("
+            SELECT DISTINCT c.name 
+            FROM additional_fee_payments afp
+            JOIN students s ON s.id = afp.student_id
+            JOIN classes c ON c.id = s.class_id
+            JOIN additional_fee_types aft ON aft.id = afp.fee_type_id
+            WHERE aft.name = :name AND aft.due_date = :due_date AND aft.academic_year_id = :ayid
+        ");
+
+        return array_map(function($t) use ($stmtClassNames, $totalClassesCount) {
             $t['id'] = (int)$t['id'];
             $t['amount'] = (float)$t['amount'];
             $t['academic_year_id'] = (int)$t['academic_year_id'];
+            $t['total_students'] = (int)$t['total_students'];
+            $t['collected_students'] = (int)$t['collected_students'];
+            $t['pending_students'] = (int)$t['pending_students'];
+            
+            $t['collected_amount'] = (float)($t['collected_amount'] ?? 0);
+            $t['pending_amount'] = (float)($t['pending_amount'] ?? 0);
+            $t['total_amount'] = $t['collected_amount'] + $t['pending_amount'];
+
+            // Fetch classes this type was assigned to
+            $stmtClassNames->execute([
+                ':name' => $t['name'],
+                ':due_date' => $t['due_date'],
+                ':ayid' => $t['academic_year_id']
+            ]);
+            $classNames = $stmtClassNames->fetchAll(PDO::FETCH_COLUMN);
+
+            // Determine if assigned to Entire School or class names
+            if (empty($classNames)) {
+                $t['assigned_to'] = '—';
+            } elseif (count($classNames) >= $totalClassesCount || count($classNames) > 5) {
+                $t['assigned_to'] = 'For All';
+            } else {
+                $t['assigned_to'] = implode(', ', $classNames);
+            }
+
             return $t;
         }, $types);
     }
@@ -2940,14 +2986,10 @@ class SchoolAdminService extends BaseService
         $academicYearId = (int)$yearId;
 
         // Validate dates
-        if (empty($data['effective_date']) || empty($data['due_date'])) {
-            throw new ValidationException(['dates' => 'Effective Date and Due Date are required.']);
+        if (empty($data['due_date'])) {
+            throw new ValidationException(['due_date' => 'Due Date is required.']);
         }
-        $effectiveDate = trim($data['effective_date']);
         $dueDate = trim($data['due_date']);
-        if (strtotime($dueDate) < strtotime($effectiveDate)) {
-            throw new ValidationException(['due_date' => 'Due Date cannot be earlier than Effective Date.']);
-        }
 
         $applyType = $data['apply_type'] ?? 'school'; // 'school' or 'classes'
         $studentsToApply = []; // Array of ['student_id' => int, 'class_id' => int, 'amount' => float]
@@ -3035,23 +3077,42 @@ class SchoolAdminService extends BaseService
         $pdo->beginTransaction();
         try {
             $classFeeTypeIds = []; // class_id => fee_type_id
-            $stmtType = $pdo->prepare("
-                INSERT INTO additional_fee_types (school_id, name, amount, academic_year_id, effective_date, due_date)
-                VALUES (:sid, :name, :amount, :ayid, :eff_date, :due_date)
-            ");
-
-            foreach ($studentsToApply as $s) {
-                $cid = $s['class_id'];
-                if (!isset($classFeeTypeIds[$cid])) {
+            
+            if ($applyType === 'school') {
+                // Scenario 1: Entire School. Create ONE master Additional Fee Record
+                $stmtType = $pdo->prepare("
+                    INSERT INTO additional_fee_types (school_id, name, amount, academic_year_id, due_date)
+                    VALUES (:sid, :name, :amount, :ayid, :due_date)
+                ");
+                $stmtType->execute([
+                    ':sid' => $schoolId,
+                    ':name' => $name,
+                    ':amount' => $amount,
+                    ':ayid' => $academicYearId,
+                    ':due_date' => $dueDate
+                ]);
+                $masterTypeId = (int)$pdo->lastInsertId();
+                
+                // Map all student classes to this single master fee type ID
+                foreach ($studentsToApply as $s) {
+                    $classFeeTypeIds[$s['class_id']] = $masterTypeId;
+                }
+            } else {
+                // Scenario 2: Selected Classes. Create one fee record per class (class-wise amount split)
+                $stmtType = $pdo->prepare("
+                    INSERT INTO additional_fee_types (school_id, name, amount, academic_year_id, due_date)
+                    VALUES (:sid, :name, :amount, :ayid, :due_date)
+                ");
+                
+                foreach ($data['class_amounts'] as $classId => $amt) {
                     $stmtType->execute([
                         ':sid' => $schoolId,
                         ':name' => $name,
-                        ':amount' => $s['amount'],
+                        ':amount' => (float)$amt,
                         ':ayid' => $academicYearId,
-                        ':eff_date' => $effectiveDate,
                         ':due_date' => $dueDate
                     ]);
-                    $classFeeTypeIds[$cid] = (int)$pdo->lastInsertId();
+                    $classFeeTypeIds[$classId] = (int)$pdo->lastInsertId();
                 }
             }
 
@@ -3090,7 +3151,7 @@ class SchoolAdminService extends BaseService
 
         $stmt = $pdo->prepare("
             SELECT afp.*, s.name as student_name, c.name as class_name, 
-                   aft.name as fee_name, aft.effective_date, aft.due_date, ay.name as academic_year_name
+                   aft.name as fee_name, aft.due_date, ay.name as academic_year_name
             FROM additional_fee_payments afp
             JOIN students s ON s.id = afp.student_id
             JOIN classes c ON c.id = s.class_id
@@ -3179,6 +3240,158 @@ class SchoolAdminService extends BaseService
         ]);
 
         return ['success' => true];
+    }
+
+    public function updateAdditionalFeeType(array $user, int $id, array $data): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->staffRepo->getPdo();
+
+        // Fetch the reference fee type
+        $stmtRef = $pdo->prepare("SELECT * FROM additional_fee_types WHERE id = :id AND school_id = :sid");
+        $stmtRef->execute([':id' => $id, ':sid' => $schoolId]);
+        $ref = $stmtRef->fetch(PDO::FETCH_ASSOC);
+        if (!$ref) {
+            throw new ValidationException(['id' => 'Additional fee type not found.']);
+        }
+
+        // Find all matching fee types with same name, due_date, and academic_year_id
+        $stmtMatches = $pdo->prepare("
+            SELECT id FROM additional_fee_types 
+            WHERE school_id = :sid AND name = :name AND due_date = :due_date AND academic_year_id = :ayid
+        ");
+        $stmtMatches->execute([
+            ':sid' => $schoolId,
+            ':name' => $ref['name'],
+            ':due_date' => $ref['due_date'],
+            ':ayid' => $ref['academic_year_id']
+        ]);
+        $typeIds = $stmtMatches->fetchAll(PDO::FETCH_COLUMN);
+
+        if (empty($typeIds)) {
+            throw new ValidationException(['id' => 'Additional fee type not found.']);
+        }
+
+        if (empty($data['name']) || strlen(trim($data['name'])) < 3) {
+            throw new ValidationException(['name' => 'Fee description must be at least 3 characters.']);
+        }
+        $name = trim($data['name']);
+
+        if (empty($data['due_date'])) {
+            throw new ValidationException(['due_date' => 'Due Date is required.']);
+        }
+        $dueDate = trim($data['due_date']);
+
+        $pdo->beginTransaction();
+        try {
+            $inParams = implode(',', array_fill(0, count($typeIds), '?'));
+
+            // If a new amount is specified
+            if (isset($data['amount'])) {
+                $amount = (float)$data['amount'];
+                if ($amount <= 0) {
+                    throw new ValidationException(['amount' => 'Amount must be greater than 0.']);
+                }
+
+                // Check if any payment is already collected for amount modification
+                $stmtCheck = $pdo->prepare("
+                    SELECT COUNT(*) FROM additional_fee_payments 
+                    WHERE fee_type_id IN ($inParams) AND status = 'Paid'
+                ");
+                $stmtCheck->execute($typeIds);
+                if ((int)$stmtCheck->fetchColumn() > 0) {
+                    throw new ValidationException(['amount' => 'Cannot modify the fee amount because some payments have already been collected.']);
+                }
+
+                // Update type amounts using positional parameters
+                $stmtUpTypeAmt = $pdo->prepare("
+                    UPDATE additional_fee_types SET amount = ? 
+                    WHERE id IN ($inParams)
+                ");
+                $stmtUpTypeAmt->execute(array_merge([$amount], $typeIds));
+
+                // Update pending payment amounts using positional parameters
+                $stmtUpPayAmt = $pdo->prepare("
+                    UPDATE additional_fee_payments SET amount = ? 
+                    WHERE fee_type_id IN ($inParams) AND status = 'Pending'
+                ");
+                $stmtUpPayAmt->execute(array_merge([$amount], $typeIds));
+            }
+
+            // Update names and due dates for types using positional parameters
+            $stmtUpTypes = $pdo->prepare("
+                UPDATE additional_fee_types SET name = ?, due_date = ? 
+                WHERE id IN ($inParams)
+            ");
+            $stmtUpTypes->execute(array_merge([
+                $name,
+                $dueDate
+            ], $typeIds));
+
+            $pdo->commit();
+            return ['success' => true];
+        } catch (\Exception $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+    }
+
+    public function deleteAdditionalFeeType(array $user, int $id): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->staffRepo->getPdo();
+
+        // Fetch the reference fee type
+        $stmtRef = $pdo->prepare("SELECT * FROM additional_fee_types WHERE id = :id AND school_id = :sid");
+        $stmtRef->execute([':id' => $id, ':sid' => $schoolId]);
+        $ref = $stmtRef->fetch(PDO::FETCH_ASSOC);
+        if (!$ref) {
+            throw new ValidationException(['id' => 'Additional fee type not found.']);
+        }
+
+        // Find all matching fee types with same name, due_date, and academic_year_id
+        $stmtMatches = $pdo->prepare("
+            SELECT id FROM additional_fee_types 
+            WHERE school_id = :sid AND name = :name AND due_date = :due_date AND academic_year_id = :ayid
+        ");
+        $stmtMatches->execute([
+            ':sid' => $schoolId,
+            ':name' => $ref['name'],
+            ':due_date' => $ref['due_date'],
+            ':ayid' => $ref['academic_year_id']
+        ]);
+        $typeIds = $stmtMatches->fetchAll(PDO::FETCH_COLUMN);
+
+        if (empty($typeIds)) {
+            return ['success' => true];
+        }
+
+        // Check if any payment is already collected
+        $inParams = implode(',', array_fill(0, count($typeIds), '?'));
+        $stmtCheck = $pdo->prepare("
+            SELECT COUNT(*) FROM additional_fee_payments 
+            WHERE fee_type_id IN ($inParams) AND status = 'Paid'
+        ");
+        $stmtCheck->execute($typeIds);
+        if ((int)$stmtCheck->fetchColumn() > 0) {
+            throw new ValidationException(['payments' => 'Cannot delete this additional fee because some students have already paid.']);
+        }
+
+        // Delete payments and types
+        $pdo->beginTransaction();
+        try {
+            $stmtDelPayments = $pdo->prepare("DELETE FROM additional_fee_payments WHERE fee_type_id IN ($inParams)");
+            $stmtDelPayments->execute($typeIds);
+
+            $stmtDelTypes = $pdo->prepare("DELETE FROM additional_fee_types WHERE id IN ($inParams)");
+            $stmtDelTypes->execute($typeIds);
+
+            $pdo->commit();
+            return ['success' => true];
+        } catch (\Exception $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
     }
 }
 

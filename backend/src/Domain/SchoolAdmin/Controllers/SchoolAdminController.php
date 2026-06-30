@@ -607,6 +607,29 @@ class SchoolAdminController extends BaseController
         return $this->success($response, $data, 'Additional fee type created and assigned', 201);
     }
 
+    public function updateAdditionalFeeType(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int)($args['id'] ?? 0);
+        $body = RequestParser::body($request);
+        $data = $this->service->updateAdditionalFeeType($user, $id, $body);
+
+        return $this->success($response, $data, 'Additional fee updated successfully');
+    }
+
+    public function deleteAdditionalFeeType(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int)($args['id'] ?? 0);
+        $data = $this->service->deleteAdditionalFeeType($user, $id);
+
+        return $this->success($response, $data, 'Additional fee deleted successfully');
+    }
+
     public function getAdditionalFeePayments(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);

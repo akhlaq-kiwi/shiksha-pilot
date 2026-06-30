@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS `additional_fee_types` (
     `name` VARCHAR(100) NOT NULL,
     `amount` DECIMAL(12,2) NOT NULL,
     `academic_year_id` INT NOT NULL,
+    `due_date` DATE NULL,
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (`school_id`) REFERENCES `schools` (`id`) ON DELETE CASCADE,
     FOREIGN KEY (`academic_year_id`) REFERENCES `academic_years` (`id`) ON DELETE CASCADE
