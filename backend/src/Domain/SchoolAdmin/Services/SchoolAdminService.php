@@ -312,6 +312,24 @@ class SchoolAdminService extends BaseService
             }
         }
 
+        // Query Additional Fee Payments
+        $addStmt = $pdo->prepare("
+            SELECT afp.*, aft.name as fee_name, aft.effective_date, aft.due_date
+            FROM additional_fee_payments afp
+            JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+            WHERE afp.student_id = :student_id
+            ORDER BY afp.id DESC
+        ");
+        $addStmt->execute([':student_id' => $id]);
+        $additionalPayments = $addStmt->fetchAll(PDO::FETCH_ASSOC);
+        $additionalPayments = array_map(function($ap) {
+            $ap['id'] = (int)$ap['id'];
+            $ap['student_id'] = (int)$ap['student_id'];
+            $ap['fee_type_id'] = (int)$ap['fee_type_id'];
+            $ap['amount'] = (float)$ap['amount'];
+            return $ap;
+        }, $additionalPayments);
+
         return [
             'student' => $student,
             'fee_summary' => [
@@ -319,6 +337,7 @@ class SchoolAdminService extends BaseService
                 'payment_count' => (int)$feeSummary['payment_count'],
                 'payments' => $feeSummary['payments'] ?? []
             ],
+            'additional_fee_payments' => $additionalPayments,
             'class_fee_config' => $classFeeConfig,
             'attendance_summary' => [
                 'total_marked' => (int)$attSummary['total_marked'],
@@ -2632,25 +2651,69 @@ class SchoolAdminService extends BaseService
         return $this->financialReportRepo->findById($id);
     }
 
-    public function getSchoolExpenses(array $user): array
+    public function getSchoolExpenses(array $user, array $filters = []): array
     {
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->staffRepo->getPdo();
+
+        $where = "se.school_id = :sid";
+        $params = [':sid' => $schoolId];
+
+        // Filter by Month
+        if (!empty($filters['month']) && $filters['month'] !== 'ALL') {
+            $monthsMap = [
+                'January' => '01', 'February' => '02', 'March' => '03', 'April' => '04',
+                'May' => '05', 'June' => '06', 'July' => '07', 'August' => '08',
+                'September' => '09', 'October' => '10', 'November' => '11', 'December' => '12'
+            ];
+            if (isset($monthsMap[$filters['month']])) {
+                $where .= " AND DATE_FORMAT(se.expense_date, '%m') = :month_val";
+                $params[':month_val'] = $monthsMap[$filters['month']];
+            }
+        }
+
+        // Handle search (by matching any word or partial text in description, case-insensitive)
+        if (!empty($filters['search'])) {
+            $words = array_filter(explode(' ', trim($filters['search'])));
+            $wordClauses = [];
+            foreach ($words as $idx => $word) {
+                $paramName = ":search_word_{$idx}";
+                $wordClauses[] = "se.description LIKE {$paramName}";
+                $params[$paramName] = '%' . $word . '%';
+            }
+            if (!empty($wordClauses)) {
+                $where .= " AND (" . implode(" AND ", $wordClauses) . ")";
+            }
+        }
+
+        // Default sorting is always newest first
+        $sortBy = "se.expense_date DESC, se.id DESC";
 
         $stmt = $pdo->prepare("
             SELECT se.*, u.name as creator_name 
             FROM school_expenses se
             JOIN users u ON u.id = se.created_by
-            WHERE se.school_id = :sid
-            ORDER BY se.expense_date DESC, se.id DESC
+            WHERE {$where}
+            ORDER BY {$sortBy}
         ");
-        $stmt->execute([':sid' => $schoolId]);
+        $stmt->execute($params);
         $expenses = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        return array_map(function($e) {
+        // Pre-prepare locking validation query
+        $stmtReports = $pdo->prepare("
+            SELECT COUNT(*) FROM financial_reports 
+            WHERE school_id = :sid AND :expense_date BETWEEN from_date AND to_date
+        ");
+
+        return array_map(function($e) use ($stmtReports, $schoolId) {
             $e['id'] = (int)$e['id'];
             $e['amount'] = (float)$e['amount'];
             $e['created_by'] = (int)$e['created_by'];
+            
+            // Check if expense is locked by an existing financial report
+            $stmtReports->execute([':sid' => $schoolId, ':expense_date' => $e['expense_date']]);
+            $e['is_locked'] = ((int)$stmtReports->fetchColumn() > 0);
+            
             return $e;
         }, $expenses);
     }
@@ -2666,26 +2729,41 @@ class SchoolAdminService extends BaseService
         if (empty($data['amount']) || (float)$data['amount'] <= 0) {
             throw new ValidationException(['amount' => 'Amount must be greater than 0.']);
         }
+        if (empty($data['expense_date'])) {
+            throw new ValidationException(['expense_date' => 'Expense Date is required.']);
+        }
 
+        $category = !empty($data['category']) ? trim($data['category']) : 'Other';
         $desc = trim($data['description']);
         $amount = (float)$data['amount'];
+        $expenseDate = trim($data['expense_date']);
         $createdBy = (int)$user['id'];
-        $expenseDate = date('Y-m-d');
+        $payMethod = !empty($data['payment_method']) ? trim($data['payment_method']) : 'Cash';
+        $refNo = !empty($data['reference_number']) ? trim($data['reference_number']) : null;
 
         $stmt = $pdo->prepare("
-            INSERT INTO school_expenses (school_id, description, amount, created_by, expense_date)
-            VALUES (:sid, :desc, :amount, :created_by, :expense_date)
+            INSERT INTO school_expenses (school_id, description, amount, created_by, expense_date, category, payment_method, reference_number)
+            VALUES (:sid, :desc, :amount, :created_by, :expense_date, :cat, :pmethod, :ref)
         ");
         $stmt->execute([
             ':sid' => $schoolId,
             ':desc' => $desc,
             ':amount' => $amount,
             ':created_by' => $createdBy,
-            ':expense_date' => $expenseDate
+            ':expense_date' => $expenseDate,
+            ':cat' => $category,
+            ':pmethod' => $payMethod,
+            ':ref' => $refNo
         ]);
 
         $id = (int)$pdo->lastInsertId();
 
+        return $this->getExpenseById($schoolId, $id);
+    }
+
+    private function getExpenseById(int $schoolId, int $id): array
+    {
+        $pdo = $this->staffRepo->getPdo();
         $stmtGet = $pdo->prepare("
             SELECT se.*, u.name as creator_name 
             FROM school_expenses se
@@ -2704,6 +2782,122 @@ class SchoolAdminService extends BaseService
 
         return $expense ?: [];
     }
+
+    public function updateSchoolExpense(array $user, int $id, array $data): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->staffRepo->getPdo();
+
+        $expense = $this->getExpenseById($schoolId, $id);
+        if (empty($expense)) {
+            throw new NotFoundException('Expense not found.');
+        }
+
+        // Enforce lock verification
+        $stmtCheckReport = $pdo->prepare("
+            SELECT COUNT(*) FROM financial_reports 
+            WHERE school_id = :sid AND :expense_date BETWEEN from_date AND to_date
+        ");
+        $stmtCheckReport->execute([':sid' => $schoolId, ':expense_date' => $expense['expense_date']]);
+        if ((int)$stmtCheckReport->fetchColumn() > 0) {
+            throw new ValidationException(['locked' => 'This expense has already been included in a generated financial report and can no longer be modified.']);
+        }
+
+        // Verify if expense belongs to currently active academic year
+        $stmtYear = $pdo->prepare("SELECT start_date, end_date FROM academic_years WHERE school_id = :sid AND is_current = 1 LIMIT 1");
+        $stmtYear->execute([':sid' => $schoolId]);
+        $year = $stmtYear->fetch(PDO::FETCH_ASSOC);
+        if ($year === false) {
+            throw new ValidationException(['academic_year' => 'No active academic year found.']);
+        }
+
+        $expTimestamp = strtotime($expense['expense_date']);
+        $startY = strtotime($year['start_date']);
+        $endY = strtotime($year['end_date']);
+
+        if ($expTimestamp < $startY || $expTimestamp > $endY) {
+            throw new ValidationException(['academic_year' => 'Cannot edit expenses from historical or inactive academic years.']);
+        }
+
+        // Perform validation
+        if (empty($data['description']) || strlen(trim($data['description'])) < 3) {
+            throw new ValidationException(['description' => 'Description must be at least 3 characters.']);
+        }
+        if (empty($data['amount']) || (float)$data['amount'] <= 0) {
+            throw new ValidationException(['amount' => 'Amount must be greater than 0.']);
+        }
+        if (empty($data['expense_date'])) {
+            throw new ValidationException(['expense_date' => 'Expense Date is required.']);
+        }
+
+        $category = !empty($data['category']) ? trim($data['category']) : 'Other';
+        $desc = trim($data['description']);
+        $amount = (float)$data['amount'];
+        $expenseDate = trim($data['expense_date']);
+        $payMethod = !empty($data['payment_method']) ? trim($data['payment_method']) : 'Cash';
+        $refNo = !empty($data['reference_number']) ? trim($data['reference_number']) : null;
+
+        $stmt = $pdo->prepare("
+            UPDATE school_expenses 
+            SET description = :desc, amount = :amount, expense_date = :expense_date, category = :cat, payment_method = :pmethod, reference_number = :ref
+            WHERE id = :id AND school_id = :sid
+        ");
+        $stmt->execute([
+            ':id' => $id,
+            ':sid' => $schoolId,
+            ':desc' => $desc,
+            ':amount' => $amount,
+            ':expense_date' => $expenseDate,
+            ':cat' => $category,
+            ':pmethod' => $payMethod,
+            ':ref' => $refNo
+        ]);
+
+        return $this->getExpenseById($schoolId, $id);
+    }
+
+    public function deleteSchoolExpense(array $user, int $id): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->staffRepo->getPdo();
+
+        $expense = $this->getExpenseById($schoolId, $id);
+        if (empty($expense)) {
+            throw new NotFoundException('Expense not found.');
+        }
+
+        // Enforce lock verification
+        $stmtCheckReport = $pdo->prepare("
+            SELECT COUNT(*) FROM financial_reports 
+            WHERE school_id = :sid AND :expense_date BETWEEN from_date AND to_date
+        ");
+        $stmtCheckReport->execute([':sid' => $schoolId, ':expense_date' => $expense['expense_date']]);
+        if ((int)$stmtCheckReport->fetchColumn() > 0) {
+            throw new ValidationException(['locked' => 'This expense has already been included in a generated financial report and can no longer be modified.']);
+        }
+
+        // Check active year constraints
+        $stmtYear = $pdo->prepare("SELECT start_date, end_date FROM academic_years WHERE school_id = :sid AND is_current = 1 LIMIT 1");
+        $stmtYear->execute([':sid' => $schoolId]);
+        $year = $stmtYear->fetch(PDO::FETCH_ASSOC);
+        if ($year === false) {
+            throw new ValidationException(['academic_year' => 'No active academic year found.']);
+        }
+
+        $expTimestamp = strtotime($expense['expense_date']);
+        $startY = strtotime($year['start_date']);
+        $endY = strtotime($year['end_date']);
+
+        if ($expTimestamp < $startY || $expTimestamp > $endY) {
+            throw new ValidationException(['academic_year' => 'Cannot delete expenses from historical or inactive academic years.']);
+        }
+
+        $stmt = $pdo->prepare("DELETE FROM school_expenses WHERE id = :id AND school_id = :sid");
+        $stmt->execute([':id' => $id, ':sid' => $schoolId]);
+
+        return ['success' => true];
+    }
+
 
     public function getAdditionalFeeTypes(array $user): array
     {
@@ -2732,14 +2926,9 @@ class SchoolAdminService extends BaseService
         $pdo = $this->staffRepo->getPdo();
 
         if (empty($data['name']) || strlen(trim($data['name'])) < 3) {
-            throw new ValidationException(['name' => 'Fee type name must be at least 3 characters.']);
+            throw new ValidationException(['name' => 'Fee description must be at least 3 characters.']);
         }
-        if (empty($data['amount']) || (float)$data['amount'] <= 0) {
-            throw new ValidationException(['amount' => 'Amount must be greater than 0.']);
-        }
-
         $name = trim($data['name']);
-        $amount = (float)$data['amount'];
 
         // Get currently active academic year
         $stmtYear = $pdo->prepare("SELECT id FROM academic_years WHERE school_id = :school_id AND is_current = 1 LIMIT 1");
@@ -2750,57 +2939,143 @@ class SchoolAdminService extends BaseService
         }
         $academicYearId = (int)$yearId;
 
-        // Start transaction
-        $pdo->beginTransaction();
-        try {
-            // 1. Insert fee type
-            $stmtType = $pdo->prepare("
-                INSERT INTO additional_fee_types (school_id, name, amount, academic_year_id)
-                VALUES (:sid, :name, :amount, :ayid)
-            ");
-            $stmtType->execute([
-                ':sid' => $schoolId,
-                ':name' => $name,
-                ':amount' => $amount,
-                ':ayid' => $academicYearId
-            ]);
-            $typeId = (int)$pdo->lastInsertId();
+        // Validate dates
+        if (empty($data['effective_date']) || empty($data['due_date'])) {
+            throw new ValidationException(['dates' => 'Effective Date and Due Date are required.']);
+        }
+        $effectiveDate = trim($data['effective_date']);
+        $dueDate = trim($data['due_date']);
+        if (strtotime($dueDate) < strtotime($effectiveDate)) {
+            throw new ValidationException(['due_date' => 'Due Date cannot be earlier than Effective Date.']);
+        }
 
-            // 2. Query all active students in active academic year
+        $applyType = $data['apply_type'] ?? 'school'; // 'school' or 'classes'
+        $studentsToApply = []; // Array of ['student_id' => int, 'class_id' => int, 'amount' => float]
+
+        if ($applyType === 'school') {
+            if (empty($data['amount']) || (float)$data['amount'] <= 0) {
+                throw new ValidationException(['amount' => 'Amount must be greater than 0.']);
+            }
+            $amount = (float)$data['amount'];
+
+            // Query active students in current academic year
             $stmtStudents = $pdo->prepare("
-                SELECT id FROM students 
+                SELECT id, class_id FROM students 
                 WHERE school_id = :sid AND status = 'ACTIVE' AND academic_year_id = :ayid
             ");
-            $stmtStudents->execute([
-                ':sid' => $schoolId,
+            $stmtStudents->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+            $studentRows = $stmtStudents->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($studentRows as $s) {
+                $studentsToApply[] = [
+                    'student_id' => (int)$s['id'],
+                    'class_id' => (int)$s['class_id'],
+                    'amount' => $amount
+                ];
+            }
+        } else {
+            // Selected classes with custom amounts
+            if (empty($data['class_amounts']) || !is_array($data['class_amounts'])) {
+                throw new ValidationException(['classes' => 'At least one class is required when "Selected Classes" is chosen.']);
+            }
+
+            foreach ($data['class_amounts'] as $classId => $amt) {
+                if ((float)$amt <= 0) {
+                    throw new ValidationException(['amount' => 'Amount for selected classes must be greater than 0.']);
+                }
+
+                // Fetch active students in this class
+                $stmtStudents = $pdo->prepare("
+                    SELECT id, class_id FROM students 
+                    WHERE school_id = :sid AND class_id = :cid AND status = 'ACTIVE' AND academic_year_id = :ayid
+                ");
+                $stmtStudents->execute([
+                    ':sid' => $schoolId,
+                    ':cid' => (int)$classId,
+                    ':ayid' => $academicYearId
+                ]);
+                $studentRows = $stmtStudents->fetchAll(PDO::FETCH_ASSOC);
+
+                foreach ($studentRows as $s) {
+                    $studentsToApply[] = [
+                        'student_id' => (int)$s['id'],
+                        'class_id' => (int)$s['class_id'],
+                        'amount' => (float)$amt
+                    ];
+                }
+            }
+        }
+
+        if (empty($studentsToApply)) {
+            throw new ValidationException(['students' => 'No active students found in the target group.']);
+        }
+
+        // Duplicate Check Rule: if a fee has already been applied previously, do NOT create duplicate entries
+        // Check if there are already records in additional_fee_payments with same fee name for the same student in current academic year
+        $stmtDup = $pdo->prepare("
+            SELECT COUNT(*) FROM additional_fee_payments afp
+            JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+            WHERE afp.student_id = :student_id 
+              AND aft.name = :name 
+              AND aft.academic_year_id = :ayid
+        ");
+
+        foreach ($studentsToApply as $s) {
+            $stmtDup->execute([
+                ':student_id' => $s['student_id'],
+                ':name' => $name,
                 ':ayid' => $academicYearId
             ]);
-            $students = $stmtStudents->fetchAll(PDO::FETCH_ASSOC);
+            if ((int)$stmtDup->fetchColumn() > 0) {
+                throw new ValidationException(['duplicate' => 'This additional fee has already been applied to the selected students.']);
+            }
+        }
 
-            // 3. Assign pending fee payments to each student
-            if (!empty($students)) {
-                $stmtInsertPay = $pdo->prepare("
-                    INSERT INTO additional_fee_payments (school_id, student_id, fee_type_id, amount, status)
-                    VALUES (:sid, :student_id, :type_id, :amount, 'Pending')
-                ");
-                foreach ($students as $student) {
-                    $stmtInsertPay->execute([
+        // Commit transaction
+        $pdo->beginTransaction();
+        try {
+            $classFeeTypeIds = []; // class_id => fee_type_id
+            $stmtType = $pdo->prepare("
+                INSERT INTO additional_fee_types (school_id, name, amount, academic_year_id, effective_date, due_date)
+                VALUES (:sid, :name, :amount, :ayid, :eff_date, :due_date)
+            ");
+
+            foreach ($studentsToApply as $s) {
+                $cid = $s['class_id'];
+                if (!isset($classFeeTypeIds[$cid])) {
+                    $stmtType->execute([
                         ':sid' => $schoolId,
-                        ':student_id' => (int)$student['id'],
-                        ':type_id' => $typeId,
-                        ':amount' => $amount
+                        ':name' => $name,
+                        ':amount' => $s['amount'],
+                        ':ayid' => $academicYearId,
+                        ':eff_date' => $effectiveDate,
+                        ':due_date' => $dueDate
                     ]);
+                    $classFeeTypeIds[$cid] = (int)$pdo->lastInsertId();
                 }
+            }
+
+            // Insert Payments
+            $stmtInsertPay = $pdo->prepare("
+                INSERT INTO additional_fee_payments (school_id, student_id, fee_type_id, amount, status)
+                VALUES (:sid, :student_id, :type_id, :amount, 'Pending')
+            ");
+
+            foreach ($studentsToApply as $s) {
+                $stmtInsertPay->execute([
+                    ':sid' => $schoolId,
+                    ':student_id' => $s['student_id'],
+                    ':type_id' => $classFeeTypeIds[$s['class_id']],
+                    ':amount' => $s['amount']
+                ]);
             }
 
             $pdo->commit();
 
             return [
-                'id' => $typeId,
                 'name' => $name,
-                'amount' => $amount,
                 'academic_year_id' => $academicYearId,
-                'assigned_count' => count($students)
+                'assigned_count' => count($studentsToApply)
             ];
         } catch (\Exception $e) {
             $pdo->rollBack();
@@ -2814,11 +3089,13 @@ class SchoolAdminService extends BaseService
         $pdo = $this->staffRepo->getPdo();
 
         $stmt = $pdo->prepare("
-            SELECT afp.*, s.name as student_name, c.name as class_name, aft.name as fee_name
+            SELECT afp.*, s.name as student_name, c.name as class_name, 
+                   aft.name as fee_name, aft.effective_date, aft.due_date, ay.name as academic_year_name
             FROM additional_fee_payments afp
             JOIN students s ON s.id = afp.student_id
             JOIN classes c ON c.id = s.class_id
             JOIN additional_fee_types aft ON aft.id = afp.fee_type_id
+            LEFT JOIN academic_years ay ON ay.id = aft.academic_year_id
             WHERE afp.school_id = :sid
             ORDER BY afp.id DESC
         ");
@@ -2878,6 +3155,30 @@ class SchoolAdminService extends BaseService
         }
 
         return $pay ?: [];
+    }
+
+    public function revertAdditionalFeePayment(array $user, int $id): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->staffRepo->getPdo();
+
+        $stmtCheck = $pdo->prepare("SELECT id FROM additional_fee_payments WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtCheck->execute([':id' => $id, ':sid' => $schoolId]);
+        if ($stmtCheck->fetchColumn() === false) {
+            throw new NotFoundException('Fee record not found.');
+        }
+
+        $stmtUpdate = $pdo->prepare("
+            UPDATE additional_fee_payments 
+            SET status = 'Pending', payment_date = NULL 
+            WHERE id = :id AND school_id = :sid
+        ");
+        $stmtUpdate->execute([
+            ':id' => $id,
+            ':sid' => $schoolId
+        ]);
+
+        return ['success' => true];
     }
 }
 

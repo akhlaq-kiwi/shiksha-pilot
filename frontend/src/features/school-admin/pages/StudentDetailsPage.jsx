@@ -230,10 +230,10 @@ function ReceiptModal({ receipt, student, schoolName, allPayments = [], onClose 
             <div className="bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-xl border border-border flex justify-between items-center">
               <div>
                 <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">
-                  {sortedGroup.length > 1 ? 'Billing Months' : 'Billing Month'}
+                  {receipt.is_additional ? 'Description' : (sortedGroup.length > 1 ? 'Billing Months' : 'Billing Month')}
                 </p>
                 <p className="text-sm font-black text-text-primary mt-0.5 max-w-[200px] break-words">
-                  {sortedGroup.map(p => p.fee_month).join(', ')}
+                  {receipt.is_additional ? receipt.fee_name : sortedGroup.map(p => p.fee_month).join(', ')}
                 </p>
               </div>
               <div className="text-right">
@@ -416,12 +416,109 @@ function DepositModal({ student, availableMonths, paidMonths, classFeeConfig, on
   );
 }
 
+// Additional Fees Deposit Modal (Matches design guidelines of tuition DepositModal)
+function AdditionalDepositModal({ student, unpaidFees, onSave, onClose }) {
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleToggle = (id) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleSave = async () => {
+    if (selectedIds.length === 0) {
+      setError('Please select at least one fee.');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      await Promise.all(selectedIds.map(id => schoolService.collectAdditionalFeePayment(id)));
+      onSave();
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Failed to deposit fees.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+      <div className="bg-surface border border-border rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-zinc-50 dark:bg-zinc-900/50">
+          <h3 className="font-extrabold text-text-primary text-base tracking-tight font-display">Deposit Fees</h3>
+          <button onClick={onClose} className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg transition-colors">
+            <X className="h-4 w-4 text-text-secondary" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <p className="text-xs text-text-secondary leading-relaxed">
+            Select the Additional Fee(s) to deposit for <strong className="text-text-primary uppercase">{student.name}</strong>. Only unpaid Additional Fees are shown below.
+          </p>
+
+          {error && (
+            <div className="p-2.5 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl text-xs font-semibold">
+              {error}
+            </div>
+          )}
+
+          <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
+            {unpaidFees.map(fee => {
+              const isSelected = selectedIds.includes(fee.id);
+              return (
+                <label 
+                  key={fee.id}
+                  className={`flex items-center justify-between p-3 rounded-xl border text-xs font-semibold cursor-pointer transition-all select-none ${
+                    isSelected 
+                      ? 'border-primary bg-primary/5 text-text-primary font-bold' 
+                      : 'border-border bg-surface text-text-secondary hover:border-zinc-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <input 
+                      type="checkbox" 
+                      checked={isSelected}
+                      onChange={() => handleToggle(fee.id)}
+                      className="rounded border-border text-primary focus:ring-primary cursor-pointer h-4 w-4"
+                    />
+                    <span className="font-extrabold uppercase tracking-wide">{fee.fee_name}</span>
+                  </div>
+                  <span className="font-bold font-sans">₹{parseFloat(fee.amount).toLocaleString()}</span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Footer actions */}
+        <div className="px-6 py-4 border-t border-border bg-surface flex justify-end gap-3">
+          <Button variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button 
+            className="flex items-center gap-1.5 font-bold" 
+            onClick={handleSave} 
+            disabled={saving || selectedIds.length === 0}
+          >
+            {saving ? 'Processing...' : 'Deposit'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeSubTab, setActiveSubTab] = useState('finance'); // 'finance', 'profile', 'academic'
+  const [activeLedgerTab, setActiveLedgerTab] = useState('monthly'); // 'monthly' | 'additional'
   
   // Accordion toggle for Documents (closed by default)
   const [docsOpen, setDocsOpen] = useState(false);
@@ -430,6 +527,8 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
   const [viewingDoc, setViewingDoc] = useState(null); // { name, path }
   const [viewingReceipt, setViewingReceipt] = useState(null); // payment object
   const [showDepositModal, setShowDepositModal] = useState(false);
+  const [showAdditionalDepositModal, setShowAdditionalDepositModal] = useState(false);
+  const [unpaidAdditionalFeesList, setUnpaidAdditionalFeesList] = useState([]);
   const [showRemovePhotoConfirm, setShowRemovePhotoConfirm] = useState(false);
   const [showPhotoMenu, setShowPhotoMenu] = useState(false);
   const [schoolProfile, setSchoolProfile] = useState(null);
@@ -549,6 +648,51 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
         alert(err.message || 'Failed to revert payment.');
       }
     }
+  };
+
+  const handleCollectAdditionalPayment = async (item) => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const unpaidDueFees = (data?.additional_fee_payments || [])
+      .filter(p => p.status === 'Pending' && p.due_date <= todayStr);
+
+    if (unpaidDueFees.length === 0) return;
+
+    if (unpaidDueFees.length === 1) {
+      try {
+        await schoolService.collectAdditionalFeePayment(unpaidDueFees[0].id);
+        await loadDetails();
+      } catch (err) {
+        console.error(err);
+        alert(err.message || 'Failed to collect payment.');
+      }
+    } else {
+      setUnpaidAdditionalFeesList(unpaidDueFees);
+      setShowAdditionalDepositModal(true);
+    }
+  };
+
+  const handleRevertAdditionalPayment = async (item) => {
+    if (window.confirm(`Are you sure you want to revert the payment for ${item.fee_name}? This will mark it as unpaid.`)) {
+      try {
+        await schoolService.revertAdditionalFeePayment(item.id);
+        await loadDetails();
+      } catch (err) {
+        console.error(err);
+        alert(err.message || 'Failed to revert payment.');
+      }
+    }
+  };
+
+  const handleViewAdditionalReceipt = (item) => {
+    setViewingReceipt({
+      id: item.id,
+      receipt_no: `AFP-${String(item.id).padStart(5, '0')}`,
+      payment_date: item.payment_date,
+      fee_month: item.fee_name || 'Additional Fee',
+      amount_paid: item.amount,
+      is_additional: true,
+      fee_name: item.fee_name
+    });
   };
 
   const statusBadge = (status) => {
@@ -959,109 +1103,236 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                 <>
                   {/* Fee summary card */}
                   {(() => {
-                    let totalSessionFee = 0;
                     const academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
-                    
-                    if (data && data.class_fee_config && data.class_fee_config.monthly_fees) {
-                      academicMonths.forEach(m => {
-                        totalSessionFee += parseFloat(data.class_fee_config.monthly_fees[m] || 0);
-                      });
-                    } else {
-                      const monthlyFee = fee_summary.payments?.[0]?.amount_paid ? parseFloat(fee_summary.payments[0].amount_paid) : 2000;
-                      totalSessionFee = 12 * monthlyFee;
-                    }
-                    const totalDuesInSession = Math.max(0, totalSessionFee - parseFloat(fee_summary.total_paid));
+                    const now = new Date();
+                    const calendarMonth = now.getMonth();
+                    const monthMapping = {
+                      3: 0,  // April
+                      4: 1,  // May
+                      5: 2,  // June
+                      6: 3,  // July
+                      7: 4,  // August
+                      8: 5,  // September
+                      9: 6,  // October
+                      10: 7, // November
+                      11: 8, // December
+                      0: 9,  // January
+                      1: 10, // February
+                      2: 11  // March
+                    };
+                    const currentAcademicIdx = monthMapping[calendarMonth] !== undefined ? monthMapping[calendarMonth] : 2;
+                    const pastAndCurrentMonths = academicMonths.slice(0, currentAcademicIdx + 1);
+
+                    const paymentsList = fee_summary.payments || [];
+                    const paidMonths = paymentsList.map(p => p.fee_month);
+
+                    let monthlyFeeDue = 0;
+                    pastAndCurrentMonths.forEach(m => {
+                      if (!paidMonths.includes(m)) {
+                        let amount = 2000;
+                        if (data && data.class_fee_config && data.class_fee_config.monthly_fees && data.class_fee_config.monthly_fees[m]) {
+                          amount = parseFloat(data.class_fee_config.monthly_fees[m]);
+                        } else {
+                          const firstPaid = paymentsList[0]?.amount_paid ? parseFloat(paymentsList[0].amount_paid) : 2000;
+                          amount = firstPaid;
+                        }
+                        monthlyFeeDue += amount;
+                      }
+                    });
+
+                    const todayStr = new Date().toISOString().split('T')[0];
+                    const additionalFeeDue = (data.additional_fee_payments || [])
+                      .filter(p => p.status === 'Pending' && p.due_date <= todayStr)
+                      .reduce((sum, p) => sum + parseFloat(p.amount), 0);
+
                     return (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                        <Card className="shadow-xs p-5 bg-surface border-border flex flex-col justify-between">
+                        <Card 
+                          onClick={() => setActiveLedgerTab('monthly')}
+                          className={`shadow-xs p-5 bg-surface border flex flex-col justify-between cursor-pointer select-none transition-all duration-200 rounded-2xl ${
+                            activeLedgerTab === 'monthly'
+                              ? 'border-primary border-2 bg-primary/5 ring-2 ring-primary/10'
+                              : 'border-border opacity-70 hover:opacity-100 hover:border-zinc-400'
+                          }`}
+                        >
                           <div>
-                            <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Total Paid in Session</p>
-                            <p className="text-2xl font-black text-teal-600 mt-1 font-display">₹{parseFloat(fee_summary.total_paid).toLocaleString()}</p>
+                            <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">
+                              {activeLedgerTab === 'monthly' ? '✓ ' : ''}Monthly Fee Due
+                            </p>
+                            <p className="text-2xl font-black text-amber-600 mt-1 font-display">₹{monthlyFeeDue.toLocaleString()}</p>
                           </div>
                         </Card>
                         
-                        <Card className="shadow-xs p-5 bg-surface border-border flex flex-col justify-between">
+                        <Card 
+                          onClick={() => setActiveLedgerTab('additional')}
+                          className={`shadow-xs p-5 bg-surface border flex flex-col justify-between cursor-pointer select-none transition-all duration-200 rounded-2xl ${
+                            activeLedgerTab === 'additional'
+                              ? 'border-primary border-2 bg-primary/5 ring-2 ring-primary/10'
+                              : 'border-border opacity-70 hover:opacity-100 hover:border-zinc-400'
+                          }`}
+                        >
                           <div>
-                            <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Total Dues In Session</p>
-                            <p className="text-2xl font-black text-amber-600 mt-1 font-display">₹{totalDuesInSession.toLocaleString()}</p>
+                            <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">
+                              {activeLedgerTab === 'additional' ? '✓ ' : ''}Additional Fee Due
+                            </p>
+                            <p className="text-2xl font-black text-amber-600 mt-1 font-display">₹{additionalFeeDue.toLocaleString()}</p>
                           </div>
                         </Card>
                       </div>
                     );
                   })()}
 
-                  {/* Month-wise Fee Management panel */}
+                  {/* Switchable Fee Management panel */}
                   <Card className="shadow-xs">
                     <CardContent className="p-6 space-y-4">
                       <div className="flex items-center gap-2 border-b border-border pb-2.5">
                         <FileText className="h-4 w-4 text-primary" />
-                        <h4 className="text-xs font-bold text-text-primary uppercase tracking-wider">Month-wise Fee Record</h4>
+                        <h4 className="text-xs font-bold text-text-primary uppercase tracking-wider">
+                          {activeLedgerTab === 'monthly' ? 'Month-wise Fee Card' : 'Additional Fee Card'}
+                        </h4>
                       </div>
 
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Month</TableHead>
-                            <TableHead>Amount</TableHead>
-                            <TableHead>Payment Date</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead className="text-right">Action</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {monthWiseList.map(mw => (
-                            <TableRow key={mw.month}>
-                              <TableCell className="font-extrabold text-text-primary text-xs uppercase tracking-wider">
-                                {mw.month}
-                              </TableCell>
-                              <TableCell className="text-xs text-text-primary">
-                                ₹{mw.amount.toLocaleString()}
-                              </TableCell>
-                              <TableCell className="text-xs text-text-secondary">
-                                {mw.status === 'PAID' && mw.receipt?.payment_date ? formatDate(mw.receipt.payment_date) : '—'}
-                              </TableCell>
-                              <TableCell>
-                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase border ${mw.statusClass}`}>
-                                  {mw.status}
-                                </span>
-                              </TableCell>
-                              <TableCell className="text-right">
-                                {mw.status === 'PAID' ? (
-                                  <div className="flex justify-end gap-2">
-                                    {student.status !== 'Alumni' && student.status !== 'Archived' && (
+                      {activeLedgerTab === 'monthly' ? (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Month</TableHead>
+                              <TableHead>Amount</TableHead>
+                              <TableHead className="whitespace-nowrap">Payment Date</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead className="text-right">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {monthWiseList.map(mw => (
+                              <TableRow key={mw.month}>
+                                <TableCell className="font-extrabold text-text-primary text-xs uppercase tracking-wider">
+                                  {mw.month}
+                                </TableCell>
+                                <TableCell className="text-xs text-text-primary">
+                                  ₹{mw.amount.toLocaleString()}
+                                </TableCell>
+                                <TableCell className="text-xs text-text-secondary whitespace-nowrap">
+                                  {mw.status === 'PAID' && mw.receipt?.payment_date ? formatDate(mw.receipt.payment_date) : '—'}
+                                </TableCell>
+                                <TableCell>
+                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase border ${mw.statusClass}`}>
+                                    {mw.status}
+                                  </span>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {mw.status === 'PAID' ? (
+                                    <div className="flex justify-end gap-2">
+                                      {student.status !== 'Alumni' && student.status !== 'Archived' && (
+                                        <Button 
+                                          variant="secondary" 
+                                          className="h-7 w-20 text-[10px] px-0 font-bold"
+                                          onClick={() => handleRevertPayment(mw.receipt)}
+                                        >
+                                          Revert
+                                        </Button>
+                                      )}
                                       <Button 
                                         variant="secondary" 
                                         className="h-7 w-20 text-[10px] px-0 font-bold"
-                                        onClick={() => handleRevertPayment(mw.receipt)}
+                                        onClick={() => setViewingReceipt(mw.receipt)}
                                       >
-                                        Revert
+                                        Receipt
                                       </Button>
-                                    )}
-                                    <Button 
-                                      variant="secondary" 
-                                      className="h-7 w-20 text-[10px] px-0 font-bold"
-                                      onClick={() => setViewingReceipt(mw.receipt)}
-                                    >
-                                      Receipt
-                                    </Button>
-                                  </div>
-                                ) : (
-                                  student.status !== 'Alumni' && student.status !== 'Archived' ? (
-                                    <Button 
-                                      className="h-7 w-20 text-[10px] px-0 font-bold"
-                                      onClick={() => setShowDepositModal(true)}
-                                    >
-                                      Deposit
-                                    </Button>
+                                    </div>
                                   ) : (
-                                    <span className="text-[10px] text-text-muted font-bold">—</span>
-                                  )
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                                    student.status !== 'Alumni' && student.status !== 'Archived' ? (
+                                      <Button 
+                                        className="h-7 w-20 text-[10px] px-0 font-bold"
+                                        onClick={() => setShowDepositModal(true)}
+                                      >
+                                        Deposit
+                                      </Button>
+                                    ) : (
+                                      <span className="text-[10px] text-text-muted font-bold">—</span>
+                                    )
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      ) : (
+                        (!data.additional_fee_payments || data.additional_fee_payments.length === 0) ? (
+                          <div className="p-8 text-center text-text-muted text-xs font-bold leading-relaxed bg-zinc-50/50 dark:bg-zinc-900/10 border border-border rounded-xl">
+                            No additional fee records found for this student.
+                          </div>
+                        ) : (
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Description</TableHead>
+                                <TableHead>Amount</TableHead>
+                                <TableHead className="whitespace-nowrap">Payment Date</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="text-right">Action</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {data.additional_fee_payments.map(af => (
+                                <TableRow key={af.id}>
+                                  <TableCell className="font-extrabold text-text-primary text-xs uppercase tracking-wider">
+                                    {af.fee_name}
+                                  </TableCell>
+                                  <TableCell className="text-xs text-text-primary font-bold">
+                                    ₹{parseFloat(af.amount || 0).toLocaleString()}
+                                  </TableCell>
+                                  <TableCell className="text-xs text-text-secondary whitespace-nowrap">
+                                    {af.status === 'Paid' && af.payment_date ? formatDate(af.payment_date) : '—'}
+                                  </TableCell>
+                                  <TableCell>
+                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase border ${
+                                      af.status === 'Paid'
+                                        ? 'bg-green-500/10 text-green-600 border-green-500/20'
+                                        : 'bg-red-500/10 text-red-600 border-red-500/20'
+                                    }`}>
+                                      {af.status}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    {af.status === 'Paid' ? (
+                                      <div className="flex justify-end gap-2">
+                                        {student.status !== 'Alumni' && student.status !== 'Archived' && (
+                                          <Button 
+                                            variant="secondary" 
+                                            className="h-7 w-20 text-[10px] px-0 font-bold"
+                                            onClick={() => handleRevertAdditionalPayment(af)}
+                                          >
+                                            Revert
+                                          </Button>
+                                        )}
+                                        <Button 
+                                          variant="secondary" 
+                                          className="h-7 w-20 text-[10px] px-0 font-bold"
+                                          onClick={() => handleViewAdditionalReceipt(af)}
+                                        >
+                                          Receipt
+                                        </Button>
+                                      </div>
+                                    ) : (
+                                      (af.due_date <= (new Date().toISOString().split('T')[0]) && student.status !== 'Alumni' && student.status !== 'Archived') ? (
+                                        <Button 
+                                          className="h-7 w-20 text-[10px] px-0 font-bold"
+                                          onClick={() => handleCollectAdditionalPayment(af)}
+                                        >
+                                          Deposit
+                                        </Button>
+                                      ) : (
+                                        <span className="text-[10px] text-text-muted font-bold">—</span>
+                                      )
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        )
+                      )}
                     </CardContent>
                   </Card>
                 </>
@@ -1104,6 +1375,19 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
             await loadDetails();
           }} 
           onClose={() => setShowDepositModal(false)} 
+        />
+      )}
+
+      {/* Additional Fee Deposit Dialog */}
+      {showAdditionalDepositModal && (
+        <AdditionalDepositModal 
+          student={student} 
+          unpaidFees={unpaidAdditionalFeesList} 
+          onSave={async () => {
+            setShowAdditionalDepositModal(false);
+            await loadDetails();
+          }} 
+          onClose={() => setShowAdditionalDepositModal(false)} 
         />
       )}
 

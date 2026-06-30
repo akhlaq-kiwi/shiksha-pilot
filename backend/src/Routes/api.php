@@ -55,10 +55,13 @@ return function (App $app) {
     $app->put('/api/school/financial-reports/{id}/settle', [SchoolAdminController::class, 'updateFinancialReportStatus']);
     $app->get('/api/school/expenses', [SchoolAdminController::class, 'getSchoolExpenses']);
     $app->post('/api/school/expenses', [SchoolAdminController::class, 'createSchoolExpense']);
+    $app->put('/api/school/expenses/{id}', [SchoolAdminController::class, 'updateSchoolExpense']);
+    $app->delete('/api/school/expenses/{id}', [SchoolAdminController::class, 'deleteSchoolExpense']);
     $app->get('/api/school/additional-fees/types', [SchoolAdminController::class, 'getAdditionalFeeTypes']);
     $app->post('/api/school/additional-fees/types', [SchoolAdminController::class, 'createAdditionalFeeType']);
     $app->get('/api/school/additional-fees/payments', [SchoolAdminController::class, 'getAdditionalFeePayments']);
     $app->post('/api/school/additional-fees/payments/{id}/pay', [SchoolAdminController::class, 'collectAdditionalFeePayment']);
+    $app->post('/api/school/additional-fees/payments/{id}/revert', [SchoolAdminController::class, 'revertAdditionalFeePayment']);
     $app->get('/api/school/classes', [SchoolAdminController::class, 'getClasses']);
     $app->post('/api/school/classes', [SchoolAdminController::class, 'createClass']);
     $app->put('/api/school/classes', [SchoolAdminController::class, 'updateClass']);

@@ -36,7 +36,7 @@ const NAV_ITEMS = [
   { path: '/school-admin/timetable',  label: 'Timetable', icon: Clock },
   { path: '/school-admin/attendance', label: 'Attendance', icon: ClipboardCheck },
   { path: '/school-admin/exams',      label: 'Examinations', icon: FileText },
-  { path: '/school-admin/finance',    label: 'Finance', icon: DollarSign },
+  { path: '/school-admin/finance',    label: 'Fees Portal', icon: DollarSign },
   { path: '/school-admin/reports',    label: 'Reports', icon: BarChart2 },
   { path: '/school-admin/audits-settings', label: 'Audits & Settings', icon: Settings },
   { path: '/school-admin/financial-reports', label: 'Financial Reports', icon: FileText },
@@ -96,6 +96,9 @@ export default function SchoolAdminPortal() {
 
   const isActive = (path, exact) => {
     if (exact) return location.pathname === path;
+    if (path === '/school-admin/finance') {
+      return location.pathname === '/school-admin/finance';
+    }
     return location.pathname.startsWith(path);
   };
 

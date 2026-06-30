@@ -576,7 +576,7 @@ export default function StaffPage() {
     if (!element) return;
     
     const opt = {
-      margin: 15,
+      margin: 0,
       filename: `Experience_Letter_${teacherDetails?.name || 'Teacher'}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true },
@@ -891,17 +891,31 @@ export default function StaffPage() {
                     </div>
                     
                     <div className="flex items-center justify-between w-full mt-4 text-xs">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[9px] font-black uppercase border ${
-                        t.status === 'ACTIVE' 
-                          ? 'bg-green-500/10 text-green-600 border-green-500/20'
-                          : 'bg-red-500/10 text-red-600 border-red-500/20'
-                      }`}>
-                        {t.status}
-                      </span>
-                      
-                      <span className="text-[10px] text-text-muted font-mono">
-                        {t.employee_id}
-                      </span>
+                      {(() => {
+                        const rawAssigned = parseInt(t.assigned_periods || 0, 10);
+                        const max = parseInt(t.max_periods || 8, 10);
+                        let assigned = rawAssigned;
+                        if (rawAssigned > max) {
+                          console.error(`[Validation Error] Teacher ${t.name} has assigned periods (${rawAssigned}) exceeding max allowed (${max}).`);
+                          assigned = max;
+                        }
+                        const isOccupied = assigned === max;
+                        return (
+                          <>
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[9px] font-black uppercase border ${
+                              isOccupied 
+                                ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+                                : 'bg-green-500/10 text-green-600 border-green-500/20'
+                            }`}>
+                              {isOccupied ? 'Occupied' : 'Available'}
+                            </span>
+                            
+                            <span className="text-[10px] text-text-muted font-bold font-sans">
+                              Assigned {assigned}/{max}
+                            </span>
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
                 );

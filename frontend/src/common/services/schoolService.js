@@ -181,12 +181,20 @@ export const schoolService = {
     return apiClient.put(`/api/school/financial-reports/${id}/settle`, data);
   },
 
-  getSchoolExpenses() {
-    return apiClient.get('/api/school/expenses');
+  getSchoolExpenses(params = {}) {
+    return apiClient.get(buildUrl('/api/school/expenses', params));
   },
 
   createSchoolExpense(data) {
     return apiClient.post('/api/school/expenses', data);
+  },
+
+  updateSchoolExpense(id, data) {
+    return apiClient.put(`/api/school/expenses/${id}`, data);
+  },
+
+  deleteSchoolExpense(id) {
+    return apiClient.delete(`/api/school/expenses/${id}`);
   },
 
   getAdditionalFeeTypes() {
@@ -203,6 +211,10 @@ export const schoolService = {
 
   collectAdditionalFeePayment(id) {
     return apiClient.post(`/api/school/additional-fees/payments/${id}/pay`);
+  },
+
+  revertAdditionalFeePayment(id) {
+    return apiClient.post(`/api/school/additional-fees/payments/${id}/revert`);
   }
 };
 

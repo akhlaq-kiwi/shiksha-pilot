@@ -44,6 +44,7 @@ export default function AuditsSettingsPage() {
   const [isConfigLocked, setIsConfigLocked] = useState(false);
   const [showLockConfirm, setShowLockConfirm] = useState(false);
   const [feeError, setFeeError] = useState('');
+  const [feeSuccess, setFeeSuccess] = useState('');
   const [isSwitchingClass, setIsSwitchingClass] = useState(false);
 
   // Source Data for Wizard
@@ -566,6 +567,12 @@ export default function AuditsSettingsPage() {
           {feeError && (
             <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl text-xs font-semibold">
               {feeError}
+            </div>
+          )}
+
+          {feeSuccess && (
+            <div className="p-3 bg-green-500/10 border border-green-500/20 text-green-600 rounded-xl text-xs font-semibold">
+              {feeSuccess}
             </div>
           )}
 

@@ -546,9 +546,33 @@ class SchoolAdminController extends BaseController
         $user = $this->authenticate($request);
         $this->requireRole($user, ['SCHOOL_ADMIN']);
 
-        $data = $this->service->getSchoolExpenses($user);
+        $params = $request->getQueryParams();
+        $data = $this->service->getSchoolExpenses($user, $params);
 
         return $this->success($response, $data);
+    }
+
+    public function updateSchoolExpense(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int)$args['id'];
+        $body = RequestParser::body($request);
+        $data = $this->service->updateSchoolExpense($user, $id, $body);
+
+        return $this->success($response, $data, 'School expense updated successfully');
+    }
+
+    public function deleteSchoolExpense(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int)$args['id'];
+        $data = $this->service->deleteSchoolExpense($user, $id);
+
+        return $this->success($response, $data, 'School expense deleted successfully');
     }
 
     public function createSchoolExpense(Request $request, Response $response): Response
@@ -602,6 +626,17 @@ class SchoolAdminController extends BaseController
         $data = $this->service->collectAdditionalFeePayment($user, $id);
 
         return $this->success($response, $data, 'Additional fee payment collected successfully');
+    }
+
+    public function revertAdditionalFeePayment(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int)$args['id'];
+        $data = $this->service->revertAdditionalFeePayment($user, $id);
+
+        return $this->success($response, $data, 'Additional fee payment reverted successfully');
     }
 }
 
