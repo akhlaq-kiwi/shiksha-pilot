@@ -2596,7 +2596,7 @@ class SchoolAdminService extends BaseService
 
         // 3. Determine next suggested start date
         $suggestedStartDate = '';
-        $stmtLatest = $pdo->prepare("SELECT to_date FROM financial_reports WHERE school_id = :sid ORDER BY to_date DESC LIMIT 1");
+        $stmtLatest = $pdo->prepare("SELECT `to_date` FROM financial_reports WHERE school_id = :sid ORDER BY `to_date` DESC LIMIT 1");
         $stmtLatest->execute([':sid' => $schoolId]);
         $latestToDate = $stmtLatest->fetchColumn();
 
@@ -2731,7 +2731,7 @@ class SchoolAdminService extends BaseService
         // Pre-prepare locking validation query
         $stmtReports = $pdo->prepare("
             SELECT COUNT(*) FROM financial_reports 
-            WHERE school_id = :sid AND :expense_date BETWEEN from_date AND to_date
+            WHERE school_id = :sid AND :expense_date BETWEEN `from_date` AND `to_date`
         ");
 
         return array_map(function($e) use ($stmtReports, $schoolId) {
@@ -2825,7 +2825,7 @@ class SchoolAdminService extends BaseService
         // Enforce lock verification
         $stmtCheckReport = $pdo->prepare("
             SELECT COUNT(*) FROM financial_reports 
-            WHERE school_id = :sid AND :expense_date BETWEEN from_date AND to_date
+            WHERE school_id = :sid AND :expense_date BETWEEN `from_date` AND `to_date`
         ");
         $stmtCheckReport->execute([':sid' => $schoolId, ':expense_date' => $expense['expense_date']]);
         if ((int)$stmtCheckReport->fetchColumn() > 0) {
@@ -2898,7 +2898,7 @@ class SchoolAdminService extends BaseService
         // Enforce lock verification
         $stmtCheckReport = $pdo->prepare("
             SELECT COUNT(*) FROM financial_reports 
-            WHERE school_id = :sid AND :expense_date BETWEEN from_date AND to_date
+            WHERE school_id = :sid AND :expense_date BETWEEN `from_date` AND `to_date`
         ");
         $stmtCheckReport->execute([':sid' => $schoolId, ':expense_date' => $expense['expense_date']]);
         if ((int)$stmtCheckReport->fetchColumn() > 0) {

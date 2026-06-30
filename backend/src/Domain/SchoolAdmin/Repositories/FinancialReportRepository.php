@@ -14,7 +14,7 @@ class FinancialReportRepository extends BaseRepository
     public function findBySchool(int $schoolId): array
     {
         $stmt = $this->pdo->prepare(
-            "SELECT * FROM financial_reports WHERE school_id = :sid ORDER BY to_date DESC"
+            "SELECT * FROM financial_reports WHERE school_id = :sid ORDER BY `to_date` DESC"
         );
         $stmt->execute([':sid' => $schoolId]);
 

@@ -37,9 +37,9 @@ const NAV_ITEMS = [
   { path: '/school-admin/attendance', label: 'Attendance', icon: ClipboardCheck },
   { path: '/school-admin/exams',      label: 'Examinations', icon: FileText },
   { path: '/school-admin/finance',    label: 'Fees Portal', icon: DollarSign },
-  { path: '/school-admin/audits-settings', label: 'Audits & Settings', icon: Settings },
   { path: '/school-admin/financial-reports', label: 'Financial Reports', icon: FileText },
   { path: '/school-admin/finance-management', label: 'Finance Management', icon: Landmark },
+  { path: '/school-admin/audits-settings', label: 'Audits & Settings', icon: Settings },
   { path: '/school-admin/security',   label: 'Security', icon: Shield },
 ];
 
