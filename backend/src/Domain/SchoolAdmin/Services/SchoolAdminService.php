@@ -2404,7 +2404,7 @@ class SchoolAdminService extends BaseService
         $pdo = $this->feeRepo->getPdo();
 
         // Check if the payment exists and belongs to this school
-        $stmt = $pdo->prepare("SELECT id, receipt_no FROM fee_payments WHERE id = :id AND school_id = :school_id LIMIT 1");
+        $stmt = $pdo->prepare("SELECT id, receipt_no, student_id, fee_month, academic_year_id, payment_date, created_at FROM fee_payments WHERE id = :id AND school_id = :school_id LIMIT 1");
         $stmt->execute([':id' => $id, ':school_id' => $schoolId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -2412,27 +2412,66 @@ class SchoolAdminService extends BaseService
             throw new NotFoundException('Fee payment not found');
         }
 
+        $studentId = (int)$row['student_id'];
+        $receiptNo = $row['receipt_no'];
+        $academicYearId = $row['academic_year_id'] !== null ? (int)$row['academic_year_id'] : 0;
+
+        // 1. Report lock check
+        if ($this->isTransactionInReport($pdo, $schoolId, $row['created_at'])) {
+            throw new ValidationException(['locked' => 'This payment has already been included in a generated Financial Report and can no longer be reverted.']);
+        }
+
+        // 2. Outstanding migration lock check
         $stmtGetInfo = $pdo->prepare("
-            SELECT s.academic_year_id AS student_ay_id, s.status AS student_status, fp.academic_year_id AS payment_ay_id
-            FROM fee_payments fp
-            JOIN students s ON s.id = fp.student_id
-            WHERE fp.id = :id AND fp.school_id = :sid
+            SELECT s.academic_year_id AS student_ay_id, s.status AS student_status
+            FROM students s
+            WHERE s.id = :student_id AND s.school_id = :sid
             LIMIT 1
         ");
-        $stmtGetInfo->execute([':id' => $id, ':sid' => $schoolId]);
+        $stmtGetInfo->execute([':student_id' => $studentId, ':sid' => $schoolId]);
         $info = $stmtGetInfo->fetch(PDO::FETCH_ASSOC);
         if ($info) {
             $studentAyId = $info['student_ay_id'] !== null ? (int)$info['student_ay_id'] : 0;
-            $paymentAyId = $info['payment_ay_id'] !== null ? (int)$info['payment_ay_id'] : 0;
-            if ($info['student_status'] === 'ACTIVE' && $studentAyId > $paymentAyId) {
+            if ($info['student_status'] === 'ACTIVE' && $studentAyId > $academicYearId) {
                 throw new ValidationException(['fields' => "This student's outstanding balance has already been migrated to the current Academic Year as 'Previous Year Dues'. Payment can only be collected from the current Academic Year."]);
             }
         }
 
-        $receiptNo = $row['receipt_no'];
-
+        // 3. Chronological sequence check
         if (!empty($receiptNo)) {
-            // Delete all payments in this transaction
+            $stmtTx = $pdo->prepare("SELECT fee_month FROM fee_payments WHERE receipt_no = :receipt_no AND school_id = :school_id");
+            $stmtTx->execute([':receipt_no' => $receiptNo, ':school_id' => $schoolId]);
+            $revertedMonths = $stmtTx->fetchAll(PDO::FETCH_COLUMN);
+        } else {
+            $revertedMonths = [$row['fee_month']];
+        }
+
+        // Fetch all paid months for this student in this academic year
+        $stmtPaid = $pdo->prepare("SELECT fee_month FROM fee_payments WHERE student_id = :student_id AND status = 'PAID' AND academic_year_id = :academic_year_id");
+        $stmtPaid->execute([':student_id' => $studentId, ':academic_year_id' => $academicYearId]);
+        $alreadyPaid = $stmtPaid->fetchAll(PDO::FETCH_COLUMN);
+
+        $academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+
+        $maxRevertedIdx = -1;
+        foreach ($revertedMonths as $rm) {
+            $idx = array_search($rm, $academicMonths, true);
+            if ($idx !== false && $idx > $maxRevertedIdx) {
+                $maxRevertedIdx = $idx;
+            }
+        }
+
+        foreach ($alreadyPaid as $ap) {
+            if (!in_array($ap, $revertedMonths, true)) {
+                $idx = array_search($ap, $academicMonths, true);
+                if ($idx !== false && $idx > $maxRevertedIdx) {
+                    throw new ValidationException(['months' => "Cannot revert this payment because later month's fee has already been paid."]);
+                }
+            }
+        }
+
+        // 4. Perform deletion
+        if (!empty($receiptNo)) {
             $stmtDel = $pdo->prepare("DELETE FROM fee_payments WHERE receipt_no = :receipt_no AND school_id = :school_id");
             return $stmtDel->execute([':receipt_no' => $receiptNo, ':school_id' => $schoolId]);
         }
@@ -2802,16 +2841,8 @@ class SchoolAdminService extends BaseService
         }
 
         // Check if the payment date falls within any generated financial report
-        $stmtCheckReport = $pdo->prepare("
-            SELECT COUNT(*) FROM financial_reports 
-            WHERE school_id = :sid AND :payment_date BETWEEN `from_date` AND `to_date`
-        ");
-        $stmtCheckReport->execute([
-            ':sid' => $schoolId,
-            ':payment_date' => $payment['payment_date']
-        ]);
-        if ((int)$stmtCheckReport->fetchColumn() > 0) {
-            throw new ValidationException(['locked' => 'This salary payment can no longer be reverted because it has already been included in a generated Financial Report.']);
+        if ($this->isTransactionInReport($pdo, $schoolId, $payment['created_at'])) {
+            throw new ValidationException(['locked' => 'This payment has already been included in a generated Financial Report and can no longer be reverted.']);
         }
 
         // Verify and delete payout
@@ -2874,7 +2905,7 @@ class SchoolAdminService extends BaseService
         $stmtAddFees = $pdo->prepare("
             SELECT COALESCE(SUM(amount), 0) 
             FROM additional_fee_payments 
-            WHERE school_id = :sid AND status = 'Paid' AND created_at {$operator} :from_ts AND created_at <= :to_ts
+            WHERE school_id = :sid AND status = 'Paid' AND updated_at {$operator} :from_ts AND updated_at <= :to_ts
         ");
         $stmtAddFees->execute([':sid' => $schoolId, ':from_ts' => $fromTimestamp, ':to_ts' => $toTimestamp]);
         $addFeesCollected = (float)$stmtAddFees->fetchColumn();
@@ -3621,12 +3652,19 @@ class SchoolAdminService extends BaseService
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->staffRepo->getPdo();
 
-        $stmtCheck = $pdo->prepare("SELECT id FROM additional_fee_payments WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtCheck = $pdo->prepare("SELECT id, payment_date, updated_at FROM additional_fee_payments WHERE id = :id AND school_id = :sid LIMIT 1");
         $stmtCheck->execute([':id' => $id, ':sid' => $schoolId]);
-        if ($stmtCheck->fetchColumn() === false) {
+        $paymentDetails = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+        if ($paymentDetails === false) {
             throw new NotFoundException('Fee record not found.');
         }
 
+        // 1. Report lock check
+        if ($this->isTransactionInReport($pdo, $schoolId, $paymentDetails['updated_at'])) {
+            throw new ValidationException(['locked' => 'This payment has already been included in a generated Financial Report and can no longer be reverted.']);
+        }
+
+        // 2. Outstanding migration lock check
         $stmtGetInfo = $pdo->prepare("
             SELECT s.academic_year_id AS student_ay_id, s.status AS student_status, aft.academic_year_id AS fee_ay_id
             FROM additional_fee_payments afp
@@ -3818,6 +3856,46 @@ class SchoolAdminService extends BaseService
             $pdo->rollBack();
             throw $e;
         }
+    }
+
+    private function isTransactionInReport(\PDO $pdo, int $schoolId, string $txTime): bool
+    {
+        $stmt = $pdo->prepare("SELECT * FROM financial_reports WHERE school_id = :sid ORDER BY created_at ASC");
+        $stmt->execute([':sid' => $schoolId]);
+        $reports = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        $prevCreatedAt = null;
+        foreach ($reports as $r) {
+            if ($prevCreatedAt !== null) {
+                $lowerBound = $prevCreatedAt;
+                $operator = '>';
+            } else {
+                $lowerBound = $r['from_date'] . ' 00:00:00';
+                $operator = '>=';
+            }
+
+            $createdDate = date('Y-m-d', strtotime($r['created_at']));
+            if ($r['to_date'] === $createdDate) {
+                $upperBound = $r['created_at'];
+            } else {
+                $upperBound = $r['to_date'] . ' 23:59:59';
+            }
+
+            $txVal = strtotime($txTime);
+            $lowerVal = strtotime($lowerBound);
+            $upperVal = strtotime($upperBound);
+
+            $inLower = ($operator === '>') ? ($txVal > $lowerVal) : ($txVal >= $lowerVal);
+            $inUpper = ($txVal <= $upperVal);
+
+            if ($inLower && $inUpper) {
+                return true;
+            }
+
+            $prevCreatedAt = $r['created_at'];
+        }
+
+        return false;
     }
 }
 

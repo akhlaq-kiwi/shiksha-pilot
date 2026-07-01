@@ -536,6 +536,8 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
   const [schoolProfile, setSchoolProfile] = useState(null);
   const [revertConfirmOpen, setRevertConfirmOpen] = useState(false);
   const [revertTarget, setRevertTarget] = useState(null); // { id, type: 'monthly' | 'additional', label }
+  const [revertError, setRevertError] = useState('');
+  const [revertSubmitting, setRevertSubmitting] = useState(false);
 
   const loadDetails = async () => {
     setLoading(true);
@@ -652,6 +654,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
 
   const handleRevertPayment = (receipt) => {
     if (!receipt || !receipt.id) return;
+    setRevertError('');
     setRevertTarget({
       id: receipt.id,
       type: 'monthly',
@@ -687,6 +690,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
 
   const handleRevertAdditionalPayment = (item) => {
     if (!item || !item.id) return;
+    setRevertError('');
     setRevertTarget({
       id: item.id,
       type: 'additional',
@@ -697,6 +701,8 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
 
   const confirmRevert = async () => {
     if (!revertTarget) return;
+    setRevertSubmitting(true);
+    setRevertError('');
     try {
       if (revertTarget.type === 'monthly') {
         await schoolService.revertFeePayment(revertTarget.id);
@@ -708,7 +714,27 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
       await loadDetails();
     } catch (err) {
       console.error(err);
-      alert(err.message || 'Failed to revert payment.');
+      let errorMsg = 'Failed to revert payment.';
+      if (err.data) {
+        if (typeof err.data === 'string') {
+          errorMsg = err.data;
+        } else if (err.data.errors) {
+          const keys = Object.keys(err.data.errors);
+          if (keys.length > 0) {
+            errorMsg = err.data.errors[keys[0]];
+          }
+        } else {
+          const keys = Object.keys(err.data);
+          if (keys.length > 0) {
+            errorMsg = err.data[keys[0]];
+          }
+        }
+      } else {
+        errorMsg = err.message || 'Failed to revert payment.';
+      }
+      setRevertError(errorMsg);
+    } finally {
+      setRevertSubmitting(false);
     }
   };
 
@@ -1480,14 +1506,21 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
               <Button 
                 variant="destructive"
                 onClick={confirmRevert}
+                disabled={revertSubmitting}
                 className="font-bold bg-red-600 hover:bg-red-700 text-white"
               >
-                Revert Payment
+                {revertSubmitting ? 'Reverting...' : 'Revert Payment'}
               </Button>
             </div>
           }
         >
           <div className="space-y-3 text-sm mt-2">
+            {revertError && (
+              <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl text-xs font-semibold leading-normal flex items-center gap-2 animate-in fade-in duration-200">
+                <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
+                <span>{revertError}</span>
+              </div>
+            )}
             <p className="text-zinc-600 dark:text-zinc-400">
               Are you sure you want to revert this payment?
             </p>
