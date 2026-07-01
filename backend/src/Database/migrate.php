@@ -76,7 +76,7 @@ try {
                 // $e->getCode() is the SQLSTATE string; MySQL-specific error number is in errorInfo[1]
                 // Ignorable: 1050 table exists, 1060 duplicate column, 1061 duplicate key name, 1062 duplicate entry
                 $mysqlCode = (int) ($e->errorInfo[1] ?? 0);
-                $ignorable  = [1050, 1060, 1061, 1062];
+                $ignorable  = [1050, 1060, 1061, 1062, 1265];
                 if (in_array($mysqlCode, $ignorable, true)) {
                     echo "  (skipped — already applied: {$e->getMessage()})\n";
                     continue;

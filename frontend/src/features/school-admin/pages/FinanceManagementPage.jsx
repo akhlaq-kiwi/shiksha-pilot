@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Landmark, Plus, Search, Calendar, Clock, Eye, Edit, Trash2, MoreVertical, X, AlertTriangle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
 import { Button } from '../../../common/ui/button';
@@ -7,6 +8,7 @@ import { Select } from '../../../common/ui/select';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
 import { Dialog } from '../../../common/ui/dialog';
 import { schoolService } from '../../../common/services/schoolService';
+import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 
 const formatCurrency = (val) => {
   const num = parseFloat(val);
@@ -24,6 +26,14 @@ const formatDateFull = (dateStr) => {
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return dateStr;
   return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+};
+
+const getLocalDateString = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 const ACADEMIC_MONTHS = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
@@ -60,6 +70,7 @@ export default function FinanceManagementPage() {
   // Three-dot Action Dropdowns State
   const [activeExpenseDropdownId, setActiveExpenseDropdownId] = useState(null);
   const [activeFeeDropdownId, setActiveFeeDropdownId] = useState(null);
+  const [dropdownCoords, setDropdownCoords] = useState(null);
   const dropdownRef = useRef(null);
 
   // Dialog Modals State
@@ -69,9 +80,6 @@ export default function FinanceManagementPage() {
   const [expenseAmount, setExpenseAmount] = useState('');
   const [expenseDate, setExpenseDate] = useState('');
   const [expenseSubmitting, setExpenseSubmitting] = useState(false);
-
-  // View Expense Modal
-  const [viewingExpense, setViewingExpense] = useState(null);
 
   // Delete Expense Confirmation
   const [deletingExpenseId, setDeletingExpenseId] = useState(null);
@@ -85,6 +93,7 @@ export default function FinanceManagementPage() {
   const [classAmountsMap, setClassAmountsMap] = useState({}); // classId => amount string
   const [feeDueDate, setFeeDueDate] = useState('');
   const [feeSubmitting, setFeeSubmitting] = useState(false);
+  const [feeFormErrors, setFeeFormErrors] = useState({});
 
   // View Summary Detail Popup for Additional Fee Type
   const [viewingFeeType, setViewingFeeType] = useState(null);
@@ -126,8 +135,17 @@ export default function FinanceManagementPage() {
     }
   };
 
+  const { isReadOnly } = useAcademicYear();
+
   useEffect(() => {
     loadData();
+    const handleYearSwitch = () => {
+      loadData();
+    };
+    window.addEventListener('academic-year-switched', handleYearSwitch);
+    return () => {
+      window.removeEventListener('academic-year-switched', handleYearSwitch);
+    };
   }, []);
 
   // Reload expenses list when filters trigger changes
@@ -147,8 +165,16 @@ export default function FinanceManagementPage() {
         setActiveFeeDropdownId(null);
       }
     };
+    const handleScroll = () => {
+      setActiveExpenseDropdownId(null);
+      setActiveFeeDropdownId(null);
+    };
     document.addEventListener('mousedown', handleOutsideClick);
-    return () => document.removeEventListener('mousedown', handleOutsideClick);
+    window.addEventListener('scroll', handleScroll, true);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      window.removeEventListener('scroll', handleScroll, true);
+    };
   }, []);
 
   const handleExpenseModalOpen = (expenseToEdit = null) => {
@@ -169,7 +195,7 @@ export default function FinanceManagementPage() {
       setEditingExpense(null);
       setExpenseDesc('');
       setExpenseAmount('');
-      setExpenseDate(new Date().toISOString().split('T')[0]);
+      setExpenseDate(getLocalDateString());
     }
     setIsExpenseModalOpen(true);
   };
@@ -182,6 +208,11 @@ export default function FinanceManagementPage() {
     }
     if (parseFloat(expenseAmount) <= 0) {
       alert('Amount must be positive.');
+      return;
+    }
+    const todayStr = getLocalDateString();
+    if (expenseDate > todayStr) {
+      alert('Expense date cannot be in the future.');
       return;
     }
 
@@ -257,6 +288,7 @@ export default function FinanceManagementPage() {
 
     setFeeDueDate('');
     setApplyType('school');
+    setFeeFormErrors({});
     setIsApplyFeeModalOpen(true);
   };
 
@@ -269,6 +301,7 @@ export default function FinanceManagementPage() {
     setFeeDueDate(ft.due_date);
     setFeeSchoolAmount(ft.amount);
     setApplyType(ft.assigned_to === 'For All' ? 'school' : 'classes');
+    setFeeFormErrors({});
     setIsApplyFeeModalOpen(true);
   };
 
@@ -299,15 +332,17 @@ export default function FinanceManagementPage() {
   };
 
   const handleApplyAdditionalFee = async (e) => {
-    e.preventDefault();
-    if (!feeDescription.trim() || !feeDueDate) {
-      alert('Please fill in all mandatory fields.');
-      return;
+    if (e && e.preventDefault) {
+      e.preventDefault();
     }
-
-    setFeeSubmitting(true);
-    setError('');
-    setSuccess('');
+    
+    const errors = {};
+    if (!feeDescription.trim()) {
+      errors.description = 'Fee description is required.';
+    }
+    if (!feeDueDate) {
+      errors.dueDate = 'Due date is required.';
+    }
 
     const payload = {
       name: feeDescription.trim(),
@@ -316,18 +351,20 @@ export default function FinanceManagementPage() {
 
     // Mode specific attributes
     if (!editingFeeType) {
-      payload.effective_date = new Date().toISOString().split('T')[0];
+      payload.effective_date = getLocalDateString();
       payload.apply_type = applyType;
       if (applyType === 'school') {
-        if (!feeSchoolAmount || parseFloat(feeSchoolAmount) <= 0) {
-          alert('Amount is mandatory and must be greater than 0.');
-          setFeeSubmitting(false);
-          return;
+        if (!feeSchoolAmount) {
+          errors.amount = 'Fee amount is required.';
+        } else if (parseFloat(feeSchoolAmount) <= 0) {
+          errors.amount = 'Amount must be greater than zero.';
+        } else {
+          payload.amount = parseFloat(feeSchoolAmount);
         }
-        payload.amount = parseFloat(feeSchoolAmount);
       } else {
         const activeClassAmounts = {};
         let hasPositive = false;
+        let hasInvalid = false;
         Object.keys(classAmountsMap).forEach(classId => {
           const val = classAmountsMap[classId];
           if (val && val.trim() !== '') {
@@ -335,32 +372,42 @@ export default function FinanceManagementPage() {
             if (amt > 0) {
               activeClassAmounts[classId] = amt;
               hasPositive = true;
-            } else if (amt <= 0) {
-              alert('Class fee amounts must be greater than zero.');
-              setFeeSubmitting(false);
-              return;
+            } else {
+              hasInvalid = true;
             }
           }
         });
 
-        if (!hasPositive) {
-          alert('At least one class amount greater than zero is required.');
-          setFeeSubmitting(false);
-          return;
+        if (hasInvalid) {
+          errors.classAmounts = 'Class fee amounts must be greater than zero.';
+        } else if (!hasPositive) {
+          errors.classAmounts = 'At least one class amount is required.';
+        } else {
+          payload.class_amounts = activeClassAmounts;
         }
-        payload.class_amounts = activeClassAmounts;
       }
     } else {
       // Editing Mode
       if (editingFeeType.assigned_to === 'For All') {
-        if (!feeSchoolAmount || parseFloat(feeSchoolAmount) <= 0) {
-          alert('Amount is mandatory and must be greater than 0.');
-          setFeeSubmitting(false);
-          return;
+        if (!feeSchoolAmount) {
+          errors.amount = 'Fee amount is required.';
+        } else if (parseFloat(feeSchoolAmount) <= 0) {
+          errors.amount = 'Amount must be greater than zero.';
+        } else {
+          payload.amount = parseFloat(feeSchoolAmount);
         }
-        payload.amount = parseFloat(feeSchoolAmount);
       }
     }
+
+    if (Object.keys(errors).length > 0) {
+      setFeeFormErrors(errors);
+      return;
+    }
+
+    setFeeFormErrors({});
+    setFeeSubmitting(true);
+    setError('');
+    setSuccess('');
 
     try {
       if (editingFeeType) {
@@ -528,14 +575,16 @@ export default function FinanceManagementPage() {
                 </Select>
               </div>
 
-              <div className="flex justify-end">
-                <Button 
-                  className="w-full md:w-auto font-bold uppercase tracking-wider text-xs flex items-center justify-center gap-1.5 shadow-2xs"
-                  onClick={() => handleExpenseModalOpen(null)}
-                >
-                  <Plus className="h-4 w-4" /> Add Expense
-                </Button>
-              </div>
+              {!isReadOnly && (
+                <div className="flex justify-end">
+                  <Button 
+                    className="w-full md:w-auto font-bold uppercase tracking-wider text-xs flex items-center justify-center gap-1.5 shadow-2xs"
+                    onClick={() => handleExpenseModalOpen(null)}
+                  >
+                    <Plus className="h-4 w-4" /> Add Expense
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -570,35 +619,44 @@ export default function FinanceManagementPage() {
                           <button 
                             onClick={(ev) => {
                               ev.stopPropagation();
-                              setActiveExpenseDropdownId(activeExpenseDropdownId === e.id ? null : e.id);
+                              if (activeExpenseDropdownId === e.id) {
+                                setActiveExpenseDropdownId(null);
+                                setDropdownCoords(null);
+                              } else {
+                                const rect = ev.currentTarget.getBoundingClientRect();
+                                setDropdownCoords({
+                                  top: rect.bottom + window.scrollY,
+                                  left: rect.right - 128 + window.scrollX,
+                                });
+                                setActiveExpenseDropdownId(e.id);
+                              }
                             }}
                             className="p-1.5 hover:bg-zinc-100 rounded-lg transition-all"
                           >
                             <MoreVertical className="h-4 w-4 text-text-muted" />
                           </button>
 
-                          {/* Dropdown Menu Overlay */}
-                          {activeExpenseDropdownId === e.id && (
+                          {/* Dropdown Menu Overlay via Portal */}
+                          {activeExpenseDropdownId === e.id && dropdownCoords && createPortal(
                             <div 
                               ref={dropdownRef}
-                              className="absolute right-4 top-10 w-32 bg-surface border border-border shadow-md rounded-xl py-1.5 z-20 text-left text-xs text-text-primary animate-in fade-in duration-100"
+                              style={{
+                                position: 'absolute',
+                                top: `${dropdownCoords.top}px`,
+                                left: `${dropdownCoords.left}px`,
+                              }}
+                              className="w-32 bg-surface border border-border shadow-md rounded-xl py-1.5 z-[9999] text-left text-xs text-text-primary animate-in fade-in duration-100"
                             >
-                              <button 
-                                onClick={() => { setViewingExpense(e); setActiveExpenseDropdownId(null); }}
-                                className="w-full px-3 py-1.5 hover:bg-zinc-50 flex items-center gap-1.5 font-semibold"
-                              >
-                                <Eye className="h-3.5 w-3.5 text-text-muted" /> View Details
-                              </button>
-                              
-                              {e.is_locked ? (
-                                <div className="px-3 py-1.5 text-text-muted font-bold italic border-t border-border flex flex-col">
+                              {isReadOnly || e.is_locked ? (
+                                <div className="px-3 py-1.5 text-text-muted font-bold italic flex flex-col">
                                   <span className="text-[9px] uppercase tracking-wider text-amber-600 flex items-center gap-0.5"><AlertTriangle className="h-3 w-3" /> Locked</span>
+                                  {isReadOnly && <span className="text-[8px] text-text-muted mt-0.5">Archived Year</span>}
                                 </div>
                               ) : (
                                 <>
                                   <button 
                                     onClick={() => handleExpenseModalOpen(e)}
-                                    className="w-full px-3 py-1.5 hover:bg-zinc-50 border-t border-border flex items-center gap-1.5 font-semibold text-zinc-700"
+                                    className="w-full px-3 py-1.5 hover:bg-zinc-50 flex items-center gap-1.5 font-semibold text-zinc-700"
                                   >
                                     <Edit className="h-3.5 w-3.5 text-text-muted" /> Edit
                                   </button>
@@ -610,7 +668,8 @@ export default function FinanceManagementPage() {
                                   </button>
                                 </>
                               )}
-                            </div>
+                            </div>,
+                            document.body
                           )}
                         </TableCell>
                       </TableRow>
@@ -646,14 +705,16 @@ export default function FinanceManagementPage() {
                 />
               </div>
 
-              <div className="flex justify-end">
-                <Button 
-                  className="w-full md:w-auto font-bold uppercase tracking-wider text-xs flex items-center justify-center gap-1.5 shadow-2xs"
-                  onClick={handleApplyFeeModalOpen}
-                >
-                  <Plus className="h-4 w-4" /> Additional Fee
-                </Button>
-              </div>
+              {!isReadOnly && (
+                <div className="flex justify-end">
+                  <Button 
+                    className="w-full md:w-auto font-bold uppercase tracking-wider text-xs flex items-center justify-center gap-1.5 shadow-2xs"
+                    onClick={handleApplyFeeModalOpen}
+                  >
+                    <Plus className="h-4 w-4" /> Additional Fee
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -690,18 +751,33 @@ export default function FinanceManagementPage() {
                           <button 
                             onClick={(ev) => {
                               ev.stopPropagation();
-                              setActiveFeeDropdownId(activeFeeDropdownId === ft.id ? null : ft.id);
+                              if (activeFeeDropdownId === ft.id) {
+                                setActiveFeeDropdownId(null);
+                                setDropdownCoords(null);
+                              } else {
+                                const rect = ev.currentTarget.getBoundingClientRect();
+                                setDropdownCoords({
+                                  top: rect.bottom + window.scrollY,
+                                  left: rect.right - 128 + window.scrollX,
+                                });
+                                setActiveFeeDropdownId(ft.id);
+                              }
                             }}
                             className="p-1.5 hover:bg-zinc-100 rounded-lg transition-all"
                           >
                             <MoreVertical className="h-4 w-4 text-text-muted" />
                           </button>
 
-                          {/* Dropdown Menu Overlay */}
-                          {activeFeeDropdownId === ft.id && (
+                          {/* Dropdown Menu Overlay via Portal */}
+                          {activeFeeDropdownId === ft.id && dropdownCoords && createPortal(
                             <div 
                               ref={dropdownRef}
-                              className="absolute right-4 top-10 w-32 bg-surface border border-border shadow-md rounded-xl py-1.5 z-20 text-left text-xs text-text-primary animate-in fade-in duration-100"
+                              style={{
+                                position: 'absolute',
+                                top: `${dropdownCoords.top}px`,
+                                left: `${dropdownCoords.left}px`,
+                              }}
+                              className="w-32 bg-surface border border-border shadow-md rounded-xl py-1.5 z-[9999] text-left text-xs text-text-primary animate-in fade-in duration-100"
                             >
                               <button 
                                 onClick={() => { setViewingFeeType(ft); setActiveFeeDropdownId(null); }}
@@ -710,20 +786,32 @@ export default function FinanceManagementPage() {
                                 <Eye className="h-3.5 w-3.5 text-text-muted" /> View Details
                               </button>
                               
-                              <button 
-                                onClick={() => handleEditFeeTypeClick(ft)}
-                                className="w-full px-3 py-1.5 hover:bg-zinc-50 border-t border-border flex items-center gap-1.5 font-semibold text-zinc-700"
-                              >
-                                <Edit className="h-3.5 w-3.5 text-text-muted" /> Edit
-                              </button>
+                              {ft.category !== 'System Generated' && !isReadOnly && (
+                                <button 
+                                  onClick={() => handleEditFeeTypeClick(ft)}
+                                  className="w-full px-3 py-1.5 hover:bg-zinc-50 border-t border-border flex items-center gap-1.5 font-semibold text-zinc-700"
+                                >
+                                  <Edit className="h-3.5 w-3.5 text-text-muted" /> Edit
+                                </button>
+                              )}
                               
-                              <button 
-                                onClick={() => handleDeleteFeeTypeClick(ft)}
-                                className="w-full px-3 py-1.5 hover:bg-zinc-50 flex items-center gap-1.5 font-semibold text-red-600"
-                              >
-                                <Trash2 className="h-3.5 w-3.5 text-red-400" /> Delete
-                              </button>
-                            </div>
+                              {ft.category !== 'System Generated' && !isReadOnly && (
+                                <button 
+                                  onClick={() => handleDeleteFeeTypeClick(ft)}
+                                  className="w-full px-3 py-1.5 hover:bg-zinc-50 flex items-center gap-1.5 font-semibold text-red-600"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5 text-red-400" /> Delete
+                                </button>
+                              )}
+
+                              {isReadOnly && (
+                                <div className="px-3 py-1.5 text-text-muted font-bold italic border-t border-border flex flex-col">
+                                  <span className="text-[9px] uppercase tracking-wider text-amber-600 flex items-center gap-0.5"><AlertTriangle className="h-3 w-3" /> Read Only</span>
+                                  <span className="text-[8px] text-text-muted mt-0.5">Archived Year</span>
+                                </div>
+                              )}
+                            </div>,
+                            document.body
                           )}
                         </TableCell>
                       </TableRow>
@@ -783,50 +871,12 @@ export default function FinanceManagementPage() {
                 type="date" 
                 value={expenseDate} 
                 onChange={e => setExpenseDate(e.target.value)} 
-                onKeyDown={e => e.preventDefault()}
+                max={getLocalDateString()}
                 required 
               />
             </div>
           </div>
         </form>
-      </Dialog>
-
-      {/* View Expense Detail Modal */}
-      <Dialog 
-        isOpen={viewingExpense !== null} 
-        onClose={() => setViewingExpense(null)}
-        title="Expense Receipt Information"
-        description="Detailed ledger transaction voucher for school audits."
-        footer={<Button onClick={() => setViewingExpense(null)}>Dismiss</Button>}
-      >
-        {viewingExpense && (
-          <div className="space-y-4 text-xs">
-            <div className="flex items-center justify-between border-b border-border pb-3">
-              <div>
-                <span className="text-[10px] text-text-muted font-black uppercase tracking-wider">Expense Amount</span>
-                <p className="text-xl font-black text-red-500 font-sans mt-0.5">{formatCurrency(viewingExpense.amount)}</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-[10px] text-text-muted font-black uppercase tracking-wider">Expense Date</p>
-                <p className="font-semibold mt-0.5 text-text-primary">{formatDateFull(viewingExpense.expense_date)}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-text-muted font-black uppercase tracking-wider">Recorded By</p>
-                <p className="font-semibold mt-0.5 text-text-primary uppercase">{viewingExpense.creator_name || 'System Admin'}</p>
-              </div>
-            </div>
-
-            <div>
-              <p className="text-[10px] text-text-muted font-black uppercase tracking-wider">Description</p>
-              <p className="font-semibold mt-1 text-text-primary bg-zinc-50 dark:bg-zinc-900/50 p-3 rounded-lg border border-border leading-relaxed text-justify">
-                {viewingExpense.description}
-              </p>
-            </div>
-          </div>
-        )}
       </Dialog>
 
       {/* Delete Expense Confirmation */}
@@ -875,7 +925,7 @@ export default function FinanceManagementPage() {
         </>}
         className="w-[95vw] md:max-w-xl"
       >
-        <form onSubmit={handleApplyAdditionalFee} className="space-y-4 text-xs">
+        <form onSubmit={handleApplyAdditionalFee} noValidate className="space-y-4 text-xs">
           
           {/* Apply Fee To Selection (Hide when editing) */}
           {!editingFeeType && (
@@ -915,9 +965,11 @@ export default function FinanceManagementPage() {
               placeholder="e.g. Annual Sports Fee" 
               value={feeDescription} 
               onChange={e => setFeeDescription(e.target.value)} 
-              required 
               className="text-xs"
             />
+            {feeFormErrors.description && (
+              <p className="text-[10px] text-red-500 font-bold mt-1">{feeFormErrors.description}</p>
+            )}
           </div>
 
           {/* Case 1: Entire School Amount */}
@@ -929,10 +981,12 @@ export default function FinanceManagementPage() {
                 placeholder="e.g. 500" 
                 value={feeSchoolAmount} 
                 onChange={e => setFeeSchoolAmount(e.target.value)} 
-                required 
                 disabled={editingFeeType && editingFeeType.collected_students > 0}
                 className="text-xs"
               />
+              {feeFormErrors.amount && (
+                <p className="text-[10px] text-red-500 font-bold mt-1">{feeFormErrors.amount}</p>
+              )}
               {editingFeeType && editingFeeType.collected_students > 0 && (
                 <p className="text-[9px] text-amber-600 mt-1 font-semibold leading-none">
                   Amount cannot be changed as some students have already paid.
@@ -971,6 +1025,9 @@ export default function FinanceManagementPage() {
                   </TableBody>
                 </Table>
               </div>
+              {feeFormErrors.classAmounts && (
+                <p className="text-[10px] text-red-500 font-bold mt-1">{feeFormErrors.classAmounts}</p>
+              )}
             </div>
           )}
 
@@ -989,9 +1046,11 @@ export default function FinanceManagementPage() {
               value={feeDueDate} 
               onChange={e => setFeeDueDate(e.target.value)} 
               onKeyDown={e => e.preventDefault()}
-              required 
               className="text-xs"
             />
+            {feeFormErrors.dueDate && (
+              <p className="text-[10px] text-red-500 font-bold mt-1">{feeFormErrors.dueDate}</p>
+            )}
             <p className="text-[9px] text-text-muted mt-1 font-semibold leading-relaxed">
               The selected Due Date determines when this fee becomes payable. Students will not see this fee as due until the selected date is reached.
             </p>

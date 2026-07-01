@@ -8,8 +8,9 @@ import { Input } from '../../../common/ui/input';
 import { Dialog } from '../../../common/ui/dialog';
 import { schoolService } from '../../../common/services/schoolService';
 import { apiClient } from '../../../common/services/apiClient';
+import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 
-export default function AuditsSettingsPage() {
+export default function AuditsSettingsPage({ onYearsUpdated }) {
   const location = useLocation();
   const [academicYears, setAcademicYears] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -35,6 +36,7 @@ export default function AuditsSettingsPage() {
 
   // Class Fee Configuration States
   const [selectedClassId, setSelectedClassId] = useState('');
+  const [configuredClassIds, setConfiguredClassIds] = useState([]);
   const [feeMode, setFeeMode] = useState('SAME'); // 'SAME' or 'DIFFERENT'
   const [sameFeeAmount, setSameFeeAmount] = useState('');
   const [monthlyFeesMap, setMonthlyFeesMap] = useState({
@@ -67,6 +69,9 @@ export default function AuditsSettingsPage() {
     try {
       const years = await schoolService.getAcademicYears();
       setAcademicYears(years || []);
+      if (onYearsUpdated) {
+        onYearsUpdated(years || []);
+      }
     } catch (err) {
       console.error(err);
       setError('Failed to load academic years.');
@@ -75,9 +80,10 @@ export default function AuditsSettingsPage() {
     }
   };
 
+  const { currentYear, isReadOnly, refreshYears } = useAcademicYear();
+
   useEffect(() => {
     loadData();
-    // Fetch classes list for the configurations dropdown
     const fetchClasses = async () => {
       try {
         const list = await schoolService.getClasses();
@@ -87,7 +93,33 @@ export default function AuditsSettingsPage() {
       }
     };
     fetchClasses();
+
+    const handleYearSwitch = () => {
+      loadData();
+      fetchClasses();
+    };
+    window.addEventListener('academic-year-switched', handleYearSwitch);
+    return () => {
+      window.removeEventListener('academic-year-switched', handleYearSwitch);
+    };
   }, []);
+
+  const fetchConfiguredClasses = async () => {
+    const activeYear = currentYear || academicYears.find(y => y.is_current) || academicYears.find(y => y.status === 'Draft');
+    if (!activeYear) return;
+    try {
+      const res = await schoolService.getClassFeeConfigurations({
+        academic_year_id: activeYear.id
+      });
+      setConfiguredClassIds((res || []).map(c => String(c.class_id)));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    fetchConfiguredClasses();
+  }, [currentYear, academicYears]);
 
   // Pre-select class from router state redirect if redirecting from Finance
   useEffect(() => {
@@ -110,7 +142,7 @@ export default function AuditsSettingsPage() {
         return;
       }
 
-      const activeYear = academicYears.find(y => y.is_current);
+      const activeYear = currentYear || academicYears.find(y => y.is_current) || academicYears.find(y => y.status === 'Draft');
       if (!activeYear) return;
 
       try {
@@ -158,9 +190,9 @@ export default function AuditsSettingsPage() {
       return;
     }
 
-    const activeYear = academicYears.find(y => y.is_current);
+    const activeYear = currentYear || academicYears.find(y => y.is_current) || academicYears.find(y => y.status === 'Draft');
     if (!activeYear) {
-      setFeeError('Active academic year not found.');
+      setFeeError('Academic year not found. Please create an Academic Year first.');
       return;
     }
 
@@ -192,7 +224,7 @@ export default function AuditsSettingsPage() {
     setFeeError('');
     setFeeSuccess('');
 
-    const activeYear = academicYears.find(y => y.is_current);
+    const activeYear = currentYear || academicYears.find(y => y.is_current) || academicYears.find(y => y.status === 'Draft');
     if (!activeYear) return;
 
     const feesMap = {};
@@ -223,6 +255,8 @@ export default function AuditsSettingsPage() {
 
       setFeeSuccess('Fee configuration saved and locked successfully.');
       setIsConfigLocked(true);
+      fetchConfiguredClasses();
+      setSelectedClassId('');
     } catch (err) {
       console.error(err);
       setFeeError(err.message || 'Failed to save fee configuration.');
@@ -306,10 +340,18 @@ export default function AuditsSettingsPage() {
       });
       setSuccess(`Academic Year ${createYearName} created in Draft state successfully.`);
       setIsCreateModalOpen(false);
+      if (refreshYears) {
+        await refreshYears();
+      }
       loadData();
     } catch (err) {
       console.error(err);
-      setFormError(err.message || 'Failed to create academic year.');
+      if (err.data && typeof err.data === 'object') {
+        const firstErrKey = Object.keys(err.data)[0];
+        setFormError(err.data[firstErrKey] || 'Failed to create academic year.');
+      } else {
+        setFormError(err.message || 'Failed to create academic year.');
+      }
     }
   };
 
@@ -489,9 +531,11 @@ export default function AuditsSettingsPage() {
       <Card className="shadow-sm">
         <CardHeader className="py-3 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-bold text-text-primary">Academic Years</CardTitle>
-          <Button onClick={openCreateModal} className="h-8 font-bold flex items-center gap-1.5 shadow-sm text-xs">
-            <Plus className="h-3.5 w-3.5" /> Create Academic Year
-          </Button>
+          {!isReadOnly && (
+            <Button onClick={openCreateModal} className="h-8 font-bold flex items-center gap-1.5 shadow-sm text-xs">
+              <Plus className="h-3.5 w-3.5" /> Create Academic Year
+            </Button>
+          )}
         </CardHeader>
         <CardContent className="p-0">
           <Table>
@@ -533,7 +577,7 @@ export default function AuditsSettingsPage() {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      {year.status === 'Draft' && (
+                      {!isReadOnly && year.status === 'Draft' && (
                         <Button 
                           onClick={() => handleActivateDirectClick(year)}
                           className="h-7 px-3 text-[10px] font-bold bg-green-600 hover:bg-green-700 text-white"
@@ -541,7 +585,7 @@ export default function AuditsSettingsPage() {
                           Activate
                         </Button>
                       )}
-                      {(year.status === 'ACTIVE' || year.is_current) && (
+                      {!isReadOnly && !!(year.status === 'ACTIVE' || year.is_current) && (
                         <Button 
                           onClick={() => handleMigrateClick(year)}
                           className="h-7 px-3 text-[10px] font-bold bg-primary hover:bg-primary/95 text-white"
@@ -593,7 +637,7 @@ export default function AuditsSettingsPage() {
                 className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs"
               >
                 <option value="">Select Class</option>
-                {classes.map(c => (
+                {classes.filter(c => !configuredClassIds.includes(String(c.id))).map(c => (
                   <option key={c.id} value={c.id}>{c.name} {c.section ? ` - ${c.section}` : ''}</option>
                 ))}
               </select>
@@ -671,15 +715,15 @@ export default function AuditsSettingsPage() {
               </div>
             )}
 
-            {selectedClassId && isConfigLocked ? (
+            {selectedClassId && (isConfigLocked || isReadOnly) ? (
               <div className="mt-6 p-4 bg-zinc-100 border border-zinc-200 dark:bg-zinc-900/50 dark:border-zinc-800 rounded-xl flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center">
                     <Lock className="h-4 w-4 text-zinc-500" />
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-text-primary">Fee Configuration Locked</p>
-                    <p className="text-[10px] text-text-muted mt-0.5">This configuration is permanently locked for the active year.</p>
+                    <p className="text-xs font-bold text-text-primary font-display">Fee Configuration Locked</p>
+                    <p className="text-[10px] text-text-muted mt-0.5">{isReadOnly ? 'Fee configuration cannot be modified in an archived academic year.' : 'This configuration is permanently locked for the active year.'}</p>
                   </div>
                 </div>
                 <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-zinc-200 text-zinc-600 border border-zinc-300">

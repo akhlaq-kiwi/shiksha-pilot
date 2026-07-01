@@ -81,8 +81,9 @@ abstract class BaseRepository
         $columns      = array_keys($data);
         $placeholders = array_map(static fn($col) => ":{$col}", $columns);
 
-        $colList  = implode(', ', $columns);
-        $valList  = implode(', ', $placeholders);
+        $backticked   = array_map(static fn($col) => "`{$col}`", $columns);
+        $colList      = implode(', ', $backticked);
+        $valList      = implode(', ', $placeholders);
 
         $sql  = "INSERT INTO {$this->table} ({$colList}) VALUES ({$valList})";
         $stmt = $this->pdo->prepare($sql);
@@ -106,7 +107,7 @@ abstract class BaseRepository
             return false;
         }
 
-        $setParts = array_map(static fn($col) => "{$col} = :{$col}", array_keys($data));
+        $setParts = array_map(static fn($col) => "`{$col}` = :{$col}", array_keys($data));
         $setClause = implode(', ', $setParts);
 
         $sql  = "UPDATE {$this->table} SET {$setClause} WHERE id = :id";

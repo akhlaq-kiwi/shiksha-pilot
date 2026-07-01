@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Calendar, DollarSign, ArrowRight, AlertCircle, RefreshCw, BarChart2, Sparkles } from 'lucide-react';
+import { FileText, Calendar, ArrowRight, AlertCircle, RefreshCw, BarChart2, Sparkles } from 'lucide-react';
 import { Card, CardHeader, CardTitle } from '../../../common/ui/card';
 import { Button } from '../../../common/ui/button';
 import { Input } from '../../../common/ui/input';
 import { schoolService } from '../../../common/services/schoolService';
+import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
+import { Dialog } from '../../../common/ui/dialog';
 
 const formatCurrency = (val) => {
   return new Intl.NumberFormat('en-IN', {
@@ -20,7 +22,17 @@ const formatDateFull = (dateStr) => {
   if (isNaN(d.getTime())) return dateStr;
   return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
 };
-
+const formatDateDisplay = (dateStr) => {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  const day = d.getDate();
+  const months = [
+    'January', 'February', 'March', 'April', 'May', 'June', 
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  return `${day} ${months[d.getMonth()]} ${d.getFullYear()}`;
+};
 const formatTime12h = (dateStr) => {
   if (!dateStr) return '—';
   const d = new Date(dateStr);
@@ -34,8 +46,10 @@ const formatTime12h = (dateStr) => {
 };
 
 export default function FinancialReportsPage() {
+  const { isReadOnly } = useAcademicYear();
   const [reports, setReports] = useState([]);
   const [nextSuggestedStartDate, setNextSuggestedStartDate] = useState('');
+  const [hasPreviousReport, setHasPreviousReport] = useState(false);
   const [loading, setLoading] = useState(true);
   
   // Date params
@@ -51,6 +65,7 @@ export default function FinancialReportsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [showGenerateConfirm, setShowGenerateConfirm] = useState(false);
 
   const loadReports = async () => {
     setLoading(true);
@@ -61,9 +76,10 @@ export default function FinancialReportsPage() {
       const suggestedStart = res.next_suggested_start_date || '';
       setNextSuggestedStartDate(suggestedStart);
       setFromDate(suggestedStart);
+      setHasPreviousReport(!!res.has_previous_report);
       
-      // Default toDate to today
-      const today = new Date().toISOString().split('T')[0];
+      // Default toDate to today in local client timezone
+      const today = new Date().toLocaleDateString('en-CA');
       setToDate(today);
     } catch (err) {
       console.error(err);
@@ -75,6 +91,13 @@ export default function FinancialReportsPage() {
 
   useEffect(() => {
     loadReports();
+    const handleYearSwitch = () => {
+      loadReports();
+    };
+    window.addEventListener('academic-year-switched', handleYearSwitch);
+    return () => {
+      window.removeEventListener('academic-year-switched', handleYearSwitch);
+    };
   }, []);
 
   const handlePreview = async () => {
@@ -105,7 +128,13 @@ export default function FinancialReportsPage() {
     }
   };
 
-  const handleGenerateReport = async () => {
+  const handleGenerateReport = () => {
+    if (!previewData) return;
+    setShowGenerateConfirm(true);
+  };
+
+  const handleConfirmGenerateReport = async () => {
+    setShowGenerateConfirm(false);
     if (!previewData) return;
     setSubmitting(true);
     setError('');
@@ -153,7 +182,7 @@ export default function FinancialReportsPage() {
     <div className="space-y-6 animate-in fade-in duration-300">
       
       {/* Title Header Card */}
-      <div className="bg-surface border border-border p-6 rounded-2xl shadow-2xs">
+      <div className="sticky top-24 z-20 bg-surface border border-border p-6 rounded-2xl shadow-2xs">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-primary/10 text-primary rounded-xl">
             <FileText className="h-6 w-6" />
@@ -177,17 +206,23 @@ export default function FinancialReportsPage() {
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-text-secondary uppercase">From Date</label>
               <div className="relative">
-                <Input 
+                <div className="w-full h-10 px-3 flex items-center rounded-lg border border-border bg-surface text-sm font-semibold text-text-primary shadow-2xs select-none">
+                  {formatDateDisplay(fromDate) || 'Select Date'}
+                </div>
+                <input 
                   type="date" 
                   value={fromDate} 
                   onChange={e => setFromDate(e.target.value)} 
-                  className="w-full text-sm font-semibold pr-10 cursor-pointer"
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 />
-                <Calendar className="absolute right-3 top-2.5 h-4 w-4 text-text-muted pointer-events-none" />
+                <Calendar className="absolute right-3 top-3 h-4 w-4 text-text-muted pointer-events-none" />
               </div>
               {nextSuggestedStartDate && (
                 <p className="text-[10px] text-teal-600 font-extrabold uppercase flex items-center gap-1 mt-1">
-                  <Sparkles className="h-3 w-3" /> Auto-suggested start date (Last ending + 1 day)
+                  <Sparkles className="h-3 w-3" /> {hasPreviousReport 
+                    ? "Includes transactions since the last generated report."
+                    : "Includes transactions since the academic year start."
+                  }
                 </p>
               )}
             </div>
@@ -195,13 +230,16 @@ export default function FinancialReportsPage() {
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-text-secondary uppercase">To Date</label>
               <div className="relative">
-                <Input 
+                <div className="w-full h-10 px-3 flex items-center rounded-lg border border-border bg-surface text-sm font-semibold text-text-primary shadow-2xs select-none">
+                  {formatDateDisplay(toDate) || 'Select Date'}
+                </div>
+                <input 
                   type="date" 
                   value={toDate} 
                   onChange={e => setToDate(e.target.value)} 
-                  className="w-full text-sm font-semibold pr-10 cursor-pointer"
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 />
-                <Calendar className="absolute right-3 top-2.5 h-4 w-4 text-text-muted pointer-events-none" />
+                <Calendar className="absolute right-3 top-3 h-4 w-4 text-text-muted pointer-events-none" />
               </div>
             </div>
 
@@ -286,8 +324,8 @@ export default function FinancialReportsPage() {
                     </h4>
                   </div>
                   
-                  <div className={`p-2.5 rounded-full ${previewData.profit_loss >= 0 ? 'bg-green-500/10 text-green-600' : 'bg-red-500/10 text-red-500'}`}>
-                    <DollarSign className="h-5 w-5" />
+                  <div className={`flex items-center justify-center rounded-full transition-all duration-200 ${previewData.profit_loss >= 0 ? 'bg-green-500/10 text-green-600' : 'bg-red-500/10 text-red-500'}`} style={{ width: '42px', height: '42px' }}>
+                    <span className="font-extrabold" style={{ fontSize: '22px', lineHeight: '1' }}>₹</span>
                   </div>
                 </div>
               </div>
@@ -404,8 +442,44 @@ export default function FinancialReportsPage() {
             })}
           </div>
         )}
-      </div>
+      {showGenerateConfirm && (
+        <Dialog
+          isOpen={showGenerateConfirm}
+          onClose={() => setShowGenerateConfirm(false)}
+          title="Generate Financial Report?"
+          description=""
+          className="max-w-md animate-in fade-in duration-200"
+          footer={
+            <div className="flex gap-2 justify-end w-full">
+              <Button 
+                variant="secondary" 
+                onClick={() => setShowGenerateConfirm(false)}
+                disabled={submitting}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleConfirmGenerateReport}
+                disabled={submitting}
+                className="font-bold bg-teal-600 hover:bg-teal-700 text-white"
+              >
+                {submitting ? 'Generating...' : 'Generate Report'}
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-3 text-sm mt-2">
+            <p className="text-zinc-600 dark:text-zinc-400">
+              This report creates an official financial snapshot of all transactions recorded since the previous report.
+            </p>
+            <p className="text-xs text-zinc-500 leading-normal">
+              Generate it only when you're ready to finalize the current accounting period.
+            </p>
+          </div>
+        </Dialog>
+      )}
 
     </div>
+  </div>
   );
 }

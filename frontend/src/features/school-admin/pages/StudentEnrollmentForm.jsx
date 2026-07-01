@@ -351,7 +351,7 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
           }
         } else {
           // Pre-select current academic year and today's date if possible
-          const currentYear = years.find(y => y.is_current);
+          const currentYear = years.find(y => y.is_current) || years.find(y => y.status === 'Draft');
           setFormData(prev => ({
             ...prev,
             academic_year_id: currentYear ? currentYear.id : (years[0]?.id || ''),

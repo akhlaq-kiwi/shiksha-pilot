@@ -4,6 +4,7 @@ import {
   CreditCard, BookMarked, PieChart
 } from 'lucide-react';
 import { Card, CardContent } from '../../../common/ui/card';
+import { Button } from '../../../common/ui/button';
 import { schoolService } from '../../../common/services/schoolService';
 import { Dialog } from '../../../common/ui/dialog';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../../common/ui/table';
@@ -32,9 +33,6 @@ export default function DashboardPage({ onNavigate }) {
   });
   const [loading, setLoading] = useState(true);
   const [auditLogs] = useState(MOCK_AUDIT_LOGS);
-
-  const [staffPaymentsList, setStaffPaymentsList] = useState([]);
-  const [loadingSalary, setLoadingSalary] = useState(false);
 
   const fetchDashboardData = async () => {
     try {
@@ -69,49 +67,6 @@ export default function DashboardPage({ onNavigate }) {
     fetchDashboardData();
   }, []);
 
-  const fetchSalaryPayments = async (monthLabel) => {
-    if (!monthLabel) return;
-    setLoadingSalary(true);
-    try {
-      const list = await schoolService.getStaffPayments({ month: monthLabel });
-      setStaffPaymentsList(list || []);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoadingSalary(false);
-    }
-  };
-
-  const handlePaySalary = async (staffId) => {
-    try {
-      await schoolService.payStaffSalary({
-        staff_id: staffId,
-        month: selectedSalaryMonthLabel
-      });
-      await fetchSalaryPayments(selectedSalaryMonthLabel);
-      await fetchDashboardData();
-    } catch (err) {
-      console.error(err);
-      alert(err.response?.data?.message || 'Failed to pay salary.');
-    }
-  };
-
-  const handleRevertSalary = async (paymentId) => {
-    if (window.confirm('Are you sure you want to revert this salary payment?')) {
-      try {
-        await schoolService.revertStaffSalary(paymentId);
-        await fetchSalaryPayments(selectedSalaryMonthLabel);
-        await fetchDashboardData();
-      } catch (err) {
-        console.error(err);
-        alert(err.response?.data?.message || 'Failed to revert salary payment.');
-      }
-    }
-  };
-
-  const [isSalaryDialogOpen, setIsSalaryDialogOpen] = useState(false);
-  const [selectedSalaryMonth, setSelectedSalaryMonth] = useState('');
-  const [selectedSalaryMonthLabel, setSelectedSalaryMonthLabel] = useState('');
   const [isAnimated, setIsAnimated] = useState(false);
 
   useEffect(() => {
@@ -421,7 +376,7 @@ export default function DashboardPage({ onNavigate }) {
   const totalStudents = students.length;
   const activeStudents = students.filter(s => s.status === 'ACTIVE').length;
   const totalStaff = staff.length;
-  const totalFeeCollected = dbStats.total_collected || feePayments.filter(f => f.status === 'PAID').reduce((sum, f) => sum + parseFloat(f.amount_paid || 0), 0);
+  const totalFeeCollected = dbStats.total_collected !== undefined && dbStats.total_collected !== null ? dbStats.total_collected : feePayments.filter(f => f.status === 'PAID').reduce((sum, f) => sum + parseFloat(f.amount_paid || 0), 0);
   const pendingFees = dbStats.pending_fees || 0;
 
   const stats = {
@@ -518,10 +473,7 @@ export default function DashboardPage({ onNavigate }) {
                     <div 
                       key={i} 
                       onClick={() => {
-                        setSelectedSalaryMonth(item.month);
-                        setSelectedSalaryMonthLabel(item.label);
-                        fetchSalaryPayments(item.label);
-                        setIsSalaryDialogOpen(true);
+                        onNavigate('salary-disbursement?month=' + encodeURIComponent(item.label));
                       }}
                       className="flex-1 flex flex-col items-center group cursor-pointer z-10 relative"
                     >
@@ -557,89 +509,6 @@ export default function DashboardPage({ onNavigate }) {
           </div>
         </div>
       </div>
-
-      {/* Salary Disbursement Details Dialog */}
-      <Dialog
-        isOpen={isSalaryDialogOpen}
-        onClose={() => setIsSalaryDialogOpen(false)}
-        title={`Salary Disbursement — ${selectedSalaryMonthLabel}`}
-        description=""
-        className="w-[90vw] md:max-w-4xl"
-      >
-        {loadingSalary ? (
-          <div className="flex flex-col items-center justify-center py-12 gap-3">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-            <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Loading staff records...</p>
-          </div>
-        ) : staffPaymentsList.length === 0 ? (
-          <div className="text-center py-12 text-xs text-text-secondary">
-            No active staff records found for this period.
-          </div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="whitespace-nowrap">Staff Name</TableHead>
-                <TableHead className="whitespace-nowrap">Designation</TableHead>
-                <TableHead className="whitespace-nowrap">Salary Amount</TableHead>
-                <TableHead className="whitespace-nowrap">Payment Date</TableHead>
-                <TableHead className="whitespace-nowrap">Payment Status</TableHead>
-                <TableHead className="whitespace-nowrap">Salary Slip</TableHead>
-                <TableHead className="text-right whitespace-nowrap">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {staffPaymentsList.map((staff, idx) => (
-                <TableRow key={idx}>
-                  <TableCell className="font-semibold text-text-primary text-sm whitespace-nowrap">{staff.name}</TableCell>
-                  <TableCell className="text-xs whitespace-nowrap">{staff.designation}</TableCell>
-                  <TableCell className="font-mono text-sm font-semibold whitespace-nowrap">₹{staff.salary.toLocaleString()}</TableCell>
-                  <TableCell className="font-mono text-xs whitespace-nowrap">{staff.date}</TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                      staff.status === 'Paid' 
-                        ? 'bg-green-500/10 text-green-600 border border-green-500/20' 
-                        : 'bg-amber-500/10 text-amber-600 border border-amber-500/20'
-                    }`}>
-                      {staff.status}
-                    </span>
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    {staff.status === 'Paid' ? (
-                      <button 
-                        onClick={() => handleDownloadSalarySlip(staff, selectedSalaryMonthLabel)}
-                        className="text-xs text-primary hover:underline font-semibold text-teal-600 dark:text-teal-400"
-                      >
-                        Download Salary Slip
-                      </button>
-                    ) : (
-                      <span className="text-xs text-text-muted">--</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right whitespace-nowrap">
-                    {staff.status === 'Paid' ? (
-                      <Button 
-                        variant="secondary"
-                        onClick={() => handleRevertSalary(staff.payment_id)}
-                        className="h-7 text-[10px] font-bold px-3 border border-red-500/20 hover:border-red-500/50 hover:bg-red-50 text-red-600 dark:hover:bg-red-950/20"
-                      >
-                        Revert Payout
-                      </Button>
-                    ) : (
-                      <Button 
-                        onClick={() => handlePaySalary(staff.id)}
-                        className="h-7 text-[10px] font-bold px-3"
-                      >
-                        Pay Salary
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </Dialog>
     </div>
   );
 }

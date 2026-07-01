@@ -19,6 +19,7 @@ import FinancialReportsPage from './pages/FinancialReportsPage';
 import FinanceManagementPage from './pages/FinanceManagementPage';
 import AuditsSettingsPage from './pages/AuditsSettingsPage';
 import SecurityPage from './pages/SecurityPage';
+import SalaryDisbursementPage from './pages/SalaryDisbursementPage';
 
 import { schoolService } from '../../common/services/schoolService';
 import { apiClient } from '../../common/services/apiClient';
@@ -26,6 +27,8 @@ import { Card } from '../../common/ui/card';
 import { Input } from '../../common/ui/input';
 import { Dialog } from '../../common/ui/dialog';
 import { Button } from '../../common/ui/button';
+
+import { useAcademicYear } from '../../common/contexts/AcademicYearContext';
 
 // ─── Nav Items ────────────────────────────────────────────────────────────────
 
@@ -75,23 +78,7 @@ export default function SchoolAdminPortal() {
   const nav = useNavigate();
   const location = useLocation();
 
-  const [academicYears, setAcademicYears] = useState([]);
-  const [loadingYears, setLoadingYears] = useState(true);
-
-  const loadAcademicYears = async () => {
-    try {
-      const list = await schoolService.getAcademicYears();
-      setAcademicYears(list || []);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoadingYears(false);
-    }
-  };
-
-  useEffect(() => {
-    loadAcademicYears();
-  }, []);
+  const { academicYears, loading: loadingYears, refreshYears } = useAcademicYear();
 
   const isActive = (path, exact) => {
     if (exact) return location.pathname === path;
@@ -156,9 +143,10 @@ export default function SchoolAdminPortal() {
             <Route path="exams" element={<ExamsPage />} />
             <Route path="finance" element={<FinancePage />} />
             <Route path="reports" element={<ReportsPage />} />
-            <Route path="audits-settings" element={<AuditsSettingsPage />} />
+            <Route path="audits-settings" element={<AuditsSettingsPage onYearsUpdated={() => refreshYears()} />} />
             <Route path="financial-reports" element={<FinancialReportsPage />} />
             <Route path="finance-management" element={<FinanceManagementPage />} />
+            <Route path="salary-disbursement" element={<SalaryDisbursementPage />} />
             <Route path="security" element={<SecurityPage />} />
             <Route path="*" element={<Navigate to="/school-admin" replace />} />
           </Routes>

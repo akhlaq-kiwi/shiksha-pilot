@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle } from '../../../common/ui/card';
+import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
 import { Input } from '../../../common/ui/input';
 import { Select } from '../../../common/ui/select';
@@ -34,6 +35,7 @@ const statusBadge = (status) => {
 };
 
 export default function AttendancePage({ students }) {
+  const { isReadOnly } = useAcademicYear();
   const attendance = MOCK_ATTENDANCE;
 
   return (
@@ -66,7 +68,7 @@ export default function AttendancePage({ students }) {
       <Card>
         <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-bold text-text-primary">Student Attendance — 25 Jun 2026</CardTitle>
-          <Button className="text-xs h-8 px-3">Save Attendance</Button>
+          {!isReadOnly && <Button className="text-xs h-8 px-3">Save Attendance</Button>}
         </CardHeader>
         <Table>
           <TableHeader>
@@ -86,7 +88,7 @@ export default function AttendancePage({ students }) {
                 <TableCell className="text-xs text-text-secondary">{a.class}</TableCell>
                 <TableCell>{statusBadge(a.status)}</TableCell>
                 <TableCell>
-                  <Select defaultValue={a.status} className="h-7 text-xs w-28">
+                  <Select defaultValue={a.status} className="h-7 text-xs w-28" disabled={isReadOnly}>
                     <option>Present</option><option>Absent</option><option>Late</option>
                   </Select>
                 </TableCell>

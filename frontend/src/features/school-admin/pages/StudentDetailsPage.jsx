@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../../common/ui/button';
+import { Dialog } from '../../../common/ui/dialog';
 import { Card, CardContent } from '../../../common/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
 import { schoolService } from '../../../common/services/schoolService';
 import html2pdf from 'html2pdf.js';
+import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 import { 
   User, BookOpen, Users, Home, Calendar, FileText, 
-  Download, Printer, AlertCircle, Eye, ChevronDown, ChevronUp, X 
+  Download, Printer, AlertCircle, Eye, ChevronDown, ChevronUp, X, ShieldAlert 
 } from 'lucide-react';
 
 // Self-healing avatar image component to handle loading errors gracefully
@@ -532,6 +534,8 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
   const [showRemovePhotoConfirm, setShowRemovePhotoConfirm] = useState(false);
   const [showPhotoMenu, setShowPhotoMenu] = useState(false);
   const [schoolProfile, setSchoolProfile] = useState(null);
+  const [revertConfirmOpen, setRevertConfirmOpen] = useState(false);
+  const [revertTarget, setRevertTarget] = useState(null); // { id, type: 'monthly' | 'additional', label }
 
   const loadDetails = async () => {
     setLoading(true);
@@ -551,8 +555,17 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
     }
   };
 
+  const { isReadOnly } = useAcademicYear();
+
   useEffect(() => {
     loadDetails();
+    const handleYearSwitch = () => {
+      loadDetails();
+    };
+    window.addEventListener('academic-year-switched', handleYearSwitch);
+    return () => {
+      window.removeEventListener('academic-year-switched', handleYearSwitch);
+    };
   }, [studentId]);
 
   if (loading) {
@@ -637,21 +650,22 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
     return date.toLocaleDateString('en-GB', options);
   };
 
-  const handleRevertPayment = async (receipt) => {
+  const handleRevertPayment = (receipt) => {
     if (!receipt || !receipt.id) return;
-    if (window.confirm(`Are you sure you want to revert the payment for ${receipt.fee_month}? This will delete the payment record and receipt.`)) {
-      try {
-        await schoolService.revertFeePayment(receipt.id);
-        await loadDetails();
-      } catch (err) {
-        console.error(err);
-        alert(err.message || 'Failed to revert payment.');
-      }
-    }
+    setRevertTarget({
+      id: receipt.id,
+      type: 'monthly',
+      label: receipt.fee_month
+    });
+    setRevertConfirmOpen(true);
   };
 
   const handleCollectAdditionalPayment = async (item) => {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const todayStr = `${yyyy}-${mm}-${dd}`;
     const unpaidDueFees = (data?.additional_fee_payments || [])
       .filter(p => p.status === 'Pending' && p.due_date <= todayStr);
 
@@ -671,15 +685,30 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
     }
   };
 
-  const handleRevertAdditionalPayment = async (item) => {
-    if (window.confirm(`Are you sure you want to revert the payment for ${item.fee_name}? This will mark it as unpaid.`)) {
-      try {
-        await schoolService.revertAdditionalFeePayment(item.id);
-        await loadDetails();
-      } catch (err) {
-        console.error(err);
-        alert(err.message || 'Failed to revert payment.');
+  const handleRevertAdditionalPayment = (item) => {
+    if (!item || !item.id) return;
+    setRevertTarget({
+      id: item.id,
+      type: 'additional',
+      label: item.fee_name
+    });
+    setRevertConfirmOpen(true);
+  };
+
+  const confirmRevert = async () => {
+    if (!revertTarget) return;
+    try {
+      if (revertTarget.type === 'monthly') {
+        await schoolService.revertFeePayment(revertTarget.id);
+      } else {
+        await schoolService.revertAdditionalFeePayment(revertTarget.id);
       }
+      setRevertConfirmOpen(false);
+      setRevertTarget(null);
+      await loadDetails();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Failed to revert payment.');
     }
   };
 
@@ -760,7 +789,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
           </button>
           <h2 className="text-2xl font-black text-text-primary tracking-tight font-display">Student Profile</h2>
         </div>
-        {student.status !== 'Alumni' && student.status !== 'Archived' && (
+        {!isReadOnly && student.status !== 'Alumni' && student.status !== 'Archived' && (
           <Button onClick={() => onEdit(student.id)} className="font-bold">
             Edit Profile
           </Button>
@@ -779,11 +808,11 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
               <div className="relative -mt-10 z-20">
                 <button 
                   onClick={() => {
-                    if (student.status !== 'Alumni' && student.status !== 'Archived') {
+                    if (!isReadOnly && student.status !== 'Alumni' && student.status !== 'Archived') {
                       setShowPhotoMenu(prev => !prev);
                     }
                   }}
-                  className={`w-20 h-20 rounded-full border-4 border-surface bg-zinc-50 flex items-center justify-center overflow-hidden shadow-xs transition-all focus:outline-none ${student.status !== 'Alumni' && student.status !== 'Archived' ? 'hover:ring-2 hover:ring-primary/20 cursor-pointer' : ''}`}
+                  className={`w-20 h-20 rounded-full border-4 border-surface bg-zinc-50 flex items-center justify-center overflow-hidden shadow-xs transition-all focus:outline-none ${!isReadOnly && student.status !== 'Alumni' && student.status !== 'Archived' ? 'hover:ring-2 hover:ring-primary/20 cursor-pointer' : ''}`}
                 >
                   <StudentAvatar src={student.photo_path} name={student.name} updatedAt={student.updated_at} />
                 </button>
@@ -1082,6 +1111,12 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
           {/* Sub-tab 3: Finance */}
           {activeSubTab === 'finance' && (
             <div className="space-y-6 animate-in fade-in duration-200">
+              {data?.is_ledger_locked && (
+                <div className="p-4 bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-400 rounded-xl text-xs font-semibold leading-relaxed flex items-start gap-3">
+                  <ShieldAlert className="h-5 w-5 flex-shrink-0 mt-0.5 text-amber-600" />
+                  <span>{data.ledger_locked_message}</span>
+                </div>
+              )}
               {(!data || !data.class_fee_config) ? (
                 <div className="bg-surface border border-border rounded-2xl p-8 flex flex-col items-center text-center space-y-4 max-w-md mx-auto shadow-2xs">
                   <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-600">
@@ -1093,8 +1128,9 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                     Please configure the class fee before collecting or managing student fees.
                   </p>
                   <Button 
+                    variant="accent"
                     onClick={() => navigate('/school-admin/audits-settings', { state: { preselectClassId: student.class_id } })}
-                    className="font-bold bg-primary text-primary-foreground hover:bg-primary/95 flex items-center gap-1.5 text-xs h-9 px-4 rounded-lg shadow-2xs mt-2"
+                    className="font-bold flex items-center gap-1.5 text-xs h-9 px-4 rounded-lg shadow-2xs mt-2"
                   >
                     Configure Class Fee
                   </Button>
@@ -1140,7 +1176,11 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                       }
                     });
 
-                    const todayStr = new Date().toISOString().split('T')[0];
+                    const today = new Date();
+                    const yyyy = today.getFullYear();
+                    const mm = String(today.getMonth() + 1).padStart(2, '0');
+                    const dd = String(today.getDate()).padStart(2, '0');
+                    const todayStr = `${yyyy}-${mm}-${dd}`;
                     const additionalFeeDue = (data.additional_fee_payments || [])
                       .filter(p => p.status === 'Pending' && p.due_date <= todayStr)
                       .reduce((sum, p) => sum + parseFloat(p.amount), 0);
@@ -1223,25 +1263,25 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                                 <TableCell className="text-right">
                                   {mw.status === 'PAID' ? (
                                     <div className="flex justify-end gap-2">
-                                      {student.status !== 'Alumni' && student.status !== 'Archived' && (
-                                        <Button 
-                                          variant="secondary" 
-                                          className="h-7 w-20 text-[10px] px-0 font-bold"
-                                          onClick={() => handleRevertPayment(mw.receipt)}
-                                        >
-                                          Revert
-                                        </Button>
-                                      )}
-                                      <Button 
-                                        variant="secondary" 
-                                        className="h-7 w-20 text-[10px] px-0 font-bold"
-                                        onClick={() => setViewingReceipt(mw.receipt)}
-                                      >
-                                        Receipt
-                                      </Button>
+                                      {!data?.is_ledger_locked && (
+                                         <Button 
+                                           variant="secondary" 
+                                           className="h-7 w-20 text-[10px] px-0 font-bold"
+                                           onClick={() => handleRevertPayment(mw.receipt)}
+                                         >
+                                           Revert
+                                         </Button>
+                                       )}
+                                       <Button 
+                                         variant="secondary" 
+                                         className="h-7 w-20 text-[10px] px-0 font-bold"
+                                         onClick={() => setViewingReceipt(mw.receipt)}
+                                       >
+                                         Receipt
+                                       </Button>
                                     </div>
                                   ) : (
-                                    student.status !== 'Alumni' && student.status !== 'Archived' ? (
+                                    !data?.is_ledger_locked ? (
                                       <Button 
                                         className="h-7 w-20 text-[10px] px-0 font-bold"
                                         onClick={() => setShowDepositModal(true)}
@@ -1297,7 +1337,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                                   <TableCell className="text-right">
                                     {af.status === 'Paid' ? (
                                       <div className="flex justify-end gap-2">
-                                        {student.status !== 'Alumni' && student.status !== 'Archived' && (
+                                        {!data?.is_ledger_locked && (
                                           <Button 
                                             variant="secondary" 
                                             className="h-7 w-20 text-[10px] px-0 font-bold"
@@ -1315,7 +1355,14 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                                         </Button>
                                       </div>
                                     ) : (
-                                      (af.due_date <= (new Date().toISOString().split('T')[0]) && student.status !== 'Alumni' && student.status !== 'Archived') ? (
+                                      ((() => {
+                                        const today = new Date();
+                                        const yyyy = today.getFullYear();
+                                        const mm = String(today.getMonth() + 1).padStart(2, '0');
+                                        const dd = String(today.getDate()).padStart(2, '0');
+                                        const todayStr = `${yyyy}-${mm}-${dd}`;
+                                        return af.due_date <= todayStr;
+                                      })() && !data?.is_ledger_locked) ? (
                                         <Button 
                                           className="h-7 w-20 text-[10px] px-0 font-bold"
                                           onClick={() => handleCollectAdditionalPayment(af)}
@@ -1408,6 +1455,47 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
             </div>
           </div>
         </div>
+      )}
+      {revertConfirmOpen && (
+        <Dialog
+          isOpen={revertConfirmOpen}
+          onClose={() => {
+            setRevertConfirmOpen(false);
+            setRevertTarget(null);
+          }}
+          title="Revert Payment?"
+          description=""
+          className="max-w-md animate-in fade-in duration-200"
+          footer={
+            <div className="flex gap-2 justify-end w-full">
+              <Button 
+                variant="secondary" 
+                onClick={() => {
+                  setRevertConfirmOpen(false);
+                  setRevertTarget(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button 
+                variant="destructive"
+                onClick={confirmRevert}
+                className="font-bold bg-red-600 hover:bg-red-700 text-white"
+              >
+                Revert Payment
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-3 text-sm mt-2">
+            <p className="text-zinc-600 dark:text-zinc-400">
+              Are you sure you want to revert this payment?
+            </p>
+            <p className="text-xs text-zinc-500 leading-normal">
+              The payment record and generated receipt will be permanently removed.
+            </p>
+          </div>
+        </Dialog>
       )}
 
     </div>

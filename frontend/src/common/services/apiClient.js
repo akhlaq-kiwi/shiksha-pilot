@@ -12,6 +12,11 @@ async function request(endpoint, options = {}) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
+  const selectedYearId = localStorage.getItem('shiksha_pilot_academic_year_id');
+  if (selectedYearId) {
+    headers['X-Academic-Year-Id'] = selectedYearId;
+  }
+
   if (options.body && !(options.body instanceof FormData)) {
     headers['Content-Type'] = 'application/json';
     if (typeof options.body === 'object') {
@@ -43,7 +48,9 @@ async function request(endpoint, options = {}) {
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(data.message || data.error || 'API Request failed');
+    const err = new Error(data.message || data.error || 'API Request failed');
+    err.data = data.data;
+    throw err;
   }
 
   // Unwrap uniform envelope {status, message, data} → return data field if present

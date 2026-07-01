@@ -21,7 +21,7 @@ export default function ReportsPage() {
         const totalStudents = students.length;
         const activeStudents = students.filter(s => s.status === 'ACTIVE').length;
 
-        const totalFeeCollected = statsData?.total_collected || feePayments.filter(f => f.status === 'PAID').reduce((sum, f) => sum + parseFloat(f.amount_paid || 0), 0);
+        const totalFeeCollected = statsData?.total_collected !== undefined && statsData?.total_collected !== null ? statsData.total_collected : feePayments.filter(f => f.status === 'PAID').reduce((sum, f) => sum + parseFloat(f.amount_paid || 0), 0);
         const pendingFees = statsData?.pending_fees || feePayments.filter(f => f.status === 'Pending').length;
 
         setStats({

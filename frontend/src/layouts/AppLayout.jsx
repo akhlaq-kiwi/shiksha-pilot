@@ -6,6 +6,7 @@ import { Button } from '../common/ui/button';
 import ForcePasswordChange from '../common/components/ForcePasswordChange';
 import { useNavigate } from 'react-router-dom';
 import { schoolService } from '../common/services/schoolService';
+import { useAcademicYear } from '../common/contexts/AcademicYearContext';
 
 const ROLE_LABELS = {
   SUPER_ADMIN: 'Super Admin',
@@ -21,6 +22,12 @@ const AppLayout = ({ children }) => {
 
   const user = authService.getCurrentUser();
   const role = authService.getUserRole();
+  const isSchoolAdmin = role === 'SCHOOL_ADMIN';
+
+  const { academicYears, currentYear, selectYear } = isSchoolAdmin
+    ? useAcademicYear()
+    : { academicYears: [], currentYear: null, selectYear: () => {} };
+
   const [showForcePassword, setShowForcePassword] = useState(
     () => !!(user?.force_password_change)
   );
@@ -104,12 +111,42 @@ const AppLayout = ({ children }) => {
             {/* Left side dynamic header */}
             <div className="flex items-center gap-3 min-w-0">
               {role !== 'SUPER_ADMIN' && schoolProfile ? (
-                <span 
-                  className="text-sm font-black text-text-primary font-display tracking-tight leading-none truncate"
-                  style={{ fontWeight: 900 }}
-                >
-                  {schoolProfile.name}
-                </span>
+                <div className="flex items-center gap-3">
+                  <span 
+                    className="text-sm font-black text-text-primary font-display tracking-tight leading-none truncate"
+                    style={{ fontWeight: 900 }}
+                  >
+                    {schoolProfile.name}
+                  </span>
+                  
+                  {isSchoolAdmin && currentYear && (
+                    <>
+                      <div className="h-4 w-px bg-border"></div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider whitespace-nowrap hidden sm:inline">
+                          Academic Year
+                        </span>
+                        <select
+                          value={currentYear.id}
+                          onChange={(e) => selectYear(e.target.value)}
+                          className="h-8 pl-2 pr-8 text-xs font-black rounded-lg border border-border bg-surface text-text-primary shadow-2xs focus:outline-hidden focus:ring-1 focus:ring-primary appearance-none cursor-pointer relative"
+                          style={{
+                            backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2371717a' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E")`,
+                            backgroundPosition: 'right 0.25rem center',
+                            backgroundSize: '1.25rem',
+                            backgroundRepeat: 'no-repeat',
+                          }}
+                        >
+                          {academicYears.map(y => (
+                            <option key={y.id} value={y.id}>
+                              {y.name} {y.status === 'ACTIVE' ? '(Active)' : y.status === 'Archived' ? '(Archived)' : `(${y.status})`}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </>
+                  )}
+                </div>
               ) : (
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="flex items-center justify-center w-8 h-8 rounded-md bg-zinc-900 dark:bg-zinc-50 flex-shrink-0">

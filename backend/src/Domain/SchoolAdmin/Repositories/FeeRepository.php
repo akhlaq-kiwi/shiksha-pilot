@@ -56,13 +56,44 @@ class FeeRepository extends BaseRepository
         return (int) $stmt->fetchColumn();
     }
 
-    public function getTotalCollectedBySchool(int $schoolId): float
+    public function getTotalCollectedBySchool(int $schoolId, ?int $academicYearId = null): float
     {
-        $stmt = $this->pdo->prepare(
-            "SELECT SUM(amount_paid) FROM fee_payments WHERE school_id = :sid AND status = 'PAID'"
-        );
-        $stmt->execute([':sid' => $schoolId]);
-        return (float) ($stmt->fetchColumn() ?: 0.0);
+        if ($academicYearId !== null) {
+            $stmt = $this->pdo->prepare("
+                SELECT COALESCE(SUM(amount_paid), 0) 
+                FROM fee_payments 
+                WHERE school_id = :sid AND status = 'PAID' AND academic_year_id = :ayid
+            ");
+            $stmt->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+            $monthlyCollected = (float)$stmt->fetchColumn();
+
+            $stmtAdd = $this->pdo->prepare("
+                SELECT COALESCE(SUM(afp.amount), 0) 
+                FROM additional_fee_payments afp
+                JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+                WHERE afp.school_id = :sid AND afp.status = 'Paid' AND aft.academic_year_id = :ayid
+            ");
+            $stmtAdd->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+            $additionalCollected = (float)$stmtAdd->fetchColumn();
+        } else {
+            $stmt = $this->pdo->prepare("
+                SELECT COALESCE(SUM(amount_paid), 0) 
+                FROM fee_payments 
+                WHERE school_id = :sid AND status = 'PAID'
+            ");
+            $stmt->execute([':sid' => $schoolId]);
+            $monthlyCollected = (float)$stmt->fetchColumn();
+
+            $stmtAdd = $this->pdo->prepare("
+                SELECT COALESCE(SUM(amount), 0) 
+                FROM additional_fee_payments 
+                WHERE school_id = :sid AND status = 'Paid'
+            ");
+            $stmtAdd->execute([':sid' => $schoolId]);
+            $additionalCollected = (float)$stmtAdd->fetchColumn();
+        }
+
+        return $monthlyCollected + $additionalCollected;
     }
 
     public function createPayment(array $data): int

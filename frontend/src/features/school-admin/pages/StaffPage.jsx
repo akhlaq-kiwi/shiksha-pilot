@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Edit, User, UserCog, Upload, AlertCircle, ArrowLeft, Check, Trash2, FileText, Download, Printer } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Plus, Search, Edit, User, UserCog, Upload, AlertCircle, ArrowLeft, Check, Trash2, FileText, Download, Printer, MoreVertical, Lock, CheckCircle } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
 import { Input } from '../../../common/ui/input';
@@ -9,6 +10,7 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '.
 import { schoolService } from '../../../common/services/schoolService';
 import { SearchableSelect, INDIAN_STATES_AND_CITIES } from '../../../common/ui/SearchableSelect';
 import html2pdf from 'html2pdf.js';
+import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 
 // Self-healing avatar image component to handle loading errors gracefully
 const TeacherAvatar = ({ src, name, updatedAt }) => {
@@ -145,8 +147,20 @@ const printStyles = `
 `;
 
 export default function StaffPage() {
+  const [searchParams] = useSearchParams();
   const [view, setView] = useState('list'); // 'list', 'details'
   const [selectedTeacherId, setSelectedTeacherId] = useState(null);
+
+  useEffect(() => {
+    const idParam = searchParams.get('id');
+    if (idParam) {
+      const parsedId = parseInt(idParam, 10);
+      if (!isNaN(parsedId)) {
+        setSelectedTeacherId(parsedId);
+        setView('details');
+      }
+    }
+  }, [searchParams]);
   
   const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -162,6 +176,19 @@ export default function StaffPage() {
   const [teacherDetails, setTeacherDetails] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
 
+  const [academicYears, setAcademicYears] = useState([]);
+  
+  // Salary disbursement / revert dialog states
+  const [disburseMonth, setDisburseMonth] = useState('');
+  const [isDisburseDialogOpen, setIsDisburseDialogOpen] = useState(false);
+  const [revertPayment, setRevertPayment] = useState(null);
+  const [isRevertDialogOpen, setIsRevertDialogOpen] = useState(false);
+  const [isSalarySlipOpen, setIsSalarySlipOpen] = useState(false);
+  const [selectedSlipPayment, setSelectedSlipPayment] = useState(null);
+  const [actionError, setActionError] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
+  const [activeMenuMonth, setActiveMenuMonth] = useState(null);
+
   const [newStaff, setNewStaff] = useState({ 
     id: null,
     name: '', 
@@ -175,7 +202,7 @@ export default function StaffPage() {
     emergency_phone: '',
     joining_date: '',
     exit_date: '',
-    parent_occupation: '',
+    salary: '',
     current_address_line: '',
     current_city: '',
     current_state: '',
@@ -225,6 +252,8 @@ export default function StaffPage() {
     }
   };
 
+  const { isReadOnly } = useAcademicYear();
+
   useEffect(() => {
     loadStaff();
     const fetchSchool = async () => {
@@ -236,7 +265,28 @@ export default function StaffPage() {
       }
     };
     fetchSchool();
-  }, []);
+
+    const fetchYears = async () => {
+      try {
+        const years = await schoolService.getAcademicYears();
+        setAcademicYears(years || []);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchYears();
+
+    const handleYearSwitch = () => {
+      loadStaff();
+      if (selectedTeacherId && view === 'details') {
+        loadTeacherDetails(selectedTeacherId);
+      }
+    };
+    window.addEventListener('academic-year-switched', handleYearSwitch);
+    return () => {
+      window.removeEventListener('academic-year-switched', handleYearSwitch);
+    };
+  }, [selectedTeacherId, view]);
 
   useEffect(() => {
     if (selectedTeacherId && view === 'details') {
@@ -429,13 +479,6 @@ export default function StaffPage() {
     }
     if (!newStaff.joining_date) {
       errors.joining_date = "Joining date is required.";
-    } else {
-      const joinVal = new Date(newStaff.joining_date);
-      const today = new Date();
-      today.setHours(23, 59, 59, 999);
-      if (joinVal > today) {
-        errors.joining_date = "Joining date cannot be a future date.";
-      }
     }
     if (newStaff.exit_date) {
       const exitVal = new Date(newStaff.exit_date);
@@ -474,6 +517,16 @@ export default function StaffPage() {
       }
     }
 
+    // Salary Validation
+    if (newStaff.salary === undefined || newStaff.salary === null || String(newStaff.salary).trim() === '') {
+      errors.salary = "Salary is required.";
+    } else {
+      const salVal = parseFloat(newStaff.salary);
+      if (isNaN(salVal) || salVal <= 0) {
+        errors.salary = "Salary must be a positive number.";
+      }
+    }
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -493,7 +546,7 @@ export default function StaffPage() {
       photo_path: newStaff.photo_path || null,
       father_name: newStaff.father_name.trim(),
       mother_name: newStaff.mother_name.trim(),
-      parent_occupation: newStaff.parent_occupation.trim(),
+      salary: newStaff.salary,
       emergency_phone: newStaff.emergency_phone.trim(),
       joining_date: newStaff.joining_date,
       exit_date: newStaff.exit_date || null,
@@ -549,7 +602,7 @@ export default function StaffPage() {
       photo_path: t.photo_path || '',
       father_name: t.father_name || '',
       mother_name: t.mother_name || '',
-      parent_occupation: t.parent_occupation || '',
+      salary: t.salary || '',
       emergency_phone: t.emergency_phone || '',
       joining_date: t.joining_date || '',
       exit_date: t.exit_date || '',
@@ -569,6 +622,134 @@ export default function StaffPage() {
     setFormErrors({});
     setUploadError('');
     setIsAddStaffOpen(true);
+  };
+
+  const handleConfirmDisburse = async () => {
+    setActionLoading(true);
+    setActionError('');
+    try {
+      await schoolService.payStaffSalary({
+        staff_id: teacherDetails.id,
+        month: disburseMonth
+      });
+      setIsDisburseDialogOpen(false);
+      await loadTeacherDetails(teacherDetails.id);
+    } catch (err) {
+      console.error(err);
+      let errorMsg = 'Failed to disburse salary.';
+      if (err.data && typeof err.data === 'object') {
+        if (err.data.errors && typeof err.data.errors === 'object') {
+          const firstErrKey = Object.keys(err.data.errors)[0];
+          errorMsg = err.data.errors[firstErrKey];
+        } else {
+          const firstErrKey = Object.keys(err.data)[0];
+          if (typeof err.data[firstErrKey] === 'string') {
+            errorMsg = err.data[firstErrKey];
+          } else if (err.data[firstErrKey] && typeof err.data[firstErrKey] === 'object') {
+            const nestedKey = Object.keys(err.data[firstErrKey])[0];
+            errorMsg = err.data[firstErrKey][nestedKey];
+          }
+        }
+      } else {
+        errorMsg = err.message || 'Failed to disburse salary.';
+      }
+      setActionError(errorMsg);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleConfirmRevert = async () => {
+    setActionLoading(true);
+    setActionError('');
+    try {
+      await schoolService.revertStaffSalary(revertPayment.id);
+      setIsRevertDialogOpen(false);
+      await loadTeacherDetails(teacherDetails.id);
+    } catch (err) {
+      console.error(err);
+      let errorMsg = 'Failed to revert salary payment.';
+      if (err.data && typeof err.data === 'object') {
+        if (err.data.errors && typeof err.data.errors === 'object') {
+          const firstErrKey = Object.keys(err.data.errors)[0];
+          errorMsg = err.data.errors[firstErrKey];
+        } else {
+          const firstErrKey = Object.keys(err.data)[0];
+          if (typeof err.data[firstErrKey] === 'string') {
+            errorMsg = err.data[firstErrKey];
+          } else if (err.data[firstErrKey] && typeof err.data[firstErrKey] === 'object') {
+            const nestedKey = Object.keys(err.data[firstErrKey])[0];
+            errorMsg = err.data[firstErrKey][nestedKey];
+          }
+        }
+      } else {
+        errorMsg = err.message || 'Failed to revert salary payment.';
+      }
+      setActionError(errorMsg);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDownloadSalarySlip = () => {
+    const element = document.getElementById('salary-slip-print-area');
+    if (!element) return;
+    
+    const opt = {
+      margin: 15,
+      filename: `SalarySlip_${teacherDetails?.name?.split(/\\s+/).join('') || 'Teacher'}_${selectedSlipPayment?.payment_month}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+    
+    html2pdf().from(element).set(opt).save();
+  };
+
+  const handlePrintSalarySlip = () => {
+    const printContent = document.getElementById('salary-slip-print-area').innerHTML;
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+    
+    const doc = iframe.contentWindow.document;
+    doc.open();
+    doc.write('<html><head><title>Print Salary Slip</title>');
+    Array.from(document.querySelectorAll('link[rel="stylesheet"], style')).forEach(el => {
+      doc.write(el.outerHTML);
+    });
+    doc.write(`
+      <style>
+        @page {
+          size: auto;
+          margin: 0mm;
+        }
+        body {
+          background-color: white !important;
+          color: black !important;
+          padding: 40px !important;
+        }
+      </style>
+    </head>
+    <body class="bg-white text-black">
+      <div class="space-y-6">
+        ${printContent}
+      </div>
+    </body>
+    </html>
+    `);
+    doc.close();
+    
+    iframe.contentWindow.focus();
+    setTimeout(() => {
+      iframe.contentWindow.print();
+      document.body.removeChild(iframe);
+    }, 500);
   };
 
   const handleDownloadPDF = () => {
@@ -613,7 +794,7 @@ export default function StaffPage() {
         return (
           <div className="space-y-6 animate-in fade-in duration-300">
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-border pb-4 gap-4 bg-surface p-4 rounded-2xl shadow-2xs">
+            <div className="sticky top-24 z-20 flex items-center justify-between border-b border-border pb-4 gap-4 bg-surface p-4 rounded-2xl shadow-2xs">
               <div className="flex items-center gap-6">
                 <button 
                   onClick={() => setView('list')} 
@@ -632,9 +813,11 @@ export default function StaffPage() {
                     <FileText className="h-4 w-4" /> Experience Letter
                   </Button>
                 )}
-                <Button variant="outline" className="flex items-center gap-2 font-bold" onClick={() => handleEditClick(t)}>
-                  <Edit className="h-4 w-4" /> Edit Profile
-                </Button>
+                {!isReadOnly && (
+                  <Button variant="outline" className="flex items-center gap-2 font-bold" onClick={() => handleEditClick(t)}>
+                    <Edit className="h-4 w-4" /> Edit Profile
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -676,10 +859,7 @@ export default function StaffPage() {
                     <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Mother's Name</p>
                     <p className="text-sm font-semibold text-text-primary mt-0.5">{t.mother_name || '—'}</p>
                   </div>
-                  <div>
-                    <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Parent Occupation</p>
-                    <p className="text-sm font-semibold text-text-primary mt-0.5">{t.parent_occupation || '—'}</p>
-                  </div>
+
                   <div>
                     <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Contact Phone</p>
                     <p className="text-sm font-semibold text-text-primary mt-0.5">{t.phone || '—'}</p>
@@ -734,56 +914,122 @@ export default function StaffPage() {
                     </div>
                   </div>
                 </Card>
-
-                {/* Documents details */}
-                <Card className="p-6 bg-surface border border-border rounded-2xl shadow-xs">
-                  <h3 className="text-sm font-extrabold text-text-primary uppercase tracking-wider mb-4 border-b border-border pb-2">Attached Documents</h3>
+                   {/* Salary Card panel */}
+                <Card className="p-6 bg-surface border border-border rounded-2xl shadow-xs animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between border-b border-border pb-4 mb-4">
+                    <h3 className="text-sm font-extrabold text-text-primary uppercase tracking-wider">Salary Card</h3>
+                    <span className="text-xs text-text-secondary font-bold">
+                      Academic Year: {academicYears.find(y => y.is_current)?.name || academicYears.find(y => y.status === 'Draft')?.name || '—'}
+                    </span>
+                  </div>
                   
-                  {(!t.documents || t.documents.length === 0) ? (
-                    <p className="text-xs text-text-muted italic py-4">No documents uploaded.</p>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="text-xs uppercase font-extrabold text-text-secondary">Document</TableHead>
-                            <TableHead className="text-xs uppercase font-extrabold text-text-secondary">Upload Date</TableHead>
-                            <TableHead className="text-xs uppercase font-extrabold text-text-secondary">Size</TableHead>
-                            <TableHead className="text-xs uppercase font-extrabold text-text-secondary">View</TableHead>
-                            <TableHead className="text-right text-xs uppercase font-extrabold text-text-secondary">Action</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {t.documents.map((doc, idx) => (
-                            <TableRow key={idx}>
-                              <TableCell className="font-semibold text-text-primary text-xs">{doc.category}</TableCell>
-                              <TableCell className="text-xs text-text-muted">{formatDateTime(doc.upload_date)}</TableCell>
-                              <TableCell className="text-xs text-text-muted font-mono">{formatBytes(doc.file_size)}</TableCell>
-                              <TableCell>
-                                <a 
-                                  href={doc.file_path.startsWith('http') ? doc.file_path : `http://localhost:8000${doc.file_path}`} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center text-[10px] font-black text-indigo-600 hover:text-indigo-700 bg-indigo-50 dark:bg-indigo-900/10 px-2 py-1 rounded"
-                                >
-                                  View
-                                </a>
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <a 
-                                  href={doc.file_path.startsWith('http') ? doc.file_path : `http://localhost:8000${doc.file_path}`} 
-                                  download
-                                  className="inline-flex items-center gap-1 text-[10px] font-bold text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-50 border border-border px-2 py-1 rounded shadow-3xs"
-                                >
-                                  Download
-                                </a>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                    {['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'].map(month => {
+                      const payment = (t.salary_payments || []).find(p => p.payment_month === month);
+                      const isPaid = !!payment;
+                      const isLocked = payment ? !!payment.is_locked : false;
+                      const salaryAmount = t.salary || 0.0;
+
+                      return (
+                        <div 
+                          key={month} 
+                          className={`p-4 rounded-xl border flex flex-col justify-between relative transition-all shadow-3xs ${
+                            isPaid 
+                              ? 'bg-zinc-50/50 dark:bg-zinc-900/10 border-border' 
+                              : 'bg-surface border-zinc-200 dark:border-zinc-800'
+                          }`}
+                        >
+                          {/* Top row: Month name and dropdown menu (if paid and not locked) */}
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <h4 className="text-sm font-extrabold text-text-primary">{month}</h4>
+                              <p className="text-[10px] text-text-secondary font-bold uppercase mt-0.5">
+                                {isPaid ? (
+                                  <span className="inline-flex items-center gap-1 text-green-600">
+                                    <CheckCircle className="h-3 w-3" /> Paid
+                                  </span>
+                                ) : (
+                                  <span className="text-amber-500">Pending</span>
+                                )}
+                              </p>
+                            </div>
+                            
+                            {isPaid && (
+                              <div className="flex items-center gap-1.5">
+                                {isLocked && (
+                                  <span title="Locked by Financial Report" className="text-zinc-400">
+                                    <Lock className="h-3.5 w-3.5" />
+                                  </span>
+                                )}
+                                {!isReadOnly && !isLocked && (
+                                  <div className="relative">
+                                    <button 
+                                      onClick={() => setActiveMenuMonth(activeMenuMonth === month ? null : month)}
+                                      className="p-1 text-zinc-500 hover:text-zinc-950 dark:hover:text-zinc-50 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-all"
+                                    >
+                                      <MoreVertical className="h-3.5 w-3.5" />
+                                    </button>
+                                    {activeMenuMonth === month && (
+                                      <>
+                                        <div className="fixed inset-0 z-40" onClick={() => setActiveMenuMonth(null)} />
+                                        <div className="absolute right-0 mt-1 w-32 bg-surface border border-border rounded-lg shadow-md py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
+                                          <button
+                                            onClick={() => {
+                                              setActiveMenuMonth(null);
+                                              setRevertPayment(payment);
+                                              setIsRevertDialogOpen(true);
+                                            }}
+                                            className="w-full text-left px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-500/10 transition-colors"
+                                          >
+                                            Revert Salary
+                                          </button>
+                                        </div>
+                                      </>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Middle row: salary amount */}
+                          <div className="my-4">
+                            <p className="text-lg font-black text-text-primary">
+                              ₹{parseFloat(salaryAmount).toLocaleString('en-IN')}
+                            </p>
+                          </div>
+
+                          {/* Bottom row: Disburse / Salary Slip button */}
+                          <div className="mt-2">
+                            {isPaid ? (
+                              <Button 
+                                variant="outline"
+                                onClick={() => {
+                                  setSelectedSlipPayment(payment);
+                                  setIsSalarySlipOpen(true);
+                                }}
+                                className="w-full h-8 text-xs font-bold flex items-center gap-1 bg-surface border border-border hover:bg-zinc-50"
+                              >
+                                <FileText className="h-3.5 w-3.5" /> Salary Slip
+                              </Button>
+                            ) : (
+                              <Button 
+                                disabled={isReadOnly}
+                                onClick={() => {
+                                  if (isReadOnly) return;
+                                  setDisburseMonth(month);
+                                  setIsDisburseDialogOpen(true);
+                                }}
+                                className={`w-full h-8 text-xs font-bold ${isReadOnly ? 'bg-zinc-200 text-zinc-400 dark:bg-zinc-800 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 text-white'}`}
+                              >
+                                Disburse
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </Card>
               </div>
             </div>
@@ -799,21 +1045,22 @@ export default function StaffPage() {
               <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">Teachers</h2>
               <p className="text-text-secondary text-sm mt-1">{totalTeachers} teachers · {activeTeachersCount} active</p>
             </div>
-            <Button className="flex items-center gap-2 font-bold" onClick={() => {
+            {!isReadOnly && (
+            <Button className="flex items-center gap-2 font-bold shadow-xs hover:shadow-md transition-all duration-200" onClick={() => {
               setNewStaff({
                 id: null,
                 name: '',
                 role: 'Teacher',
-                department: 'Mathematics',
+                department: '',
                 email: '',
                 phone: '',
+                emergency_phone: '',
                 photo_path: '',
                 father_name: '',
                 mother_name: '',
-                emergency_phone: '',
                 joining_date: '',
                 exit_date: '',
-                parent_occupation: '',
+                salary: '',
                 current_address_line: '',
                 current_city: '',
                 current_state: '',
@@ -833,6 +1080,7 @@ export default function StaffPage() {
             }}>
               <Plus className="h-4 w-4" /> Add Teacher
             </Button>
+          )}
           </div>
 
           {error && (
@@ -1048,8 +1296,16 @@ export default function StaffPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-text-secondary uppercase">Parent Occupation</label>
-                    <Input name="parent_occupation" value={newStaff.parent_occupation} onChange={handleTextChange} placeholder="e.g. Businessman" />
+                    <label className="text-xs font-bold text-text-secondary uppercase">Salary <span className="text-red-500">*</span></label>
+                    <Input 
+                      type="number" 
+                      name="salary" 
+                      value={newStaff.salary} 
+                      onChange={handleTextChange} 
+                      placeholder="e.g. 25000" 
+                      required 
+                    />
+                    {formErrors.salary && <p className="text-[10px] text-red-500 font-semibold">{formErrors.salary}</p>}
                   </div>
                 </div>
 
@@ -1088,8 +1344,16 @@ export default function StaffPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-text-secondary uppercase">Parent Occupation</label>
-                    <Input name="parent_occupation" value={newStaff.parent_occupation} onChange={handleTextChange} placeholder="e.g. Businessman" />
+                    <label className="text-xs font-bold text-text-secondary uppercase">Salary <span className="text-red-500">*</span></label>
+                    <Input 
+                      type="number" 
+                      name="salary" 
+                      value={newStaff.salary} 
+                      onChange={handleTextChange} 
+                      placeholder="e.g. 25000" 
+                      required 
+                    />
+                    {formErrors.salary && <p className="text-[10px] text-red-500 font-semibold">{formErrors.salary}</p>}
                   </div>
 
                   <div className="space-y-1.5">
@@ -1297,6 +1561,244 @@ export default function StaffPage() {
           </div>
         </div>
       </Dialog>
+
+      {/* Salary Card Modals */}
+      {isDisburseDialogOpen && (
+        <Dialog
+          isOpen={isDisburseDialogOpen}
+          onClose={() => {
+            if (!actionLoading) {
+              setIsDisburseDialogOpen(false);
+              setActionError('');
+            }
+          }}
+          title="Disburse Salary"
+          description="Please confirm salary disbursement details below."
+          className="max-w-md animate-in fade-in duration-200"
+          footer={
+            <div className="flex gap-2 justify-end w-full">
+              <Button 
+                variant="secondary" 
+                onClick={() => {
+                  setIsDisburseDialogOpen(false);
+                  setActionError('');
+                }}
+                disabled={actionLoading}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleConfirmDisburse}
+                disabled={actionLoading}
+                className="bg-green-600 hover:bg-green-700 text-white font-bold"
+              >
+                {actionLoading ? 'Disbursing...' : 'Confirm Disbursement'}
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-4 text-sm mt-2">
+            {actionError && (
+              <div className="p-3 bg-red-500/10 text-red-600 rounded-lg text-xs font-bold flex items-center gap-1.5 border border-red-500/25">
+                <AlertCircle className="h-4 w-4" /> {actionError}
+              </div>
+            )}
+            <p className="text-zinc-600 dark:text-zinc-400">You are about to disburse the salary for:</p>
+            <div className="bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-xl border border-border space-y-3 font-medium">
+              <div className="flex justify-between">
+                <span className="text-zinc-500">Teacher:</span>
+                <span className="text-text-primary font-bold">{teacherDetails?.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-zinc-500">Month:</span>
+                <span className="text-text-primary font-bold">{disburseMonth} {academicYears.find(y => y.is_current)?.name || academicYears.find(y => y.status === 'Draft')?.name || ''}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-zinc-500">Amount:</span>
+                <span className="text-green-600 font-extrabold">₹{parseFloat(teacherDetails?.salary || 0).toLocaleString('en-IN')}</span>
+              </div>
+            </div>
+            <p className="text-xs text-zinc-500 leading-normal">This action will record the salary payment.</p>
+          </div>
+        </Dialog>
+      )}
+
+      {isRevertDialogOpen && (
+        <Dialog
+          isOpen={isRevertDialogOpen}
+          onClose={() => {
+            if (!actionLoading) {
+              setIsRevertDialogOpen(false);
+              setActionError('');
+            }
+          }}
+          title="Revert Salary Payment"
+          description="Please confirm if you want to revert this salary disbursement."
+          className="max-w-md animate-in fade-in duration-200"
+          footer={
+            <div className="flex gap-2 justify-end w-full">
+              <Button 
+                variant="secondary" 
+                onClick={() => {
+                  setIsRevertDialogOpen(false);
+                  setActionError('');
+                }}
+                disabled={actionLoading}
+              >
+                Cancel
+              </Button>
+              <Button 
+                variant="destructive"
+                onClick={handleConfirmRevert}
+                disabled={actionLoading}
+                className="font-bold"
+              >
+                {actionLoading ? 'Reverting...' : 'Confirm Revert'}
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-4 text-sm mt-2">
+            {actionError && (
+              <div className="p-3 bg-red-500/10 text-red-600 rounded-lg text-xs font-bold flex items-center gap-1.5 border border-red-500/25">
+                <AlertCircle className="h-4 w-4" /> {actionError}
+              </div>
+            )}
+            <p className="text-zinc-600 dark:text-zinc-400">You are about to revert the salary payment for:</p>
+            <div className="bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-xl border border-border space-y-3 font-medium">
+              <div className="flex justify-between">
+                <span className="text-zinc-500">Teacher:</span>
+                <span className="text-text-primary font-bold">{teacherDetails?.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-zinc-500">Month:</span>
+                <span className="text-text-primary font-bold">{revertPayment?.payment_month} {academicYears.find(y => y.is_current)?.name || academicYears.find(y => y.status === 'Draft')?.name || ''}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-zinc-500">Amount:</span>
+                <span className="text-red-600 font-extrabold">₹{parseFloat(revertPayment?.amount_paid || 0).toLocaleString('en-IN')}</span>
+              </div>
+            </div>
+            <p className="text-xs text-zinc-500 leading-normal">This will remove the salary payment record and return the month to Pending status.</p>
+          </div>
+        </Dialog>
+      )}
+
+      {isSalarySlipOpen && selectedSlipPayment && (
+        <Dialog
+          isOpen={isSalarySlipOpen}
+          onClose={() => setIsSalarySlipOpen(false)}
+          title="Salary Slip Preview"
+          description="View, print, or download the official salary payment slip."
+          className="w-[95vw] md:max-w-3xl animate-in fade-in duration-200"
+          footer={
+            <div className="flex gap-3 justify-end w-full no-print-section">
+              <Button variant="secondary" onClick={() => setIsSalarySlipOpen(false)}>Close</Button>
+              <Button onClick={handleDownloadSalarySlip} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold flex items-center gap-1.5 shadow-2xs">
+                <Download className="h-4 w-4" /> Download PDF
+              </Button>
+              <Button onClick={handlePrintSalarySlip} className="bg-primary hover:bg-primary/95 text-white font-bold flex items-center gap-1.5 shadow-2xs">
+                <Printer className="h-4 w-4" /> Print Slip
+              </Button>
+            </div>
+          }
+        >
+          <div className="max-h-[70vh] overflow-y-auto p-4 bg-zinc-100 dark:bg-zinc-900 border border-border rounded-xl">
+            <div 
+              id="salary-slip-print-area" 
+              className="w-full max-w-[210mm] bg-white p-8 text-zinc-950 font-sans shadow-lg rounded-sm border border-border flex flex-col justify-between select-text mx-auto my-2"
+            >
+              {/* Header / School details */}
+              <div className="space-y-6">
+                <div className="flex items-start justify-between border-b-2 border-zinc-950 pb-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-zinc-950 text-white rounded-md flex items-center justify-center font-bold text-2xl flex-shrink-0 shadow-2xs select-none">
+                      {schoolProfile?.name ? schoolProfile.name.charAt(0).toUpperCase() : 'S'}
+                    </div>
+                    <div>
+                      <h1 className="text-lg font-black text-zinc-950 tracking-tight leading-none uppercase">{schoolProfile?.name || 'ABC Public School'}</h1>
+                      <p className="text-[10px] text-zinc-500 mt-1 uppercase tracking-wider font-extrabold">Teacher Payout Payslip</p>
+                    </div>
+                  </div>
+                  <div className="text-right text-[10px] text-zinc-600 leading-normal">
+                    <p className="font-bold text-zinc-950">{schoolProfile?.street_address || '123 Main Street'}</p>
+                    <p>{schoolProfile?.city || 'City'}, {schoolProfile?.state || 'State'} - {schoolProfile?.pin_code || ''}</p>
+                    <p>Phone: {schoolProfile?.contact_phone || '—'}</p>
+                  </div>
+                </div>
+
+                {/* Payslip details */}
+                <div className="text-center py-2">
+                  <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-900 underline decoration-double underline-offset-4 font-display tracking-wider">SALARY SLIP - {selectedSlipPayment.payment_month.toUpperCase()}</h2>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 text-xs bg-zinc-50 border border-zinc-200 p-4 rounded-lg font-medium text-zinc-800">
+                  <div>
+                    <p className="text-zinc-500">Teacher Name:</p>
+                    <p className="text-zinc-950 font-bold text-sm mt-0.5">{teacherDetails?.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-zinc-500">Employee ID:</p>
+                    <p className="text-zinc-950 font-bold font-mono text-sm mt-0.5">{teacherDetails?.employee_id || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-zinc-500">Designation / Department:</p>
+                    <p className="text-zinc-950 font-bold mt-0.5">{teacherDetails?.role || 'Teacher'} · {teacherDetails?.department || 'General'}</p>
+                  </div>
+                  <div>
+                    <p className="text-zinc-500">Academic Year:</p>
+                    <p className="text-zinc-950 font-bold mt-0.5">{
+                      academicYears.find(y => y.id === selectedSlipPayment.academic_year_id)?.name || academicYears.find(y => y.is_current)?.name || academicYears.find(y => y.status === 'Draft')?.name || ''
+                    }</p>
+                  </div>
+                </div>
+
+                {/* Salary calculation / summary */}
+                <div className="border border-zinc-200 rounded-lg overflow-hidden">
+                  <table className="w-full text-xs text-left border-collapse">
+                    <thead>
+                      <tr className="bg-zinc-100 border-b border-zinc-200 font-extrabold text-zinc-700">
+                        <th className="p-3">Description</th>
+                        <th className="p-3 text-right">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-b border-zinc-100 text-zinc-800 font-medium">
+                        <td className="p-3">Basic Monthly Salary (Disbursed)</td>
+                        <td className="p-3 text-right font-semibold">₹{parseFloat(selectedSlipPayment.amount_paid).toLocaleString('en-IN')}</td>
+                      </tr>
+                      <tr className="bg-zinc-50 font-bold text-zinc-950 border-t-2 border-zinc-200 text-sm">
+                        <td className="p-3">Net Disbursed Amount</td>
+                        <td className="p-3 text-right text-green-700 font-extrabold">₹{parseFloat(selectedSlipPayment.amount_paid).toLocaleString('en-IN')}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 text-[10px] text-zinc-500 pt-4 border-t border-dashed border-zinc-200 font-medium">
+                  <div>
+                    <p>Payment Date: <span className="text-zinc-800 font-bold">{formatDate(selectedSlipPayment.payment_date)}</span></p>
+                    <p>Payment Transaction ID: <span className="text-zinc-800 font-mono font-bold">TXN-SL-{String(selectedSlipPayment.id).padStart(5, '0')}</span></p>
+                  </div>
+                  <div className="text-right">
+                    <p>Slip Generated Date: <span className="text-zinc-800 font-bold">{formatDate(new Date().toISOString().split('T')[0])}</span></p>
+                    <p>Payment Status: <span className="text-green-600 font-black uppercase">PAID</span></p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Principal Signature Signoff */}
+              <div className="pt-16 flex justify-end">
+                <div className="text-center w-40 text-xs text-zinc-700">
+                  <div className="border-b border-zinc-400 h-10 w-full mb-2"></div>
+                  <p className="font-bold text-zinc-900">Principal Signature</p>
+                  <p className="text-[10px] text-zinc-500">School Administration</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Dialog>
+      )}
 
       {/* Experience Letter Preview Dialog Modal */}
       <Dialog 

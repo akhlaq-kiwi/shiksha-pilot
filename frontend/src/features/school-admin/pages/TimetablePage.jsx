@@ -4,6 +4,7 @@ import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle } from '../../../common/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
 import { Select } from '../../../common/ui/select';
+import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 
 const MOCK_TIMETABLE = [
   { id: 1, day: 'Monday', period: '1st (8:00–8:45)', class: 'Class 10A', subject: 'Mathematics', teacher: 'Mr. Suresh Kumar', room: 'R-201' },
@@ -14,6 +15,8 @@ const MOCK_TIMETABLE = [
 ];
 
 export default function TimetablePage() {
+  const { isReadOnly } = useAcademicYear();
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
@@ -21,9 +24,11 @@ export default function TimetablePage() {
           <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">Timetable Management</h2>
           <p className="text-text-secondary text-sm mt-1">Class schedules, teacher assignments, and room allocation.</p>
         </div>
-        <Button className="flex items-center gap-2">
-          <Plus className="h-4 w-4" /> Add Entry
-        </Button>
+        {!isReadOnly && (
+          <Button className="flex items-center gap-2">
+            <Plus className="h-4 w-4" /> Add Entry
+          </Button>
+        )}
       </div>
 
       <div className="flex gap-3">
@@ -59,7 +64,7 @@ export default function TimetablePage() {
                 <TableCell className="text-xs font-semibold text-text-primary">{t.subject}</TableCell>
                 <TableCell className="text-xs text-text-secondary">{t.teacher}</TableCell>
                 <TableCell><span className="text-[10px] font-bold px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-text-muted">{t.room}</span></TableCell>
-                <TableCell><button className="text-text-muted hover:text-primary"><Edit className="h-3.5 w-3.5" /></button></TableCell>
+                <TableCell>{!isReadOnly && <button className="text-text-muted hover:text-primary"><Edit className="h-3.5 w-3.5" /></button>}</TableCell>
               </TableRow>
             ))}
           </TableBody>

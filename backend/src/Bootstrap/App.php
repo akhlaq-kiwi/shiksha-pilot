@@ -97,6 +97,7 @@ class App
 {
     public static function create(): SlimApp
     {
+        date_default_timezone_set('Asia/Kolkata');
         // ── 1. Load .env for local development ───────────────────────────────
         loadEnvFile(dirname(__DIR__, 2) . '/.env');
 

@@ -7,6 +7,7 @@ import { Select } from '../../../common/ui/select';
 import { Button } from '../../../common/ui/button';
 import { schoolService } from '../../../common/services/schoolService';
 import StudentDetailsPage from './StudentDetailsPage';
+import StudentEnrollmentForm from './StudentEnrollmentForm';
 
 const formatCurrency = (val) => {
   return new Intl.NumberFormat('en-IN', {
@@ -56,6 +57,7 @@ export default function FinancePage() {
   
   // Inline Detail View State
   const [selectedStudentId, setSelectedStudentId] = useState(null);
+  const [view, setView] = useState('list'); // 'list', 'details', 'edit'
 
   // Lazy Loading / Infinite Scroll States
   const [visibleCount, setVisibleCount] = useState(25);
@@ -98,13 +100,31 @@ export default function FinancePage() {
     }
   }, [searchTerm, selectedClassId, selectedStatus]);
 
-  if (selectedStudentId) {
+  if (view === 'details' && selectedStudentId) {
     return (
       <StudentDetailsPage 
         studentId={selectedStudentId} 
         onBack={() => {
           setSelectedStudentId(null);
+          setView('list');
           loadData(); // reload in case payments were collected
+        }} 
+        onEdit={(id) => {
+          setSelectedStudentId(id);
+          setView('edit');
+        }}
+      />
+    );
+  }
+
+  if (view === 'edit' && selectedStudentId) {
+    return (
+      <StudentEnrollmentForm 
+        studentId={selectedStudentId} 
+        onCancel={() => setView('details')} 
+        onSuccess={async () => {
+          setView('details');
+          await loadData();
         }} 
       />
     );
@@ -152,15 +172,33 @@ export default function FinancePage() {
     }
   });
 
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  const todayStr = `${yyyy}-${mm}-${dd}`;
+
   // Group additional fee payments by student
   const additionalUnpaidByStudent = {};
+  const unpaidAddCountByStudent = {};
+  const hasPreviousYearDuesByStudent = {};
+
   additionalFeePayments.forEach(p => {
-    if (p.status === 'Pending') {
+    if (p.status === 'Pending' && (!p.due_date || p.due_date <= todayStr)) {
       const studentId = parseInt(p.student_id, 10);
       if (!additionalUnpaidByStudent[studentId]) {
         additionalUnpaidByStudent[studentId] = 0;
       }
       additionalUnpaidByStudent[studentId] += parseFloat(p.amount || 0);
+
+      if (!unpaidAddCountByStudent[studentId]) {
+        unpaidAddCountByStudent[studentId] = 0;
+      }
+      unpaidAddCountByStudent[studentId]++;
+
+      if (p.fee_name === 'Previous Year Dues') {
+        hasPreviousYearDuesByStudent[studentId] = true;
+      }
     }
   });
 
@@ -183,15 +221,20 @@ export default function FinancePage() {
     const unpaidAddAmt = additionalUnpaidByStudent[student.id] || 0;
     outstandingDues += unpaidAddAmt;
 
-    // Assign status badge based on count of unpaid past months
+    const addCount = unpaidAddCountByStudent[student.id] || 0;
+    const totalUnpaidCount = unpaidCount + addCount;
+
+    // Assign status badge based on count of unpaid past months and additional fee items
     let status = 'PAID';
-    if (unpaidCount === 1) {
+    if (hasPreviousYearDuesByStudent[student.id]) {
+      status = 'DEFAULT';
+    } else if (totalUnpaidCount === 1) {
       status = 'PENDING';
-    } else if (unpaidCount === 2) {
+    } else if (totalUnpaidCount === 2) {
       status = 'OVERDUE';
-    } else if (unpaidCount === 3) {
+    } else if (totalUnpaidCount === 3) {
       status = 'CRITICAL';
-    } else if (unpaidCount >= 4) {
+    } else if (totalUnpaidCount >= 4) {
       status = 'DEFAULT';
     }
 
@@ -355,7 +398,10 @@ export default function FinancePage() {
                     </TableCell>
                     <TableCell className="text-right py-3.5">
                       <button 
-                        onClick={() => setSelectedStudentId(s.id)}
+                        onClick={() => {
+                          setSelectedStudentId(s.id);
+                          setView('details');
+                        }}
                         className="px-4 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-text-primary border border-border transition-all inline-flex items-center gap-1 leading-none h-[22px]"
                       >
                         Open Ledger <ChevronRight className="h-3 w-3 text-text-muted" />

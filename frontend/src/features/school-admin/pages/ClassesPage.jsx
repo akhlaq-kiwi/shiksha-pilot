@@ -4,6 +4,7 @@ import { Button } from '../../../common/ui/button';
 import { Card, CardContent } from '../../../common/ui/card';
 import { Input } from '../../../common/ui/input';
 import { schoolService } from '../../../common/services/schoolService';
+import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 import StudentEnrollmentForm from './StudentEnrollmentForm';
 import StudentDetailsPage from './StudentDetailsPage';
 
@@ -73,8 +74,17 @@ export default function ClassesPage() {
     }
   };
 
+  const { isReadOnly } = useAcademicYear();
+
   useEffect(() => {
     loadData();
+    const handleYearSwitch = () => {
+      loadData();
+    };
+    window.addEventListener('academic-year-switched', handleYearSwitch);
+    return () => {
+      window.removeEventListener('academic-year-switched', handleYearSwitch);
+    };
   }, []);
 
   const handleOpenEditClass = (gc) => {
@@ -291,9 +301,11 @@ export default function ClassesPage() {
             </button>
             <h2 className="text-2xl font-black text-text-primary tracking-tight font-display">{selectedClassName} ({rosterStudents.length})</h2>
           </div>
-          <Button className="flex items-center gap-2 font-bold" onClick={() => { setView('enroll'); setSelectedStudentId(null); }}>
-            <Plus className="h-4 w-4" /> Enroll Student
-          </Button>
+          {!isReadOnly && (
+            <Button className="flex items-center gap-2 font-bold" onClick={() => { setView('enroll'); setSelectedStudentId(null); }}>
+              <Plus className="h-4 w-4" /> Enroll Student
+            </Button>
+          )}
         </div>
 
         {/* Combined Filter Toolbar */}
@@ -385,9 +397,11 @@ export default function ClassesPage() {
         <div>
           <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">Classes</h2>
         </div>
-        <Button className="flex items-center gap-2 font-bold" onClick={() => setShowCreateForm(true)}>
-          <Plus className="h-4 w-4" /> Create Class
-        </Button>
+        {!isReadOnly && (
+          <Button className="flex items-center gap-2 font-bold" onClick={() => setShowCreateForm(true)}>
+            <Plus className="h-4 w-4" /> Create Class
+          </Button>
+        )}
       </div>
 
       {error && (
@@ -410,43 +424,45 @@ export default function ClassesPage() {
               className="relative flex flex-col items-center justify-center p-7 bg-surface border border-border hover:border-primary/50 hover:shadow-md rounded-2xl cursor-pointer transition-all duration-200 min-h-[140px] text-center"
             >
               {/* 3-dot dropdown menu */}
-              <div className="absolute top-3 right-3 z-10">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setOpenMenuClass(openMenuClass === gc.name ? null : gc.name);
-                  }}
-                  className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg text-text-muted hover:text-text-primary transition-colors focus:outline-none"
-                >
-                  <MoreVertical className="h-4 w-4" />
-                </button>
-                
-                {openMenuClass === gc.name && (
-                  <>
-                    <div 
-                      className="fixed inset-0 z-20" 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenMenuClass(null);
-                      }}
-                    ></div>
-                    <div className="absolute top-7 right-0 bg-surface border border-border rounded-xl shadow-lg py-1 z-30 animate-in fade-in slide-in-from-top-1 duration-150 text-xs">
-                      <button
-                        type="button"
+              {!isReadOnly && (
+                <div className="absolute top-3 right-3 z-10">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenMenuClass(openMenuClass === gc.name ? null : gc.name);
+                    }}
+                    className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg text-text-muted hover:text-text-primary transition-colors focus:outline-none"
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </button>
+                  
+                  {openMenuClass === gc.name && (
+                    <>
+                      <div 
+                        className="fixed inset-0 z-20" 
                         onClick={(e) => {
                           e.stopPropagation();
                           setOpenMenuClass(null);
-                          handleOpenEditClass(gc);
                         }}
-                        className="block w-full text-left px-4 py-2 font-semibold text-text-primary hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors whitespace-nowrap"
-                      >
-                        Edit Class
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
+                      ></div>
+                      <div className="absolute top-7 right-0 bg-surface border border-border rounded-xl shadow-lg py-1 z-30 animate-in fade-in slide-in-from-top-1 duration-150 text-xs">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenMenuClass(null);
+                            handleOpenEditClass(gc);
+                          }}
+                          className="block w-full text-left px-4 py-2 font-semibold text-text-primary hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors whitespace-nowrap"
+                        >
+                          Edit Class
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
 
               <h3 className="font-extrabold text-text-primary text-xl tracking-tight font-display">{gc.name}</h3>
             </div>

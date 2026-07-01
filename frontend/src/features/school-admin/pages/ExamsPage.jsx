@@ -7,6 +7,7 @@ import { Input } from '../../../common/ui/input';
 import { Select } from '../../../common/ui/select';
 import { Dialog } from '../../../common/ui/dialog';
 import { schoolService } from '../../../common/services/schoolService';
+import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 
 const statusBadge = (status) => {
   const map = {
@@ -22,6 +23,7 @@ const statusBadge = (status) => {
 };
 
 export default function ExamsPage() {
+  const { isReadOnly } = useAcademicYear();
   const [exams, setExams] = useState([]);
   const [classes, setClasses] = useState([]);
   const [students, setStudents] = useState([]);
@@ -53,6 +55,13 @@ export default function ExamsPage() {
 
   useEffect(() => {
     loadData();
+    const handleYearSwitch = () => {
+      loadData();
+    };
+    window.addEventListener('academic-year-switched', handleYearSwitch);
+    return () => {
+      window.removeEventListener('academic-year-switched', handleYearSwitch);
+    };
   }, []);
 
   if (loading) {
@@ -105,9 +114,11 @@ export default function ExamsPage() {
           <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">Examinations</h2>
           <p className="text-text-secondary text-sm mt-1">Create exams, enter marks, calculate grades, and publish results.</p>
         </div>
-        <Button className="flex items-center gap-2" onClick={() => setIsAddExamOpen(true)}>
-          <Plus className="h-4 w-4" /> Create Exam
-        </Button>
+        {!isReadOnly && (
+          <Button className="flex items-center gap-2" onClick={() => setIsAddExamOpen(true)}>
+            <Plus className="h-4 w-4" /> Create Exam
+          </Button>
+        )}
       </div>
 
       {error && (

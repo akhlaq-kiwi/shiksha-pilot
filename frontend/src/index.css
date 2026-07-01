@@ -127,3 +127,13 @@ h1, h2, h3, h4, h5, h6 {
 .animate-glow {
   animation: border-glow-pulse 3s infinite ease-in-out;
 }
+
+/* Remove default browser Number Input Spinner Controls */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type=number] {
+  -moz-appearance: textfield;
+}
