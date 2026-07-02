@@ -189,6 +189,10 @@ export const schoolService = {
     return apiClient.put(`/api/school/financial-reports/${id}/settle`, data);
   },
 
+  submitSettlementRequest(id) {
+    return apiClient.post(`/api/school/financial-reports/${id}/settlement-request`);
+  },
+
   getSchoolExpenses(params = {}) {
     return apiClient.get(buildUrl('/api/school/expenses', params));
   },

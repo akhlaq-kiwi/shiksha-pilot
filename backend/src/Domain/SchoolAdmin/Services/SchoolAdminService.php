@@ -3045,8 +3045,12 @@ class SchoolAdminService extends BaseService
             throw new NotFoundException('Financial report not found.');
         }
 
+        if ($report['status'] === 'Settled') {
+            throw new ValidationException(['fields' => 'A settled report must never be editable or re-submittable.']);
+        }
+
         $status = $data['status'] ?? 'Pending';
-        if (!in_array($status, ['Pending', 'Settled'])) {
+        if (!in_array($status, ['Pending', 'Request Sent', 'Settled'])) {
             throw new ValidationException(['status' => 'Invalid status value.']);
         }
 
@@ -3055,6 +3059,429 @@ class SchoolAdminService extends BaseService
         ]);
 
         return $this->financialReportRepo->findById($id);
+    }
+
+    public function submitSettlementRequest(array $user, int $id): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->financialReportRepo->getPdo();
+
+        $report = $this->financialReportRepo->findById($id);
+        if ($report === null || (int)$report['school_id'] !== $schoolId) {
+            throw new NotFoundException('Financial report not found.');
+        }
+
+        if ($report['status'] === 'Settled') {
+            throw new ValidationException(['fields' => 'A settled report must never be editable or re-submittable.']);
+        }
+
+        if ($report['status'] === 'Request Sent') {
+            throw new ValidationException(['fields' => 'A settlement request has already been submitted for this report.']);
+        }
+
+        // Fetch school contact details
+        $stmtSchool = $pdo->prepare("SELECT name, contact_email FROM schools WHERE id = :sid LIMIT 1");
+        $stmtSchool->execute([':sid' => $schoolId]);
+        $school = $stmtSchool->fetch(PDO::FETCH_ASSOC);
+        if (!$school) {
+            throw new NotFoundException('School not found.');
+        }
+
+        // Retrieve academic year info
+        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+
+        // Retrieve bounds of transactions contributing to this report
+        list($from_ts, $operator, $to_ts) = $this->getReportBounds($pdo, $schoolId, $report);
+
+        // Fetch Student Fee Collections
+        $stmtFeeList = $pdo->prepare("
+            SELECT s.name AS student_name, s.admission_no, c.name AS class_name, fp.payment_date, 'Tuition Fee' AS payment_type, fp.amount_paid AS amount
+            FROM fee_payments fp
+            JOIN students s ON fp.student_id = s.id
+            LEFT JOIN classes c ON s.class_id = c.id
+            WHERE fp.school_id = :sid 
+              AND fp.status = 'PAID'
+              AND fp.created_at {$operator} :from_ts 
+              AND fp.created_at <= :to_ts
+        ");
+        $stmtFeeList->execute([':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts]);
+        $feePayments = $stmtFeeList->fetchAll(PDO::FETCH_ASSOC);
+
+        $stmtAddFeeList = $pdo->prepare("
+            SELECT s.name AS student_name, s.admission_no, c.name AS class_name, afp.payment_date, aft.name AS payment_type, afp.amount
+            FROM additional_fee_payments afp
+            JOIN students s ON afp.student_id = s.id
+            LEFT JOIN classes c ON s.class_id = c.id
+            JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+            WHERE afp.school_id = :sid 
+              AND afp.status = 'Paid'
+              AND afp.updated_at {$operator} :from_ts 
+              AND afp.updated_at <= :to_ts
+        ");
+        $stmtAddFeeList->execute([':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts]);
+        $addPayments = $stmtAddFeeList->fetchAll(PDO::FETCH_ASSOC);
+
+        $feeCollections = array_merge($feePayments, $addPayments);
+        usort($feeCollections, function($a, $b) {
+            return strcmp($a['payment_date'] ?? '', $b['payment_date'] ?? '');
+        });
+
+        // Fetch Expenses
+        $stmtSalaryList = $pdo->prepare("
+            SELECT st.name AS description, 'Salary Payment' AS category, sp.payment_date AS expense_date, sp.amount_paid AS amount
+            FROM staff_payments sp
+            JOIN staff st ON sp.staff_id = st.id
+            WHERE sp.school_id = :sid 
+              AND sp.created_at {$operator} :from_ts 
+              AND sp.created_at <= :to_ts
+        ");
+        $stmtSalaryList->execute([':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts]);
+        $salaryPayments = $stmtSalaryList->fetchAll(PDO::FETCH_ASSOC);
+
+        $stmtExpenseList = $pdo->prepare("
+            SELECT description, 'School Expense' AS category, expense_date, amount
+            FROM school_expenses
+            WHERE school_id = :sid 
+              AND created_at {$operator} :from_ts 
+              AND created_at <= :to_ts
+        ");
+        $stmtExpenseList->execute([':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts]);
+        $expensesItems = $stmtExpenseList->fetchAll(PDO::FETCH_ASSOC);
+
+        $expenses = array_merge($salaryPayments, $expensesItems);
+        usort($expenses, function($a, $b) {
+            return strcmp($a['expense_date'] ?? '', $b['expense_date'] ?? '');
+        });
+
+        // Profit / Loss Summary
+        $summary = [
+            'revenue' => (float)$report['fees_collected'],
+            'expenses' => (float)$report['salary_paid'],
+        ];
+
+        // Excel file generation
+        $excelData = ExcelGenerator::generate($feeCollections, $expenses, $summary);
+        $filename = "financial_statement_" . $report['report_id'] . ".xls";
+
+        // Email variables
+        $toEmail = $school['contact_email'] ?: 'owner@yopmail.com';
+        $subject = "Settlement Approval Request – Financial Report " . $report['report_id'];
+        $sender = "shikshapilot@gmail.com";
+        $academicYearName = $workingYear ? $workingYear['name'] : 'N/A';
+        $reportPeriod = $report['from_date'] . ' to ' . $report['to_date'];
+        $revenueVal = (float)$report['fees_collected'];
+        $expensesVal = (float)$report['salary_paid'];
+        $outcomeVal = (float)$report['profit_loss'];
+        $generatedDate = date('Y-m-d H:i:s', strtotime($report['created_at']));
+
+        $emailBodyText = "
+Report ID: {$report['report_id']}
+Academic Year: {$academicYearName}
+Report Period: {$reportPeriod}
+Total Revenue: ₹" . number_format($revenueVal, 2) . "
+Total Salaries & Expenses: ₹" . number_format($expensesVal, 2) . "
+Net Profit / Loss: ₹" . number_format($outcomeVal, 2) . "
+Report Generated Date: {$generatedDate}
+
+Dear School Owner,
+
+A new financial settlement request has been submitted for your review.
+
+Please verify the attached financial report carefully before approving the settlement.
+
+An Excel file containing detailed financial records has been attached for verification.
+
+Only approve the request after reviewing all attached data.
+";
+
+        $emailBodyHtml = "
+<h3>Settlement Approval Request – Financial Report {$report['report_id']}</h3>
+<table border='0' cellpadding='5' cellspacing='0' style='font-family: Arial, sans-serif; font-size: 14px;'>
+    <tr><td><strong>Report ID:</strong></td><td>{$report['report_id']}</td></tr>
+    <tr><td><strong>Academic Year:</strong></td><td>{$academicYearName}</td></tr>
+    <tr><td><strong>Report Period:</strong></td><td>{$reportPeriod}</td></tr>
+    <tr><td><strong>Total Revenue:</strong></td><td>₹" . number_format($revenueVal, 2) . "</td></tr>
+    <tr><td><strong>Total Salaries & Expenses:</strong></td><td>₹" . number_format($expensesVal, 2) . "</td></tr>
+    <tr><td><strong>Net Profit / Loss:</strong></td><td>₹" . number_format($outcomeVal, 2) . "</td></tr>
+    <tr><td><strong>Report Generated Date:</strong></td><td>{$generatedDate}</td></tr>
+</table>
+
+<p>Dear School Owner,</p>
+<p>A new financial settlement request has been submitted for your review.</p>
+<p>Please verify the attached financial report carefully before approving the settlement.</p>
+<p>An Excel file containing detailed financial records has been attached for verification.</p>
+<p>Only approve the request after reviewing all attached data.</p>
+
+<p style='margin-top: 30px;'>
+  <a href='http://localhost:8000/api/public/financial-reports/{$report['id']}/settlement/approve' 
+     style='background-color: #0d9488; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; margin-right: 15px; display: inline-block;'>
+     Approve Settlement
+  </a>
+  <a href='http://localhost:8000/api/public/financial-reports/{$report['id']}/settlement/reject' 
+     style='background-color: #dc2626; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;'>
+     Reject Settlement
+  </a>
+</p>
+";
+
+        // Boundary for multipart
+        $boundary = md5(uniqid((string)time(), true));
+
+        // Headers
+        $headers = "From: " . $sender . "\r\n";
+        $headers .= "MIME-Version: 1.0\r\n";
+        $headers .= "Content-Type: multipart/mixed; boundary=\"" . $boundary . "\"\r\n";
+
+        // Body message
+        $body = "--" . $boundary . "\r\n";
+        $body .= "Content-Type: text/html; charset=\"UTF-8\"\r\n";
+        $body .= "Content-Transfer-Encoding: base64\r\n\r\n";
+        $body .= chunk_split(base64_encode($emailBodyHtml)) . "\r\n";
+
+        // Attachment
+        $body .= "--" . $boundary . "\r\n";
+        $body .= "Content-Type: application/vnd.ms-excel; name=\"" . $filename . "\"\r\n";
+        $body .= "Content-Description: " . $filename . "\r\n";
+        $body .= "Content-Disposition: attachment; filename=\"" . $filename . "\"; size=" . strlen($excelData) . ";\r\n";
+        $body .= "Content-Transfer-Encoding: base64\r\n\r\n";
+        $body .= chunk_split(base64_encode($excelData)) . "\r\n";
+        $body .= "--" . $boundary . "--\r\n";
+
+        // Send using native mail
+        @mail($toEmail, $subject, $body, $headers);
+
+        // Write log entry for developer review
+        $logPath = __DIR__ . '/../../../../sent_emails.log';
+        $logEntry = "========================================================================\n";
+        $logEntry .= "TIMESTAMP: " . date('Y-m-d H:i:s') . "\n";
+        $logEntry .= "FROM: " . $sender . "\n";
+        $logEntry .= "TO: " . $toEmail . "\n";
+        $logEntry .= "SUBJECT: " . $subject . "\n";
+        $logEntry .= "------------------------------------------------------------------------\n";
+        $logEntry .= "BODY:\n" . $emailBodyText . "\n";
+        $logEntry .= "------------------------------------------------------------------------\n";
+        $logEntry .= "APPROVE LINK: http://localhost:8000/api/public/financial-reports/" . $report['id'] . "/settlement/approve\n";
+        $logEntry .= "REJECT LINK: http://localhost:8000/api/public/financial-reports/" . $report['id'] . "/settlement/reject\n";
+        $logEntry .= "------------------------------------------------------------------------\n";
+        $logEntry .= "EXCEL FILENAME: " . $filename . "\n";
+        $logEntry .= "EXCEL CONTENT:\n" . $excelData . "\n";
+        $logEntry .= "========================================================================\n\n";
+
+        file_put_contents($logPath, $logEntry, FILE_APPEND);
+
+        // Update status to 'Request Sent'
+        $this->financialReportRepo->update($id, [
+            'status' => 'Request Sent'
+        ]);
+
+        // Audit Log
+        $stmtAudit = $pdo->prepare("
+            INSERT INTO audit_logs (action, target_school, user, user_role, ip_address)
+            VALUES (:action, :target_school, :user, :user_role, :ip_address)
+        ");
+        $stmtAudit->execute([
+            ':action' => "Sent settlement request for report " . $report['report_id'],
+            ':target_school' => (string)$schoolId,
+            ':user' => $user['email'] ?? 'admin',
+            ':user_role' => $user['role'] ?? 'SCHOOL_ADMIN',
+            ':ip_address' => $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'
+        ]);
+
+        return $this->financialReportRepo->findById($id);
+    }
+
+    public function ownerApproveSettlement(int $id): string
+    {
+        $pdo = $this->financialReportRepo->getPdo();
+
+        $report = $this->financialReportRepo->findById($id);
+        if ($report === null) {
+            return $this->renderOwnerResponseHtml("Error", "Financial report not found.", false);
+        }
+
+        if ($report['status'] === 'Settled') {
+            return $this->renderOwnerResponseHtml("Already Settled", "This financial report (ID: " . htmlspecialchars($report['report_id']) . ") has already been successfully settled.", true);
+        }
+
+        if ($report['status'] !== 'Request Sent') {
+            return $this->renderOwnerResponseHtml("Error", "This report is not currently pending settlement.", false);
+        }
+
+        // Update status to 'Settled'
+        $this->financialReportRepo->update($id, [
+            'status' => 'Settled'
+        ]);
+
+        // Log audit
+        $stmtAudit = $pdo->prepare("
+            INSERT INTO audit_logs (action, target_school, user, user_role, ip_address)
+            VALUES (:action, :target_school, :user, :user_role, :ip_address)
+        ");
+        $stmtAudit->execute([
+            ':action' => "Owner approved settlement for report " . $report['report_id'],
+            ':target_school' => (string)$report['school_id'],
+            ':user' => 'School Owner',
+            ':user_role' => 'SCHOOL_OWNER',
+            ':ip_address' => $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'
+        ]);
+
+        return $this->renderOwnerResponseHtml("Success", "Settlement approved successfully for report " . htmlspecialchars($report['report_id']) . ".", true);
+    }
+
+    public function ownerRejectSettlement(int $id): string
+    {
+        $pdo = $this->financialReportRepo->getPdo();
+
+        $report = $this->financialReportRepo->findById($id);
+        if ($report === null) {
+            return $this->renderOwnerResponseHtml("Error", "Financial report not found.", false);
+        }
+
+        if ($report['status'] === 'Settled') {
+            return $this->renderOwnerResponseHtml("Error", "This report is already settled and cannot be rejected.", false);
+        }
+
+        if ($report['status'] !== 'Request Sent') {
+            return $this->renderOwnerResponseHtml("Error", "This report is not currently pending settlement.", false);
+        }
+
+        // Revert status to 'Pending'
+        $this->financialReportRepo->update($id, [
+            'status' => 'Pending'
+        ]);
+
+        // Log audit
+        $stmtAudit = $pdo->prepare("
+            INSERT INTO audit_logs (action, target_school, user, user_role, ip_address)
+            VALUES (:action, :target_school, :user, :user_role, :ip_address)
+        ");
+        $stmtAudit->execute([
+            ':action' => "Owner rejected settlement for report " . $report['report_id'],
+            ':target_school' => (string)$report['school_id'],
+            ':user' => 'School Owner',
+            ':user_role' => 'SCHOOL_OWNER',
+            ':ip_address' => $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'
+        ]);
+
+        return $this->renderOwnerResponseHtml("Rejected", "Settlement request rejected for report " . htmlspecialchars($report['report_id']) . ". The School Admin can now make changes and submit a new request.", true);
+    }
+
+    private function getReportBounds(PDO $pdo, int $schoolId, array $report): array
+    {
+        // Find previous report
+        $stmtPrev = $pdo->prepare("
+            SELECT * FROM financial_reports 
+            WHERE school_id = :sid AND created_at < :created_at 
+            ORDER BY created_at DESC LIMIT 1
+        ");
+        $stmtPrev->execute([':sid' => $schoolId, ':created_at' => $report['created_at']]);
+        $prevReport = $stmtPrev->fetch(PDO::FETCH_ASSOC);
+
+        if ($prevReport) {
+            $fromTimestamp = $prevReport['created_at'];
+            $operator = '>';
+        } else {
+            $fromTimestamp = $report['from_date'] . ' 00:00:00';
+            $operator = '>=';
+        }
+
+        $createdDate = date('Y-m-d', strtotime($report['created_at']));
+        if ($report['to_date'] === $createdDate) {
+            $toTimestamp = $report['created_at'];
+        } else {
+            $toTimestamp = $report['to_date'] . ' 23:59:59';
+        }
+
+        return [$fromTimestamp, $operator, $toTimestamp];
+    }
+
+    private function renderOwnerResponseHtml(string $title, string $message, bool $isSuccess): string
+    {
+        $color = $isSuccess ? '#0d9488' : '#dc2626';
+        $bgLight = $isSuccess ? '#f0fdfa' : '#fef2f2';
+        $border = $isSuccess ? '#ccfbf1' : '#fecaca';
+
+        return "
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+    <meta charset='UTF-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <title>ShikshaPilot - Settlement Decision</title>
+    <link href='https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&display=swap' rel='stylesheet'>
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #f4f4f5;
+            color: #18181b;
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 80vh;
+        }
+        .card {
+            background-color: #ffffff;
+            border: 1px solid #e4e4e7;
+            border-radius: 24px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            max-width: 500px;
+            width: 100%;
+            padding: 40px;
+            text-align: center;
+        }
+        .logo {
+            font-size: 24px;
+            font-weight: 900;
+            letter-spacing: -0.05em;
+            color: #0d9488;
+            margin-bottom: 30px;
+        }
+        .logo span {
+            color: #18181b;
+        }
+        .status-box {
+            background-color: {$bgLight};
+            border: 1px solid {$border};
+            color: {$color};
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 24px;
+            font-weight: 600;
+            font-size: 18px;
+        }
+        .message {
+            color: #71717a;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+        .footer {
+            font-size: 11px;
+            color: #a1a1aa;
+            text-transform: uppercase;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+        }
+    </style>
+</head>
+<body>
+    <div class='card'>
+        <div class='logo'>Shiksha<span>Pilot</span></div>
+        <div class='status-box'>
+            {$title}
+        </div>
+        <div class='message'>
+            {$message}
+        </div>
+        <div class='footer'>
+            ShikshaPilot Enterprise School Management Platform
+        </div>
+    </div>
+</body>
+</html>
+";
     }
 
     public function getSchoolExpenses(array $user, array $filters = []): array

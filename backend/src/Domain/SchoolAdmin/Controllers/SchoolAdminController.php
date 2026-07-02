@@ -585,6 +585,33 @@ class SchoolAdminController extends BaseController
         return $this->success($response, $data, 'Financial report status updated');
     }
 
+    public function submitSettlementRequest(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int)$args['id'];
+        $data = $this->service->submitSettlementRequest($user, $id);
+
+        return $this->success($response, $data, 'Settlement request submitted successfully');
+    }
+
+    public function ownerApproveSettlement(Request $request, Response $response, array $args): Response
+    {
+        $id = (int)$args['id'];
+        $html = $this->service->ownerApproveSettlement($id);
+        $response->getBody()->write($html);
+        return $response->withHeader('Content-Type', 'text/html');
+    }
+
+    public function ownerRejectSettlement(Request $request, Response $response, array $args): Response
+    {
+        $id = (int)$args['id'];
+        $html = $this->service->ownerRejectSettlement($id);
+        $response->getBody()->write($html);
+        return $response->withHeader('Content-Type', 'text/html');
+    }
+
     public function getSchoolExpenses(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);

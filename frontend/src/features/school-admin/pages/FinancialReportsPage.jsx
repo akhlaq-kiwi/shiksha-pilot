@@ -66,6 +66,8 @@ export default function FinancialReportsPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [showGenerateConfirm, setShowGenerateConfirm] = useState(false);
+  const [showSettlementConfirm, setShowSettlementConfirm] = useState(false);
+  const [settlementTarget, setSettlementTarget] = useState(null);
 
   const loadReports = async () => {
     setLoading(true);
@@ -159,22 +161,29 @@ export default function FinancialReportsPage() {
     }
   };
 
-  const handleToggleSettle = async (reportId, currentStatus) => {
-    const nextStatus = currentStatus === 'Settled' ? 'Pending' : 'Settled';
+  const handleSendSettlementRequest = (report) => {
+    setSettlementTarget(report);
+    setShowSettlementConfirm(true);
+  };
+
+  const handleConfirmSettlementRequest = async () => {
+    if (!settlementTarget) return;
+    setShowSettlementConfirm(false);
+    setSubmitting(true);
+    setError('');
+    setSuccess('');
+    
     try {
-      await schoolService.updateFinancialReportStatus(reportId, {
-        status: nextStatus
-      });
-      
-      setReports(prev => prev.map(r => {
-        if (r.id === reportId) {
-          return { ...r, status: nextStatus };
-        }
-        return r;
-      }));
+      await schoolService.submitSettlementRequest(settlementTarget.id);
+      setSuccess('Settlement request submitted successfully.');
+      setSettlementTarget(null);
+      await loadReports();
+      setTimeout(() => setSuccess(''), 4000);
     } catch (err) {
       console.error(err);
-      alert('Failed to update settlement status.');
+      setError(err.message || 'Failed to submit settlement request.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -384,21 +393,27 @@ export default function FinancialReportsPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-black text-text-primary font-mono">{r.report_id}</span>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[9px] font-black uppercase border ${
-                        r.status === 'Settled'
-                          ? 'bg-green-500/10 text-green-600 border-green-500/20'
-                          : 'bg-red-500/10 text-red-600 border-red-500/20'
-                      }`}>
-                        {r.status}
-                      </span>
+                      {r.status === 'Request Sent' && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-black uppercase border bg-blue-500/10 text-blue-600 border-blue-500/20">
+                          Request Sent
+                        </span>
+                      )}
+                      {r.status === 'Settled' && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-black uppercase border bg-green-500/10 text-green-600 border-green-500/20 font-sans">
+                          Settled
+                        </span>
+                      )}
                     </div>
 
-                    <button
-                      onClick={() => handleToggleSettle(r.id, r.status)}
-                      className="text-[10px] font-extrabold uppercase tracking-tight text-primary hover:underline"
-                    >
-                      {r.status === 'Settled' ? 'Mark Pending' : 'Mark Settled'}
-                    </button>
+                    {r.status !== 'Settled' && (
+                      <button
+                        onClick={() => handleSendSettlementRequest(r)}
+                        disabled={r.status === 'Request Sent'}
+                        className="text-[10px] font-extrabold uppercase tracking-tight text-primary hover:underline disabled:text-text-muted disabled:no-underline"
+                      >
+                        Send Settled Request
+                      </button>
+                    )}
                   </div>
 
                   {/* Period dates */}
@@ -474,6 +489,52 @@ export default function FinancialReportsPage() {
             </p>
             <p className="text-xs text-zinc-500 leading-normal">
               Generate it only when you're ready to finalize the current accounting period.
+            </p>
+          </div>
+        </Dialog>
+      )}
+
+      {showSettlementConfirm && (
+        <Dialog
+          isOpen={showSettlementConfirm}
+          onClose={() => {
+            setShowSettlementConfirm(false);
+            setSettlementTarget(null);
+          }}
+          title="Send Settlement Request?"
+          description=""
+          className="max-w-md animate-in fade-in duration-200"
+          footer={
+            <div className="flex gap-2 justify-end w-full">
+              <Button 
+                variant="secondary" 
+                onClick={() => {
+                  setShowSettlementConfirm(false);
+                  setSettlementTarget(null);
+                }}
+                disabled={submitting}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleConfirmSettlementRequest}
+                disabled={submitting}
+                className="font-bold bg-teal-600 hover:bg-teal-700 text-white"
+              >
+                {submitting ? 'Sending...' : 'Send Request'}
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-3 text-sm mt-2">
+            <p className="text-zinc-600 dark:text-zinc-400">
+              Are you sure you want to send this financial report for settlement approval?
+            </p>
+            <p className="text-xs text-zinc-500 leading-normal">
+              Your school owner will review the report and its attached financial statement before approving or rejecting the request.
+            </p>
+            <p className="text-xs text-zinc-500 leading-normal font-semibold">
+              Once submitted, the request will remain pending until the owner takes action.
             </p>
           </div>
         </Dialog>

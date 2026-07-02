@@ -53,6 +53,9 @@ return function (App $app) {
     $app->get('/api/school/financial-reports', [SchoolAdminController::class, 'getFinancialReports']);
     $app->post('/api/school/financial-reports', [SchoolAdminController::class, 'createFinancialReport']);
     $app->put('/api/school/financial-reports/{id}/settle', [SchoolAdminController::class, 'updateFinancialReportStatus']);
+    $app->post('/api/school/financial-reports/{id}/settlement-request', [SchoolAdminController::class, 'submitSettlementRequest']);
+    $app->get('/api/public/financial-reports/{id}/settlement/approve', [SchoolAdminController::class, 'ownerApproveSettlement']);
+    $app->get('/api/public/financial-reports/{id}/settlement/reject', [SchoolAdminController::class, 'ownerRejectSettlement']);
     $app->get('/api/school/expenses', [SchoolAdminController::class, 'getSchoolExpenses']);
     $app->post('/api/school/expenses', [SchoolAdminController::class, 'createSchoolExpense']);
     $app->put('/api/school/expenses/{id}', [SchoolAdminController::class, 'updateSchoolExpense']);
