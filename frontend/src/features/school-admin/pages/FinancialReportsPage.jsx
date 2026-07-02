@@ -191,7 +191,7 @@ export default function FinancialReportsPage() {
     <div className="space-y-6 animate-in fade-in duration-300">
       
       {/* Title Header Card */}
-      <div className="sticky top-24 z-20 bg-surface border border-border p-6 rounded-2xl shadow-2xs">
+      <div className="sticky top-14 z-20 bg-surface border border-border p-6 rounded-2xl shadow-2xs">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-primary/10 text-primary rounded-xl">
             <FileText className="h-6 w-6" />

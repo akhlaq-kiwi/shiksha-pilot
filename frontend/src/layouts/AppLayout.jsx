@@ -104,7 +104,7 @@ const AppLayout = ({ children }) => {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       {/* Sticky header */}
-      <header className="sticky top-0 z-40 border-b border-border bg-surface">
+      <header className="sticky top-0 z-50 border-b border-border bg-surface">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
           <div className="flex items-center justify-between h-14 gap-4">
             

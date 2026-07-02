@@ -20,7 +20,7 @@ const PRESET_PLANS = [
 
 const EMPTY = {
   name: '', subdomain: '', plan: 'Premium',
-  contact_phone: '', admin_phone: '', admin_password: '',
+  contact_phone: '', contact_email: '', admin_phone: '', admin_password: '',
   // trial fields
   trial_duration: '1', trial_unit: 'month',
   // custom plan fields
@@ -145,6 +145,10 @@ export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-text-secondary uppercase">Contact Phone</label>
             <Input placeholder="e.g. 9900000001" value={form.contact_phone} onChange={set('contact_phone')} />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-text-secondary uppercase">School Owner Email Address *</label>
+            <Input type="email" placeholder="e.g. owner@school.com" value={form.contact_email} onChange={set('contact_email')} required />
           </div>
         </div>
 

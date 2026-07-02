@@ -438,16 +438,6 @@ export default function DashboardPage({ onNavigate }) {
 
                       {/* X-Axis Label */}
                       <span className="absolute -bottom-6 text-[10px] font-semibold text-text-muted mt-2">{item.month}</span>
-
-                      {/* Tooltip Popover */}
-                      <div className="absolute bottom-full mb-3 hidden group-hover:flex flex-col items-center pointer-events-none z-30 animate-in fade-in slide-in-from-bottom-1 duration-200">
-                        <div className="bg-zinc-950 text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900 text-[10px] font-semibold p-2.5 rounded-lg shadow-lg whitespace-nowrap flex flex-col gap-0.5 border border-border/10">
-                          <span className="font-bold border-b border-zinc-800 dark:border-zinc-200 pb-0.5 mb-1">{item.label}</span>
-                          <span>Total Collection: ₹{item.amount.toLocaleString()}</span>
-                          <span>{item.studentsPaid} Fee Transactions</span>
-                        </div>
-                        <div className="w-1.5 h-1.5 bg-zinc-950 dark:bg-zinc-50 rotate-45 -mt-1"></div>
-                      </div>
                     </div>
                   );
                 })}
@@ -490,17 +480,6 @@ export default function DashboardPage({ onNavigate }) {
 
                       {/* X-Axis Label */}
                       <span className="absolute -bottom-6 text-[10px] font-semibold text-text-muted mt-2">{item.month}</span>
-
-                      {/* Tooltip Popover */}
-                      <div className="absolute bottom-full mb-3 hidden group-hover:flex flex-col items-center pointer-events-none z-30 animate-in fade-in slide-in-from-bottom-1 duration-200">
-                        <div className="bg-zinc-950 text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900 text-[10px] font-semibold p-2.5 rounded-lg shadow-lg whitespace-nowrap flex flex-col gap-0.5 border border-border/10">
-                          <span className="font-bold border-b border-zinc-800 dark:border-zinc-200 pb-0.5 mb-1">{item.label}</span>
-                          <span>Salary Disbursed: ₹{item.amount.toLocaleString()}</span>
-                          <span>{item.teachersPaid} Teachers Paid</span>
-                          <span className="text-[9px] text-indigo-400 font-medium">Click to view staff list</span>
-                        </div>
-                        <div className="w-1.5 h-1.5 bg-zinc-950 dark:bg-zinc-50 rotate-45 -mt-1"></div>
-                      </div>
                     </div>
                   );
                 })}

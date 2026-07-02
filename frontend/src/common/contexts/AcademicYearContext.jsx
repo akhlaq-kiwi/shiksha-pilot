@@ -52,13 +52,25 @@ export const AcademicYearProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    const token = localStorage.getItem('shiksha_pilot_token');
-    const role = localStorage.getItem('shiksha_pilot_role');
-    if (token && role === 'SCHOOL_ADMIN') {
-      loadYears();
-    } else {
-      setLoading(false);
-    }
+    const handleAuthChange = () => {
+      const token = localStorage.getItem('shiksha_pilot_token');
+      const role = localStorage.getItem('shiksha_pilot_role');
+      if (token && role === 'SCHOOL_ADMIN') {
+        setLoading(true);
+        loadYears();
+      } else {
+        setAcademicYears([]);
+        setCurrentYear(null);
+        setLoading(false);
+      }
+    };
+
+    handleAuthChange();
+
+    window.addEventListener('auth-change', handleAuthChange);
+    return () => {
+      window.removeEventListener('auth-change', handleAuthChange);
+    };
   }, []);
 
   const selectYear = (yearId) => {

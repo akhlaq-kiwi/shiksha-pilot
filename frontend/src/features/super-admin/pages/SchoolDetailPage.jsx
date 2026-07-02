@@ -1,12 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ChevronRight, Ban, UserCheck, Trash2, KeyRound, Palette, X, Eye, EyeOff, MoreVertical, Users, GraduationCap, BookOpen, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Ban, UserCheck, Trash2, KeyRound, Palette, X, Eye, EyeOff, MoreVertical, Users, GraduationCap, BookOpen, ShieldCheck, Edit } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
 import { Input } from '../../../common/ui/input';
 import { Select } from '../../../common/ui/select';
 import { platformService } from '../../../common/services/platformService';
 import { useToast } from '../../../common/components/Toast';
+import { DropdownMenu, DropdownItem } from '../../../common/ui/DropdownMenu';
 
 const PRESET_PLANS = [
   { value: 'Standard',   label: 'Standard — ₹7,999/mo' },
@@ -272,43 +273,124 @@ function ThemePickerDialog({ school, onClose, onSaved }) {
 }
 
 function ActionsMenu({ school, onToggleStatus, onChangePassword, onDelete }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  const item = (label, Icon, onClick, danger = false) => (
-    <button
-      onClick={() => { setOpen(false); onClick(); }}
-      className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm font-medium rounded-md transition-colors text-left ${danger ? 'text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40' : 'text-text-primary hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
-    >
-      <Icon className="h-4 w-4 flex-shrink-0" />
-      {label}
-    </button>
+  return (
+    <DropdownMenu>
+      <DropdownItem onClick={onChangePassword}>
+        <span className="flex items-center gap-2">
+          <KeyRound className="h-4 w-4" /> Change Admin Password
+        </span>
+      </DropdownItem>
+      <DropdownItem 
+        destructive={school.status === 'ACTIVE'}
+        onClick={() => onToggleStatus(school)}
+      >
+        <span className="flex items-center gap-2">
+          {school.status === 'ACTIVE' ? <Ban className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
+          {school.status === 'ACTIVE' ? 'Suspend School' : 'Activate School'}
+        </span>
+      </DropdownItem>
+      <div className="my-1 border-t border-border" />
+      <DropdownItem destructive onClick={onDelete}>
+        <span className="flex items-center gap-2">
+          <Trash2 className="h-4 w-4" /> Delete School
+        </span>
+      </DropdownItem>
+    </DropdownMenu>
   );
+}
+
+
+function EditSchoolDetailsDialog({ school, onClose, onSaved }) {
+  const toast = useToast();
+  const [name, setName] = useState(school.name || '');
+  const [subdomain, setSubdomain] = useState(school.subdomain || '');
+  const [contactPhone, setContactPhone] = useState(school.contact_phone || '');
+  const [contactEmail, setContactEmail] = useState(school.contact_email || '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setError('');
+    
+    const trimmedEmail = contactEmail.trim();
+    if (!trimmedEmail) {
+      setError('School Owner Email Address is required.');
+      setSaving(false);
+      return;
+    }
+
+    try {
+      const updated = await platformService.updateSchool(school.id, {
+        name: name.trim(),
+        subdomain: subdomain.trim().toLowerCase(),
+        contact_phone: contactPhone.trim(),
+        contact_email: trimmedEmail,
+      });
+      onSaved(updated);
+      toast.success(`School details updated successfully.`, 'Updated');
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Failed to update school details.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
-    <div className="relative" ref={ref}>
-      <Button variant="outline" size="icon" onClick={() => setOpen(v => !v)} aria-label="Actions">
-        <MoreVertical className="h-4 w-4" />
-      </Button>
-      {open && (
-        <div className="absolute right-0 top-10 z-50 w-52 bg-surface border border-border rounded-xl shadow-lg p-1.5 animate-in fade-in zoom-in-95 duration-150">
-          {item('Change Admin Password', KeyRound, onChangePassword)}
-          {item(
-            school.status === 'ACTIVE' ? 'Suspend School' : 'Activate School',
-            school.status === 'ACTIVE' ? Ban : UserCheck,
-            () => onToggleStatus(school),
-            school.status === 'ACTIVE',
-          )}
-          <div className="my-1 border-t border-border" />
-          {item('Delete School', Trash2, onDelete, true)}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-surface border border-border rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95 fade-in duration-200">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h3 className="text-base font-bold text-text-primary">Edit School Details</h3>
+            <p className="text-xs text-text-muted mt-0.5">Update the school details and owner contact email.</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-text-muted">
+            <X className="h-4 w-4" />
+          </button>
         </div>
-      )}
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-lg text-xs text-red-600 font-semibold">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-text-secondary uppercase">School Name</label>
+            <Input value={name} onChange={e => setName(e.target.value)} required />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-text-secondary uppercase">Subdomain</label>
+            <div className="flex items-center gap-1.5">
+              <Input value={subdomain} onChange={e => setSubdomain(e.target.value)} required className="flex-1" />
+              <span className="text-sm font-semibold text-text-muted whitespace-nowrap">.shikshapilot.com</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-text-secondary uppercase">Contact Phone</label>
+              <Input placeholder="e.g. 9900000001" value={contactPhone} onChange={e => setContactPhone(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-text-secondary uppercase">School Owner Email *</label>
+              <Input type="email" placeholder="owner@school.com" value={contactEmail} onChange={e => setContactEmail(e.target.value)} required />
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
+            <Button type="submit" className="flex-1" disabled={saving}>
+              {saving ? 'Saving…' : 'Save Changes'}
+            </Button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
@@ -328,7 +410,7 @@ function StatBox({ icon: Icon, label, value, color }) {
   );
 }
 
-export default function SchoolDetailPage({ schools, onToggleStatus, onDeleteSchool }) {
+export default function SchoolDetailPage({ schools, onToggleStatus, onDeleteSchool, onSchoolUpdated }) {
   const { id }  = useParams();
   const nav     = useNavigate();
   const toast   = useToast();
@@ -342,6 +424,12 @@ export default function SchoolDetailPage({ schools, onToggleStatus, onDeleteScho
   const [showPasswordDialog,     setShowPasswordDialog]     = useState(false);
   const [showThemeDialog,        setShowThemeDialog]        = useState(false);
   const [showSubscriptionDialog, setShowSubscriptionDialog] = useState(false);
+  const [showEditDialog,         setShowEditDialog]         = useState(false);
+
+  const handleSchoolDetailsSaved = (updated) => {
+    setSchool(updated);
+    if (onSchoolUpdated) onSchoolUpdated();
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -424,8 +512,11 @@ export default function SchoolDetailPage({ schools, onToggleStatus, onDeleteScho
       <div className="grid grid-cols-12 gap-8">
         <div className="col-span-12 lg:col-span-7 space-y-6">
           <Card>
-            <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
+            <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-bold text-text-primary">School Profile</CardTitle>
+              <Button variant="outline" size="sm" onClick={() => setShowEditDialog(true)} className="flex items-center gap-1.5 text-xs font-bold h-8">
+                <Edit className="h-3.5 w-3.5" /> Edit Profile
+              </Button>
             </CardHeader>
             <CardContent className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div>
@@ -435,6 +526,10 @@ export default function SchoolDetailPage({ schools, onToggleStatus, onDeleteScho
               <div>
                 <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Subdomain</p>
                 <p className="text-sm font-bold text-text-primary mt-1">{school.subdomain}.shikshapilot.com</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">School Owner Email</p>
+                <p className="text-sm font-bold text-text-primary mt-1">{school.contact_email || '—'}</p>
               </div>
               <div>
                 <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Admin Phone</p>
@@ -567,6 +662,9 @@ export default function SchoolDetailPage({ schools, onToggleStatus, onDeleteScho
       )}
       {showSubscriptionDialog && (
         <ManageSubscriptionDialog school={school} onClose={() => setShowSubscriptionDialog(false)} onSaved={handlePlanSaved} />
+      )}
+      {showEditDialog && (
+        <EditSchoolDetailsDialog school={school} onClose={() => setShowEditDialog(false)} onSaved={handleSchoolDetailsSaved} />
       )}
     </div>
   );

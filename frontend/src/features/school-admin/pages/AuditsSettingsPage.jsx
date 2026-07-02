@@ -763,7 +763,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
               </Button>
               <Button 
                 onClick={handleSaveAndLockConfig} 
-                className="font-bold bg-primary text-primary-foreground hover:bg-primary/95"
+                className="font-bold"
               >
                 Save & Lock
               </Button>
@@ -848,7 +848,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
               { s: 3, label: 'Review' }
             ].map(step => (
               <div key={step.s} className="flex items-center gap-1.5 text-xs">
-                <div className={`w-5 h-5 rounded-full flex items-center justify-center font-bold border transition-colors ${wizardStep === step.s ? 'bg-primary border-primary text-primary-foreground' : wizardStep > step.s ? 'bg-green-500/15 border-green-500 text-green-600' : 'border-border text-text-muted'}`}>
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center font-bold border transition-colors ${wizardStep === step.s ? 'bg-primary border-primary text-zinc-50 dark:text-zinc-900' : wizardStep > step.s ? 'bg-green-500/15 border-green-500 text-green-600' : 'border-border text-text-muted'}`}>
                   {wizardStep > step.s ? <Check className="h-3 w-3" /> : step.s}
                 </div>
                 <span className={`font-semibold ${wizardStep === step.s ? 'text-primary' : 'text-text-muted'}`}>{step.label}</span>
@@ -1080,7 +1080,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                   setShowNoDraftWarning(false);
                   openCreateModal();
                 }}
-                className="font-bold bg-primary text-primary-foreground hover:bg-primary/95"
+                className="font-bold"
               >
                 Create Academic Year
               </Button>

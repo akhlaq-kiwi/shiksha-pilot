@@ -1381,7 +1381,30 @@ class SchoolAdminService extends BaseService
         ]);
         $newYearId = (int)$pdo->lastInsertId();
 
-        $this->log('Academic year created as Draft', ['name' => $body['name'], 'school_id' => $schoolId]);
+        // Automatically prefill standard national holidays
+        $defaultHolidays = [
+            ['name' => 'Labour Day', 'date' => "{$startYear}-05-01"],
+            ['name' => 'Independence Day', 'date' => "{$startYear}-08-15"],
+            ['name' => 'Mahatma Gandhi Jayanti', 'date' => "{$startYear}-10-02"],
+            ['name' => 'Christmas Day', 'date' => "{$startYear}-12-25"],
+            ['name' => 'New Year\'s Day', 'date' => "{$endYear}-01-01"],
+            ['name' => 'Republic Day', 'date' => "{$endYear}-01-26"]
+        ];
+
+        $stmtHoliday = $pdo->prepare("
+            INSERT INTO holidays (school_id, academic_year_id, name, date)
+            VALUES (:school_id, :academic_year_id, :name, :date)
+        ");
+        foreach ($defaultHolidays as $h) {
+            $stmtHoliday->execute([
+                ':school_id' => $schoolId,
+                ':academic_year_id' => $newYearId,
+                ':name' => $h['name'],
+                ':date' => $h['date']
+            ]);
+        }
+
+        $this->log('Academic year created as Draft with default national holidays', ['name' => $body['name'], 'school_id' => $schoolId]);
         return ['id' => $newYearId, 'name' => $body['name'], 'status' => 'Draft'];
     }
 
@@ -1876,6 +1899,31 @@ class SchoolAdminService extends BaseService
 
         $date   = $data['date'] ?? date('Y-m-d');
         $status = $data['status'] ?? 'Present';
+
+        // Boundary date validation (between active academic year start_date and today)
+        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+        if ($workingYear !== null) {
+            $startDate = $workingYear['start_date'];
+            $today = date('Y-m-d');
+            if ($date < $startDate) {
+                throw new ValidationException(['date' => "Cannot mark attendance before the academic year started ($startDate)."]);
+            }
+            if ($date > $today) {
+                throw new ValidationException(['date' => "Cannot mark attendance for a future date."]);
+            }
+        }
+
+        // Sunday validation
+        if (date('N', strtotime($date)) == 7) {
+            throw new ValidationException(['date' => 'Cannot mark attendance on a Sunday.']);
+        }
+
+        // Holiday validation
+        $stmtHCheck = $pdo->prepare("SELECT id FROM holidays WHERE school_id = :sid AND date = :date LIMIT 1");
+        $stmtHCheck->execute([':sid' => $schoolId, ':date' => $date]);
+        if ($stmtHCheck->fetchColumn() !== false) {
+            throw new ValidationException(['date' => 'Cannot mark attendance on a holiday.']);
+        }
 
         $this->attendanceRepo->upsert([
             'school_id'  => $this->getSchoolId($user),
@@ -3164,7 +3212,10 @@ class SchoolAdminService extends BaseService
         $filename = "financial_statement_" . $report['report_id'] . ".xls";
 
         // Email variables
-        $toEmail = $school['contact_email'] ?: 'owner@yopmail.com';
+        $toEmail = isset($school['contact_email']) ? trim((string)$school['contact_email']) : '';
+        if (empty($toEmail) || filter_var($toEmail, FILTER_VALIDATE_EMAIL) === false) {
+            throw new ValidationException(['email' => 'The School Owner Email Address is not set or is invalid. Please contact the Super Admin to update it.']);
+        }
         $subject = "Settlement Approval Request – Financial Report " . $report['report_id'];
         $sender = "shikshapilot@gmail.com";
         $academicYearName = $workingYear ? $workingYear['name'] : 'N/A';
@@ -3180,19 +3231,24 @@ Academic Year: {$academicYearName}
 Report Period: {$reportPeriod}
 Total Revenue: ₹" . number_format($revenueVal, 2) . "
 Total Salaries & Expenses: ₹" . number_format($expensesVal, 2) . "
-Net Profit / Loss: ₹" . number_format($outcomeVal, 2) . "
-Report Generated Date: {$generatedDate}
+Net Profit / Net Loss: ₹" . number_format(abs($outcomeVal), 2) . ($outcomeVal >= 0 ? " (Profit)" : " (Loss)") . "
+Report Generated Date & Time: {$generatedDate}
 
 Dear School Owner,
 
-A new financial settlement request has been submitted for your review.
+A financial settlement request has been submitted for your review.
 
-Please verify the attached financial report carefully before approving the settlement.
+Please verify the attached Excel workbook carefully before approving or rejecting this settlement request.
 
-An Excel file containing detailed financial records has been attached for verification.
-
-Only approve the request after reviewing all attached data.
+Only approve the settlement after reviewing all financial records.
 ";
+
+        $secret = getenv('DB_PASS') ?: 'secure_fallback_salt';
+        $approveSig = hash_hmac('sha256', "report-{$report['id']}-action-approve", $secret);
+        $rejectSig = hash_hmac('sha256', "report-{$report['id']}-action-reject", $secret);
+
+        $approveLink = "http://localhost:8000/api/public/financial-reports/{$report['id']}/settlement/approve?signature={$approveSig}";
+        $rejectLink = "http://localhost:8000/api/public/financial-reports/{$report['id']}/settlement/reject?signature={$rejectSig}";
 
         $emailBodyHtml = "
 <h3>Settlement Approval Request – Financial Report {$report['report_id']}</h3>
@@ -3202,56 +3258,49 @@ Only approve the request after reviewing all attached data.
     <tr><td><strong>Report Period:</strong></td><td>{$reportPeriod}</td></tr>
     <tr><td><strong>Total Revenue:</strong></td><td>₹" . number_format($revenueVal, 2) . "</td></tr>
     <tr><td><strong>Total Salaries & Expenses:</strong></td><td>₹" . number_format($expensesVal, 2) . "</td></tr>
-    <tr><td><strong>Net Profit / Loss:</strong></td><td>₹" . number_format($outcomeVal, 2) . "</td></tr>
-    <tr><td><strong>Report Generated Date:</strong></td><td>{$generatedDate}</td></tr>
+    <tr><td><strong>Net Profit / Net Loss:</strong></td><td>₹" . number_format(abs($outcomeVal), 2) . ($outcomeVal >= 0 ? " (Profit)" : " (Loss)") . "</td></tr>
+    <tr><td><strong>Report Generated Date & Time:</strong></td><td>{$generatedDate}</td></tr>
 </table>
 
 <p>Dear School Owner,</p>
-<p>A new financial settlement request has been submitted for your review.</p>
-<p>Please verify the attached financial report carefully before approving the settlement.</p>
-<p>An Excel file containing detailed financial records has been attached for verification.</p>
-<p>Only approve the request after reviewing all attached data.</p>
+<p>A financial settlement request has been submitted for your review.</p>
+<p>Please verify the attached Excel workbook carefully before approving or rejecting this settlement request.</p>
+<p>Only approve the settlement after reviewing all financial records.</p>
 
 <p style='margin-top: 30px;'>
-  <a href='http://localhost:8000/api/public/financial-reports/{$report['id']}/settlement/approve' 
+  <a href='{$approveLink}' 
      style='background-color: #0d9488; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; margin-right: 15px; display: inline-block;'>
      Approve Settlement
   </a>
-  <a href='http://localhost:8000/api/public/financial-reports/{$report['id']}/settlement/reject' 
+  <a href='{$rejectLink}' 
      style='background-color: #dc2626; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;'>
      Reject Settlement
   </a>
 </p>
 ";
 
-        // Boundary for multipart
-        $boundary = md5(uniqid((string)time(), true));
+        $logPath = __DIR__ . '/../../../../sent_emails.log';
 
-        // Headers
-        $headers = "From: " . $sender . "\r\n";
-        $headers .= "MIME-Version: 1.0\r\n";
-        $headers .= "Content-Type: multipart/mixed; boundary=\"" . $boundary . "\"\r\n";
+        // Send using custom SmtpMailer
+        try {
+            SmtpMailer::send($toEmail, $subject, $emailBodyHtml, $excelData, $filename);
+        } catch (\Throwable $e) {
+            // Log SMTP failure for debugging
+            $errorLogEntry = "========================================================================\n";
+            $errorLogEntry .= "SMTP FAILURE TIMESTAMP: " . date('Y-m-d H:i:s') . "\n";
+            $errorLogEntry .= "TO: " . $toEmail . "\n";
+            $errorLogEntry .= "ERROR MESSAGE: " . $e->getMessage() . "\n";
+            $errorLogEntry .= "TRACE: " . $e->getTraceAsString() . "\n";
+            $errorLogEntry .= "========================================================================\n\n";
+            file_put_contents($logPath, $errorLogEntry, FILE_APPEND);
 
-        // Body message
-        $body = "--" . $boundary . "\r\n";
-        $body .= "Content-Type: text/html; charset=\"UTF-8\"\r\n";
-        $body .= "Content-Transfer-Encoding: base64\r\n\r\n";
-        $body .= chunk_split(base64_encode($emailBodyHtml)) . "\r\n";
-
-        // Attachment
-        $body .= "--" . $boundary . "\r\n";
-        $body .= "Content-Type: application/vnd.ms-excel; name=\"" . $filename . "\"\r\n";
-        $body .= "Content-Description: " . $filename . "\r\n";
-        $body .= "Content-Disposition: attachment; filename=\"" . $filename . "\"; size=" . strlen($excelData) . ";\r\n";
-        $body .= "Content-Transfer-Encoding: base64\r\n\r\n";
-        $body .= chunk_split(base64_encode($excelData)) . "\r\n";
-        $body .= "--" . $boundary . "--\r\n";
-
-        // Send using native mail
-        @mail($toEmail, $subject, $body, $headers);
+            throw new ValidationException(
+                ['email' => 'Failed to send settlement email to the School Owner. Please verify SMTP settings.'],
+                'Failed to send settlement email to the School Owner. Please verify SMTP settings.'
+            );
+        }
 
         // Write log entry for developer review
-        $logPath = __DIR__ . '/../../../../sent_emails.log';
         $logEntry = "========================================================================\n";
         $logEntry .= "TIMESTAMP: " . date('Y-m-d H:i:s') . "\n";
         $logEntry .= "FROM: " . $sender . "\n";
@@ -3260,8 +3309,8 @@ Only approve the request after reviewing all attached data.
         $logEntry .= "------------------------------------------------------------------------\n";
         $logEntry .= "BODY:\n" . $emailBodyText . "\n";
         $logEntry .= "------------------------------------------------------------------------\n";
-        $logEntry .= "APPROVE LINK: http://localhost:8000/api/public/financial-reports/" . $report['id'] . "/settlement/approve\n";
-        $logEntry .= "REJECT LINK: http://localhost:8000/api/public/financial-reports/" . $report['id'] . "/settlement/reject\n";
+        $logEntry .= "APPROVE LINK: " . $approveLink . "\n";
+        $logEntry .= "REJECT LINK: " . $rejectLink . "\n";
         $logEntry .= "------------------------------------------------------------------------\n";
         $logEntry .= "EXCEL FILENAME: " . $filename . "\n";
         $logEntry .= "EXCEL CONTENT:\n" . $excelData . "\n";
@@ -3290,13 +3339,20 @@ Only approve the request after reviewing all attached data.
         return $this->financialReportRepo->findById($id);
     }
 
-    public function ownerApproveSettlement(int $id): string
+    public function ownerApproveSettlement(int $id, string $signature): string
     {
         $pdo = $this->financialReportRepo->getPdo();
 
         $report = $this->financialReportRepo->findById($id);
         if ($report === null) {
             return $this->renderOwnerResponseHtml("Error", "Financial report not found.", false);
+        }
+
+        // Validate HMAC signature to ensure link is secure
+        $secret = getenv('DB_PASS') ?: 'secure_fallback_salt';
+        $expectedSig = hash_hmac('sha256', "report-{$id}-action-approve", $secret);
+        if (!hash_equals($expectedSig, $signature)) {
+            return $this->renderOwnerResponseHtml("Unauthorized", "Invalid security signature for this settlement request.", false);
         }
 
         if ($report['status'] === 'Settled') {
@@ -3328,13 +3384,20 @@ Only approve the request after reviewing all attached data.
         return $this->renderOwnerResponseHtml("Success", "Settlement approved successfully for report " . htmlspecialchars($report['report_id']) . ".", true);
     }
 
-    public function ownerRejectSettlement(int $id): string
+    public function ownerRejectSettlement(int $id, string $signature): string
     {
         $pdo = $this->financialReportRepo->getPdo();
 
         $report = $this->financialReportRepo->findById($id);
         if ($report === null) {
             return $this->renderOwnerResponseHtml("Error", "Financial report not found.", false);
+        }
+
+        // Validate HMAC signature to ensure link is secure
+        $secret = getenv('DB_PASS') ?: 'secure_fallback_salt';
+        $expectedSig = hash_hmac('sha256', "report-{$id}-action-reject", $secret);
+        if (!hash_equals($expectedSig, $signature)) {
+            return $this->renderOwnerResponseHtml("Unauthorized", "Invalid security signature for this settlement request.", false);
         }
 
         if ($report['status'] === 'Settled') {
@@ -4323,6 +4386,187 @@ Only approve the request after reviewing all attached data.
         }
 
         return false;
+    }
+
+    public function getHolidays(array $user): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->classRepo->getPdo();
+        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+        if (!$workingYear) {
+            return [];
+        }
+
+        $stmt = $pdo->prepare("SELECT * FROM holidays WHERE school_id = :sid AND academic_year_id = :yid ORDER BY date ASC");
+        $stmt->execute([':sid' => $schoolId, ':yid' => (int)$workingYear['id']]);
+        $holidays = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (count($holidays) === 0) {
+            // Auto-prefill if empty
+            if (preg_match('/^(\d{4})[-–—](\d{4})$/u', trim($workingYear['name']), $matches)) {
+                $startYear = (int)$matches[1];
+                $endYear = (int)$matches[2];
+            } else {
+                $startYear = (int)date('Y', strtotime($workingYear['start_date']));
+                $endYear = (int)date('Y', strtotime($workingYear['end_date']));
+            }
+            $defaultHolidays = [
+                ['name' => 'Labour Day', 'date' => "{$startYear}-05-01"],
+                ['name' => 'Independence Day', 'date' => "{$startYear}-08-15"],
+                ['name' => 'Mahatma Gandhi Jayanti', 'date' => "{$startYear}-10-02"],
+                ['name' => 'Christmas Day', 'date' => "{$startYear}-12-25"],
+                ['name' => 'New Year\'s Day', 'date' => "{$endYear}-01-01"],
+                ['name' => 'Republic Day', 'date' => "{$endYear}-01-26"]
+            ];
+            $stmtHoliday = $pdo->prepare("
+                INSERT IGNORE INTO holidays (school_id, academic_year_id, name, date)
+                VALUES (:school_id, :academic_year_id, :name, :date)
+            ");
+            foreach ($defaultHolidays as $h) {
+                if ($h['date'] >= $workingYear['start_date'] && $h['date'] <= $workingYear['end_date']) {
+                    $stmtHoliday->execute([
+                        ':school_id' => $schoolId,
+                        ':academic_year_id' => (int)$workingYear['id'],
+                        ':name' => $h['name'],
+                        ':date' => $h['date']
+                    ]);
+                }
+            }
+            $stmt->execute([':sid' => $schoolId, ':yid' => (int)$workingYear['id']]);
+            $holidays = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        return $holidays;
+    }
+
+    public function createHoliday(array $user, array $body): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->classRepo->getPdo();
+
+        if (empty($body['name'])) {
+            throw new ValidationException(['name' => 'Holiday name is required.']);
+        }
+        if (empty($body['date'])) {
+            throw new ValidationException(['date' => 'Holiday date is required.']);
+        }
+
+        $date = trim($body['date']);
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            throw new ValidationException(['date' => 'Invalid date format.']);
+        }
+
+        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+        if (!$workingYear) {
+            throw new ValidationException(['date' => 'No active Academic Year found.']);
+        }
+
+        if ($date < $workingYear['start_date'] || $date > $workingYear['end_date']) {
+            throw new ValidationException(['date' => "Holiday date must be within the academic year ({$workingYear['start_date']} to {$workingYear['end_date']})."]);
+        }
+
+        // Check for duplicates
+        $stmtCheck = $pdo->prepare("SELECT id FROM holidays WHERE school_id = :sid AND date = :date");
+        $stmtCheck->execute([':sid' => $schoolId, ':date' => $date]);
+        if ($stmtCheck->fetchColumn() !== false) {
+            throw new ValidationException(['date' => 'A holiday already exists on this date.']);
+        }
+
+        $stmt = $pdo->prepare("INSERT INTO holidays (school_id, academic_year_id, name, date) VALUES (:sid, :yid, :name, :date)");
+        $stmt->execute([
+            ':sid' => $schoolId,
+            ':yid' => (int)$workingYear['id'],
+            ':name' => trim($body['name']),
+            ':date' => $date
+        ]);
+
+        return ['id' => (int)$pdo->lastInsertId(), 'name' => trim($body['name']), 'date' => $date];
+    }
+
+    public function updateHoliday(array $user, int $id, array $body): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->classRepo->getPdo();
+
+        // Check if exists
+        $stmtEx = $pdo->prepare("SELECT * FROM holidays WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtEx->execute([':id' => $id, ':sid' => $schoolId]);
+        $holiday = $stmtEx->fetch(PDO::FETCH_ASSOC);
+        if (!$holiday) {
+            throw new NotFoundException('Holiday not found.');
+        }
+
+        // Past holiday read-only validation
+        $today = date('Y-m-d');
+        if ($holiday['date'] < $today) {
+            throw new ValidationException(['date' => 'Cannot edit past holidays.']);
+        }
+
+        if (empty($body['name'])) {
+            throw new ValidationException(['name' => 'Holiday name is required.']);
+        }
+        if (empty($body['date'])) {
+            throw new ValidationException(['date' => 'Holiday date is required.']);
+        }
+
+        $date = trim($body['date']);
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            throw new ValidationException(['date' => 'Invalid date format.']);
+        }
+
+        if ($date < $today) {
+            throw new ValidationException(['date' => 'Cannot set holiday date in the past.']);
+        }
+
+        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+        if (!$workingYear) {
+            throw new ValidationException(['date' => 'No active Academic Year found.']);
+        }
+
+        if ($date < $workingYear['start_date'] || $date > $workingYear['end_date']) {
+            throw new ValidationException(['date' => "Holiday date must be within the academic year ({$workingYear['start_date']} to {$workingYear['end_date']})."]);
+        }
+
+        // Check for duplicates (excluding this holiday)
+        $stmtCheck = $pdo->prepare("SELECT id FROM holidays WHERE school_id = :sid AND date = :date AND id != :id");
+        $stmtCheck->execute([':sid' => $schoolId, ':date' => $date, ':id' => $id]);
+        if ($stmtCheck->fetchColumn() !== false) {
+            throw new ValidationException(['date' => 'A holiday already exists on this date.']);
+        }
+
+        $stmt = $pdo->prepare("UPDATE holidays SET name = :name, date = :date WHERE id = :id AND school_id = :sid");
+        $stmt->execute([
+            ':name' => trim($body['name']),
+            ':date' => $date,
+            ':id' => $id,
+            ':sid' => $schoolId
+        ]);
+
+        return ['id' => $id, 'name' => trim($body['name']), 'date' => $date];
+    }
+
+    public function deleteHoliday(array $user, int $id): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->classRepo->getPdo();
+
+        $stmtEx = $pdo->prepare("SELECT * FROM holidays WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtEx->execute([':id' => $id, ':sid' => $schoolId]);
+        $holiday = $stmtEx->fetch(PDO::FETCH_ASSOC);
+        if (!$holiday) {
+            throw new NotFoundException('Holiday not found.');
+        }
+
+        // Past holiday read-only validation
+        $today = date('Y-m-d');
+        if ($holiday['date'] < $today) {
+            throw new ValidationException(['date' => 'Cannot delete past holidays.']);
+        }
+
+        $stmt = $pdo->prepare("DELETE FROM holidays WHERE id = :id AND school_id = :sid");
+        $stmt->execute([':id' => $id, ':sid' => $schoolId]);
+
+        return ['success' => true];
     }
 }
 

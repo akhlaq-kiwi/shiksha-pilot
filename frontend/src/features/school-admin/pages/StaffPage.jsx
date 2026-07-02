@@ -11,6 +11,7 @@ import { schoolService } from '../../../common/services/schoolService';
 import { SearchableSelect, INDIAN_STATES_AND_CITIES } from '../../../common/ui/SearchableSelect';
 import html2pdf from 'html2pdf.js';
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
+import { DropdownMenu, DropdownItem } from '../../../common/ui/DropdownMenu';
 
 // Self-healing avatar image component to handle loading errors gracefully
 const TeacherAvatar = ({ src, name, updatedAt }) => {
@@ -794,7 +795,7 @@ export default function StaffPage() {
         return (
           <div className="space-y-6 animate-in fade-in duration-300">
             {/* Header */}
-            <div className="sticky top-24 z-20 flex items-center justify-between border-b border-border pb-4 gap-4 bg-surface p-4 rounded-2xl shadow-2xs">
+            <div className="sticky top-14 z-20 flex items-center justify-between border-b border-border pb-4 gap-4 bg-surface p-4 rounded-2xl shadow-2xs">
               <div className="flex items-center gap-6">
                 <button 
                   onClick={() => setView('list')} 
@@ -825,7 +826,7 @@ export default function StaffPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               
               {/* Left Column Card */}
-              <Card className="lg:col-span-1 p-6 bg-surface border border-border rounded-2xl shadow-xs space-y-6">
+              <Card className="lg:col-span-1 p-6 bg-surface border border-border rounded-2xl shadow-xs space-y-6 overflow-hidden">
                 <div className="flex flex-col items-center text-center">
                   <div className="w-28 h-28 rounded-full border-2 border-primary/20 bg-zinc-50 dark:bg-zinc-900/50 flex items-center justify-center overflow-hidden shadow-sm flex-shrink-0 relative">
                     <TeacherAvatar src={t.photo_path} name={t.name} updatedAt={t.updated_at} />
@@ -955,39 +956,25 @@ export default function StaffPage() {
                             </div>
                             
                             {isPaid && (
-                              <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5">
                                 {isLocked && (
                                   <span title="Locked by Financial Report" className="text-zinc-400">
                                     <Lock className="h-3.5 w-3.5" />
                                   </span>
                                 )}
-                                {!isReadOnly && !isLocked && (
-                                  <div className="relative">
-                                    <button 
-                                      onClick={() => setActiveMenuMonth(activeMenuMonth === month ? null : month)}
-                                      className="p-1 text-zinc-500 hover:text-zinc-950 dark:hover:text-zinc-50 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-all"
-                                    >
-                                      <MoreVertical className="h-3.5 w-3.5" />
-                                    </button>
-                                    {activeMenuMonth === month && (
-                                      <>
-                                        <div className="fixed inset-0 z-40" onClick={() => setActiveMenuMonth(null)} />
-                                        <div className="absolute right-0 mt-1 w-32 bg-surface border border-border rounded-lg shadow-md py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
-                                          <button
-                                            onClick={() => {
-                                              setActiveMenuMonth(null);
-                                              setRevertPayment(payment);
-                                              setIsRevertDialogOpen(true);
-                                            }}
-                                            className="w-full text-left px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-500/10 transition-colors"
-                                          >
-                                            Revert Salary
-                                          </button>
-                                        </div>
-                                      </>
-                                    )}
-                                  </div>
-                                )}
+                                {!isReadOnly && !isLocked && isPaid && (
+                                   <DropdownMenu>
+                                     <DropdownItem
+                                       destructive
+                                       onClick={() => {
+                                         setRevertPayment(payment);
+                                         setIsRevertDialogOpen(true);
+                                       }}
+                                     >
+                                       Revert Salary
+                                     </DropdownItem>
+                                   </DropdownMenu>
+                                 )}
                               </div>
                             )}
                           </div>

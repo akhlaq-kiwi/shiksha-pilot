@@ -219,6 +219,53 @@ class SchoolAdminController extends BaseController
     }
 
     // -------------------------------------------------------------------------
+    // Holidays / Leave Days
+    // -------------------------------------------------------------------------
+
+    public function getHolidays(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $data = $this->service->getHolidays($user);
+        return $this->success($response, $data);
+    }
+
+    public function createHoliday(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body = RequestParser::body($request);
+        $result = $this->service->createHoliday($user, $body);
+
+        return $this->success($response, $result, 'Holiday created successfully');
+    }
+
+    public function updateHoliday(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int)$request->getAttribute('id');
+        $body = RequestParser::body($request);
+        $result = $this->service->updateHoliday($user, $id, $body);
+
+        return $this->success($response, $result, 'Holiday updated successfully');
+    }
+
+    public function deleteHoliday(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int)$request->getAttribute('id');
+        $result = $this->service->deleteHoliday($user, $id);
+
+        return $this->success($response, $result, 'Holiday deleted successfully');
+    }
+
+    // -------------------------------------------------------------------------
     // Exams
     // -------------------------------------------------------------------------
 
@@ -599,7 +646,9 @@ class SchoolAdminController extends BaseController
     public function ownerApproveSettlement(Request $request, Response $response, array $args): Response
     {
         $id = (int)$args['id'];
-        $html = $this->service->ownerApproveSettlement($id);
+        $params = $request->getQueryParams();
+        $signature = $params['signature'] ?? '';
+        $html = $this->service->ownerApproveSettlement($id, $signature);
         $response->getBody()->write($html);
         return $response->withHeader('Content-Type', 'text/html');
     }
@@ -607,7 +656,9 @@ class SchoolAdminController extends BaseController
     public function ownerRejectSettlement(Request $request, Response $response, array $args): Response
     {
         $id = (int)$args['id'];
-        $html = $this->service->ownerRejectSettlement($id);
+        $params = $request->getQueryParams();
+        $signature = $params['signature'] ?? '';
+        $html = $this->service->ownerRejectSettlement($id, $signature);
         $response->getBody()->write($html);
         return $response->withHeader('Content-Type', 'text/html');
     }

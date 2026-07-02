@@ -432,3 +432,32 @@ Never hardcode colors.
 Never duplicate UI patterns.
 
 The design system should make new features look consistent by default.
+
+---
+
+## Application Initialization & Authentication Flow
+
+### 1. Unified Bootstrap Sequence
+To prevent stale contextual state and race conditions (e.g., empty Academic Year context leading to false onboarding redirections), the application must adhere to a standardized asynchronous bootstrap sequence after authentication states change:
+1. **Token Persistence**: Store the access token, role, and profile details in persistent storage (`localStorage`).
+2. **Dispatch Auth Change Event**: Broadcast an `auth-change` event to notify all context providers and state layers.
+3. **Synchronous State Hydration**: Context providers must listen to `auth-change` and refresh their parameters synchronously before components render the protected routes.
+4. **Loading States**: Layout guards must render a clean verification splash spinner while context states are resolving (`loading: true`), preventing flash displays of onboarding or missing data screens.
+
+### 2. Event-Driven Synchronization
+Providers wrapping the routing hierarchy (e.g., `AcademicYearProvider`) must never rely solely on mount-based initialization (`useEffect` with empty dependencies `[]`). They must subscribe to `'auth-change'` events to dynamically refresh their states:
+
+```javascript
+useEffect(() => {
+  const syncState = () => {
+    if (isAuthenticated()) {
+      loadSessionData();
+    } else {
+      clearSessionData();
+    }
+  };
+  syncState();
+  window.addEventListener('auth-change', syncState);
+  return () => window.removeEventListener('auth-change', syncState);
+}, []);
+```

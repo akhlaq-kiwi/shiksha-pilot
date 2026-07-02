@@ -56,9 +56,12 @@ class PlatformService extends BaseService
 
     public function createSchool(array $data, array $actor): array
     {
+        $data['contact_email'] = isset($data['contact_email']) ? trim((string)$data['contact_email']) : '';
+
         Validator::make($data, [
-            'name'      => 'required',
-            'subdomain' => 'required',
+            'name'          => 'required',
+            'subdomain'     => 'required',
+            'contact_email' => 'required|email',
         ])->validate();
 
         $subdomain = strtolower((string) $data['subdomain']);
@@ -76,7 +79,7 @@ class PlatformService extends BaseService
             'plan'          => $data['plan'] ?? 'Premium',
             'status'        => 'ACTIVE',
             'contact_phone' => $data['contact_phone'] ?? '',
-            'contact_email' => $data['contact_email'] ?? '',
+            'contact_email' => $data['contact_email'],
         ]);
 
         // Create school admin user if credentials provided
@@ -126,6 +129,13 @@ class PlatformService extends BaseService
 
         if ($school === null) {
             throw new NotFoundException('School tenant not found.');
+        }
+
+        if (isset($data['contact_email'])) {
+            $data['contact_email'] = trim((string) $data['contact_email']);
+            Validator::make($data, [
+                'contact_email' => 'required|email',
+            ])->validate();
         }
 
         $newSubdomain = strtolower($data['subdomain'] ?? $school['subdomain']);

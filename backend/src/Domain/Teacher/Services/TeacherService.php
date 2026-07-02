@@ -96,6 +96,45 @@ class TeacherService extends BaseService
         $status  = $data['status']   ?? 'Present';
         $classId = isset($data['class_id']) ? (int) $data['class_id'] : null;
 
+        $pdo = $this->attendanceRepo->getPdo();
+        $schoolId = (int)$user['school_id'];
+        
+        $requestYearId = $_SERVER['HTTP_X_ACADEMIC_YEAR_ID'] ?? $_SERVER['X_ACADEMIC_YEAR_ID'] ?? null;
+        $workingYear = null;
+        if ($requestYearId !== null && is_numeric($requestYearId)) {
+            $stmt = $pdo->prepare("SELECT * FROM academic_years WHERE id = :id AND school_id = :sid LIMIT 1");
+            $stmt->execute([':id' => (int)$requestYearId, ':sid' => $schoolId]);
+            $workingYear = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
+        if (!$workingYear) {
+            $stmt = $pdo->prepare("SELECT * FROM academic_years WHERE school_id = :sid AND (status = 'ACTIVE' OR is_current = 1) LIMIT 1");
+            $stmt->execute([':sid' => $schoolId]);
+            $workingYear = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
+
+        if ($workingYear) {
+            $startDate = $workingYear['start_date'];
+            $today = date('Y-m-d');
+            if ($date < $startDate) {
+                throw new ValidationException(['date' => "Cannot mark attendance before the academic year started ($startDate)."]);
+            }
+            if ($date > $today) {
+                throw new ValidationException(['date' => "Cannot mark attendance for a future date."]);
+            }
+        }
+
+        // Sunday validation
+        if (date('N', strtotime($date)) == 7) {
+            throw new ValidationException(['date' => 'Cannot mark attendance on a Sunday.']);
+        }
+
+        // Holiday validation
+        $stmtHCheck = $pdo->prepare("SELECT id FROM holidays WHERE school_id = :sid AND date = :date LIMIT 1");
+        $stmtHCheck->execute([':sid' => $schoolId, ':date' => $date]);
+        if ($stmtHCheck->fetchColumn() !== false) {
+            throw new ValidationException(['date' => 'Cannot mark attendance on a holiday.']);
+        }
+
         $this->attendanceRepo->upsert([
             ':school_id'  => (int) $user['school_id'],
             ':student_id' => $studentId,

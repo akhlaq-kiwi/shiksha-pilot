@@ -81,6 +81,22 @@ export const schoolService = {
     return apiClient.post('/api/school/attendance', attendanceData);
   },
 
+  getHolidays() {
+    return apiClient.get('/api/school/holidays');
+  },
+
+  createHoliday(data) {
+    return apiClient.post('/api/school/holidays', data);
+  },
+
+  updateHoliday(id, data) {
+    return apiClient.put(`/api/school/holidays/${id}`, data);
+  },
+
+  deleteHoliday(id) {
+    return apiClient.delete(`/api/school/holidays/${id}`);
+  },
+
   getFeeStructures() {
     return apiClient.get('/api/school/fee-structures');
   },

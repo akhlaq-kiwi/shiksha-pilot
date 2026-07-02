@@ -136,6 +136,7 @@ export default function SuperAdminPortal() {
         school_name:    newSchool.name,
         subdomain:      newSchool.subdomain.toLowerCase(),
         contact_phone:  newSchool.contact_phone || '',
+        contact_email:  newSchool.contact_email ? newSchool.contact_email.trim() : '',
         plan:           effectivePlan,
         admin_phone:    newSchool.admin_phone || '',
         admin_password: newSchool.admin_password || '',
@@ -209,6 +210,7 @@ export default function SuperAdminPortal() {
               schools={schools}
               onToggleStatus={handleToggleStatus}
               onDeleteSchool={handleDeleteSchool}
+              onSchoolUpdated={refreshSchools}
             />
           } />
           <Route path="billing"  element={<BillingPage  schools={schools} stats={stats} plans={plans} />} />
