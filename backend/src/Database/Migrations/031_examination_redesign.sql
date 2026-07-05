@@ -21,6 +21,7 @@ ALTER TABLE examination_papers ADD CONSTRAINT fk_examination_papers_class FOREIG
 
 -- 3. Drop constraint and class_id column from examinations
 ALTER TABLE examinations DROP FOREIGN KEY `3`;
+ALTER TABLE examinations DROP FOREIGN KEY `examinations_ibfk_3`;
 ALTER TABLE examinations DROP COLUMN class_id;
 
 SET FOREIGN_KEY_CHECKS = 1;

@@ -1068,7 +1068,13 @@ class SchoolAdminService extends BaseService
 
     public function handleFileUpload($uploadedFile): string
     {
-        $directory = dirname(__DIR__, 5) . '/backend/public/uploads';
+        // QA uses '/api' as the deployment folder, Local uses '/backend'
+        if (str_contains(__DIR__, DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR)) {
+            $directory = dirname(__DIR__, 5) . '/uploads';
+        } else {
+            $directory = dirname(__DIR__, 5) . '/backend/public/uploads';
+        }
+
         if (!is_dir($directory)) {
             mkdir($directory, 0777, true);
         }
