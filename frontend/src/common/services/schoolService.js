@@ -37,12 +37,14 @@ export const schoolService = {
     return apiClient.get('/api/school/academic-years');
   },
 
-  getStaff() {
-    return apiClient.get('/api/school/staff');
+  getStaff(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    return apiClient.get(`/api/school/staff${query ? '?' + query : ''}`);
   },
 
-  getStaffDetails(id) {
-    return apiClient.get(`/api/school/staff/${id}`);
+  getStaffDetails(id, params = {}) {
+    const query = new URLSearchParams(params).toString();
+    return apiClient.get(`/api/school/staff/${id}${query ? '?' + query : ''}`);
   },
 
   createStaff(staffData) {
@@ -95,6 +97,76 @@ export const schoolService = {
 
   deleteHoliday(id) {
     return apiClient.delete(`/api/school/holidays/${id}`);
+  },
+
+  getExaminations() {
+    return apiClient.get('/api/school/exams-new');
+  },
+
+  createExamination(data) {
+    return apiClient.post('/api/school/exams-new', data);
+  },
+
+  getExaminationDetails(id) {
+    return apiClient.get(`/api/school/exams-new/${id}`);
+  },
+
+  deleteExamination(id) {
+    return apiClient.delete(`/api/school/exams-new/${id}`);
+  },
+
+  updateExamination(id, data) {
+    return apiClient.put(`/api/school/exams-new/${id}`, data);
+  },
+
+  getExamTimetable(examId, classId) {
+    const url = buildUrl(`/api/school/exams-new/${examId}/timetable`, { class_id: classId });
+    return apiClient.get(url);
+  },
+
+  saveExamTimetable(examId, classId, data) {
+    const url = buildUrl(`/api/school/exams-new/${examId}/timetable`, { class_id: classId });
+    return apiClient.post(url, data);
+  },
+
+  getExamMarksSheet(examId, classId, subjectId) {
+    const url = buildUrl(`/api/school/exams-new/${examId}/marks`, { class_id: classId, subject_id: subjectId });
+    return apiClient.get(url);
+  },
+
+  saveExamMark(examId, data) {
+    return apiClient.post(`/api/school/exams-new/${examId}/marks`, data);
+  },
+
+  publishExamResults(examId, classId, status = 'Published') {
+    return apiClient.post(`/api/school/exams-new/${examId}/publish`, { class_id: classId, status });
+  },
+
+  getReportCards(examId, classId, studentId = null) {
+    const query = { class_id: classId };
+    if (studentId) query.student_id = studentId;
+    const url = buildUrl(`/api/school/exams-new/${examId}/report-cards`, query);
+    return apiClient.get(url);
+  },
+
+  getExamClassStatuses(examId) {
+    return apiClient.get(`/api/school/exams-new/${examId}/class-status`);
+  },
+
+  getExamInstructions(examId, classId) {
+    return apiClient.get(`/api/school/exams-new/${examId}/instructions?class_id=${classId}`);
+  },
+
+  saveExamInstructions(examId, classId, data) {
+    return apiClient.post(`/api/school/exams-new/${examId}/instructions?class_id=${classId}`, data);
+  },
+
+  getGradeConfigurations() {
+    return apiClient.get('/api/school/grade-configurations');
+  },
+
+  saveGradeConfigurations(data) {
+    return apiClient.post('/api/school/grade-configurations', data);
   },
 
   getFeeStructures() {
@@ -251,6 +323,10 @@ export const schoolService = {
 
   revertAdditionalFeePayment(id) {
     return apiClient.post(`/api/school/additional-fees/payments/${id}/revert`);
+  },
+
+  getHolidays() {
+    return apiClient.get('/api/school/holidays');
   }
 };
 

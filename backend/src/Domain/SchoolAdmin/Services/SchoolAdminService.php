@@ -32,7 +32,159 @@ class SchoolAdminService extends BaseService
         parent::__construct($logger);
     }
 
-    private function getWorkingAcademicYear(PDO $pdo, int $schoolId): ?array
+    public function pasteTimetableSchedule(array $user, array $data): void
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        if (empty($data['class_id']) || empty($data['source_day']) || empty($data['destination_day']) || empty($data['destination_date'])) {
+            throw new ValidationException(['fields' => 'Class ID, source day, destination day, and destination date are required.']);
+        }
+
+        $classId = (int)$data['class_id'];
+        $sourceDay = $data['source_day'];
+        $destDay = $data['destination_day'];
+        $destDate = $data['destination_date'];
+
+        $startDate = $destDate;
+
+        // Fetch active periods from the source day
+        $stmtSrc = $pdo->prepare("
+            SELECT * FROM timetable 
+            WHERE class_id = :cid AND day_of_week = :day AND school_id = :sid AND end_date IS NULL
+        ");
+        $stmtSrc->execute([
+            ':cid' => $classId,
+            ':day' => $sourceDay,
+            ':sid' => $schoolId
+        ]);
+        $srcPeriods = $stmtSrc->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        // Validate teacher availability and maximum workload constraints
+        foreach ($srcPeriods as $p) {
+            $teacherId = (int)$p['teacher_id'];
+            $periodNum = (int)$p['period_number'];
+
+            // 1. Conflict Check: is the teacher already assigned to ANOTHER class during this period on the destination day?
+            $stmtConflict = $pdo->prepare("
+                SELECT t.id, c.name AS class_name FROM timetable t
+                JOIN classes c ON t.class_id = c.id
+                WHERE t.teacher_id = :tid 
+                  AND t.day_of_week = :day 
+                  AND t.period_number = :pnum 
+                  AND t.class_id != :cid 
+                  AND t.end_date IS NULL
+            ");
+            $stmtConflict->execute([
+                ':tid' => $teacherId,
+                ':day' => $destDay,
+                ':pnum' => $periodNum,
+                ':cid' => $classId
+            ]);
+            $conflict = $stmtConflict->fetch(\PDO::FETCH_ASSOC);
+            if ($conflict) {
+                throw new ValidationException(['teacher_id' => "Schedule cannot be pasted because one or more teachers are already assigned to another class during the same period."]);
+            }
+
+            // 2. Workload Check: does assigning this period exceed the teacher's max periods workload?
+            $stmtCount = $pdo->prepare("
+                SELECT COUNT(*) FROM timetable 
+                WHERE teacher_id = :tid 
+                  AND school_id = :sid 
+                  AND day_of_week = :day 
+                  AND class_id != :cid 
+                  AND end_date IS NULL
+            ");
+            $stmtCount->execute([
+                ':tid' => $teacherId,
+                ':sid' => $schoolId,
+                ':day' => $destDay,
+                ':cid' => $classId
+            ]);
+            $otherAssignedCount = (int)$stmtCount->fetchColumn();
+
+            $copiedCountForTeacher = 0;
+            foreach ($srcPeriods as $sp) {
+                if ((int)$sp['teacher_id'] === $teacherId) {
+                    $copiedCountForTeacher++;
+                }
+            }
+
+            $totalWorkload = $otherAssignedCount + $copiedCountForTeacher;
+
+            $stmtMax = $pdo->prepare("SELECT max_periods FROM staff WHERE id = :tid AND school_id = :sid");
+            $stmtMax->execute([':tid' => $teacherId, ':sid' => $schoolId]);
+            $maxPeriods = (int)$stmtMax->fetchColumn();
+
+            if ($totalWorkload > $maxPeriods) {
+                throw new ValidationException(['teacher_id' => "Schedule cannot be pasted because one or more teachers would exceed their maximum workload limit of {$maxPeriods} periods."]);
+            }
+        }
+
+        // All checks passed! Execute paste atomically inside a transaction
+        $pdo->beginTransaction();
+        try {
+            // Find existing active timetable entries of this class on the destination day
+            $stmtFindDest = $pdo->prepare("
+                SELECT id, start_date FROM timetable 
+                WHERE class_id = :cid AND day_of_week = :day AND school_id = :sid AND end_date IS NULL
+            ");
+            $stmtFindDest->execute([
+                ':cid' => $classId,
+                ':day' => $destDay,
+                ':sid' => $schoolId
+            ]);
+            $destEntries = $stmtFindDest->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            foreach ($destEntries as $de) {
+                if ($de['start_date'] < $startDate) {
+                    // The entry has history. End it.
+                    $dt = new \DateTime($startDate);
+                    $dt->modify('-1 day');
+                    $endDate = $dt->format('Y-m-d');
+                    
+                    $stmtEnd = $pdo->prepare("UPDATE timetable SET end_date = :end_date WHERE id = :id");
+                    $stmtEnd->execute([':end_date' => $endDate, ':id' => $de['id']]);
+                    
+                    // Delete backups on or after start_date
+                    $stmtDelBackup = $pdo->prepare("DELETE FROM timetable_backups WHERE timetable_id = :id AND date >= :date");
+                    $stmtDelBackup->execute([':id' => $de['id'], ':date' => $startDate]);
+                } else {
+                    // The entry is newer. Delete it completely.
+                    $stmtDelBackup = $pdo->prepare("DELETE FROM timetable_backups WHERE timetable_id = :id");
+                    $stmtDelBackup->execute([':id' => $de['id']]);
+                    
+                    $stmtDel = $pdo->prepare("DELETE FROM timetable WHERE id = :id");
+                    $stmtDel->execute([':id' => $de['id']]);
+                }
+            }
+
+            // Insert copied periods
+            $stmtInsert = $pdo->prepare("
+                INSERT INTO timetable (school_id, class_id, subject_id, teacher_id, day_of_week, period_number, start_date, is_published)
+                VALUES (:sid, :cid, :subid, :tid, :day, :pnum, :start_date, 0)
+            ");
+
+            foreach ($srcPeriods as $p) {
+                $stmtInsert->execute([
+                    ':sid' => $schoolId,
+                    ':cid' => $classId,
+                    ':subid' => $p['subject_id'],
+                    ':tid' => $p['teacher_id'],
+                    ':day' => $destDay,
+                    ':pnum' => $p['period_number'],
+                    ':start_date' => $startDate
+                ]);
+            }
+
+            $pdo->commit();
+        } catch (\Exception $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+    }
+
+    public function getWorkingAcademicYear(PDO $pdo, int $schoolId): ?array
     {
         $requestYearId = $_SERVER['HTTP_X_ACADEMIC_YEAR_ID'] ?? $_SERVER['X_ACADEMIC_YEAR_ID'] ?? null;
         if ($requestYearId !== null && is_numeric($requestYearId)) {
@@ -932,20 +1084,92 @@ class SchoolAdminService extends BaseService
     // Staff
     // -------------------------------------------------------------------------
 
-    public function getStaff(array $user): array
+    public function getStaff(array $user, array $params = []): array
     {
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->staffRepo->getPdo();
         
+        $date = $params['date'] ?? date('Y-m-d');
+        try {
+            $dt = new \DateTime($date);
+            $dayOfWeek = $dt->format('l');
+        } catch (\Exception $e) {
+            $dayOfWeek = date('l');
+            $date = date('Y-m-d');
+        }
+
         $stmt = $pdo->prepare("SELECT * FROM staff WHERE school_id = :sid ORDER BY id DESC");
         $stmt->execute([':sid' => $schoolId]);
         $staffList = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-        // For each staff member, fetch documents count
+        // Fetch active periods for this specific day (taking into account backup overrides)
+        $stmtPeriods = $pdo->prepare("
+            SELECT id, teacher_id, start_date 
+            FROM timetable 
+            WHERE school_id = :sid AND day_of_week = :day AND end_date IS NULL
+        ");
+        $stmtPeriods->execute([':sid' => $schoolId, ':day' => $dayOfWeek]);
+        $timetablePeriods = $stmtPeriods->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        $teacherCounts = [];
+        foreach ($timetablePeriods as $tp) {
+            // Skip if the period was not effective yet on the requested date
+            if ($date < $tp['start_date']) {
+                continue;
+            }
+            $stmtB = $pdo->prepare("
+                SELECT backup_teacher_id 
+                FROM timetable_backups 
+                WHERE timetable_id = :tid AND date = :date
+            ");
+            $stmtB->execute([':tid' => $tp['id'], ':date' => $date]);
+            $backupTeacherId = $stmtB->fetchColumn();
+
+            if ($backupTeacherId) {
+                $activeTid = (int)$backupTeacherId;
+            } else {
+                $activeTid = (int)$tp['teacher_id'];
+            }
+
+            if (!isset($teacherCounts[$activeTid])) {
+                $teacherCounts[$activeTid] = 0;
+            }
+            $teacherCounts[$activeTid]++;
+        }
+
+        // For each staff member, fetch documents count and sync active periods
         foreach ($staffList as &$s) {
             $stmtDocs = $pdo->prepare("SELECT COUNT(*) FROM staff_documents WHERE staff_id = :sid");
             $stmtDocs->execute([':sid' => $s['id']]);
             $s['documents_count'] = (int)$stmtDocs->fetchColumn();
+
+            if (strcasecmp($s['role'], 'Teacher') === 0) {
+                $count = $teacherCounts[$s['id']] ?? 0;
+
+                if ((int)$s['assigned_periods'] !== $count) {
+                    $stmtUpdate = $pdo->prepare("UPDATE staff SET assigned_periods = :count WHERE id = :tid");
+                    $stmtUpdate->execute([':count' => $count, ':tid' => $s['id']]);
+                    $s['assigned_periods'] = $count;
+                }
+
+                // Query day workloads for the teacher
+                $stmtDays = $pdo->prepare("
+                    SELECT day_of_week, COUNT(*) as cnt 
+                    FROM timetable 
+                    WHERE teacher_id = :tid AND school_id = :sid AND end_date IS NULL
+                    GROUP BY day_of_week
+                ");
+                $stmtDays->execute([':tid' => $s['id'], ':sid' => $schoolId]);
+                $dayCounts = $stmtDays->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
+                $s['day_workloads'] = [
+                    'Monday'    => (int)($dayCounts['Monday'] ?? 0),
+                    'Tuesday'   => (int)($dayCounts['Tuesday'] ?? 0),
+                    'Wednesday' => (int)($dayCounts['Wednesday'] ?? 0),
+                    'Thursday'  => (int)($dayCounts['Thursday'] ?? 0),
+                    'Friday'    => (int)($dayCounts['Friday'] ?? 0),
+                    'Saturday'  => (int)($dayCounts['Saturday'] ?? 0),
+                ];
+            }
         }
 
         return $staffList;
@@ -962,6 +1186,40 @@ class SchoolAdminService extends BaseService
 
         if (!$member) {
             throw new NotFoundException('Teacher profile not found');
+        }
+
+        // Dynamic workload sync
+        if (strcasecmp($member['role'], 'Teacher') === 0) {
+            $stmtCount = $pdo->prepare("
+                SELECT COUNT(*) FROM timetable 
+                WHERE teacher_id = :tid AND school_id = :sid AND end_date IS NULL
+            ");
+            $stmtCount->execute([':tid' => $member['id'], ':sid' => $schoolId]);
+            $count = (int)$stmtCount->fetchColumn();
+
+            if ((int)$member['assigned_periods'] !== $count) {
+                $stmtUpdate = $pdo->prepare("UPDATE staff SET assigned_periods = :count WHERE id = :tid");
+                $stmtUpdate->execute([':count' => $count, ':tid' => $member['id']]);
+                $member['assigned_periods'] = $count;
+            }
+
+            // Query day workloads for the teacher
+            $stmtDays = $pdo->prepare("
+                SELECT day_of_week, COUNT(*) as cnt 
+                FROM timetable 
+                WHERE teacher_id = :tid AND school_id = :sid AND end_date IS NULL
+                GROUP BY day_of_week
+            ");
+            $stmtDays->execute([':tid' => $member['id'], ':sid' => $schoolId]);
+            $dayCounts = $stmtDays->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
+            $member['day_workloads'] = [
+                'Monday'    => (int)($dayCounts['Monday'] ?? 0),
+                'Tuesday'   => (int)($dayCounts['Tuesday'] ?? 0),
+                'Wednesday' => (int)($dayCounts['Wednesday'] ?? 0),
+                'Thursday'  => (int)($dayCounts['Thursday'] ?? 0),
+                'Friday'    => (int)($dayCounts['Friday'] ?? 0),
+                'Saturday'  => (int)($dayCounts['Saturday'] ?? 0),
+            ];
         }
 
         // Fetch documents
@@ -1769,6 +2027,11 @@ class SchoolAdminService extends BaseService
                 }
             }
 
+            if ($prevYearId !== false && $prevYearId !== null) {
+                $stmtUpdatePrevStatus = $pdo->prepare("UPDATE academic_years SET migration_status = 'Completed' WHERE id = :id");
+                $stmtUpdatePrevStatus->execute([':id' => (int)$prevYearId]);
+            }
+
             $pdo->commit();
             $this->log('Academic year rollover migration executed', ['id' => $newYearId, 'school_id' => $schoolId]);
             return ['id' => $newYearId, 'status' => 'Draft', 'migrated' => true];
@@ -1858,6 +2121,19 @@ class SchoolAdminService extends BaseService
             throw new NotFoundException('Academic year not found.');
         }
 
+        // Find the currently active academic year
+        $stmtPrev = $pdo->prepare("SELECT * FROM academic_years WHERE school_id = :sid AND is_current = 1 LIMIT 1");
+        $stmtPrev->execute([':sid' => $schoolId]);
+        $prevYear = $stmtPrev->fetch(PDO::FETCH_ASSOC);
+
+        if ($prevYear && $targetYear['status'] === 'Draft') {
+            if (($prevYear['migration_status'] ?? 'Not Started') !== 'Completed') {
+                throw new ValidationException([
+                    'migration' => "The current Academic Year's records have not yet been migrated to the selected Academic Year. Please complete the Academic Year Migration process before activating this Academic Year. Migration ensures that teachers, students, class promotions, and all required academic records are carried forward correctly."
+                ]);
+            }
+        }
+
         $pdo->beginTransaction();
         try {
             // Set the target academic year to ACTIVE and current active session
@@ -1911,6 +2187,18 @@ class SchoolAdminService extends BaseService
             if ($date > $today) {
                 throw new ValidationException(['date' => "Cannot mark attendance for a future date."]);
             }
+        }
+
+        // Sunday validation
+        if (date('N', strtotime($date)) == 7) {
+            throw new ValidationException(['date' => 'Cannot mark attendance on a Sunday.']);
+        }
+
+        // Holiday validation
+        $stmtHCheck = $pdo->prepare("SELECT id FROM holidays WHERE school_id = :sid AND date = :date LIMIT 1");
+        $stmtHCheck->execute([':sid' => $schoolId, ':date' => $date]);
+        if ($stmtHCheck->fetchColumn() !== false) {
+            throw new ValidationException(['date' => 'Cannot mark attendance on a holiday.']);
         }
 
         // Sunday validation
@@ -2025,38 +2313,924 @@ class SchoolAdminService extends BaseService
     // Timetable & Subjects (read-only, via raw PDO through classRepo escape hatch)
     // -------------------------------------------------------------------------
 
-    public function getTimetable(array $user): array
+    public function getTimetable(array $user, ?int $classId = null, ?string $date = null): array
     {
-        $pdo  = $this->classRepo->getPdo();
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        if ($classId && $date) {
+            $dt = new \DateTime($date);
+            $dayOfWeekNum = (int)$dt->format('N');
+            $mondayDt = clone $dt;
+            if ($dayOfWeekNum > 1) {
+                $mondayDt->modify('-' . ($dayOfWeekNum - 1) . ' days');
+            }
+            
+            $stmt = $pdo->prepare("
+                SELECT t.*, c.name AS class_name, s.name AS subject_name, st.name AS teacher_name, st.photo_path AS teacher_photo_path
+                FROM timetable t
+                LEFT JOIN classes  c ON t.class_id   = c.id
+                LEFT JOIN subjects s ON t.subject_id  = s.id
+                LEFT JOIN staff    st ON t.teacher_id  = st.id
+                WHERE t.school_id = :sid AND t.class_id = :cid
+            ");
+            $stmt->execute([
+                ':sid' => $schoolId,
+                ':cid' => $classId
+            ]);
+            $entries = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            
+            $resolved = [];
+            $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+            
+            foreach ($days as $idx => $dayName) {
+                $dayDate = (clone $mondayDt)->modify('+' . $idx . ' days')->format('Y-m-d');
+                
+                $dayEntries = [];
+                foreach ($entries as $t) {
+                    if ($t['day_of_week'] === $dayName) {
+                        // Skip if the requested weekday's date is before the timetable start date
+                        if ($dayDate < $t['start_date']) {
+                            continue;
+                        }
+                        // Skip if the requested weekday's date is after the timetable end date
+                        if ($t['end_date'] !== null && $dayDate > $t['end_date']) {
+                            continue;
+                        }
+
+                        $stmtBackup = $pdo->prepare("
+                            SELECT b.id AS backup_id, b.backup_teacher_id, st.name AS backup_teacher_name
+                            FROM timetable_backups b
+                            JOIN staff st ON b.backup_teacher_id = st.id
+                            WHERE b.timetable_id = :tid AND b.date = :date
+                        ");
+                        $stmtBackup->execute([
+                            ':tid' => $t['id'],
+                            ':date' => $dayDate
+                        ]);
+                        $backup = $stmtBackup->fetch(\PDO::FETCH_ASSOC);
+                        
+                        $t['day_date'] = $dayDate;
+                        if ($backup) {
+                            $t['backup_teacher_id'] = (int)$backup['backup_teacher_id'];
+                            $t['backup_teacher_name'] = $backup['backup_teacher_name'];
+                            $t['is_backup'] = true;
+                        } else {
+                            $t['backup_teacher_id'] = null;
+                            $t['backup_teacher_name'] = null;
+                            $t['is_backup'] = false;
+                        }
+                        
+                        $dayEntries[] = $t;
+                    }
+                }
+                
+                $resolved[$dayName] = [
+                    'date' => $dayDate,
+                    'day' => $dayName,
+                    'periods' => $dayEntries
+                ];
+            }
+            
+            return $resolved;
+        }
+
         $stmt = $pdo->prepare("
-            SELECT t.*, c.name AS class_name, s.name AS subject_name, u.name AS teacher_name
+            SELECT t.*, c.name AS class_name, s.name AS subject_name, st.name AS teacher_name
             FROM timetable t
             LEFT JOIN classes  c ON t.class_id   = c.id
             LEFT JOIN subjects s ON t.subject_id  = s.id
-            LEFT JOIN users    u ON t.teacher_id  = u.id
-            WHERE t.school_id = :sid
+            LEFT JOIN staff    st ON t.teacher_id  = st.id
+            WHERE t.school_id = :sid AND t.end_date IS NULL
             ORDER BY FIELD(t.day_of_week,'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'),
-                     t.start_time
+                     t.period_number
         ");
-        $stmt->execute([':sid' => $this->getSchoolId($user)]);
+        $stmt->execute([':sid' => $schoolId]);
+        $entries = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        // If date is provided, resolve backups for each weekday's date
+        if ($date) {
+            try {
+                $dt = new \DateTime($date);
+                $dayOfWeekNum = (int)$dt->format('N');
+                $mondayDt = clone $dt;
+                if ($dayOfWeekNum > 1) {
+                    $mondayDt->modify('-' . ($dayOfWeekNum - 1) . ' days');
+                }
+
+                // Map day of week name to date
+                $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                $dayDates = [];
+                foreach ($days as $idx => $dayName) {
+                    $dayDates[$dayName] = (clone $mondayDt)->modify('+' . $idx . ' days')->format('Y-m-d');
+                }
+
+                $filteredEntries = [];
+                foreach ($entries as $t) {
+                    $dayName = $t['day_of_week'];
+                    $dayDate = $dayDates[$dayName] ?? null;
+                    if ($dayDate) {
+                        // Skip if the requested weekday's date is before the timetable start date
+                        if ($dayDate < $t['start_date']) {
+                            continue;
+                        }
+                        // Skip if the requested weekday's date is after the timetable end date
+                        if ($t['end_date'] !== null && $dayDate > $t['end_date']) {
+                            continue;
+                        }
+
+                        $stmtBackup = $pdo->prepare("
+                            SELECT b.backup_teacher_id, st.name AS backup_teacher_name
+                            FROM timetable_backups b
+                            JOIN staff st ON b.backup_teacher_id = st.id
+                            WHERE b.timetable_id = :tid AND b.date = :date
+                        ");
+                        $stmtBackup->execute([
+                            ':tid' => $t['id'],
+                            ':date' => $dayDate
+                        ]);
+                        $backup = $stmtBackup->fetch(\PDO::FETCH_ASSOC);
+                        if ($backup) {
+                            $t['backup_teacher_id'] = (int)$backup['backup_teacher_id'];
+                            $t['backup_teacher_name'] = $backup['backup_teacher_name'];
+                            $t['is_backup'] = true;
+                            $t['active_teacher_id'] = (int)$backup['backup_teacher_id'];
+                        } else {
+                            $t['active_teacher_id'] = (int)$t['teacher_id'];
+                            $t['is_backup'] = false;
+                        }
+                    } else {
+                        $t['active_teacher_id'] = (int)$t['teacher_id'];
+                        $t['is_backup'] = false;
+                    }
+                    $filteredEntries[] = $t;
+                }
+                $entries = $filteredEntries;
+            } catch (\Exception $e) {
+                foreach ($entries as &$t) {
+                    $t['active_teacher_id'] = (int)$t['teacher_id'];
+                    $t['is_backup'] = false;
+                }
+            }
+        } else {
+            foreach ($entries as &$t) {
+                $t['active_teacher_id'] = (int)$t['teacher_id'];
+                $t['is_backup'] = false;
+            }
+        }
+        
+        return $entries;
     }
 
-    public function getSubjects(array $user): array
+    public function addTimetablePeriod(array $user, array $data): array
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+        
+        if (empty($data['class_id']) || empty($data['subject_id']) || empty($data['teacher_id']) || empty($data['day_of_week']) || empty($data['period_number'])) {
+            throw new ValidationException(['fields' => 'All fields (class, subject, teacher, day, period number) are required.']);
+        }
+
+        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+        $startDate = $data['start_date'] ?? ($workingYear ? $workingYear['start_date'] : date('Y-m-d'));
+
+        $stmtTeacherCheck = $pdo->prepare("
+            SELECT t.id, c.name AS class_name FROM timetable t
+            JOIN classes c ON t.class_id = c.id
+            WHERE t.teacher_id = :tid 
+              AND t.day_of_week = :day 
+              AND t.period_number = :pnum
+              AND t.start_date <= :start_date1
+              AND (t.end_date IS NULL OR t.end_date >= :start_date2)
+        ");
+        $stmtTeacherCheck->execute([
+            ':tid' => $data['teacher_id'],
+            ':day' => $data['day_of_week'],
+            ':pnum' => $data['period_number'],
+            ':start_date1' => $startDate,
+            ':start_date2' => $startDate
+        ]);
+        $teacherConflict = $stmtTeacherCheck->fetch(\PDO::FETCH_ASSOC);
+        if ($teacherConflict) {
+            throw new ValidationException(['teacher_id' => "Conflict: This teacher is already assigned to {$teacherConflict['class_name']} for Period {$data['period_number']} on {$data['day_of_week']}."]);
+        }
+
+        $stmtCount = $pdo->prepare("
+            SELECT COUNT(*) FROM timetable 
+            WHERE teacher_id = :tid AND school_id = :sid AND day_of_week = :day AND end_date IS NULL
+        ");
+        $stmtCount->execute([':tid' => $data['teacher_id'], ':sid' => $schoolId, ':day' => $data['day_of_week']]);
+        $assigned = (int)$stmtCount->fetchColumn();
+        
+        $stmtMax = $pdo->prepare("SELECT max_periods, status FROM staff WHERE id = :tid AND school_id = :sid");
+        $stmtMax->execute([':tid' => $data['teacher_id'], ':sid' => $schoolId]);
+        $staffInfo = $stmtMax->fetch(\PDO::FETCH_ASSOC);
+        if (!$staffInfo) {
+            throw new ValidationException(['teacher_id' => 'Teacher profile not found']);
+        }
+        if ($staffInfo['status'] !== 'ACTIVE') {
+            throw new ValidationException(['teacher_id' => 'Teacher profile is inactive']);
+        }
+        $max = (int)$staffInfo['max_periods'];
+        if ($assigned >= $max) {
+            throw new ValidationException(['teacher_id' => "This teacher has reached their maximum workload limit of {$max} periods."]);
+        }
+
+        // End any existing active timetable entry for this class, day, and period
+        $stmtFindClassActive = $pdo->prepare("
+            SELECT id, start_date FROM timetable 
+            WHERE class_id = :cid AND day_of_week = :day AND period_number = :pnum AND end_date IS NULL
+        ");
+        $stmtFindClassActive->execute([
+            ':cid' => $data['class_id'],
+            ':day' => $data['day_of_week'],
+            ':pnum' => $data['period_number']
+        ]);
+        $existingClassActive = $stmtFindClassActive->fetch(\PDO::FETCH_ASSOC);
+        
+        if ($existingClassActive) {
+            if ($existingClassActive['start_date'] < $startDate) {
+                // End the older entry
+                $dt = new \DateTime($startDate);
+                $dt->modify('-1 day');
+                $endDate = $dt->format('Y-m-d');
+                
+                $stmtEndOld = $pdo->prepare("UPDATE timetable SET end_date = :end_date WHERE id = :id");
+                $stmtEndOld->execute([':end_date' => $endDate, ':id' => $existingClassActive['id']]);
+                
+                // Clear backups for the old entry on or after start_date
+                $stmtDelBackupOld = $pdo->prepare("DELETE FROM timetable_backups WHERE timetable_id = :id AND date >= :date");
+                $stmtDelBackupOld->execute([':id' => $existingClassActive['id'], ':date' => $startDate]);
+            } else {
+                // Delete the newer duplicate completely
+                $stmtDelBackupOld = $pdo->prepare("DELETE FROM timetable_backups WHERE timetable_id = :id");
+                $stmtDelBackupOld->execute([':id' => $existingClassActive['id']]);
+                
+                $stmtDelOld = $pdo->prepare("DELETE FROM timetable WHERE id = :id");
+                $stmtDelOld->execute([':id' => $existingClassActive['id']]);
+            }
+        }
+
+        $stmtInsert = $pdo->prepare("
+            INSERT INTO timetable (school_id, class_id, subject_id, teacher_id, day_of_week, period_number, start_date)
+            VALUES (:sid, :cid, :subid, :tid, :day, :pnum, :start_date)
+        ");
+        $stmtInsert->execute([
+            ':sid' => $schoolId,
+            ':cid' => $data['class_id'],
+            ':subid' => $data['subject_id'],
+            ':tid' => $data['teacher_id'],
+            ':day' => $data['day_of_week'],
+            ':pnum' => $data['period_number'],
+            ':start_date' => $startDate
+        ]);
+        $newId = (int)$pdo->lastInsertId();
+        
+        $this->syncTeacherAssignedPeriods($pdo, (int)$data['teacher_id'], $schoolId);
+        
+        return ['id' => $newId];
+    }
+
+    public function deleteTimetablePeriod(array $user, int $id, ?string $date = null): void
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+        
+        $stmtEntry = $pdo->prepare("SELECT * FROM timetable WHERE id = :id AND school_id = :sid");
+        $stmtEntry->execute([':id' => $id, ':sid' => $schoolId]);
+        $entry = $stmtEntry->fetch(\PDO::FETCH_ASSOC);
+        if (!$entry) {
+            throw new NotFoundException('Timetable period not found');
+        }
+        
+        if ($date !== null && $entry['start_date'] < $date) {
+            // The timetable entry was effective in the past. End it today.
+            $dt = new \DateTime($date);
+            $dt->modify('-1 day');
+            $endDate = $dt->format('Y-m-d');
+            
+            $stmtUpdate = $pdo->prepare("UPDATE timetable SET end_date = :end_date WHERE id = :id");
+            $stmtUpdate->execute([':end_date' => $endDate, ':id' => $id]);
+            
+            // Clean up backups that are on or after the deletion date
+            $stmtDelBackup = $pdo->prepare("DELETE FROM timetable_backups WHERE timetable_id = :id AND date >= :date");
+            $stmtDelBackup->execute([':id' => $id, ':date' => $date]);
+        } else {
+            // The entry was created today or in the future, or no date was provided. Deleting it completely is correct.
+            $stmtDelBackup = $pdo->prepare("DELETE FROM timetable_backups WHERE timetable_id = :id");
+            $stmtDelBackup->execute([':id' => $id]);
+            
+            $stmtDel = $pdo->prepare("DELETE FROM timetable WHERE id = :id");
+            $stmtDel->execute([':id' => $id]);
+        }
+
+        // Auto-draft all other periods of this class on this weekday
+        $stmtMarkDraft = $pdo->prepare("
+            UPDATE timetable 
+            SET is_published = 0 
+            WHERE class_id = :cid AND day_of_week = :day AND school_id = :sid
+        ");
+        $stmtMarkDraft->execute([
+            ':cid' => $entry['class_id'],
+            ':day' => $entry['day_of_week'],
+            ':sid' => $schoolId
+        ]);
+        
+        $this->syncTeacherAssignedPeriods($pdo, (int)$entry['teacher_id'], $schoolId);
+    }
+
+    public function assignBackupTeacher(array $user, array $data): array
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        if (empty($data['timetable_id']) || empty($data['date']) || empty($data['backup_teacher_id'])) {
+            throw new ValidationException(['fields' => 'All fields (timetable ID, date, backup teacher) are required.']);
+        }
+
+        if ($this->isPastWeek($data['date'])) {
+            throw new ValidationException(['date' => 'Past weeks are locked and cannot be edited.']);
+        }
+
+        $stmtEntry = $pdo->prepare("SELECT * FROM timetable WHERE id = :id AND school_id = :sid");
+        $stmtEntry->execute([':id' => $data['timetable_id'], ':sid' => $schoolId]);
+        $entry = $stmtEntry->fetch(\PDO::FETCH_ASSOC);
+        if (!$entry) {
+            throw new NotFoundException('Timetable period not found');
+        }
+
+        if ((int)$entry['teacher_id'] === (int)$data['backup_teacher_id']) {
+            throw new ValidationException(['backup_teacher_id' => 'The backup teacher cannot be the same as the main teacher.']);
+        }
+
+        $dayOfWeek = (new \DateTime($data['date']))->format('l');
+        $stmtConflict = $pdo->prepare("
+            SELECT t.id, c.name AS class_name FROM timetable t
+            JOIN classes c ON t.class_id = c.id
+            WHERE t.teacher_id = :tid AND t.day_of_week = :day AND t.period_number = :pnum
+              AND t.id != :timetable_id
+        ");
+        $stmtConflict->execute([
+            ':tid' => $data['backup_teacher_id'],
+            ':day' => $dayOfWeek,
+            ':pnum' => $entry['period_number'],
+            ':timetable_id' => $entry['id']
+        ]);
+        $conflict = $stmtConflict->fetch(\PDO::FETCH_ASSOC);
+        if ($conflict) {
+            throw new ValidationException(['backup_teacher_id' => "Conflict: This teacher is already assigned to {$conflict['class_name']} for Period {$entry['period_number']} on {$dayOfWeek}."]);
+        }
+
+        $stmtBackupConflict = $pdo->prepare("
+            SELECT b.id, c.name AS class_name FROM timetable_backups b
+            JOIN timetable t ON b.timetable_id = t.id
+            JOIN classes c ON t.class_id = c.id
+            WHERE b.backup_teacher_id = :tid AND b.date = :date AND t.period_number = :pnum
+              AND b.timetable_id != :timetable_id
+        ");
+        $stmtBackupConflict->execute([
+            ':tid' => $data['backup_teacher_id'],
+            ':date' => $data['date'],
+            ':pnum' => $entry['period_number'],
+            ':timetable_id' => $entry['id']
+        ]);
+        $backupConflict = $stmtBackupConflict->fetch(\PDO::FETCH_ASSOC);
+        if ($backupConflict) {
+            throw new ValidationException(['backup_teacher_id' => "Conflict: This teacher is already assigned as a backup to {$backupConflict['class_name']} for Period {$entry['period_number']} on this date."]);
+        }
+
+        $stmtMax = $pdo->prepare("SELECT status FROM staff WHERE id = :tid AND school_id = :sid");
+        $stmtMax->execute([':tid' => $data['backup_teacher_id'], ':sid' => $schoolId]);
+        $status = $stmtMax->fetchColumn();
+        if ($status !== 'ACTIVE') {
+            throw new ValidationException(['backup_teacher_id' => 'Backup teacher profile is inactive']);
+        }
+
+        $stmtUpsert = $pdo->prepare("
+            INSERT INTO timetable_backups (school_id, timetable_id, date, backup_teacher_id)
+            VALUES (:sid, :tid, :date, :backup_tid1)
+            ON DUPLICATE KEY UPDATE backup_teacher_id = :backup_tid2
+        ");
+        $stmtUpsert->execute([
+            ':sid' => $schoolId,
+            ':tid' => $data['timetable_id'],
+            ':date' => $data['date'],
+            ':backup_tid1' => $data['backup_teacher_id'],
+            ':backup_tid2' => $data['backup_teacher_id']
+        ]);
+
+        // Auto-draft all periods of this class on this weekday
+        $stmtMarkDraft = $pdo->prepare("
+            UPDATE timetable 
+            SET is_published = 0 
+            WHERE class_id = :cid AND day_of_week = :day AND school_id = :sid
+        ");
+        $stmtMarkDraft->execute([
+            ':cid' => $entry['class_id'],
+            ':day' => $entry['day_of_week'],
+            ':sid' => $schoolId
+        ]);
+
+        return ['success' => true];
+    }
+
+    public function replaceTeacher(array $user, array $data): array
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        if (empty($data['timetable_id']) || empty($data['date']) || empty($data['new_teacher_id'])) {
+            throw new ValidationException(['fields' => 'All fields (timetable ID, date, new teacher) are required.']);
+        }
+
+        $stmtEntry = $pdo->prepare("SELECT * FROM timetable WHERE id = :id AND school_id = :sid");
+        $stmtEntry->execute([':id' => $data['timetable_id'], ':sid' => $schoolId]);
+        $entry = $stmtEntry->fetch(\PDO::FETCH_ASSOC);
+        if (!$entry) {
+            throw new NotFoundException('Timetable period not found');
+        }
+
+        if ((int)$entry['teacher_id'] === (int)$data['new_teacher_id']) {
+            throw new ValidationException(['new_teacher_id' => 'The new teacher cannot be the same as the current teacher.']);
+        }
+
+        $dayOfWeek = $entry['day_of_week'];
+        $periodNumber = $entry['period_number'];
+
+        $stmtConflict = $pdo->prepare("
+            SELECT t.id, c.name AS class_name FROM timetable t
+            JOIN classes c ON t.class_id = c.id
+            WHERE t.teacher_id = :tid AND t.day_of_week = :day AND t.period_number = :pnum
+              AND t.id != :timetable_id
+        ");
+        $stmtConflict->execute([
+            ':tid' => $data['new_teacher_id'],
+            ':day' => $dayOfWeek,
+            ':pnum' => $periodNumber,
+            ':timetable_id' => $entry['id']
+        ]);
+        $conflict = $stmtConflict->fetch(\PDO::FETCH_ASSOC);
+        if ($conflict) {
+            throw new ValidationException(['new_teacher_id' => "Conflict: The new teacher is already assigned to {$conflict['class_name']} for Period {$periodNumber} on {$dayOfWeek}."]);
+        }
+
+        $stmtCount = $pdo->prepare("
+            SELECT COUNT(*) FROM timetable 
+            WHERE teacher_id = :tid AND school_id = :sid AND day_of_week = :day AND end_date IS NULL
+        ");
+        $stmtCount->execute([':tid' => $data['new_teacher_id'], ':sid' => $schoolId, ':day' => $dayOfWeek]);
+        $assigned = (int)$stmtCount->fetchColumn();
+        
+        $stmtMax = $pdo->prepare("SELECT max_periods, status FROM staff WHERE id = :tid AND school_id = :sid");
+        $stmtMax->execute([':tid' => $data['new_teacher_id'], ':sid' => $schoolId]);
+        $staffInfo = $stmtMax->fetch(\PDO::FETCH_ASSOC);
+        if (!$staffInfo) {
+            throw new ValidationException(['new_teacher_id' => 'Teacher profile not found']);
+        }
+        if ($staffInfo['status'] !== 'ACTIVE') {
+            throw new ValidationException(['new_teacher_id' => 'Teacher profile is inactive']);
+        }
+        $max = (int)$staffInfo['max_periods'];
+        if ($assigned >= $max) {
+            throw new ValidationException(['new_teacher_id' => "This teacher has reached their maximum workload limit of {$max} periods."]);
+        }
+
+        $replaceDate = $data['date'];
+        
+        $pdo->beginTransaction();
+        try {
+            if ($entry['start_date'] < $replaceDate) {
+                // End the current entry
+                $dt = new \DateTime($replaceDate);
+                $dt->modify('-1 day');
+                $endDate = $dt->format('Y-m-d');
+                
+                $stmtUpdateOld = $pdo->prepare("UPDATE timetable SET end_date = :end_date WHERE id = :id");
+                $stmtUpdateOld->execute([':end_date' => $endDate, ':id' => $entry['id']]);
+                
+                // Clear backups for the old entry that are on or after the replacement date
+                $stmtDelBackupOld = $pdo->prepare("DELETE FROM timetable_backups WHERE timetable_id = :id AND date >= :date");
+                $stmtDelBackupOld->execute([':id' => $entry['id'], ':date' => $replaceDate]);
+                
+                // Insert a new entry starting on the replacement date
+                $stmtInsertNew = $pdo->prepare("
+                    INSERT INTO timetable (school_id, class_id, subject_id, teacher_id, day_of_week, period_number, start_date, is_published)
+                    VALUES (:sid, :cid, :subid, :tid, :day, :pnum, :start_date, :is_published)
+                ");
+                $stmtInsertNew->execute([
+                    ':sid' => $schoolId,
+                    ':cid' => $entry['class_id'],
+                    ':subid' => $entry['subject_id'],
+                    ':tid' => $data['new_teacher_id'],
+                    ':day' => $entry['day_of_week'],
+                    ':pnum' => $entry['period_number'],
+                    ':start_date' => $replaceDate,
+                    ':is_published' => $entry['is_published']
+                ]);
+            } else {
+                // The entry was created on or after the replacement date (no historical dates). Update it directly.
+                $stmtUpdate = $pdo->prepare("UPDATE timetable SET teacher_id = :new_tid WHERE id = :id");
+                $stmtUpdate->execute([':new_tid' => $data['new_teacher_id'], ':id' => $entry['id']]);
+                
+                // Clear backups for this timetable period
+                $stmtDelBackup = $pdo->prepare("DELETE FROM timetable_backups WHERE timetable_id = :id");
+                $stmtDelBackup->execute([':id' => $entry['id']]);
+            }
+            
+            // Auto-draft all periods of this class on this weekday
+            $stmtMarkDraft = $pdo->prepare("
+                UPDATE timetable 
+                SET is_published = 0 
+                WHERE class_id = :cid AND day_of_week = :day AND school_id = :sid
+            ");
+            $stmtMarkDraft->execute([
+                ':cid' => $entry['class_id'],
+                ':day' => $entry['day_of_week'],
+                ':sid' => $schoolId
+            ]);
+            
+            $pdo->commit();
+        } catch (\Exception $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+
+        $this->syncTeacherAssignedPeriods($pdo, (int)$entry['teacher_id'], $schoolId);
+        $this->syncTeacherAssignedPeriods($pdo, (int)$data['new_teacher_id'], $schoolId);
+
+        return ['success' => true];
+    }
+
+    public function publishTimetable(array $user, array $data): void
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        if (empty($data['class_id'])) {
+            throw new ValidationException(['fields' => 'Class ID is required to publish.']);
+        }
+
+        $dayOfWeek = $data['day_of_week'] ?? null;
+        if ($dayOfWeek) {
+            $stmtPublish = $pdo->prepare("
+                UPDATE timetable 
+                SET is_published = 1
+                WHERE school_id = :sid AND class_id = :cid AND day_of_week = :day
+            ");
+            $stmtPublish->execute([
+                ':sid' => $schoolId,
+                ':cid' => $data['class_id'],
+                ':day' => $dayOfWeek
+            ]);
+        } else {
+            $stmtPublish = $pdo->prepare("
+                UPDATE timetable 
+                SET is_published = 1
+                WHERE school_id = :sid AND class_id = :cid
+            ");
+            $stmtPublish->execute([
+                ':sid' => $schoolId,
+                ':cid' => $data['class_id']
+            ]);
+        }
+    }
+
+    public function getSubjects(array $user, ?int $classId = null): array
     {
         $pdo  = $this->classRepo->getPdo();
-        $stmt = $pdo->prepare("
-            SELECT s.*, c.name AS class_name, u.name AS teacher_name
-            FROM subjects s
-            LEFT JOIN classes c ON s.class_id   = c.id
-            LEFT JOIN users   u ON s.teacher_id = u.id
-            WHERE s.school_id = :sid
-            ORDER BY s.id DESC
-        ");
-        $stmt->execute([':sid' => $this->getSchoolId($user)]);
+        $schoolId = $this->getSchoolId($user);
 
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if ($classId) {
+            $stmt = $pdo->prepare("
+                SELECT s.*, c.name AS class_name, st.name AS teacher_name
+                FROM subjects s
+                LEFT JOIN classes c ON s.class_id   = c.id
+                LEFT JOIN staff   st ON s.teacher_id = st.id
+                WHERE s.school_id = :sid AND s.class_id = :cid
+                ORDER BY s.id DESC
+            ");
+            $stmt->execute([':sid' => $schoolId, ':cid' => $classId]);
+        } else {
+            $stmt = $pdo->prepare("
+                SELECT s.*, c.name AS class_name, st.name AS teacher_name
+                FROM subjects s
+                LEFT JOIN classes c ON s.class_id   = c.id
+                LEFT JOIN staff   st ON s.teacher_id = st.id
+                WHERE s.school_id = :sid
+                ORDER BY s.id DESC
+            ");
+            $stmt->execute([':sid' => $schoolId]);
+        }
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function createSubject(array $user, array $data): array
+    {
+        $name = isset($data['name']) ? trim($data['name']) : '';
+        if (empty($name)) {
+            throw new ValidationException(['name' => 'Subject name is required']);
+        }
+        
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+        $classId = !empty($data['class_id']) ? (int)$data['class_id'] : null;
+
+        // Case-insensitive duplicate check within the class
+        if ($classId) {
+            $stmtCheck = $pdo->prepare("
+                SELECT COUNT(*) FROM subjects 
+                WHERE school_id = :sid AND LOWER(name) = LOWER(:name) AND class_id = :cid
+            ");
+            $stmtCheck->execute([':sid' => $schoolId, ':name' => $name, ':cid' => $classId]);
+        } else {
+            $stmtCheck = $pdo->prepare("
+                SELECT COUNT(*) FROM subjects 
+                WHERE school_id = :sid AND LOWER(name) = LOWER(:name) AND class_id IS NULL
+            ");
+            $stmtCheck->execute([':sid' => $schoolId, ':name' => $name]);
+        }
+
+        if ((int)$stmtCheck->fetchColumn() > 0) {
+            throw new ValidationException(['name' => 'This subject already exists for this class.']);
+        }
+        
+        $stmt = $pdo->prepare("
+            INSERT INTO subjects (school_id, name, class_id, teacher_id)
+            VALUES (:sid, :name, :cid, :tid)
+        ");
+        $stmt->execute([
+            ':sid' => $schoolId,
+            ':name' => $name,
+            ':cid' => $classId,
+            ':tid' => !empty($data['teacher_id']) ? $data['teacher_id'] : null
+        ]);
+        return ['id' => (int)$pdo->lastInsertId()];
+    }
+
+    public function updateSubject(array $user, int $id, array $data): array
+    {
+        $name = isset($data['name']) ? trim($data['name']) : '';
+        if (empty($name)) {
+            throw new ValidationException(['name' => 'Subject name is required']);
+        }
+        
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+        $classId = !empty($data['class_id']) ? (int)$data['class_id'] : null;
+
+        // Case-insensitive duplicate check excluding self within the class
+        if ($classId) {
+            $stmtCheck = $pdo->prepare("
+                SELECT COUNT(*) FROM subjects 
+                WHERE school_id = :sid AND LOWER(name) = LOWER(:name) AND class_id = :cid AND id != :id
+            ");
+            $stmtCheck->execute([':sid' => $schoolId, ':name' => $name, ':cid' => $classId, ':id' => $id]);
+        } else {
+            $stmtCheck = $pdo->prepare("
+                SELECT COUNT(*) FROM subjects 
+                WHERE school_id = :sid AND LOWER(name) = LOWER(:name) AND class_id IS NULL AND id != :id
+            ");
+            $stmtCheck->execute([':sid' => $schoolId, ':name' => $name, ':id' => $id]);
+        }
+
+        if ((int)$stmtCheck->fetchColumn() > 0) {
+            throw new ValidationException(['name' => 'This subject already exists for this class.']);
+        }
+        
+        $stmt = $pdo->prepare("
+            UPDATE subjects 
+            SET name = :name, class_id = :cid, teacher_id = :tid
+            WHERE id = :id AND school_id = :sid
+        ");
+        $stmt->execute([
+            ':name' => $name,
+            ':cid' => $classId,
+            ':tid' => !empty($data['teacher_id']) ? $data['teacher_id'] : null,
+            ':id' => $id,
+            ':sid' => $schoolId
+        ]);
+        return ['success' => true];
+    }
+
+    public function deleteSubject(array $user, int $id): void
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        // Existing timetable safety check
+        $stmtCheck = $pdo->prepare("
+            SELECT COUNT(*) FROM timetable 
+            WHERE subject_id = :id AND school_id = :sid
+        ");
+        $stmtCheck->execute([':id' => $id, ':sid' => $schoolId]);
+        if ((int)$stmtCheck->fetchColumn() > 0) {
+            throw new ValidationException([
+                'subject' => 'This subject is currently assigned in one or more timetable periods. Please remove those assignments before deleting the subject.'
+            ]);
+        }
+
+        $stmt = $pdo->prepare("DELETE FROM subjects WHERE id = :id AND school_id = :sid");
+        $stmt->execute([':id' => $id, ':sid' => $schoolId]);
+    }
+
+    public function getPeriodConfigurations(array $user, ?string $date = null): array
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        $stmt = $pdo->prepare("
+            SELECT * FROM period_configurations 
+            WHERE school_id = :sid AND end_date IS NULL
+            ORDER BY period_number ASC
+        ");
+        $stmt->execute([':sid' => $schoolId]);
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        
+        // Fallback: If empty, get the latest configurations created for this school
+        if (empty($rows)) {
+            $stmtLatest = $pdo->prepare("
+                SELECT * FROM period_configurations 
+                WHERE school_id = :sid1 AND start_date = (
+                    SELECT MAX(start_date) FROM period_configurations WHERE school_id = :sid2
+                )
+                ORDER BY period_number ASC
+            ");
+            $stmtLatest->execute([':sid1' => $schoolId, ':sid2' => $schoolId]);
+            $rows = $stmtLatest->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        }
+
+        return $rows;
+    }
+
+    public function getTimetableSettings(array $user): ?array
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        $stmt = $pdo->prepare("
+            SELECT * FROM school_timetable_settings 
+            WHERE school_id = :sid AND end_date IS NULL
+            LIMIT 1
+        ");
+        $stmt->execute([':sid' => $schoolId]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if ($row === false) {
+            $stmtLatest = $pdo->prepare("
+                SELECT * FROM school_timetable_settings 
+                WHERE school_id = :sid 
+                ORDER BY start_date DESC, id DESC 
+                LIMIT 1
+            ");
+            $stmtLatest->execute([':sid' => $schoolId]);
+            $row = $stmtLatest->fetch(\PDO::FETCH_ASSOC);
+        }
+        
+        return $row !== false ? $row : null;
+    }
+
+    public function saveTimetableSettings(array $user, array $data): array
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        // 1. Validations
+        if (empty($data['school_start_time'])) {
+            throw new ValidationException(['school_start_time' => 'School start time is required.']);
+        }
+        $periodDuration = isset($data['period_duration']) ? (int)$data['period_duration'] : 0;
+        if ($periodDuration <= 0) {
+            throw new ValidationException(['period_duration' => 'Period duration must be greater than 0.']);
+        }
+        $intervalDuration = isset($data['interval_duration']) ? (int)$data['interval_duration'] : 0;
+        if ($intervalDuration < 0) {
+            throw new ValidationException(['interval_duration' => 'Interval duration must be 0 or greater.']);
+        }
+        $totalPeriods = isset($data['total_periods']) ? (int)$data['total_periods'] : 0;
+        if ($totalPeriods <= 0) {
+            throw new ValidationException(['total_periods' => 'Total periods must be greater than 0.']);
+        }
+        $intervalAfter = isset($data['interval_after_period']) ? (int)$data['interval_after_period'] : 0;
+        if ($intervalAfter < 1 || $intervalAfter > $totalPeriods) {
+            throw new ValidationException(['interval_after_period' => "Interval break must be placed between Period 1 and Period {$totalPeriods}."]);
+        }
+
+        $today = !empty($data['date']) ? $data['date'] : date('Y-m-d');
+        $yesterday = date('Y-m-d', strtotime($today . ' -1 day'));
+
+        $currentSettings = $this->getTimetableSettings($user);
+        $totalPeriodsChanged = $currentSettings && ((int)$currentSettings['total_periods'] !== $totalPeriods);
+        $clearTimetable = $totalPeriodsChanged || !empty($data['clear_timetable']);
+
+        $pdo->beginTransaction();
+        try {
+            if ($clearTimetable) {
+                $stmtClearBackups = $pdo->prepare("DELETE FROM timetable_backups WHERE school_id = :sid");
+                $stmtClearBackups->execute([':sid' => $schoolId]);
+
+                $stmtClearTimetable = $pdo->prepare("DELETE FROM timetable WHERE school_id = :sid");
+                $stmtClearTimetable->execute([':sid' => $schoolId]);
+
+                $stmtResetStaff = $pdo->prepare("UPDATE staff SET assigned_periods = 0 WHERE school_id = :sid");
+                $stmtResetStaff->execute([':sid' => $schoolId]);
+            }
+
+            // End current settings
+            $stmtEndSetting = $pdo->prepare("
+                UPDATE school_timetable_settings 
+                SET end_date = :yesterday 
+                WHERE school_id = :sid AND end_date IS NULL
+            ");
+            $stmtEndSetting->execute([':yesterday' => $yesterday, ':sid' => $schoolId]);
+
+            // End current period configs
+            $stmtEndConfigs = $pdo->prepare("
+                UPDATE period_configurations 
+                SET end_date = :yesterday 
+                WHERE school_id = :sid AND end_date IS NULL
+            ");
+            $stmtEndConfigs->execute([':yesterday' => $yesterday, ':sid' => $schoolId]);
+
+            // Insert new settings record
+            $stmtInsSetting = $pdo->prepare("
+                INSERT INTO school_timetable_settings (school_id, school_start_time, period_duration, interval_duration, interval_after_period, total_periods, start_date)
+                VALUES (:sid, :start_time, :period_dur, :interval_dur, :interval_after, :total_p, :start_date)
+            ");
+            $stmtInsSetting->execute([
+                ':sid' => $schoolId,
+                ':start_time' => $data['school_start_time'],
+                ':period_dur' => $periodDuration,
+                ':interval_dur' => $intervalDuration,
+                ':interval_after' => $intervalAfter,
+                ':total_p' => $totalPeriods,
+                ':start_date' => $today
+            ]);
+
+            // Calculate and insert period timings
+            $startTime = strtotime($data['school_start_time']);
+            $currentTime = $startTime;
+
+            $stmtInsPeriod = $pdo->prepare("
+                INSERT INTO period_configurations (school_id, period_number, start_time, end_time, start_date)
+                VALUES (:sid, :pnum, :start_time, :end_time, :start_date)
+            ");
+
+            for ($i = 1; $i <= $totalPeriods; $i++) {
+                $pStart = date('H:i:s', $currentTime);
+                $currentTime += $periodDuration * 60;
+                $pEnd = date('H:i:s', $currentTime);
+
+                $stmtInsPeriod->execute([
+                    ':sid' => $schoolId,
+                    ':pnum' => $i,
+                    ':start_time' => $pStart,
+                    ':end_time' => $pEnd,
+                    ':start_date' => $today
+                ]);
+
+                // Apply interval break after specified period number
+                if ($i === $intervalAfter && $intervalDuration > 0) {
+                    $currentTime += $intervalDuration * 60;
+                }
+            }
+
+            $pdo->commit();
+        } catch (\Exception $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+
+        return ['success' => true];
+    }
+
+    private function syncTeacherAssignedPeriods(\PDO $pdo, int $teacherId, int $schoolId): void
+    {
+        $stmtCount = $pdo->prepare("
+            SELECT COUNT(*) FROM timetable 
+            WHERE teacher_id = :tid AND school_id = :sid AND end_date IS NULL
+        ");
+        $stmtCount->execute([':tid' => $teacherId, ':sid' => $schoolId]);
+        $count = (int)$stmtCount->fetchColumn();
+        
+        $stmtUpdate = $pdo->prepare("
+            UPDATE staff SET assigned_periods = :count 
+            WHERE id = :tid AND school_id = :sid
+        ");
+        $stmtUpdate->execute([':count' => $count, ':tid' => $teacherId, ':sid' => $schoolId]);
+    }
+
+    private function isPastWeek(string $date): bool
+    {
+        $dt = new \DateTime($date);
+        $dayOfWeekNum = (int)$dt->format('N');
+        $sundayDt = clone $dt;
+        if ($dayOfWeekNum < 7) {
+            $sundayDt->modify('+' . (7 - $dayOfWeekNum) . ' days');
+        }
+        $sundayStr = $sundayDt->format('Y-m-d');
+        $todayStr = (new \DateTime())->format('Y-m-d');
+        return $sundayStr < $todayStr;
     }
 
     public function createFeeStructure(array $user, array $data): array
@@ -2240,6 +3414,10 @@ class SchoolAdminService extends BaseService
             throw new NotFoundException('School not found');
         }
 
+        if (empty($school['report_card_remark'])) {
+            $school['report_card_remark'] = 'Congratulations! The student has passed all examinations and demonstrated excellent understanding.';
+        }
+
         return $school;
     }
 
@@ -2247,6 +3425,7 @@ class SchoolAdminService extends BaseService
     {
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->classRepo->getPdo();
+        $currentProfile = $this->getSchoolProfile($user);
 
         $stmt = $pdo->prepare("
             UPDATE schools SET
@@ -2265,27 +3444,29 @@ class SchoolAdminService extends BaseService
                 current_term = :current_term,
                 term_start = :term_start,
                 term_end = :term_end,
-                classes_offered = :classes_offered
+                classes_offered = :classes_offered,
+                report_card_remark = :report_card_remark
             WHERE id = :id
         ");
 
         $stmt->execute([
-            ':name'                  => $data['name'] ?? '',
-            ':contact_phone'         => $data['contact_phone'] ?? null,
-            ':contact_email'         => $data['contact_email'] ?? null,
-            ':registration_no'       => $data['registration_no'] ?? null,
-            ':affiliation_board'     => $data['affiliation_board'] ?? null,
-            ':school_type'           => $data['school_type'] ?? null,
-            ':founded_year'          => $data['founded_year'] ?? null,
-            ':medium_of_instruction' => $data['medium_of_instruction'] ?? null,
-            ':street_address'        => $data['street_address'] ?? null,
-            ':city'                  => $data['city'] ?? null,
-            ':state'                 => $data['state'] ?? null,
-            ':pin_code'              => $data['pin_code'] ?? null,
-            ':current_term'          => $data['current_term'] ?? null,
-            ':term_start'            => $data['term_start'] ?? null,
-            ':term_end'              => $data['term_end'] ?? null,
-            ':classes_offered'       => $data['classes_offered'] ?? null,
+            ':name'                  => $data['name'] ?? $currentProfile['name'],
+            ':contact_phone'         => array_key_exists('contact_phone', $data) ? $data['contact_phone'] : $currentProfile['contact_phone'],
+            ':contact_email'         => array_key_exists('contact_email', $data) ? $data['contact_email'] : $currentProfile['contact_email'],
+            ':registration_no'       => array_key_exists('registration_no', $data) ? $data['registration_no'] : $currentProfile['registration_no'],
+            ':affiliation_board'     => array_key_exists('affiliation_board', $data) ? $data['affiliation_board'] : $currentProfile['affiliation_board'],
+            ':school_type'           => array_key_exists('school_type', $data) ? $data['school_type'] : $currentProfile['school_type'],
+            ':founded_year'          => array_key_exists('founded_year', $data) ? $data['founded_year'] : $currentProfile['founded_year'],
+            ':medium_of_instruction' => array_key_exists('medium_of_instruction', $data) ? $data['medium_of_instruction'] : $currentProfile['medium_of_instruction'],
+            ':street_address'        => array_key_exists('street_address', $data) ? $data['street_address'] : $currentProfile['street_address'],
+            ':city'                  => array_key_exists('city', $data) ? $data['city'] : $currentProfile['city'],
+            ':state'                 => array_key_exists('state', $data) ? $data['state'] : $currentProfile['state'],
+            ':pin_code'              => array_key_exists('pin_code', $data) ? $data['pin_code'] : $currentProfile['pin_code'],
+            ':current_term'          => array_key_exists('current_term', $data) ? $data['current_term'] : $currentProfile['current_term'],
+            ':term_start'            => array_key_exists('term_start', $data) ? $data['term_start'] : $currentProfile['term_start'],
+            ':term_end'              => array_key_exists('term_end', $data) ? $data['term_end'] : $currentProfile['term_end'],
+            ':classes_offered'       => array_key_exists('classes_offered', $data) ? $data['classes_offered'] : $currentProfile['classes_offered'],
+            ':report_card_remark'    => array_key_exists('report_card_remark', $data) ? $data['report_card_remark'] : $currentProfile['report_card_remark'],
             ':id'                    => $schoolId,
         ]);
 
@@ -3029,7 +4210,7 @@ class SchoolAdminService extends BaseService
         }
 
         if ($latestReport) {
-            $suggestedStartDate = date('Y-m-d');
+            $suggestedStartDate = $latestReport['to_date'];
         } else {
             if ($workingYear) {
                 $suggestedStartDate = $workingYear['start_date'];
@@ -4567,6 +5748,1322 @@ Only approve the settlement after reviewing all financial records.
         $stmt->execute([':id' => $id, ':sid' => $schoolId]);
 
         return ['success' => true];
+    }
+
+    public function getExaminations(array $user): array
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+        $academicYearId = $workingYear ? (int)$workingYear['id'] : 0;
+
+        $stmt = $pdo->prepare("
+            SELECT * FROM examinations 
+            WHERE school_id = :sid AND academic_year_id = :ayid
+            ORDER BY start_date DESC
+        ");
+        $stmt->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function createExamination(array $user, array $data): array
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+        $academicYearId = $workingYear ? (int)$workingYear['id'] : 0;
+
+        if (empty($data['name']) || empty($data['start_date']) || empty($data['end_date']) || empty($data['publish_date'])) {
+            throw new ValidationException(['fields' => 'All fields (Exam Name, Start Date, End Date, Publish Date) are required.']);
+        }
+
+        $name = trim($data['name']);
+        $startDate = $data['start_date'];
+        $endDate = $data['end_date'];
+        $publishDate = $data['publish_date'];
+        $description = $data['description'] ?? null;
+
+        if ($endDate < $startDate) {
+            throw new ValidationException(['end_date' => 'End Date cannot be before Start Date.']);
+        }
+        if ($publishDate < $endDate) {
+            throw new ValidationException(['publish_date' => 'Publish Date cannot be before End Date.']);
+        }
+
+        // Check duplicate name school-wide for this academic year
+        $stmtDup = $pdo->prepare("
+            SELECT COUNT(*) FROM examinations 
+            WHERE school_id = :sid AND academic_year_id = :ayid AND LOWER(name) = LOWER(:name)
+        ");
+        $stmtDup->execute([':sid' => $schoolId, ':ayid' => $academicYearId, ':name' => $name]);
+        if ((int)$stmtDup->fetchColumn() > 0) {
+            throw new ValidationException(['name' => 'An examination with this name already exists in this academic year.']);
+        }
+
+        // Check exam date overlap school-wide
+        $stmtOverlap = $pdo->prepare("
+            SELECT COUNT(*) FROM examinations
+            WHERE school_id = :sid AND academic_year_id = :ayid
+              AND ((start_date <= :end_date AND end_date >= :start_date))
+        ");
+        $stmtOverlap->execute([
+            ':sid' => $schoolId,
+            ':ayid' => $academicYearId,
+            ':start_date' => $startDate,
+            ':end_date' => $endDate
+        ]);
+        if ((int)$stmtOverlap->fetchColumn() > 0) {
+            throw new ValidationException(['start_date' => 'This examination dates overlap with an existing examination.']);
+        }
+
+        $stmtInsert = $pdo->prepare("
+            INSERT INTO examinations (school_id, academic_year_id, name, start_date, end_date, publish_date, description, status)
+            VALUES (:sid, :ayid, :name, :start_date, :end_date, :publish_date, :description, 'Draft')
+        ");
+        $stmtInsert->execute([
+            ':sid' => $schoolId,
+            ':ayid' => $academicYearId,
+            ':name' => $name,
+            ':start_date' => $startDate,
+            ':end_date' => $endDate,
+            ':publish_date' => $publishDate,
+            ':description' => $description
+        ]);
+
+        $id = (int)$pdo->lastInsertId();
+        
+        $stmtGet = $pdo->prepare("SELECT * FROM examinations WHERE id = :id LIMIT 1");
+        $stmtGet->execute([':id' => $id]);
+        return $stmtGet->fetch(PDO::FETCH_ASSOC);
+    }
+
+    public function getExaminationDetails(array $user, int $id): array
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        $stmt = $pdo->prepare("
+            SELECT e.*
+            FROM examinations e
+            WHERE e.id = :id AND e.school_id = :sid
+            LIMIT 1
+        ");
+        $stmt->execute([':id' => $id, ':sid' => $schoolId]);
+        $exam = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$exam) {
+            throw new NotFoundException('Examination not found.');
+        }
+        return $exam;
+    }
+
+    public function updateExamination(array $user, int $id, array $data): void
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        // Fetch existing
+        $stmtCheck = $pdo->prepare("SELECT * FROM examinations WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtCheck->execute([':id' => $id, ':sid' => $schoolId]);
+        $exam = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+        if (!$exam) {
+            throw new NotFoundException('Examination not found.');
+        }
+
+        $name = isset($data['name']) ? trim($data['name']) : $exam['name'];
+        $startDate = $data['start_date'] ?? $exam['start_date'];
+        $endDate = $data['end_date'] ?? $exam['end_date'];
+        $publishDate = $data['publish_date'] ?? $exam['publish_date'];
+        $description = array_key_exists('description', $data) ? $data['description'] : $exam['description'];
+        $status = $data['status'] ?? $exam['status'];
+
+        if (empty($name) || empty($startDate) || empty($endDate) || empty($publishDate)) {
+            throw new ValidationException(['fields' => 'All fields (Exam Name, Start Date, End Date, Publish Date) are required.']);
+        }
+
+        if ($endDate < $startDate) {
+            throw new ValidationException(['end_date' => 'End Date cannot be before Start Date.']);
+        }
+        if ($publishDate < $endDate) {
+            throw new ValidationException(['publish_date' => 'Publish Date cannot be before End Date.']);
+        }
+
+        // Check duplicate name school-wide for this academic year (excluding current exam)
+        $stmtDup = $pdo->prepare("
+            SELECT COUNT(*) FROM examinations 
+            WHERE school_id = :sid AND academic_year_id = :ayid AND LOWER(name) = LOWER(:name) AND id != :id
+        ");
+        $stmtDup->execute([':sid' => $schoolId, ':ayid' => (int)$exam['academic_year_id'], ':name' => $name, ':id' => $id]);
+        if ((int)$stmtDup->fetchColumn() > 0) {
+            throw new ValidationException(['name' => 'An examination with this name already exists in this academic year.']);
+        }
+
+        // Check exam date overlap school-wide (excluding current exam)
+        $stmtOverlap = $pdo->prepare("
+            SELECT COUNT(*) FROM examinations
+            WHERE school_id = :sid AND academic_year_id = :ayid AND id != :id
+              AND ((start_date <= :end_date AND end_date >= :start_date))
+        ");
+        $stmtOverlap->execute([
+            ':sid' => $schoolId,
+            ':ayid' => (int)$exam['academic_year_id'],
+            ':end_date' => $endDate,
+            ':start_date' => $startDate,
+            ':id' => $id
+        ]);
+        if ((int)$stmtOverlap->fetchColumn() > 0) {
+            throw new ValidationException(['start_date' => 'This examination dates overlap with an existing examination.']);
+        }
+
+        // Update
+        $stmtUpdate = $pdo->prepare("
+            UPDATE examinations 
+            SET name = :name, start_date = :start_date, end_date = :end_date, publish_date = :publish_date, description = :description, status = :status
+            WHERE id = :id AND school_id = :sid
+        ");
+        $stmtUpdate->execute([
+            ':name' => $name,
+            ':start_date' => $startDate,
+            ':end_date' => $endDate,
+            ':publish_date' => $publishDate,
+            ':description' => $description,
+            ':status' => $status,
+            ':id' => $id,
+            ':sid' => $schoolId
+        ]);
+
+        if ($status === 'Draft' && $exam['status'] === 'Published') {
+            $stmtClassReset = $pdo->prepare("
+                UPDATE examination_class_status 
+                SET status = 'Draft', publish_date = NULL 
+                WHERE exam_id = :exam_id
+            ");
+            $stmtClassReset->execute([':exam_id' => $id]);
+        } elseif ($status === 'Published' && $exam['status'] === 'Draft') {
+            $stmtClasses = $pdo->prepare("
+                SELECT id FROM classes 
+                WHERE school_id = :sid AND academic_year_id = :ay_id
+            ");
+            $stmtClasses->execute([':sid' => $schoolId, ':ay_id' => $exam['academic_year_id']]);
+            $classes = $stmtClasses->fetchAll(PDO::FETCH_COLUMN);
+
+            foreach ($classes as $cId) {
+                $stmt = $pdo->prepare("
+                    INSERT INTO examination_class_status (exam_id, class_id, status, publish_date)
+                    VALUES (:exam_id, :class_id, 'Published', CURRENT_DATE())
+                    ON DUPLICATE KEY UPDATE status = 'Published', publish_date = CURRENT_DATE()
+                ");
+                $stmt->execute([':exam_id' => $id, ':class_id' => (int)$cId]);
+            }
+        }
+    }
+
+    public function deleteExamination(array $user, int $id): void
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        $stmtCheck = $pdo->prepare("SELECT id FROM examinations WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtCheck->execute([':id' => $id, ':sid' => $schoolId]);
+        if (!$stmtCheck->fetchColumn()) {
+            throw new NotFoundException('Examination not found.');
+        }
+
+        $stmt = $pdo->prepare("DELETE FROM examinations WHERE id = :id AND school_id = :sid");
+        $stmt->execute([':id' => $id, ':sid' => $schoolId]);
+    }
+
+    public function getExamTimetable(array $user, int $examId, int $classId): array
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        // Verify exam belongs to school
+        $stmtCheck = $pdo->prepare("SELECT id FROM examinations WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtCheck->execute([':id' => $examId, ':sid' => $schoolId]);
+        if (!$stmtCheck->fetchColumn()) {
+            throw new NotFoundException('Examination not found.');
+        }
+
+        $stmt = $pdo->prepare("
+            SELECT 
+                ep.*, 
+                s.name AS subject_name,
+                (SELECT COUNT(*) FROM students stud WHERE stud.class_id = ep.class_id AND stud.school_id = :sid_student AND stud.status = 'ACTIVE') AS total_students,
+                (SELECT COUNT(*) FROM examination_marks em WHERE em.exam_id = ep.exam_id AND em.paper_id = ep.id AND (em.marks_obtained IS NOT NULL OR em.is_absent = 1)) AS entered_marks_count
+            FROM examination_papers ep
+            JOIN subjects s ON ep.subject_id = s.id
+            WHERE ep.exam_id = :exam_id AND ep.class_id = :class_id
+            ORDER BY ep.exam_date ASC, ep.start_time ASC
+        ");
+        $stmt->execute([
+            ':exam_id' => $examId,
+            ':class_id' => $classId,
+            ':sid_student' => $schoolId
+        ]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        
+        return array_map(function($row) {
+            $total = (int)$row['total_students'];
+            $entered = (int)$row['entered_marks_count'];
+            $row['marks_completed'] = ($total > 0 && $entered >= $total);
+            return $row;
+        }, $rows);
+    }
+
+    public function saveExamTimetable(array $user, int $examId, int $classId, array $data): void
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        $stmtCheck = $pdo->prepare("SELECT * FROM examinations WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtCheck->execute([':id' => $examId, ':sid' => $schoolId]);
+        $exam = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+        if (!$exam) {
+            throw new NotFoundException('Examination not found.');
+        }
+
+        // Verify class publish status
+        $stmtStatus = $pdo->prepare("SELECT status FROM examination_class_status WHERE exam_id = :exam_id AND class_id = :class_id LIMIT 1");
+        $stmtStatus->execute([':exam_id' => $examId, ':class_id' => $classId]);
+        if ($stmtStatus->fetchColumn() === 'Published') {
+            throw new ValidationException(['status' => 'Cannot edit timetable of a published class examination.']);
+        }
+
+        $papers = $data['papers'] ?? [];
+
+        // Validation for time overlaps
+        for ($i = 0; $i < count($papers); $i++) {
+            $p1 = $papers[$i];
+            if (empty($p1['subject_id']) || empty($p1['exam_date']) || empty($p1['start_time']) || empty($p1['end_time']) || empty($p1['max_marks']) || empty($p1['passing_marks'])) {
+                throw new ValidationException(['fields' => 'All fields for paper entries are required.']);
+            }
+            $t1_start = strtotime($p1['start_time']);
+            $t1_end = strtotime($p1['end_time']);
+            if ($t1_end <= $t1_start) {
+                throw new ValidationException(['end_time' => 'End Time must be after Start Time.']);
+            }
+
+            for ($j = $i + 1; $j < count($papers); $j++) {
+                $p2 = $papers[$j];
+                if ($p1['exam_date'] === $p2['exam_date']) {
+                    $t2_start = strtotime($p2['start_time']);
+                    $t2_end = strtotime($p2['end_time']);
+                    
+                    // Range overlap condition
+                    if (($t1_start < $t2_end) && ($t2_start < $t1_end)) {
+                        throw new ValidationException(['overlap' => 'Papers cannot overlap in schedule on ' . $p1['exam_date']]);
+                    }
+                }
+            }
+        }
+
+        $pdo->beginTransaction();
+        try {
+            // Delete old papers for this class
+            $stmtDel = $pdo->prepare("DELETE FROM examination_papers WHERE exam_id = :exam_id AND class_id = :class_id");
+            $stmtDel->execute([':exam_id' => $examId, ':class_id' => $classId]);
+
+            // Insert new papers
+            $stmtIns = $pdo->prepare("
+                INSERT INTO examination_papers (exam_id, class_id, subject_id, exam_date, start_time, end_time, max_marks, passing_marks, room, paper_type)
+                VALUES (:exam_id, :class_id, :subid, :edate, :stime, :etime, :maxm, :passm, :room, :ptype)
+            ");
+            foreach ($papers as $p) {
+                $stmtIns->execute([
+                    ':exam_id' => $examId,
+                    ':class_id' => $classId,
+                    ':subid' => (int)$p['subject_id'],
+                    ':edate' => $p['exam_date'],
+                    ':stime' => $p['start_time'],
+                    ':etime' => $p['end_time'],
+                    ':maxm' => (float)$p['max_marks'],
+                    ':passm' => (float)$p['passing_marks'],
+                    ':room' => !empty($p['room']) ? $p['room'] : null,
+                    ':ptype' => !empty($p['paper_type']) ? $p['paper_type'] : 'Written'
+                ]);
+            }
+
+            $pdo->commit();
+        } catch (\Exception $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+    }
+
+    public function getExamMarksSheet(array $user, int $examId, int $classId, int $subjectId): array
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        // Fetch Exam
+        $stmtCheck = $pdo->prepare("SELECT * FROM examinations WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtCheck->execute([':id' => $examId, ':sid' => $schoolId]);
+        $exam = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+        if (!$exam) {
+            throw new NotFoundException('Examination not found.');
+        }
+
+        // Fetch Paper Details
+        $stmtPaper = $pdo->prepare("SELECT * FROM examination_papers WHERE exam_id = :exam_id AND class_id = :class_id AND subject_id = :subid LIMIT 1");
+        $stmtPaper->execute([':exam_id' => $examId, ':class_id' => $classId, ':subid' => $subjectId]);
+        $paper = $stmtPaper->fetch(PDO::FETCH_ASSOC);
+        if (!$paper) {
+            throw new ValidationException(['subject_id' => 'This subject is not scheduled in the exam timetable.']);
+        }
+
+        // Fetch Class Students
+        $stmtStudents = $pdo->prepare("
+            SELECT id, roll_no, name 
+            FROM students 
+            WHERE class_id = :cid AND school_id = :sid AND status = 'ACTIVE' 
+            ORDER BY CAST(roll_no AS UNSIGNED) ASC, name ASC
+        ");
+        $stmtStudents->execute([':cid' => $classId, ':sid' => $schoolId]);
+        $students = $stmtStudents->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        // Fetch Marks Obtained
+        $stmtMarks = $pdo->prepare("
+            SELECT * FROM examination_marks 
+            WHERE exam_id = :exam_id AND paper_id = :paper_id
+        ");
+        $stmtMarks->execute([':exam_id' => $examId, ':paper_id' => $paper['id']]);
+        $marksList = $stmtMarks->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        $marksMap = [];
+        foreach ($marksList as $m) {
+            $sid = (int)$m['student_id'];
+            $pid = (int)$m['paper_id'];
+            if (!isset($marksMap[$sid])) {
+                $marksMap[$sid] = [];
+            }
+            $marksMap[$sid][$pid] = $m;
+        }
+
+        $list = [];
+        foreach ($students as $s) {
+            $studentId = (int)$s['id'];
+            $m = $marksMap[$studentId][$paper['id']] ?? ['marks_obtained' => null, 'is_absent' => 0, 'remarks' => ''];
+            $list[] = [
+                'student_id' => $studentId,
+                'student_name' => $s['name'],
+                'roll_no' => $s['roll_no'],
+                'marks_obtained' => $m['marks_obtained'] !== null ? (float)$m['marks_obtained'] : null,
+                'is_absent' => (int)$m['is_absent'],
+                'remarks' => $m['remarks'] ?: ''
+            ];
+        }
+
+        // Fetch Class Exam status
+        $stmtStatus = $pdo->prepare("SELECT status FROM examination_class_status WHERE exam_id = :exam_id AND class_id = :class_id LIMIT 1");
+        $stmtStatus->execute([':exam_id' => $examId, ':class_id' => $classId]);
+        $classStatus = $stmtStatus->fetchColumn() ?: 'Draft';
+
+        return [
+            'exam_name' => $exam['name'],
+            'status' => $classStatus,
+            'max_marks' => (float)$paper['max_marks'],
+            'passing_marks' => (float)$paper['passing_marks'],
+            'students' => $list
+        ];
+    }
+
+    public function saveExamMark(array $user, int $examId, array $data): array
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        // Fetch Exam
+        $stmtCheck = $pdo->prepare("SELECT * FROM examinations WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtCheck->execute([':id' => $examId, ':sid' => $schoolId]);
+        $exam = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+        if (!$exam) {
+            throw new NotFoundException('Examination not found.');
+        }
+
+        if (empty($data['subject_id']) || empty($data['student_id'])) {
+            throw new ValidationException(['fields' => 'Subject and Student IDs are required.']);
+        }
+
+        $subjectId = (int)$data['subject_id'];
+        $studentId = (int)$data['student_id'];
+        $isAbsent = isset($data['is_absent']) ? (int)$data['is_absent'] : 0;
+        $marksObtained = isset($data['marks_obtained']) && $data['marks_obtained'] !== '' && !$isAbsent ? (float)$data['marks_obtained'] : null;
+        $remarks = $data['remarks'] ?? null;
+
+        // Fetch student's class to verify publish status
+        $stmtStudClass = $pdo->prepare("SELECT class_id FROM students WHERE id = :sid LIMIT 1");
+        $stmtStudClass->execute([':sid' => $studentId]);
+        $classId = (int)$stmtStudClass->fetchColumn();
+
+        $stmtStatus = $pdo->prepare("SELECT status FROM examination_class_status WHERE exam_id = :exam_id AND class_id = :class_id LIMIT 1");
+        $stmtStatus->execute([':exam_id' => $examId, ':class_id' => $classId]);
+        if ($stmtStatus->fetchColumn() === 'Published') {
+            throw new ValidationException(['status' => 'Cannot edit marks of a published class examination.']);
+        }
+
+        // Fetch Paper Details
+        $stmtPaper = $pdo->prepare("SELECT * FROM examination_papers WHERE exam_id = :exam_id AND class_id = :class_id AND subject_id = :subid LIMIT 1");
+        $stmtPaper->execute([':exam_id' => $examId, ':class_id' => $classId, ':subid' => $subjectId]);
+        $paper = $stmtPaper->fetch(PDO::FETCH_ASSOC);
+        if (!$paper) {
+            throw new ValidationException(['subject_id' => 'Subject is not scheduled in the exam timetable.']);
+        }
+
+        if ($marksObtained !== null) {
+            if ($marksObtained < 0) {
+                throw new ValidationException(['marks_obtained' => 'Negative marks are not allowed.']);
+            }
+            if ($marksObtained > (float)$paper['max_marks']) {
+                throw new ValidationException(['marks_obtained' => "Marks obtained cannot exceed maximum marks ({$paper['max_marks']})."]);
+            }
+        }
+
+        $stmtUpsert = $pdo->prepare("
+            INSERT INTO examination_marks (exam_id, paper_id, student_id, marks_obtained, is_absent, remarks)
+            VALUES (:exam_id, :paper_id, :student_id, :marks_obtained, :is_absent, :remarks)
+            ON DUPLICATE KEY UPDATE
+                marks_obtained = VALUES(marks_obtained),
+                is_absent = VALUES(is_absent),
+                remarks = VALUES(remarks)
+        ");
+        $stmtUpsert->execute([
+            ':exam_id' => $examId,
+            ':paper_id' => (int)$paper['id'],
+            ':student_id' => $studentId,
+            ':marks_obtained' => $marksObtained,
+            ':is_absent' => $isAbsent,
+            ':remarks' => $remarks
+        ]);
+
+        return ['success' => true];
+    }
+
+    public function publishExamResults(array $user, int $examId, int $classId, string $status = 'Published'): void
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        $stmtCheck = $pdo->prepare("SELECT id, academic_year_id FROM examinations WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtCheck->execute([':id' => $examId, ':sid' => $schoolId]);
+        $exam = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+        if (!$exam) {
+            throw new NotFoundException('Examination not found.');
+        }
+
+        if ($classId > 0) {
+            $stmt = $pdo->prepare("
+                INSERT INTO examination_class_status (exam_id, class_id, status, publish_date)
+                VALUES (:exam_id, :class_id, :status, " . ($status === 'Published' ? "CURRENT_DATE()" : "NULL") . ")
+                ON DUPLICATE KEY UPDATE status = :status2, publish_date = " . ($status === 'Published' ? "CURRENT_DATE()" : "NULL") . "
+            ");
+            $stmt->execute([
+                ':exam_id' => $examId,
+                ':class_id' => $classId,
+                ':status' => $status,
+                ':status2' => $status
+            ]);
+        } else {
+            // Update examinations table status
+            $stmtUpdateExam = $pdo->prepare("
+                UPDATE examinations 
+                SET status = :status, publish_date = " . ($status === 'Published' ? "CURRENT_DATE()" : "NULL") . "
+                WHERE id = :id
+            ");
+            $stmtUpdateExam->execute([':status' => $status, ':id' => $examId]);
+
+            // Fetch all classes of the school for the exam's academic year
+            $stmtClasses = $pdo->prepare("
+                SELECT id FROM classes 
+                WHERE school_id = :sid AND academic_year_id = :ay_id
+            ");
+            $stmtClasses->execute([':sid' => $schoolId, ':ay_id' => $exam['academic_year_id']]);
+            $classes = $stmtClasses->fetchAll(PDO::FETCH_COLUMN);
+
+            foreach ($classes as $cId) {
+                $stmt = $pdo->prepare("
+                    INSERT INTO examination_class_status (exam_id, class_id, status, publish_date)
+                    VALUES (:exam_id, :class_id, :status, " . ($status === 'Published' ? "CURRENT_DATE()" : "NULL") . ")
+                    ON DUPLICATE KEY UPDATE status = :status2, publish_date = " . ($status === 'Published' ? "CURRENT_DATE()" : "NULL") . "
+                ");
+                $stmt->execute([
+                    ':exam_id' => $examId,
+                    ':class_id' => (int)$cId,
+                    ':status' => $status,
+                    ':status2' => $status
+                ]);
+            }
+        }
+    }
+
+    public function getGradeConfigurations(array $user): array
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        $stmt = $pdo->prepare("
+            SELECT * FROM grade_configurations 
+            WHERE school_id = :sid 
+            ORDER BY min_percentage DESC
+        ");
+        $stmt->execute([':sid' => $schoolId]);
+        $grades = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        if (empty($grades)) {
+            // Seed defaults for this school if empty
+            $stmtIns = $pdo->prepare("
+                INSERT IGNORE INTO grade_configurations (school_id, min_percentage, max_percentage, grade, grade_point, remark) VALUES
+                (:sid, 91.00, 100.00, 'A+', 10, 'Outstanding'),
+                (:sid, 81.00, 90.00, 'A', 9, 'Excellent'),
+                (:sid, 71.00, 80.00, 'B+', 8, 'Very Good'),
+                (:sid, 61.00, 70.00, 'B', 7, 'Good'),
+                (:sid, 51.00, 60.00, 'C', 6, 'Average'),
+                (:sid, 41.00, 50.00, 'D', 5, 'Pass'),
+                (:sid, 0.00, 40.00, 'F', 0, 'Fail')
+            ");
+            $stmtIns->execute([':sid' => $schoolId]);
+
+            $stmt->execute([':sid' => $schoolId]);
+            $grades = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        }
+
+        return $grades;
+    }
+
+    public function saveGradeConfigurations(array $user, array $data): void
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        $scales = $data['scales'] ?? [];
+        if (empty($scales)) {
+            throw new ValidationException(['scales' => 'Grade configurations scale list cannot be empty.']);
+        }
+
+        // Validate overlapping intervals
+        for ($i = 0; $i < count($scales); $i++) {
+            $s1 = $scales[$i];
+            $min1 = (float)$s1['min_percentage'];
+            $max1 = (float)$s1['max_percentage'];
+            if ($max1 < $min1) {
+                throw new ValidationException(['overlap' => 'Max percentage cannot be less than Min percentage.']);
+            }
+            for ($j = $i + 1; $j < count($scales); $j++) {
+                $s2 = $scales[$j];
+                $min2 = (float)$s2['min_percentage'];
+                $max2 = (float)$s2['max_percentage'];
+                if (($min1 <= $max2) && ($min2 <= $max1)) {
+                    throw new ValidationException(['overlap' => "Overlapping ranges detected between grades {$s1['grade']} and {$s2['grade']}."]);
+                }
+            }
+        }
+
+        $pdo->beginTransaction();
+        try {
+            $stmtDel = $pdo->prepare("DELETE FROM grade_configurations WHERE school_id = :sid");
+            $stmtDel->execute([':sid' => $schoolId]);
+
+            $stmtIns = $pdo->prepare("
+                INSERT INTO grade_configurations (school_id, min_percentage, max_percentage, grade, grade_point, remark)
+                VALUES (:sid, :min_p, :max_p, :grade, :gp, :rem)
+            ");
+            foreach ($scales as $s) {
+                $stmtIns->execute([
+                    ':sid' => $schoolId,
+                    ':min_p' => (float)$s['min_percentage'],
+                    ':max_p' => (float)$s['max_percentage'],
+                    ':grade' => trim($s['grade']),
+                    ':gp' => (int)($s['grade_point'] ?? 0),
+                    ':rem' => !empty($s['remark']) ? trim($s['remark']) : null
+                ]);
+            }
+            $pdo->commit();
+        } catch (\Exception $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+    }
+
+    public function getReportCards(array $user, int $examId, int $classId, ?int $studentId = null): array
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        // Fetch Exam Details
+        $stmtCheck = $pdo->prepare("
+            SELECT e.*, ay.name AS academic_year_name, ay.start_date AS ay_start, ay.end_date AS ay_end
+            FROM examinations e
+            JOIN academic_years ay ON e.academic_year_id = ay.id
+            WHERE e.id = :id AND e.school_id = :sid
+            LIMIT 1
+        ");
+        $stmtCheck->execute([':id' => $examId, ':sid' => $schoolId]);
+        $exam = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+        if (!$exam) {
+            throw new NotFoundException('Examination not found.');
+        }
+
+        // Fetch Class Details
+        $stmtClass = $pdo->prepare("SELECT name, section FROM classes WHERE id = :cid AND school_id = :sid LIMIT 1");
+        $stmtClass->execute([':cid' => $classId, ':sid' => $schoolId]);
+        $classInfo = $stmtClass->fetch(PDO::FETCH_ASSOC);
+        $exam['class_name'] = $classInfo['name'] ?? '';
+        $exam['class_section'] = $classInfo['section'] ?? '';
+
+        // Fetch Class Exam status
+        $stmtStatus = $pdo->prepare("SELECT status FROM examination_class_status WHERE exam_id = :exam_id AND class_id = :class_id LIMIT 1");
+        $stmtStatus->execute([':exam_id' => $examId, ':class_id' => $classId]);
+        $classExamStatus = $stmtStatus->fetchColumn() ?: 'Draft';
+
+        // Fetch Exam Timetable Papers for this class
+        $stmtPapers = $pdo->prepare("
+            SELECT ep.*, s.name AS subject_name 
+            FROM examination_papers ep
+            JOIN subjects s ON ep.subject_id = s.id
+            WHERE ep.exam_id = :exam_id AND ep.class_id = :class_id
+        ");
+        $stmtPapers->execute([':exam_id' => $examId, ':class_id' => $classId]);
+        $papers = $stmtPapers->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        // Fetch Grade configurations
+        $gradeScales = $this->getGradeConfigurations($user);
+
+        // Helper function to resolve grade from percentage
+        $resolveGrade = function($pct) use ($gradeScales) {
+            foreach ($gradeScales as $s) {
+                if ($pct >= (float)$s['min_percentage'] && $pct <= (float)$s['max_percentage']) {
+                    return $s['grade'];
+                }
+            }
+            // Default fallbacks
+            if ($pct >= 90) return 'A+';
+            if ($pct >= 80) return 'A';
+            if ($pct >= 70) return 'B+';
+            if ($pct >= 60) return 'B';
+            if ($pct >= 50) return 'C';
+            if ($pct >= 40) return 'D';
+            return 'F';
+        };
+
+        // Fetch Students list
+        $studentsFilter = '';
+        $params = [];
+        if ($studentId !== null) {
+            $studentsFilter = " AND s.id = :student_id ";
+            $params[':student_id'] = $studentId;
+        }
+        $params[':class_id'] = $classId;
+        $params[':sid'] = $schoolId;
+
+        $stmtStudents = $pdo->prepare("
+            SELECT s.*, c.name AS class_name, c.section AS class_section
+            FROM students s
+            JOIN classes c ON s.class_id = c.id
+            WHERE s.class_id = :class_id AND s.school_id = :sid AND s.status = 'ACTIVE' {$studentsFilter}
+            ORDER BY CAST(s.roll_no AS UNSIGNED) ASC, s.name ASC
+        ");
+        $stmtStudents->execute($params);
+        $students = $stmtStudents->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        // Fetch All Marks for this exam
+        $stmtAllMarks = $pdo->prepare("
+            SELECT * FROM examination_marks WHERE exam_id = :exam_id
+        ");
+        $stmtAllMarks->execute([':exam_id' => $examId]);
+        $allMarks = $stmtAllMarks->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        $marksMap = []; // [student_id => [paper_id => mark_row]]
+        foreach ($allMarks as $m) {
+            $sid = (int)$m['student_id'];
+            $pid = (int)$m['paper_id'];
+            if (!isset($marksMap[$sid])) {
+                $marksMap[$sid] = [];
+            }
+            $marksMap[$sid][$pid] = $m;
+        }
+
+        // Fetch all active students in all classes of the SAME NAME (to compute Class Rank across sections)
+        $stmtClassGroup = $pdo->prepare("
+            SELECT s.id, s.class_id, c.name AS class_name 
+            FROM students s 
+            JOIN classes c ON s.class_id = c.id
+            WHERE c.name = :class_name AND c.academic_year_id = :ayid AND s.school_id = :sid AND s.status = 'ACTIVE'
+        ");
+        $stmtClassGroup->execute([
+            ':class_name' => $exam['class_name'],
+            ':ayid' => $exam['academic_year_id'],
+            ':sid' => $schoolId
+        ]);
+        $allCohort = $stmtClassGroup->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        // Batch fetch Attendance summaries for the entire cohort at once to optimize performance
+        $cohortStudentIds = array_map(fn($c) => (int)$c['id'], $allCohort);
+        $attendanceMap = [];
+        if (!empty($cohortStudentIds)) {
+            $inClause = implode(',', $cohortStudentIds);
+            $stmtAllAtt = $pdo->prepare("
+                SELECT student_id,
+                       COUNT(*) AS total,
+                       SUM(CASE WHEN status IN ('PRESENT', 'LATE') THEN 1 ELSE 0 END) AS present
+                FROM attendance
+                WHERE student_id IN ({$inClause}) AND date BETWEEN :start_d AND :end_d
+                GROUP BY student_id
+            ");
+            $stmtAllAtt->execute([
+                ':start_d' => $exam['ay_start'],
+                ':end_d' => $exam['ay_end']
+            ]);
+            $allAtt = $stmtAllAtt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            foreach ($allAtt as $attRow) {
+                $sid = (int)$attRow['student_id'];
+                $attTotal = (int)$attRow['total'];
+                $attPresent = (int)$attRow['present'];
+                $attendanceMap[$sid] = $attTotal > 0 ? round(($attPresent / $attTotal) * 100, 2) : 100.00;
+            }
+        }
+
+        // Compute Marks & Attendance details for the whole cohort
+        $cohortScores = [];
+        foreach ($allCohort as $cStud) {
+            $cStudId = (int)$cStud['id'];
+            $cClassId = (int)$cStud['class_id'];
+            
+            $studTotalObtained = 0.0;
+            $studTotalMax = 0.0;
+
+            foreach ($papers as $p) {
+                $pid = (int)$p['id'];
+                $m = $marksMap[$cStudId][$pid] ?? null;
+                $studTotalMax += (float)$p['max_marks'];
+                if ($m) {
+                    if ((int)$m['is_absent'] !== 1) {
+                        $studTotalObtained += (float)$m['marks_obtained'];
+                    }
+                }
+            }
+
+            $studAtt = $attendanceMap[$cStudId] ?? 100.00;
+            $cohortScores[$cStudId] = [
+                'student_id' => $cStudId,
+                'class_id' => $cClassId,
+                'score' => $studTotalObtained,
+                'attendance' => $studAtt
+            ];
+        }
+
+        // Reusable tie-breaker ranking generator matching sequential ranking rules (no skipped ranks after ties)
+        $rankCohort = function(array $studentsList) {
+            usort($studentsList, function($a, $b) {
+                if (abs((float)$a['score'] - (float)$b['score']) > 0.0001) {
+                    return ((float)$b['score'] > (float)$a['score']) ? 1 : -1;
+                }
+                if (abs((float)$a['attendance'] - (float)$b['attendance']) > 0.0001) {
+                    return ((float)$b['attendance'] > (float)$a['attendance']) ? 1 : -1;
+                }
+                return 0;
+            });
+
+            $ranks = [];
+            $currentRank = 1;
+            $prevScore = null;
+            $prevAtt = null;
+
+            foreach ($studentsList as $item) {
+                $sid = (int)$item['student_id'];
+                if ($prevScore !== null) {
+                    $isTie = (abs((float)$item['score'] - (float)$prevScore) < 0.0001) && 
+                             (abs((float)$item['attendance'] - (float)$prevAtt) < 0.0001);
+                    if (!$isTie) {
+                        $currentRank++;
+                    }
+                }
+                $ranks[$sid] = $currentRank;
+                $prevScore = (float)$item['score'];
+                $prevAtt = (float)$item['attendance'];
+            }
+
+            return $ranks;
+        };
+
+        // Compute cohort and section ranks
+        $classRanks = $rankCohort(array_values($cohortScores));
+        
+        $sectionStudents = array_filter(array_values($cohortScores), fn($item) => (int)$item['class_id'] === $classId);
+        $sectionRanks = $rankCohort(array_values($sectionStudents));
+
+        // Fetch School Profile Details
+        $stmtSchool = $pdo->prepare("SELECT name, logo_path, report_card_remark FROM schools WHERE id = :sid LIMIT 1");
+        $stmtSchool->execute([':sid' => $schoolId]);
+        $school = $stmtSchool->fetch(PDO::FETCH_ASSOC);
+        if ($school && empty($school['report_card_remark'])) {
+            $school['report_card_remark'] = 'Congratulations! The student has passed all examinations and demonstrated excellent understanding.';
+        }
+
+        $reportCards = [];
+        foreach ($students as $s) {
+            $sid = (int)$s['id'];
+
+            $subjectMarks = [];
+            $totalMax = 0.0;
+            $totalObtained = 0.0;
+            $allPassed = true;
+            $anyData = false;
+
+            foreach ($papers as $p) {
+                $pid = (int)$p['id'];
+                $m = $marksMap[$sid][$pid] ?? null;
+                $maxM = (float)$p['max_marks'];
+                $passM = (float)$p['passing_marks'];
+                
+                $obtained = null;
+                $absent = false;
+                $remarks = '';
+                $passed = false;
+                $subjectGrade = 'F';
+
+                if ($m) {
+                    $anyData = true;
+                    $absent = (int)$m['is_absent'] === 1;
+                    if (!$absent) {
+                        $obtained = (float)$m['marks_obtained'];
+                        $totalObtained += $obtained;
+                        $passed = $obtained >= $passM;
+                        $subjectPct = ($maxM > 0) ? ($obtained / $maxM) * 100 : 0.0;
+                        $subjectGrade = $resolveGrade($subjectPct);
+                    } else {
+                        $subjectGrade = 'F';
+                        $passed = false;
+                    }
+                    $remarks = $m['remarks'] ?: '';
+                }
+
+                if (!$passed) {
+                    $allPassed = false;
+                }
+                $totalMax += $maxM;
+
+                $subjectMarks[] = [
+                    'subject_name' => $p['subject_name'],
+                    'paper_type' => $p['paper_type'] ?? 'Written',
+                    'max_marks' => $maxM,
+                    'passing_marks' => $passM,
+                    'marks_obtained' => $absent ? 'ABSENT' : ($obtained !== null ? $obtained : '-'),
+                    'grade' => $absent ? 'F' : ($obtained !== null ? $subjectGrade : '-'),
+                    'remarks' => $remarks,
+                    'result' => $absent ? 'FAIL' : ($obtained !== null ? ($passed ? 'PASS' : 'FAIL') : '-')
+                ];
+            }
+
+            // Attendance rate
+            $stmtAtt = $pdo->prepare("
+                SELECT 
+                    COUNT(*) AS total,
+                    SUM(CASE WHEN status IN ('PRESENT', 'LATE') THEN 1 ELSE 0 END) AS present
+                FROM attendance
+                WHERE student_id = :sid AND date BETWEEN :start_d AND :end_d
+            ");
+            $stmtAtt->execute([
+                ':sid' => $sid,
+                ':start_d' => $exam['ay_start'],
+                ':end_d' => $exam['ay_end']
+            ]);
+            $att = $stmtAtt->fetch(PDO::FETCH_ASSOC);
+            $attTotal = (int)($att['total'] ?? 0);
+            $attPresent = (int)($att['present'] ?? 0);
+            $attRate = $attTotal > 0 ? round(($attPresent / $attTotal) * 100, 2) : 100.00;
+
+            // Totals
+            $percentage = $totalMax > 0 ? round(($totalObtained / $totalMax) * 100, 2) : 0.0;
+            $overallGrade = $resolveGrade($percentage);
+
+            // Compute Rank in Class Group and Rank in Section
+            $classRank = $classRanks[$sid] ?? 1;
+            $sectionRank = $sectionRanks[$sid] ?? 1;
+
+            $classSize = count($cohortScores);
+            $sectionSize = count($sectionStudents);
+
+            $reportCards[] = [
+                'student_id' => $sid,
+                'student_name' => $s['name'],
+                'roll_no' => $s['roll_no'],
+                'admission_no' => $s['sr_no'] ?? $s['admission_no'] ?? '',
+                'father_name' => $s['father_name'] ?? '',
+                'mother_name' => $s['mother_name'] ?? '',
+                'class_name' => $exam['class_name'],
+                'class_section' => $exam['class_section'],
+                'exam_name' => $exam['name'],
+                'academic_year_name' => $exam['academic_year_name'],
+                'school_name' => $school['name'] ?? 'Academic Portal',
+                'school_logo' => $school['logo_path'] ?? null,
+                'report_card_remark' => $school['report_card_remark'] ?? null,
+                'subjects' => $subjectMarks,
+                'total_max' => $totalMax,
+                'total_obtained' => $totalObtained,
+                'percentage' => $percentage,
+                'grade' => $overallGrade,
+                'result' => $allPassed && $anyData ? 'PASS' : 'FAIL',
+                'class_rank' => "{$classRank} of {$classSize}",
+                'section_rank' => "{$sectionRank} of {$sectionSize}",
+                'attendance' => [
+                    'working_days' => $attTotal,
+                    'present_days' => $attPresent,
+                    'attendance_rate' => $attRate
+                ],
+                'status' => $classExamStatus
+            ];
+        }
+
+        // Sort report cards by class rank (ascending), then roll_no (ascending)
+        usort($reportCards, function($a, $b) {
+            $rankA = (int)explode(' ', $a['class_rank'])[0];
+            $rankB = (int)explode(' ', $b['class_rank'])[0];
+            if ($rankA !== $rankB) {
+                return $rankA <=> $rankB;
+            }
+            return (int)($a['roll_no'] ?? 0) <=> (int)($b['roll_no'] ?? 0);
+        });
+
+        return $studentId !== null && !empty($reportCards) ? $reportCards[0] : $reportCards;
+    }
+
+    public function getExamClassStatuses(array $user, int $examId): array
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        // Verify exam belongs to school
+        $stmtCheck = $pdo->prepare("SELECT id FROM examinations WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtCheck->execute([':id' => $examId, ':sid' => $schoolId]);
+        if (!$stmtCheck->fetchColumn()) {
+            throw new NotFoundException('Examination not found.');
+        }
+
+        // Fetch all classes of the school for the exam's academic year
+        $stmtClasses = $pdo->prepare("
+            SELECT c.id, c.name, c.section, COALESCE(ecs.status, 'Draft') AS status, ecs.publish_date
+            FROM classes c
+            LEFT JOIN examination_class_status ecs ON ecs.exam_id = :exam_id AND ecs.class_id = c.id
+            WHERE c.school_id = :sid AND c.academic_year_id = (SELECT academic_year_id FROM examinations WHERE id = :exam_id2 LIMIT 1)
+            ORDER BY c.id ASC
+        ");
+        $stmtClasses->execute([
+            ':exam_id' => $examId,
+            ':sid' => $schoolId,
+            ':exam_id2' => $examId
+        ]);
+        return $stmtClasses->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function getExamInstructions(array $user, int $examId, int $classId): array
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        $stmtCheck = $pdo->prepare("SELECT * FROM examinations WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtCheck->execute([':id' => $examId, ':sid' => $schoolId]);
+        if (!$stmtCheck->fetch()) {
+            throw new NotFoundException('Examination not found.');
+        }
+
+        $stmt = $pdo->prepare("SELECT * FROM examination_instructions WHERE exam_id = :exam_id AND class_id = :class_id ORDER BY id ASC");
+        $stmt->execute([':exam_id' => $examId, ':class_id' => $classId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function saveExamInstructions(array $user, int $examId, int $classId, array $data): void
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        $stmtCheck = $pdo->prepare("SELECT * FROM examinations WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtCheck->execute([':id' => $examId, ':sid' => $schoolId]);
+        if (!$stmtCheck->fetch()) {
+            throw new NotFoundException('Examination not found.');
+        }
+
+        $stmtStatus = $pdo->prepare("SELECT status FROM examination_class_status WHERE exam_id = :exam_id AND class_id = :class_id LIMIT 1");
+        $stmtStatus->execute([':exam_id' => $examId, ':class_id' => $classId]);
+        if ($stmtStatus->fetchColumn() === 'Published') {
+            throw new ValidationException(['status' => 'Cannot edit instructions of a published class examination.']);
+        }
+
+        $instructions = $data['instructions'] ?? [];
+        if (count($instructions) > 5) {
+            throw new ValidationException(['instructions' => 'You can add a maximum of 5 instructions.']);
+        }
+
+        $pdo->beginTransaction();
+        try {
+            $stmtDel = $pdo->prepare("DELETE FROM examination_instructions WHERE exam_id = :exam_id AND class_id = :class_id");
+            $stmtDel->execute([':exam_id' => $examId, ':class_id' => $classId]);
+
+            $stmtIns = $pdo->prepare("INSERT INTO examination_instructions (exam_id, class_id, instruction) VALUES (:exam_id, :class_id, :instr)");
+            foreach ($instructions as $instr) {
+                if (empty(trim($instr))) continue;
+                $stmtIns->execute([
+                    ':exam_id' => $examId,
+                    ':class_id' => $classId,
+                    ':instr' => trim($instr)
+                ]);
+            }
+            $pdo->commit();
+        } catch (\Exception $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+    }
+
+    public function logAudit(
+        PDO $pdo,
+        array $actorUser,
+        string $module,
+        string $action,
+        string $description,
+        ?string $academicYearName = null
+    ): void {
+        $actorEmail = $actorUser['email'] ?? 'system@school.edu';
+        $actorName = $actorUser['name'] ?? $actorEmail;
+        $actorRole = $actorUser['role'] ?? 'Unknown';
+        $schoolId = $this->getSchoolId($actorUser);
+
+        $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+        if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+            $ip = trim(explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'])[0]);
+        }
+        $device = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown Device';
+        $deviceStr = $this->parseUserAgent($device);
+
+        $stmt = $pdo->prepare("
+            INSERT INTO audit_logs (action, module, description, target_school, user, performed_by, user_role, academic_year, ip_address, device)
+            VALUES (:act, :mod, :desc, :sch, :usr, :perf, :role, :ay, :ip, :dev)
+        ");
+        $stmt->execute([
+            ':act' => $action,
+            ':mod' => $module,
+            ':desc' => $description,
+            ':sch' => (string)$schoolId,
+            ':usr' => $actorEmail,
+            ':perf' => $actorName,
+            ':role' => $actorRole,
+            ':ay' => $academicYearName,
+            ':ip' => $ip,
+            ':dev' => $deviceStr
+        ]);
+    }
+
+    private function parseUserAgent(string $ua): string
+    {
+        if (empty($ua)) return 'Unknown';
+        $browser = 'Unknown Browser';
+        $os = 'Unknown OS';
+
+        if (preg_match('/windows|win32/i', $ua)) {
+            $os = 'Windows';
+        } elseif (preg_match('/macintosh|mac os x/i', $ua)) {
+            $os = 'macOS';
+        } elseif (preg_match('/linux/i', $ua)) {
+            $os = 'Linux';
+        } elseif (preg_match('/iphone|ipad|ipod/i', $ua)) {
+            $os = 'iOS';
+        } elseif (preg_match('/android/i', $ua)) {
+            $os = 'Android';
+        }
+
+        if (preg_match('/chrome/i', $ua) && !preg_match('/edge|edg/i', $ua) && !preg_match('/opr/i', $ua)) {
+            $browser = 'Chrome';
+        } elseif (preg_match('/safari/i', $ua) && !preg_match('/chrome/i', $ua)) {
+            $browser = 'Safari';
+        } elseif (preg_match('/firefox/i', $ua)) {
+            $browser = 'Firefox';
+        } elseif (preg_match('/edge|edg/i', $ua)) {
+            $browser = 'Edge';
+        } elseif (preg_match('/opr/i', $ua)) {
+            $browser = 'Opera';
+        }
+
+        return "$browser ($os)";
+    }
+
+    public function getSchoolAuditLogs(array $user, array $params): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->classRepo->getPdo();
+
+        $page = isset($params['page']) ? max(1, (int)$params['page']) : 1;
+        $limit = isset($params['limit']) ? max(1, (int)$params['limit']) : 25;
+        $offset = ($page - 1) * $limit;
+
+        $conditions = ["target_school = :school_id"];
+        $queryParams = [':school_id' => (string)$schoolId];
+
+        if (!empty($params['date_filter'])) {
+            $filter = $params['date_filter'];
+            if ($filter === 'today') {
+                $conditions[] = "created_at >= :date_start";
+                $queryParams[':date_start'] = date('Y-m-d') . ' 00:00:00';
+            } elseif ($filter === '7days') {
+                $conditions[] = "created_at >= :date_start";
+                $queryParams[':date_start'] = date('Y-m-d', strtotime('-7 days')) . ' 00:00:00';
+            } elseif ($filter === '30days') {
+                $conditions[] = "created_at >= :date_start";
+                $queryParams[':date_start'] = date('Y-m-d', strtotime('-30 days')) . ' 00:00:00';
+            } elseif ($filter === 'custom') {
+                if (!empty($params['from_date'])) {
+                    $conditions[] = "created_at >= :date_start";
+                    $queryParams[':date_start'] = $params['from_date'] . ' 00:00:00';
+                }
+                if (!empty($params['to_date'])) {
+                    $conditions[] = "created_at <= :date_end";
+                    $queryParams[':date_end'] = $params['to_date'] . ' 23:59:59';
+                }
+            }
+        }
+
+        if (!empty($params['module'])) {
+            $conditions[] = "module = :module";
+            $queryParams[':module'] = $params['module'];
+        }
+
+        if (!empty($params['user'])) {
+            $conditions[] = "user = :user";
+            $queryParams[':user'] = $params['user'];
+        }
+
+        if (!empty($params['action'])) {
+            $conditions[] = "action = :action";
+            $queryParams[':action'] = $params['action'];
+        }
+
+        if (!empty($params['search'])) {
+            $searchTerm = '%' . $params['search'] . '%';
+            $conditions[] = "(action LIKE :search OR description LIKE :search OR performed_by LIKE :search OR module LIKE :search)";
+            $queryParams[':search'] = $searchTerm;
+        }
+
+        $whereSql = implode(' AND ', $conditions);
+
+        $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM audit_logs WHERE {$whereSql}");
+        $stmtCount->execute($queryParams);
+        $totalRecords = (int)$stmtCount->fetchColumn();
+
+        $stmtRecords = $pdo->prepare("
+            SELECT * FROM audit_logs 
+            WHERE {$whereSql} 
+            ORDER BY id DESC 
+            LIMIT :limit OFFSET :offset
+        ");
+        
+        foreach ($queryParams as $key => $val) {
+            $stmtRecords->bindValue($key, $val);
+        }
+        $stmtRecords->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmtRecords->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmtRecords->execute();
+        
+        $logs = $stmtRecords->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        $formattedLogs = array_map(function($l) {
+            $l['id'] = (int)$l['id'];
+            if (!empty($l['created_at'])) {
+                $d = new \DateTime($l['created_at']);
+                $l['formatted_date'] = $d->format('d F Y h:i A');
+            } else {
+                $l['formatted_date'] = '—';
+            }
+            return $l;
+        }, $logs);
+
+        $stmtModules = $pdo->prepare("
+            SELECT DISTINCT module 
+            FROM audit_logs 
+            WHERE target_school = :school_id AND module IS NOT NULL AND module != ''
+            ORDER BY module ASC
+        ");
+        $stmtModules->execute([':school_id' => (string)$schoolId]);
+        $modules = $stmtModules->fetchAll(PDO::FETCH_COLUMN) ?: [];
+
+        $stmtUsers = $pdo->prepare("
+            SELECT DISTINCT user, performed_by 
+            FROM audit_logs 
+            WHERE target_school = :school_id AND user IS NOT NULL AND user != ''
+            ORDER BY performed_by ASC
+        ");
+        $stmtUsers->execute([':school_id' => (string)$schoolId]);
+        $usersList = $stmtUsers->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        return [
+            'logs' => $formattedLogs,
+            'total' => $totalRecords,
+            'page' => $page,
+            'limit' => $limit,
+            'modules' => $modules,
+            'users' => $usersList
+        ];
+    }
+
+    public function logClientAudit(array $user, array $data): void
+    {
+        $pdo = $this->classRepo->getPdo();
+        $workingYear = $this->getWorkingAcademicYear($pdo, (int)$user['school_id']);
+        $ayName = $workingYear ? $workingYear['name'] : null;
+
+        $this->logAudit(
+            $pdo,
+            $user,
+            (string)$data['module'],
+            (string)$data['action'],
+            (string)$data['description'],
+            $ayName
+        );
+    }
+
+    public function getSchoolLoginHistory(array $user, array $params): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->classRepo->getPdo();
+
+        $page = isset($params['page']) ? max(1, (int)$params['page']) : 1;
+        $limit = isset($params['limit']) ? max(1, (int)$params['limit']) : 25;
+        $offset = ($page - 1) * $limit;
+
+        $stmtCount = $pdo->prepare("
+            SELECT COUNT(*) FROM audit_logs 
+            WHERE target_school = :school_id AND action IN ('User Logged In', 'Failed Login Attempt')
+        ");
+        $stmtCount->execute([':school_id' => (string)$schoolId]);
+        $totalRecords = (int)$stmtCount->fetchColumn();
+
+        $stmtRecords = $pdo->prepare("
+            SELECT * FROM audit_logs 
+            WHERE target_school = :school_id AND action IN ('User Logged In', 'Failed Login Attempt')
+            ORDER BY id DESC 
+            LIMIT :limit OFFSET :offset
+        ");
+        $stmtRecords->bindValue(':school_id', (string)$schoolId);
+        $stmtRecords->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmtRecords->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmtRecords->execute();
+
+        $logs = $stmtRecords->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        $formattedLogs = array_map(function($l) {
+            $l['id'] = (int)$l['id'];
+            if (!empty($l['created_at'])) {
+                $d = new \DateTime($l['created_at']);
+                $l['formatted_date'] = $d->format('d F Y h:i A');
+            } else {
+                $l['formatted_date'] = '—';
+            }
+            $l['status'] = $l['action'] === 'User Logged In' ? 'Success' : 'Failed';
+            return $l;
+        }, $logs);
+
+        return [
+            'history' => $formattedLogs,
+            'total' => $totalRecords,
+            'page' => $page,
+            'limit' => $limit
+        ];
     }
 }
 

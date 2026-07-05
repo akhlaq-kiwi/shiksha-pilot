@@ -53,14 +53,17 @@ class AuthService extends BaseService
         $user = $this->repo->findByPhone($phone);
 
         if ($user === null) {
+            $this->logAuditDirect(['email' => $phone, 'role' => 'Guest'], 'Security', 'Failed Login Attempt', 'Failed login attempt for unregistered phone number ' . $phone);
             throw new NotFoundException('No account found for the provided phone number.');
         }
 
         if (!password_verify($password, (string) ($user['password'] ?? ''))) {
+            $this->logAuditDirect($user, 'Security', 'Failed Login Attempt', 'Failed login attempt for user "' . ($user['name'] ?? $user['email']) . '" due to incorrect password');
             throw new ValidationException(['password' => 'Invalid credentials.']);
         }
 
         if (($user['status'] ?? '') !== 'ACTIVE') {
+            $this->logAuditDirect($user, 'Security', 'Failed Login Attempt', 'Failed login attempt for inactive account of user "' . ($user['name'] ?? $user['email']) . '"');
             throw new ForbiddenException('Account is not active.');
         }
 
@@ -74,6 +77,7 @@ class AuthService extends BaseService
         ]);
 
         $this->log('User logged in', ['id' => $user['id']]);
+        $this->logAuditDirect($user, 'Security', 'User Logged In', 'User "' . ($user['name'] ?? $user['email']) . '" logged in successfully');
 
         return [
             'token' => $token,
@@ -94,5 +98,87 @@ class AuthService extends BaseService
 
         $this->repo->updatePassword($userId, $newPassword);
         $this->log('Password changed', ['id' => $userId]);
+
+        $userObj = $this->repo->findById($userId);
+        if ($userObj) {
+            $this->logAuditDirect($userObj, 'Security', 'Password Changed', 'Password changed for user "' . ($userObj['name'] ?? $userObj['email']) . '"');
+        }
+    }
+
+    private function logAuditDirect(
+        array $actorUser,
+        string $module,
+        string $action,
+        string $description
+    ): void {
+        $pdo = $this->repo->getPdo();
+        $actorEmail = $actorUser['email'] ?? 'system@school.edu';
+        $actorName = $actorUser['name'] ?? $actorEmail;
+        $actorRole = $actorUser['role'] ?? 'Unknown';
+        $schoolId = isset($actorUser['school_id']) ? (int)$actorUser['school_id'] : null;
+
+        $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+        if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+            $ip = trim(explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'])[0]);
+        }
+        $device = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown Device';
+        $deviceStr = $this->parseUserAgent($device);
+
+        $ayName = null;
+        if ($schoolId !== null) {
+            $stmt = $pdo->prepare("SELECT name FROM academic_years WHERE school_id = :sid AND status = 'ACTIVE' LIMIT 1");
+            $stmt->execute([':sid' => $schoolId]);
+            $ayName = $stmt->fetchColumn() ?: null;
+        }
+
+        $stmt = $pdo->prepare("
+            INSERT INTO audit_logs (action, module, description, target_school, user, performed_by, user_role, academic_year, ip_address, device)
+            VALUES (:act, :mod, :desc, :sch, :usr, :perf, :role, :ay, :ip, :dev)
+        ");
+        $stmt->execute([
+            ':act' => $action,
+            ':mod' => $module,
+            ':desc' => $description,
+            ':sch' => $schoolId !== null ? (string)$schoolId : null,
+            ':usr' => $actorEmail,
+            ':perf' => $actorName,
+            ':role' => $actorRole,
+            ':ay' => $ayName,
+            ':ip' => $ip,
+            ':dev' => $deviceStr
+        ]);
+    }
+
+    private function parseUserAgent(string $ua): string
+    {
+        if (empty($ua)) return 'Unknown';
+        $browser = 'Unknown Browser';
+        $os = 'Unknown OS';
+
+        if (preg_match('/windows|win32/i', $ua)) {
+            $os = 'Windows';
+        } elseif (preg_match('/macintosh|mac os x/i', $ua)) {
+            $os = 'macOS';
+        } elseif (preg_match('/linux/i', $ua)) {
+            $os = 'Linux';
+        } elseif (preg_match('/iphone|ipad|ipod/i', $ua)) {
+            $os = 'iOS';
+        } elseif (preg_match('/android/i', $ua)) {
+            $os = 'Android';
+        }
+
+        if (preg_match('/chrome/i', $ua) && !preg_match('/edge|edg/i', $ua) && !preg_match('/opr/i', $ua)) {
+            $browser = 'Chrome';
+        } elseif (preg_match('/safari/i', $ua) && !preg_match('/chrome/i', $ua)) {
+            $browser = 'Safari';
+        } elseif (preg_match('/firefox/i', $ua)) {
+            $browser = 'Firefox';
+        } elseif (preg_match('/edge|edg/i', $ua)) {
+            $browser = 'Edge';
+        } elseif (preg_match('/opr/i', $ua)) {
+            $browser = 'Opera';
+        }
+
+        return "$browser ($os)";
     }
 }

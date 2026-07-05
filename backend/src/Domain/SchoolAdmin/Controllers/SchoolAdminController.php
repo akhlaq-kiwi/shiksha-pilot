@@ -114,7 +114,8 @@ class SchoolAdminController extends BaseController
         $user = $this->authenticate($request);
         $this->requireRole($user, ['SCHOOL_ADMIN']);
 
-        $data = $this->service->getStaff($user);
+        $params = $request->getQueryParams();
+        $data = $this->service->getStaff($user, $params);
 
         return $this->success($response, $data);
     }
@@ -148,7 +149,8 @@ class SchoolAdminController extends BaseController
         $this->requireRole($user, ['SCHOOL_ADMIN']);
 
         $id = (int)$args['id'];
-        $member = $this->service->getStaffDetails($user, $id);
+        $params = $request->getQueryParams();
+        $member = $this->service->getStaffDetails($user, $id, $params);
 
         return $this->success($response, $member);
     }
@@ -312,6 +314,146 @@ class SchoolAdminController extends BaseController
         return $this->success($response, $result);
     }
 
+    public function getExaminations(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $data = $this->service->getExaminations($user);
+        return $this->success($response, $data);
+    }
+
+    public function createExamination(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $body = RequestParser::body($request);
+        $data = $this->service->createExamination($user, $body);
+        return $this->success($response, $data, 'Examination created successfully', 201);
+    }
+
+    public function getExaminationDetails(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $id = (int)$args['id'];
+        $data = $this->service->getExaminationDetails($user, $id);
+        return $this->success($response, $data);
+    }
+
+    public function deleteExamination(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $id = (int)$args['id'];
+        $this->service->deleteExamination($user, $id);
+        return $this->success($response, null, 'Examination deleted successfully');
+    }
+
+    public function updateExamination(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $id = (int)$args['id'];
+        $body = RequestParser::body($request);
+        $this->service->updateExamination($user, $id, $body);
+        return $this->success($response, null, 'Examination updated successfully');
+    }
+
+    public function getExamTimetable(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $examId = (int)$args['id'];
+        $params = $request->getQueryParams();
+        $classId = isset($params['class_id']) ? (int)$params['class_id'] : 0;
+        $data = $this->service->getExamTimetable($user, $examId, $classId);
+        return $this->success($response, $data);
+    }
+
+    public function saveExamTimetable(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $examId = (int)$args['id'];
+        $params = $request->getQueryParams();
+        $classId = isset($params['class_id']) ? (int)$params['class_id'] : 0;
+        $body = RequestParser::body($request);
+        $this->service->saveExamTimetable($user, $examId, $classId, $body);
+        return $this->success($response, null, 'Exam timetable saved successfully');
+    }
+
+    public function getExamMarksSheet(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $examId = (int)$args['id'];
+        $params = $request->getQueryParams();
+        $classId = isset($params['class_id']) ? (int)$params['class_id'] : 0;
+        $subjectId = isset($params['subject_id']) ? (int)$params['subject_id'] : 0;
+        $data = $this->service->getExamMarksSheet($user, $examId, $classId, $subjectId);
+        return $this->success($response, $data);
+    }
+
+    public function saveExamMark(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $examId = (int)$args['id'];
+        $body = RequestParser::body($request);
+        $data = $this->service->saveExamMark($user, $examId, $body);
+        return $this->success($response, $data, 'Mark saved successfully');
+    }
+
+    public function publishExamResults(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $examId = (int)$args['id'];
+        $body = RequestParser::body($request);
+        $classId = (int)($body['class_id'] ?? 0);
+        $status = $body['status'] ?? 'Published';
+        $this->service->publishExamResults($user, $examId, $classId, $status);
+        return $this->success($response, null, 'Exam results status updated successfully');
+    }
+
+    public function getReportCards(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'STUDENT', 'PARENT']);
+        $examId = (int)$args['id'];
+        $params = $request->getQueryParams();
+        $classId = isset($params['class_id']) ? (int)$params['class_id'] : 0;
+        $studentId = isset($params['student_id']) && $params['student_id'] !== '' ? (int)$params['student_id'] : null;
+        $data = $this->service->getReportCards($user, $examId, $classId, $studentId);
+        return $this->success($response, $data);
+    }
+
+    public function getExamClassStatuses(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $examId = (int)$args['id'];
+        $data = $this->service->getExamClassStatuses($user, $examId);
+        return $this->success($response, $data);
+    }
+
+    public function getGradeConfigurations(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $data = $this->service->getGradeConfigurations($user);
+        return $this->success($response, $data);
+    }
+
+    public function saveGradeConfigurations(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $body = RequestParser::body($request);
+        $this->service->saveGradeConfigurations($user, $body);
+        return $this->success($response, null, 'Grade configurations saved successfully');
+    }
+
     // -------------------------------------------------------------------------
     // Fees
     // -------------------------------------------------------------------------
@@ -345,9 +487,81 @@ class SchoolAdminController extends BaseController
         $user = $this->authenticate($request);
         $this->requireRole($user, ['SCHOOL_ADMIN']);
 
-        $data = $this->service->getTimetable($user);
+        $params = $request->getQueryParams();
+        $classId = isset($params['class_id']) ? (int)$params['class_id'] : null;
+        $date = $params['date'] ?? null;
+
+        $data = $this->service->getTimetable($user, $classId, $date);
 
         return $this->success($response, $data);
+    }
+
+    public function addTimetablePeriod(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body = RequestParser::body($request);
+        $data = $this->service->addTimetablePeriod($user, $body);
+
+        return $this->success($response, $data, 'Timetable period added successfully', 201);
+    }
+
+    public function deleteTimetablePeriod(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int)$args['id'];
+        $body = RequestParser::body($request);
+        $date = $body['date'] ?? null;
+        $this->service->deleteTimetablePeriod($user, $id, $date);
+
+        return $this->success($response, null, 'Timetable period deleted successfully');
+    }
+
+    public function assignBackupTeacher(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body = RequestParser::body($request);
+        $data = $this->service->assignBackupTeacher($user, $body);
+
+        return $this->success($response, $data, 'Backup teacher assigned successfully');
+    }
+
+    public function replaceTeacher(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body = RequestParser::body($request);
+        $data = $this->service->replaceTeacher($user, $body);
+
+        return $this->success($response, $data, 'Teacher replaced successfully');
+    }
+
+    public function publishTimetable(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body = RequestParser::body($request);
+        $this->service->publishTimetable($user, $body);
+
+        return $this->success($response, null, 'Timetable published successfully');
+    }
+
+    public function pasteTimetableSchedule(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body = RequestParser::body($request);
+        $this->service->pasteTimetableSchedule($user, $body);
+
+        return $this->success($response, null, 'Schedule pasted successfully');
     }
 
     public function getSubjects(Request $request, Response $response): Response
@@ -355,9 +569,80 @@ class SchoolAdminController extends BaseController
         $user = $this->authenticate($request);
         $this->requireRole($user, ['SCHOOL_ADMIN']);
 
-        $data = $this->service->getSubjects($user);
+        $params = $request->getQueryParams();
+        $classId = isset($params['class_id']) && $params['class_id'] !== '' ? (int)$params['class_id'] : null;
+
+        $data = $this->service->getSubjects($user, $classId);
 
         return $this->success($response, $data);
+    }
+
+    public function createSubject(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body = RequestParser::body($request);
+        $data = $this->service->createSubject($user, $body);
+
+        return $this->success($response, $data, 'Subject created successfully', 201);
+    }
+
+    public function updateSubject(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int)$args['id'];
+        $body = RequestParser::body($request);
+        $data = $this->service->updateSubject($user, $id, $body);
+
+        return $this->success($response, $data, 'Subject updated successfully');
+    }
+
+    public function deleteSubject(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int)$args['id'];
+        $this->service->deleteSubject($user, $id);
+
+        return $this->success($response, null, 'Subject deleted successfully');
+    }
+
+    public function getPeriodConfigurations(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $params = $request->getQueryParams();
+        $date = $params['date'] ?? null;
+
+        $data = $this->service->getPeriodConfigurations($user, $date);
+
+        return $this->success($response, $data);
+    }
+
+    public function getTimetableSettings(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $data = $this->service->getTimetableSettings($user);
+
+        return $this->success($response, $data);
+    }
+
+    public function saveTimetableSettings(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body = RequestParser::body($request);
+        $data = $this->service->saveTimetableSettings($user, $body);
+
+        return $this->success($response, $data, 'Timetable settings saved and periods generated successfully');
     }
 
     public function createFeeStructure(Request $request, Response $response): Response
@@ -782,6 +1067,57 @@ class SchoolAdminController extends BaseController
         $data = $this->service->revertAdditionalFeePayment($user, $id);
 
         return $this->success($response, $data, 'Additional fee payment reverted successfully');
+    }
+
+    public function getExamInstructions(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $examId = (int)$args['id'];
+        $params = $request->getQueryParams();
+        $classId = isset($params['class_id']) ? (int)$params['class_id'] : 0;
+        $data = $this->service->getExamInstructions($user, $examId, $classId);
+        return $this->success($response, $data);
+    }
+
+    public function saveExamInstructions(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $examId = (int)$args['id'];
+        $params = $request->getQueryParams();
+        $classId = isset($params['class_id']) ? (int)$params['class_id'] : 0;
+        $body = RequestParser::body($request);
+        $this->service->saveExamInstructions($user, $examId, $classId, $body);
+        return $this->success($response, null, 'Examination instructions saved successfully');
+    }
+
+    public function getSchoolAuditLogs(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $params = $request->getQueryParams();
+        $data = $this->service->getSchoolAuditLogs($user, $params);
+        return $this->success($response, $data);
+    }
+
+    public function logClientAuditAction(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $body = RequestParser::body($request);
+        RequestParser::required($body, ['module', 'action', 'description']);
+        $this->service->logClientAudit($user, $body);
+        return $this->success($response, null, 'Client action logged successfully');
+    }
+
+    public function getSchoolLoginHistory(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $params = $request->getQueryParams();
+        $data = $this->service->getSchoolLoginHistory($user, $params);
+        return $this->success($response, $data);
     }
 }
 

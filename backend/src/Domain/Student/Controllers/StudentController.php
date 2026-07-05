@@ -105,4 +105,14 @@ class StudentController extends BaseController
 
         return $this->success($response, $data);
     }
+
+    public function getPublishedReportCards(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, self::ALLOWED_ROLES);
+
+        $data = $this->service->getPublishedReportCards($user);
+
+        return $this->success($response, $data);
+    }
 }

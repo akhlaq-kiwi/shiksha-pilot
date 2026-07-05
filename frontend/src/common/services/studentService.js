@@ -73,4 +73,8 @@ export const studentService = {
   async submitLeaveRequest(childId, leaveData) {
     return apiClient.post(`/api/parent/children/${childId}/leave`, leaveData);
   },
+
+  async getPublishedReportCards() {
+    return apiClient.get('/api/student/exams-new/report-cards');
+  },
 };

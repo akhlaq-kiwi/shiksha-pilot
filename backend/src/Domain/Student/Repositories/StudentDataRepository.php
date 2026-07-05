@@ -214,15 +214,19 @@ class StudentDataRepository extends BaseRepository
         $sql = "
             SELECT t.*,
                    s.name AS subject_name,
-                   u.name AS teacher_name
+                   u.name AS teacher_name,
+                   pc.start_time,
+                   pc.end_time
             FROM timetable t
             LEFT JOIN subjects s ON t.subject_id = s.id
             LEFT JOIN users   u ON t.teacher_id  = u.id
+            LEFT JOIN period_configurations pc ON t.period_number = pc.period_number AND t.school_id = pc.school_id AND pc.end_date IS NULL
             WHERE t.class_id  = :class_id
               AND t.school_id = :school_id
+              AND t.end_date IS NULL
             ORDER BY FIELD(t.day_of_week,
                 'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'
-            ), t.start_time
+            ), t.period_number
         ";
 
         $stmt = $this->pdo->prepare($sql);

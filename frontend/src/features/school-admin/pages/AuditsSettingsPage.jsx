@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Plus, CheckCircle2, ChevronRight, UserCog, Users, ShieldAlert, Award, FileSpreadsheet, ArrowLeft, RefreshCw, Check, Lock } from 'lucide-react';
+import { Plus, CheckCircle2, ChevronRight, UserCog, Users, ShieldAlert, Award, FileSpreadsheet, ArrowLeft, RefreshCw, Check, Lock, Save, Trash2 } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
@@ -9,6 +9,7 @@ import { Dialog } from '../../../common/ui/dialog';
 import { schoolService } from '../../../common/services/schoolService';
 import { apiClient } from '../../../common/services/apiClient';
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
+import { schoolAdminService } from '../../../common/services/schoolAdminService';
 
 export default function AuditsSettingsPage({ onYearsUpdated }) {
   const location = useLocation();
@@ -33,6 +34,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
   const [showNoDraftWarning, setShowNoDraftWarning] = useState(false);
   const [activateTargetYear, setActivateTargetYear] = useState(null);
   const [showActivateConfirm, setShowActivateConfirm] = useState(false);
+  const [showMigrationAlertModal, setShowMigrationAlertModal] = useState(false);
 
   // Class Fee Configuration States
   const [selectedClassId, setSelectedClassId] = useState('');
@@ -63,18 +65,76 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
   const [showConfirmExecute, setShowConfirmExecute] = useState(false);
   const [executing, setExecuting] = useState(false);
 
+  // Grade Configuration States
+  const [gradeScales, setGradeScales] = useState([]);
+  const [gradeLoading, setGradeLoading] = useState(false);
+  const [gradeError, setGradeError] = useState('');
+  const [gradeSuccess, setGradeSuccess] = useState('');
+
+  // Reusable report card remark state variables
+  const [reportCardRemark, setReportCardRemark] = useState('');
+  const [isRemarkModalOpen, setIsRemarkModalOpen] = useState(false);
+  const [tempRemark, setTempRemark] = useState('');
+  const [remarkError, setRemarkError] = useState('');
+  const [remarkLoading, setRemarkLoading] = useState(false);
+
+  const getWordCount = (text) => {
+    if (!text) return 0;
+    const words = text.trim().split(/\s+/);
+    return words.filter(word => word.length > 0).length;
+  };
+
+  const handleOpenRemarkModal = () => {
+    setTempRemark(reportCardRemark);
+    setRemarkError('');
+    setRemarkLoading(false);
+    setIsRemarkModalOpen(true);
+  };
+
+  const handleSaveRemark = async () => {
+    setRemarkError('');
+    
+    const wordCount = getWordCount(tempRemark);
+    if (wordCount > 12) {
+      setRemarkError('Maximum 12 words are allowed.');
+      return;
+    }
+
+    setRemarkLoading(true);
+    try {
+      const updatedProfile = await schoolService.updateSchoolProfile({
+        report_card_remark: tempRemark.trim()
+      });
+      setReportCardRemark(updatedProfile.report_card_remark || '');
+      setIsRemarkModalOpen(false);
+    } catch (err) {
+      console.error(err);
+      setRemarkError(err.message || 'Failed to save remark.');
+    } finally {
+      setRemarkLoading(false);
+    }
+  };
+
   const loadData = async () => {
     setLoading(true);
     setError('');
     try {
-      const years = await schoolService.getAcademicYears();
+      const [years, grades, profile] = await Promise.all([
+        schoolService.getAcademicYears(),
+        schoolService.getGradeConfigurations(),
+        schoolService.getSchoolProfile().catch(() => null)
+      ]);
       setAcademicYears(years || []);
+      setGradeScales(grades || []);
+      if (profile) {
+        setReportCardRemark(profile.report_card_remark || '');
+      }
       if (onYearsUpdated) {
         onYearsUpdated(years || []);
       }
     } catch (err) {
       console.error(err);
-      setError('Failed to load academic years.');
+      setError('Failed to load settings data.');
     } finally {
       setLoading(false);
     }
@@ -82,8 +142,212 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
 
   const { currentYear, isReadOnly, refreshYears } = useAcademicYear();
 
+  // Period Configuration state
+  const [schoolStartTime, setSchoolStartTime] = useState('08:00');
+  const [periodDuration, setPeriodDuration] = useState(40);
+  const [intervalDuration, setIntervalDuration] = useState(20);
+  const [intervalAfterPeriod, setIntervalAfterPeriod] = useState(4);
+  const [totalPeriods, setTotalPeriods] = useState(8);
+
+  const [periods, setPeriods] = useState([]);
+  const [showPreview, setShowPreview] = useState(false);
+
+  const [periodLoading, setPeriodLoading] = useState(false);
+  const [periodSuccess, setPeriodSuccess] = useState('');
+  const [periodError, setPeriodError] = useState('');
+  const [initialTotalPeriods, setInitialTotalPeriods] = useState(null);
+  const [showConfirmConfig, setShowConfirmConfig] = useState(false);
+
+  const handleSaveGradeScale = async () => {
+    setGradeLoading(true);
+    setGradeError('');
+    setGradeSuccess('');
+    
+    // Quick validate client-side
+    for (let i = 0; i < gradeScales.length; i++) {
+      const s1 = gradeScales[i];
+      const min1 = parseFloat(s1.min_percentage);
+      const max1 = parseFloat(s1.max_percentage);
+      if (max1 < min1) {
+        setGradeError(`Grade ${s1.grade}: Max percentage cannot be less than Min percentage.`);
+        setGradeLoading(false);
+        return;
+      }
+      for (let j = i + 1; j < gradeScales.length; j++) {
+        const s2 = gradeScales[j];
+        const min2 = parseFloat(s2.min_percentage);
+        const max2 = parseFloat(s2.max_percentage);
+        if (min1 <= max2 && min2 <= max1) {
+          setGradeError(`Overlapping ranges detected between Grade ${s1.grade} and Grade ${s2.grade}.`);
+          setGradeLoading(false);
+          return;
+        }
+      }
+    }
+
+    try {
+      await schoolService.saveGradeConfigurations({ scales: gradeScales });
+      setGradeSuccess('Grading configurations saved successfully.');
+    } catch (err) {
+      console.error(err);
+      setGradeError(err.message || 'Failed to save grading configurations.');
+    } finally {
+      setGradeLoading(false);
+    }
+  };
+
+  const handleAddGradeRow = () => {
+    setGradeScales([
+      ...gradeScales,
+      { min_percentage: 0, max_percentage: 0, grade: '', grade_point: 0, remark: '' }
+    ]);
+  };
+
+  const handleRemoveGradeRow = (idx) => {
+    setGradeScales(gradeScales.filter((_, i) => i !== idx));
+  };
+
+  const handleGradeFieldChange = (idx, field, value) => {
+    const updated = gradeScales.map((s, i) => {
+      if (i === idx) {
+        let val = value;
+        if (field === 'min_percentage' || field === 'max_percentage') {
+          val = parseFloat(value) || 0;
+        } else if (field === 'grade_point') {
+          val = parseInt(value) || 0;
+        }
+        return { ...s, [field]: val };
+      }
+      return s;
+    });
+    setGradeScales(updated);
+  };
+
+  const handleResetGradesDefault = () => {
+    setGradeScales([
+      { min_percentage: 91, max_percentage: 100, grade: 'A+', grade_point: 10, remark: 'Outstanding' },
+      { min_percentage: 81, max_percentage: 90, grade: 'A', grade_point: 9, remark: 'Excellent' },
+      { min_percentage: 71, max_percentage: 80, grade: 'B+', grade_point: 8, remark: 'Very Good' },
+      { min_percentage: 61, max_percentage: 70, grade: 'B', grade_point: 7, remark: 'Good' },
+      { min_percentage: 51, max_percentage: 60, grade: 'C', grade_point: 6, remark: 'Average' },
+      { min_percentage: 41, max_percentage: 50, grade: 'D', grade_point: 5, remark: 'Pass' },
+      { min_percentage: 0, max_percentage: 40, grade: 'F', grade_point: 0, remark: 'Fail' }
+    ]);
+  };
+
+  const getLocalDateStr = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const formatTime12h = (timeStr) => {
+    if (!timeStr) return '';
+    const [h, m] = timeStr.split(':');
+    const hr = parseInt(h);
+    const ampm = hr >= 12 ? 'PM' : 'AM';
+    const formattedHr = hr % 12 || 12;
+    const padHr = String(formattedHr).padStart(2, '0');
+    return `${padHr}:${m} ${ampm}`;
+  };
+
+  const getBreakTimingStr = () => {
+    const afterPeriod = periods.find(p => p.period_number === parseInt(intervalAfterPeriod));
+    const nextPeriod = periods.find(p => p.period_number === parseInt(intervalAfterPeriod) + 1);
+    if (!afterPeriod || !nextPeriod) return '';
+    return `${formatTime12h(afterPeriod.end_time)} – ${formatTime12h(nextPeriod.start_time)}`;
+  };
+
+  const loadPeriodConfigs = async () => {
+    try {
+      const todayStr = getLocalDateStr();
+      const settings = await schoolAdminService.getTimetableSettings();
+      if (settings) {
+        setSchoolStartTime(settings.school_start_time.substring(0, 5));
+        setPeriodDuration(settings.period_duration);
+        setIntervalDuration(settings.interval_duration);
+        setIntervalAfterPeriod(settings.interval_after_period);
+        setTotalPeriods(settings.total_periods);
+        setInitialTotalPeriods(settings.total_periods);
+        setShowPreview(true);
+
+        const data = await schoolAdminService.getPeriodConfigurations({ date: todayStr });
+        setPeriods(data || []);
+      } else {
+        setShowPreview(false);
+        setPeriods([]);
+      }
+    } catch (err) {
+      console.error('Failed to load period configurations', err);
+    }
+  };
+
+  const executeSavePeriods = async (clearTimetable) => {
+    setShowConfirmConfig(false);
+    setPeriodLoading(true);
+    setPeriodError('');
+    setPeriodSuccess('');
+    const todayStr = getLocalDateStr();
+    try {
+      await schoolAdminService.saveTimetableSettings({
+        school_start_time: schoolStartTime,
+        period_duration: parseInt(periodDuration),
+        interval_duration: parseInt(intervalDuration),
+        interval_after_period: parseInt(intervalAfterPeriod),
+        total_periods: parseInt(totalPeriods),
+        clear_timetable: clearTimetable,
+        date: todayStr
+      });
+      setPeriodSuccess('Timetable settings saved and periods generated successfully.');
+      setShowPreview(true);
+      await loadPeriodConfigs();
+    } catch (err) {
+      console.error(err);
+      setPeriodError(err.response?.data?.message || err.message || 'Failed to save settings.');
+    } finally {
+      setPeriodLoading(false);
+    }
+  };
+
+  const handleSavePeriods = async () => {
+    setPeriodError('');
+    setPeriodSuccess('');
+    
+    // Front-end validations
+    if (!schoolStartTime) {
+      setPeriodError('School start time is required.');
+      return;
+    }
+    if (parseInt(periodDuration) <= 0) {
+      setPeriodError('Period duration must be greater than 0.');
+      return;
+    }
+    if (parseInt(intervalDuration) < 0) {
+      setPeriodError('Interval duration must be 0 or greater.');
+      return;
+    }
+    if (parseInt(totalPeriods) <= 0) {
+      setPeriodError('Total periods must be greater than 0.');
+      return;
+    }
+    if (parseInt(intervalAfterPeriod) < 1 || parseInt(intervalAfterPeriod) > parseInt(totalPeriods)) {
+      setPeriodError(`Interval break must be placed between Period 1 and Period ${totalPeriods}.`);
+      return;
+    }
+
+    const isCountChanged = initialTotalPeriods !== null && parseInt(totalPeriods) !== parseInt(initialTotalPeriods);
+    if (isCountChanged) {
+      setShowConfirmConfig(true);
+    } else {
+      executeSavePeriods(false);
+    }
+  };
+
   useEffect(() => {
     loadData();
+    loadPeriodConfigs();
     const fetchClasses = async () => {
       try {
         const list = await schoolService.getClasses();
@@ -97,6 +361,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
     const handleYearSwitch = () => {
       loadData();
       fetchClasses();
+      loadPeriodConfigs();
     };
     window.addEventListener('academic-year-switched', handleYearSwitch);
     return () => {
@@ -468,6 +733,13 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
 
   const handleActivateDirectClick = (year) => {
     setActivateTargetYear(year);
+    // Check if the previous Active Academic Year has completed migration
+    const activeYear = academicYears.find(y => y.status === 'ACTIVE' || y.is_current);
+    if (activeYear && (activeYear.migration_status || 'Not Started') !== 'Completed') {
+      setShowMigrationAlertModal(true);
+      return;
+    }
+
     setShowActivateConfirm(true);
   };
 
@@ -586,12 +858,18 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                         </Button>
                       )}
                       {!isReadOnly && !!(year.status === 'ACTIVE' || year.is_current) && (
-                        <Button 
-                          onClick={() => handleMigrateClick(year)}
-                          className="h-7 px-3 text-[10px] font-bold bg-primary hover:bg-primary/95 text-white"
-                        >
-                          Migrate
-                        </Button>
+                        year.migration_status === 'Completed' ? (
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold uppercase bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 border border-border select-none">
+                            Archived
+                          </span>
+                        ) : (
+                          <Button 
+                            onClick={() => handleMigrateClick(year)}
+                            className="h-7 px-3 text-[10px] font-bold bg-primary hover:bg-primary/95 text-white"
+                          >
+                            Migrate
+                          </Button>
+                        )
                       )}
                     </TableCell>
                   </TableRow>
@@ -738,6 +1016,274 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                   className="font-bold flex items-center gap-1.5 shadow-sm bg-primary"
                 >
                   Save Fee Configuration
+                </Button>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Period Time Configuration Panel */}
+      <Card className="shadow-sm">
+        <CardHeader className="py-5 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
+          <CardTitle className="text-lg font-bold text-text-primary tracking-tight">School Settings & Timetable Configuration</CardTitle>
+          <p className="text-xs text-text-secondary mt-1">Define structural settings for classroom schedulers and faculty workload computation.</p>
+        </CardHeader>
+        <CardContent className="p-6 space-y-6">
+          {periodError && (
+            <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl text-xs font-semibold">
+              {periodError}
+            </div>
+          )}
+
+          {periodSuccess && (
+            <div className="p-3 bg-green-500/10 border border-green-500/20 text-green-600 rounded-xl text-xs font-semibold">
+              {periodSuccess}
+            </div>
+          )}
+
+          {/* Configuration Inputs */}
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-text-secondary uppercase">School Start Time</label>
+                <input
+                  type="time"
+                  value={schoolStartTime}
+                  disabled={isReadOnly || periodLoading}
+                  onChange={e => setSchoolStartTime(e.target.value)}
+                  className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs"
+                />
+                <p className="text-[10px] text-text-muted mt-1">Selected: {formatTime12h(schoolStartTime + ':00')}</p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-text-secondary uppercase">Period Duration (Minutes)</label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={periodDuration}
+                  disabled={isReadOnly || periodLoading}
+                  onChange={e => setPeriodDuration(e.target.value)}
+                  className="font-semibold text-xs h-10"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-text-secondary uppercase">Interval Duration (Minutes)</label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={intervalDuration}
+                  disabled={isReadOnly || periodLoading}
+                  onChange={e => setIntervalDuration(e.target.value)}
+                  className="font-semibold text-xs h-10"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-text-secondary uppercase">Interval After Period</label>
+                <Input
+                  type="number"
+                  min="1"
+                  max={totalPeriods}
+                  value={intervalAfterPeriod}
+                  disabled={isReadOnly || periodLoading}
+                  onChange={e => setIntervalAfterPeriod(e.target.value)}
+                  className="font-semibold text-xs h-10"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-end gap-6 pt-2">
+              <div className="space-y-1.5 w-full sm:w-64">
+                <label className="text-xs font-bold text-text-secondary uppercase">Total Periods Per Day</label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={totalPeriods}
+                  disabled={isReadOnly || periodLoading}
+                  onChange={e => setTotalPeriods(e.target.value)}
+                  className="font-semibold text-xs h-10"
+                />
+              </div>
+
+              <Button
+                onClick={handleSavePeriods}
+                disabled={isReadOnly || periodLoading}
+                className="font-bold h-10 px-6 bg-primary hover:bg-primary/95 text-white rounded-lg flex items-center gap-1.5 shadow-sm"
+              >
+                {periodLoading ? 'Saving...' : 'Save Configuration'}
+              </Button>
+            </div>
+          </div>
+
+          {/* Generated Timetable Preview */}
+          {showPreview && periods.length > 0 && (
+            <div className="border border-border/80 p-5 rounded-2xl bg-zinc-950/5 dark:bg-black/5 space-y-4 pt-4 mt-6">
+              <h4 className="text-xs font-black text-text-secondary uppercase tracking-wider">Generated Timetable Preview</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {periods.map((p) => {
+                  const isAfterPeriod = p.period_number === parseInt(intervalAfterPeriod);
+                  return (
+                    <React.Fragment key={p.period_number}>
+                      <div className="flex items-center justify-between px-4 py-3 bg-zinc-50 dark:bg-zinc-900/30 border border-border/60 rounded-xl">
+                        <span className="text-xs font-bold text-text-secondary">Period {p.period_number}</span>
+                        <span className="text-xs font-black text-text-primary font-mono ml-4 whitespace-nowrap">
+                          {formatTime12h(p.start_time)} – {formatTime12h(p.end_time)}
+                        </span>
+                      </div>
+
+                      {isAfterPeriod && parseInt(intervalDuration) > 0 && (
+                        <div className="flex items-center justify-between px-4 py-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                          <span className="text-xs font-bold text-amber-600 dark:text-amber-400">Interval Break</span>
+                          <span className="text-xs font-black text-amber-600 dark:text-amber-400 font-mono ml-4 whitespace-nowrap">
+                            {getBreakTimingStr()}
+                          </span>
+                        </div>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Grade Configurations Card */}
+      <Card className="shadow-sm">
+        <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
+          <CardTitle className="text-sm font-bold text-text-primary">Grade Configuration Scale</CardTitle>
+        </CardHeader>
+        <CardContent className="p-6 space-y-4">
+          {gradeError && (
+            <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl text-xs font-semibold">
+              {gradeError}
+            </div>
+          )}
+
+          {gradeSuccess && (
+            <div className="p-3 bg-green-500/10 border border-green-500/20 text-green-600 rounded-xl text-xs font-semibold">
+              {gradeSuccess}
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <p className="text-xs text-text-secondary">
+                Configure grade scale ranges to automatically calculate marks grades.
+              </p>
+              {!isReadOnly && (
+                <div className="flex gap-2">
+                  <Button variant="outline" className="h-8 text-xs font-bold" onClick={handleOpenRemarkModal}>
+                    Add Remark
+                  </Button>
+                  <Button variant="outline" className="h-8 text-xs font-bold" onClick={handleResetGradesDefault}>
+                    Reset to Defaults
+                  </Button>
+                  <Button className="h-8 text-xs font-bold flex items-center gap-1" onClick={handleAddGradeRow}>
+                    <Plus className="h-3.5 w-3.5" /> Add Grade Row
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {/* Report Card Remark Block */}
+            <div className="p-4 bg-zinc-50 dark:bg-zinc-900/20 border border-border rounded-xl flex flex-col gap-1.5 shadow-2xs">
+              <span className="text-[10px] font-black text-text-secondary uppercase tracking-wider">Report Card Remark</span>
+              {reportCardRemark ? (
+                <p className="text-xs text-green-700 dark:text-green-400 font-bold italic leading-relaxed">
+                  "{reportCardRemark}"
+                </p>
+              ) : (
+                <p className="text-xs text-text-muted italic leading-relaxed">
+                  No report card remark has been configured.
+                </p>
+              )}
+            </div>
+
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Grade Code</TableHead>
+                  <TableHead>Min Percentage (%)</TableHead>
+                  <TableHead>Max Percentage (%)</TableHead>
+                  <TableHead>Grade Points</TableHead>
+                  <TableHead>Remarks</TableHead>
+                  {!isReadOnly && <TableHead className="text-right w-20">Actions</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {gradeScales.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={isReadOnly ? 5 : 6} className="text-center py-6 text-text-muted text-xs">
+                      No grading configurations found. Click "Reset to Defaults" to populate standard ranges.
+                    </TableCell>
+                  </TableRow>
+                ) : gradeScales.map((s, idx) => (
+                  <TableRow key={idx}>
+                    <TableCell>
+                      <Input
+                        value={s.grade}
+                        placeholder="e.g. A+"
+                        disabled={isReadOnly}
+                        className="h-8 text-xs font-bold text-primary max-w-[80px]"
+                        onChange={e => handleGradeFieldChange(idx, 'grade', e.target.value)}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        value={s.min_percentage}
+                        disabled={isReadOnly}
+                        className="h-8 text-xs font-mono max-w-[120px]"
+                        onChange={e => handleGradeFieldChange(idx, 'min_percentage', e.target.value)}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        value={s.max_percentage}
+                        disabled={isReadOnly}
+                        className="h-8 text-xs font-mono max-w-[120px]"
+                        onChange={e => handleGradeFieldChange(idx, 'max_percentage', e.target.value)}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        value={s.grade_point}
+                        disabled={isReadOnly}
+                        className="h-8 text-xs font-mono max-w-[100px]"
+                        onChange={e => handleGradeFieldChange(idx, 'grade_point', e.target.value)}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        value={s.remark || ''}
+                        placeholder="e.g. Excellent"
+                        disabled={isReadOnly}
+                        className="h-8 text-xs max-w-[200px]"
+                        onChange={e => handleGradeFieldChange(idx, 'remark', e.target.value)}
+                      />
+                    </TableCell>
+                    {!isReadOnly && (
+                      <TableCell className="text-right">
+                        <Button variant="outline" className="h-7 w-7 p-0 text-red-500 hover:text-red-700" onClick={() => handleRemoveGradeRow(idx)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+
+            {!isReadOnly && gradeScales.length > 0 && (
+              <div className="flex justify-end pt-2">
+                <Button className="font-bold flex items-center gap-1.5" onClick={handleSaveGradeScale} disabled={gradeLoading}>
+                  <Save className="h-4 w-4" /> {gradeLoading ? 'Saving...' : 'Save Grading Scale'}
                 </Button>
               </div>
             )}
@@ -1089,6 +1635,29 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
         </div>
       )}
 
+      {/* Dialog: Confirm Save Period Configuration */}
+      <Dialog
+        isOpen={showConfirmConfig}
+        onClose={() => setShowConfirmConfig(false)}
+        title="Update Timetable Configuration?"
+        description="Changing the total number of periods will reset the existing timetable for all classes. You will need to assign the timetable again after saving this configuration."
+        footer={<>
+          <Button variant="secondary" onClick={() => setShowConfirmConfig(false)}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={() => executeSavePeriods(true)} 
+            className="font-bold bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            Update Configuration
+          </Button>
+        </>}
+      >
+        <div className="pt-2 text-xs text-text-muted">
+          Please confirm if you want to proceed with this modification.
+        </div>
+      </Dialog>
+
       {/* Activate Confirm Modal */}
       {showActivateConfirm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
@@ -1114,6 +1683,75 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
           </div>
         </div>
       )}
+
+      {/* Add Report Card Remark Dialog */}
+      <Dialog
+        isOpen={isRemarkModalOpen}
+        onClose={() => setIsRemarkModalOpen(false)}
+        title="Add Report Card Remark"
+        description="Configure a reusable final remark that will appear on student report cards."
+      >
+        <div className="space-y-4 pt-4">
+          {remarkError && (
+            <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl text-xs font-semibold">
+              {remarkError}
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-text-secondary uppercase tracking-wide">Remark</label>
+            <textarea
+              rows={3}
+              value={tempRemark}
+              onChange={e => setTempRemark(e.target.value)}
+              placeholder="e.g. Excellent performance throughout the examination. Keep improving."
+              className="w-full p-3.5 text-xs bg-background border border-border rounded-xl focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs resize-none text-text-primary font-medium"
+            />
+            <div className="flex justify-between items-center text-[10px] text-text-muted mt-1 px-1">
+              <span>Maximum 12 words</span>
+              <span className={`font-semibold ${getWordCount(tempRemark) > 12 ? 'text-red-500 font-bold' : ''}`}>
+                {getWordCount(tempRemark)} / 12 words
+              </span>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 border-t border-border pt-4">
+            <Button variant="outline" onClick={() => setIsRemarkModalOpen(false)} disabled={remarkLoading}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveRemark} disabled={remarkLoading} className="font-bold">
+              {remarkLoading ? 'Saving...' : 'Save Remark'}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* Migration Alert Dialog Modal */}
+      <Dialog
+        isOpen={showMigrationAlertModal}
+        onClose={() => setShowMigrationAlertModal(false)}
+        title="Academic Year Cannot Be Activated"
+      >
+        <div className="space-y-4 pt-4 text-center">
+          <p className="text-sm text-text-secondary leading-relaxed">
+            The current Academic Year's records have not yet been migrated to the <strong>{activateTargetYear?.name} Academic Year</strong>.
+          </p>
+          <p className="text-sm text-text-secondary leading-relaxed">
+            Please complete the Academic Year Migration process before activating <strong>{activateTargetYear?.name} Academic Year</strong>.
+          </p>
+          <p className="text-xs text-text-muted leading-relaxed">
+            Migration ensures that teachers, students, class promotions, and all required academic records are carried forward correctly.
+          </p>
+          <div className="flex justify-center pt-2">
+            <Button 
+              onClick={() => setShowMigrationAlertModal(false)} 
+              className="px-6 font-bold bg-primary hover:bg-primary/90"
+            >
+              Okay
+            </Button>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }

@@ -126,6 +126,13 @@ class App
 
             // ── Shared ────────────────────────────────────────────────────────
             TokenService::class => fn() => new TokenService(),
+            \App\Shared\Http\AuditLoggingMiddleware::class => function ($c) {
+                return new \App\Shared\Http\AuditLoggingMiddleware(
+                    $c->get(TokenService::class),
+                    $c->get(Connection::class),
+                    $c->get(SchoolAdminService::class)
+                );
+            },
 
             // ── Auth ──────────────────────────────────────────────────────────
             AuthRepository::class => function ($c) {
@@ -279,6 +286,7 @@ class App
         // ── 4. Middleware ─────────────────────────────────────────────────────
         $app->addBodyParsingMiddleware();
         $app->addRoutingMiddleware();
+        $app->add(\App\Shared\Http\AuditLoggingMiddleware::class);
 
         // CORS
         $app->add(function ($request, $handler) {

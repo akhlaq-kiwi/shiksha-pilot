@@ -85,6 +85,26 @@ return function (App $app) {
     $app->post('/api/school/exams', [SchoolAdminController::class, 'createExam']);
     $app->get('/api/school/exam-marks', [SchoolAdminController::class, 'getExamMarks']);
     $app->post('/api/school/exam-marks', [SchoolAdminController::class, 'enterMarks']);
+
+    // New Exams System
+    $app->get('/api/school/exams-new', [SchoolAdminController::class, 'getExaminations']);
+    $app->post('/api/school/exams-new', [SchoolAdminController::class, 'createExamination']);
+    $app->get('/api/school/exams-new/{id}', [SchoolAdminController::class, 'getExaminationDetails']);
+    $app->put('/api/school/exams-new/{id}', [SchoolAdminController::class, 'updateExamination']);
+    $app->delete('/api/school/exams-new/{id}', [SchoolAdminController::class, 'deleteExamination']);
+    $app->get('/api/school/exams-new/{id}/timetable', [SchoolAdminController::class, 'getExamTimetable']);
+    $app->post('/api/school/exams-new/{id}/timetable', [SchoolAdminController::class, 'saveExamTimetable']);
+    $app->get('/api/school/exams-new/{id}/marks', [SchoolAdminController::class, 'getExamMarksSheet']);
+    $app->post('/api/school/exams-new/{id}/marks', [SchoolAdminController::class, 'saveExamMark']);
+    $app->post('/api/school/exams-new/{id}/publish', [SchoolAdminController::class, 'publishExamResults']);
+    $app->get('/api/school/exams-new/{id}/report-cards', [SchoolAdminController::class, 'getReportCards']);
+    $app->get('/api/school/exams-new/{id}/class-status', [SchoolAdminController::class, 'getExamClassStatuses']);
+    $app->get('/api/school/exams-new/{id}/instructions', [SchoolAdminController::class, 'getExamInstructions']);
+    $app->post('/api/school/exams-new/{id}/instructions', [SchoolAdminController::class, 'saveExamInstructions']);
+    
+    // Grade configurations
+    $app->get('/api/school/grade-configurations', [SchoolAdminController::class, 'getGradeConfigurations']);
+    $app->post('/api/school/grade-configurations', [SchoolAdminController::class, 'saveGradeConfigurations']);
     $app->get('/api/school/fee-structures', [SchoolAdminController::class, 'getFeeStructures']);
     $app->post('/api/school/fee-structures', [SchoolAdminController::class, 'createFeeStructure']);
     $app->get('/api/school/fee-payments', [SchoolAdminController::class, 'getFeePayments']);
@@ -96,11 +116,31 @@ return function (App $app) {
     $app->post('/api/school/class-fee-configurations/lock', [SchoolAdminController::class, 'lockClassFeeConfiguration']);
 
     $app->get('/api/school/timetable', [SchoolAdminController::class, 'getTimetable']);
+    $app->post('/api/school/timetable', [SchoolAdminController::class, 'addTimetablePeriod']);
+    $app->delete('/api/school/timetable/{id}', [SchoolAdminController::class, 'deleteTimetablePeriod']);
+    $app->post('/api/school/timetable/backup', [SchoolAdminController::class, 'assignBackupTeacher']);
+    $app->post('/api/school/timetable/replace', [SchoolAdminController::class, 'replaceTeacher']);
+    $app->post('/api/school/timetable/publish', [SchoolAdminController::class, 'publishTimetable']);
+    $app->post('/api/school/timetable/paste', [SchoolAdminController::class, 'pasteTimetableSchedule']);
+
     $app->get('/api/school/subjects', [SchoolAdminController::class, 'getSubjects']);
+    $app->post('/api/school/subjects', [SchoolAdminController::class, 'createSubject']);
+    $app->put('/api/school/subjects/{id}', [SchoolAdminController::class, 'updateSubject']);
+    $app->delete('/api/school/subjects/{id}', [SchoolAdminController::class, 'deleteSubject']);
+
+    $app->get('/api/school/period-configurations', [SchoolAdminController::class, 'getPeriodConfigurations']);
+    $app->get('/api/school/timetable-settings', [SchoolAdminController::class, 'getTimetableSettings']);
+    $app->post('/api/school/timetable-settings', [SchoolAdminController::class, 'saveTimetableSettings']);
+
     $app->get('/api/school/profile', [SchoolAdminController::class, 'getSchoolProfile']);
     $app->post('/api/school/profile', [SchoolAdminController::class, 'updateSchoolProfile']);
     $app->post('/api/school/profile/logo', [SchoolAdminController::class, 'uploadSchoolLogo']);
     $app->delete('/api/school/profile/logo', [SchoolAdminController::class, 'removeSchoolLogo']);
+
+    // Security Domain
+    $app->get('/api/school/security/audit-logs', [SchoolAdminController::class, 'getSchoolAuditLogs']);
+    $app->post('/api/school/security/audit-logs/log', [SchoolAdminController::class, 'logClientAuditAction']);
+    $app->get('/api/school/security/login-history', [SchoolAdminController::class, 'getSchoolLoginHistory']);
 
     // Teacher Domain
     $app->get('/api/teacher/classes', [TeacherController::class, 'getMyClasses']);
@@ -120,6 +160,7 @@ return function (App $app) {
     $app->get('/api/student/timetable', [StudentController::class, 'getTimetable']);
     $app->get('/api/student/attendance', [StudentController::class, 'getAttendance']);
     $app->get('/api/student/results', [StudentController::class, 'getExamResults']);
+    $app->get('/api/student/exams-new/report-cards', [StudentController::class, 'getPublishedReportCards']);
     $app->get('/api/student/assignments', [StudentController::class, 'getAssignments']);
     $app->get('/api/student/fees', [StudentController::class, 'getFees']);
     $app->get('/api/student/fee-payments', [StudentController::class, 'getFeePayments']);

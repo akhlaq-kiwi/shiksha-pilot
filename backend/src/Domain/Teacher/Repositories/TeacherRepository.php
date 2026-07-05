@@ -17,11 +17,14 @@ class TeacherRepository extends BaseRepository
     public function getSchedule(int $teacherId, ?string $dayOfWeek = null): array
     {
         $sql = "
-            SELECT t.*, c.name AS class_name, s.name AS subject_name
+            SELECT t.*, c.name AS class_name, s.name AS subject_name,
+                   pc.start_time, pc.end_time
             FROM timetable t
             LEFT JOIN classes c ON t.class_id = c.id
             LEFT JOIN subjects s ON t.subject_id = s.id
+            LEFT JOIN period_configurations pc ON t.period_number = pc.period_number AND t.school_id = pc.school_id AND pc.end_date IS NULL
             WHERE t.teacher_id = :teacher_id
+              AND t.end_date IS NULL
         ";
 
         $params = [':teacher_id' => $teacherId];
@@ -31,7 +34,7 @@ class TeacherRepository extends BaseRepository
             $params[':day_of_week'] = $dayOfWeek;
         }
 
-        $sql .= ' ORDER BY t.day_of_week, t.start_time';
+        $sql .= ' ORDER BY t.day_of_week, t.period_number';
 
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($params);

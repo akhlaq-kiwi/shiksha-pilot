@@ -28,8 +28,9 @@ export const schoolAdminService = {
   async createSection(data) {
     return apiClient.post('/api/school/sections', data);
   },
-  async getSubjects() {
-    return apiClient.get('/api/school/subjects');
+  async getSubjects(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    return apiClient.get(`/api/school/subjects${query ? '?' + query : ''}`);
   },
   async createSubject(data) {
     return apiClient.post('/api/school/subjects', data);
@@ -100,8 +101,36 @@ export const schoolAdminService = {
   async updateTimetableEntry(id, data) {
     return apiClient.put(`/api/school/timetable/${id}`, data);
   },
-  async deleteTimetableEntry(id) {
-    return apiClient.delete(`/api/school/timetable/${id}`);
+  async deleteTimetableEntry(id, data = {}) {
+    return apiClient.delete(`/api/school/timetable/${id}`, { body: data });
+  },
+  async assignBackupTeacher(data) {
+    return apiClient.post('/api/school/timetable/backup', data);
+  },
+  async replaceTeacher(data) {
+    return apiClient.post('/api/school/timetable/replace', data);
+  },
+  async publishTimetable(data) {
+    return apiClient.post('/api/school/timetable/publish', data);
+  },
+  async pasteTimetableSchedule(data) {
+    return apiClient.post('/api/school/timetable/paste', data);
+  },
+  async updateSubject(id, data) {
+    return apiClient.put(`/api/school/subjects/${id}`, data);
+  },
+  async deleteSubject(id) {
+    return apiClient.delete(`/api/school/subjects/${id}`);
+  },
+  async getPeriodConfigurations(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    return apiClient.get(`/api/school/period-configurations${query ? '?' + query : ''}`);
+  },
+  async getTimetableSettings() {
+    return apiClient.get('/api/school/timetable-settings');
+  },
+  async saveTimetableSettings(data) {
+    return apiClient.post('/api/school/timetable-settings', data);
   },
   async getSubstitutes() {
     return apiClient.get('/api/school/timetable/substitutes');
@@ -210,5 +239,8 @@ export const schoolAdminService = {
   async getLoginHistory(params = {}) {
     const query = new URLSearchParams(params).toString();
     return apiClient.get(`/api/school/security/login-history${query ? '?' + query : ''}`);
+  },
+  async logClientAudit(data) {
+    return apiClient.post('/api/school/security/audit-logs/log', data);
   },
 };

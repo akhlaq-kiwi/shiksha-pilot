@@ -1,7 +1,10 @@
-import React from 'react';
-import { Download, FileText } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Download, FileText, Printer } from 'lucide-react';
 import { Card, CardContent } from '../../../common/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
+import { Dialog } from '../../../common/ui/dialog';
+import { Button } from '../../../common/ui/button';
+import { studentService } from '../../../common/services/studentService';
 
 const subjectColors = {
   'Mathematics': 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
@@ -34,6 +37,25 @@ const ScoreBar = ({ score, max = 100 }) => {
 };
 
 export default function AcademicsPage({ timetable, subjects, results }) {
+  const [reportCards, setReportCards] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedCard, setSelectedCard] = useState(null);
+  const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    const loadReportCards = async () => {
+      try {
+        const list = await studentService.getPublishedReportCards();
+        setReportCards(list || []);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadReportCards();
+  }, []);
+
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
       <div>
@@ -163,23 +185,149 @@ export default function AcademicsPage({ timetable, subjects, results }) {
       {/* Report Cards */}
       <div>
         <h3 className="text-base font-bold text-text-primary mb-4">Report Cards</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {['Term 1 — 2025', 'Term 2 — 2025', 'Term 3 — 2026'].map(term => (
-            <div key={term} className="flex items-center justify-between p-4 border border-border rounded-xl bg-surface shadow-xs hover:shadow-sm transition-shadow">
-              <div className="flex items-center gap-3">
-                <FileText className="h-5 w-5 text-text-muted flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-bold text-text-primary">{term}</p>
-                  <p className="text-[10px] text-text-muted">Grade Card · PDF</p>
+        {loading ? (
+          <div className="text-xs text-text-muted font-bold">Loading report cards...</div>
+        ) : reportCards.length === 0 ? (
+          <div className="text-xs text-text-muted py-4">No published report cards available for this student.</div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {reportCards.map(card => (
+              <div key={card.exam_id} className="flex items-center justify-between p-4 border border-border rounded-xl bg-surface shadow-xs hover:shadow-sm transition-shadow">
+                <div className="flex items-center gap-3">
+                  <FileText className="h-5 w-5 text-text-muted flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-bold text-text-primary">{card.exam_name}</p>
+                    <p className="text-[10px] text-text-muted">{card.academic_year_name} · Grade: {card.grade}</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => { setSelectedCard(card); setIsOpen(true); }}
+                  className="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-text-secondary hover:text-text-primary"
+                >
+                  <Download className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* DETAILED REPORT CARD DIALOG MODAL (A4 PRINTABLE) */}
+      <Dialog isOpen={isOpen} onClose={() => setIsOpen(false)} size="lg">
+        {selectedCard && (
+          <div id="printable-report-card-container" className="space-y-6">
+            {/* Action Bar (Not printed) */}
+            <div className="flex justify-between items-center bg-zinc-50 border-b border-border p-4 -m-6 mb-6 no-print">
+              <span className="text-xs font-bold text-text-secondary">Progress Report Card Preview</span>
+              <Button onClick={() => window.print()} className="flex items-center gap-2 font-bold py-1 px-3">
+                <Printer className="h-4 w-4" /> Print / Download PDF
+              </Button>
+            </div>
+
+            {/* A4 Report Card document */}
+            <div id="printable-report-card" className="border-4 border-double border-zinc-400 p-8 bg-white text-zinc-900 rounded-sm font-sans relative" style={{ minHeight: '297mm' }}>
+              
+              {/* Report Card Header */}
+              <div className="text-center border-b-2 border-zinc-800 pb-5">
+                <div className="flex justify-center mb-3">
+                  {selectedCard.school_logo ? (
+                    <img src={selectedCard.school_logo} alt="Logo" className="h-16 w-16 object-contain" />
+                  ) : (
+                    <div className="h-14 w-14 rounded-full bg-zinc-100 border border-zinc-300 flex items-center justify-center font-bold text-zinc-600 text-lg uppercase">
+                      {selectedCard.school_name.charAt(0)}
+                    </div>
+                  )}
+                </div>
+                <h2 className="text-2xl font-black uppercase tracking-tight text-zinc-900 font-display">{selectedCard.school_name}</h2>
+                <h4 className="text-[10px] font-bold tracking-widest text-zinc-500 uppercase mt-1">ACADEMIC PERFORMANCE REPORT CARD</h4>
+                <p className="text-xs font-mono text-zinc-600 mt-2">Academic Year: {selectedCard.academic_year_name}</p>
+              </div>
+
+              {/* Student Metadata grid */}
+              <div className="grid grid-cols-2 gap-y-3 gap-x-6 py-6 text-xs border-b border-zinc-300 font-semibold">
+                <div>Student Name: <span className="font-bold text-zinc-900">{selectedCard.student_name}</span></div>
+                <div>Admission No: <span className="font-mono text-zinc-700">{selectedCard.admission_no || 'N/A'}</span></div>
+                <div>Class Name: <span className="font-bold text-zinc-900">{selectedCard.class_name} {selectedCard.class_section ? `(${selectedCard.class_section})` : ''}</span></div>
+                <div>Roll Number: <span className="font-mono text-zinc-700">{selectedCard.roll_no}</span></div>
+                <div>Father Name: <span className="text-zinc-700">{selectedCard.father_name || 'N/A'}</span></div>
+                <div>Mother Name: <span className="text-zinc-700">{selectedCard.mother_name || 'N/A'}</span></div>
+              </div>
+
+              {/* Marks Table */}
+              <div className="py-6">
+                <table className="w-full text-left text-xs border border-zinc-400 border-collapse">
+                  <thead>
+                    <tr className="bg-zinc-100 border-b border-zinc-400">
+                      <th className="p-2 border-r border-zinc-400 font-bold uppercase">Subject</th>
+                      <th className="p-2 border-r border-zinc-400 font-bold uppercase text-center w-24">Paper Type</th>
+                      <th className="p-2 border-r border-zinc-400 font-bold uppercase text-center w-24">Max Marks</th>
+                      <th className="p-2 border-r border-zinc-400 font-bold uppercase text-center w-24">Passing</th>
+                      <th className="p-2 border-r border-zinc-400 font-bold uppercase text-center w-28">Obtained Marks</th>
+                      <th className="p-2 border-r border-zinc-400 font-bold uppercase text-center w-16">Grade</th>
+                      <th className="p-2 font-bold uppercase text-center w-20">Result</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedCard.subjects.map((s, idx) => (
+                      <tr key={idx} className="border-b border-zinc-300">
+                        <td className="p-2 border-r border-zinc-400 font-semibold">{s.subject_name}</td>
+                        <td className="p-2 border-r border-zinc-400 text-center font-semibold">{s.paper_type || 'Written'}</td>
+                        <td className="p-2 border-r border-zinc-400 text-center font-mono">{s.max_marks}</td>
+                        <td className="p-2 border-r border-zinc-400 text-center font-mono">{s.passing_marks}</td>
+                        <td className="p-2 border-r border-zinc-400 text-center font-mono font-bold">{s.marks_obtained}</td>
+                        <td className="p-2 border-r border-zinc-400 text-center font-bold">{s.grade}</td>
+                        <td className="p-2 text-center">
+                          <span className={`font-bold uppercase ${s.result === 'PASS' ? 'text-green-700' : 'text-red-700'}`}>
+                            {s.result}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Results Summary grid */}
+              <div className="grid grid-cols-2 gap-6 p-4 bg-zinc-50 border border-zinc-300 rounded-sm text-xs font-semibold">
+                <div className="space-y-2">
+                  <div>Grand Total: <span className="font-mono font-bold text-zinc-900">{selectedCard.total_obtained} / {selectedCard.total_max}</span></div>
+                  <div>Percentage: <span className="font-mono font-bold text-primary">{selectedCard.percentage}%</span></div>
+                  <div>Overall Grade: <span className="font-bold text-primary">{selectedCard.grade}</span></div>
+                </div>
+                <div className="space-y-2">
+                  <div>Class Rank: <span className="font-bold text-zinc-900">{selectedCard.class_rank}</span></div>
+                  <div>Section Rank: <span className="font-bold text-zinc-900">{selectedCard.section_rank}</span></div>
+                  <div>Attendance rate: <span className="font-mono text-zinc-700">{selectedCard.attendance.attendance_rate}% ({selectedCard.attendance.present_days}/{selectedCard.attendance.working_days} Days)</span></div>
                 </div>
               </div>
-              <button className="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-text-secondary hover:text-text-primary">
-                <Download className="h-4 w-4" />
-              </button>
+
+              {/* Remarks/Status display */}
+              <div className="py-6 space-y-2">
+                <h4 className="text-xs font-bold uppercase text-zinc-800">Final Verdict & Remarks</h4>
+                <div className="border border-zinc-300 p-4 min-h-[60px] text-xs leading-relaxed text-zinc-700 italic">
+                  {selectedCard.result === 'PASS' 
+                    ? (selectedCard.report_card_remark || 'Congratulations! Passed all subjects and promoted successfully.') 
+                    : 'Requires additional support and performance improvement in core subjects.'
+                  }
+                </div>
+              </div>
+
+              {/* Signatures block */}
+              <div className="absolute bottom-10 left-8 right-8 flex justify-between text-xs font-bold pt-8 border-t border-dashed border-zinc-400 font-sans">
+                <div className="text-center w-36">
+                  <div className="h-8"></div>
+                  <div className="border-t border-zinc-800 pt-1 text-zinc-700">Class Teacher</div>
+                </div>
+                <div className="text-center w-36">
+                  <div className="h-8"></div>
+                  <div className="border-t border-zinc-800 pt-1 text-zinc-700">Principal Signature</div>
+                </div>
+              </div>
+
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
+        )}
+      </Dialog>
     </div>
   );
 }

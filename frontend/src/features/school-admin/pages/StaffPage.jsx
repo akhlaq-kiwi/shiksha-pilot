@@ -8,6 +8,7 @@ import { Select } from '../../../common/ui/select';
 import { Dialog } from '../../../common/ui/dialog';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
 import { schoolService } from '../../../common/services/schoolService';
+import { schoolAdminService } from '../../../common/services/schoolAdminService';
 import { SearchableSelect, INDIAN_STATES_AND_CITIES } from '../../../common/ui/SearchableSelect';
 import html2pdf from 'html2pdf.js';
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
@@ -147,10 +148,19 @@ const printStyles = `
   }
 `;
 
+const getLocalDateStr = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export default function StaffPage() {
   const [searchParams] = useSearchParams();
   const [view, setView] = useState('list'); // 'list', 'details'
   const [selectedTeacherId, setSelectedTeacherId] = useState(null);
+  const [totalPeriodsLimit, setTotalPeriodsLimit] = useState(8);
 
   useEffect(() => {
     const idParam = searchParams.get('id');
@@ -230,7 +240,7 @@ export default function StaffPage() {
     setLoading(true);
     setError('');
     try {
-      const data = await schoolService.getStaff();
+      const data = await schoolService.getStaff({ date: getLocalDateStr() });
       setStaff(data || []);
     } catch (err) {
       console.error(err);
@@ -243,7 +253,7 @@ export default function StaffPage() {
   const loadTeacherDetails = async (id) => {
     setLoadingDetails(true);
     try {
-      const data = await schoolService.getStaffDetails(id);
+      const data = await schoolService.getStaffDetails(id, { date: getLocalDateStr() });
       setTeacherDetails(data || null);
     } catch (err) {
       console.error(err);
@@ -257,6 +267,18 @@ export default function StaffPage() {
 
   useEffect(() => {
     loadStaff();
+    const fetchTimetableSettings = async () => {
+      try {
+        const settings = await schoolAdminService.getTimetableSettings();
+        if (settings && settings.total_periods) {
+          setTotalPeriodsLimit(parseInt(settings.total_periods, 10));
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchTimetableSettings();
+
     const fetchSchool = async () => {
       try {
         const data = await schoolService.getSchoolProfile();
@@ -768,6 +790,62 @@ export default function StaffPage() {
     html2pdf().from(element).set(opt).save();
   };
 
+  const handlePrintExpLetter = () => {
+    const printContent = document.getElementById('experience-letter-print-area').innerHTML;
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+    
+    const doc = iframe.contentWindow.document;
+    doc.open();
+    doc.write('<html><head><title>Print Experience Letter</title>');
+    Array.from(document.querySelectorAll('link[rel="stylesheet"], style')).forEach(el => {
+      doc.write(el.outerHTML);
+    });
+    doc.write(`
+      <style>
+        @page {
+          size: A4 portrait;
+          margin: 0mm;
+        }
+        body {
+          background-color: white !important;
+          color: black !important;
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+        #experience-letter-print-area {
+          border: none !important;
+          box-shadow: none !important;
+          margin: 0 !important;
+          width: 210mm !important;
+          height: 297mm !important;
+          padding: 20mm !important;
+          box-sizing: border-box !important;
+        }
+      </style>
+    </head>
+    <body class="bg-white text-black">
+      <div id="experience-letter-print-area" class="w-full h-full bg-white text-zinc-950 font-serif flex flex-col justify-between select-text">
+        ${printContent}
+      </div>
+    </body>
+    </html>
+    `);
+    doc.close();
+    
+    iframe.contentWindow.focus();
+    setTimeout(() => {
+      iframe.contentWindow.print();
+      document.body.removeChild(iframe);
+    }, 500);
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       
@@ -1128,7 +1206,7 @@ export default function StaffPage() {
                     <div className="flex items-center justify-between w-full mt-4 text-xs">
                       {(() => {
                         const rawAssigned = parseInt(t.assigned_periods || 0, 10);
-                        const max = parseInt(t.max_periods || 8, 10);
+                        const max = totalPeriodsLimit;
                         let assigned = rawAssigned;
                         if (rawAssigned > max) {
                           console.error(`[Validation Error] Teacher ${t.name} has assigned periods (${rawAssigned}) exceeding max allowed (${max}).`);
@@ -1799,7 +1877,7 @@ export default function StaffPage() {
           <Button onClick={handleDownloadPDF} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold flex items-center gap-1.5 shadow-2xs">
             <Download className="h-4 w-4" /> Download PDF
           </Button>
-          <Button onClick={() => window.print()} className="bg-primary hover:bg-primary/95 text-white font-bold flex items-center gap-1.5 shadow-2xs">
+          <Button onClick={handlePrintExpLetter} className="bg-primary hover:bg-primary/95 text-white font-bold flex items-center gap-1.5 shadow-2xs">
             <Printer className="h-4 w-4" /> Print Letter
           </Button>
         </div>}
@@ -1812,11 +1890,11 @@ export default function StaffPage() {
           {/* Printable Container in A4 Ratio */}
           <div 
             id="experience-letter-print-area" 
-            className="w-full max-w-[210mm] min-h-[297mm] bg-white p-[15mm] text-zinc-950 font-serif shadow-lg rounded-sm border border-border flex flex-col justify-between select-text"
+            className="w-full max-w-[210mm] h-[296mm] bg-white p-[15mm] text-zinc-950 font-serif shadow-lg rounded-sm border border-border flex flex-col justify-between select-text mx-auto"
           >
             {/* Header / School details */}
             <div className="space-y-4">
-              <div className="flex items-start justify-between border-b-2 border-zinc-950 pb-4">
+              <div className="flex items-center justify-center border-b-2 border-zinc-950 pb-4">
                 <div className="flex items-center gap-4">
                   {/* Default academic crest logo */}
                   <div className="w-16 h-16 bg-zinc-950 text-white rounded-md flex items-center justify-center font-bold text-3xl font-display flex-shrink-0 shadow-2xs select-none">
@@ -1827,22 +1905,15 @@ export default function StaffPage() {
                     <p className="text-[10px] font-sans font-extrabold text-zinc-500 mt-1 uppercase tracking-wider">Official Certificate of Service</p>
                   </div>
                 </div>
-                <div className="text-right text-[10px] font-sans text-zinc-600 leading-normal">
-                  <p className="font-bold text-zinc-950">{schoolProfile?.street_address || '123 Main Street'}</p>
-                  <p>{schoolProfile?.city || 'City'}, {schoolProfile?.state || 'State'} - {schoolProfile?.pin_code || ''}</p>
-                  <p>Email: {schoolProfile?.contact_email || 'contact@school.com'}</p>
-                  <p>Phone: {schoolProfile?.contact_phone || '—'}</p>
-                </div>
               </div>
 
               {/* Title */}
               <div className="text-center py-6">
-                <h2 className="text-xl font-bold uppercase tracking-widest text-zinc-900 underline decoration-double underline-offset-4">To Whom It May Concern</h2>
+                <h2 className="text-xl font-bold uppercase tracking-widest text-zinc-900">To Whom It May Concern</h2>
               </div>
 
-              {/* Ref No and Date */}
-              <div className="flex items-center justify-between text-xs font-sans text-zinc-700 px-1">
-                <p><strong>Ref No:</strong> <span className="font-mono text-zinc-900 font-extrabold">EXP-{new Date(teacherDetails?.exit_date || '').getFullYear()}-{String(teacherDetails?.id || '').padStart(5, '0')}</span></p>
+              {/* Date only */}
+              <div className="flex items-center justify-end text-xs font-sans text-zinc-700 px-1">
                 <p><strong>Date:</strong> <span className="text-zinc-900 font-bold">{formatDateFull(new Date())}</span></p>
               </div>
 
@@ -1864,7 +1935,7 @@ export default function StaffPage() {
             </div>
 
             {/* Signatures & Seal */}
-            <div className="pt-20">
+            <div className="pt-10">
               <div className="flex items-end justify-between px-2 text-xs font-sans text-zinc-700">
                 <div className="text-center w-40">
                   <div className="border-b border-zinc-400 h-10 w-full mb-2"></div>

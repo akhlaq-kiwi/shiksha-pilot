@@ -1,20 +1,32 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { MoreVertical } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
 export function DropdownMenu({ trigger, children, align = 'right' }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [coords, setCoords] = useState({ top: 0, left: 0, right: 0 });
   const containerRef = useRef(null);
 
   const toggle = (e) => {
     e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    setCoords({
+      top: rect.bottom,
+      left: rect.left,
+      right: rect.right
+    });
     setIsOpen((prev) => !prev);
   };
 
   useEffect(() => {
     const handleOutsideClick = (event) => {
       if (containerRef.current && !containerRef.current.contains(event.target)) {
+        const portalMenu = document.getElementById('dropdown-portal-menu');
+        if (portalMenu && portalMenu.contains(event.target)) {
+          return;
+        }
         setIsOpen(false);
       }
     };
@@ -25,14 +37,25 @@ export function DropdownMenu({ trigger, children, align = 'right' }) {
       }
     };
 
+    const handleScroll = () => {
+      setIsOpen(false);
+    };
+
     document.addEventListener('mousedown', handleOutsideClick);
     document.addEventListener('keydown', handleKeyDown);
+
+    if (isOpen) {
+      window.addEventListener('scroll', handleScroll, true);
+      window.addEventListener('resize', handleScroll);
+    }
 
     return () => {
       document.removeEventListener('mousedown', handleOutsideClick);
       document.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('scroll', handleScroll, true);
+      window.removeEventListener('resize', handleScroll);
     };
-  }, []);
+  }, [isOpen]);
 
   return (
     <div className="relative inline-block text-left font-sans" ref={containerRef}>
@@ -44,12 +67,18 @@ export function DropdownMenu({ trigger, children, align = 'right' }) {
         {trigger || <MoreVertical className="h-4 w-4" />}
       </button>
 
-      {isOpen && (
+      {isOpen && createPortal(
         <div
+          id="dropdown-portal-menu"
+          style={{
+            position: 'fixed',
+            top: `${coords.top + 4}px`,
+            left: align === 'right' ? `${coords.right}px` : `${coords.left}px`,
+            transform: align === 'right' ? 'translateX(-100%)' : 'none',
+          }}
           className={twMerge(
             clsx(
-              "absolute mt-1 bg-surface border border-border rounded-xl shadow-lg py-1 z-30 animate-in fade-in slide-in-from-top-1 duration-150 min-w-[120px] text-xs",
-              align === 'right' ? 'right-0' : 'left-0'
+              "bg-surface border border-border rounded-xl shadow-lg py-1 z-[9999] animate-in fade-in slide-in-from-top-1 duration-150 min-w-[120px] text-xs"
             )
           )}
         >
@@ -67,7 +96,8 @@ export function DropdownMenu({ trigger, children, align = 'right' }) {
             }
             return child;
           })}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
