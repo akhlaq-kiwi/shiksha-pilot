@@ -6,6 +6,7 @@ import { Dialog } from '../../../common/ui/dialog';
 import { Input } from '../../../common/ui/input';
 import { schoolService } from '../../../common/services/schoolService';
 import { authService } from '../../../common/services/authService';
+import { SearchableSelect, INDIAN_STATES_AND_CITIES } from '../../../common/ui/SearchableSelect';
 
 export default function ProfilePage({ mode = 'details' }) {
   const [profile, setProfile] = useState(null);
@@ -20,10 +21,15 @@ export default function ProfilePage({ mode = 'details' }) {
 
   // Profile Form State
   const [profileForm, setProfileForm] = useState({
-    name: '', registration_no: '', affiliation_board: '', school_type: '',
-    founded_year: '', medium_of_instruction: '', street_address: '',
-    city: '', state: '', pin_code: '', classes_offered: ''
+    name: '',
+    street_address: '',
+    city: '',
+    state: '',
+    pin_code: '',
+    contact_email: '',
+    contact_phone: ''
   });
+  const [formErrors, setFormErrors] = useState({});
 
   // Password Form State
   const [passwordForm, setPasswordForm] = useState({ newPassword: '', confirmPassword: '' });
@@ -67,39 +73,65 @@ export default function ProfilePage({ mode = 'details' }) {
 
   // Value mappings
   const schoolName = profile?.name || '—';
-  const regNo = profile?.registration_no || '—';
-  const board = profile?.affiliation_board || '—';
-  const type = profile?.school_type || '—';
-  const founded = profile?.founded_year || '—';
-  const medium = profile?.medium_of_instruction || '—';
   const email = profile?.contact_email || '—';
   const phone = profile?.contact_phone || '—';
   const street = profile?.street_address || '—';
   const city = profile?.city || '—';
   const state = profile?.state || '—';
   const pin = profile?.pin_code || '—';
-  const classesOffered = profile?.classes_offered || '—';
 
   const handleEditProfile = () => {
     setProfileForm({
       name: schoolName === '—' ? '' : schoolName,
-      registration_no: regNo === '—' ? '' : regNo,
-      affiliation_board: board === '—' ? '' : board,
-      school_type: type === '—' ? '' : type,
-      founded_year: founded === '—' ? '' : founded,
-      medium_of_instruction: medium === '—' ? '' : medium,
       street_address: street === '—' ? '' : street,
       city: city === '—' ? '' : city,
       state: state === '—' ? '' : state,
       pin_code: pin === '—' ? '' : pin,
-      classes_offered: classesOffered === '—' ? '' : classesOffered,
+      contact_email: email === '—' ? '' : email,
+      contact_phone: phone === '—' ? '' : phone,
     });
+    setFormErrors({});
     setError('');
     setSuccessMsg('');
     setIsEditProfileOpen(true);
   };
 
+  const validateForm = () => {
+    const errs = {};
+    if (!profileForm.name.trim()) {
+      errs.name = "School Name is required";
+    }
+    if (!profileForm.street_address.trim()) {
+      errs.street_address = "Street Address is required";
+    }
+    if (!profileForm.state) {
+      errs.state = "State is required";
+    } else if (!Object.keys(INDIAN_STATES_AND_CITIES).includes(profileForm.state)) {
+      errs.state = "Please select a valid state from the list";
+    }
+    
+    if (!profileForm.city) {
+      errs.city = "City is required";
+    } else {
+      const allowedCities = INDIAN_STATES_AND_CITIES[profileForm.state] || [];
+      if (!allowedCities.includes(profileForm.city)) {
+        errs.city = "Please select a valid city from the list";
+      }
+    }
+    
+    if (!profileForm.pin_code.trim()) {
+      errs.pin_code = "PIN Code is required";
+    } else if (!/^\d{6}$/.test(profileForm.pin_code.trim())) {
+      errs.pin_code = "PIN Code must be a 6-digit number";
+    }
+
+    setFormErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
   const handleSave = async (updatedFields, closeDialog) => {
+    if (!validateForm()) return;
+    
     setSubmitting(true);
     setError('');
     setSuccessMsg('');
@@ -109,7 +141,11 @@ export default function ProfilePage({ mode = 'details' }) {
         contact_email: email === '—' ? null : email,
         contact_phone: phone === '—' ? null : phone,
         // Update user fields
-        ...updatedFields
+        name: updatedFields.name,
+        street_address: updatedFields.street_address,
+        city: updatedFields.city,
+        state: updatedFields.state,
+        pin_code: updatedFields.pin_code
       };
       const updatedProfile = await schoolService.updateSchoolProfile(payload);
       closeDialog(false);
@@ -123,6 +159,30 @@ export default function ProfilePage({ mode = 'details' }) {
       setError(err.message || 'Failed to update school profile.');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleStateChange = (stateName) => {
+    setProfileForm(prev => ({
+      ...prev,
+      state: stateName,
+      city: ''
+    }));
+    if (formErrors.state) {
+      setFormErrors(prev => ({ ...prev, state: null }));
+    }
+    if (formErrors.city) {
+      setFormErrors(prev => ({ ...prev, city: null }));
+    }
+  };
+
+  const handleCityChange = (cityName) => {
+    setProfileForm(prev => ({
+      ...prev,
+      city: cityName
+    }));
+    if (formErrors.city) {
+      setFormErrors(prev => ({ ...prev, city: null }));
     }
   };
 
@@ -312,30 +372,10 @@ export default function ProfilePage({ mode = 'details' }) {
               {/* School Information */}
               <div>
                 <h4 className="text-xs font-extrabold text-primary mb-3 uppercase tracking-wider">School Information</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-xs">
+                <div className="grid grid-cols-1 gap-6 text-xs">
                   <div>
                     <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">School Name</p>
                     <p className="text-sm font-semibold text-text-primary mt-0.5">{schoolName}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Registration No.</p>
-                    <p className="text-sm font-semibold text-text-primary mt-0.5">{regNo}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Affiliation Board</p>
-                    <p className="text-sm font-semibold text-text-primary mt-0.5">{board}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">School Type</p>
-                    <p className="text-sm font-semibold text-text-primary mt-0.5">{type}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Founded Year</p>
-                    <p className="text-sm font-semibold text-text-primary mt-0.5">{founded}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Medium of Instruction</p>
-                    <p className="text-sm font-semibold text-text-primary mt-0.5">{medium}</p>
                   </div>
                 </div>
               </div>
@@ -361,19 +401,6 @@ export default function ProfilePage({ mode = 'details' }) {
                   <div>
                     <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">PIN Code</p>
                     <p className="text-sm font-semibold text-text-primary mt-0.5">{pin}</p>
-                  </div>
-                </div>
-              </div>
-
-              <hr className="border-border" />
-
-              {/* Academic Configuration */}
-              <div>
-                <h4 className="text-xs font-extrabold text-primary mb-3 uppercase tracking-wider">Academic Configuration</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-xs">
-                  <div>
-                    <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Classes Offered</p>
-                    <p className="text-sm font-semibold text-text-primary mt-0.5">{classesOffered}</p>
                   </div>
                 </div>
               </div>
@@ -555,7 +582,7 @@ export default function ProfilePage({ mode = 'details' }) {
 
       {/* Dialog: Edit Profile Details */}
       <Dialog isOpen={isEditProfileOpen} onClose={() => setIsEditProfileOpen(false)}
-        title="Edit Profile Details" description="Update your school's information, address, and classes."
+        title="Edit Profile Details" description="Update your school's name and address information."
         footer={<>
           <Button variant="secondary" onClick={() => setIsEditProfileOpen(false)}>Cancel</Button>
           <Button onClick={() => handleSave(profileForm, setIsEditProfileOpen)} disabled={submitting}>
@@ -564,60 +591,74 @@ export default function ProfilePage({ mode = 'details' }) {
         </>}>
         <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-text-secondary uppercase">School Name</label>
-            <Input value={profileForm.name} onChange={e => setProfileForm(p => ({ ...p, name: e.target.value }))} required />
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">Registration No.</label>
-              <Input value={profileForm.registration_no} onChange={e => setProfileForm(p => ({ ...p, registration_no: e.target.value }))} />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">Affiliation Board</label>
-              <Input value={profileForm.affiliation_board} onChange={e => setProfileForm(p => ({ ...p, affiliation_board: e.target.value }))} />
-            </div>
+            <label className="text-xs font-bold text-text-secondary uppercase">School Name <span className="text-red-500">*</span></label>
+            <Input 
+              value={profileForm.name} 
+              onChange={e => {
+                setProfileForm(p => ({ ...p, name: e.target.value }));
+                if (formErrors.name) setFormErrors(prev => ({ ...prev, name: null }));
+              }} 
+              required 
+            />
+            {formErrors.name && <p className="text-[10px] text-red-500 font-semibold">{formErrors.name}</p>}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">School Type</label>
-              <Input value={profileForm.school_type} onChange={e => setProfileForm(p => ({ ...p, school_type: e.target.value }))} />
+              <label className="text-xs font-bold text-text-secondary uppercase">Contact Email (Read-only)</label>
+              <Input value={profileForm.contact_email} disabled className="bg-zinc-50 dark:bg-zinc-800/40 text-text-muted" />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">Founded Year</label>
-              <Input value={profileForm.founded_year} onChange={e => setProfileForm(p => ({ ...p, founded_year: e.target.value }))} />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">Medium of Instruction</label>
-              <Input value={profileForm.medium_of_instruction} onChange={e => setProfileForm(p => ({ ...p, medium_of_instruction: e.target.value }))} />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">Classes Offered</label>
-              <Input placeholder="e.g. 1 - 12" value={profileForm.classes_offered} onChange={e => setProfileForm(p => ({ ...p, classes_offered: e.target.value }))} required />
+              <label className="text-xs font-bold text-text-secondary uppercase">Contact Phone (Read-only)</label>
+              <Input value={profileForm.contact_phone} disabled className="bg-zinc-50 dark:bg-zinc-800/40 text-text-muted" />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-text-secondary uppercase">Street Address</label>
-            <Input value={profileForm.street_address} onChange={e => setProfileForm(p => ({ ...p, street_address: e.target.value }))} />
+            <label className="text-xs font-bold text-text-secondary uppercase">Street Address <span className="text-red-500">*</span></label>
+            <Input 
+              value={profileForm.street_address} 
+              onChange={e => {
+                setProfileForm(p => ({ ...p, street_address: e.target.value }));
+                if (formErrors.street_address) setFormErrors(prev => ({ ...prev, street_address: null }));
+              }} 
+              required
+            />
+            {formErrors.street_address && <p className="text-[10px] text-red-500 font-semibold">{formErrors.street_address}</p>}
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <SearchableSelect
+              label="State"
+              placeholder="Search State..."
+              value={profileForm.state}
+              onChange={handleStateChange}
+              options={Object.keys(INDIAN_STATES_AND_CITIES)}
+              required
+              error={formErrors.state}
+            />
+            <SearchableSelect
+              label="City"
+              placeholder="Search City..."
+              value={profileForm.city}
+              onChange={handleCityChange}
+              options={profileForm.state ? (INDIAN_STATES_AND_CITIES[profileForm.state] || []) : []}
+              required
+              error={formErrors.city}
+            />
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">City</label>
-              <Input value={profileForm.city} onChange={e => setProfileForm(p => ({ ...p, city: e.target.value }))} />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">State</label>
-              <Input value={profileForm.state} onChange={e => setProfileForm(p => ({ ...p, state: e.target.value }))} />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">PIN Code</label>
-              <Input value={profileForm.pin_code} onChange={e => setProfileForm(p => ({ ...p, pin_code: e.target.value }))} />
+              <label className="text-xs font-bold text-text-secondary uppercase">PIN Code <span className="text-red-500">*</span></label>
+              <Input 
+                value={profileForm.pin_code} 
+                onChange={e => {
+                  const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+                  setProfileForm(p => ({ ...p, pin_code: val }));
+                  if (formErrors.pin_code) setFormErrors(prev => ({ ...prev, pin_code: null }));
+                }} 
+                placeholder="6-digit ZIP/PIN code"
+                required 
+              />
+              {formErrors.pin_code && <p className="text-[10px] text-red-500 font-semibold">{formErrors.pin_code}</p>}
             </div>
           </div>
         </div>
