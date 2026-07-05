@@ -6318,15 +6318,27 @@ Only approve the settlement after reviewing all financial records.
             // Seed defaults for this school if empty
             $stmtIns = $pdo->prepare("
                 INSERT IGNORE INTO grade_configurations (school_id, min_percentage, max_percentage, grade, grade_point, remark) VALUES
-                (:sid, 91.00, 100.00, 'A+', 10, 'Outstanding'),
-                (:sid, 81.00, 90.00, 'A', 9, 'Excellent'),
-                (:sid, 71.00, 80.00, 'B+', 8, 'Very Good'),
-                (:sid, 61.00, 70.00, 'B', 7, 'Good'),
-                (:sid, 51.00, 60.00, 'C', 6, 'Average'),
-                (:sid, 41.00, 50.00, 'D', 5, 'Pass'),
-                (:sid, 0.00, 40.00, 'F', 0, 'Fail')
+                (:sid, :min, :max, :grade, :point, :remark)
             ");
-            $stmtIns->execute([':sid' => $schoolId]);
+            $defaults = [
+                [91.00, 100.00, 'A+', 10, 'Outstanding'],
+                [81.00, 90.00, 'A', 9, 'Excellent'],
+                [71.00, 80.00, 'B+', 8, 'Very Good'],
+                [61.00, 70.00, 'B', 7, 'Good'],
+                [51.00, 60.00, 'C', 6, 'Average'],
+                [41.00, 50.00, 'D', 5, 'Pass'],
+                [0.00, 40.00, 'F', 0, 'Fail']
+            ];
+            foreach ($defaults as $row) {
+                $stmtIns->execute([
+                    ':sid' => $schoolId,
+                    ':min' => $row[0],
+                    ':max' => $row[1],
+                    ':grade' => $row[2],
+                    ':point' => $row[3],
+                    ':remark' => $row[4]
+                ]);
+            }
 
             $stmt->execute([':sid' => $schoolId]);
             $grades = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
