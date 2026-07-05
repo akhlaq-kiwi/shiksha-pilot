@@ -582,11 +582,17 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
       if (!formData.dob) errs.dob = 'Date of birth is required';
       
       // Dropdown Validations
+      if (!formData.academic_year_id) {
+        errs.academic_year_id = 'Academic Session is required';
+      }
+      if (!formData.admission_date) {
+        errs.admission_date = 'Admission Date is required';
+      }
       if (!selectedClassName) {
         errs.class_name = 'Class is required';
       }
       if (availableSections.length > 0 && !selectedSectionName) {
-        errs.section_name = 'Section is required';
+        errs.section_name = 'Please select a section for the selected class.';
       }
       
       // Numeric Validations
@@ -956,6 +962,93 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                         </div>
                       </div>
                     )}
+                  </div>
+
+                  <hr className="border-border my-6" />
+
+                  {/* Academic Details Section */}
+                  <div>
+                    <h3 className="text-sm font-bold text-text-primary uppercase tracking-wide border-b border-border pb-2 mb-4">Academic & Enrollment Details</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-text-secondary uppercase">Academic Session <span className="text-red-500">*</span></label>
+                        <select
+                          name="academic_year_id"
+                          value={formData.academic_year_id}
+                          onChange={handleTextChange}
+                          required
+                          className="flex h-9 w-full rounded-md border border-zinc-200 bg-surface px-3 py-1.5 text-sm text-text-primary shadow-xs transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-950 dark:border-zinc-800 dark:focus:ring-zinc-300"
+                        >
+                          <option value="">Select Session...</option>
+                          {academicYears.map(y => (
+                            <option key={y.id} value={y.id}>{y.name}</option>
+                          ))}
+                        </select>
+                        {errors.academic_year_id && <p className="text-[10px] text-red-500 font-semibold">{errors.academic_year_id}</p>}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-text-secondary uppercase">Admission Date <span className="text-red-500">*</span></label>
+                        <div className="relative">
+                          <Input
+                            type="date"
+                            name="admission_date"
+                            value={formData.admission_date}
+                            onChange={handleTextChange}
+                            required
+                            className="pr-10 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-10 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer text-text-primary"
+                          />
+                          <Calendar className="absolute right-3 top-2.5 h-4 w-4 text-text-muted pointer-events-none" />
+                        </div>
+                        {errors.admission_date && <p className="text-[10px] text-red-500 font-semibold">{errors.admission_date}</p>}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-text-secondary uppercase">Select Class <span className="text-red-500">*</span></label>
+                        <select
+                          name="class_name"
+                          value={selectedClassName}
+                          onChange={handleClassChange}
+                          required
+                          className="flex h-9 w-full rounded-md border border-zinc-200 bg-surface px-3 py-1.5 text-sm text-text-primary shadow-xs transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-950 dark:border-zinc-800 dark:focus:ring-zinc-300"
+                        >
+                          <option value="">Select Class...</option>
+                          {uniqueClassNames.map(name => (
+                            <option key={name} value={name}>{name}</option>
+                          ))}
+                        </select>
+                        {errors.class_name && <p className="text-[10px] text-red-500 font-semibold">{errors.class_name}</p>}
+                      </div>
+
+                      {availableSections.length > 0 && (
+                        <div className="space-y-1.5 animate-in fade-in duration-200">
+                          <label className="text-xs font-bold text-text-secondary uppercase">Select Section <span className="text-red-500">*</span></label>
+                          <select
+                            name="section_name"
+                            value={selectedSectionName}
+                            onChange={handleSectionChange}
+                            required
+                            className="flex h-9 w-full rounded-md border border-zinc-200 bg-surface px-3 py-1.5 text-sm text-text-primary shadow-xs transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-950 dark:border-zinc-800 dark:focus:ring-zinc-300"
+                          >
+                            <option value="">Select Section...</option>
+                            {availableSections.map(sec => (
+                              <option key={sec} value={sec}>Section {sec}</option>
+                            ))}
+                          </select>
+                          {errors.section_name && <p className="text-[10px] text-red-500 font-semibold">{errors.section_name}</p>}
+                        </div>
+                      )}
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-text-secondary uppercase">Roll Number</label>
+                        <Input
+                          name="roll_no"
+                          value={formData.roll_no || ''}
+                          onChange={handleTextChange}
+                          placeholder="e.g. 15"
+                        />
+                      </div>
+                    </div>
                   </div>
 
                 </div>
