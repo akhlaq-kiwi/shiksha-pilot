@@ -14,7 +14,7 @@ const StudentAvatar = ({ src, name, updatedAt }) => {
   const [error, setError] = useState(false);
   
   if (src && !error) {
-    const fileUrl = src.startsWith('http') ? src : `http://localhost:8000${src}`;
+    const fileUrl = src.startsWith('http') ? src : src;
     const cleanUrl = updatedAt ? `${fileUrl}?v=${encodeURIComponent(updatedAt)}` : fileUrl;
     return (
       <img 

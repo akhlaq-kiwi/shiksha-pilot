@@ -19,7 +19,7 @@ const TeacherAvatar = ({ src, name, updatedAt }) => {
   const [error, setError] = useState(false);
   
   if (src && !error) {
-    const fileUrl = src.startsWith('http') ? src : `http://localhost:8000${src}`;
+    const fileUrl = src.startsWith('http') ? src : src;
     const cleanUrl = updatedAt ? `${fileUrl}?v=${encodeURIComponent(updatedAt)}` : `${fileUrl}?v=${Date.now()}`;
     return (
       <img 
@@ -1599,7 +1599,7 @@ export default function StaffPage() {
                         <TableCell className="text-xs text-text-muted font-mono">{formatBytes(doc.file_size)}</TableCell>
                         <TableCell>
                           <a 
-                            href={doc.file_path.startsWith('http') ? doc.file_path : `http://localhost:8000${doc.file_path}`} 
+                            href={doc.file_path.startsWith('http') ? doc.file_path : doc.file_path} 
                             target="_blank" 
                             rel="noopener noreferrer"
                             className="inline-flex items-center text-[10px] font-black text-indigo-600 hover:text-indigo-700 bg-indigo-50 dark:bg-indigo-900/10 px-2 py-1 rounded"
