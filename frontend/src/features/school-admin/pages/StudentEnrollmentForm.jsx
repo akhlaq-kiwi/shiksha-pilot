@@ -445,6 +445,37 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
   const isFirstYear = academicYears.length <= 1 || (formData.academic_year_id && 
     parseInt(formData.academic_year_id) === academicYears[0]?.id);
 
+  const handleSrNoBlur = async () => {
+    if (!isFirstYear || !formData.sr_no) return;
+    
+    if (!/^\d+$/.test(formData.sr_no)) {
+      setErrors(prev => ({ ...prev, sr_no: 'Only numeric digits are allowed.' }));
+      return;
+    }
+    if (parseInt(formData.sr_no, 10) <= 0) {
+      setErrors(prev => ({ ...prev, sr_no: 'SR Number must be a positive integer.' }));
+      return;
+    }
+    
+    try {
+      const isEdit = !!studentId;
+      const res = await schoolService.checkSrNoExists({
+        sr_no: formData.sr_no,
+        exclude_id: isEdit ? studentId : undefined
+      });
+      if (res && res.exists) {
+        setErrors(prev => ({
+          ...prev,
+          sr_no: 'SR Number already exists. Please enter a unique SR Number.'
+        }));
+      } else {
+        setErrors(prev => ({ ...prev, sr_no: null }));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const handleTextChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -637,11 +668,14 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
         errs.section_name = 'Please select a section.';
       }
       
-      // Numeric Validations
-      if (isFirstYear && !formData.sr_no) {
-        errs.sr_no = 'SR Number is required for the first session';
-      } else if (isFirstYear && formData.sr_no && !/^\d+$/.test(formData.sr_no)) {
-        errs.sr_no = 'Only numeric digits are allowed.';
+      if (isFirstYear) {
+        if (!formData.sr_no) {
+          errs.sr_no = 'SR Number is required';
+        } else if (!/^\d+$/.test(formData.sr_no)) {
+          errs.sr_no = 'Only numeric digits are allowed.';
+        } else if (parseInt(formData.sr_no, 10) <= 0) {
+          errs.sr_no = 'SR Number must be a positive integer.';
+        }
       }
 
       if (!formData.student_mobile) {
@@ -673,35 +707,45 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
     return Object.keys(errs).length === 0;
   };
 
-  const handleNext = async () => {
-    if (activeTab === 1) {
-      const ok = validateTab(1);
-      if (!ok) return;
+  const handleTabChange = async (targetTabNum) => {
+    if (targetTabNum === activeTab) return;
 
-      if (formData.sr_no) {
-        try {
-          const isEdit = !!studentId;
-          const res = await schoolService.checkSrNoExists({
-            sr_no: formData.sr_no,
-            exclude_id: isEdit ? studentId : undefined
-          });
-          if (res && res.exists) {
-            setErrors(prev => ({
-              ...prev,
-              sr_no: 'SR Number already exists in this school. Please enter a unique SR Number.'
-            }));
-            return;
+    if (targetTabNum > activeTab) {
+      if (activeTab === 1 || (activeTab < 1 && targetTabNum > 1)) {
+        const ok = validateTab(1);
+        if (!ok) return;
+
+        if (isFirstYear && formData.sr_no) {
+          try {
+            const isEdit = !!studentId;
+            const res = await schoolService.checkSrNoExists({
+              sr_no: formData.sr_no,
+              exclude_id: isEdit ? studentId : undefined
+            });
+            if (res && res.exists) {
+              setErrors(prev => ({
+                ...prev,
+                sr_no: 'SR Number already exists. Please enter a unique SR Number.'
+              }));
+              return;
+            }
+          } catch (err) {
+            console.error(err);
           }
-        } catch (err) {
-          console.error(err);
         }
       }
-    } else {
-      const ok = validateTab(activeTab);
-      if (!ok) return;
+
+      if (activeTab === 2 || (activeTab < 2 && targetTabNum > 2)) {
+        const ok = validateTab(2);
+        if (!ok) return;
+      }
     }
 
-    setActiveTab(prev => prev + 1);
+    setActiveTab(targetTabNum);
+  };
+
+  const handleNext = async () => {
+    await handleTabChange(activeTab + 1);
   };
 
   const handlePrev = () => {
@@ -832,14 +876,7 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
           <button
             key={t.num}
             type="button"
-            onClick={() => {
-              // Ensure we check validation of prior steps before skipping tabs
-              if (t.num > activeTab) {
-                if (activeTab === 1 && !validateTab(1)) return;
-                if (activeTab === 2 && !validateTab(2)) return;
-              }
-              setActiveTab(t.num);
-            }}
+            onClick={() => handleTabChange(t.num)}
             className={`pb-3 font-bold border-b-2 transition-all ${activeTab === t.num ? 'border-primary text-primary' : 'border-transparent text-text-muted hover:text-text-secondary'}`}
           >
             {t.label}
@@ -985,18 +1022,20 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                       <Input type="email" name="student_email" value={formData.student_email} onChange={handleTextChange} placeholder="student@domain.com" />
                       {errors.student_email && <p className="text-[10px] text-red-500 font-semibold">{errors.student_email}</p>}
                     </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-text-secondary uppercase">SR Number {isFirstYear && <span className="text-red-500">*</span>}</label>
-                      <Input 
-                        name="sr_no" 
-                        value={isFirstYear ? formData.sr_no : ''} 
-                        onChange={handleNumericChange} 
-                        placeholder={isFirstYear ? "Enter SR Number" : "Auto-Generated"} 
-                        disabled={!isFirstYear}
-                        className={!isFirstYear ? 'bg-zinc-50 dark:bg-zinc-900 border-dashed cursor-not-allowed text-text-muted font-bold shadow-none' : 'font-bold'}
-                      />
-                      {errors.sr_no && <p className="text-[10px] text-red-500 font-semibold">{errors.sr_no}</p>}
-                    </div>
+                    {isFirstYear && (
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-text-secondary uppercase">SR Number <span className="text-red-500">*</span></label>
+                        <Input 
+                          name="sr_no" 
+                          value={formData.sr_no || ''} 
+                          onChange={handleNumericChange} 
+                          onBlur={handleSrNoBlur}
+                          placeholder="Enter SR Number" 
+                          className="font-bold"
+                        />
+                        {errors.sr_no && <p className="text-[10px] text-red-500 font-semibold">{errors.sr_no}</p>}
+                      </div>
+                    )}
 
                     {availableSections.length > 0 && (
                       <div className="space-y-1.5 animate-in fade-in duration-200">
