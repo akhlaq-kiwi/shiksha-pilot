@@ -83,6 +83,20 @@ class SchoolAdminController extends BaseController
         return $this->success($response, $student, 'Student updated successfully');
     }
 
+    public function checkSrNo(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $params = $request->getQueryParams();
+        $srNo = $params['sr_no'] ?? '';
+        $excludeId = isset($params['exclude_id']) && $params['exclude_id'] !== '' ? (int)$params['exclude_id'] : null;
+
+        $exists = $this->service->checkSrNoExists($user, $srNo, $excludeId);
+
+        return $this->success($response, ['exists' => $exists]);
+    }
+
     public function uploadDocument(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
