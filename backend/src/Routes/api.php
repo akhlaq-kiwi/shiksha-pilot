@@ -31,6 +31,10 @@ return function (App $app) {
     $app->get('/api/platform/stats', [PlatformController::class, 'getStats']);
     $app->get('/api/platform/growth-chart', [PlatformController::class, 'getGrowthChart']);
     $app->get('/api/platform/schools/{id}/stats', [PlatformController::class, 'getSchoolStats']);
+    $app->delete('/api/platform/plans/{id}', [PlatformController::class, 'deletePlan']);
+    $app->get('/api/platform/schools/{id}/teachers', [PlatformController::class, 'getSchoolTeachers']);
+    $app->get('/api/platform/schools/{id}/students', [PlatformController::class, 'getSchoolStudents']);
+    $app->get('/api/platform/schools/{id}/subscriptions', [PlatformController::class, 'getSchoolSubscriptions']);
     $app->get('/api/platform/admins', [PlatformController::class, 'getAdmins']);
     $app->post('/api/platform/admins', [PlatformController::class, 'createAdmin']);
 

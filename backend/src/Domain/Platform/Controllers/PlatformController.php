@@ -187,4 +187,41 @@ class PlatformController extends BaseController
         $id = (int) ($args['id'] ?? 0);
         return $this->success($response, $this->service->getSchoolStats($id));
     }
+
+    public function deletePlan(Request $request, Response $response, array $args): Response
+    {
+        $actor = $this->authenticate($request);
+        $this->requireRole($actor, ['SUPER_ADMIN']);
+
+        $id = (int) ($args['id'] ?? 0);
+        $this->service->deletePlan($id);
+        return $this->success($response, null, 'Plan deleted successfully.');
+    }
+
+    public function getSchoolTeachers(Request $request, Response $response, array $args): Response
+    {
+        $actor = $this->authenticate($request);
+        $this->requireRole($actor, ['SUPER_ADMIN']);
+
+        $id = (int) ($args['id'] ?? 0);
+        return $this->success($response, $this->service->getSchoolTeachers($id));
+    }
+
+    public function getSchoolStudents(Request $request, Response $response, array $args): Response
+    {
+        $actor = $this->authenticate($request);
+        $this->requireRole($actor, ['SUPER_ADMIN']);
+
+        $id = (int) ($args['id'] ?? 0);
+        return $this->success($response, $this->service->getSchoolStudents($id));
+    }
+
+    public function getSchoolSubscriptions(Request $request, Response $response, array $args): Response
+    {
+        $actor = $this->authenticate($request);
+        $this->requireRole($actor, ['SUPER_ADMIN']);
+
+        $id = (int) ($args['id'] ?? 0);
+        return $this->success($response, $this->service->getSchoolSubscriptions($id));
+    }
 }

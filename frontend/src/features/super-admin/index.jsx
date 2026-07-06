@@ -7,15 +7,16 @@ import { useConfirm } from '../../common/components/ConfirmDialog';
 import DashboardPage from './pages/DashboardPage';
 import SchoolsPage from './pages/SchoolsPage';
 import SchoolDetailPage from './pages/SchoolDetailPage';
-import BillingPage from './pages/BillingPage';
-import SettingsPage from './pages/SettingsPage';
+import PlansPage from './pages/PlansPage';
+import SchoolTeachersPage from './pages/SchoolTeachersPage';
+import SchoolStudentsPage from './pages/SchoolStudentsPage';
+import SchoolHistoryPage from './pages/SchoolHistoryPage';
 import CreateSchoolDialog from './components/CreateSchoolDialog';
 
 const NAV = [
   { path: '/super-admin',          label: 'Dashboard', icon: LayoutDashboard, exact: true },
-  { path: '/super-admin/schools',  label: 'Schools',   icon: Building2 },
-  { path: '/super-admin/billing',  label: 'Billing',   icon: CreditCard },
-  { path: '/super-admin/settings', label: 'Settings',  icon: Settings },
+  { path: '/super-admin/schools',  label: 'Manage Schools',   icon: Building2 },
+  { path: '/super-admin/plans',    label: 'Manage Plans',   icon: CreditCard },
 ];
 
 export default function SuperAdminPortal() {
@@ -197,12 +198,15 @@ export default function SuperAdminPortal() {
 
         <Routes>
           <Route index element={
-            <DashboardPage schools={schools} auditLogs={auditLogs} stats={stats} />
+            <DashboardPage schools={schools} stats={stats} />
           } />
           <Route path="schools" element={
             <SchoolsPage
               schools={schools}
               onCreateSchool={() => setIsCreateSchoolOpen(true)}
+              onToggleStatus={handleToggleStatus}
+              onDeleteSchool={handleDeleteSchool}
+              onSchoolUpdated={refreshSchools}
             />
           } />
           <Route path="schools/:id" element={
@@ -213,8 +217,18 @@ export default function SuperAdminPortal() {
               onSchoolUpdated={refreshSchools}
             />
           } />
-          <Route path="billing"  element={<BillingPage  schools={schools} stats={stats} plans={plans} />} />
-          <Route path="settings" element={<SettingsPage auditLogs={auditLogs} />} />
+          <Route path="schools/:id/teachers" element={
+            <SchoolTeachersPage />
+          } />
+          <Route path="schools/:id/students" element={
+            <SchoolStudentsPage />
+          } />
+          <Route path="schools/:id/history" element={
+            <SchoolHistoryPage />
+          } />
+          <Route path="plans" element={
+            <PlansPage />
+          } />
           <Route path="*" element={<Navigate to="/super-admin" replace />} />
         </Routes>
       </div>

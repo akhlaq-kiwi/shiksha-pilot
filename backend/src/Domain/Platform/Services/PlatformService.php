@@ -51,7 +51,92 @@ class PlatformService extends BaseService
 
     public function getSchools(): array
     {
-        return $this->schools->findAll([], 'id DESC');
+        $schools = $this->schools->findAll([], 'id DESC');
+        $pdo = $this->schools->getPdo();
+        $today = date('Y-m-d');
+
+        foreach ($schools as &$school) {
+            $stmt = $pdo->prepare("
+                SELECT plan_name, expiry_date 
+                FROM subscriptions 
+                WHERE school_id = :school_id AND status = 'PAID'
+                ORDER BY expiry_date DESC, id DESC
+                LIMIT 1
+            ");
+            $stmt->execute([':school_id' => $school['id']]);
+            $sub = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($sub && $today <= $sub['expiry_date'] && $school['status'] === 'ACTIVE') {
+                $school['active_plan'] = $sub['plan_name'];
+                $school['subscription_expiry'] = $sub['expiry_date'];
+            } else {
+                $school['active_plan'] = null; // No Active Subscription
+                $school['subscription_expiry'] = null;
+            }
+        }
+
+        return $schools;
+    }
+
+    private function addSubscriptionForSchool(PDO $pdo, int $schoolId, string $planName, string $type = 'new'): void
+    {
+        $stmtPlan = $pdo->prepare("SELECT price, duration_value, duration_unit FROM plans WHERE name = :name LIMIT 1");
+        $stmtPlan->execute([':name' => $planName]);
+        $plan = $stmtPlan->fetch(PDO::FETCH_ASSOC);
+
+        $price = 0;
+        $durationValue = 12;
+        $durationUnit = 'month';
+
+        if ($plan) {
+            $price = (int)$plan['price'];
+            $durationValue = (int)($plan['duration_value'] ?? 12);
+            $durationUnit = $plan['duration_unit'] ?? 'month';
+        } else {
+            if ($planName === 'Trial' || str_contains(strtolower($planName), 'trial')) {
+                $price = 0;
+                $durationValue = 1;
+                $durationUnit = 'month';
+            } elseif ($planName === 'Standard') {
+                $price = 7999;
+                $durationValue = 1;
+                $durationUnit = 'month';
+            } elseif ($planName === 'Premium') {
+                $price = 19999;
+                $durationValue = 1;
+                $durationUnit = 'month';
+            } elseif ($planName === 'Enterprise') {
+                $price = 39999;
+                $durationValue = 12;
+                $durationUnit = 'month';
+            }
+        }
+
+        $startDate = date('Y-m-d');
+        if ($durationUnit === 'year') {
+            $expiryDate = date('Y-m-d', strtotime("+$durationValue years"));
+        } else {
+            $expiryDate = date('Y-m-d', strtotime("+$durationValue months"));
+        }
+
+        $invoiceNo = 'INV-' . time() . '-' . rand(100, 999);
+
+        $stmtIns = $pdo->prepare("
+            INSERT INTO subscriptions (school_id, invoice_no, amount, billing_cycle, status, plan_name, duration_value, duration_unit, start_date, expiry_date, type)
+            VALUES (:school_id, :invoice_no, :amount, :billing_cycle, 'PAID', :plan_name, :duration_value, :duration_unit, :start_date, :expiry_date, :type)
+        ");
+        $stmtIns->execute([
+            ':school_id' => $schoolId,
+            ':invoice_no' => $invoiceNo,
+            ':amount' => $price,
+            ':billing_cycle' => $durationValue . ' ' . ucfirst($durationUnit) . ($durationValue > 1 ? 's' : ''),
+            ':plan_name' => $planName,
+            ':duration_value' => $durationValue,
+            ':duration_unit' => $durationUnit,
+            ':start_date' => $startDate,
+            ':expiry_date' => $expiryDate,
+            ':type' => $type
+        ]);
     }
 
     public function createSchool(array $data, array $actor): array
@@ -81,6 +166,9 @@ class PlatformService extends BaseService
             'contact_phone' => $data['contact_phone'] ?? '',
             'contact_email' => $data['contact_email'],
         ]);
+
+        $pdo = $this->schools->getPdo();
+        $this->addSubscriptionForSchool($pdo, $schoolId, $data['plan'] ?? 'Premium', 'new');
 
         // Create school admin user if credentials provided
         if (!empty($data['admin_phone'])) {
@@ -152,6 +240,11 @@ class PlatformService extends BaseService
             'portal_theme'  => $data['portal_theme']  ?? $school['portal_theme'] ?? 'default',
         ]);
 
+        if (isset($data['plan']) && $data['plan'] !== $school['plan']) {
+            $pdo = $this->schools->getPdo();
+            $this->addSubscriptionForSchool($pdo, $id, $data['plan'], 'upgrade');
+        }
+
         $action = ($school['status'] !== $newStatus)
             ? "Update school status to {$newStatus}"
             : 'Update school details';
@@ -180,6 +273,19 @@ class PlatformService extends BaseService
 
         if ($school === null) {
             throw new NotFoundException('School tenant not found.');
+        }
+
+        $pdo = $this->schools->getPdo();
+
+        // Check subscriptions count
+        $stmtSub = $pdo->prepare("SELECT COUNT(*) FROM subscriptions WHERE school_id = :school_id");
+        $stmtSub->execute([':school_id' => $id]);
+        $subCount = (int)$stmtSub->fetchColumn();
+
+        if ($school['status'] === 'ACTIVE' && $subCount > 0) {
+            throw new \App\Shared\Exceptions\ValidationException([
+                'delete' => 'Cannot delete an active school that has subscription history. Please suspend the school first.'
+            ]);
         }
 
         $this->schools->delete($id);
@@ -329,8 +435,78 @@ class PlatformService extends BaseService
 
     public function getStats(): array
     {
-        $totalSchools     = $this->schools->count();
-        $activeSchools    = $this->schools->countByStatus('ACTIVE');
+        $pdo = $this->schools->getPdo();
+        $today = date('Y-m-d');
+
+        // 1. Fetch schools with active subscription
+        $stmtActiveSubs = $pdo->prepare("
+            SELECT DISTINCT school_id 
+            FROM subscriptions 
+            WHERE status = 'PAID' AND start_date <= :today AND expiry_date >= :today
+        ");
+        $stmtActiveSubs->execute([':today' => $today]);
+        $activeSubSchoolIds = $stmtActiveSubs->fetchAll(PDO::FETCH_COLUMN);
+
+        $activeSchoolsWithSub = [];
+        if (!empty($activeSubSchoolIds)) {
+            $idsStr = implode(',', array_map('intval', $activeSubSchoolIds));
+            $stmtFilteredSchools = $pdo->query("
+                SELECT id 
+                FROM schools 
+                WHERE status = 'ACTIVE' AND id IN ($idsStr)
+            ");
+            $activeSchoolsWithSub = $stmtFilteredSchools->fetchAll(PDO::FETCH_COLUMN);
+        }
+        $totalActiveSchoolsCount = count($activeSchoolsWithSub);
+
+        // 2. Count Active Teachers across Active schools with active subscription
+        $totalTeachers = 0;
+        if (!empty($activeSchoolsWithSub)) {
+            $schoolIdsStr = implode(',', array_map('intval', $activeSchoolsWithSub));
+            $stmtTeachers = $pdo->query("
+                SELECT COUNT(*) 
+                FROM users 
+                WHERE role = 'TEACHER' AND status = 'ACTIVE' AND school_id IN ($schoolIdsStr)
+            ");
+            $totalTeachers = (int)$stmtTeachers->fetchColumn();
+        }
+
+        // 3. Count Active Students across Active schools with active subscription
+        $totalStudents = 0;
+        if (!empty($activeSchoolsWithSub)) {
+            $schoolIdsStr = implode(',', array_map('intval', $activeSchoolsWithSub));
+            $stmtStudents = $pdo->query("
+                SELECT COUNT(*) 
+                FROM users 
+                WHERE role = 'STUDENT' AND status = 'ACTIVE' AND school_id IN ($schoolIdsStr)
+            ");
+            $totalStudents = (int)$stmtStudents->fetchColumn();
+        }
+
+        // 4. Calculate Financial Year Revenue (1 April to 31 March)
+        $currentMonth = (int)date('m');
+        $currentYear = (int)date('Y');
+
+        if ($currentMonth >= 4) {
+            $fyStart = "$currentYear-04-01";
+            $fyEnd = ($currentYear + 1) . "-03-31";
+        } else {
+            $fyStart = ($currentYear - 1) . "-04-01";
+            $fyEnd = "$currentYear-03-31";
+        }
+
+        $stmtRev = $pdo->prepare("
+            SELECT COALESCE(SUM(amount), 0) 
+            FROM subscriptions 
+            WHERE status = 'PAID' AND created_at >= :fy_start AND created_at <= :fy_end
+        ");
+        $stmtRev->execute([
+            ':fy_start' => $fyStart . ' 00:00:00',
+            ':fy_end' => $fyEnd . ' 23:59:59'
+        ]);
+        $totalRevenue = (float)$stmtRev->fetchColumn();
+
+        $totalSchools = $this->schools->count();
         $suspendedSchools = $this->schools->countByStatus('SUSPENDED');
 
         $planCounts  = $this->schools->countByPlan();
@@ -345,25 +521,14 @@ class PlatformService extends BaseService
             $mrr  += $price * (int) $row['count'];
         }
 
-        $pdo = $this->schools->getPdo();
-
-        $roleStmt = $pdo->query(
-            "SELECT role, COUNT(*) AS count FROM users GROUP BY role"
-        );
-        $roleCounts = [];
-        foreach ($roleStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $roleCounts[$row['role']] = (int) $row['count'];
-        }
-
         return [
             'schools_count'     => $totalSchools,
-            'active_schools'    => $activeSchools,
+            'active_schools'    => $totalActiveSchoolsCount,
             'suspended_schools' => $suspendedSchools,
             'billing_mrr'       => $mrr,
-            'total_students'    => $roleCounts['STUDENT']      ?? 0,
-            'total_teachers'    => $roleCounts['TEACHER']      ?? 0,
-            'total_admins'      => $roleCounts['SCHOOL_ADMIN'] ?? 0,
-            'total_users'       => array_sum($roleCounts),
+            'total_students'    => $totalStudents,
+            'total_teachers'    => $totalTeachers,
+            'total_revenue'     => $totalRevenue,
         ];
     }
 
@@ -423,5 +588,55 @@ class PlatformService extends BaseService
             'plan'         => $school['plan'],
             'status'       => $school['status'],
         ];
+    }
+
+    public function getSchoolTeachers(int $schoolId): array
+    {
+        $pdo = $this->schools->getPdo();
+        $stmt = $pdo->prepare("
+            SELECT * 
+            FROM staff 
+            WHERE school_id = :school_id
+            ORDER BY id DESC
+        ");
+        $stmt->execute([':school_id' => $schoolId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getSchoolStudents(int $schoolId): array
+    {
+        $pdo = $this->schools->getPdo();
+        $stmt = $pdo->prepare("
+            SELECT s.*, c.name AS class_name, c.section, ay.name AS academic_year_name
+            FROM students s
+            LEFT JOIN classes c ON s.class_id = c.id
+            LEFT JOIN academic_years ay ON s.academic_year_id = ay.id
+            WHERE s.school_id = :school_id
+            ORDER BY s.id DESC
+        ");
+        $stmt->execute([':school_id' => $schoolId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getSchoolSubscriptions(int $schoolId): array
+    {
+        $pdo = $this->schools->getPdo();
+        $stmt = $pdo->prepare("
+            SELECT * 
+            FROM subscriptions 
+            WHERE school_id = :school_id
+            ORDER BY expiry_date DESC, id DESC
+        ");
+        $stmt->execute([':school_id' => $schoolId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function deletePlan(int $id): void
+    {
+        $plan = $this->plans->findById($id);
+        if ($plan === null) {
+            throw new NotFoundException('Plan not found.');
+        }
+        $this->plans->delete($id);
     }
 }

@@ -37,6 +37,22 @@ export const platformService = {
     return apiClient.put(`/api/platform/plans/${id}`, data);
   },
 
+  async deletePlan(id) {
+    return apiClient.delete(`/api/platform/plans/${id}`);
+  },
+
+  async getSchoolTeachers(id) {
+    return apiClient.get(`/api/platform/schools/${id}/teachers`);
+  },
+
+  async getSchoolStudents(id) {
+    return apiClient.get(`/api/platform/schools/${id}/students`);
+  },
+
+  async getSchoolSubscriptions(id) {
+    return apiClient.get(`/api/platform/schools/${id}/subscriptions`);
+  },
+
   async getSubscriptions() {
     return apiClient.get('/api/platform/subscriptions');
   },
