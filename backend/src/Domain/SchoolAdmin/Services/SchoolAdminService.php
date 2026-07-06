@@ -1751,7 +1751,6 @@ class SchoolAdminService extends BaseService
                             ':teacher_id' => $teacherId
                         ]);
                         $newSubjectId = (int)$pdo->lastInsertId();
-                        $subjectMap[(int)$os['id']] = $newSubjectId;
                     }
                 }
 
@@ -1760,7 +1759,10 @@ class SchoolAdminService extends BaseService
                 $stmtTimetable->execute([':sid' => $schoolId]);
                 $oldTimetables = $stmtTimetable->fetchAll(PDO::FETCH_ASSOC);
 
-                $stmtInsTimetable = $pdo->prepare("INSERT INTO timetable (school_id, class_id, subject_id, teacher_id, day_of_week, start_time, end_time, room) VALUES (:school_id, :class_id, :subject_id, :teacher_id, :day_of_week, :start_time, :end_time, :room)");
+                $stmtInsTimetable = $pdo->prepare("
+                    INSERT INTO timetable (school_id, class_id, subject_id, teacher_id, day_of_week, period_number, start_date, is_published) 
+                    VALUES (:school_id, :class_id, :subject_id, :teacher_id, :day_of_week, :period_number, :start_date, 0)
+                ");
                 foreach ($oldTimetables as $ot) {
                     $oldClassId = (int)$ot['class_id'];
                     if (in_array($oldClassId, $oldClassIds, true)) {
@@ -1784,9 +1786,8 @@ class SchoolAdminService extends BaseService
                             ':subject_id' => $newSubjId,
                             ':teacher_id' => $teacherId,
                             ':day_of_week' => $ot['day_of_week'],
-                            ':start_time' => $ot['start_time'],
-                            ':end_time' => $ot['end_time'],
-                            ':room' => $ot['room']
+                            ':period_number' => $ot['period_number'],
+                            ':start_date' => $targetYear['start_date']
                         ]);
                     }
                 }
