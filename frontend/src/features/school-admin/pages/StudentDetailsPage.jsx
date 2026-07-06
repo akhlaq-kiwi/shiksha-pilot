@@ -221,7 +221,7 @@ function ReceiptModal({ receipt, student, schoolName, allPayments = [], onClose 
 
           <div className="border-y border-dashed border-border py-4 space-y-2 text-xs">
             <div className="flex justify-between"><span className="text-text-muted">Student Name:</span> <span className="font-extrabold text-text-primary uppercase">{student.name}</span></div>
-            <div className="flex justify-between"><span className="text-text-muted">Class & Section:</span> <span className="font-bold text-text-primary">{student.class_name} {student.section ? ` - Section ${student.section}` : ''}</span></div>
+            <div className="flex justify-between"><span className="text-text-muted">Class & Section:</span> <span className="font-bold text-text-primary">{student.class_name}</span></div>
             <div className="flex justify-between"><span className="text-text-muted">Roll Number / SR No:</span> <span className="font-bold text-text-primary">{student.roll_no || '—'} / {student.sr_no || '—'}</span></div>
             <div className="flex justify-between"><span className="text-text-muted">Receipt No:</span> <span className="font-mono font-bold text-text-primary">{receipt.receipt_no}</span></div>
             <div className="flex justify-between"><span className="text-text-muted">Academic Session:</span> <span className="font-bold text-text-primary">{student.academic_year_name || student.academic_year || '2025–2026'}</span></div>
@@ -954,7 +954,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                     <p><span className="text-text-muted block font-medium">Religion</span> <span className="font-semibold text-text-primary text-sm">{student.religion || '-'}</span></p>
                     <p><span className="text-text-muted block font-medium">Student Mobile</span> <span className="font-semibold font-mono text-text-primary text-sm">{student.student_mobile || '-'}</span></p>
                     <p><span className="text-text-muted block font-medium">Student Email</span> <span className="font-semibold text-text-primary text-sm">{student.student_email || '-'}</span></p>
-                    <p><span className="text-text-muted block font-medium">Class Assigned</span> <span className="font-semibold text-text-primary text-sm">{student.class_name || 'Not Assigned'}{student.section ? ` - ${student.section}` : ''}</span></p>
+                    <p><span className="text-text-muted block font-medium">Class Assigned</span> <span className="font-semibold text-text-primary text-sm">{student.class_name || 'Not Assigned'}</span></p>
                     <p><span className="text-text-muted block font-medium">Exit Date</span> <span className="font-semibold text-text-primary text-sm">{student.exit_date || 'Not Assigned'}</span></p>
                   </div>
                 </CardContent>
