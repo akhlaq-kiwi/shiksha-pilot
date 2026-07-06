@@ -212,9 +212,11 @@ export default function FinancePage() {
 
     monthsToEvaluate.forEach(m => {
       if (!paidMonths.includes(m)) {
-        unpaidCount++;
-        const amt = monthlyFees[m] !== undefined ? parseFloat(monthlyFees[m]) : 2000;
-        outstandingDues += amt;
+        const amt = monthlyFees[m] !== undefined ? parseFloat(monthlyFees[m]) : 0;
+        if (amt > 0) {
+          unpaidCount++;
+          outstandingDues += amt;
+        }
       }
     });
 

@@ -282,7 +282,7 @@ function DepositModal({ student, availableMonths, paidMonths, classFeeConfig, on
       return parseFloat(classFeeConfig.monthly_fees[m]);
     }
     const paymentsList = student?.payments || [];
-    const firstPaidAmount = paymentsList[0]?.amount_paid ? parseFloat(paymentsList[0].amount_paid) : 2000;
+    const firstPaidAmount = paymentsList[0]?.amount_paid ? parseFloat(paymentsList[0].amount_paid) : 0;
     return firstPaidAmount;
   };
 
@@ -778,13 +778,13 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
         ? 'bg-green-500/10 text-green-600 border-green-500/20'
         : 'bg-red-500/10 text-red-600 border-red-500/20';
 
-      let amount = 2000;
+      let amount = 0;
       if (isPaid && receipt) {
         amount = parseFloat(receipt.amount_paid);
       } else if (data && data.class_fee_config && data.class_fee_config.monthly_fees && data.class_fee_config.monthly_fees[m]) {
         amount = parseFloat(data.class_fee_config.monthly_fees[m]);
       } else {
-        const firstPaid = paymentsList[0]?.amount_paid ? parseFloat(paymentsList[0].amount_paid) : 2000;
+        const firstPaid = paymentsList[0]?.amount_paid ? parseFloat(paymentsList[0].amount_paid) : 0;
         amount = firstPaid;
       }
 
@@ -1191,11 +1191,11 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                     let monthlyFeeDue = 0;
                     pastAndCurrentMonths.forEach(m => {
                       if (!paidMonths.includes(m)) {
-                        let amount = 2000;
+                        let amount = 0;
                         if (data && data.class_fee_config && data.class_fee_config.monthly_fees && data.class_fee_config.monthly_fees[m]) {
                           amount = parseFloat(data.class_fee_config.monthly_fees[m]);
                         } else {
-                          const firstPaid = paymentsList[0]?.amount_paid ? parseFloat(paymentsList[0].amount_paid) : 2000;
+                          const firstPaid = paymentsList[0]?.amount_paid ? parseFloat(paymentsList[0].amount_paid) : 0;
                           amount = firstPaid;
                         }
                         monthlyFeeDue += amount;

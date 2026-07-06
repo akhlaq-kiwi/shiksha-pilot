@@ -3290,7 +3290,7 @@ class SchoolAdminService extends BaseService
 
         // 2. Fetch fee structure for this class (or fallback)
         $feeStructureId = null;
-        $amountPaid = 2000.0; // Default fallback
+        $amountPaid = 0.0; // Default fallback
         if ($classId !== null) {
             $stmtFee = $pdo->prepare("SELECT id, amount FROM fee_structures WHERE school_id = :school_id AND class_id = :class_id LIMIT 1");
             $stmtFee->execute([':school_id' => $schoolId, ':class_id' => $classId]);
