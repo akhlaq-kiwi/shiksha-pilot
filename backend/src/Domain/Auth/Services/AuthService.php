@@ -112,8 +112,8 @@ class AuthService extends BaseService
         string $description
     ): void {
         $pdo = $this->repo->getPdo();
-        $actorEmail = $actorUser['email'] ?? 'system@school.edu';
-        $actorName = $actorUser['name'] ?? $actorEmail;
+        $actorEmail = $actorUser['phone'] ?? $actorUser['email'] ?? 'system@school.edu';
+        $actorName = $actorUser['phone'] ?? $actorUser['name'] ?? $actorEmail;
         $actorRole = $actorUser['role'] ?? 'Unknown';
         $schoolId = isset($actorUser['school_id']) ? (int)$actorUser['school_id'] : null;
 

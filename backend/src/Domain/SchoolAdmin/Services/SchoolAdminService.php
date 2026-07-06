@@ -4508,18 +4508,7 @@ Only approve the settlement after reviewing all financial records.
             'status' => 'Request Sent'
         ]);
 
-        // Audit Log
-        $stmtAudit = $pdo->prepare("
-            INSERT INTO audit_logs (action, target_school, user, user_role, ip_address)
-            VALUES (:action, :target_school, :user, :user_role, :ip_address)
-        ");
-        $stmtAudit->execute([
-            ':action' => "Sent settlement request for report " . $report['report_id'],
-            ':target_school' => (string)$schoolId,
-            ':user' => $user['email'] ?? 'admin',
-            ':user_role' => $user['role'] ?? 'SCHOOL_ADMIN',
-            ':ip_address' => $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'
-        ]);
+        // Centrally logged by AuditLoggingMiddleware
 
         return $this->financialReportRepo->findById($id);
     }
@@ -6837,8 +6826,8 @@ Only approve the settlement after reviewing all financial records.
         string $description,
         ?string $academicYearName = null
     ): void {
-        $actorEmail = $actorUser['email'] ?? 'system@school.edu';
-        $actorName = $actorUser['name'] ?? $actorEmail;
+        $actorEmail = $actorUser['phone'] ?? $actorUser['email'] ?? 'system@school.edu';
+        $actorName = $actorUser['phone'] ?? $actorUser['name'] ?? $actorEmail;
         $actorRole = $actorUser['role'] ?? 'Unknown';
         $schoolId = $this->getSchoolId($actorUser);
 
