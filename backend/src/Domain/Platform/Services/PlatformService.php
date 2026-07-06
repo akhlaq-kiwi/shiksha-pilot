@@ -57,7 +57,7 @@ class PlatformService extends BaseService
 
         foreach ($schools as &$school) {
             $stmt = $pdo->prepare("
-                SELECT plan_name, expiry_date 
+                SELECT plan_name, start_date, expiry_date, duration_value, duration_unit 
                 FROM subscriptions 
                 WHERE school_id = :school_id AND status = 'PAID'
                 ORDER BY expiry_date DESC, id DESC
@@ -69,9 +69,15 @@ class PlatformService extends BaseService
             if ($sub && $today <= $sub['expiry_date'] && $school['status'] === 'ACTIVE') {
                 $school['active_plan'] = $sub['plan_name'];
                 $school['subscription_expiry'] = $sub['expiry_date'];
+                $school['subscription_start'] = $sub['start_date'];
+                $school['subscription_duration_value'] = $sub['duration_value'];
+                $school['subscription_duration_unit'] = $sub['duration_unit'];
             } else {
                 $school['active_plan'] = null; // No Active Subscription
                 $school['subscription_expiry'] = null;
+                $school['subscription_start'] = null;
+                $school['subscription_duration_value'] = null;
+                $school['subscription_duration_unit'] = null;
             }
         }
 
@@ -229,6 +235,7 @@ class PlatformService extends BaseService
         $newSubdomain = strtolower($data['subdomain'] ?? $school['subdomain']);
         $newStatus    = $data['status']        ?? $school['status'];
         $newName      = $data['name']          ?? $school['name'];
+        $planChanged  = isset($data['plan']) && $data['plan'] !== $school['plan'];
 
         $this->schools->update($id, [
             'name'          => $newName,
@@ -240,9 +247,23 @@ class PlatformService extends BaseService
             'portal_theme'  => $data['portal_theme']  ?? $school['portal_theme'] ?? 'default',
         ]);
 
-        if (isset($data['plan']) && $data['plan'] !== $school['plan']) {
+        if (isset($data['plan'])) {
             $pdo = $this->schools->getPdo();
-            $this->addSubscriptionForSchool($pdo, $id, $data['plan'], 'upgrade');
+            
+            // Check if there is an active subscription for this school with the selected plan
+            $today = date('Y-m-d');
+            $stmt = $pdo->prepare("
+                SELECT COUNT(*) 
+                FROM subscriptions 
+                WHERE school_id = :school_id AND plan_name = :plan_name AND status = 'PAID' AND expiry_date >= :today
+            ");
+            $stmt->execute([':school_id' => $id, ':plan_name' => $data['plan'], ':today' => $today]);
+            $hasActiveSub = (int)$stmt->fetchColumn() > 0;
+            
+            if (!$hasActiveSub || $planChanged) {
+                $type = $planChanged ? 'upgrade' : 'new';
+                $this->addSubscriptionForSchool($pdo, $id, $data['plan'], $type);
+            }
         }
 
         $action = ($school['status'] !== $newStatus)
@@ -638,5 +659,33 @@ class PlatformService extends BaseService
             throw new NotFoundException('Plan not found.');
         }
         $this->plans->delete($id);
+    }
+
+    public function getSchoolAcademicYears(int $schoolId): array
+    {
+        $pdo = $this->schools->getPdo();
+        $stmt = $pdo->prepare("
+            SELECT * 
+            FROM academic_years 
+            WHERE school_id = :school_id
+            ORDER BY start_date DESC
+        ");
+        $stmt->execute([':school_id' => $schoolId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getSchoolClasses(int $schoolId): array
+    {
+        $pdo = $this->schools->getPdo();
+        $stmt = $pdo->prepare("
+            SELECT c.*, ay.name AS academic_year_name, ay.status AS academic_year_status,
+                   (SELECT COUNT(*) FROM students s WHERE s.class_id = c.id) AS students_count
+            FROM classes c
+            LEFT JOIN academic_years ay ON c.academic_year_id = ay.id
+            WHERE c.school_id = :school_id
+            ORDER BY c.name ASC, c.section ASC
+        ");
+        $stmt->execute([':school_id' => $schoolId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 }

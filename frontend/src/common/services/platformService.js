@@ -53,6 +53,14 @@ export const platformService = {
     return apiClient.get(`/api/platform/schools/${id}/subscriptions`);
   },
 
+  async getSchoolAcademicYears(id) {
+    return apiClient.get(`/api/platform/schools/${id}/academic-years`);
+  },
+
+  async getSchoolClasses(id) {
+    return apiClient.get(`/api/platform/schools/${id}/classes`);
+  },
+
   async getSubscriptions() {
     return apiClient.get('/api/platform/subscriptions');
   },

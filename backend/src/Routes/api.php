@@ -35,6 +35,8 @@ return function (App $app) {
     $app->get('/api/platform/schools/{id}/teachers', [PlatformController::class, 'getSchoolTeachers']);
     $app->get('/api/platform/schools/{id}/students', [PlatformController::class, 'getSchoolStudents']);
     $app->get('/api/platform/schools/{id}/subscriptions', [PlatformController::class, 'getSchoolSubscriptions']);
+    $app->get('/api/platform/schools/{id}/academic-years', [PlatformController::class, 'getSchoolAcademicYears']);
+    $app->get('/api/platform/schools/{id}/classes', [PlatformController::class, 'getSchoolClasses']);
     $app->get('/api/platform/admins', [PlatformController::class, 'getAdmins']);
     $app->post('/api/platform/admins', [PlatformController::class, 'createAdmin']);
 
