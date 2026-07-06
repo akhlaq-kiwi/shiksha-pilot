@@ -64,6 +64,8 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
   // Confirmation dialog
   const [showConfirmExecute, setShowConfirmExecute] = useState(false);
   const [executing, setExecuting] = useState(false);
+  const [showInactiveTeachers, setShowInactiveTeachers] = useState(false);
+  const [showInactiveStudents, setShowInactiveStudents] = useState(false);
 
   // Grade Configuration States
   const [gradeScales, setGradeScales] = useState([]);
@@ -620,6 +622,21 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
     }
   };
 
+  // Helper to determine next class name dynamically
+  const getNextClassLabel = (className) => {
+    const name = className || '';
+    if (name.toLowerCase().includes('nursery')) return 'LKG';
+    if (name.toLowerCase().includes('lkg')) return 'UKG';
+    if (name.toLowerCase().includes('ukg')) return 'Class 1';
+
+    const match = name.match(/\d+/);
+    if (match) {
+      const num = parseInt(match[0], 10);
+      return name.replace(match[0], String(num + 1));
+    }
+    return 'Next Class';
+  };
+
   // Open activation wizard for a Draft Academic Year
   const startActivation = async (year) => {
     setFormError('');
@@ -651,11 +668,26 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
 
       // 2. Students: Determine default actions for active students
       const studentMap = {};
+      
+      // Calculate highest configured class numeric level
+      let highestNum = 0;
+      classList.forEach(c => {
+        const match = (c.name || '').match(/\d+/);
+        if (match) {
+          const num = parseInt(match[0], 10);
+          if (num > highestNum) highestNum = num;
+        }
+      });
+
       studentList
         .filter(s => s.status === 'ACTIVE')
         .forEach(s => {
-          const isClass12 = s.class_name && s.class_name.toLowerCase().includes('12');
-          studentMap[s.id] = isClass12 ? 'graduate_alumni' : 'promote';
+          const sClass = classList.find(c => c.id === s.class_id);
+          const matchC = sClass ? (sClass.name || '').match(/\d+/) : null;
+          const cNum = matchC ? parseInt(matchC[0], 10) : 0;
+          const isHighest = cNum === highestNum && highestNum > 0;
+          
+          studentMap[s.id] = isHighest ? 'graduate_alumni' : 'promote';
         });
       setStudentActions(studentMap);
 
@@ -1410,111 +1442,161 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
           )}
 
           {/* STEP 1: Teacher Migration */}
-          {wizardStep === 1 && (
-            <div className="space-y-4 animate-in fade-in duration-200">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-black uppercase text-text-secondary tracking-wider">Active Teachers Migration</h4>
-                <span className="text-[10px] text-text-muted font-bold">{Object.values(selectedTeachers).filter(Boolean).length} Selected</span>
-              </div>
+          {wizardStep === 1 && (() => {
+            const inactiveTeachers = staff.filter(s => (s.role === 'TEACHER' || s.role === 'Teacher') && s.status !== 'ACTIVE');
+            return (
+              <div className="space-y-4 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-xs font-black uppercase text-text-secondary tracking-wider">Active Teachers Migration</h4>
+                    <span className="text-[10px] text-text-muted font-bold mt-0.5 block">{Object.values(selectedTeachers).filter(Boolean).length} Selected</span>
+                  </div>
+                  {inactiveTeachers.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowInactiveTeachers(true)}
+                      className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 text-text-muted border border-border rounded-full transition-colors shadow-3xs"
+                    >
+                      Inactive Teachers ({inactiveTeachers.length})
+                    </button>
+                  )}
+                </div>
 
-              <div className="max-h-[240px] overflow-y-auto border border-border rounded-xl divide-y divide-border bg-zinc-50/50 dark:bg-zinc-950/20">
-                {staff.filter(s => (s.role === 'TEACHER' || s.role === 'Teacher') && s.status === 'ACTIVE').length === 0 ? (
-                  <p className="text-center py-8 text-xs text-text-muted">No active teachers found to migrate.</p>
-                ) : (
-                  staff.filter(s => (s.role === 'TEACHER' || s.role === 'Teacher') && s.status === 'ACTIVE').map(t => {
-                    const tSubjects = subjects
-                      .filter(sub => sub.teacher_name === t.name)
-                      .map(sub => sub.name);
-                    const subjectDisplay = tSubjects.length > 0 ? tSubjects.join(', ') : 'No subject assigned';
+                <div className="max-h-[240px] overflow-y-auto border border-border rounded-xl divide-y divide-border bg-zinc-50/50 dark:bg-zinc-950/20">
+                  {staff.filter(s => (s.role === 'TEACHER' || s.role === 'Teacher') && s.status === 'ACTIVE').length === 0 ? (
+                    <p className="text-center py-8 text-xs text-text-muted">No active teachers found to migrate.</p>
+                  ) : (
+                    staff.filter(s => (s.role === 'TEACHER' || s.role === 'Teacher') && s.status === 'ACTIVE').map(t => {
+                      const tSubjects = subjects
+                        .filter(sub => sub.teacher_name === t.name)
+                        .map(sub => sub.name);
+                      const subjectDisplay = tSubjects.length > 0 ? tSubjects.join(', ') : 'No subject assigned';
 
-                    return (
-                      <div key={t.id} className="flex items-center justify-between p-3 text-xs hover:bg-zinc-100/50 dark:hover:bg-zinc-900/50">
-                        <label className="flex items-center gap-2.5 font-bold text-text-primary cursor-pointer w-full">
-                          <input 
-                            type="checkbox"
-                            checked={!!selectedTeachers[t.id]}
-                            onChange={() => setSelectedTeachers(p => ({ ...p, [t.id]: !p[t.id] }))}
-                            className="rounded border-zinc-300 text-primary focus:ring-primary h-4 w-4"
-                          />
-                          <div>
-                            <p className="font-bold text-text-primary text-xs">{t.name}</p>
-                            <p className="text-[10px] text-text-muted font-medium mt-0.5">{subjectDisplay}</p>
-                          </div>
-                        </label>
-                        <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-green-500/10 text-green-600 border border-green-500/20">Active</span>
-                      </div>
-                    );
-                  })
-                )}
+                      return (
+                        <div key={t.id} className="flex items-center justify-between p-3 text-xs hover:bg-zinc-100/50 dark:hover:bg-zinc-900/50">
+                          <label className="flex items-center gap-2.5 font-bold text-text-primary cursor-pointer w-full">
+                            <input 
+                              type="checkbox"
+                              checked={!!selectedTeachers[t.id]}
+                              onChange={() => setSelectedTeachers(p => ({ ...p, [t.id]: !p[t.id] }))}
+                              className="rounded border-zinc-300 text-primary focus:ring-primary h-4 w-4"
+                            />
+                            <div>
+                              <p className="font-bold text-text-primary text-xs">{t.name}</p>
+                              <p className="text-[10px] text-text-muted font-medium mt-0.5">{subjectDisplay}</p>
+                            </div>
+                          </label>
+                          <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-green-500/10 text-green-600 border border-green-500/20">Active</span>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* STEP 2: Student Promotion */}
-          {wizardStep === 2 && (
-            <div className="space-y-4 animate-in fade-in duration-200">
-              <h4 className="text-xs font-black uppercase text-text-secondary tracking-wider">Class-wise Student Promotions</h4>
-              
-              <div className="max-h-[280px] overflow-y-auto border border-border rounded-xl p-3 space-y-4 bg-zinc-50/50 dark:bg-zinc-950/20">
-                {classes.length === 0 ? (
-                  <p className="text-center py-6 text-xs text-text-muted">No classes defined to promote students.</p>
-                ) : (
-                  classes.map(c => {
-                    const classStudents = students.filter(s => s.class_id === c.id && s.status === 'ACTIVE');
-                    if (classStudents.length === 0) return null;
+          {wizardStep === 2 && (() => {
+            const inactiveStudents = students.filter(s => s.status !== 'ACTIVE');
+            
+            let highestNum = 0;
+            classes.forEach(cls => {
+              const match = (cls.name || '').match(/\d+/);
+              if (match) {
+                const num = parseInt(match[0], 10);
+                if (num > highestNum) highestNum = num;
+              }
+            });
 
-                    const isClass12 = c.name.toLowerCase().includes('12');
+            return (
+              <div className="space-y-4 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black uppercase text-text-secondary tracking-wider">Class-wise Student Promotions</h4>
+                  {inactiveStudents.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowInactiveStudents(true)}
+                      className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 text-text-muted border border-border rounded-full transition-colors shadow-3xs"
+                    >
+                      Inactive Students ({inactiveStudents.length})
+                    </button>
+                  )}
+                </div>
+                
+                <div className="max-h-[280px] overflow-y-auto border border-border rounded-xl p-3 space-y-4 bg-zinc-50/50 dark:bg-zinc-950/20">
+                  {classes.length === 0 ? (
+                    <p className="text-center py-6 text-xs text-text-muted">No classes defined to promote students.</p>
+                  ) : (
+                    classes.map(c => {
+                      const classStudents = students.filter(s => s.class_id === c.id && s.status === 'ACTIVE');
+                      if (classStudents.length === 0) return null;
 
-                    return (
-                      <div key={c.id} className="space-y-2">
-                        <div className="flex items-center justify-between border-b border-border pb-1">
-                          <span className="font-bold text-text-primary text-xs">{c.name} {c.section ? ` - ${c.section}` : ''}</span>
-                          <span className="text-[10px] text-text-muted font-semibold">{classStudents.length} Students</span>
+                      const matchC = (c.name || '').match(/\d+/);
+                      const cNum = matchC ? parseInt(matchC[0], 10) : 0;
+                      const isHighest = cNum === highestNum && highestNum > 0;
+
+                      return (
+                        <div key={c.id} className="space-y-2 border-b border-border/40 pb-3 last:border-b-0">
+                          <div className="flex items-center justify-between border-b border-border pb-1">
+                            <span className="font-bold text-text-primary text-xs">{c.name} {c.section ? ` - ${c.section}` : ''}</span>
+                            <span className="text-[10px] text-text-muted font-semibold">{classStudents.length} Students</span>
+                          </div>
+                          
+                          <div className="space-y-2 pl-2">
+                            {classStudents.map(student => {
+                              const act = studentActions[student.id] || (isHighest ? 'graduate_alumni' : 'promote');
+                              const nextClassLabel = getNextClassLabel(c.name);
+                              const promoActionVal = isHighest ? 'graduate_alumni' : 'promote';
+                              const promoteText = isHighest ? `Graduate` : `Promote ${nextClassLabel}`;
+
+                              return (
+                                <div key={student.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs py-2 border-b border-border/20 last:border-b-0">
+                                  <span className="font-semibold text-text-secondary">{student.name}</span>
+                                  
+                                  <div className="flex items-center gap-6">
+                                    <label className="flex items-center gap-1.5 font-bold uppercase text-[10px] tracking-wide cursor-pointer select-none">
+                                      <input
+                                        type="radio"
+                                        name={`student-action-${student.id}`}
+                                        value={promoActionVal}
+                                        checked={act === promoActionVal}
+                                        onChange={() => setStudentActions(p => ({ ...p, [student.id]: promoActionVal }))}
+                                        className="rounded-full border-zinc-300 text-primary focus:ring-primary h-3.5 w-3.5"
+                                      />
+                                      {promoteText}
+                                    </label>
+                                    <label className="flex items-center gap-1.5 font-bold uppercase text-[10px] tracking-wide cursor-pointer select-none">
+                                      <input
+                                        type="radio"
+                                        name={`student-action-${student.id}`}
+                                        value="repeat"
+                                        checked={act === 'repeat'}
+                                        onChange={() => setStudentActions(p => ({ ...p, [student.id]: 'repeat' }))}
+                                        className="rounded-full border-zinc-300 text-primary focus:ring-primary h-3.5 w-3.5"
+                                      />
+                                      Repeat
+                                    </label>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
-                        
-                        <div className="space-y-2 pl-2">
-                          {classStudents.map(student => {
-                            const act = studentActions[student.id] || 'promote';
-                            return (
-                              <div key={student.id} className="flex items-center justify-between gap-3 text-xs py-1">
-                                <span className="font-semibold text-text-secondary">{student.name}</span>
-                                
-                                <select 
-                                  value={act}
-                                  onChange={e => setStudentActions(p => ({ ...p, [student.id]: e.target.value }))}
-                                  className="text-[11px] font-bold border border-border rounded-md px-2.5 py-1 bg-surface focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs"
-                                >
-                                  {isClass12 ? (
-                                    <>
-                                      <option value="graduate_alumni">Mark Alumni</option>
-                                      <option value="graduate_archive">Archive Student Record</option>
-                                      <option value="repeat">Repeat Class 12</option>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <option value="promote">Promote (Next Class)</option>
-                                      <option value="repeat">Repeat (Failed/Repeat)</option>
-                                    </>
-                                  )}
-                                </select>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
+                      );
+                    })
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* STEP 3: Review */}
           {wizardStep === 3 && (
             <div className="space-y-5 animate-in fade-in duration-200">
               <h4 className="text-xs font-black uppercase text-text-secondary tracking-wider">Final Migration Review</h4>
               
-              <div className="grid grid-cols-2 gap-4 text-xs">
+              <div className="grid grid-cols-2 gap-4 text-xs font-semibold text-text-secondary">
                 <Card className="p-4 shadow-2xs">
                   <p className="text-text-muted uppercase text-[9px] font-bold tracking-wider">Target Session</p>
                   <p className="text-lg font-black text-primary mt-1 font-display">{targetYear?.name}</p>
@@ -1574,6 +1656,101 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
           </div>
         </div>
       </Dialog>
+
+      {/* Inactive Teachers Modal */}
+      {showInactiveTeachers && (
+        <Dialog
+          isOpen={showInactiveTeachers}
+          onClose={() => setShowInactiveTeachers(false)}
+          title="Inactive Teachers List"
+          description="Registered staff members whose accounts are currently inactive."
+        >
+          <div className="space-y-4 pt-4 flex flex-col max-h-[70vh]">
+            <div className="overflow-y-auto border border-border rounded-xl bg-zinc-50/50 dark:bg-zinc-950/20 max-h-[45vh]">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Teacher Name</TableHead>
+                    <TableHead>Employee ID</TableHead>
+                    <TableHead>Department</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {staff
+                    .filter(s => (s.role === 'TEACHER' || s.role === 'Teacher') && s.status !== 'ACTIVE')
+                    .map(t => (
+                      <TableRow key={t.id}>
+                        <TableCell className="font-bold text-text-primary text-xs">{t.name}</TableCell>
+                        <TableCell className="font-mono text-xs text-text-secondary">{t.employee_id || '—'}</TableCell>
+                        <TableCell className="text-xs text-text-muted">{t.department || '—'}</TableCell>
+                        <TableCell>
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-red-500/10 text-red-600 border border-red-500/20">
+                            {t.status}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                </TableBody>
+              </Table>
+            </div>
+            <div className="flex justify-end border-t border-border pt-4">
+              <Button onClick={() => setShowInactiveTeachers(false)} className="font-bold">Close</Button>
+            </div>
+          </div>
+        </Dialog>
+      )}
+
+      {/* Inactive Students Modal */}
+      {showInactiveStudents && (
+        <Dialog
+          isOpen={showInactiveStudents}
+          onClose={() => setShowInactiveStudents(false)}
+          title="Inactive Students List"
+          description="Registered students whose enrollments are currently inactive."
+        >
+          <div className="space-y-4 pt-4 flex flex-col max-h-[70vh]">
+            <div className="overflow-y-auto border border-border rounded-xl bg-zinc-50/50 dark:bg-zinc-950/20 max-h-[45vh]">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Student Name</TableHead>
+                    <TableHead>SR Number</TableHead>
+                    <TableHead>Roll Number</TableHead>
+                    <TableHead>Current Class</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {students
+                    .filter(s => s.status !== 'ACTIVE')
+                    .map(s => {
+                      const sClass = classes.find(c => c.id === s.class_id);
+                      return (
+                        <TableRow key={s.id}>
+                          <TableCell className="font-bold text-text-primary text-xs">{s.name}</TableCell>
+                          <TableCell className="font-mono text-xs text-text-secondary">{s.sr_no || '—'}</TableCell>
+                          <TableCell className="text-xs text-text-muted">{s.roll_no || '—'}</TableCell>
+                          <TableCell className="text-xs text-text-secondary">
+                            {sClass ? `${sClass.name}${sClass.section ? ` - ${sClass.section}` : ''}` : '—'}
+                          </TableCell>
+                          <TableCell>
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-red-500/10 text-red-600 border border-red-500/20">
+                              {s.status}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                </TableBody>
+              </Table>
+            </div>
+            <div className="flex justify-end border-t border-border pt-4">
+              <Button onClick={() => setShowInactiveStudents(false)} className="font-bold">Close</Button>
+            </div>
+          </div>
+        </Dialog>
+      )}
 
       {/* Confirmation Dialog overlay */}
       {showConfirmExecute && (
