@@ -14,10 +14,6 @@ const generatePassword = () => {
 const EMPTY = {
   name: '', subdomain: '', plan: '',
   contact_phone: '', contact_email: '', admin_phone: '', admin_password: '',
-  // trial fields
-  trial_duration: '1', trial_unit: 'month',
-  // custom plan fields
-  custom_plan_name: '', custom_price: '', custom_limit: '', custom_desc: '',
 };
 
 export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating }) {
@@ -62,10 +58,6 @@ export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating
     }
     onSubmit({ ...form, subdomain: sub }, () => setForm({ ...EMPTY, admin_password: generatePassword() }));
   };
-
-  const selectedPlan = plans.find(p => p.name === form.plan);
-  const isTrial  = selectedPlan?.type === 'trial';
-  const isCustom = selectedPlan?.type === 'custom';
 
   return (
     <Dialog
@@ -118,63 +110,6 @@ export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating
             )}
           </Select>
         </div>
-
-        {/* Trial options */}
-        {isTrial && (
-          <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl p-4 space-y-3">
-            <p className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">Trial Period</p>
-            <div className="flex items-center gap-2">
-              <div className="flex-1 space-y-1">
-                <label className="text-xs text-text-secondary font-semibold">Duration</label>
-                <Input
-                  type="number"
-                  min="1"
-                  max="24"
-                  placeholder="e.g. 3"
-                  value={form.trial_duration}
-                  onChange={set('trial_duration')}
-                  required
-                />
-              </div>
-              <div className="flex-1 space-y-1">
-                <label className="text-xs text-text-secondary font-semibold">Unit</label>
-                <Select value={form.trial_unit} onChange={set('trial_unit')}>
-                  <option value="day">Days</option>
-                  <option value="month">Months</option>
-                  <option value="year">Years</option>
-                </Select>
-              </div>
-            </div>
-            <p className="text-[11px] text-amber-600 dark:text-amber-400">
-              School gets free access for {form.trial_duration} {form.trial_unit}(s). Convert to paid plan anytime.
-            </p>
-          </div>
-        )}
-
-        {/* Custom plan options */}
-        {isCustom && (
-          <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl p-4 space-y-3">
-            <p className="text-xs font-bold text-blue-700 dark:text-blue-400 uppercase tracking-wider">Custom Plan Details</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs text-text-secondary font-semibold">Plan Name</label>
-                <Input placeholder="e.g. District Pro" value={form.custom_plan_name} onChange={set('custom_plan_name')} required={isCustom} />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-text-secondary font-semibold">Monthly Price (₹)</label>
-                <Input type="number" min="0" placeholder="e.g. 14999" value={form.custom_price} onChange={set('custom_price')} required={isCustom} />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-text-secondary font-semibold">Student Limit</label>
-                <Input type="number" min="0" placeholder="Leave blank for unlimited" value={form.custom_limit} onChange={set('custom_limit')} />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs text-text-secondary font-semibold">Description</label>
-              <Input placeholder="Brief description of this plan" value={form.custom_desc} onChange={set('custom_desc')} />
-            </div>
-          </div>
-        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
