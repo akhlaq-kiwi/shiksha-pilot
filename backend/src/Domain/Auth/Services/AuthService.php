@@ -67,28 +67,7 @@ class AuthService extends BaseService
             throw new ForbiddenException('Account is not active.');
         }
 
-        // Subdomain & School Authentication Isolation Checks
-        $role = $user['role'] ?? '';
-        if ($role !== 'SUPER_ADMIN') {
-            $userSchoolId = isset($user['school_id']) ? (int)$user['school_id'] : null;
 
-            if ($subdomain !== null) {
-                // Fetch school by subdomain
-                $pdo = $this->repo->getPdo();
-                $stmtSchool = $pdo->prepare("SELECT id, name FROM schools WHERE subdomain = :subdomain LIMIT 1");
-                $stmtSchool->execute([':subdomain' => $subdomain]);
-                $school = $stmtSchool->fetch(\PDO::FETCH_ASSOC);
-
-                if (!$school || (int)$school['id'] !== $userSchoolId) {
-                    $this->logAuditDirect($user, 'Security', 'Failed Login Attempt', 'Failed login attempt: User does not belong to school subdomain "' . $subdomain . '"');
-                    throw new ForbiddenException('This account does not belong to this school portal.');
-                }
-            } else {
-                // No subdomain, user is on main portal
-                $this->logAuditDirect($user, 'Security', 'Failed Login Attempt', 'Failed login attempt: School user tried to log in on main portal without subdomain');
-                throw new ForbiddenException('Please log in using your school\'s official login URL.');
-            }
-        }
 
         $safeUser = array_diff_key($user, ['password' => true]);
 

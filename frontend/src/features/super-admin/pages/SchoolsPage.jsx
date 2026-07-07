@@ -45,7 +45,6 @@ const getRemainingDaysText = (expiryDateStr) => {
 function EditSchoolDialog({ school, onClose, onSaved }) {
   const toast = useToast();
   const [name, setName] = useState(school.name || '');
-  const [subdomain, setSubdomain] = useState(school.subdomain || '');
   const [contactPhone, setContactPhone] = useState(school.contact_phone || '');
   const [contactEmail, setContactEmail] = useState(school.contact_email || '');
   const [saving, setSaving] = useState(false);
@@ -62,17 +61,9 @@ function EditSchoolDialog({ school, onClose, onSaved }) {
       return;
     }
 
-    const sub = subdomain.trim().toLowerCase();
-    if (!/^[a-z0-9-]+$/.test(sub)) {
-      setError("Subdomain must contain only lowercase letters, numbers, and hyphens without spaces or special characters.");
-      setSaving(false);
-      return;
-    }
-
     try {
       const updated = await platformService.updateSchool(school.id, {
         name: name.trim(),
-        subdomain: sub,
         contact_phone: contactPhone.trim(),
         contact_email: contactEmail.trim(),
       });
@@ -111,10 +102,7 @@ function EditSchoolDialog({ school, onClose, onSaved }) {
             <label className="text-xs font-bold text-text-secondary uppercase">School Name</label>
             <Input value={name} onChange={e => setName(e.target.value)} required />
           </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-text-secondary uppercase">Subdomain prefix</label>
-            <Input value={subdomain} onChange={e => setSubdomain(e.target.value)} required />
-          </div>
+
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-text-secondary uppercase">Contact Phone</label>
             <Input value={contactPhone} onChange={e => setContactPhone(e.target.value)} />
@@ -154,7 +142,7 @@ function CredentialsDialog({ school, onClose }) {
       setLoading(true);
       const data = await platformService.getSchoolCredentials(school.id);
       setSchoolName(data.school_name || school.name);
-      setLoginUrl(data.login_url || `${school.subdomain}.shikshapilot.com`);
+      setLoginUrl(window.location.origin);
       setAdminEmail(data.admin_email || '');
       setMobileNumber(data.mobile_number || '');
       setCurrentLoginId(data.current_login_id || '');
@@ -674,7 +662,7 @@ export default function SchoolsPage({ schools, onCreateSchool, onToggleStatus, o
                 {/* Login URL */}
                 <div className="w-full px-2">
                   <p className="text-primary hover:underline text-xs font-semibold select-all break-all leading-tight">
-                    {school.subdomain}.shikshapilot.com
+                    {window.location.host}
                   </p>
                 </div>
  

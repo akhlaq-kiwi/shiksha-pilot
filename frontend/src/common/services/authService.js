@@ -16,16 +16,7 @@ export const authService = {
     return payload;
   },
 
-  async otpLogin(phone, otp, role) {
-    const data = await apiClient.post('/api/auth/otp-login', { phone, otp, role });
-    if (data.token) {
-      localStorage.setItem('shiksha_pilot_token', data.token);
-      localStorage.setItem('shiksha_pilot_role', data.user.role || role);
-      localStorage.setItem('shiksha_pilot_user', JSON.stringify(data.user));
-      window.dispatchEvent(new Event('auth-change'));
-    }
-    return data;
-  },
+
 
   async forgotPassword(phone) {
     return apiClient.post('/api/auth/forgot-password', { phone });

@@ -105,37 +105,14 @@ export default function SuperAdminPortal() {
   };
 
   const handleCreateSchool = async (newSchool, onSuccess) => {
-    if (!newSchool.name || !newSchool.subdomain) return;
+    if (!newSchool.name) return;
     setCreating(true);
     setError('');
     try {
       let effectivePlan = newSchool.plan;
 
-      if (newSchool.plan === 'Custom') {
-        const created = await platformService.createPlan({
-          name:          newSchool.custom_plan_name || 'Custom',
-          price:         parseInt(newSchool.custom_price, 10) || 0,
-          student_limit: newSchool.custom_limit ? parseInt(newSchool.custom_limit, 10) : null,
-          description:   newSchool.custom_desc || null,
-          type:          'custom',
-        });
-        effectivePlan = created.name;
-      } else if (newSchool.plan === 'Trial') {
-        const created = await platformService.createPlan({
-          name:           `Trial (${newSchool.trial_duration} ${newSchool.trial_unit})`,
-          price:          0,
-          student_limit:  null,
-          description:    `Free trial for ${newSchool.trial_duration} ${newSchool.trial_unit}(s).`,
-          type:           'trial',
-          trial_duration: parseInt(newSchool.trial_duration, 10),
-          trial_unit:     newSchool.trial_unit,
-        });
-        effectivePlan = created.name;
-      }
-
       await platformService.inviteSchool({
         school_name:    newSchool.name,
-        subdomain:      newSchool.subdomain.toLowerCase(),
         contact_phone:  newSchool.contact_phone || '',
         contact_email:  newSchool.contact_email ? newSchool.contact_email.trim() : '',
         plan:           effectivePlan,

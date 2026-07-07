@@ -149,6 +149,21 @@ class PlatformService extends BaseService
     {
         $data['contact_email'] = isset($data['contact_email']) ? trim((string)$data['contact_email']) : '';
 
+        if (empty($data['subdomain']) && !empty($data['name'])) {
+            $baseSub = strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-', (string)$data['name'])));
+            $baseSub = trim($baseSub, '-');
+            if (empty($baseSub)) {
+                $baseSub = 'school';
+            }
+            $subdomain = $baseSub;
+            $counter = 1;
+            while ($this->schools->findBySubdomain($subdomain) !== null) {
+                $subdomain = $baseSub . '-' . $counter;
+                $counter++;
+            }
+            $data['subdomain'] = $subdomain;
+        }
+
         Validator::make($data, [
             'name'          => 'required',
             'subdomain'     => 'required',

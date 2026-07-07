@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
-import { Shield, Key, Phone, AlertCircle, RefreshCw } from 'lucide-react';
+import { Shield, Key, Phone, AlertCircle, RefreshCw, Eye, EyeOff } from 'lucide-react';
 import { authService } from '../../../common/services/authService';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../../common/ui/card';
 import { Input } from '../../../common/ui/input';
 
 export default function LoginForm({ onLoginSuccess }) {
-  const [step, setStep] = useState('login'); // login, otp-login, forgot, otp-verify, reset-pass
+  const [step, setStep] = useState('login'); // login, forgot, otp-verify, reset-pass
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -26,21 +27,6 @@ export default function LoginForm({ onLoginSuccess }) {
       onLoginSuccess(data.user);
     } catch (err) {
       setError(err.message || 'Invalid phone or password credentials');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleOtpLogin = async (e) => {
-    e.preventDefault();
-    if (!phone || !otp) return;
-    setLoading(true);
-    setError('');
-    try {
-      const data = await authService.otpLogin(phone, otp);
-      onLoginSuccess(data.user);
-    } catch (err) {
-      setError(err.message || 'Invalid or expired OTP code');
     } finally {
       setLoading(false);
     }
@@ -135,80 +121,38 @@ export default function LoginForm({ onLoginSuccess }) {
                 </div>
               </div>
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-text-secondary uppercase">Password</label>
-                  <button 
-                    type="button" 
-                    onClick={() => setStep('forgot')}
-                    className="text-xs text-zinc-500 hover:text-zinc-900 hover:underline"
-                  >
-                    Forgot Password?
-                  </button>
-                </div>
+                <label className="text-xs font-bold text-text-secondary uppercase">Password</label>
                 <div className="relative">
                   <Key className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />
                   <Input 
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     placeholder="••••••••" 
-                    className="pl-9"
+                    className="pl-9 pr-10"
                     value={password}
                     onChange={e => setPassword(e.target.value)}
                     required
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-2.5 text-text-muted hover:text-text-primary"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                <div className="flex justify-end">
+                  <button 
+                    type="button" 
+                    onClick={() => setStep('forgot')}
+                    className="text-xs text-zinc-500 hover:text-zinc-900 hover:underline pt-1"
+                  >
+                    Forgot Password?
+                  </button>
                 </div>
               </div>
               <Button type="submit" className="w-full flex justify-center items-center gap-2 py-2.5" disabled={loading}>
                 {loading ? <RefreshCw className="h-4 w-4 animate-spin" /> : 'Login'}
               </Button>
-              <div className="text-center pt-2">
-                <button 
-                  type="button" 
-                  onClick={() => setStep('otp-login')} 
-                  className="text-xs text-primary font-bold hover:underline"
-                >
-                  Use Mobile OTP Login instead
-                </button>
-              </div>
-            </form>
-          )}
-
-          {step === 'otp-login' && (
-            <form onSubmit={handleOtpLogin} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-text-secondary uppercase">Mobile Phone Number</label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />
-                  <Input 
-                    placeholder="e.g. 9876543210" 
-                    className="pl-9"
-                    value={phone}
-                    onChange={e => setPhone(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-text-secondary uppercase">OTP Code</label>
-                <Input 
-                  placeholder="e.g. 123456" 
-                  value={otp}
-                  onChange={e => setOtp(e.target.value)}
-                  maxLength={6}
-                  required
-                />
-              </div>
-              <Button type="submit" className="w-full flex justify-center items-center gap-2 py-2.5" disabled={loading}>
-                {loading ? <RefreshCw className="h-4 w-4 animate-spin" /> : 'Login with OTP'}
-              </Button>
-              <div className="text-center pt-2">
-                <button 
-                  type="button" 
-                  onClick={() => setStep('login')} 
-                  className="text-xs text-primary font-bold hover:underline"
-                >
-                  Use Password Login instead
-                </button>
-              </div>
             </form>
           )}
 

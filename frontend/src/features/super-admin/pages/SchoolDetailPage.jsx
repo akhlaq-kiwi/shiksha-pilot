@@ -303,7 +303,6 @@ function ActionsMenu({ school, onToggleStatus, onChangePassword, onDelete }) {
 function EditSchoolDetailsDialog({ school, onClose, onSaved }) {
   const toast = useToast();
   const [name, setName] = useState(school.name || '');
-  const [subdomain, setSubdomain] = useState(school.subdomain || '');
   const [contactPhone, setContactPhone] = useState(school.contact_phone || '');
   const [contactEmail, setContactEmail] = useState(school.contact_email || '');
   const [saving, setSaving] = useState(false);
@@ -324,7 +323,6 @@ function EditSchoolDetailsDialog({ school, onClose, onSaved }) {
     try {
       const updated = await platformService.updateSchool(school.id, {
         name: name.trim(),
-        subdomain: subdomain.trim().toLowerCase(),
         contact_phone: contactPhone.trim(),
         contact_email: trimmedEmail,
       });
@@ -362,14 +360,6 @@ function EditSchoolDetailsDialog({ school, onClose, onSaved }) {
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-text-secondary uppercase">School Name</label>
             <Input value={name} onChange={e => setName(e.target.value)} required />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-text-secondary uppercase">Subdomain</label>
-            <div className="flex items-center gap-1.5">
-              <Input value={subdomain} onChange={e => setSubdomain(e.target.value)} required className="flex-1" />
-              <span className="text-sm font-semibold text-text-muted whitespace-nowrap">.shikshapilot.com</span>
-            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -488,7 +478,7 @@ export default function SchoolDetailPage({ schools, onToggleStatus, onDeleteScho
                 {school.status}
               </span>
             </div>
-            <p className="text-primary text-xs font-bold mt-1">{school.subdomain}.shikshapilot.com</p>
+            <p className="text-primary text-xs font-bold mt-1">{window.location.host}</p>
           </div>
         </div>
 
@@ -524,8 +514,8 @@ export default function SchoolDetailPage({ schools, onToggleStatus, onDeleteScho
                 <p className="text-sm font-bold text-text-primary mt-1">SP-{String(school.id).padStart(4, '0')}</p>
               </div>
               <div>
-                <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Subdomain</p>
-                <p className="text-sm font-bold text-text-primary mt-1">{school.subdomain}.shikshapilot.com</p>
+                <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Login URL</p>
+                <p className="text-sm font-bold text-text-primary mt-1">{window.location.host}</p>
               </div>
               <div>
                 <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">School Owner Email</p>
