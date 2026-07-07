@@ -201,6 +201,17 @@ function ReceiptModal({ receipt, student, schoolName, allPayments = [], onClose 
   const totalAmountPaid = sortedGroup.reduce((sum, p) => sum + parseFloat(p.amount_paid || 0), 0);
   const displaySchoolName = schoolName || 'SHIKSHA PILOT SCHOOL';
 
+  const currentYearName = student.academic_year_name || student.academic_year || '2027–2028';
+  let previousYearName = '';
+  const match = currentYearName.match(/(\d{4})[–-](\d{4})/);
+  if (match) {
+    const startYear = parseInt(match[1], 10);
+    const endYear = parseInt(match[2], 10);
+    previousYearName = `Academic Year ${startYear - 1}–${endYear - 1}`;
+  } else {
+    previousYearName = 'Previous Academic Year';
+  }
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
       <div className="bg-surface border border-border rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col">
@@ -247,6 +258,22 @@ function ReceiptModal({ receipt, student, schoolName, allPayments = [], onClose 
                 </p>
               </div>
             </div>
+            {receipt.fee_name === 'Previous Year Dues' && (
+              <div className="border border-border p-4 rounded-xl text-xs space-y-2 bg-zinc-50/50 dark:bg-zinc-900/10">
+                <div className="flex justify-between">
+                  <span className="text-text-muted font-semibold">Fee Type:</span>
+                  <span className="font-extrabold text-text-primary">Previous Year Dues</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-text-muted font-semibold">Collected For:</span>
+                  <span className="font-bold text-text-primary">{previousYearName || 'Previous Academic Year'} Outstanding</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-text-muted font-semibold">Collected In:</span>
+                  <span className="font-bold text-text-primary">{currentYearName || 'Current Academic Year'}</span>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="text-center text-[10px] text-text-muted leading-relaxed pt-2">
@@ -419,8 +446,8 @@ function DepositModal({ student, availableMonths, paidMonths, classFeeConfig, on
 }
 
 // Additional Fees Deposit Modal (Matches design guidelines of tuition DepositModal)
-function AdditionalDepositModal({ student, unpaidFees, onSave, onClose }) {
-  const [selectedIds, setSelectedIds] = useState([]);
+function AdditionalDepositModal({ student, unpaidFees, initialSelectedIds = [], onSave, onClose }) {
+  const [selectedIds, setSelectedIds] = useState(initialSelectedIds);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -531,6 +558,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [showAdditionalDepositModal, setShowAdditionalDepositModal] = useState(false);
   const [unpaidAdditionalFeesList, setUnpaidAdditionalFeesList] = useState([]);
+  const [preselectedAdditionalIds, setPreselectedAdditionalIds] = useState([]);
   const [showRemovePhotoConfirm, setShowRemovePhotoConfirm] = useState(false);
   const [showPhotoMenu, setShowPhotoMenu] = useState(false);
   const [schoolProfile, setSchoolProfile] = useState(null);
@@ -670,7 +698,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
     const dd = String(today.getDate()).padStart(2, '0');
     const todayStr = `${yyyy}-${mm}-${dd}`;
     const unpaidDueFees = (data?.additional_fee_payments || [])
-      .filter(p => p.status === 'Pending' && p.due_date <= todayStr);
+      .filter(p => p.status === 'Pending' && (p.due_date <= todayStr || !p.due_date || p.fee_name === 'Previous Year Dues'));
 
     if (unpaidDueFees.length === 0) return;
 
@@ -684,6 +712,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
       }
     } else {
       setUnpaidAdditionalFeesList(unpaidDueFees);
+      setPreselectedAdditionalIds(item && item.id ? [item.id] : []);
       setShowAdditionalDepositModal(true);
     }
   };
@@ -1208,7 +1237,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                     const dd = String(today.getDate()).padStart(2, '0');
                     const todayStr = `${yyyy}-${mm}-${dd}`;
                     const additionalFeeDue = (data.additional_fee_payments || [])
-                      .filter(p => p.status === 'Pending' && p.due_date <= todayStr)
+                      .filter(p => p.status === 'Pending' && (p.due_date <= todayStr || p.fee_name === 'Previous Year Dues' || !p.due_date))
                       .reduce((sum, p) => sum + parseFloat(p.amount), 0);
 
                     return (
@@ -1289,7 +1318,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                                 <TableCell className="text-right">
                                   {mw.status === 'PAID' ? (
                                     <div className="flex justify-end gap-2">
-                                      {!data?.is_ledger_locked && (
+                                       {!data?.is_ledger_locked && !isReadOnly && (
                                          <Button 
                                            variant="secondary" 
                                            className="h-7 w-20 text-[10px] px-0 font-bold"
@@ -1363,7 +1392,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                                   <TableCell className="text-right">
                                     {af.status === 'Paid' ? (
                                       <div className="flex justify-end gap-2">
-                                        {!data?.is_ledger_locked && (
+                                        {!data?.is_ledger_locked && !isReadOnly && (
                                           <Button 
                                             variant="secondary" 
                                             className="h-7 w-20 text-[10px] px-0 font-bold"
@@ -1387,7 +1416,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                                         const mm = String(today.getMonth() + 1).padStart(2, '0');
                                         const dd = String(today.getDate()).padStart(2, '0');
                                         const todayStr = `${yyyy}-${mm}-${dd}`;
-                                        return af.due_date <= todayStr;
+                                        return !af.due_date || af.due_date <= todayStr || af.fee_name === 'Previous Year Dues';
                                       })() && !data?.is_ledger_locked) ? (
                                         <Button 
                                           className="h-7 w-20 text-[10px] px-0 font-bold"
@@ -1456,11 +1485,16 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
         <AdditionalDepositModal 
           student={student} 
           unpaidFees={unpaidAdditionalFeesList} 
+          initialSelectedIds={preselectedAdditionalIds}
           onSave={async () => {
             setShowAdditionalDepositModal(false);
+            setPreselectedAdditionalIds([]);
             await loadDetails();
           }} 
-          onClose={() => setShowAdditionalDepositModal(false)} 
+          onClose={() => {
+            setShowAdditionalDepositModal(false);
+            setPreselectedAdditionalIds([]);
+          }} 
         />
       )}
 

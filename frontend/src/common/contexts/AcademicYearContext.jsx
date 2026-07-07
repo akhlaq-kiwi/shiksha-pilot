@@ -83,7 +83,7 @@ export const AcademicYearProvider = ({ children }) => {
   };
 
   const isReadOnly = currentYear?.status === 'Archived';
-  const isDraft = currentYear?.status === 'Draft';
+  const isDraft = false;
   const isCurrent = currentYear?.is_current === 1 || currentYear?.status === 'ACTIVE';
 
   return (

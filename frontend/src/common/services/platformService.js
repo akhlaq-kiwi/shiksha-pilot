@@ -88,4 +88,12 @@ export const platformService = {
   async createAdmin(data) {
     return apiClient.post('/api/platform/admins', data);
   },
+
+  async getSchoolCredentials(id) {
+    return apiClient.get(`/api/platform/schools/${id}/credentials`);
+  },
+
+  async updateSchoolCredentials(id, data) {
+    return apiClient.put(`/api/platform/schools/${id}/credentials`, data);
+  },
 };

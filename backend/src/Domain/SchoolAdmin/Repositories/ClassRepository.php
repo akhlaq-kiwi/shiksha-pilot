@@ -11,16 +11,27 @@ class ClassRepository extends BaseRepository
 {
     protected string $table = 'classes';
 
-    public function findBySchool(int $schoolId): array
+    public function findBySchool(int $schoolId, ?int $academicYearId = null): array
     {
-        $stmt = $this->pdo->prepare("
-            SELECT c.*, ay.name AS academic_year_name
-            FROM classes c
-            LEFT JOIN academic_years ay ON c.academic_year_id = ay.id
-            WHERE c.school_id = :sid
-            ORDER BY c.id DESC
-        ");
-        $stmt->execute([':sid' => $schoolId]);
+        if ($academicYearId !== null) {
+            $stmt = $this->pdo->prepare("
+                SELECT c.*, ay.name AS academic_year_name
+                FROM classes c
+                LEFT JOIN academic_years ay ON c.academic_year_id = ay.id
+                WHERE c.school_id = :sid AND c.academic_year_id = :ayid
+                ORDER BY c.id DESC
+            ");
+            $stmt->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+        } else {
+            $stmt = $this->pdo->prepare("
+                SELECT c.*, ay.name AS academic_year_name
+                FROM classes c
+                LEFT JOIN academic_years ay ON c.academic_year_id = ay.id
+                WHERE c.school_id = :sid
+                ORDER BY c.id DESC
+            ");
+            $stmt->execute([':sid' => $schoolId]);
+        }
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }

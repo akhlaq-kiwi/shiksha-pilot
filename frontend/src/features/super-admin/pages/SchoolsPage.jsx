@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Search, MoreVertical, Edit2, Trash2, Users, GraduationCap, Clock, X, HelpCircle, Sparkles } from 'lucide-react';
+import { Plus, Search, MoreVertical, Edit2, Trash2, Users, GraduationCap, Clock, X, HelpCircle, Sparkles, Key, Eye, EyeOff, Copy } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../../common/ui/button';
 import { Input } from '../../../common/ui/input';
@@ -62,10 +62,17 @@ function EditSchoolDialog({ school, onClose, onSaved }) {
       return;
     }
 
+    const sub = subdomain.trim().toLowerCase();
+    if (!/^[a-z0-9-]+$/.test(sub)) {
+      setError("Subdomain must contain only lowercase letters, numbers, and hyphens without spaces or special characters.");
+      setSaving(false);
+      return;
+    }
+
     try {
       const updated = await platformService.updateSchool(school.id, {
         name: name.trim(),
-        subdomain: subdomain.trim().toLowerCase(),
+        subdomain: sub,
         contact_phone: contactPhone.trim(),
         contact_email: contactEmail.trim(),
       });
@@ -123,6 +130,192 @@ function EditSchoolDialog({ school, onClose, onSaved }) {
             </Button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+function CredentialsDialog({ school, onClose }) {
+  const toast = useToast();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
+  const [schoolName, setSchoolName] = useState('');
+  const [loginUrl, setLoginUrl] = useState('');
+  const [adminEmail, setAdminEmail] = useState('');
+  const [mobileNumber, setMobileNumber] = useState('');
+  const [currentLoginId, setCurrentLoginId] = useState('');
+  const [password, setPassword] = useState('');
+
+  const loadCredentials = async () => {
+    try {
+      setLoading(true);
+      const data = await platformService.getSchoolCredentials(school.id);
+      setSchoolName(data.school_name || school.name);
+      setLoginUrl(data.login_url || `${school.subdomain}.shikshapilot.com`);
+      setAdminEmail(data.admin_email || '');
+      setMobileNumber(data.mobile_number || '');
+      setCurrentLoginId(data.current_login_id || '');
+      setPassword(data.password || '');
+    } catch (err) {
+      setError(err.message || 'Failed to load credentials.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    if (school) {
+      loadCredentials();
+    }
+  }, [school]);
+
+  const handleCopy = () => {
+    const text = `School Name: ${schoolName}\nPortal URL: ${loginUrl}\nLogin ID: ${currentLoginId}\nPassword: ${password}`;
+    navigator.clipboard.writeText(text)
+      .then(() => {
+        toast.success('Credentials copied to clipboard!', 'Copied');
+      })
+      .catch(() => {
+        toast.error('Failed to copy credentials.');
+      });
+  };
+
+  const handleUpdate = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setError('');
+
+    if (!adminEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail)) {
+      setError('A valid admin email is required.');
+      setSaving(false);
+      return;
+    }
+
+    if (!/^[0-9]{10}$/.test(mobileNumber.trim())) {
+      setError('Mobile number must be exactly 10 digits.');
+      setSaving(false);
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters.');
+      setSaving(false);
+      return;
+    }
+
+    try {
+      const updated = await platformService.updateSchoolCredentials(school.id, {
+        admin_email: adminEmail.trim(),
+        mobile_number: mobileNumber.trim(),
+        password: password,
+      });
+      setAdminEmail(updated.admin_email);
+      setMobileNumber(updated.mobile_number);
+      setCurrentLoginId(updated.current_login_id);
+      setPassword(updated.password);
+      toast.success('School credentials updated successfully.', 'Updated');
+    } catch (err) {
+      setError(err.message || 'Failed to update credentials.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-surface border border-border rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95 duration-200 flex flex-col">
+        <div className="flex items-center justify-between mb-5 border-b border-border/60 pb-3">
+          <div>
+            <h3 className="text-base font-bold text-text-primary">Credentials Management</h3>
+            <p className="text-xs text-text-muted mt-0.5">Secure login control for {schoolName || school.name}.</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-text-muted">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-lg text-xs font-semibold">
+            {error}
+          </div>
+        )}
+
+        {loading ? (
+          <div className="py-12 text-center text-xs text-text-muted">Loading secure credentials…</div>
+        ) : (
+          <form onSubmit={handleUpdate} className="space-y-4">
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-text-secondary uppercase">School Name</label>
+              <Input value={schoolName} disabled className="bg-zinc-50 dark:bg-zinc-900 cursor-not-allowed" />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-text-secondary uppercase">Login URL</label>
+              <Input value={loginUrl} disabled className="bg-zinc-50 dark:bg-zinc-900 cursor-not-allowed text-primary font-semibold" />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-text-secondary uppercase">Admin Email / Username</label>
+              <Input type="email" value={adminEmail} onChange={e => setAdminEmail(e.target.value)} required />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-text-secondary uppercase">Mobile Number</label>
+              <Input type="tel" value={mobileNumber} onChange={e => setMobileNumber(e.target.value)} required />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-text-secondary uppercase">Current Login ID</label>
+              <Input value={currentLoginId} disabled className="bg-zinc-50 dark:bg-zinc-900 cursor-not-allowed font-mono text-xs" />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-text-secondary uppercase">Password</label>
+              <div className="flex items-center gap-1.5">
+                <Input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  required
+                  className="flex-1 font-mono text-xs"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="p-2 rounded-md border border-border hover:bg-zinc-50 dark:hover:bg-zinc-800 text-text-muted hover:text-text-primary transition-colors"
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 pt-3">
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1 flex items-center justify-center gap-1.5 h-9 text-xs"
+                  onClick={handleCopy}
+                >
+                  <Copy className="h-3.5 w-3.5" /> Copy Credentials
+                </Button>
+                <Button
+                  type="submit"
+                  className="flex-1 h-9 text-xs"
+                  disabled={saving}
+                >
+                  {saving ? 'Updating…' : 'Update Credentials'}
+                </Button>
+              </div>
+              <Button type="button" variant="secondary" className="w-full h-9 text-xs" onClick={onClose}>Close</Button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );
@@ -304,6 +497,11 @@ export default function SchoolsPage({ schools, onCreateSchool, onToggleStatus, o
   const [editingSchool, setEditingSchool] = useState(null);
   const [selectedSubSchool, setSelectedSubSchool] = useState(null);
   const [upgradeSchool, setUpgradeSchool] = useState(null);
+  const [credentialsSchool, setCredentialsSchool] = useState(null);
+
+  const handleOpenCredentials = (school) => {
+    setCredentialsSchool(school);
+  };
 
   const filtered = Array.isArray(schools) ? schools.filter(s => {
     const matchSearch = (s.name || '').toLowerCase().includes(search.toLowerCase())
@@ -383,7 +581,7 @@ export default function SchoolsPage({ schools, onCreateSchool, onToggleStatus, o
           filtered.map(school => (
             <div
               key={school.id}
-              className="bg-surface border border-border rounded-2xl p-6 transition-all shadow-sm hover:shadow-md flex flex-col justify-between h-48 relative group"
+              className="bg-surface border border-border rounded-2xl p-6 transition-all shadow-sm hover:shadow-md flex flex-col items-center justify-between text-center relative group min-h-[300px]"
             >
               
               {/* Three-Dot Dropdown aligned absolutely to avoid overflows */}
@@ -397,12 +595,12 @@ export default function SchoolsPage({ schools, onCreateSchool, onToggleStatus, o
                 >
                   <MoreVertical className="h-4.5 w-4.5" />
                 </button>
-
+ 
                 {/* Actions Dropdown */}
                 {menuOpenSchoolId === school.id && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setMenuOpenSchoolId(null)} />
-                    <div className="absolute right-0 top-7 bg-surface border border-border shadow-xl rounded-xl w-44 py-1.5 z-20 animate-in fade-in slide-in-from-top-1 duration-100 text-xs font-semibold">
+                    <div className="absolute right-0 top-7 bg-surface border border-border shadow-xl rounded-xl w-44 py-1.5 z-20 animate-in fade-in slide-in-from-top-1 duration-100 text-xs font-semibold text-left">
                       <button
                         onClick={() => {
                           setMenuOpenSchoolId(null);
@@ -411,6 +609,15 @@ export default function SchoolsPage({ schools, onCreateSchool, onToggleStatus, o
                         className="w-full text-left px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-text-primary flex items-center gap-2"
                       >
                         <Edit2 className="h-3.5 w-3.5" /> Edit details
+                      </button>
+                      <button
+                        onClick={() => {
+                          setMenuOpenSchoolId(null);
+                          handleOpenCredentials(school);
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-text-primary flex items-center gap-2"
+                      >
+                        <Key className="h-3.5 w-3.5" /> Credentials
                       </button>
                       <button
                         onClick={() => nav(`/super-admin/schools/${school.id}/teachers`)}
@@ -441,36 +648,46 @@ export default function SchoolsPage({ schools, onCreateSchool, onToggleStatus, o
                   </>
                 )}
               </div>
-
-              {/* Main Card Content */}
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3 min-w-0 pr-8">
-                  {school.logo_path ? (
-                    <img
-                      src={school.logo_path}
-                      alt={school.name}
-                      className="w-12 h-12 rounded-xl object-cover border border-border"
-                    />
-                  ) : (
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-sm flex-shrink-0 ${getSchoolColor(school.name)}`}>
-                      {school.name.substring(0, 2).toUpperCase()}
-                    </div>
-                  )}
-                  <div className="min-w-0">
-                    <h3 className="font-bold text-text-primary text-base truncate pr-2">{school.name}</h3>
-                    <p className="text-text-secondary text-xs truncate">{school.subdomain}.shikshapilot.com</p>
+ 
+              {/* Main Content Area */}
+              <div className="flex flex-col items-center gap-3 w-full">
+                {/* Logo */}
+                {school.logo_path ? (
+                  <img
+                    src={school.logo_path}
+                    alt={school.name}
+                    className="w-16 h-16 rounded-2xl object-cover border border-border shadow-sm mt-2"
+                  />
+                ) : (
+                  <div className={`w-16 h-16 rounded-2xl flex items-center justify-center font-black text-xl shadow-sm mt-2 ${getSchoolColor(school.name)}`}>
+                    {school.name.substring(0, 2).toUpperCase()}
                   </div>
+                )}
+ 
+                {/* Name */}
+                <div className="w-full px-2 mt-1">
+                  <h3 className="font-extrabold text-text-primary text-base leading-snug break-words">
+                    {school.name}
+                  </h3>
                 </div>
-
-                <div className="flex items-center gap-1.5 pr-6">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${school.status === 'ACTIVE' ? 'bg-green-500/10 text-green-600' : 'bg-red-500/10 text-red-600'}`}>
+ 
+                {/* Login URL */}
+                <div className="w-full px-2">
+                  <p className="text-primary hover:underline text-xs font-semibold select-all break-all leading-tight">
+                    {school.subdomain}.shikshapilot.com
+                  </p>
+                </div>
+ 
+                {/* Status Badge */}
+                <div className="mt-1">
+                  <span className={`inline-flex items-center px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${school.status === 'ACTIVE' ? 'bg-green-500/10 text-green-600' : 'bg-red-500/10 text-red-600'}`}>
                     {school.status === 'ACTIVE' ? 'Active' : 'Inactive'}
                   </span>
                 </div>
               </div>
-
+ 
               {/* Bottom Section - Plan Badge Popup or Upgrade Plan Button */}
-              <div className="border-t border-border/60 pt-4 mt-auto flex items-center justify-between text-xs font-semibold">
+              <div className="border-t border-border/60 pt-4 mt-6 w-full flex items-center justify-between text-xs font-semibold">
                 <span className="text-text-muted">Subscription Plan</span>
                 {school.active_plan ? (
                   <button
@@ -514,6 +731,13 @@ export default function SchoolsPage({ schools, onCreateSchool, onToggleStatus, o
           school={upgradeSchool}
           onClose={() => setUpgradeSchool(null)}
           onAssigned={onSchoolUpdated}
+        />
+      )}
+
+      {credentialsSchool && (
+        <CredentialsDialog
+          school={credentialsSchool}
+          onClose={() => setCredentialsSchool(null)}
         />
       )}
     </div>

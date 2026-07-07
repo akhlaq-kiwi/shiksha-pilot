@@ -22,6 +22,8 @@ return function (App $app) {
     $app->post('/api/platform/schools', [PlatformController::class, 'createSchool']);
     $app->post('/api/platform/invitations', [PlatformController::class, 'inviteSchool']);
     $app->put('/api/platform/schools/{id}', [PlatformController::class, 'updateSchool']);
+    $app->get('/api/platform/schools/{id}/credentials', [PlatformController::class, 'getSchoolCredentials']);
+    $app->put('/api/platform/schools/{id}/credentials', [PlatformController::class, 'updateSchoolCredentials']);
     $app->delete('/api/platform/schools/{id}', [PlatformController::class, 'deleteSchool']);
     $app->get('/api/platform/plans', [PlatformController::class, 'getPlans']);
     $app->post('/api/platform/plans', [PlatformController::class, 'createPlan']);

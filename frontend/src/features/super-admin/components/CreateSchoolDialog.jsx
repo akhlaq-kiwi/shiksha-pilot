@@ -1,25 +1,18 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { Dialog } from '../../../common/ui/dialog';
 import { Button } from '../../../common/ui/button';
 import { Input } from '../../../common/ui/input';
 import { Select } from '../../../common/ui/select';
+import { platformService } from '../../../common/services/platformService';
 
 const generatePassword = () => {
   const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789!@#';
   return Array.from({ length: 10 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 };
 
-const PRESET_PLANS = [
-  { value: 'Standard',   label: 'Standard — ₹7,999/mo' },
-  { value: 'Premium',    label: 'Premium — ₹19,999/mo' },
-  { value: 'Enterprise', label: 'Enterprise — ₹39,999/mo' },
-  { value: 'Trial',      label: 'Trial (free for a period)' },
-  { value: 'Custom',     label: 'Custom plan…' },
-];
-
 const EMPTY = {
-  name: '', subdomain: '', plan: 'Premium',
+  name: '', subdomain: '', plan: '',
   contact_phone: '', contact_email: '', admin_phone: '', admin_password: '',
   // trial fields
   trial_duration: '1', trial_unit: 'month',
@@ -29,6 +22,30 @@ const EMPTY = {
 
 export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating }) {
   const [form, setForm] = useState({ ...EMPTY, admin_password: generatePassword() });
+  const [plans, setPlans] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setLoading(true);
+      platformService.getPlans()
+        .then(data => {
+          const activePlans = (data || []).filter(p => p.is_active === 1 || p.is_active === '1' || p.is_active === true);
+          setPlans(activePlans);
+          if (activePlans.length > 0) {
+            setForm(prev => ({ ...prev, plan: activePlans[0].name, admin_password: generatePassword() }));
+          } else {
+            setForm(prev => ({ ...prev, plan: '', admin_password: generatePassword() }));
+          }
+        })
+        .catch(err => {
+          console.error(err);
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    }
+  }, [isOpen]);
 
   const set = (key) => (e) => setForm(prev => ({ ...prev, [key]: e.target.value }));
 
@@ -38,11 +55,17 @@ export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSubmit(form, () => setForm({ ...EMPTY, admin_password: generatePassword() }));
+    const sub = (form.subdomain || '').trim().toLowerCase();
+    if (!/^[a-z0-9-]+$/.test(sub)) {
+      alert("Subdomain must contain only lowercase letters, numbers, and hyphens without spaces or special characters.");
+      return;
+    }
+    onSubmit({ ...form, subdomain: sub }, () => setForm({ ...EMPTY, admin_password: generatePassword() }));
   };
 
-  const isTrial  = form.plan === 'Trial';
-  const isCustom = form.plan === 'Custom';
+  const selectedPlan = plans.find(p => p.name === form.plan);
+  const isTrial  = selectedPlan?.type === 'trial';
+  const isCustom = selectedPlan?.type === 'custom';
 
   return (
     <Dialog
@@ -53,13 +76,19 @@ export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={creating}>
+          <Button onClick={handleSubmit} disabled={creating || plans.length === 0}>
             {creating ? 'Creating...' : 'Create School'}
           </Button>
         </>
       }
     >
       <form onSubmit={handleSubmit} className="space-y-4">
+        {plans.length === 0 && !loading && (
+          <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-lg text-xs font-bold leading-normal">
+            Please create and activate at least one subscription plan before adding a school.
+          </div>
+        )}
+
         {/* School details */}
         <div className="space-y-1.5">
           <label className="text-xs font-bold text-text-secondary uppercase">School Name</label>
@@ -77,10 +106,16 @@ export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating
         {/* Plan selector */}
         <div className="space-y-1.5">
           <label className="text-xs font-bold text-text-secondary uppercase">Pricing Plan</label>
-          <Select value={form.plan} onChange={set('plan')}>
-            {PRESET_PLANS.map(p => (
-              <option key={p.value} value={p.value}>{p.label}</option>
-            ))}
+          <Select value={form.plan} onChange={set('plan')} disabled={plans.length === 0}>
+            {plans.length === 0 ? (
+              <option value="">No active subscription plans available.</option>
+            ) : (
+              plans.map(p => (
+                <option key={p.id} value={p.name}>
+                  {p.name} — {p.price > 0 ? `₹${Number(p.price).toLocaleString()}` : 'Free'}
+                </option>
+              ))
+            )}
           </Select>
         </div>
 

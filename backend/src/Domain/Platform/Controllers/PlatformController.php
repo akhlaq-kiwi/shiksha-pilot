@@ -242,4 +242,27 @@ class PlatformController extends BaseController
         $id = (int) ($args['id'] ?? 0);
         return $this->success($response, $this->service->getSchoolClasses($id));
     }
+
+    public function getSchoolCredentials(Request $request, Response $response, array $args): Response
+    {
+        $actor = $this->authenticate($request);
+        $this->requireRole($actor, ['SUPER_ADMIN']);
+
+        $id = (int) ($args['id'] ?? 0);
+        $credentials = $this->service->getSchoolCredentials($id, $actor);
+
+        return $this->success($response, $credentials);
+    }
+
+    public function updateSchoolCredentials(Request $request, Response $response, array $args): Response
+    {
+        $actor = $this->authenticate($request);
+        $this->requireRole($actor, ['SUPER_ADMIN']);
+
+        $id = (int) ($args['id'] ?? 0);
+        $body = RequestParser::body($request);
+        $credentials = $this->service->updateSchoolCredentials($id, $body, $actor);
+
+        return $this->success($response, $credentials, 'Credentials updated successfully.');
+    }
 }

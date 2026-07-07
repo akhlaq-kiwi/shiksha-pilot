@@ -128,7 +128,10 @@ const AppLayout = ({ children }) => {
                         </span>
                         <select
                           value={currentYear.id}
-                          onChange={(e) => selectYear(e.target.value)}
+                          onChange={(e) => {
+                            selectYear(e.target.value);
+                            navigate('/school-admin');
+                          }}
                           className="h-8 pl-2 pr-8 text-xs font-black rounded-lg border border-border bg-surface text-text-primary shadow-2xs focus:outline-hidden focus:ring-1 focus:ring-primary appearance-none cursor-pointer relative"
                           style={{
                             backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2371717a' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E")`,

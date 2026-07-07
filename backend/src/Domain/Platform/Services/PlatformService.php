@@ -157,6 +157,13 @@ class PlatformService extends BaseService
 
         $subdomain = strtolower((string) $data['subdomain']);
 
+        if (!preg_match('/^[a-z0-9-]+$/', $subdomain)) {
+            throw new \App\Shared\Exceptions\ValidationException(
+                ['subdomain' => 'Subdomain must contain only lowercase letters, numbers, and hyphens.'],
+                'Subdomain format invalid.'
+            );
+        }
+
         if ($this->schools->findBySubdomain($subdomain) !== null) {
             throw new \App\Shared\Exceptions\ValidationException(
                 ['subdomain' => 'Subdomain prefix already registered.'],
@@ -186,6 +193,8 @@ class PlatformService extends BaseService
                 'status'                => 'ACTIVE',
                 'school_id'             => $schoolId,
                 'force_password_change' => 1,
+                'email'                 => (string) $data['contact_email'],
+                'plain_password'        => (string) ($data['admin_password'] ?? 'changeme123'),
             ]);
         }
 
@@ -233,6 +242,23 @@ class PlatformService extends BaseService
         }
 
         $newSubdomain = strtolower($data['subdomain'] ?? $school['subdomain']);
+
+        if (isset($data['subdomain']) && $newSubdomain !== $school['subdomain']) {
+            if (!preg_match('/^[a-z0-9-]+$/', $newSubdomain)) {
+                throw new \App\Shared\Exceptions\ValidationException(
+                    ['subdomain' => 'Subdomain must contain only lowercase letters, numbers, and hyphens.'],
+                    'Subdomain format invalid.'
+                );
+            }
+            $existing = $this->schools->findBySubdomain($newSubdomain);
+            if ($existing !== null && (int)$existing['id'] !== $id) {
+                throw new \App\Shared\Exceptions\ValidationException(
+                    ['subdomain' => 'Subdomain prefix already registered.'],
+                    'Subdomain prefix already registered.'
+                );
+            }
+        }
+
         $newStatus    = $data['status']        ?? $school['status'];
         $newName      = $data['name']          ?? $school['name'];
         $planChanged  = isset($data['plan']) && $data['plan'] !== $school['plan'];
@@ -419,6 +445,7 @@ class PlatformService extends BaseService
                 ? ($data['student_limit'] !== '' && $data['student_limit'] !== null ? (int) $data['student_limit'] : null)
                 : $plan['student_limit'],
             'description'   => $data['description']  ?? $plan['description'],
+            'is_active'     => isset($data['is_active']) ? (int) $data['is_active'] : $plan['is_active'],
         ]);
 
         return $this->plans->findById($id);
@@ -687,5 +714,131 @@ class PlatformService extends BaseService
         ");
         $stmt->execute([':school_id' => $schoolId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getSchoolCredentials(int $schoolId, array $actor): array
+    {
+        $actorInfo = $this->actorInfo($actor);
+        if (($actorInfo['role'] ?? '') !== 'SUPER_ADMIN') {
+            throw new \App\Shared\Exceptions\ForbiddenException('Access denied.');
+        }
+
+        $school = $this->schools->findById($schoolId);
+        if ($school === null) {
+            throw new NotFoundException('School tenant not found.');
+        }
+
+        $pdo = $this->schools->getPdo();
+        $stmt = $pdo->prepare("SELECT * FROM users WHERE school_id = :sid AND role = 'SCHOOL_ADMIN' LIMIT 1");
+        $stmt->execute([':sid' => $schoolId]);
+        $admin = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$admin) {
+            throw new NotFoundException('School administrator not found.');
+        }
+
+        $this->auditLogs->log(
+            'Viewed Credentials',
+            (string) $school['name'],
+            $actorInfo['name'],
+            (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'),
+            $actorInfo['role']
+        );
+
+        return [
+            'school_name' => $school['name'],
+            'login_url' => $school['subdomain'] . '.shikshapilot.com',
+            'admin_email' => $admin['email'] ?? '',
+            'mobile_number' => $admin['phone'] ?? '',
+            'current_login_id' => $admin['phone'] ?? '',
+            'password' => $admin['plain_password'] ?? 'changeme123',
+        ];
+    }
+
+    public function updateSchoolCredentials(int $schoolId, array $data, array $actor): array
+    {
+        $actorInfo = $this->actorInfo($actor);
+        if (($actorInfo['role'] ?? '') !== 'SUPER_ADMIN') {
+            throw new \App\Shared\Exceptions\ForbiddenException('Access denied.');
+        }
+
+        $school = $this->schools->findById($schoolId);
+        if ($school === null) {
+            throw new NotFoundException('School tenant not found.');
+        }
+
+        $pdo = $this->schools->getPdo();
+        $stmt = $pdo->prepare("SELECT * FROM users WHERE school_id = :sid AND role = 'SCHOOL_ADMIN' LIMIT 1");
+        $stmt->execute([':sid' => $schoolId]);
+        $admin = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$admin) {
+            throw new NotFoundException('School administrator not found.');
+        }
+
+        $email = isset($data['admin_email']) ? trim((string)$data['admin_email']) : '';
+        $phone = isset($data['mobile_number']) ? trim((string)$data['mobile_number']) : '';
+        $password = isset($data['password']) ? (string)$data['password'] : '';
+
+        // Validation Checks
+        if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new \App\Shared\Exceptions\ValidationException(['admin_email' => 'Invalid email format.']);
+        }
+
+        if (empty($phone) || !preg_match('/^[0-9]{10}$/', $phone)) {
+            throw new \App\Shared\Exceptions\ValidationException(['mobile_number' => 'Mobile number must be exactly 10 digits.']);
+        }
+
+        if (empty($password) || strlen($password) < 6) {
+            throw new \App\Shared\Exceptions\ValidationException(['password' => 'Password must be at least 6 characters.']);
+        }
+
+        // Uniqueness validation on email
+        $stmtEmailCheck = $pdo->prepare("SELECT id FROM users WHERE email = :email AND id != :uid LIMIT 1");
+        $stmtEmailCheck->execute([':email' => $email, ':uid' => $admin['id']]);
+        if ($stmtEmailCheck->fetchColumn() !== false) {
+            throw new \App\Shared\Exceptions\ValidationException(['admin_email' => 'Email address already in use.']);
+        }
+
+        // Uniqueness validation on phone
+        $stmtPhoneCheck = $pdo->prepare("SELECT id FROM users WHERE phone = :phone AND id != :uid LIMIT 1");
+        $stmtPhoneCheck->execute([':phone' => $phone, ':uid' => $admin['id']]);
+        if ($stmtPhoneCheck->fetchColumn() !== false) {
+            throw new \App\Shared\Exceptions\ValidationException(['mobile_number' => 'Mobile number already in use.']);
+        }
+
+        // Perform updates and audit logs
+        $updateFields = [];
+        $ip = (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1');
+
+        if ($email !== ($admin['email'] ?? '')) {
+            $updateFields['email'] = $email;
+            $this->auditLogs->log('Updated Credentials', (string)$school['name'], $actorInfo['name'], $ip, $actorInfo['role']);
+        }
+
+        if ($phone !== ($admin['phone'] ?? '')) {
+            $updateFields['phone'] = $phone;
+            $this->auditLogs->log('Changed Login ID', (string)$school['name'], $actorInfo['name'], $ip, $actorInfo['role']);
+            $this->auditLogs->log('Changed Mobile', (string)$school['name'], $actorInfo['name'], $ip, $actorInfo['role']);
+        }
+
+        if ($password !== ($admin['plain_password'] ?? '')) {
+            $updateFields['password'] = password_hash($password, PASSWORD_BCRYPT);
+            $updateFields['plain_password'] = $password;
+            $this->auditLogs->log('Changed Password', (string)$school['name'], $actorInfo['name'], $ip, $actorInfo['role']);
+        }
+
+        if (!empty($updateFields)) {
+            $this->users->update((int)$admin['id'], $updateFields);
+        }
+
+        return [
+            'school_name' => $school['name'],
+            'login_url' => $school['subdomain'] . '.shikshapilot.com',
+            'admin_email' => $email,
+            'mobile_number' => $phone,
+            'current_login_id' => $phone,
+            'password' => $password,
+        ];
     }
 }

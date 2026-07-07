@@ -52,7 +52,12 @@ class AuthController extends BaseController
         $phone    = (string) $body['phone'];
         $password = (string) $body['password'];
 
-        $result = $this->authService->login($phone, $password);
+        $subdomain = $request->getHeaderLine('X-School-Subdomain');
+        if (empty($subdomain)) {
+            $subdomain = null;
+        }
+
+        $result = $this->authService->login($phone, $password, $subdomain);
 
         return $this->success($response, $result, 'Login successful.');
     }

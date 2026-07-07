@@ -9,6 +9,7 @@ import { schoolService } from '../../../common/services/schoolService';
 import { schoolAdminService } from '../../../common/services/schoolAdminService';
 import { Dialog } from '../../../common/ui/dialog';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../../common/ui/table';
+import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 
 const MOCK_AUDIT_LOGS = [
   { id: 1, action: 'Student Enrolled', user: 'admin@school.edu', detail: 'Aryan Mehta enrolled in Class 10A', date: '2026-06-20 09:12' },
@@ -19,6 +20,7 @@ const MOCK_AUDIT_LOGS = [
 ];
 
 export default function DashboardPage({ onNavigate }) {
+  const { currentYear } = useAcademicYear();
   const [students, setStudents] = useState([]);
   const [staff, setStaff] = useState([]);
   const [exams, setExams] = useState([]);
@@ -44,6 +46,7 @@ export default function DashboardPage({ onNavigate }) {
   const [timetableError, setTimetableError] = useState('');
 
   const fetchDashboardData = async () => {
+    setLoading(true);
     try {
       const [stuData, stfData, exData, fpData, statsData, classesList, settings] = await Promise.all([
         schoolService.getStudents(),
@@ -81,7 +84,7 @@ export default function DashboardPage({ onNavigate }) {
 
   useEffect(() => {
     fetchDashboardData();
-  }, []);
+  }, [currentYear?.id]);
 
   const getTodayLocalDateStr = () => {
     const d = new Date();
@@ -128,7 +131,7 @@ export default function DashboardPage({ onNavigate }) {
     if (selectedClassId) {
       loadTodayTimetable();
     }
-  }, [selectedClassId]);
+  }, [selectedClassId, currentYear?.id]);
 
   const getPeriodTimingStr = (num) => {
     const conf = periodConfigs.find(c => c.period_number === num);

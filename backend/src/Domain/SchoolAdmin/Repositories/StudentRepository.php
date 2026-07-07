@@ -26,6 +26,11 @@ class StudentRepository extends BaseRepository
             $bindings[':status'] = $filters['status'];
         }
 
+        if (!empty($filters['academic_year_id'])) {
+            $where .= ' AND s.academic_year_id = :academic_year_id';
+            $bindings[':academic_year_id'] = $filters['academic_year_id'];
+        }
+
         if (!empty($filters['search'])) {
             $where .= ' AND (s.name LIKE :search OR s.admission_no LIKE :search OR s.sr_no LIKE :search OR s.first_name LIKE :search OR s.last_name LIKE :search)';
             $bindings[':search'] = '%' . $filters['search'] . '%';
@@ -75,12 +80,19 @@ class StudentRepository extends BaseRepository
         return $row !== false ? $row : null;
     }
 
-    public function countBySchool(int $schoolId, string $status = 'ACTIVE'): int
+    public function countBySchool(int $schoolId, string $status = 'ACTIVE', ?int $academicYearId = null): int
     {
-        $stmt = $this->pdo->prepare(
-            "SELECT COUNT(*) FROM students WHERE school_id = :sid AND status = :status"
-        );
-        $stmt->execute([':sid' => $schoolId, ':status' => $status]);
+        if ($academicYearId !== null) {
+            $stmt = $this->pdo->prepare(
+                "SELECT COUNT(*) FROM students WHERE school_id = :sid AND status = :status AND academic_year_id = :ayid"
+            );
+            $stmt->execute([':sid' => $schoolId, ':status' => $status, ':ayid' => $academicYearId]);
+        } else {
+            $stmt = $this->pdo->prepare(
+                "SELECT COUNT(*) FROM students WHERE school_id = :sid AND status = :status"
+            );
+            $stmt->execute([':sid' => $schoolId, ':status' => $status]);
+        }
 
         return (int) $stmt->fetchColumn();
     }

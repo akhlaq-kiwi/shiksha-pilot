@@ -3,10 +3,30 @@ const BASE_URL = '';
 async function request(endpoint, options = {}) {
   const token = localStorage.getItem('shiksha_pilot_token');
   
+  // Parse subdomain dynamically from hostname
+  const hostname = window.location.hostname;
+  const parts = hostname.split('.');
+  let subdomain = '';
+  if (parts.length > 2) {
+    if (parts[parts.length - 1] === 'localhost') {
+      subdomain = parts[0];
+    } else {
+      if (parts[0] !== 'qa' && parts[0] !== 'www' && parts[0] !== 'superadmin') {
+        subdomain = parts[0];
+      }
+    }
+  } else if (parts.length === 2 && parts[1] === 'localhost') {
+    subdomain = parts[0];
+  }
+
   const headers = {
     'Accept': 'application/json',
     ...options.headers,
   };
+
+  if (subdomain) {
+    headers['X-School-Subdomain'] = subdomain;
+  }
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;

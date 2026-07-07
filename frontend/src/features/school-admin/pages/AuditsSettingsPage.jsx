@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Plus, CheckCircle2, ChevronRight, UserCog, Users, ShieldAlert, Award, FileSpreadsheet, ArrowLeft, RefreshCw, Check, Lock, Save, Trash2 } from 'lucide-react';
+import { Plus, CheckCircle2, ChevronRight, UserCog, Users, ShieldAlert, Award, FileSpreadsheet, ArrowLeft, RefreshCw, Check, Lock, Save, Trash2, Loader2 } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
@@ -372,7 +372,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
   }, []);
 
   const fetchConfiguredClasses = async () => {
-    const activeYear = currentYear || academicYears.find(y => y.is_current) || academicYears.find(y => y.status === 'Draft');
+    const activeYear = currentYear || academicYears.find(y => y.is_current);
     if (!activeYear) return;
     try {
       const res = await schoolService.getClassFeeConfigurations({
@@ -409,7 +409,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
         return;
       }
 
-      const activeYear = currentYear || academicYears.find(y => y.is_current) || academicYears.find(y => y.status === 'Draft');
+      const activeYear = currentYear || academicYears.find(y => y.is_current);
       if (!activeYear) return;
 
       try {
@@ -457,7 +457,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
       return;
     }
 
-    const activeYear = currentYear || academicYears.find(y => y.is_current) || academicYears.find(y => y.status === 'Draft');
+    const activeYear = currentYear || academicYears.find(y => y.is_current);
     if (!activeYear) {
       setFeeError('Academic year not found. Please create an Academic Year first.');
       return;
@@ -491,7 +491,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
     setFeeError('');
     setFeeSuccess('');
 
-    const activeYear = currentYear || academicYears.find(y => y.is_current) || academicYears.find(y => y.status === 'Draft');
+    const activeYear = currentYear || academicYears.find(y => y.is_current);
     if (!activeYear) return;
 
     const feesMap = {};
@@ -735,16 +735,17 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
         student_migrations: studentMigrations,
       };
 
-      await schoolService.migrateAcademicYear(targetYear.id, payload);
+      const res = await schoolService.migrateAcademicYear(targetYear.id, payload);
 
       setSuccess(`Academic Year ${targetYear.name} migration executed successfully.`);
       setIsWizardOpen(false);
       setShowConfirmExecute(false);
+      localStorage.setItem('shiksha_pilot_academic_year_id', String(res.id || targetYear.id));
       loadData();
       
-      // Auto reload after a brief moment to update app-wide contexts
+      // Redirect to Dashboard and load fresh academic year context
       setTimeout(() => {
-        window.location.reload();
+        window.location.replace('/school-admin');
       }, 1500);
     } catch (err) {
       console.error(err);
@@ -755,12 +756,19 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
   };
 
   const handleMigrateClick = (year) => {
-    const draftYear = academicYears.find(y => y.status === 'Draft');
-    if (!draftYear) {
-      setShowNoDraftWarning(true);
-    } else {
-      startActivation(draftYear);
-    }
+    const getNextYearName = (currentName) => {
+      if (!currentName) return '';
+      const match = currentName.match(/(\d{4})[-–](\d{4})/);
+      if (match) {
+        const y1 = parseInt(match[1], 10) + 1;
+        const y2 = parseInt(match[2], 10) + 1;
+        return `${y1}–${y2}`;
+      }
+      return '';
+    };
+
+    const targetYearName = getNextYearName(year.name);
+    startActivation({ ...year, name: targetYearName });
   };
 
   const handleActivateDirectClick = (year) => {
@@ -781,6 +789,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
       await schoolService.activateAcademicYear(activateTargetYear.id, {});
       setSuccess(`Academic Year ${activateTargetYear.name} is now ACTIVE.`);
       setShowActivateConfirm(false);
+      localStorage.setItem('shiksha_pilot_academic_year_id', String(activateTargetYear.id));
       loadData();
       setTimeout(() => {
         window.location.reload();
@@ -835,11 +844,6 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
       <Card className="shadow-sm">
         <CardHeader className="py-3 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-bold text-text-primary">Academic Years</CardTitle>
-          {!isReadOnly && (
-            <Button onClick={openCreateModal} className="h-8 font-bold flex items-center gap-1.5 shadow-sm text-xs">
-              <Plus className="h-3.5 w-3.5" /> Create Academic Year
-            </Button>
-          )}
         </CardHeader>
         <CardContent className="p-0">
           <Table>
@@ -853,7 +857,15 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {academicYears.length === 0 ? (
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-8 text-text-secondary text-xs">
+                    <span className="flex items-center justify-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" /> Loading Academic Years...
+                    </span>
+                  </TableCell>
+                </TableRow>
+              ) : academicYears.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center py-8 text-text-muted text-xs">
                     No academic years defined. Please create one to start.
@@ -870,10 +882,6 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-green-500/10 text-green-600 border border-green-500/20">
                           Active
                         </span>
-                      ) : year.status === 'Draft' ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-500/10 text-amber-600 border border-amber-500/20">
-                          Draft
-                        </span>
                       ) : (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 border border-border">
                           Archived
@@ -881,14 +889,6 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      {!isReadOnly && year.status === 'Draft' && (
-                        <Button 
-                          onClick={() => handleActivateDirectClick(year)}
-                          className="h-7 px-3 text-[10px] font-bold bg-green-600 hover:bg-green-700 text-white"
-                        >
-                          Activate
-                        </Button>
-                      )}
                       {!isReadOnly && !!(year.status === 'ACTIVE' || year.is_current) && (
                         year.migration_status === 'Completed' ? (
                           <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold uppercase bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 border border-border select-none">
@@ -1414,7 +1414,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
         isOpen={isWizardOpen} 
         onClose={() => setIsWizardOpen(false)}
         title="Academic Year Rollover Migration"
-        description={`Migrate teachers, classes, and promote students into the ${targetYear?.name || ''} Draft session.`}
+        description={`Migrate teachers, classes, and promote students into the ${targetYear?.name || ''} academic session.`}
       >
         <div className="space-y-6 pt-4">
           
@@ -1608,6 +1608,12 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                   </p>
                 </Card>
                 <Card className="p-4 shadow-2xs">
+                  <p className="text-text-muted uppercase text-[9px] font-bold tracking-wider">Inactive Teachers Skipped</p>
+                  <p className="text-lg font-black text-red-500 mt-1 font-display font-display">
+                    {staff.filter(s => (s.role === 'TEACHER' || s.role === 'Teacher') && s.status !== 'ACTIVE').length}
+                  </p>
+                </Card>
+                <Card className="p-4 shadow-2xs">
                   <p className="text-text-muted uppercase text-[9px] font-bold tracking-wider">Students Promoted</p>
                   <p className="text-lg font-black text-teal-600 mt-1 font-display">
                     {reviewCounts.promoted}
@@ -1617,6 +1623,12 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                   <p className="text-text-muted uppercase text-[9px] font-bold tracking-wider">Students Repeating</p>
                   <p className="text-lg font-black text-amber-600 mt-1 font-display">
                     {reviewCounts.repeating}
+                  </p>
+                </Card>
+                <Card className="p-4 shadow-2xs">
+                  <p className="text-text-muted uppercase text-[9px] font-bold tracking-wider">Inactive Students Skipped</p>
+                  <p className="text-lg font-black text-red-500 mt-1 font-display font-display">
+                    {students.filter(s => s.status !== 'ACTIVE').length}
                   </p>
                 </Card>
                 <Card className="p-4 shadow-2xs col-span-2">
@@ -1784,33 +1796,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
         </div>
       )}
 
-      {/* No Draft Warning Modal */}
-      {showNoDraftWarning && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-          <div className="bg-surface border border-border rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col p-6 space-y-4">
-            <h3 className="font-extrabold text-text-primary text-base tracking-tight text-center font-display">
-              No Draft Academic Year Found
-            </h3>
-            <p className="text-xs text-text-secondary text-center leading-relaxed">
-              Please create the next Academic Year before migrating students and teachers.
-            </p>
-            <div className="flex gap-3 justify-center pt-2">
-              <Button variant="secondary" onClick={() => setShowNoDraftWarning(false)}>
-                Cancel
-              </Button>
-              <Button 
-                onClick={() => {
-                  setShowNoDraftWarning(false);
-                  openCreateModal();
-                }}
-                className="font-bold"
-              >
-                Create Academic Year
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {/* Dialog: Confirm Save Period Configuration */}
       <Dialog
