@@ -362,11 +362,11 @@ class SchoolAdminService extends BaseService
                 $activeStudents = $stmtStudents->fetchAll(\PDO::FETCH_ASSOC);
 
                 if (!empty($activeStudents)) {
-                    // Fetch all locked class configurations for this year
+                    // Fetch all class configurations for this year
                     $stmtConfigs = $pdo->prepare("
                         SELECT class_id, monthly_fees 
                         FROM class_fee_configurations 
-                        WHERE school_id = :sid AND academic_year_id = :ayid AND is_locked = 1
+                        WHERE school_id = :sid AND academic_year_id = :ayid
                     ");
                     $stmtConfigs->execute([
                         ':sid' => $schoolId,
@@ -621,12 +621,12 @@ class SchoolAdminService extends BaseService
         $examStmt->execute([':student_id' => $id]);
         $examResults = $examStmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // Query locked class fee configuration
+        // Query class fee configuration
         $classFeeConfig = null;
         if ($workingYearClassId !== null) {
             $stmtCfg = $pdo->prepare("
                 SELECT * FROM class_fee_configurations 
-                WHERE school_id = :school_id AND class_id = :class_id AND academic_year_id = :academic_year_id AND is_locked = 1
+                WHERE school_id = :school_id AND class_id = :class_id AND academic_year_id = :academic_year_id
                 LIMIT 1
             ");
             $stmtCfg->execute([
@@ -2596,7 +2596,7 @@ class SchoolAdminService extends BaseService
 
         $stmtCfg = $pdo->prepare("
             SELECT monthly_fees FROM class_fee_configurations 
-            WHERE school_id = :school_id AND class_id = :class_id AND academic_year_id = :academic_year_id AND is_locked = 1
+            WHERE school_id = :school_id AND class_id = :class_id AND academic_year_id = :academic_year_id
             LIMIT 1
         ");
         $stmtCfg->execute([
@@ -3840,12 +3840,12 @@ class SchoolAdminService extends BaseService
             }
         }
 
-        // Fetch locked class fee config
+        // Fetch class fee config
         $classFeeConfig = null;
         if ($classId !== null && $academicYearId !== null) {
             $stmtCfg = $pdo->prepare("
                 SELECT monthly_fees FROM class_fee_configurations 
-                WHERE school_id = :school_id AND class_id = :class_id AND academic_year_id = :academic_year_id AND is_locked = 1
+                WHERE school_id = :school_id AND class_id = :class_id AND academic_year_id = :academic_year_id
                 LIMIT 1
             ");
             $stmtCfg->execute([
@@ -4307,7 +4307,7 @@ class SchoolAdminService extends BaseService
         $academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
         foreach ($academicMonths as $m) {
             if ($mode === 'SAME' && count($monthlyFees) === 0) {
-                throw new ValidationException(['monthly_fees' => 'Fee amount must be greater than zero.']);
+                throw new ValidationException(['monthly_fees' => 'Monthly fee must be greater than ₹0.']);
             }
 
             $val = isset($monthlyFees[$m]) ? $monthlyFees[$m] : null;
@@ -4318,13 +4318,13 @@ class SchoolAdminService extends BaseService
             if ($val !== null && $val !== '') {
                 $valFloat = (float)$val;
                 if ($valFloat <= 0) {
-                    throw new ValidationException(['monthly_fees' => 'Fee amount must be greater than zero.']);
+                    throw new ValidationException(['monthly_fees' => 'Monthly fee must be greater than ₹0.']);
                 }
             }
         }
 
-        // Check if configuration already exists and is locked
-        $stmtCheck = $pdo->prepare("SELECT is_locked FROM class_fee_configurations WHERE school_id = :school_id AND class_id = :class_id AND academic_year_id = :academic_year_id LIMIT 1");
+        // Fetch existing configuration if any
+        $stmtCheck = $pdo->prepare("SELECT * FROM class_fee_configurations WHERE school_id = :school_id AND class_id = :class_id AND academic_year_id = :academic_year_id LIMIT 1");
         $stmtCheck->execute([
             ':school_id' => $schoolId,
             ':class_id' => $classId,
@@ -4332,13 +4332,45 @@ class SchoolAdminService extends BaseService
         ]);
         $existing = $stmtCheck->fetch(PDO::FETCH_ASSOC);
 
-        if ($existing && (int)$existing['is_locked'] === 1) {
-            throw new ValidationException(['lock' => 'Class fee configuration is locked and cannot be changed.']);
+        // Compute currentMonthIdx relative to the active Academic Year
+        $stmtYear = $pdo->prepare("SELECT * FROM academic_years WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtYear->execute([':id' => $academicYearId, ':sid' => $schoolId]);
+        $ay = $stmtYear->fetch(PDO::FETCH_ASSOC);
+        
+        $currentMonthIdx = -1; // Default: future academic year
+        if ($ay) {
+            $now = new \DateTime();
+            $start = new \DateTime($ay['start_date']);
+            $end = new \DateTime($ay['end_date']);
+            
+            if ($now < $start) {
+                $currentMonthIdx = -1;
+            } elseif ($now > $end) {
+                $currentMonthIdx = 11; // past academic year
+            } else {
+                $currentMonthName = $now->format('F');
+                $idx = array_search($currentMonthName, $academicMonths, true);
+                if ($idx !== false) {
+                    $currentMonthIdx = $idx;
+                } else {
+                    $currentMonthIdx = 2; // fallback to June
+                }
+            }
         }
 
-        $jsonFees = json_encode($monthlyFees);
-
         if ($existing) {
+            $oldMonthlyFees = json_decode($existing['monthly_fees'], true) ?: [];
+            $mergedMonthlyFees = [];
+            foreach ($academicMonths as $index => $m) {
+                if ($index <= $currentMonthIdx && isset($oldMonthlyFees[$m])) {
+                    $mergedMonthlyFees[$m] = $oldMonthlyFees[$m];
+                } else {
+                    $mergedMonthlyFees[$m] = isset($monthlyFees[$m]) ? $monthlyFees[$m] : (isset($oldMonthlyFees[$m]) ? $oldMonthlyFees[$m] : 0);
+                }
+            }
+            $jsonFees = json_encode($mergedMonthlyFees);
+            $monthlyFees = $mergedMonthlyFees;
+
             $stmtUpdate = $pdo->prepare("
                 UPDATE class_fee_configurations 
                 SET mode = :mode, monthly_fees = :monthly_fees 
@@ -4352,6 +4384,7 @@ class SchoolAdminService extends BaseService
                 ':academic_year_id' => $academicYearId
             ]);
         } else {
+            $jsonFees = json_encode($monthlyFees);
             $stmtInsert = $pdo->prepare("
                 INSERT INTO class_fee_configurations (school_id, class_id, academic_year_id, mode, monthly_fees, is_locked)
                 VALUES (:school_id, :class_id, :academic_year_id, :mode, :monthly_fees, 0)
@@ -4371,7 +4404,7 @@ class SchoolAdminService extends BaseService
             'academic_year_id' => $academicYearId,
             'mode' => $mode,
             'monthly_fees' => $monthlyFees,
-            'is_locked' => 0
+            'is_locked' => $existing ? (int)$existing['is_locked'] : 0
         ];
     }
 

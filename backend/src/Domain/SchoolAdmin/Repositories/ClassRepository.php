@@ -19,7 +19,7 @@ class ClassRepository extends BaseRepository
                 FROM classes c
                 LEFT JOIN academic_years ay ON c.academic_year_id = ay.id
                 WHERE c.school_id = :sid AND c.academic_year_id = :ayid
-                ORDER BY c.id DESC
+                ORDER BY c.id ASC
             ");
             $stmt->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
         } else {
@@ -28,7 +28,7 @@ class ClassRepository extends BaseRepository
                 FROM classes c
                 LEFT JOIN academic_years ay ON c.academic_year_id = ay.id
                 WHERE c.school_id = :sid
-                ORDER BY c.id DESC
+                ORDER BY c.id ASC
             ");
             $stmt->execute([':sid' => $schoolId]);
         }

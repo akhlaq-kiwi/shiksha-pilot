@@ -150,11 +150,15 @@ export default function ClassesPage() {
         groups[c.name] = {
           name: c.name,
           sections: [],
-          studentCount: 0
+          studentCount: 0,
+          minId: c.id
         };
       }
       if (c.section) {
         groups[c.name].sections.push(c.section);
+      }
+      if (c.id < groups[c.name].minId) {
+        groups[c.name].minId = c.id;
       }
     });
 
@@ -164,7 +168,7 @@ export default function ClassesPage() {
       groups[name].studentCount = students.filter(s => s.class_name === name).length;
     });
 
-    return Object.values(groups).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    return Object.values(groups).sort((a, b) => a.minId - b.minId);
   };
 
   if (loading) {

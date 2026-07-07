@@ -842,9 +842,13 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
     );
   }
 
-  // Extract unique class names for select dropdown list
-  const uniqueClassNames = Array.from(new Set(classesList.map(c => c.name)))
-    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  // Extract unique class names in their creation order
+  const uniqueClassNames = [];
+  classesList.forEach(c => {
+    if (!uniqueClassNames.includes(c.name)) {
+      uniqueClassNames.push(c.name);
+    }
+  });
 
   return (
     <div className="space-y-4 animate-in fade-in duration-200">

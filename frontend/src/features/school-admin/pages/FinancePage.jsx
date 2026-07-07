@@ -21,6 +21,8 @@ const getStatusBadgeStyles = (status) => {
   const map = {
     PAID: 'bg-green-100 text-green-800 dark:bg-green-950/30 dark:text-green-400 border-green-200 dark:border-green-900/30',
     PENDING: 'bg-amber-100 text-amber-800 dark:bg-amber-950/30 dark:text-amber-400 border-amber-200 dark:border-amber-900/30',
+    PARTIAL: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/30 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900/30',
+    '—': 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700',
     OVERDUE: 'bg-orange-100 text-orange-800 dark:bg-orange-950/30 dark:text-orange-400 border-orange-200 dark:border-orange-900/30',
     CRITICAL: 'bg-red-100 text-red-800 dark:bg-red-950/30 dark:text-red-400 border-red-200 dark:border-red-900/30',
     DEFAULT: 'bg-rose-900/10 text-rose-900 dark:bg-rose-950/30 dark:text-rose-400 border-rose-300 dark:border-rose-900/30',
@@ -207,6 +209,9 @@ export default function FinancePage() {
     const paidMonths = paymentsByStudent[student.id] || [];
     const monthlyFees = feeConfigMap[student.class_id] || {};
     
+    // Check if monthly fees are configured at all
+    const hasConfiguredFees = Object.keys(monthlyFees).length > 0 && Object.values(monthlyFees).some(v => parseFloat(v) > 0);
+
     let unpaidCount = 0;
     let outstandingDues = 0;
 
@@ -223,21 +228,18 @@ export default function FinancePage() {
     const unpaidAddAmt = additionalUnpaidByStudent[student.id] || 0;
     outstandingDues += unpaidAddAmt;
 
-    const addCount = unpaidAddCountByStudent[student.id] || 0;
-    const totalUnpaidCount = unpaidCount + addCount;
+    const paidAddCount = additionalFeePayments.filter(p => parseInt(p.student_id, 10) === student.id && p.status === 'Paid').length;
+    const hasPayments = paidMonths.length > 0 || paidAddCount > 0;
 
-    // Assign status badge based on count of unpaid past months and additional fee items
     let status = 'PAID';
-    if (hasPreviousYearDuesByStudent[student.id]) {
-      status = 'DEFAULT';
-    } else if (totalUnpaidCount === 1) {
-      status = 'PENDING';
-    } else if (totalUnpaidCount === 2) {
-      status = 'OVERDUE';
-    } else if (totalUnpaidCount === 3) {
-      status = 'CRITICAL';
-    } else if (totalUnpaidCount >= 4) {
-      status = 'DEFAULT';
+    if (!hasConfiguredFees) {
+      status = '—';
+    } else if (outstandingDues > 0) {
+      if (hasPayments) {
+        status = 'PARTIAL';
+      } else {
+        status = 'PENDING';
+      }
     }
 
     return {
@@ -324,9 +326,8 @@ export default function FinancePage() {
               <option value="ALL">All Statuses</option>
               <option value="PAID">PAID</option>
               <option value="PENDING">PENDING</option>
-              <option value="OVERDUE">OVERDUE</option>
-              <option value="CRITICAL">CRITICAL</option>
-              <option value="DEFAULT">DEFAULT</option>
+              <option value="PARTIAL">PARTIAL</option>
+              <option value="—">NOT CONFIGURD (—)</option>
             </Select>
           </div>
         </div>

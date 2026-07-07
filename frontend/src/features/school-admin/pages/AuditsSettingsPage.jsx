@@ -424,7 +424,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
         if (res && res.length > 0) {
           const config = res[0];
           setFeeMode(config.mode);
-          setIsConfigLocked(!!config.is_locked);
+          setIsConfigLocked(false); // Ignore is_locked: monthly fee must be editable whenever required
           
           if (config.mode === 'SAME') {
             setSameFeeAmount(config.monthly_fees.April || '');
@@ -467,7 +467,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
 
     if (feeMode === 'SAME') {
       if (!sameFeeAmount || parseFloat(sameFeeAmount) <= 0) {
-        setFeeError('Fee amount must be greater than zero.');
+        setFeeError('Monthly fee must be greater than ₹0.');
         return;
       }
     } else {
@@ -479,7 +479,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
           return;
         }
         if (parseFloat(val) <= 0) {
-          setFeeError('Fee amount must be greater than zero.');
+          setFeeError('Monthly fee must be greater than ₹0.');
           return;
         }
       }
@@ -517,13 +517,8 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
         monthly_fees: feesMap
       });
 
-      await schoolService.lockClassFeeConfiguration({
-        class_id: parseInt(selectedClassId, 10),
-        academic_year_id: activeYear.id
-      });
-
-      setFeeSuccess('Fee configuration saved and locked successfully.');
-      setIsConfigLocked(true);
+      setFeeSuccess('Fee configuration saved successfully.');
+      setIsConfigLocked(false);
       fetchConfiguredClasses();
       setSelectedClassId('');
     } catch (err) {
@@ -1375,17 +1370,16 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
         </CardContent>
       </Card>
 
-      {/* Save & Lock Confirmation Modal */}
+      {/* Save Confirmation Modal */}
       {showLockConfirm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-surface border border-border rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col p-6 space-y-4">
             <h3 className="font-extrabold text-text-primary text-base tracking-tight text-center font-display">
-              Confirm Fee Lock
+              Confirm Save
             </h3>
             <p className="text-xs text-text-secondary text-center leading-relaxed">
-              Class fee configuration cannot be changed after saving. <br />
-              Please verify all monthly fee amounts carefully. <br />
-              Are you sure?
+              Are you sure you want to save the class fee configuration? <br />
+              This will update future unpaid billing cycles.
             </p>
             <div className="flex gap-3 justify-center pt-2">
               <Button variant="secondary" onClick={() => setShowLockConfirm(false)}>
@@ -1393,9 +1387,9 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
               </Button>
               <Button 
                 onClick={handleSaveAndLockConfig} 
-                className="font-bold"
+                className="font-bold bg-primary hover:bg-primary/95 text-white"
               >
-                Save & Lock
+                Save
               </Button>
             </div>
           </div>

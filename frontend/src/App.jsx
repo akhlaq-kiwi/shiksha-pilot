@@ -1,5 +1,5 @@
-import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { authService } from './common/services/authService';
 import { ROLE_HOME } from './routes/roleMap';
 
@@ -19,9 +19,20 @@ function RootRedirect() {
   return <Navigate to={ROLE_HOME[role] || '/login'} replace />;
 }
 
+function ScrollToTop() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
+  return null;
+}
+
 export default function App() {
   return (
     <AcademicYearProvider>
+      <ScrollToTop />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/" element={<RootRedirect />} />
