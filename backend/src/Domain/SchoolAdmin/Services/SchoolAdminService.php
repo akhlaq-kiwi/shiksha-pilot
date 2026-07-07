@@ -424,13 +424,14 @@ class SchoolAdminService extends BaseService
                 WHERE afp.school_id = :sid
                   AND afp.status = 'Pending'
                   AND s.status = 'ACTIVE'
-                  AND s.academic_year_id = :ayid
-                  AND aft.academic_year_id = :ayid
+                  AND s.academic_year_id = :ayid_stu
+                  AND aft.academic_year_id = :ayid_fee
                   AND (aft.due_date <= :today OR aft.name = 'Previous Year Dues')
             ");
             $stmtAddPending->execute([
                 ':sid' => $schoolId,
-                ':ayid' => $activeYear['id'],
+                ':ayid_stu' => $activeYear['id'],
+                ':ayid_fee' => $activeYear['id'],
                 ':today' => $today
             ]);
             $pendingAddFees = (float)$stmtAddPending->fetchColumn();
