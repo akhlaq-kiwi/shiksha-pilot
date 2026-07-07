@@ -35,6 +35,8 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
   const [activateTargetYear, setActivateTargetYear] = useState(null);
   const [showActivateConfirm, setShowActivateConfirm] = useState(false);
   const [showMigrationAlertModal, setShowMigrationAlertModal] = useState(false);
+  const [showNoDraftModal, setShowNoDraftModal] = useState(false);
+  const [creatingDraft, setCreatingDraft] = useState(false);
 
   // Class Fee Configuration States
   const [selectedClassId, setSelectedClassId] = useState('');
@@ -694,7 +696,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
       setIsWizardOpen(true);
     } catch (err) {
       console.error(err);
-      alert('Failed to load school data for the activation wizard.');
+      setError('Failed to load school data for the activation wizard.');
     }
   };
 
@@ -752,7 +754,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
       }, 1500);
     } catch (err) {
       console.error(err);
-      alert(err.message || 'Migration failed. Please check validation rules.');
+      setError(err.message || 'Migration failed. Please check validation rules.');
     } finally {
       setExecuting(false);
     }
@@ -761,10 +763,55 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
   const handleMigrateClick = (year) => {
     const draftYear = academicYears.find(y => y.status === 'Draft');
     if (!draftYear) {
-      alert("No Draft Academic Year Found. Please create one first.");
+      setShowNoDraftModal(true);
       return;
     }
     startActivation(draftYear);
+  };
+
+  const handleAutoCreateDraft = async () => {
+    setCreatingDraft(true);
+    setError('');
+    
+    let nextSessionName = '';
+    let nextStartDate = '';
+    let nextEndDate = '';
+
+    const sorted = [...academicYears].sort((a, b) => new Date(b.end_date) - new Date(a.end_date));
+    if (sorted.length > 0) {
+      const parts = sorted[0].name.trim().split(/[-–—]/);
+      if (parts.length === 2) {
+        const start = parseInt(parts[0], 10);
+        const end = parseInt(parts[1], 10);
+        nextSessionName = `${start + 1}–${end + 1}`;
+        nextStartDate = `${start + 1}-04-01`;
+        nextEndDate = `${end + 1}-03-31`;
+      }
+    } else {
+      const currentYearVal = new Date().getFullYear();
+      nextSessionName = `${currentYearVal}–${currentYearVal + 1}`;
+      nextStartDate = `${currentYearVal}-04-01`;
+      nextEndDate = `${currentYearVal + 1}-03-31`;
+    }
+
+    try {
+      await schoolService.createAcademicYear({
+        name: nextSessionName,
+        start_date: nextStartDate,
+        end_date: nextEndDate
+      });
+      setSuccess(`Draft Academic Year ${nextSessionName} created successfully.`);
+      setShowNoDraftModal(false);
+      if (refreshYears) {
+        await refreshYears();
+      }
+      loadData();
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Failed to create Draft Academic Year.');
+    } finally {
+      setCreatingDraft(false);
+    }
   };
 
   const handleActivateDirectClick = (year) => {
@@ -792,7 +839,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
       }, 1500);
     } catch (err) {
       console.error(err);
-      alert(err.message || 'Activation failed.');
+      setError(err.message || 'Activation failed.');
     }
   };
 
@@ -1918,6 +1965,37 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
               Okay
             </Button>
           </div>
+        </div>
+      </Dialog>
+
+      {/* Draft Academic Year Required Dialog Modal */}
+      <Dialog
+        isOpen={showNoDraftModal}
+        onClose={() => setShowNoDraftModal(false)}
+        title="Draft Academic Year Required"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setShowNoDraftModal(false)}>Cancel</Button>
+            <Button 
+              className="bg-primary hover:bg-primary/95 text-white font-bold" 
+              onClick={handleAutoCreateDraft}
+              disabled={creatingDraft}
+            >
+              {creatingDraft ? 'Creating...' : 'Create Draft Academic Year'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4 pt-2">
+          <p className="text-sm text-text-secondary leading-relaxed">
+            No Draft Academic Year exists for the upcoming session.
+          </p>
+          <p className="text-sm text-text-secondary leading-relaxed">
+            A Draft Academic Year is required before migration can begin.
+          </p>
+          <p className="text-sm font-semibold text-text-primary pt-2 leading-relaxed">
+            Would you like to create it now?
+          </p>
         </div>
       </Dialog>
     </div>

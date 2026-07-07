@@ -6,16 +6,12 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../..
 import { Input } from '../../../common/ui/input';
 
 export default function LoginForm({ onLoginSuccess }) {
-  const [step, setStep] = useState('login'); // login, forgot, otp-verify, reset-pass
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
-  const [otp, setOtp] = useState('');
-  const [newPassword, setNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
 
   const handlePasswordLogin = async (e) => {
     e.preventDefault();
@@ -27,54 +23,6 @@ export default function LoginForm({ onLoginSuccess }) {
       onLoginSuccess(data.user);
     } catch (err) {
       setError(err.message || 'Invalid phone or password credentials');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleForgotPassword = async (e) => {
-    e.preventDefault();
-    if (!phone) return;
-    setLoading(true);
-    setError('');
-    try {
-      await authService.forgotPassword(phone);
-      setSuccessMsg('OTP code sent to your mobile phone number.');
-      setStep('otp-verify');
-    } catch (err) {
-      setError(err.message || 'Forgot password failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyOtp = async (e) => {
-    e.preventDefault();
-    if (!phone || !otp) return;
-    setLoading(true);
-    setError('');
-    try {
-      await authService.verifyOtp(phone, otp);
-      setStep('reset-pass');
-    } catch (err) {
-      setError(err.message || 'OTP verification failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResetPassword = async (e) => {
-    e.preventDefault();
-    if (!phone || !otp || !newPassword) return;
-    setLoading(true);
-    setError('');
-    try {
-      await authService.resetPassword(phone, otp, newPassword);
-      setSuccessMsg('Password reset successfully. You can now login.');
-      setStep('login');
-      setPassword('');
-    } catch (err) {
-      setError(err.message || 'Reset password failed');
     } finally {
       setLoading(false);
     }
@@ -99,124 +47,45 @@ export default function LoginForm({ onLoginSuccess }) {
             </div>
           )}
 
-          {successMsg && (
-            <div className="p-3 bg-green-500/10 border border-green-500/20 text-green-600 rounded-md text-xs font-semibold">
-              {successMsg}
+          <form onSubmit={handlePasswordLogin} className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-text-secondary uppercase">Mobile Phone Number</label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />
+                <Input 
+                  placeholder="e.g. 9876543210" 
+                  className="pl-9"
+                  value={phone}
+                  onChange={e => setPhone(e.target.value)}
+                  required
+                />
+              </div>
             </div>
-          )}
-
-          {step === 'login' && (
-            <form onSubmit={handlePasswordLogin} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-text-secondary uppercase">Mobile Phone Number</label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />
-                  <Input 
-                    placeholder="e.g. 9876543210" 
-                    className="pl-9"
-                    value={phone}
-                    onChange={e => setPhone(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-text-secondary uppercase">Password</label>
-                <div className="relative">
-                  <Key className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />
-                  <Input 
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="••••••••" 
-                    className="pl-9 pr-10"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-2.5 text-text-muted hover:text-text-primary"
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-                <div className="flex justify-end">
-                  <button 
-                    type="button" 
-                    onClick={() => setStep('forgot')}
-                    className="text-xs text-zinc-500 hover:text-zinc-900 hover:underline pt-1"
-                  >
-                    Forgot Password?
-                  </button>
-                </div>
-              </div>
-              <Button type="submit" className="w-full flex justify-center items-center gap-2 py-2.5" disabled={loading}>
-                {loading ? <RefreshCw className="h-4 w-4 animate-spin" /> : 'Login'}
-              </Button>
-            </form>
-          )}
-
-          {step === 'forgot' && (
-            <form onSubmit={handleForgotPassword} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-text-secondary uppercase">Mobile Phone Number</label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />
-                  <Input 
-                    placeholder="e.g. 9876543210" 
-                    className="pl-9"
-                    value={phone}
-                    onChange={e => setPhone(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-              <p className="text-xs text-text-secondary">We will send an OTP verification code to reset your account password.</p>
-              <Button type="submit" className="w-full flex justify-center items-center gap-2 py-2.5" disabled={loading}>
-                {loading ? <RefreshCw className="h-4 w-4 animate-spin" /> : 'Send Reset OTP'}
-              </Button>
-              <Button type="button" variant="outline" className="w-full py-2.5" onClick={() => setStep('login')}>Cancel</Button>
-            </form>
-          )}
-
-          {step === 'otp-verify' && (
-            <form onSubmit={handleVerifyOtp} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-text-secondary uppercase">Enter 6-Digit OTP</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-text-secondary uppercase">Password</label>
+              <div className="relative">
+                <Key className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />
                 <Input 
-                  placeholder="e.g. 123456" 
-                  value={otp}
-                  onChange={e => setOtp(e.target.value)}
-                  maxLength={6}
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="••••••••" 
+                  className="pl-9 pr-10"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-2.5 text-text-muted hover:text-text-primary"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
-              <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={() => setStep('login')} className="flex-1 py-2.5">Back</Button>
-                <Button type="submit" className="flex-1 flex justify-center items-center gap-2 py-2.5" disabled={loading}>
-                  {loading ? <RefreshCw className="h-4 w-4 animate-spin" /> : 'Verify Code'}
-                </Button>
-              </div>
-            </form>
-          )}
-
-          {step === 'reset-pass' && (
-            <form onSubmit={handleResetPassword} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-text-secondary uppercase">Enter New Password</label>
-                <Input 
-                  type="password"
-                  placeholder="New Password" 
-                  value={newPassword}
-                  onChange={e => setNewPassword(e.target.value)}
-                  required
-                />
-              </div>
-              <Button type="submit" className="w-full flex justify-center items-center gap-2 py-2.5" disabled={loading}>
-                {loading ? <RefreshCw className="h-4 w-4 animate-spin" /> : 'Update Password'}
-              </Button>
-            </form>
-          )}
+            </div>
+            <Button type="submit" className="w-full flex justify-center items-center gap-2 py-2.5" disabled={loading}>
+              {loading ? <RefreshCw className="h-4 w-4 animate-spin" /> : 'Login'}
+            </Button>
+          </form>
 
         </CardContent>
       </Card>

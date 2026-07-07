@@ -38,7 +38,7 @@ export const authService = {
     localStorage.removeItem('shiksha_pilot_token');
     localStorage.removeItem('shiksha_pilot_role');
     localStorage.removeItem('shiksha_pilot_user');
-    window.dispatchEvent(new Event('auth-change'));
+    localStorage.removeItem('shiksha_pilot_academic_year_id');
     window.location.replace('/login');
   },
 

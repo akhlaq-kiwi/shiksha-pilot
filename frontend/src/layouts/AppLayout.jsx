@@ -7,6 +7,7 @@ import ForcePasswordChange from '../common/components/ForcePasswordChange';
 import { useNavigate } from 'react-router-dom';
 import { schoolService } from '../common/services/schoolService';
 import { useAcademicYear } from '../common/contexts/AcademicYearContext';
+import { Dialog } from '../common/ui/dialog';
 
 const ROLE_LABELS = {
   SUPER_ADMIN: 'Super Admin',
@@ -35,6 +36,7 @@ const AppLayout = ({ children }) => {
   const [schoolProfile, setSchoolProfile] = useState(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [logoError, setLogoError] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const dropdownRef = useRef(null);
 
   // Apply the school-scoped portal theme once on mount (non-SUPER_ADMIN only)
@@ -91,6 +93,11 @@ const AppLayout = ({ children }) => {
   const roleLabel = ROLE_LABELS[role] || role || 'Member';
 
   const handleLogout = () => {
+    setShowLogoutConfirm(true);
+  };
+
+  const confirmLogout = () => {
+    setShowLogoutConfirm(false);
     authService.logout();
   };
 
@@ -290,6 +297,25 @@ const AppLayout = ({ children }) => {
           </p>
         </div>
       </footer>
+
+      <Dialog
+        isOpen={showLogoutConfirm}
+        onClose={() => setShowLogoutConfirm(false)}
+        title="Confirm Logout"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setShowLogoutConfirm(false)}>Cancel</Button>
+            <Button className="bg-red-600 hover:bg-red-700 text-white font-bold" onClick={confirmLogout}>Sign Out</Button>
+          </>
+        }
+      >
+        <p className="text-sm text-text-secondary font-medium">
+          Are you sure you want to sign out?
+        </p>
+        <p className="text-xs text-text-muted mt-1 leading-normal">
+          Any unsaved changes may be lost.
+        </p>
+      </Dialog>
     </div>
   );
 };
