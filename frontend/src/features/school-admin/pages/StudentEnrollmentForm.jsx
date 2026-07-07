@@ -482,7 +482,13 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
       ...prev,
       [name]: value
     }));
-    if (errors[name]) {
+
+    if (name === 'student_email') {
+      const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+      if (!value || emailRegex.test(value.trim())) {
+        setErrors(prev => ({ ...prev, student_email: null }));
+      }
+    } else if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: null }));
     }
   };
@@ -686,6 +692,13 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
 
       if (formData.aadhaar_no && !/^\d+$/.test(formData.aadhaar_no)) {
         errs.aadhaar_no = 'Only numeric digits are allowed.';
+      }
+
+      if (formData.student_email && formData.student_email.trim() !== '') {
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        if (!emailRegex.test(formData.student_email.trim())) {
+          errs.student_email = 'Please enter a valid email address.';
+        }
       }
     }
     

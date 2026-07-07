@@ -567,6 +567,33 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
   const [revertError, setRevertError] = useState('');
   const [revertSubmitting, setRevertSubmitting] = useState(false);
 
+  const getMonthYearString = (month, academicYearName) => {
+    const parts = (academicYearName || '2025–2026').split(/[–-]/);
+    const startYear = parts[0] ? parts[0].trim() : '2025';
+    const endYear = parts[1] ? parts[1].trim() : '2026';
+    
+    const secondYearMonths = ['January', 'February', 'March'];
+    const year = secondYearMonths.includes(month) ? endYear : startYear;
+    return `${month} ${year}`;
+  };
+
+  const getRevertedMonthsList = () => {
+    if (!revertTarget || revertTarget.type !== 'monthly' || !data || !data.fee_summary) return [];
+    
+    const payments = data.fee_summary.payments || [];
+    const targetPayment = payments.find(p => p.id === revertTarget.id);
+    if (!targetPayment) return [revertTarget.label];
+    
+    if (targetPayment.receipt_no) {
+      const related = payments.filter(p => p.receipt_no === targetPayment.receipt_no);
+      const academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+      related.sort((a, b) => academicMonths.indexOf(a.fee_month) - academicMonths.indexOf(b.fee_month));
+      return related.map(p => p.fee_month);
+    }
+    
+    return [targetPayment.fee_month];
+  };
+
   const loadDetails = async () => {
     setLoading(true);
     setError('');
@@ -1543,24 +1570,68 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                 disabled={revertSubmitting}
                 className="font-bold bg-red-600 hover:bg-red-700 text-white"
               >
-                {revertSubmitting ? 'Reverting...' : 'Revert Payment'}
+                {revertSubmitting ? 'Reverting...' : 'Confirm Revert'}
               </Button>
             </div>
           }
         >
-          <div className="space-y-3 text-sm mt-2">
+          <div className="space-y-4 text-sm mt-2">
             {revertError && (
               <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl text-xs font-semibold leading-normal flex items-center gap-2 animate-in fade-in duration-200">
                 <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
                 <span>{revertError}</span>
               </div>
             )}
-            <p className="text-zinc-600 dark:text-zinc-400">
-              Are you sure you want to revert this payment?
-            </p>
-            <p className="text-xs text-zinc-500 leading-normal">
-              The payment record and generated receipt will be permanently removed.
-            </p>
+            
+            {revertTarget && revertTarget.type === 'monthly' ? (
+              <div className="space-y-4">
+                <p className="text-text-secondary leading-relaxed font-semibold">
+                  You are about to revert fee payment for:
+                </p>
+                <div className="space-y-1">
+                  <span className="text-text-muted text-xs uppercase tracking-wider font-extrabold block">Student:</span>
+                  <span className="font-extrabold text-text-primary text-base block">{student?.name}</span>
+                </div>
+                
+                <div className="space-y-2">
+                  <span className="text-text-muted text-xs uppercase tracking-wider font-extrabold block">Months:</span>
+                  <div className="space-y-1 text-sm font-bold text-text-primary">
+                    {getRevertedMonthsList().map(m => (
+                      <div key={m} className="flex items-center gap-2">
+                        <span className="text-text-muted text-lg leading-none">•</span>
+                        <span>{getMonthYearString(m, student?.academic_year_name)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <span className="text-text-muted text-xs uppercase tracking-wider font-extrabold block">Total Months:</span>
+                  <span className="font-extrabold text-text-primary text-base block">{getRevertedMonthsList().length}</span>
+                </div>
+
+                <p className="text-xs text-text-muted leading-relaxed font-medium pt-2 border-t border-border">
+                  This action will mark these months as unpaid and update all related financial records.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-text-secondary leading-relaxed font-semibold">
+                  You are about to revert the payment for:
+                </p>
+                <div className="space-y-1">
+                  <span className="text-text-muted text-xs uppercase tracking-wider font-extrabold block">Student:</span>
+                  <span className="font-extrabold text-text-primary text-base block">{student?.name}</span>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-text-muted text-xs uppercase tracking-wider font-extrabold block">Fee Item:</span>
+                  <span className="font-extrabold text-text-primary text-sm block">{revertTarget?.label}</span>
+                </div>
+                <p className="text-xs text-text-muted leading-relaxed font-medium pt-2 border-t border-border">
+                  This action will mark this item as unpaid and update all related financial records.
+                </p>
+              </div>
+            )}
           </div>
         </Dialog>
       )}

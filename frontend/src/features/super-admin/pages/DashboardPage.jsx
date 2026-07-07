@@ -7,7 +7,7 @@ export default function DashboardPage({ stats }) {
     {
       title: 'Total Schools',
       value: stats.active_schools != null ? stats.active_schools : 0,
-      description: 'Schools with Active Subscription',
+      description: 'Active schools',
       icon: Building2,
       gradient: 'from-blue-600 to-indigo-600',
       iconBg: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
@@ -15,7 +15,7 @@ export default function DashboardPage({ stats }) {
     {
       title: 'Total Teachers',
       value: stats.total_teachers != null ? stats.total_teachers : 0,
-      description: 'Active across active tiers',
+      description: 'Active teachers across active schools',
       icon: Users,
       gradient: 'from-violet-600 to-purple-600',
       iconBg: 'bg-violet-500/10 text-violet-600 dark:text-violet-400',
@@ -23,7 +23,7 @@ export default function DashboardPage({ stats }) {
     {
       title: 'Total Students',
       value: stats.total_students != null ? stats.total_students : 0,
-      description: 'Active across active tiers',
+      description: 'Active students across active schools',
       icon: GraduationCap,
       gradient: 'from-emerald-600 to-teal-600',
       iconBg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
@@ -31,7 +31,7 @@ export default function DashboardPage({ stats }) {
     {
       title: 'Total Revenue',
       value: stats.total_revenue != null ? `₹${Number(stats.total_revenue).toLocaleString()}` : '₹0',
-      description: 'Current Financial Year',
+      description: 'Total Revenue Generated',
       icon: Landmark,
       gradient: 'from-amber-600 to-orange-600',
       iconBg: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',

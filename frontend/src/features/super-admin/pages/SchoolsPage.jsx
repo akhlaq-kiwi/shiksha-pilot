@@ -42,6 +42,22 @@ const getRemainingDaysText = (expiryDateStr) => {
   }
 };
 
+const calculateDaysLeftText = (expiryDateStr) => {
+  if (!expiryDateStr) return 'Expired';
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const expiry = new Date(expiryDateStr);
+  expiry.setHours(0, 0, 0, 0);
+  
+  const diffTime = expiry.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  if (diffDays <= 0) {
+    return 'Expired';
+  }
+  return `${diffDays} Day${diffDays > 1 ? 's' : ''} Left`;
+};
+
 function EditSchoolDialog({ school, onClose, onSaved }) {
   const toast = useToast();
   const [name, setName] = useState(school.name || '');
@@ -573,7 +589,12 @@ export default function SchoolsPage({ schools, onCreateSchool, onToggleStatus, o
             >
               
               {/* Three-Dot Dropdown aligned absolutely to avoid overflows */}
-              <div className="absolute top-4 right-4 z-10">
+              <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+                {/* Status Badge */}
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${school.status === 'ACTIVE' ? 'bg-green-500/10 text-green-600 border border-green-500/20' : 'bg-red-500/10 text-red-600 border border-red-500/20'}`}>
+                  {school.status === 'ACTIVE' ? 'Active' : 'Inactive'}
+                </span>
+
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -659,40 +680,51 @@ export default function SchoolsPage({ schools, onCreateSchool, onToggleStatus, o
                   </h3>
                 </div>
  
-                {/* Login URL */}
-                <div className="w-full px-2">
-                  <p className="text-primary hover:underline text-xs font-semibold select-all break-all leading-tight">
-                    {window.location.host}
-                  </p>
-                </div>
- 
-                {/* Status Badge */}
+                {/* Days Left Countdown Badge */}
                 <div className="mt-1">
-                  <span className={`inline-flex items-center px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${school.status === 'ACTIVE' ? 'bg-green-500/10 text-green-600' : 'bg-red-500/10 text-red-600'}`}>
-                    {school.status === 'ACTIVE' ? 'Active' : 'Inactive'}
-                  </span>
+                  {(() => {
+                    const daysText = calculateDaysLeftText(school.subscription_expiry);
+                    let style = 'bg-rose-500/10 text-rose-600 border border-rose-500/20';
+                    if (daysText !== 'Expired') {
+                      const days = parseInt(daysText, 10);
+                      if (days <= 7) {
+                        style = 'bg-amber-500/10 text-amber-600 border border-amber-500/20';
+                      } else {
+                        style = 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20';
+                      }
+                    }
+                    return (
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${style}`}>
+                        {daysText}
+                      </span>
+                    );
+                  })()}
                 </div>
               </div>
  
               {/* Bottom Section - Plan Badge Popup or Upgrade Plan Button */}
               <div className="border-t border-border/60 pt-4 mt-6 w-full flex items-center justify-between text-xs font-semibold">
                 <span className="text-text-muted">Subscription Plan</span>
-                {school.active_plan ? (
-                  <button
-                    onClick={() => setSelectedSubSchool(school)}
-                    className="bg-primary/5 hover:bg-primary/10 text-primary border border-primary/20 px-2.5 py-0.5 rounded-full text-[11px] font-bold cursor-pointer transition-colors"
-                  >
-                    {school.active_plan}
-                  </button>
-                ) : (
-                  <Button
-                    size="sm"
-                    className="h-7 text-[10px] font-black uppercase tracking-wider py-1 px-3 rounded-lg"
-                    onClick={() => setUpgradeSchool(school)}
-                  >
-                    Upgrade Plan
-                  </Button>
-                )}
+                {(() => {
+                  const todayStr = new Date().toISOString().split('T')[0];
+                  const isActiveSub = school.active_plan && school.subscription_expiry && todayStr <= school.subscription_expiry;
+                  return isActiveSub ? (
+                    <button
+                      onClick={() => setSelectedSubSchool(school)}
+                      className="bg-primary/5 hover:bg-primary/10 text-primary border border-primary/20 px-2.5 py-0.5 rounded-full text-[11px] font-bold cursor-pointer transition-colors"
+                    >
+                      {school.active_plan}
+                    </button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      className="h-7 text-[10px] font-black uppercase tracking-wider py-1 px-3 rounded-lg"
+                      onClick={() => setUpgradeSchool(school)}
+                    >
+                      Upgrade Plan
+                    </Button>
+                  );
+                })()}
               </div>
             </div>
           ))

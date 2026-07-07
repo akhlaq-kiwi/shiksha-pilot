@@ -66,14 +66,14 @@ class PlatformService extends BaseService
             $stmt->execute([':school_id' => $school['id']]);
             $sub = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            if ($sub && $today <= $sub['expiry_date'] && $school['status'] === 'ACTIVE') {
+            if ($sub) {
                 $school['active_plan'] = $sub['plan_name'];
                 $school['subscription_expiry'] = $sub['expiry_date'];
                 $school['subscription_start'] = $sub['start_date'];
                 $school['subscription_duration_value'] = $sub['duration_value'];
                 $school['subscription_duration_unit'] = $sub['duration_unit'];
             } else {
-                $school['active_plan'] = null; // No Active Subscription
+                $school['active_plan'] = null;
                 $school['subscription_expiry'] = null;
                 $school['subscription_start'] = null;
                 $school['subscription_duration_value'] = null;
@@ -501,72 +501,35 @@ class PlatformService extends BaseService
         $pdo = $this->schools->getPdo();
         $today = date('Y-m-d');
 
-        // 1. Fetch schools with active subscription
-        $stmtActiveSubs = $pdo->prepare("
-            SELECT DISTINCT school_id 
-            FROM subscriptions 
-            WHERE status = 'PAID' AND start_date <= :today AND expiry_date >= :today
+        // 1. Total Schools: Count all active schools
+        $stmtActiveSchools = $pdo->query("SELECT COUNT(*) FROM schools WHERE status = 'ACTIVE'");
+        $totalActiveSchoolsCount = (int)$stmtActiveSchools->fetchColumn();
+
+        // 2. Count Active Teachers across Active schools
+        $stmtTeachers = $pdo->query("
+            SELECT COUNT(*) 
+            FROM staff 
+            WHERE status = 'ACTIVE' 
+              AND LOWER(role) = 'teacher' 
+              AND school_id IN (SELECT id FROM schools WHERE status = 'ACTIVE')
         ");
-        $stmtActiveSubs->execute([':today' => $today]);
-        $activeSubSchoolIds = $stmtActiveSubs->fetchAll(PDO::FETCH_COLUMN);
+        $totalTeachers = (int)$stmtTeachers->fetchColumn();
 
-        $activeSchoolsWithSub = [];
-        if (!empty($activeSubSchoolIds)) {
-            $idsStr = implode(',', array_map('intval', $activeSubSchoolIds));
-            $stmtFilteredSchools = $pdo->query("
-                SELECT id 
-                FROM schools 
-                WHERE status = 'ACTIVE' AND id IN ($idsStr)
-            ");
-            $activeSchoolsWithSub = $stmtFilteredSchools->fetchAll(PDO::FETCH_COLUMN);
-        }
-        $totalActiveSchoolsCount = count($activeSchoolsWithSub);
+        // 3. Count Active Students across Active schools
+        $stmtStudents = $pdo->query("
+            SELECT COUNT(*) 
+            FROM students 
+            WHERE status = 'ACTIVE' 
+              AND school_id IN (SELECT id FROM schools WHERE status = 'ACTIVE')
+        ");
+        $totalStudents = (int)$stmtStudents->fetchColumn();
 
-        // 2. Count Active Teachers across Active schools with active subscription
-        $totalTeachers = 0;
-        if (!empty($activeSchoolsWithSub)) {
-            $schoolIdsStr = implode(',', array_map('intval', $activeSchoolsWithSub));
-            $stmtTeachers = $pdo->query("
-                SELECT COUNT(*) 
-                FROM users 
-                WHERE role = 'TEACHER' AND status = 'ACTIVE' AND school_id IN ($schoolIdsStr)
-            ");
-            $totalTeachers = (int)$stmtTeachers->fetchColumn();
-        }
-
-        // 3. Count Active Students across Active schools with active subscription
-        $totalStudents = 0;
-        if (!empty($activeSchoolsWithSub)) {
-            $schoolIdsStr = implode(',', array_map('intval', $activeSchoolsWithSub));
-            $stmtStudents = $pdo->query("
-                SELECT COUNT(*) 
-                FROM users 
-                WHERE role = 'STUDENT' AND status = 'ACTIVE' AND school_id IN ($schoolIdsStr)
-            ");
-            $totalStudents = (int)$stmtStudents->fetchColumn();
-        }
-
-        // 4. Calculate Financial Year Revenue (1 April to 31 March)
-        $currentMonth = (int)date('m');
-        $currentYear = (int)date('Y');
-
-        if ($currentMonth >= 4) {
-            $fyStart = "$currentYear-04-01";
-            $fyEnd = ($currentYear + 1) . "-03-31";
-        } else {
-            $fyStart = ($currentYear - 1) . "-04-01";
-            $fyEnd = "$currentYear-03-31";
-        }
-
-        $stmtRev = $pdo->prepare("
+        // 4. Calculate actual subscription revenue generated from assigned school plans
+        $stmtRev = $pdo->query("
             SELECT COALESCE(SUM(amount), 0) 
             FROM subscriptions 
-            WHERE status = 'PAID' AND created_at >= :fy_start AND created_at <= :fy_end
+            WHERE status = 'PAID'
         ");
-        $stmtRev->execute([
-            ':fy_start' => $fyStart . ' 00:00:00',
-            ':fy_end' => $fyEnd . ' 23:59:59'
-        ]);
         $totalRevenue = (float)$stmtRev->fetchColumn();
 
         $totalSchools = $this->schools->count();
