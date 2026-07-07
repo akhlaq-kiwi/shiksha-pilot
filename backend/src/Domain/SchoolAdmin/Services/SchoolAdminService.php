@@ -1872,8 +1872,15 @@ class SchoolAdminService extends BaseService
             throw new ValidationException(['name' => 'This academic year already exists.']);
         }
 
-        // Create new academic year with status = 'ACTIVE'
-        $stmtInsert = $pdo->prepare("INSERT INTO academic_years (school_id, name, start_date, end_date, is_current, status) VALUES (:school_id, :name, :start_date, :end_date, 0, 'ACTIVE')");
+        // Enforce maximum ONE Draft Academic Year
+        $stmtCheckDraft = $pdo->prepare("SELECT COUNT(*) FROM academic_years WHERE school_id = :sid AND status = 'Draft'");
+        $stmtCheckDraft->execute([':sid' => $schoolId]);
+        if ((int)$stmtCheckDraft->fetchColumn() > 0) {
+            throw new ValidationException(['name' => 'A Draft academic year already exists. Promote or delete it first.']);
+        }
+
+        // Create new academic year with status = 'Draft'
+        $stmtInsert = $pdo->prepare("INSERT INTO academic_years (school_id, name, start_date, end_date, is_current, status) VALUES (:school_id, :name, :start_date, :end_date, 0, 'Draft')");
         $stmtInsert->execute([
             ':school_id' => $schoolId,
             ':name' => trim($body['name']),
@@ -1905,8 +1912,8 @@ class SchoolAdminService extends BaseService
             ]);
         }
 
-        $this->log('Academic year created as ACTIVE with default national holidays', ['name' => $body['name'], 'school_id' => $schoolId]);
-        return ['id' => $newYearId, 'name' => $body['name'], 'status' => 'ACTIVE'];
+        $this->log('Academic year created as Draft with default national holidays', ['name' => $body['name'], 'school_id' => $schoolId]);
+        return ['id' => $newYearId, 'name' => $body['name'], 'status' => 'Draft'];
     }
 
     public function migrateAcademicYear(array $user, int $currentYearId, array $body): array
@@ -1925,62 +1932,21 @@ class SchoolAdminService extends BaseService
         $prevYearId = (int)$currentYearId;
         $prevYear = $currentYearObj;
 
-        // Auto-compute next Academic Year properties
-        $name = trim($currentYearObj['name']);
-        if (preg_match('/(\d{4})[-–](\d{4})/', $name, $matches)) {
-            $y1 = (int)$matches[1] + 1;
-            $y2 = (int)$matches[2] + 1;
-            $nextName = "{$y1}–{$y2}";
-        } else {
-            $nextName = ((int)date('Y') + 1) . '–' . ((int)date('Y') + 2);
+        // Fetch the DRAFT academic year for migration target
+        $stmtDraft = $pdo->prepare("SELECT * FROM academic_years WHERE school_id = :sid AND status = 'Draft' LIMIT 1");
+        $stmtDraft->execute([':sid' => $schoolId]);
+        $draftYearObj = $stmtDraft->fetch(PDO::FETCH_ASSOC);
+        if (!$draftYearObj) {
+            throw new ValidationException(['migration' => 'No Draft Academic Year Found']);
         }
-
-        $nextStartDate = date('Y-m-d', strtotime($currentYearObj['start_date'] . ' +1 year'));
-        $nextEndDate = date('Y-m-d', strtotime($currentYearObj['end_date'] . ' +1 year'));
+        $newYearId = (int)$draftYearObj['id'];
+        $nextName = $draftYearObj['name'];
+        $nextStartDate = $draftYearObj['start_date'];
+        $nextEndDate = $draftYearObj['end_date'];
 
         $pdo->beginTransaction();
         try {
-            // Check duplicate name to prevent double runs
-            $stmtCheckName = $pdo->prepare("SELECT id FROM academic_years WHERE school_id = :sid AND name = :name LIMIT 1");
-            $stmtCheckName->execute([':sid' => $schoolId, ':name' => $nextName]);
-            $existingId = $stmtCheckName->fetchColumn();
-            
-            if ($existingId !== false) {
-                $newYearId = (int)$existingId;
-            } else {
-                $stmtInsert = $pdo->prepare("INSERT INTO academic_years (school_id, name, start_date, end_date, is_current, status) VALUES (:school_id, :name, :start_date, :end_date, 0, 'ACTIVE')");
-                $stmtInsert->execute([
-                    ':school_id' => $schoolId,
-                    ':name' => $nextName,
-                    ':start_date' => $nextStartDate,
-                    ':end_date' => $nextEndDate
-                ]);
-                $newYearId = (int)$pdo->lastInsertId();
-
-                // Prefill standard holidays for new year
-                $startYear = date('Y', strtotime($nextStartDate));
-                $endYear = date('Y', strtotime($nextEndDate));
-                $defaultHolidays = [
-                    ['name' => 'Labour Day', 'date' => "{$startYear}-05-01"],
-                    ['name' => 'Independence Day', 'date' => "{$startYear}-08-15"],
-                    ['name' => 'Mahatma Gandhi Jayanti', 'date' => "{$startYear}-10-02"],
-                    ['name' => 'Christmas Day', 'date' => "{$startYear}-12-25"],
-                    ['name' => 'New Year\'s Day', 'date' => "{$endYear}-01-01"],
-                    ['name' => 'Republic Day', 'date' => "{$endYear}-01-26"]
-                ];
-                $stmtHoliday = $pdo->prepare("
-                    INSERT INTO holidays (school_id, academic_year_id, name, date)
-                    VALUES (:school_id, :academic_year_id, :name, :date)
-                ");
-                foreach ($defaultHolidays as $h) {
-                    $stmtHoliday->execute([
-                        ':school_id' => $schoolId,
-                        ':academic_year_id' => $newYearId,
-                        ':name' => $h['name'],
-                        ':date' => $h['date']
-                    ]);
-                }
-            }
+            $targetYear = $draftYearObj;
 
             // If there's a previous active academic year, run the promotion migration
             if ($prevYearId !== false) {
@@ -2013,6 +1979,25 @@ class SchoolAdminService extends BaseService
                 ");
 
                 foreach ($activeStaff as $as) {
+                    $staffExists = false;
+                    if (!empty($as['employee_id'])) {
+                        $stmtCheckStaff = $pdo->prepare("SELECT COUNT(*) FROM staff WHERE school_id = :sid AND academic_year_id = :ayid AND employee_id = :emp_id");
+                        $stmtCheckStaff->execute([':sid' => $schoolId, ':ayid' => $newYearId, ':emp_id' => $as['employee_id']]);
+                        if ((int)$stmtCheckStaff->fetchColumn() > 0) {
+                            $staffExists = true;
+                        }
+                    }
+                    if (!$staffExists && !empty($as['email'])) {
+                        $stmtCheckStaff = $pdo->prepare("SELECT COUNT(*) FROM staff WHERE school_id = :sid AND academic_year_id = :ayid AND email = :email");
+                        $stmtCheckStaff->execute([':sid' => $schoolId, ':ayid' => $newYearId, ':email' => $as['email']]);
+                        if ((int)$stmtCheckStaff->fetchColumn() > 0) {
+                            $staffExists = true;
+                        }
+                    }
+                    if ($staffExists) {
+                        continue;
+                    }
+
                     $stmtInsStaff->execute([
                         ':school_id'              => $schoolId,
                         ':name'                   => $as['name'],
@@ -2049,19 +2034,42 @@ class SchoolAdminService extends BaseService
                 $stmtClasses->execute([':sid' => $schoolId, ':prev_id' => $prevYearId]);
                 $oldClasses = $stmtClasses->fetchAll(PDO::FETCH_ASSOC);
 
-                // 3. Duplicate all classes into the new academic year
+                // 3. Duplicate all classes into the new academic year, avoiding duplicates
                 $classMap = []; // [old_class_id => new_class_id]
+                $stmtFindClass = $pdo->prepare("
+                    SELECT id FROM classes 
+                    WHERE school_id = :sid 
+                      AND academic_year_id = :ayid 
+                      AND name = :name 
+                      AND (section = :section OR (section IS NULL AND :section_null = 1))
+                      AND (stream = :stream OR (stream IS NULL AND :stream_null = 1))
+                    LIMIT 1
+                ");
                 $stmtInsClass = $pdo->prepare("INSERT INTO classes (school_id, name, section, stream, academic_year_id) VALUES (:school_id, :name, :section, :stream, :new_ay_id)");
                 foreach ($oldClasses as $oc) {
-                    $stmtInsClass->execute([
-                        ':school_id' => $schoolId,
+                    $stmtFindClass->execute([
+                        ':sid' => $schoolId,
+                        ':ayid' => $newYearId,
                         ':name' => $oc['name'],
                         ':section' => $oc['section'],
+                        ':section_null' => $oc['section'] === null ? 1 : 0,
                         ':stream' => $oc['stream'],
-                        ':new_ay_id' => $newYearId
+                        ':stream_null' => $oc['stream'] === null ? 1 : 0
                     ]);
-                    $newClassId = (int)$pdo->lastInsertId();
-                    $classMap[(int)$oc['id']] = $newClassId;
+                    $existingClassId = $stmtFindClass->fetchColumn();
+                    if ($existingClassId !== false) {
+                        $classMap[(int)$oc['id']] = (int)$existingClassId;
+                    } else {
+                        $stmtInsClass->execute([
+                            ':school_id' => $schoolId,
+                            ':name' => $oc['name'],
+                            ':section' => $oc['section'],
+                            ':stream' => $oc['stream'],
+                            ':new_ay_id' => $newYearId
+                        ]);
+                        $newClassId = (int)$pdo->lastInsertId();
+                        $classMap[(int)$oc['id']] = $newClassId;
+                    }
                 }
 
                 // 4. Duplicate subjects to new classes (assigning teacher only if migrated)
@@ -2073,6 +2081,13 @@ class SchoolAdminService extends BaseService
                 $oldClassIds = array_keys($classMap);
                 $teacherMigrations = $body['teacher_migrations'] ?? []; // Array of staff.id checked for migration
 
+                $stmtFindSubject = $pdo->prepare("
+                    SELECT id FROM subjects 
+                    WHERE school_id = :sid 
+                      AND class_id = :class_id 
+                      AND name = :name
+                    LIMIT 1
+                ");
                 $stmtInsSubj = $pdo->prepare("INSERT INTO subjects (school_id, name, code, class_id, teacher_id) VALUES (:school_id, :name, :code, :class_id, :teacher_id)");
                 foreach ($oldSubjects as $os) {
                     $oldClassId = (int)$os['class_id'];
@@ -2090,14 +2105,26 @@ class SchoolAdminService extends BaseService
                             }
                         }
 
-                        $stmtInsSubj->execute([
-                            ':school_id' => $schoolId,
-                            ':name' => $os['name'],
-                            ':code' => $os['code'],
+                        // Check if subject already exists
+                        $stmtFindSubject->execute([
+                            ':sid' => $schoolId,
                             ':class_id' => $newClassId,
-                            ':teacher_id' => $teacherId
+                            ':name' => $os['name']
                         ]);
-                        $newSubjectId = (int)$pdo->lastInsertId();
+                        $existingSubjId = $stmtFindSubject->fetchColumn();
+                        if ($existingSubjId !== false) {
+                            $subjectMap[(int)$os['id']] = (int)$existingSubjId;
+                        } else {
+                            $stmtInsSubj->execute([
+                                ':school_id' => $schoolId,
+                                ':name' => $os['name'],
+                                ':code' => $os['code'],
+                                ':class_id' => $newClassId,
+                                ':teacher_id' => $teacherId
+                            ]);
+                            $newSubjectId = (int)$pdo->lastInsertId();
+                            $subjectMap[(int)$os['id']] = $newSubjectId;
+                        }
                     }
                 }
 
@@ -2280,22 +2307,61 @@ class SchoolAdminService extends BaseService
                         $stmtSelectStu->execute([':id' => $studentId, ':sid' => $schoolId]);
                         $oldStu = $stmtSelectStu->fetch(PDO::FETCH_ASSOC);
                         if ($oldStu) {
-                            unset($oldStu['id']);
-                            unset($oldStu['created_at']);
-                            unset($oldStu['updated_at']);
+                            // Check if student with same admission number already exists in target academic year
+                            $existingStudentId = false;
+                            if (!empty($oldStu['admission_no'])) {
+                                $stmtCheckExist = $pdo->prepare("
+                                    SELECT id FROM students 
+                                    WHERE school_id = :sid 
+                                      AND academic_year_id = :ayid 
+                                      AND admission_no = :admission_no
+                                    LIMIT 1
+                                ");
+                                $stmtCheckExist->execute([
+                                    ':sid' => $schoolId,
+                                    ':ayid' => $newYearId,
+                                    ':admission_no' => $oldStu['admission_no']
+                                ]);
+                                $existingStudentId = $stmtCheckExist->fetchColumn();
+                            }
+                            if ($existingStudentId === false) {
+                                $stmtCheckExistName = $pdo->prepare("
+                                    SELECT id FROM students 
+                                    WHERE school_id = :sid 
+                                      AND academic_year_id = :ayid 
+                                      AND name = :name 
+                                      AND COALESCE(father_name, '') = :father_name
+                                    LIMIT 1
+                                ");
+                                $stmtCheckExistName->execute([
+                                    ':sid' => $schoolId,
+                                    ':ayid' => $newYearId,
+                                    ':name' => $oldStu['name'],
+                                    ':father_name' => $oldStu['father_name'] ?? ''
+                                ]);
+                                $existingStudentId = $stmtCheckExistName->fetchColumn();
+                            }
 
-                            $oldStu['class_id'] = $newClassId;
-                            $oldStu['academic_year_id'] = $newYearId;
-                            $oldStu['status'] = 'ACTIVE';
-                            $oldStu['roll_no'] = $newRollNo;
+                            if ($existingStudentId !== false) {
+                                $newStudentId = (int)$existingStudentId;
+                            } else {
+                                unset($oldStu['id']);
+                                unset($oldStu['created_at']);
+                                unset($oldStu['updated_at']);
 
-                            $cols = array_keys($oldStu);
-                            $placeholders = array_map(fn($c) => ":{$c}", $cols);
-                            $sqlInsert = "INSERT INTO students (" . implode(', ', $cols) . ") VALUES (" . implode(', ', $placeholders) . ")";
-                            
-                            $stmtIns = $pdo->prepare($sqlInsert);
-                            $stmtIns->execute($oldStu);
-                            $newStudentId = (int)$pdo->lastInsertId();
+                                $oldStu['class_id'] = $newClassId;
+                                $oldStu['academic_year_id'] = $newYearId;
+                                $oldStu['status'] = 'ACTIVE';
+                                $oldStu['roll_no'] = $newRollNo;
+
+                                $cols = array_keys($oldStu);
+                                $placeholders = array_map(fn($c) => ":{$c}", $cols);
+                                $sqlInsert = "INSERT INTO students (" . implode(', ', $cols) . ") VALUES (" . implode(', ', $placeholders) . ")";
+                                
+                                $stmtIns = $pdo->prepare($sqlInsert);
+                                $stmtIns->execute($oldStu);
+                                $newStudentId = (int)$pdo->lastInsertId();
+                            }
                         }
 
                         if ($outstanding > 0 && $newStudentId !== null) {

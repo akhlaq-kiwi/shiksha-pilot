@@ -735,7 +735,10 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
         student_migrations: studentMigrations,
       };
 
-      const res = await schoolService.migrateAcademicYear(targetYear.id, payload);
+      const activeYear = academicYears.find(y => y.status === 'ACTIVE' || y.is_current);
+      const activeYearId = activeYear ? activeYear.id : targetYear.id;
+
+      const res = await schoolService.migrateAcademicYear(activeYearId, payload);
 
       setSuccess(`Academic Year ${targetYear.name} migration executed successfully.`);
       setIsWizardOpen(false);
@@ -756,19 +759,12 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
   };
 
   const handleMigrateClick = (year) => {
-    const getNextYearName = (currentName) => {
-      if (!currentName) return '';
-      const match = currentName.match(/(\d{4})[-–](\d{4})/);
-      if (match) {
-        const y1 = parseInt(match[1], 10) + 1;
-        const y2 = parseInt(match[2], 10) + 1;
-        return `${y1}–${y2}`;
-      }
-      return '';
-    };
-
-    const targetYearName = getNextYearName(year.name);
-    startActivation({ ...year, name: targetYearName });
+    const draftYear = academicYears.find(y => y.status === 'Draft');
+    if (!draftYear) {
+      alert("No Draft Academic Year Found. Please create one first.");
+      return;
+    }
+    startActivation(draftYear);
   };
 
   const handleActivateDirectClick = (year) => {
@@ -844,6 +840,11 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
       <Card className="shadow-sm">
         <CardHeader className="py-3 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-bold text-text-primary">Academic Years</CardTitle>
+          {!isReadOnly && (
+            <Button onClick={openCreateModal} className="h-8 text-xs font-bold bg-primary text-white">
+              Create Academic Year
+            </Button>
+          )}
         </CardHeader>
         <CardContent className="p-0">
           <Table>
@@ -881,6 +882,10 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                       {year.status === 'ACTIVE' || year.is_current ? (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-green-500/10 text-green-600 border border-green-500/20">
                           Active
+                        </span>
+                      ) : year.status === 'Draft' ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                          Draft
                         </span>
                       ) : (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 border border-border">
