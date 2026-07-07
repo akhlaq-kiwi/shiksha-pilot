@@ -12,7 +12,7 @@ const generatePassword = () => {
 };
 
 const EMPTY = {
-  name: '', subdomain: '', plan: '',
+  name: '', plan: '',
   contact_phone: '', contact_email: '', admin_phone: '', admin_password: '',
 };
 
@@ -51,12 +51,7 @@ export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const sub = (form.subdomain || '').trim().toLowerCase();
-    if (!/^[a-z0-9-]+$/.test(sub)) {
-      alert("Subdomain must contain only lowercase letters, numbers, and hyphens without spaces or special characters.");
-      return;
-    }
-    onSubmit({ ...form, subdomain: sub }, () => setForm({ ...EMPTY, admin_password: generatePassword() }));
+    onSubmit(form, () => setForm({ ...EMPTY, admin_password: generatePassword() }));
   };
 
   return (
@@ -85,14 +80,6 @@ export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating
         <div className="space-y-1.5">
           <label className="text-xs font-bold text-text-secondary uppercase">School Name</label>
           <Input placeholder="e.g. Cambridge Academy" value={form.name} onChange={set('name')} required />
-        </div>
-
-        <div className="space-y-1.5">
-          <label className="text-xs font-bold text-text-secondary uppercase">Subdomain</label>
-          <div className="flex items-center gap-1.5">
-            <Input placeholder="subdomain" value={form.subdomain} onChange={set('subdomain')} required className="flex-1" />
-            <span className="text-sm font-semibold text-text-muted whitespace-nowrap">.shikshapilot.com</span>
-          </div>
         </div>
 
         {/* Plan selector */}
