@@ -185,6 +185,7 @@ export default function PlansPage() {
   const [configuringPlan, setConfiguringPlan] = useState(null);
   const [showNewPlan, setShowNewPlan] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('ALL'); // 'ALL', 'ACTIVE', 'INACTIVE'
 
   useEffect(() => {
     loadPlans();
@@ -221,6 +222,12 @@ export default function PlansPage() {
     }
   };
 
+  const filteredPlans = plans.filter(p => {
+    if (filter === 'ACTIVE') return p.is_active === 1 || p.is_active === '1' || p.is_active === true;
+    if (filter === 'INACTIVE') return p.is_active === 0 || p.is_active === '0' || p.is_active === false;
+    return true;
+  });
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-border/60 pb-6">
@@ -233,26 +240,48 @@ export default function PlansPage() {
         </Button>
       </div>
 
+      {/* Filter Tabs */}
+      <div className="flex border-b border-border/60 gap-4">
+        {['ALL', 'ACTIVE', 'INACTIVE'].map((t) => (
+          <button
+            key={t}
+            onClick={() => setFilter(t)}
+            className={`px-4 py-2 text-xs font-bold transition-all relative border-b-2 -mb-[2px] ${
+              filter === t
+                ? 'border-primary text-primary font-black'
+                : 'border-transparent text-text-muted hover:text-text-primary'
+            }`}
+          >
+            {t === 'ALL' ? 'All Plans' : t === 'ACTIVE' ? 'Active' : 'Inactive'}
+          </button>
+        ))}
+      </div>
+
       {loading ? (
         <div className="py-12 text-center text-sm text-text-muted">Loading plans…</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {plans.length === 0 ? (
-            <div className="col-span-full py-16 text-center text-text-muted text-sm border-2 border-dashed border-border rounded-2xl bg-surface/50">
-              No subscription plans configured. Click "New Plan" to get started.
+          {filteredPlans.length === 0 ? (
+            <div className="col-span-full py-16 text-center text-text-muted text-sm border-2 border-dashed border-border rounded-2xl bg-surface/50 font-bold">
+              {filter === 'ALL' 
+                ? 'No subscription plans configured. Click "New Plan" to get started.'
+                : filter === 'ACTIVE' 
+                  ? 'No active subscription plans found.' 
+                  : 'No inactive subscription plans found.'
+              }
             </div>
           ) : (
-            plans.map(p => (
+            filteredPlans.map(p => (
               <Card
                 key={p.id}
-                className={`relative overflow-hidden border border-border bg-surface shadow-sm rounded-2xl flex flex-col justify-between h-[320px] transition-all hover:shadow-md ${p.is_active === 0 ? 'opacity-65' : ''}`}
+                className={`relative overflow-hidden border border-border bg-surface shadow-sm rounded-2xl flex flex-col justify-between h-[320px] transition-all hover:shadow-md ${p.is_active === 0 || p.is_active === '0' || p.is_active === false ? 'opacity-65 bg-zinc-50/50 dark:bg-zinc-900/10' : ''}`}
               >
                 <div className="p-6 flex-1 flex flex-col justify-between">
                   <div>
                     <div className="flex items-start justify-between">
                       <h3 className="text-lg font-bold text-text-primary truncate">{p.name}</h3>
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${p.is_active === 1 ? 'bg-green-500/10 text-green-600' : 'bg-zinc-100 dark:bg-zinc-800 text-text-muted'}`}>
-                        {p.is_active === 1 ? 'Active' : 'Inactive'}
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${p.is_active === 1 || p.is_active === '1' || p.is_active === true ? 'bg-green-500/10 text-green-600 border border-green-500/20' : 'bg-zinc-100 dark:bg-zinc-800 text-text-muted border border-zinc-200 dark:border-zinc-700'}`}>
+                        {p.is_active === 1 || p.is_active === '1' || p.is_active === true ? 'Active' : 'Inactive'}
                       </span>
                     </div>
 

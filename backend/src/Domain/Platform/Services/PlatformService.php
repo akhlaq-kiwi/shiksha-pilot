@@ -420,7 +420,7 @@ class PlatformService extends BaseService
 
     public function getPlans(): array
     {
-        return $this->plans->allActive();
+        return $this->plans->findAll([], 'id ASC');
     }
 
     public function createPlan(array $data): array
@@ -573,7 +573,7 @@ class PlatformService extends BaseService
         $suspendedSchools = $this->schools->countByStatus('SUSPENDED');
 
         $planCounts  = $this->schools->countByPlan();
-        $allPlans    = $this->plans->allActive();
+        $allPlans    = $this->plans->findAll([], 'id ASC');
         $priceByName = [];
         foreach ($allPlans as $p) {
             $priceByName[$p['name']] = (int) $p['price'];

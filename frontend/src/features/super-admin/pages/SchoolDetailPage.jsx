@@ -621,7 +621,7 @@ export default function SchoolDetailPage({ schools, onToggleStatus, onDeleteScho
               </button>
             </CardHeader>
             <CardContent className="p-4 space-y-3">
-              {allPlans.filter(p => p.type === 'standard').slice(0, 3).map(p => (
+              {allPlans.filter(p => p.type === 'standard' && (p.is_active === 1 || p.is_active === '1' || p.is_active === true)).slice(0, 3).map(p => (
                 <div
                   key={p.id}
                   className={`flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all ${school.plan === p.name ? 'border-primary bg-primary/5' : 'border-border'}`}

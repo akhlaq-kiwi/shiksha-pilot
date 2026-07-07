@@ -48,6 +48,41 @@ try {
         }
     }
 
+    // Check if migrations table exists
+    $stmtTable = $pdo->query("SHOW TABLES LIKE 'migrations'");
+    $migrationsTableExists = $stmtTable->rowCount() > 0;
+
+    if (!$migrationsTableExists) {
+        // Create migrations table
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS migrations (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                migration_name VARCHAR(255) UNIQUE NOT NULL,
+                executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        ");
+        echo "Created 'migrations' tracking table.\n";
+
+        // Check if this is an existing database by checking if 'users' table exists
+        $stmtUsers = $pdo->query("SHOW TABLES LIKE 'users'");
+        $isExistingDatabase = $stmtUsers->rowCount() > 0;
+
+        if ($isExistingDatabase) {
+            echo "Existing database detected. Pre-populating current migrations as applied...\n";
+            // Pre-populate with all current files
+            $migrationDir = __DIR__ . '/Migrations';
+            $files = glob($migrationDir . '/*.sql');
+            $stmtInsertMig = $pdo->prepare("INSERT IGNORE INTO migrations (migration_name) VALUES (:name)");
+            foreach ($files as $file) {
+                $filename = basename($file);
+                $stmtInsertMig->execute([':name' => $filename]);
+            }
+        }
+    }
+
+    // Fetch all executed migrations
+    $executedMigrations = $pdo->query("SELECT migration_name FROM migrations")->fetchAll(PDO::FETCH_COLUMN);
+
     // Discover and run all migration files in numeric order
     $migrationDir = __DIR__ . '/Migrations';
     $files = glob($migrationDir . '/*.sql');
@@ -56,10 +91,18 @@ try {
     foreach ($files as $file) {
         $filename = basename($file);
         echo "Running {$filename}...\n";
+        
+        if (in_array($filename, $executedMigrations, true)) {
+            echo "  (skipped — already applied)\n";
+            continue;
+        }
 
         $sql = file_get_contents($file);
         if (empty(trim($sql))) {
             echo "  (empty — skipped)\n";
+            // Record empty migration as executed
+            $stmtInsert = $pdo->prepare("INSERT INTO migrations (migration_name) VALUES (:name)");
+            $stmtInsert->execute([':name' => $filename]);
             continue;
         }
 
@@ -84,6 +127,10 @@ try {
                 throw $e;
             }
         }
+
+        // Record execution of the migration
+        $stmtInsert = $pdo->prepare("INSERT INTO migrations (migration_name) VALUES (:name)");
+        $stmtInsert->execute([':name' => $filename]);
 
         echo "  ✓ Done\n";
     }
