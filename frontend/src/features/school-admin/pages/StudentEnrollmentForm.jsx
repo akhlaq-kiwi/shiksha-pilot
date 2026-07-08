@@ -497,7 +497,10 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
   // Enforces numeric-only digits on text change for specified fields
   const handleNumericChange = (e) => {
     const { name, value } = e.target;
-    const cleanValue = value.replace(/\D/g, ''); // strip any non-digit character
+    let cleanValue = value.replace(/\D/g, ''); // strip any non-digit character
+    if (name === 'aadhaar_no') {
+      cleanValue = cleanValue.slice(0, 12);
+    }
     setFormData(prev => ({
       ...prev,
       [name]: cleanValue
@@ -707,8 +710,8 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
         errs.student_mobile = 'Only numeric digits are allowed.';
       }
 
-      if (formData.aadhaar_no && !/^\d+$/.test(formData.aadhaar_no)) {
-        errs.aadhaar_no = 'Only numeric digits are allowed.';
+      if (formData.aadhaar_no && (!/^\d+$/.test(formData.aadhaar_no) || formData.aadhaar_no.length !== 12)) {
+        errs.aadhaar_no = 'Aadhaar number must contain exactly 12 numeric digits.';
       }
 
       if (formData.student_email && formData.student_email.trim() !== '') {

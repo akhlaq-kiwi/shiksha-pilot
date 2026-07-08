@@ -994,8 +994,11 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                 className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs"
               >
                 <option value="">Select Class</option>
-                {classes.filter(c => !configuredClassIds.includes(String(c.id))).map(c => (
-                  <option key={c.id} value={c.id}>{c.name} {c.section ? ` - ${c.section}` : ''}</option>
+                {classes.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}{c.section ? ` - ${c.section}` : ''}
+                    {configuredClassIds.includes(String(c.id)) ? ' (Configured)' : ''}
+                  </option>
                 ))}
               </select>
             </div>

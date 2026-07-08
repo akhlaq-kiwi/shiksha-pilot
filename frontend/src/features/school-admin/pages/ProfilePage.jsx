@@ -540,18 +540,30 @@ export default function ProfilePage({ mode = 'details' }) {
                       <div className="flex justify-between items-start border-b border-border/60 pb-4">
                         <div>
                           <h4 className="text-base font-black text-text-primary tracking-tight font-display">{plan.name}</h4>
-                          <p className="text-[10px] text-primary bg-primary/10 px-2 py-0.5 rounded-md inline-block font-extrabold uppercase mt-2">
-                            {plan.student_limit ? `Up to ${plan.student_limit.toLocaleString()} Students` : 'Unlimited Students'}
-                          </p>
                         </div>
                         {isCurrent && (
                           <span className="text-[9px] font-black bg-primary text-zinc-50 px-2.5 py-1 rounded-full uppercase tracking-wider">Current</span>
                         )}
                       </div>
                       
-                      <div className="flex items-baseline gap-1 py-1">
-                        <span className="text-2xl font-black text-text-primary">₹{parseFloat(plan.price).toLocaleString('en-IN')}</span>
-                        <span className="text-[10px] text-text-muted">/month</span>
+                      <div className="flex justify-between items-center py-1">
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-2xl font-black text-text-primary">₹{parseFloat(plan.price).toLocaleString('en-IN')}</span>
+                          <span className="text-[10px] text-text-muted">
+                            /{plan.duration_value || 1}{plan.duration_unit || 'month'}{(plan.duration_value || 1) > 1 ? 's' : ''}
+                          </span>
+                        </div>
+                        {isCurrent && profile?.subscription_expiry && (
+                          <span className="text-xs text-text-secondary font-bold">
+                            Expires on {(() => {
+                              const d = new Date(profile.subscription_expiry);
+                              const day = d.getDate();
+                              const month = d.toLocaleString('en-US', { month: 'long' });
+                              const year = d.getFullYear();
+                              return `${day} ${month} ${year}`;
+                            })()}
+                          </span>
+                        )}
                       </div>
 
                       <p className="text-xs text-text-secondary leading-relaxed font-medium">{plan.description}</p>

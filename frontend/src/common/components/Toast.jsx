@@ -51,6 +51,7 @@ export function ToastProvider({ children }) {
   }, []);
 
   const toast = useCallback(({ type = 'info', title, message, duration = 4000 }) => {
+    if (!navigator.onLine) return null;
     const id = Date.now() + Math.random();
     setToasts(prev => [...prev, { id, type, title, message }]);
     if (duration > 0) {

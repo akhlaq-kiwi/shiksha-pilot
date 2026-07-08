@@ -249,8 +249,26 @@ export default function FinancePage() {
     };
   });
 
+  // Sort processedStudents by class creation order (determined by index in the classes array)
+  // Within each class, keep the existing relative order of students
+  const classIdOrderMap = {};
+  classes.forEach((cls, idx) => {
+    classIdOrderMap[cls.id] = idx;
+  });
+
+  const sortedProcessedStudents = [...processedStudents].sort((a, b) => {
+    const orderA = classIdOrderMap[a.class_id] !== undefined ? classIdOrderMap[a.class_id] : 999999;
+    const orderB = classIdOrderMap[b.class_id] !== undefined ? classIdOrderMap[b.class_id] : 999999;
+    if (orderA !== orderB) {
+      return orderA - orderB;
+    }
+    const idxA = students.findIndex(s => s.id === a.id);
+    const idxB = students.findIndex(s => s.id === b.id);
+    return idxA - idxB;
+  });
+
   // Filter students based on UI selections (Search strictly by Student Name only)
-  const filteredStudents = processedStudents.filter(student => {
+  const filteredStudents = sortedProcessedStudents.filter(student => {
     const term = searchTerm.toLowerCase().trim();
     const matchesSearch = !term || (student.name && student.name.toLowerCase().includes(term));
     const matchesClass = selectedClassId === 'ALL' || String(student.class_id) === String(selectedClassId);

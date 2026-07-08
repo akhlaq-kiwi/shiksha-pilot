@@ -810,8 +810,8 @@ class SchoolAdminService extends BaseService
         if (!empty($data['sr_no']) && !preg_match('/^[0-9]+$/', $data['sr_no'])) {
             $errors['sr_no'] = 'Only numeric digits are allowed.';
         }
-        if (!empty($data['aadhaar_no']) && !preg_match('/^[0-9]+$/', $data['aadhaar_no'])) {
-            $errors['aadhaar_no'] = 'Only numeric digits are allowed.';
+        if (!empty($data['aadhaar_no']) && !preg_match('/^[0-9]{12}$/', $data['aadhaar_no'])) {
+            $errors['aadhaar_no'] = 'Aadhaar number must contain exactly 12 numeric digits.';
         }
 
         // Get currently active or draft academic year
@@ -1037,8 +1037,8 @@ class SchoolAdminService extends BaseService
         if (!empty($data['sr_no']) && !preg_match('/^[0-9]+$/', $data['sr_no'])) {
             $errors['sr_no'] = 'Only numeric digits are allowed.';
         }
-        if (!empty($data['aadhaar_no']) && !preg_match('/^[0-9]+$/', $data['aadhaar_no'])) {
-            $errors['aadhaar_no'] = 'Only numeric digits are allowed.';
+        if (!empty($data['aadhaar_no']) && !preg_match('/^[0-9]{12}$/', $data['aadhaar_no'])) {
+            $errors['aadhaar_no'] = 'Aadhaar number must contain exactly 12 numeric digits.';
         }
 
         // Check/get active academic year
@@ -4567,14 +4567,9 @@ class SchoolAdminService extends BaseService
         }
 
         if ($existing) {
-            $oldMonthlyFees = json_decode($existing['monthly_fees'], true) ?: [];
             $mergedMonthlyFees = [];
-            foreach ($academicMonths as $index => $m) {
-                if ($index <= $currentMonthIdx && isset($oldMonthlyFees[$m])) {
-                    $mergedMonthlyFees[$m] = $oldMonthlyFees[$m];
-                } else {
-                    $mergedMonthlyFees[$m] = isset($monthlyFees[$m]) ? $monthlyFees[$m] : (isset($oldMonthlyFees[$m]) ? $oldMonthlyFees[$m] : 0);
-                }
+            foreach ($academicMonths as $m) {
+                $mergedMonthlyFees[$m] = isset($monthlyFees[$m]) ? (float)$monthlyFees[$m] : 0.0;
             }
             $jsonFees = json_encode($mergedMonthlyFees);
             $monthlyFees = $mergedMonthlyFees;
