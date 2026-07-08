@@ -126,11 +126,14 @@ export default function SuperAdminPortal() {
       if (onSuccess) onSuccess();
       toast.success('School created successfully.', 'School Created');
     } catch (err) {
-      if (err.data) {
+      if (err.data && err.data.errors && typeof err.data.errors === 'object' && Object.keys(err.data.errors).length > 0) {
+        setCreateErrors(err.data.errors);
+      } else if (err.data && typeof err.data === 'object' && !err.data.errors && Object.keys(err.data).length > 0) {
         setCreateErrors(err.data);
+      } else {
+        setError(err.message || 'Failed to create school');
+        toast.error(err.message || 'Failed to create school', 'Error');
       }
-      setError(err.message || 'Failed to create school');
-      toast.error(err.message || 'Failed to create school', 'Error');
     } finally {
       setCreating(false);
       // Always re-fetch so the list reflects the current DB state,
