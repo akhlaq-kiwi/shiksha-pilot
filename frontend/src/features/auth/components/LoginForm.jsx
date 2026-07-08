@@ -11,18 +11,48 @@ export default function LoginForm({ onLoginSuccess }) {
   const [showPassword, setShowPassword] = useState(false);
   
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [errors, setErrors] = useState({});
 
   const handlePasswordLogin = async (e) => {
     e.preventDefault();
-    if (!phone || !password) return;
+    setErrors({});
+    
+    let localErrors = {};
+    if (!phone) {
+      localErrors.phone = 'Mobile phone number is required.';
+    }
+    if (!password) {
+      localErrors.password = 'Password is required.';
+    }
+    
+    if (Object.keys(localErrors).length > 0) {
+      setErrors(localErrors);
+      return;
+    }
+
     setLoading(true);
-    setError('');
     try {
       const data = await authService.login(phone, password);
       onLoginSuccess(data.user);
     } catch (err) {
-      setError(err.message || 'Invalid phone or password credentials');
+      if (err.data && err.data.errors) {
+        setErrors(err.data.errors);
+      } else if (err.data && typeof err.data === 'object') {
+        setErrors(err.data);
+      } else {
+        const msg = err.message || '';
+        if (msg.toLowerCase().includes('phone') || msg.toLowerCase().includes('mobile') || msg.toLowerCase().includes('account')) {
+          setErrors({ phone: 'No account found with this mobile number.' });
+        } else if (msg.toLowerCase().includes('password')) {
+          setErrors({ password: 'Incorrect password. Please try again.' });
+        } else {
+          // Case 3 fallback
+          setErrors({
+            phone: ' ',
+            password: 'Invalid mobile number or password.'
+          });
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -39,13 +69,6 @@ export default function LoginForm({ onLoginSuccess }) {
           <CardDescription>Sign in to continue</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          
-          {error && (
-            <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-md text-xs flex items-center gap-2 font-semibold">
-              <AlertCircle className="h-4 w-4 flex-shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
 
           <form onSubmit={handlePasswordLogin} className="space-y-4">
             <div className="space-y-1.5">
@@ -54,12 +77,18 @@ export default function LoginForm({ onLoginSuccess }) {
                 <Phone className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />
                 <Input 
                   placeholder="e.g. 9876543210" 
-                  className="pl-9"
+                  className={`pl-9 ${errors?.phone ? 'border-red-500 ring-1 ring-red-500' : ''}`}
                   value={phone}
-                  onChange={e => setPhone(e.target.value)}
+                  onChange={e => {
+                    setPhone(e.target.value);
+                    if (errors?.phone) setErrors(prev => ({ ...prev, phone: '' }));
+                  }}
                   required
                 />
               </div>
+              {errors?.phone && errors.phone.trim() !== '' && (
+                <p className="text-[10px] font-bold text-red-500 mt-0.5">{errors.phone}</p>
+              )}
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-text-secondary uppercase">Password</label>
@@ -68,9 +97,13 @@ export default function LoginForm({ onLoginSuccess }) {
                 <Input 
                   type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••" 
-                  className="pl-9 pr-10"
+                  className={`pl-9 pr-10 ${errors?.password ? 'border-red-500 ring-1 ring-red-500' : ''}`}
                   value={password}
-                  onChange={e => setPassword(e.target.value)}
+                  onChange={e => {
+                    setPassword(e.target.value);
+                    if (errors?.password) setErrors(prev => ({ ...prev, password: '' }));
+                    if (errors?.phone && errors.phone === ' ') setErrors(prev => ({ ...prev, phone: '' }));
+                  }}
                   required
                 />
                 <button
@@ -81,6 +114,9 @@ export default function LoginForm({ onLoginSuccess }) {
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
+              {errors?.password && (
+                <p className="text-[10px] font-bold text-red-500 mt-0.5">{errors.password}</p>
+              )}
             </div>
             <Button type="submit" className="w-full flex justify-center items-center gap-2 py-2.5" disabled={loading}>
               {loading ? <RefreshCw className="h-4 w-4 animate-spin" /> : 'Login'}

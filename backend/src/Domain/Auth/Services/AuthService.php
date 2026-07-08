@@ -54,12 +54,12 @@ class AuthService extends BaseService
 
         if ($user === null) {
             $this->logAuditDirect(['email' => $phone, 'role' => 'Guest'], 'Security', 'Failed Login Attempt', 'Failed login attempt for unregistered phone number ' . $phone);
-            throw new NotFoundException('No account found for the provided phone number.');
+            throw new \App\Shared\Exceptions\ValidationException(['phone' => 'No account found with this mobile number.']);
         }
 
         if (!password_verify($password, (string) ($user['password'] ?? ''))) {
             $this->logAuditDirect($user, 'Security', 'Failed Login Attempt', 'Failed login attempt for user "' . ($user['name'] ?? $user['email']) . '" due to incorrect password');
-            throw new ValidationException(['password' => 'Invalid credentials.']);
+            throw new \App\Shared\Exceptions\ValidationException(['password' => 'Incorrect password. Please try again.']);
         }
 
         if (($user['status'] ?? '') !== 'ACTIVE') {
