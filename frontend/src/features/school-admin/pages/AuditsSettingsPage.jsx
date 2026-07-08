@@ -1730,7 +1730,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                   <TableRow>
                     <TableHead>Teacher Name</TableHead>
                     <TableHead>Employee ID</TableHead>
-                    <TableHead>Department</TableHead>
+                    <TableHead>Subject</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>

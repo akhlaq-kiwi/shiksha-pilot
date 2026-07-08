@@ -247,7 +247,7 @@ export default function SchoolTeachersPage() {
         </Card>
       </div>
 
-      {/* Roster Listing Grid of Cards - simplified to ONLY display Photo, Name, and Department */}
+      {/* Roster Listing Grid of Cards - simplified to ONLY display Photo, Name, and Subject */}
       {loading ? (
         <div className="py-12 text-center text-xs text-text-muted">Loading teachers directory…</div>
       ) : teachers.length === 0 ? (

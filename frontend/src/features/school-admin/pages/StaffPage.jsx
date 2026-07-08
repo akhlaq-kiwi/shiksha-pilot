@@ -553,6 +553,11 @@ export default function StaffPage() {
       }
     }
 
+    // Subject Validation (department field)
+    if (!newStaff.department || newStaff.department.trim() === '') {
+      errors.department = "Subject is required.";
+    }
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -566,7 +571,7 @@ export default function StaffPage() {
     const payload = {
       name: newStaff.name.trim(),
       role: 'Teacher',
-      department: newStaff.department,
+      department: newStaff.department ? newStaff.department.trim() : '',
       email: newStaff.email.trim(),
       phone: newStaff.phone.trim(),
       photo_path: newStaff.photo_path || null,
@@ -633,7 +638,7 @@ export default function StaffPage() {
       id: t.id,
       name: t.name,
       role: t.role,
-      department: t.department || 'Mathematics',
+      department: t.department || '',
       email: t.email || '',
       phone: t.phone || '',
       photo_path: t.photo_path || '',
@@ -1266,12 +1271,10 @@ export default function StaffPage() {
               <Input placeholder="Search teachers..." className="pl-9" value={staffSearch} onChange={e => setStaffSearch(e.target.value)} />
             </div>
             <Select className="w-full md:w-48" value={selectedDeptFilter} onChange={e => setSelectedDeptFilter(e.target.value)}>
-              <option value="">All Departments</option>
-              <option value="Mathematics">Mathematics</option>
-              <option value="Science">Science</option>
-              <option value="English">English</option>
-              <option value="Social Studies">Social Studies</option>
-              <option value="Administration">Administration</option>
+              <option value="">All Subjects</option>
+              {Array.from(new Set(teachers.map(t => t.department).filter(Boolean))).sort().map(subj => (
+                <option key={subj} value={subj}>{subj}</option>
+              ))}
             </Select>
           </div>
 
@@ -1299,7 +1302,7 @@ export default function StaffPage() {
                       <h3 className="font-extrabold text-text-primary text-base hover:text-primary transition-colors leading-tight truncate w-full px-1">
                         {t.name}
                       </h3>
-                      <p className="text-[10px] text-text-muted font-bold tracking-tight uppercase mt-1">{t.department || 'Mathematics'}</p>
+                      <p className="text-[10px] text-text-muted font-bold tracking-tight uppercase mt-1">{t.department || 'General'}</p>
                     </div>
                     
                     <div className="flex items-center justify-between w-full mt-4 text-xs">
@@ -1473,17 +1476,22 @@ export default function StaffPage() {
                   </div>
                 </div>
 
-                {/* Edit Mode: Row 4 (Department, spacer, spacer) */}
+                {/* Edit Mode: Row 4 (Subject, spacer, spacer) */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-text-secondary uppercase font-display">Department</label>
-                    <Select value={newStaff.department} onChange={e => setNewStaff(p => ({ ...p, department: e.target.value }))}>
-                      <option value="Mathematics">Mathematics</option>
-                      <option value="Science">Science</option>
-                      <option value="English">English</option>
-                      <option value="Social Studies">Social Studies</option>
-                      <option value="Administration">Administration</option>
-                    </Select>
+                    <label className="text-xs font-bold text-text-secondary uppercase font-display">Subject <span className="text-red-500">*</span></label>
+                    <Input 
+                      placeholder="e.g. English"
+                      value={newStaff.department || ''} 
+                      onChange={e => {
+                        const val = e.target.value;
+                        setNewStaff(p => ({ ...p, department: val }));
+                        if (formErrors.department) setFormErrors(prev => ({ ...prev, department: '' }));
+                      }}
+                      className={formErrors.department ? 'border-red-500 ring-1 ring-red-500' : ''}
+                      required 
+                    />
+                    {formErrors.department && <p className="text-[10px] text-red-500 font-semibold">{formErrors.department}</p>}
                   </div>
                   <div></div>
                   <div></div>
@@ -1521,14 +1529,19 @@ export default function StaffPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-text-secondary uppercase font-display">Department</label>
-                    <Select value={newStaff.department} onChange={e => setNewStaff(p => ({ ...p, department: e.target.value }))}>
-                      <option value="Mathematics">Mathematics</option>
-                      <option value="Science">Science</option>
-                      <option value="English">English</option>
-                      <option value="Social Studies">Social Studies</option>
-                      <option value="Administration">Administration</option>
-                    </Select>
+                    <label className="text-xs font-bold text-text-secondary uppercase font-display">Subject <span className="text-red-500">*</span></label>
+                    <Input 
+                      placeholder="e.g. English"
+                      value={newStaff.department || ''} 
+                      onChange={e => {
+                        const val = e.target.value;
+                        setNewStaff(p => ({ ...p, department: val }));
+                        if (formErrors.department) setFormErrors(prev => ({ ...prev, department: '' }));
+                      }}
+                      className={formErrors.department ? 'border-red-500 ring-1 ring-red-500' : ''}
+                      required 
+                    />
+                    {formErrors.department && <p className="text-[10px] text-red-500 font-semibold">{formErrors.department}</p>}
                   </div>
                 </div>
               </>
@@ -1970,7 +1983,7 @@ export default function StaffPage() {
                     <p className="text-zinc-950 font-bold font-mono text-sm mt-0.5">{teacherDetails?.employee_id || '—'}</p>
                   </div>
                   <div>
-                    <p className="text-zinc-500">Designation / Department:</p>
+                    <p className="text-zinc-500">Designation / Subject:</p>
                     <p className="text-zinc-950 font-bold mt-0.5">{teacherDetails?.role || 'Teacher'} · {teacherDetails?.department || 'General'}</p>
                   </div>
                   <div>
@@ -2083,7 +2096,7 @@ export default function StaffPage() {
               {/* Letter Body */}
               <div className="text-sm text-zinc-800 leading-relaxed space-y-6 pt-6 text-justify">
                 <p>
-                  This is to certify that <strong>Mr./Ms. {teacherDetails?.name}</strong>, son/daughter of <strong>Mr. {teacherDetails?.father_name || 'Mohammad Akram'}</strong>, was employed with <strong>{schoolProfile?.name || 'ABC Public School'}</strong> as a <strong>Teacher</strong> in the department of <strong>{teacherDetails?.department || 'Mathematics'}</strong> from <strong>{formatDateFull(teacherDetails?.joining_date)}</strong> to <strong>{formatDateFull(teacherDetails?.exit_date)}</strong>.
+                  This is to certify that <strong>Mr./Ms. {teacherDetails?.name}</strong>, son/daughter of <strong>Mr. {teacherDetails?.father_name || 'Mohammad Akram'}</strong>, was employed with <strong>{schoolProfile?.name || 'ABC Public School'}</strong> as a <strong>Teacher</strong> teaching the subject of <strong>{teacherDetails?.department || 'Mathematics'}</strong> from <strong>{formatDateFull(teacherDetails?.joining_date)}</strong> to <strong>{formatDateFull(teacherDetails?.exit_date)}</strong>.
                 </p>
                 <p>
                   During his/her tenure of service, he/she carried out the assigned responsibilities sincerely, maintained professional conduct, demonstrated dedication toward students, and contributed positively to the academic environment of the school.
