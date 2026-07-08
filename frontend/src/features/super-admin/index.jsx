@@ -35,6 +35,7 @@ export default function SuperAdminPortal() {
   const [error,   setError]   = useState('');
   const [isCreateSchoolOpen, setIsCreateSchoolOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [createErrors, setCreateErrors] = useState({});
 
   useEffect(() => { fetchInitialData(); }, []);
 
@@ -107,6 +108,7 @@ export default function SuperAdminPortal() {
   const handleCreateSchool = async (newSchool, onSuccess) => {
     if (!newSchool.name) return;
     setCreating(true);
+    setCreateErrors({});
     setError('');
     try {
       let effectivePlan = newSchool.plan;
@@ -124,6 +126,9 @@ export default function SuperAdminPortal() {
       if (onSuccess) onSuccess();
       toast.success('School created successfully.', 'School Created');
     } catch (err) {
+      if (err.data) {
+        setCreateErrors(err.data);
+      }
       setError(err.message || 'Failed to create school');
       toast.error(err.message || 'Failed to create school', 'Error');
     } finally {
@@ -212,9 +217,13 @@ export default function SuperAdminPortal() {
 
       <CreateSchoolDialog
         isOpen={isCreateSchoolOpen}
-        onClose={() => setIsCreateSchoolOpen(false)}
+        onClose={() => {
+          setIsCreateSchoolOpen(false);
+          setCreateErrors({});
+        }}
         onSubmit={handleCreateSchool}
         creating={creating}
+        validationErrors={createErrors}
       />
     </div>
   );

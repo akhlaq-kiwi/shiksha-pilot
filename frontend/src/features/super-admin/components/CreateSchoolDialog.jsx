@@ -16,7 +16,7 @@ const EMPTY = {
   contact_phone: '', contact_email: '', admin_phone: '', admin_password: '',
 };
 
-export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating }) {
+export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating, validationErrors = {} }) {
   const [form, setForm] = useState({ ...EMPTY, admin_password: generatePassword() });
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -105,7 +105,17 @@ export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-text-secondary uppercase">School Owner Email Address *</label>
-            <Input type="email" placeholder="e.g. owner@school.com" value={form.contact_email} onChange={set('contact_email')} required />
+            <Input
+              type="email"
+              placeholder="e.g. owner@school.com"
+              value={form.contact_email}
+              onChange={set('contact_email')}
+              required
+              className={validationErrors?.contact_email ? 'border-red-500 ring-1 ring-red-500' : ''}
+            />
+            {validationErrors?.contact_email && (
+              <p className="text-[10px] font-bold text-red-500 mt-0.5">{validationErrors.contact_email}</p>
+            )}
           </div>
         </div>
 
@@ -115,7 +125,16 @@ export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-text-secondary uppercase">Admin Phone</label>
-              <Input placeholder="e.g. 9800000001" value={form.admin_phone} onChange={set('admin_phone')} required />
+              <Input
+                placeholder="e.g. 9800000001"
+                value={form.admin_phone}
+                onChange={set('admin_phone')}
+                required
+                className={validationErrors?.admin_phone ? 'border-red-500 ring-1 ring-red-500' : ''}
+              />
+              {validationErrors?.admin_phone && (
+                <p className="text-[10px] font-bold text-red-500 mt-0.5">{validationErrors.admin_phone}</p>
+              )}
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-text-secondary uppercase">Password</label>
