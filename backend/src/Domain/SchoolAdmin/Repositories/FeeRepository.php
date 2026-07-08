@@ -74,22 +74,30 @@ class FeeRepository extends BaseRepository
                       AND (
                         fp.academic_year_id = :ayid
                         OR (
-                          fp.payment_date >= :start_date AND fp.payment_date <= :end_date
+                          fp.created_at >= (SELECT created_at FROM academic_years WHERE id = :ayid LIMIT 1)
+                          AND fp.academic_year_id != :ayid
                           AND (s.status = 'Inactive' OR s.status = 'Alumni' OR s.status = 'Archived')
                         )
                       )
                 ");
                 $stmt->execute([
                     ':sid' => $schoolId, 
-                    ':ayid' => $academicYearId,
-                    ':start_date' => $startDate,
-                    ':end_date' => $endDate
+                    ':ayid' => $academicYearId
                 ]);
             } else {
                 $stmt = $this->pdo->prepare("
-                    SELECT COALESCE(SUM(amount_paid), 0) 
-                    FROM fee_payments 
-                    WHERE school_id = :sid AND status = 'PAID' AND academic_year_id = :ayid
+                    SELECT COALESCE(SUM(fp.amount_paid), 0) 
+                    FROM fee_payments fp
+                    LEFT JOIN students s ON fp.student_id = s.id
+                    WHERE fp.school_id = :sid AND fp.status = 'PAID'
+                      AND (
+                        fp.academic_year_id = :ayid
+                        OR (
+                          fp.created_at >= (SELECT created_at FROM academic_years WHERE id = :ayid LIMIT 1)
+                          AND fp.academic_year_id != :ayid
+                          AND (s.status = 'Inactive' OR s.status = 'Alumni' OR s.status = 'Archived')
+                        )
+                      )
                 ");
                 $stmt->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
             }
@@ -105,23 +113,31 @@ class FeeRepository extends BaseRepository
                       AND (
                         aft.academic_year_id = :ayid
                         OR (
-                          afp.payment_date >= :start_date AND afp.payment_date <= :end_date
+                          afp.updated_at >= (SELECT created_at FROM academic_years WHERE id = :ayid LIMIT 1)
+                          AND aft.academic_year_id != :ayid
                           AND (s.status = 'Inactive' OR s.status = 'Alumni' OR s.status = 'Archived')
                         )
                       )
                 ");
                 $stmtAdd->execute([
                     ':sid' => $schoolId, 
-                    ':ayid' => $academicYearId,
-                    ':start_date' => $startDate,
-                    ':end_date' => $endDate
+                    ':ayid' => $academicYearId
                 ]);
             } else {
                 $stmtAdd = $this->pdo->prepare("
                     SELECT COALESCE(SUM(afp.amount), 0) 
                     FROM additional_fee_payments afp
                     JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
-                    WHERE afp.school_id = :sid AND afp.status = 'Paid' AND aft.academic_year_id = :ayid
+                    LEFT JOIN students s ON afp.student_id = s.id
+                    WHERE afp.school_id = :sid AND afp.status = 'Paid'
+                      AND (
+                        aft.academic_year_id = :ayid
+                        OR (
+                          afp.updated_at >= (SELECT created_at FROM academic_years WHERE id = :ayid LIMIT 1)
+                          AND aft.academic_year_id != :ayid
+                          AND (s.status = 'Inactive' OR s.status = 'Alumni' OR s.status = 'Archived')
+                        )
+                      )
                 ");
                 $stmtAdd->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
             }

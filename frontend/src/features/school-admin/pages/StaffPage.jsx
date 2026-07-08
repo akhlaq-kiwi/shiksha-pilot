@@ -1146,8 +1146,7 @@ export default function StaffPage() {
                       );
                     })}
                   </div>
-                 </Card>
-                {t.previous_year_pending && (
+                 {t.previous_year_pending && (
                   <Card className="p-6 bg-surface border border-amber-200 dark:border-amber-900/30 rounded-2xl shadow-xs mt-4 animate-in fade-in duration-200">
                     <div className="flex items-center justify-between border-b border-border pb-4 mb-4">
                       <div className="flex items-center gap-2">
@@ -1159,47 +1158,114 @@ export default function StaffPage() {
                       </span>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                      <div>
-                        <p className="text-xs text-text-secondary font-bold">Pending Salary Months:</p>
-                        <ul className="list-disc list-inside mt-1.5 space-y-1">
-                          {t.previous_year_pending.pending_months.map(m => (
-                            <li key={m} className="text-sm text-text-primary font-extrabold font-sans">
-                              {m}
-                            </li>
-                          ))}
-                        </ul>
-                        <div className="flex items-center gap-6 mt-4">
-                          <div>
-                            <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Monthly Salary Rate</p>
-                            <p className="text-sm font-black text-text-primary mt-0.5">
-                              ₹{parseFloat(t.previous_year_pending.salary).toLocaleString('en-IN')}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Total Pending Amount</p>
-                            <p className="text-sm font-black text-red-500 mt-0.5">
-                              ₹{parseFloat(t.previous_year_pending.total_pending).toLocaleString('en-IN')}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                      {['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'].map(month => {
+                        const isPending = t.previous_year_pending.pending_months.includes(month);
+                        const payment = (t.salary_payments || []).find(p => 
+                          p.payment_month === month || 
+                          p.payment_month === `Previous Year - ${month}`
+                        );
+                        const isPaid = !isPending || !!payment;
+                        const isLocked = payment ? !!payment.is_locked : false;
+                        const salaryAmount = t.previous_year_pending.salary || 0.0;
 
-                      <div className="self-end sm:self-center">
-                        <Button 
-                          onClick={() => {
-                            setPrevYearDisburseMonths(t.previous_year_pending.pending_months);
-                            setPrevYearDisburseTotal(t.previous_year_pending.total_pending);
-                            setIsPrevYearDisburseOpen(true);
-                          }}
-                          className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs h-9 px-4 rounded-xl flex items-center gap-1.5 shadow-xs"
-                        >
-                          <CreditCard className="h-4 w-4" /> Disburse Salary
-                        </Button>
-                      </div>
+                        return (
+                          <div 
+                            key={month} 
+                            className={`p-4 rounded-xl border flex flex-col justify-between relative transition-all shadow-3xs ${
+                              isPaid 
+                                ? 'bg-zinc-50/50 dark:bg-zinc-900/10 border-border' 
+                                : 'bg-surface border-zinc-200 dark:border-zinc-800'
+                            }`}
+                          >
+                            {/* Top row: Month name and dropdown menu (if paid and not locked) */}
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <h4 className="text-sm font-extrabold text-text-primary">{month}</h4>
+                                <p className="text-[10px] text-text-secondary font-bold uppercase mt-0.5">
+                                  {isPaid ? (
+                                    <span className="inline-flex items-center gap-1 text-green-600">
+                                      <CheckCircle className="h-3 w-3" /> Paid
+                                    </span>
+                                  ) : (
+                                    <span className="text-amber-500">Pending</span>
+                                  )}
+                                </p>
+                              </div>
+                              
+                              {isPaid && payment && (
+                                <div className="flex items-center gap-1.5">
+                                  {isLocked && (
+                                    <span title="Locked by Financial Report" className="text-zinc-400">
+                                      <Lock className="h-3.5 w-3.5" />
+                                    </span>
+                                  )}
+                                  {(!isReadOnly || !t.is_migrated) && !isLocked && (
+                                    <DropdownMenu>
+                                      <DropdownItem
+                                        destructive
+                                        onClick={() => {
+                                          setRevertPayment(payment);
+                                          setIsRevertDialogOpen(true);
+                                        }}
+                                      >
+                                        Revert Salary
+                                      </DropdownItem>
+                                    </DropdownMenu>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Middle row: salary amount */}
+                            <div className="my-4">
+                              <p className="text-lg font-black text-text-primary">
+                                ₹{parseFloat(salaryAmount).toLocaleString('en-IN')}
+                              </p>
+                            </div>
+
+                            {/* Bottom row: Disburse / Salary Slip button */}
+                            <div className="mt-2">
+                              {isPaid ? (
+                                payment ? (
+                                  <Button 
+                                    variant="outline"
+                                    onClick={() => {
+                                      setSelectedSlipPayment(payment);
+                                      setIsSalarySlipOpen(true);
+                                    }}
+                                    className="w-full h-8 text-xs font-bold flex items-center gap-1 bg-surface border border-border hover:bg-zinc-50"
+                                  >
+                                    <FileText className="h-3.5 w-3.5" /> Salary Slip
+                                  </Button>
+                                ) : (
+                                  <div className="h-8 flex items-center justify-center text-xs text-text-muted font-bold">
+                                    Settled in Previous Year
+                                  </div>
+                                )
+                              ) : (
+                                <Button 
+                                  disabled={isReadOnly && t.is_migrated}
+                                  onClick={() => {
+                                    if (isReadOnly && t.is_migrated) return;
+                                    setPrevYearDisburseMonths([month]);
+                                    setPrevYearDisburseTotal(salaryAmount);
+                                    setIsPrevYearDisburseOpen(true);
+                                  }}
+                                  className={`w-full h-8 text-xs font-bold ${(isReadOnly && t.is_migrated) ? 'bg-zinc-200 text-zinc-400 dark:bg-zinc-800 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-700 text-white'}`}
+                                >
+                                  Disburse
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </Card>
                 )}
+                 </Card>
+
               </div>
             </div>
           </div>
