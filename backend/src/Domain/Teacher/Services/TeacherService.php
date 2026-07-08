@@ -64,11 +64,18 @@ class TeacherService extends BaseService
 
         $pdo  = $this->attendanceRepo->getPdo();
         $stmt = $pdo->prepare("
-            SELECT s.*, c.name AS class_name, c.section
+            SELECT s.*,
+                   CASE 
+                     WHEN s.last_name = '.' OR s.last_name IS NULL OR TRIM(s.last_name) = '' THEN 
+                       TRIM(CONCAT(s.first_name, ' ', COALESCE(s.middle_name, '')))
+                     ELSE 
+                       TRIM(CONCAT(s.first_name, ' ', COALESCE(s.middle_name, ''), ' ', s.last_name))
+                   END AS name,
+                   c.name AS class_name, c.section
             FROM students s
             LEFT JOIN classes c ON s.class_id = c.id
             WHERE s.class_id = :class_id AND s.school_id = :school_id AND s.status = 'ACTIVE'
-            ORDER BY s.name
+            ORDER BY name
         ");
         $stmt->execute([':class_id' => $classId, ':school_id' => $schoolId]);
 

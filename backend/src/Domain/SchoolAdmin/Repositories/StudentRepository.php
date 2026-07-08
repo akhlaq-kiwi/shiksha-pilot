@@ -51,7 +51,14 @@ class StudentRepository extends BaseRepository
         }
 
         $sql  = "
-            SELECT s.*, c.name AS class_name, c.section, ay.name AS academic_year_name
+            SELECT s.*,
+                   CASE 
+                     WHEN s.last_name = '.' OR s.last_name IS NULL OR TRIM(s.last_name) = '' THEN 
+                       TRIM(CONCAT(s.first_name, ' ', COALESCE(s.middle_name, '')))
+                     ELSE 
+                       TRIM(CONCAT(s.first_name, ' ', COALESCE(s.middle_name, ''), ' ', s.last_name))
+                   END AS name,
+                   c.name AS class_name, c.section, ay.name AS academic_year_name
             FROM students s
             LEFT JOIN classes c ON s.class_id = c.id
             LEFT JOIN academic_years ay ON s.academic_year_id = ay.id
@@ -67,7 +74,14 @@ class StudentRepository extends BaseRepository
     public function findDetailById(int $schoolId, int $id): ?array
     {
         $sql = "
-            SELECT s.*, c.name AS class_name, c.section, ay.name AS academic_year_name
+            SELECT s.*,
+                   CASE 
+                     WHEN s.last_name = '.' OR s.last_name IS NULL OR TRIM(s.last_name) = '' THEN 
+                       TRIM(CONCAT(s.first_name, ' ', COALESCE(s.middle_name, '')))
+                     ELSE 
+                       TRIM(CONCAT(s.first_name, ' ', COALESCE(s.middle_name, ''), ' ', s.last_name))
+                   END AS name,
+                   c.name AS class_name, c.section, ay.name AS academic_year_name
             FROM students s
             LEFT JOIN classes c ON s.class_id = c.id
             LEFT JOIN academic_years ay ON s.academic_year_id = ay.id

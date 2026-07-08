@@ -317,10 +317,11 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
           const detail = await schoolService.getStudentById(studentId);
           if (detail && detail.student) {
             const studentData = detail.student;
+            const cleanLastName = (studentData.last_name || '') === '.' ? '' : (studentData.last_name || '');
             const combinedName = [
               studentData.first_name || '',
               studentData.middle_name || '',
-              studentData.last_name || ''
+              cleanLastName
             ].filter(Boolean).join(' ');
 
             setFormData({
@@ -636,6 +637,22 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
   const handleFileUpload = async (e, fieldName) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    // Reset previous upload state for this field
+    setUploadStates(prev => {
+      const next = { ...prev };
+      delete next[fieldName];
+      return next;
+    });
+
+    if (fieldName === 'photo_path') {
+      const allowedExts = ['jpg', 'jpeg', 'png', 'webp'];
+      const fileExt = file.name.split('.').pop().toLowerCase();
+      if (!allowedExts.includes(fileExt) || !file.type.startsWith('image/')) {
+        setUploadStates(prev => ({ ...prev, photo_path: 'validation_error' }));
+        return;
+      }
+    }
 
     setUploadStates(prev => ({ ...prev, [fieldName]: 'uploading' }));
     try {
@@ -1247,28 +1264,33 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                           )}
                         </div>
 
-                        <div className="flex items-center gap-3 mt-2">
-                          <label className="cursor-pointer bg-surface border border-border px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors flex items-center gap-1.5 text-text-primary shadow-xs">
-                            <Upload className="h-3.5 w-3.5" />
-                            <span>{formData[doc.key] ? 'Change File' : 'Choose File'}</span>
-                            <input 
-                              type="file" 
-                              onChange={(e) => handleFileUpload(e, doc.key)} 
-                              className="hidden" 
-                              accept=".png,.jpg,.jpeg,.pdf"
-                            />
-                          </label>
-                          
-                          {uploadStates[doc.key] === 'uploading' && (
-                            <span className="text-[10px] text-text-muted animate-pulse font-medium">Uploading...</span>
-                          )}
-                          {uploadStates[doc.key] === 'error' && (
-                            <span className="text-[10px] text-red-500 font-medium">Upload failed. Try again.</span>
-                          )}
-                          {formData[doc.key] && !uploadStates[doc.key] && (
-                            <span className="text-[10px] text-text-muted truncate max-w-[200px]" title={formData[doc.key]}>
-                              {formData[doc.key].split('/').pop()}
-                            </span>
+                        <div className="flex flex-col gap-1 mt-2">
+                          <div className="flex items-center gap-3">
+                            <label className="cursor-pointer bg-surface border border-border px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors flex items-center gap-1.5 text-text-primary shadow-xs">
+                              <Upload className="h-3.5 w-3.5" />
+                              <span>{formData[doc.key] ? 'Change File' : 'Choose File'}</span>
+                              <input 
+                                type="file" 
+                                onChange={(e) => handleFileUpload(e, doc.key)} 
+                                className="hidden" 
+                                accept={doc.key === 'photo_path' ? ".jpg,.jpeg,.png,.webp" : ".png,.jpg,.jpeg,.pdf"}
+                              />
+                            </label>
+                            
+                            {uploadStates[doc.key] === 'uploading' && (
+                              <span className="text-[10px] text-text-muted animate-pulse font-medium">Uploading...</span>
+                            )}
+                            {uploadStates[doc.key] === 'error' && (
+                              <span className="text-[10px] text-red-500 font-medium">Upload failed. Try again.</span>
+                            )}
+                            {formData[doc.key] && !uploadStates[doc.key] && (
+                              <span className="text-[10px] text-text-muted truncate max-w-[200px]" title={formData[doc.key]}>
+                                {formData[doc.key].split('/').pop()}
+                              </span>
+                            )}
+                          </div>
+                          {uploadStates[doc.key] === 'validation_error' && doc.key === 'photo_path' && (
+                            <p className="text-[10px] font-bold text-red-500 mt-1">⚠️ Only JPG, JPEG, PNG and WEBP image files are allowed.</p>
                           )}
                         </div>
                       </div>
