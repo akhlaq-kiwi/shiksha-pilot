@@ -3,6 +3,7 @@ import { Plus, Search, MoreVertical, Edit2, Trash2, Users, GraduationCap, Clock,
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../../common/ui/button';
 import { Input } from '../../../common/ui/input';
+import { Select } from '../../../common/ui/select';
 import { platformService } from '../../../common/services/platformService';
 import { useToast } from '../../../common/components/Toast';
 import { useConfirm } from '../../../common/components/ConfirmDialog';
@@ -26,7 +27,8 @@ const getRemainingDaysText = (expiryDateStr) => {
   if (!expiryDateStr) return '';
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const expiry = new Date(expiryDateStr);
+  const datePart = expiryDateStr.split(' ')[0];
+  const expiry = new Date(datePart.replace(/-/g, '/'));
   expiry.setHours(0, 0, 0, 0);
   
   const diffTime = expiry.getTime() - today.getTime();
@@ -46,7 +48,8 @@ const calculateDaysLeftText = (expiryDateStr) => {
   if (!expiryDateStr) return 'Expired';
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const expiry = new Date(expiryDateStr);
+  const datePart = expiryDateStr.split(' ')[0];
+  const expiry = new Date(datePart.replace(/-/g, '/'));
   expiry.setHours(0, 0, 0, 0);
   
   const diffTime = expiry.getTime() - today.getTime();
@@ -63,6 +66,7 @@ function EditSchoolDialog({ school, onClose, onSaved }) {
   const [name, setName] = useState(school.name || '');
   const [contactPhone, setContactPhone] = useState(school.contact_phone || '');
   const [contactEmail, setContactEmail] = useState(school.contact_email || '');
+  const [status, setStatus] = useState(school.status || 'ACTIVE');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -82,6 +86,7 @@ function EditSchoolDialog({ school, onClose, onSaved }) {
         name: name.trim(),
         contact_phone: contactPhone.trim(),
         contact_email: contactEmail.trim(),
+        status: status,
       });
       onSaved(updated);
       toast.success(`School details updated successfully.`, 'Updated');
@@ -126,6 +131,13 @@ function EditSchoolDialog({ school, onClose, onSaved }) {
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-text-secondary uppercase">Contact Email</label>
             <Input type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} required />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-text-secondary uppercase">School Status</label>
+            <Select value={status} onChange={e => setStatus(e.target.value)}>
+              <option value="ACTIVE">Active</option>
+              <option value="INACTIVE">Inactive</option>
+            </Select>
           </div>
           <div className="flex gap-3 pt-2">
             <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
@@ -585,81 +597,81 @@ export default function SchoolsPage({ schools, onCreateSchool, onToggleStatus, o
           filtered.map(school => (
             <div
               key={school.id}
-              className="bg-surface border border-border rounded-2xl p-6 transition-all shadow-sm hover:shadow-md flex flex-col items-center justify-between text-center relative group min-h-[300px]"
+              className="bg-surface border border-border rounded-2xl p-6 transition-all shadow-sm hover:shadow-md flex flex-col items-start justify-between text-left relative group min-h-[300px]"
             >
               
-              {/* Three-Dot Dropdown aligned absolutely to avoid overflows */}
               <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
-                {/* Status Badge */}
                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${school.status === 'ACTIVE' ? 'bg-green-500/10 text-green-600 border border-green-500/20' : 'bg-red-500/10 text-red-600 border border-red-500/20'}`}>
                   {school.status === 'ACTIVE' ? 'Active' : 'Inactive'}
                 </span>
+                
+                <div className="relative">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMenuOpenSchoolId(menuOpenSchoolId === school.id ? null : school.id);
+                    }}
+                    className="p-1.5 rounded-md text-text-muted hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  >
+                    <MoreVertical className="h-4.5 w-4.5" />
+                  </button>
 
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setMenuOpenSchoolId(menuOpenSchoolId === school.id ? null : school.id);
-                  }}
-                  className="p-1.5 rounded-md text-text-muted hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-                >
-                  <MoreVertical className="h-4.5 w-4.5" />
-                </button>
- 
-                {/* Actions Dropdown */}
-                {menuOpenSchoolId === school.id && (
-                  <>
-                    <div className="fixed inset-0 z-10" onClick={() => setMenuOpenSchoolId(null)} />
-                    <div className="absolute right-0 top-7 bg-surface border border-border shadow-xl rounded-xl w-44 py-1.5 z-20 animate-in fade-in slide-in-from-top-1 duration-100 text-xs font-semibold text-left">
-                      <button
-                        onClick={() => {
-                          setMenuOpenSchoolId(null);
-                          setEditingSchool(school);
-                        }}
-                        className="w-full text-left px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-text-primary flex items-center gap-2"
-                      >
-                        <Edit2 className="h-3.5 w-3.5" /> Edit details
-                      </button>
-                      <button
-                        onClick={() => {
-                          setMenuOpenSchoolId(null);
-                          handleOpenCredentials(school);
-                        }}
-                        className="w-full text-left px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-text-primary flex items-center gap-2"
-                      >
-                        <Key className="h-3.5 w-3.5" /> Credentials
-                      </button>
-                      <button
-                        onClick={() => nav(`/super-admin/schools/${school.id}/teachers`)}
-                        className="w-full text-left px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-text-primary flex items-center gap-2"
-                      >
-                        <Users className="h-3.5 w-3.5" /> View Teachers
-                      </button>
-                      <button
-                        onClick={() => nav(`/super-admin/schools/${school.id}/students`)}
-                        className="w-full text-left px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-text-primary flex items-center gap-2"
-                      >
-                        <GraduationCap className="h-3.5 w-3.5" /> View Students
-                      </button>
-                      <button
-                        onClick={() => nav(`/super-admin/schools/${school.id}/history`)}
-                        className="w-full text-left px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-text-primary flex items-center gap-2"
-                      >
-                        <Clock className="h-3.5 w-3.5" /> History
-                      </button>
-                      <div className="h-px bg-border/60 my-1.5" />
-                      <button
-                        onClick={() => handleDelete(school)}
-                        className="w-full text-left px-3 py-2 hover:bg-red-500/10 text-red-600 dark:hover:bg-red-950/20 flex items-center gap-2"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" /> Delete
-                      </button>
-                    </div>
-                  </>
-                )}
+                  {/* Actions Dropdown */}
+                  {menuOpenSchoolId === school.id && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setMenuOpenSchoolId(null)} />
+                      <div className="absolute right-0 top-7 bg-surface border border-border shadow-xl rounded-xl w-44 py-1.5 z-20 animate-in fade-in slide-in-from-top-1 duration-100 text-xs font-semibold text-left">
+                        <button
+                          onClick={() => {
+                            setMenuOpenSchoolId(null);
+                            setEditingSchool(school);
+                          }}
+                          className="w-full text-left px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-text-primary flex items-center gap-2"
+                        >
+                          <Edit2 className="h-3.5 w-3.5" /> Edit details
+                        </button>
+                        <button
+                          onClick={() => {
+                            setMenuOpenSchoolId(null);
+                            handleOpenCredentials(school);
+                          }}
+                          className="w-full text-left px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-text-primary flex items-center gap-2"
+                        >
+                          <Key className="h-3.5 w-3.5" /> Credentials
+                        </button>
+                        <button
+                          onClick={() => nav(`/super-admin/schools/${school.id}/teachers`)}
+                          className="w-full text-left px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-text-primary flex items-center gap-2"
+                        >
+                          <Users className="h-3.5 w-3.5" /> View Teachers
+                        </button>
+                        <button
+                          onClick={() => nav(`/super-admin/schools/${school.id}/students`)}
+                          className="w-full text-left px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-text-primary flex items-center gap-2"
+                        >
+                          <GraduationCap className="h-3.5 w-3.5" /> View Students
+                        </button>
+                        <button
+                          onClick={() => nav(`/super-admin/schools/${school.id}/history`)}
+                          className="w-full text-left px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-text-primary flex items-center gap-2"
+                        >
+                          <Clock className="h-3.5 w-3.5" /> History
+                        </button>
+                        <div className="h-px bg-border/60 my-1.5" />
+                        <button
+                          onClick={() => handleDelete(school)}
+                          className="w-full text-left px-3 py-2 hover:bg-red-500/10 text-red-600 dark:hover:bg-red-950/20 flex items-center gap-2"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" /> Delete
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
  
               {/* Main Content Area */}
-              <div className="flex flex-col items-center gap-3 w-full">
+              <div className="flex flex-col items-start gap-3 w-full">
                 {/* Logo */}
                 {school.logo_path ? (
                   <img
@@ -674,14 +686,16 @@ export default function SchoolsPage({ schools, onCreateSchool, onToggleStatus, o
                 )}
  
                 {/* Name */}
-                <div className="w-full px-2 mt-1">
+                <div className="w-full mt-1">
                   <h3 className="font-extrabold text-text-primary text-base leading-snug break-words">
                     {school.name}
                   </h3>
                 </div>
+
+
  
                 {/* Days Left Countdown Badge */}
-                <div className="mt-1">
+                <div className="mt-0.5">
                   {(() => {
                     const daysText = calculateDaysLeftText(school.subscription_expiry);
                     let style = 'bg-rose-500/10 text-rose-600 border border-rose-500/20';

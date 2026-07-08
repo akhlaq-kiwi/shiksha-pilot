@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, School, BookOpen, Users, UserCog, Clock,
-  ClipboardCheck, FileText, DollarSign, BarChart2, Shield, Settings, RefreshCw, Landmark
+  ClipboardCheck, FileText, DollarSign, BarChart2, Shield, Settings, RefreshCw, Landmark,
+  AlertCircle, AlertTriangle, Copy, Phone, Mail, ExternalLink
 } from 'lucide-react';
+import { useToast } from '../../common/components/Toast';
 
 import DashboardPage from './pages/DashboardPage';
 import ProfilePage from './pages/ProfilePage';
@@ -74,11 +76,202 @@ function OnboardingScreen() {
 
 // ─── Portal Root ──────────────────────────────────────────────────────────────
 
+function ContactSuperAdminDialog({ isOpen, onClose }) {
+  const toast = useToast();
+
+  const handleCopy = (text, type) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${type} copied successfully.`, 'Copied');
+  };
+
+  return (
+    <Dialog
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Contact Super Admin"
+      description="Get in touch with support to activate or renew subscription plans."
+      className="max-w-md animate-in fade-in zoom-in-95 duration-200"
+      footer={
+        <div className="flex justify-end w-full">
+          <Button onClick={onClose} variant="secondary">
+            Close
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-4 text-sm mt-3">
+        <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed font-medium">
+          To purchase or renew a subscription plan, please contact the ShikshaPilot Super Admin using any of the methods below.
+          Our team will assist you with plan activation and account renewal.
+        </p>
+
+        <div className="bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-xl border border-border space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Phone className="h-4 w-4 text-zinc-500" />
+              <span className="text-text-primary font-bold">8650302499</span>
+            </div>
+            <Button 
+              size="xs" 
+              variant="outline" 
+              className="flex items-center gap-1 font-bold text-[10px] py-1 px-2.5 h-7 rounded-lg"
+              onClick={() => handleCopy('8650302499', 'Phone number')}
+            >
+              <Copy className="h-3 w-3" /> Copy
+            </Button>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Mail className="h-4 w-4 text-zinc-500" />
+              <span className="text-text-primary font-bold">Shikshapilot@gmail.com</span>
+            </div>
+            <Button 
+              size="xs" 
+              variant="outline" 
+              className="flex items-center gap-1 font-bold text-[10px] py-1 px-2.5 h-7 rounded-lg"
+              onClick={() => handleCopy('Shikshapilot@gmail.com', 'Email address')}
+            >
+              <Copy className="h-3 w-3" /> Copy
+            </Button>
+          </div>
+        </div>
+      </div>
+    </Dialog>
+  );
+}
+
+function SubscriptionExpiredScreen({ profile }) {
+  const [plans, setPlans] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [contactOpen, setContactOpen] = useState(false);
+
+  useEffect(() => {
+    const fetchPlans = async () => {
+      try {
+        const data = await schoolService.getActivePlans();
+        const sorted = (data || []).sort((a, b) => a.price - b.price);
+        setPlans(sorted);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPlans();
+  }, []);
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-140px)] w-full px-4 py-12 bg-zinc-50/50 dark:bg-zinc-950/20">
+      <div className="max-w-4xl w-full text-center space-y-8 animate-in fade-in duration-300">
+        <div className="max-w-md mx-auto space-y-4">
+          <div className="mx-auto w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-2">
+            <AlertTriangle className="h-8 w-8 text-red-500" />
+          </div>
+          <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">Subscription Expired</h2>
+          <p className="text-sm text-text-secondary leading-relaxed font-medium">
+            Your subscription has expired.
+          </p>
+          <p className="text-sm text-text-secondary leading-relaxed font-medium mt-1">
+            Please purchase a new subscription plan to continue using ShikshaPilot.
+          </p>
+        </div>
+
+        <div>
+          <h3 className="text-xs font-bold text-text-muted uppercase tracking-widest mb-6">Available Active Plans</h3>
+          {loading ? (
+            <div className="flex flex-col items-center gap-2 py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Fetching plans...</p>
+            </div>
+          ) : plans.length === 0 ? (
+            <div className="py-12 border-2 border-dashed border-border bg-surface rounded-2xl text-text-muted text-sm font-medium">
+              No active subscription plans found. Please contact support.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto text-left">
+              {plans.map(p => (
+                <Card key={p.id} className="shadow-sm border-border bg-surface flex flex-col justify-between p-6 rounded-2xl min-h-[350px] relative hover:shadow-md transition-all duration-200">
+                  <div className="space-y-4">
+                    <div className="border-b border-border/60 pb-4">
+                      <h4 className="text-base font-black text-text-primary font-display">{p.name}</h4>
+                      <p className="text-2xl font-black text-text-primary tracking-tight mt-1">
+                        ₹{parseFloat(p.price).toLocaleString('en-IN')}
+                        <span className="text-xs font-bold text-text-secondary tracking-normal">/mo</span>
+                      </p>
+                      <p className="text-[10px] text-primary bg-primary/10 px-2 py-0.5 rounded-md inline-block font-extrabold uppercase mt-2.5">
+                        {p.student_limit ? `Up to ${p.student_limit.toLocaleString()} Students` : 'Unlimited Students'}
+                      </p>
+                    </div>
+
+                    <p className="text-xs text-text-secondary leading-relaxed font-medium">
+                      {p.description}
+                    </p>
+                  </div>
+
+                  <div className="pt-6">
+                    <Button 
+                      className="w-full font-bold bg-amber-600 hover:bg-amber-700 text-white flex items-center justify-center gap-1.5 shadow-sm text-xs py-2 rounded-xl"
+                      onClick={() => setContactOpen(true)}
+                    >
+                      CONTACT SUPER ADMIN
+                    </Button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <ContactSuperAdminDialog isOpen={contactOpen} onClose={() => setContactOpen(false)} />
+    </div>
+  );
+}
+
+// ─── Portal Root ──────────────────────────────────────────────────────────────
+
 export default function SchoolAdminPortal() {
   const nav = useNavigate();
   const location = useLocation();
 
   const { academicYears, loading: loadingYears, refreshYears } = useAcademicYear();
+
+  const [profile, setProfile] = useState(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const data = await schoolService.getSchoolProfile();
+        setProfile(data || null);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoadingProfile(false);
+      }
+    };
+    loadProfile();
+
+    const handleProfileUpdate = (e) => {
+      if (e.detail) {
+        setProfile(e.detail);
+      }
+    };
+    window.addEventListener('school-profile-updated', handleProfileUpdate);
+    return () => window.removeEventListener('school-profile-updated', handleProfileUpdate);
+  }, []);
+
+  const getRemainingDays = (expiryDateStr) => {
+    if (!expiryDateStr) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const datePart = expiryDateStr.split(' ')[0];
+    const expiry = new Date(datePart.replace(/-/g, '/'));
+    expiry.setHours(0, 0, 0, 0);
+    const diffTime = expiry.getTime() - today.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
 
   const isActive = (path, exact) => {
     if (exact) return location.pathname === path;
@@ -103,7 +296,7 @@ export default function SchoolAdminPortal() {
     );
   };
 
-  if (loadingYears) {
+  if (loadingYears || loadingProfile) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] w-full gap-3">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -112,7 +305,16 @@ export default function SchoolAdminPortal() {
     );
   }
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const isExpired = !profile?.subscription_expiry || new Date(profile.subscription_expiry.split(' ')[0].replace(/-/g, '/')).setHours(0, 0, 0, 0) < today.getTime();
+
+  if (isExpired) {
+    return <SubscriptionExpiredScreen profile={profile} />;
+  }
+
   const hasYear = academicYears.length > 0;
+  const remainingDays = getRemainingDays(profile?.subscription_expiry);
 
   return (
     <div className="flex flex-col md:flex-row gap-6 w-full min-h-[calc(100vh-140px)]">
@@ -128,6 +330,32 @@ export default function SchoolAdminPortal() {
 
       {/* Main Area */}
       <div className="flex-1 min-w-0">
+        {remainingDays !== null && (remainingDays === 7 || remainingDays === 3 || remainingDays === 1) && (
+          <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 rounded-2xl text-sm font-semibold flex items-start gap-3 animate-in slide-in-from-top-2 duration-300">
+            <AlertCircle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+            <div>
+              {remainingDays === 7 && (
+                <>
+                  <p className="font-extrabold">Your subscription plan will expire in 7 days.</p>
+                  <p className="text-xs text-text-secondary mt-0.5">Please renew your subscription to avoid interruption.</p>
+                </>
+              )}
+              {remainingDays === 3 && (
+                <>
+                  <p className="font-extrabold">Your subscription plan will expire in 3 days.</p>
+                  <p className="text-xs text-text-secondary mt-0.5">Renew your subscription before expiry.</p>
+                </>
+              )}
+              {remainingDays === 1 && (
+                <>
+                  <p className="font-extrabold">Your subscription expires tomorrow.</p>
+                  <p className="text-xs text-text-secondary mt-0.5">Renew now to continue uninterrupted access.</p>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
         {!hasYear && location.pathname !== '/school-admin/audits-settings' ? (
           <OnboardingScreen />
         ) : (

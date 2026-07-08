@@ -197,6 +197,14 @@ export const schoolService = {
     return apiClient.get('/api/school/profile');
   },
 
+  getActivePlans() {
+    return apiClient.get('/api/school/plans');
+  },
+
+  getSubscriptionHistory() {
+    return apiClient.get('/api/school/subscriptions');
+  },
+
   updateSchoolProfile(data) {
     return apiClient.post('/api/school/profile', data);
   },
@@ -257,6 +265,10 @@ export const schoolService = {
     return apiClient.post('/api/school/staff-payments', data);
   },
 
+  disbursePreviousYearStaffSalary(data) {
+    return apiClient.post('/api/school/staff-payments/disburse-previous-year', data);
+  },
+
   revertStaffSalary(id) {
     return apiClient.delete(`/api/school/staff-payments/${id}`);
   },
@@ -279,6 +291,10 @@ export const schoolService = {
 
   submitSettlementRequest(id) {
     return apiClient.post(`/api/school/financial-reports/${id}/settlement-request`);
+  },
+
+  exportFinancialReport(id) {
+    return apiClient.get(`/api/school/financial-reports/${id}/export`);
   },
 
   getSchoolExpenses(params = {}) {

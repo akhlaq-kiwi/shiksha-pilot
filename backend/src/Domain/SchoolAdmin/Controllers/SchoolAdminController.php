@@ -691,6 +691,40 @@ class SchoolAdminController extends BaseController
         return $this->success($response, $data);
     }
 
+    public function getActivePlans(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $data = $this->service->getActivePlans();
+
+        return $this->success($response, $data);
+    }
+
+    public function getSubscriptionHistory(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $data = $this->service->getSubscriptionHistory($user);
+
+        return $this->success($response, $data);
+    }
+
+    protected function requireRole(array $user, string|array $roles): void
+    {
+        parent::requireRole($user, $roles);
+
+        $uri = $_SERVER['REQUEST_URI'] ?? '';
+        if (str_contains($uri, '/api/school/profile') || str_contains($uri, '/api/school/plans') || str_contains($uri, '/api/school/subscriptions')) {
+            return;
+        }
+
+        if ($this->service->checkSubscriptionExpired($user)) {
+            throw new \App\Shared\Exceptions\ForbiddenException('Subscription Expired. Access Denied.');
+        }
+    }
+
     public function updateSchoolProfile(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
@@ -873,6 +907,17 @@ class SchoolAdminController extends BaseController
         return $this->success($response, $data, 'Staff salary paid successfully', 201);
     }
 
+    public function disbursePreviousYearStaffSalary(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body = RequestParser::body($request);
+        $data = $this->service->disbursePreviousYearStaffSalary($user, $body);
+
+        return $this->success($response, $data, 'Previous year staff salary paid successfully', 201);
+    }
+
     public function revertStaffSalary(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
@@ -940,6 +985,23 @@ class SchoolAdminController extends BaseController
         $data = $this->service->submitSettlementRequest($user, $id);
 
         return $this->success($response, $data, 'Settlement request submitted successfully');
+    }
+
+    public function exportFinancialReport(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int)$args['id'];
+        $filename = "";
+        $excelData = $this->service->exportFinancialReport($user, $id, $filename);
+
+        $response->getBody()->write($excelData);
+        return $response
+            ->withHeader('Content-Type', 'application/vnd.ms-excel')
+            ->withHeader('Content-Disposition', 'attachment; filename="' . $filename . '"')
+            ->withHeader('Pragma', 'no-cache')
+            ->withHeader('Expires', '0');
     }
 
     public function ownerApproveSettlement(Request $request, Response $response, array $args): Response

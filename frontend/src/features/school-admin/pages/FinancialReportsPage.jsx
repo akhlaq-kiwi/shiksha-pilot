@@ -65,6 +65,43 @@ const formatTime12h = (dateStr) => {
   return `${hours}:${minutes} ${ampm}`;
 };
 
+const formatServerTimestamp = (dateStr) => {
+  if (!dateStr) return '—';
+  const normalized = dateStr.replace('T', ' ').split('.')[0].replace('Z', '');
+  const parts = normalized.split(' ');
+  if (parts.length >= 2) {
+    const datePart = parts[0];
+    const timePart = parts[1];
+    
+    // Parse date
+    const dParts = datePart.split('-');
+    let dateStrFormatted = datePart;
+    if (dParts.length === 3) {
+      const year = parseInt(dParts[0], 10);
+      const month = parseInt(dParts[1], 10) - 1;
+      const day = parseInt(dParts[2], 10);
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      dateStrFormatted = `${day} ${months[month]} ${year}`;
+    }
+    
+    // Parse time
+    const tParts = timePart.split(':');
+    let timeStrFormatted = timePart;
+    if (tParts.length >= 2) {
+      let hours = parseInt(tParts[0], 10);
+      const minutes = String(parseInt(tParts[1], 10)).padStart(2, '0');
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12;
+      hours = hours ? hours : 12;
+      const hoursStr = String(hours).padStart(2, '0');
+      timeStrFormatted = `${hoursStr}:${minutes} ${ampm}`;
+    }
+    
+    return `${dateStrFormatted} at ${timeStrFormatted}`;
+  }
+  return dateStr;
+};
+
 export default function FinancialReportsPage() {
   const { isReadOnly, currentYear } = useAcademicYear();
   const [reports, setReports] = useState([]);
@@ -154,6 +191,33 @@ export default function FinancialReportsPage() {
   const handleSendSettlementRequest = (report) => {
     setSettlementTarget(report);
     setShowSettlementConfirm(true);
+  };
+
+  const handleExportReport = async (report) => {
+    try {
+      const blob = await schoolService.exportFinancialReport(report.id);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      const formatDateStr = (dateStr) => {
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const parts = dateStr.split('-');
+        if (parts.length === 3) {
+          return `${parseInt(parts[2], 10)} ${months[parseInt(parts[1], 10) - 1]} ${parts[0]}`;
+        }
+        return dateStr;
+      };
+      
+      const filename = `Financial Report - ${formatDateStr(report.from_date)} to ${formatDateStr(report.to_date)}.xlsx`;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to export report.');
+    }
   };
 
   const handleConfirmSettlementRequest = async () => {
@@ -354,15 +418,12 @@ export default function FinancialReportsPage() {
                       )}
                     </div>
 
-                    {r.status !== 'Settled' && (
-                      <button
-                        onClick={() => handleSendSettlementRequest(r)}
-                        disabled={r.status === 'Request Sent'}
-                        className="text-[10px] font-extrabold uppercase tracking-tight text-primary hover:underline disabled:text-text-muted disabled:no-underline"
-                      >
-                        Send Settled Request
-                      </button>
-                    )}
+                    <button
+                      onClick={() => handleExportReport(r)}
+                      className="text-[10px] font-extrabold uppercase tracking-tight text-primary hover:underline"
+                    >
+                      Export Report
+                    </button>
                   </div>
 
                   {/* Period dates */}
@@ -397,8 +458,8 @@ export default function FinancialReportsPage() {
 
                   {/* Generation details */}
                   <div className="flex items-center justify-between text-[9px] text-text-muted border-t border-border pt-3">
-                    <span className="font-bold uppercase">Generated</span>
-                    <span className="font-mono">{formatDateFull(r.created_at)} at {formatTime12h(r.created_at)}</span>
+                    <span className="font-bold">Generated</span>
+                    <span className="font-mono">{formatServerTimestamp(r.created_at)}</span>
                   </div>
 
                 </Card>

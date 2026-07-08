@@ -56,12 +56,14 @@ return function (App $app) {
     $app->get('/api/school/staff/{id}', [SchoolAdminController::class, 'getStaffDetails']);
     $app->get('/api/school/staff-payments', [SchoolAdminController::class, 'getStaffPayments']);
     $app->post('/api/school/staff-payments', [SchoolAdminController::class, 'payStaffSalary']);
+    $app->post('/api/school/staff-payments/disburse-previous-year', [SchoolAdminController::class, 'disbursePreviousYearStaffSalary']);
     $app->delete('/api/school/staff-payments/{id}', [SchoolAdminController::class, 'revertStaffSalary']);
     $app->get('/api/school/financial-reports/preview', [SchoolAdminController::class, 'getFinancialPreview']);
     $app->get('/api/school/financial-reports', [SchoolAdminController::class, 'getFinancialReports']);
     $app->post('/api/school/financial-reports', [SchoolAdminController::class, 'createFinancialReport']);
     $app->put('/api/school/financial-reports/{id}/settle', [SchoolAdminController::class, 'updateFinancialReportStatus']);
     $app->post('/api/school/financial-reports/{id}/settlement-request', [SchoolAdminController::class, 'submitSettlementRequest']);
+    $app->get('/api/school/financial-reports/{id}/export', [SchoolAdminController::class, 'exportFinancialReport']);
     $app->get('/api/public/financial-reports/{id}/settlement/approve', [SchoolAdminController::class, 'ownerApproveSettlement']);
     $app->get('/api/public/financial-reports/{id}/settlement/reject', [SchoolAdminController::class, 'ownerRejectSettlement']);
     $app->get('/api/school/expenses', [SchoolAdminController::class, 'getSchoolExpenses']);
@@ -144,6 +146,8 @@ return function (App $app) {
     $app->post('/api/school/profile', [SchoolAdminController::class, 'updateSchoolProfile']);
     $app->post('/api/school/profile/logo', [SchoolAdminController::class, 'uploadSchoolLogo']);
     $app->delete('/api/school/profile/logo', [SchoolAdminController::class, 'removeSchoolLogo']);
+    $app->get('/api/school/plans', [SchoolAdminController::class, 'getActivePlans']);
+    $app->get('/api/school/subscriptions', [SchoolAdminController::class, 'getSubscriptionHistory']);
 
     // Security Domain
     $app->get('/api/school/security/audit-logs', [SchoolAdminController::class, 'getSchoolAuditLogs']);

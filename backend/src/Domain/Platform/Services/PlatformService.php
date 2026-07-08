@@ -86,18 +86,20 @@ class PlatformService extends BaseService
 
     private function addSubscriptionForSchool(PDO $pdo, int $schoolId, string $planName, string $type = 'new'): void
     {
-        $stmtPlan = $pdo->prepare("SELECT price, duration_value, duration_unit FROM plans WHERE name = :name LIMIT 1");
+        $stmtPlan = $pdo->prepare("SELECT price, duration_value, duration_unit, description FROM plans WHERE name = :name LIMIT 1");
         $stmtPlan->execute([':name' => $planName]);
         $plan = $stmtPlan->fetch(PDO::FETCH_ASSOC);
 
         $price = 0;
         $durationValue = 12;
         $durationUnit = 'month';
+        $features = null;
 
         if ($plan) {
             $price = (int)$plan['price'];
             $durationValue = (int)($plan['duration_value'] ?? 12);
             $durationUnit = $plan['duration_unit'] ?? 'month';
+            $features = $plan['description'];
         } else {
             if ($planName === 'Trial' || str_contains(strtolower($planName), 'trial')) {
                 $price = 0;
@@ -128,8 +130,8 @@ class PlatformService extends BaseService
         $invoiceNo = 'INV-' . time() . '-' . rand(100, 999);
 
         $stmtIns = $pdo->prepare("
-            INSERT INTO subscriptions (school_id, invoice_no, amount, billing_cycle, status, plan_name, duration_value, duration_unit, start_date, expiry_date, type)
-            VALUES (:school_id, :invoice_no, :amount, :billing_cycle, 'PAID', :plan_name, :duration_value, :duration_unit, :start_date, :expiry_date, :type)
+            INSERT INTO subscriptions (school_id, invoice_no, amount, billing_cycle, status, plan_name, duration_value, duration_unit, start_date, expiry_date, type, features)
+            VALUES (:school_id, :invoice_no, :amount, :billing_cycle, 'PAID', :plan_name, :duration_value, :duration_unit, :start_date, :expiry_date, :type, :features)
         ");
         $stmtIns->execute([
             ':school_id' => $schoolId,
@@ -141,7 +143,8 @@ class PlatformService extends BaseService
             ':duration_unit' => $durationUnit,
             ':start_date' => $startDate,
             ':expiry_date' => $expiryDate,
-            ':type' => $type
+            ':type' => $type,
+            ':features' => $features
         ]);
     }
 

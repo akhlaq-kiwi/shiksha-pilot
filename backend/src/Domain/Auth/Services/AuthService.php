@@ -67,6 +67,13 @@ class AuthService extends BaseService
             throw new ForbiddenException('Account is not active.');
         }
 
+        if (isset($user['school_id']) && $user['school_id'] !== null) {
+            if (($user['school_status'] ?? '') !== 'ACTIVE') {
+                $this->logAuditDirect($user, 'Security', 'Failed Login Attempt', 'Failed login attempt for user "' . ($user['name'] ?? $user['email']) . '" because school status is inactive');
+                throw new ForbiddenException('Your school account has been deactivated. Please contact the Super Administrator.');
+            }
+        }
+
 
 
         $safeUser = array_diff_key($user, ['password' => true]);

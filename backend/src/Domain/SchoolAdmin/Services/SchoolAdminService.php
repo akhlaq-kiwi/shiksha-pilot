@@ -349,17 +349,33 @@ class SchoolAdminService extends BaseService
             $monthsDue = $this->getMonthsDueUpToCurrent($activeYear['start_date'], $activeYear['end_date']);
 
             if (!empty($monthsDue)) {
-                // Fetch all active students in this active year
-                $stmtStudents = $pdo->prepare("
-                    SELECT id, class_id 
-                    FROM students 
-                    WHERE school_id = :sid AND status = 'ACTIVE' AND academic_year_id = :ayid
-                ");
+                // Fetch all active students in this active year (or all students if Archived)
+                if ($activeYear['status'] === 'Archived') {
+                    $stmtStudents = $pdo->prepare("
+                        SELECT id, class_id 
+                        FROM students 
+                        WHERE school_id = :sid AND academic_year_id = :ayid
+                    ");
+                } else {
+                    $stmtStudents = $pdo->prepare("
+                        SELECT id, class_id 
+                        FROM students 
+                        WHERE school_id = :sid AND status = 'ACTIVE' AND academic_year_id = :ayid
+                    ");
+                }
                 $stmtStudents->execute([
                     ':sid' => $schoolId,
                     ':ayid' => $activeYear['id']
                 ]);
                 $activeStudents = $stmtStudents->fetchAll(\PDO::FETCH_ASSOC);
+
+                // Filter out promoted students if Archived
+                if ($activeYear['status'] === 'Archived') {
+                    $activeStudents = array_filter($activeStudents, function($student) use ($pdo, $schoolId) {
+                        return !$this->isStudentPromoted($pdo, (int)$student['id'], $schoolId);
+                    });
+                    $activeStudents = array_values($activeStudents);
+                }
 
                 if (!empty($activeStudents)) {
                     // Fetch all class configurations for this year
@@ -416,25 +432,49 @@ class SchoolAdminService extends BaseService
 
             // Calculate pending additional fees that are due
             $today = date('Y-m-d');
-            $stmtAddPending = $pdo->prepare("
-                SELECT COALESCE(SUM(afp.amount), 0)
-                FROM additional_fee_payments afp
-                JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
-                JOIN students s ON afp.student_id = s.id
-                WHERE afp.school_id = :sid
-                  AND afp.status = 'Pending'
-                  AND s.status = 'ACTIVE'
-                  AND s.academic_year_id = :ayid_stu
-                  AND aft.academic_year_id = :ayid_fee
-                  AND (aft.due_date <= :today OR aft.name = 'Previous Year Dues')
-            ");
-            $stmtAddPending->execute([
-                ':sid' => $schoolId,
-                ':ayid_stu' => $activeYear['id'],
-                ':ayid_fee' => $activeYear['id'],
-                ':today' => $today
-            ]);
-            $pendingAddFees = (float)$stmtAddPending->fetchColumn();
+            if ($activeYear['status'] === 'Archived') {
+                $stmtAddPending = $pdo->prepare("
+                    SELECT afp.amount, afp.student_id
+                    FROM additional_fee_payments afp
+                    JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+                    WHERE afp.school_id = :sid
+                      AND afp.status = 'Pending'
+                      AND aft.academic_year_id = :ayid_fee
+                      AND (aft.due_date <= :today OR aft.name = 'Previous Year Dues')
+                ");
+                $stmtAddPending->execute([
+                    ':sid' => $schoolId,
+                    ':ayid_fee' => $activeYear['id'],
+                    ':today' => $today
+                ]);
+                $addPayments = $stmtAddPending->fetchAll(PDO::FETCH_ASSOC) ?: [];
+                $pendingAddFees = 0.0;
+                foreach ($addPayments as $p) {
+                    if (!$this->isStudentPromoted($pdo, (int)$p['student_id'], $schoolId)) {
+                        $pendingAddFees += (float)$p['amount'];
+                    }
+                }
+            } else {
+                $stmtAddPending = $pdo->prepare("
+                    SELECT COALESCE(SUM(afp.amount), 0)
+                    FROM additional_fee_payments afp
+                    JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+                    JOIN students s ON afp.student_id = s.id
+                    WHERE afp.school_id = :sid
+                      AND afp.status = 'Pending'
+                      AND s.status = 'ACTIVE'
+                      AND s.academic_year_id = :ayid_stu
+                      AND aft.academic_year_id = :ayid_fee
+                      AND (aft.due_date <= :today OR aft.name = 'Previous Year Dues')
+                ");
+                $stmtAddPending->execute([
+                    ':sid' => $schoolId,
+                    ':ayid_stu' => $activeYear['id'],
+                    ':ayid_fee' => $activeYear['id'],
+                    ':today' => $today
+                ]);
+                $pendingAddFees = (float)$stmtAddPending->fetchColumn();
+            }
             $pendingFeesTotal += $pendingAddFees;
         }
 
@@ -542,7 +582,14 @@ class SchoolAdminService extends BaseService
         if ($workingYear) {
             $filters['academic_year_id'] = (int)$workingYear['id'];
         }
-        return $this->studentRepo->findBySchool($schoolId, $filters);
+        $students = $this->studentRepo->findBySchool($schoolId, $filters);
+        if ($workingYear && $workingYear['status'] === 'Archived') {
+            $students = array_filter($students, function($s) use ($pdo, $schoolId) {
+                return !$this->isStudentPromoted($pdo, (int)$s['id'], $schoolId);
+            });
+            $students = array_values($students);
+        }
+        return $students;
     }
 
     public function getStudentById(array $user, int $id): array
@@ -577,7 +624,7 @@ class SchoolAdminService extends BaseService
 
         $isLedgerLocked = false;
         $ledgerLockedMessage = '';
-        if ($student['status'] === 'ACTIVE' && $student['academic_year_id'] !== null && (int)$student['academic_year_id'] > $workingYearId) {
+        if ($this->isStudentPromoted($pdo, $id, $schoolId)) {
             $isLedgerLocked = true;
             $ledgerLockedMessage = "This student's outstanding balance has already been migrated to the current Academic Year as 'Previous Year Dues'. Payment can only be collected from the current Academic Year.";
         }
@@ -1264,6 +1311,7 @@ class SchoolAdminService extends BaseService
 
         // For each staff member, fetch documents count and sync active periods
         foreach ($staffList as &$s) {
+            $s['is_migrated'] = $this->isStaffMigrated($pdo, (int)$s['id'], $schoolId);
             $stmtDocs = $pdo->prepare("SELECT COUNT(*) FROM staff_documents WHERE staff_id = :sid");
             $stmtDocs->execute([':sid' => $s['id']]);
             $s['documents_count'] = (int)$stmtDocs->fetchColumn();
@@ -1352,14 +1400,21 @@ class SchoolAdminService extends BaseService
         $stmtDocs->execute([':sid' => $id]);
         $member['documents'] = $stmtDocs->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-        // Fetch salary payments for current working academic year
+        $member['is_migrated'] = $this->isStaffMigrated($pdo, $id, $schoolId);
+
+        // Fetch salary payments for current working academic year or current active year
         $member['salary_payments'] = [];
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
         if ($workingYear) {
-            $stmtPayments = $pdo->prepare("SELECT * FROM staff_payments WHERE staff_id = :sid AND academic_year_id = :ayid");
+            $stmtPayments = $pdo->prepare("
+                SELECT * FROM staff_payments 
+                WHERE staff_id = :sid 
+                  AND (academic_year_id = :ayid OR academic_year_id = (SELECT id FROM academic_years WHERE school_id = :school_id AND is_current = 1 LIMIT 1))
+            ");
             $stmtPayments->execute([
                 ':sid' => $id,
-                ':ayid' => $workingYear['id']
+                ':ayid' => $workingYear['id'],
+                ':school_id' => $schoolId
             ]);
             $payments = $stmtPayments->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
@@ -1377,6 +1432,93 @@ class SchoolAdminService extends BaseService
                 $p['is_locked'] = ((int)$stmtCheckReport->fetchColumn() > 0) ? 1 : 0;
             }
             $member['salary_payments'] = $payments;
+        }
+
+        // Calculate Previous Year Pending Salaries for Migrated Teachers
+        $member['previous_year_pending'] = null;
+        if ($workingYear) {
+            $stmtPrevYear = $pdo->prepare("
+                SELECT * FROM academic_years 
+                WHERE school_id = :sid AND start_date < :curr_start_date 
+                ORDER BY start_date DESC LIMIT 1
+            ");
+            $stmtPrevYear->execute([':sid' => $schoolId, ':curr_start_date' => $workingYear['start_date']]);
+            $prevYear = $stmtPrevYear->fetch(PDO::FETCH_ASSOC);
+            
+            if ($prevYear) {
+                // Find matching staff record in previous year
+                $oldStaff = null;
+                if (!empty($member['employee_id'])) {
+                    $stmtOld = $pdo->prepare("SELECT * FROM staff WHERE school_id = :sid AND academic_year_id = :ayid AND employee_id = :emp_id LIMIT 1");
+                    $stmtOld->execute([':sid' => $schoolId, ':ayid' => $prevYear['id'], ':emp_id' => $member['employee_id']]);
+                    $oldStaff = $stmtOld->fetch(PDO::FETCH_ASSOC);
+                } else if (!empty($member['email'])) {
+                    $stmtOld = $pdo->prepare("SELECT * FROM staff WHERE school_id = :sid AND academic_year_id = :ayid AND email = :email LIMIT 1");
+                    $stmtOld->execute([':sid' => $schoolId, ':ayid' => $prevYear['id'], ':email' => $member['email']]);
+                    $oldStaff = $stmtOld->fetch(PDO::FETCH_ASSOC);
+                }
+                
+                if ($oldStaff) {
+                    // Fetch paid months in previous year
+                    $stmtOldPaid = $pdo->prepare("
+                        SELECT payment_month FROM staff_payments 
+                        WHERE staff_id = :sid AND academic_year_id = :ayid
+                    ");
+                    $stmtOldPaid->execute([':sid' => $oldStaff['id'], ':ayid' => $prevYear['id']]);
+                    $oldPaidMonths = $stmtOldPaid->fetchAll(PDO::FETCH_COLUMN) ?: [];
+                    
+                    // Fetch paid previous-year months in current year
+                    $stmtCurrOldPaid = $pdo->prepare("
+                        SELECT payment_month FROM staff_payments 
+                        WHERE staff_id = :sid AND academic_year_id = :ayid AND payment_month LIKE 'Previous Year - %'
+                    ");
+                    $stmtCurrOldPaid->execute([':sid' => $id, ':ayid' => $workingYear['id']]);
+                    $currOldPaid = $stmtCurrOldPaid->fetchAll(PDO::FETCH_COLUMN) ?: [];
+                    
+                    // Extract month names from "Previous Year - <Month>"
+                    $resolvedCurrOldPaid = [];
+                    foreach ($currOldPaid as $cop) {
+                        $parts = explode('Previous Year - ', $cop);
+                        if (count($parts) > 1) {
+                            $monthsStr = trim($parts[1]);
+                            $subMonths = array_map('trim', explode(',', $monthsStr));
+                            foreach ($subMonths as $sm) {
+                                $rangeParts = preg_split('/[-–]/', $sm);
+                                if (count($rangeParts) > 1) {
+                                    $allMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+                                    $startIdx = array_search(trim($rangeParts[0]), $allMonths);
+                                    $endIdx = array_search(trim($rangeParts[1]), $allMonths);
+                                    if ($startIdx !== false && $endIdx !== false) {
+                                        for ($i = $startIdx; $i <= $endIdx; $i++) {
+                                            $resolvedCurrOldPaid[] = $allMonths[$i];
+                                        }
+                                    }
+                                } else {
+                                    $resolvedCurrOldPaid[] = $sm;
+                                }
+                            }
+                        }
+                    }
+                    
+                    $allAcademicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+                    $pendingMonths = [];
+                    foreach ($allAcademicMonths as $m) {
+                        if (!in_array($m, $oldPaidMonths, true) && !in_array($m, $resolvedCurrOldPaid, true)) {
+                            $pendingMonths[] = $m;
+                        }
+                    }
+                    
+                    if (!empty($pendingMonths)) {
+                        $member['previous_year_pending'] = [
+                            'academic_year_id' => $prevYear['id'],
+                            'academic_year_name' => $prevYear['name'],
+                            'pending_months' => $pendingMonths,
+                            'salary' => (float)$oldStaff['salary'],
+                            'total_pending' => count($pendingMonths) * (float)$oldStaff['salary']
+                        ];
+                    }
+                }
+            }
         }
 
         return $member;
@@ -2630,7 +2772,6 @@ class SchoolAdminService extends BaseService
             }
         }
 
-        $today = date('Y-m-d');
         $stmtAddPending = $pdo->prepare("
             SELECT COALESCE(SUM(afp.amount), 0)
             FROM additional_fee_payments afp
@@ -2639,13 +2780,11 @@ class SchoolAdminService extends BaseService
               AND afp.school_id = :school_id
               AND afp.status = 'Pending'
               AND aft.academic_year_id = :academic_year_id
-              AND (aft.due_date IS NULL OR aft.due_date <= :today)
         ");
         $stmtAddPending->execute([
             ':student_id' => $studentId,
             ':school_id' => $schoolId,
-            ':academic_year_id' => $academicYearId,
-            ':today' => $today
+            ':academic_year_id' => $academicYearId
         ]);
         $outstanding += (float)$stmtAddPending->fetchColumn();
 
@@ -3822,9 +3961,7 @@ class SchoolAdminService extends BaseService
         $classId = $studentRow['class_id'];
         $academicYearId = $studentRow['academic_year_id'];
 
-        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
-        $workingYearId = $workingYear ? (int)$workingYear['id'] : 0;
-        if ($studentRow['status'] === 'ACTIVE' && $academicYearId !== null && (int)$academicYearId > $workingYearId) {
+        if ($this->isStudentPromoted($pdo, $studentId, $schoolId)) {
             throw new ValidationException(['fields' => "This student's outstanding balance has already been migrated to the current Academic Year as 'Previous Year Dues'. Payment can only be collected from the current Academic Year."]);
         }
 
@@ -3962,7 +4099,74 @@ class SchoolAdminService extends BaseService
             $school['report_card_remark'] = 'Congratulations! The student has passed all examinations and demonstrated excellent understanding.';
         }
 
+        // Fetch active subscription details
+        $stmtSub = $pdo->prepare("
+            SELECT plan_name, start_date, expiry_date, duration_value, duration_unit 
+            FROM subscriptions 
+            WHERE school_id = :school_id AND status = 'PAID'
+            ORDER BY expiry_date DESC, id DESC
+            LIMIT 1
+        ");
+        $stmtSub->execute([':school_id' => $schoolId]);
+        $sub = $stmtSub->fetch(PDO::FETCH_ASSOC);
+
+        if ($sub) {
+            $school['active_plan'] = $sub['plan_name'];
+            $school['subscription_expiry'] = $sub['expiry_date'];
+            $school['subscription_start'] = $sub['start_date'];
+            $school['subscription_duration_value'] = $sub['duration_value'];
+            $school['subscription_duration_unit'] = $sub['duration_unit'];
+        } else {
+            $school['active_plan'] = null;
+            $school['subscription_expiry'] = null;
+            $school['subscription_start'] = null;
+            $school['subscription_duration_value'] = null;
+            $school['subscription_duration_unit'] = null;
+        }
+
         return $school;
+    }
+
+    public function getActivePlans(): array
+    {
+        $pdo = $this->classRepo->getPdo();
+        $stmt = $pdo->query("SELECT * FROM plans WHERE is_active = 1 ORDER BY price ASC");
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function checkSubscriptionExpired(array $user): bool
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->classRepo->getPdo();
+        $stmt = $pdo->prepare("
+            SELECT expiry_date 
+            FROM subscriptions 
+            WHERE school_id = :school_id AND status = 'PAID'
+            ORDER BY expiry_date DESC, id DESC
+            LIMIT 1
+        ");
+        $stmt->execute([':school_id' => $schoolId]);
+        $expiry = $stmt->fetchColumn();
+
+        if (!$expiry) {
+            return true;
+        }
+
+        return strtotime($expiry) < strtotime(date('Y-m-d'));
+    }
+
+    public function getSubscriptionHistory(array $user): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->classRepo->getPdo();
+        $stmt = $pdo->prepare("
+            SELECT plan_name, created_at, expiry_date, duration_value, duration_unit, amount, status, features
+            FROM subscriptions
+            WHERE school_id = :school_id
+            ORDER BY id DESC
+        ");
+        $stmt->execute([':school_id' => $schoolId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
     public function updateSchoolProfile(array $user, array $data): array
@@ -4189,7 +4393,15 @@ class SchoolAdminService extends BaseService
         $receiptNo = $row['receipt_no'];
         $academicYearId = $row['academic_year_id'] !== null ? (int)$row['academic_year_id'] : 0;
 
-        // 1. Report lock check
+        // 1. Target year writable check
+        $stmtPayYear = $pdo->prepare("SELECT status FROM academic_years WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtPayYear->execute([':id' => $academicYearId, ':sid' => $schoolId]);
+        $payYearStatus = $stmtPayYear->fetchColumn();
+        if ($payYearStatus === 'Archived') {
+            throw new ValidationException(['fields' => 'Archived academic years are read-only and cannot be modified.']);
+        }
+
+        // 1.5. Report lock check
         if ($this->isTransactionInReport($pdo, $schoolId, $row['created_at'])) {
             throw new ValidationException(['locked' => 'This payment has already been included in a generated Financial Report and can no longer be reverted.']);
         }
@@ -4546,7 +4758,6 @@ class SchoolAdminService extends BaseService
     {
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->staffRepo->getPdo();
-        $this->requireWritableAcademicYear($pdo, $schoolId);
 
         $staffId = (int)($data['staff_id'] ?? 0);
         $month = trim($data['month'] ?? '');
@@ -4567,6 +4778,24 @@ class SchoolAdminService extends BaseService
             throw new ValidationException(['message' => 'No active or draft academic year found.']);
         }
         $academicYearId = (int)$workingYear['id'];
+        $payYearId = $academicYearId;
+
+        if ($workingYear['status'] === 'Archived') {
+            if ($this->isStaffMigrated($pdo, $staffId, $schoolId)) {
+                throw new ValidationException(['month' => 'This teacher has been migrated/copied to the next academic year. Salary cannot be disbursed from the archived academic year.']);
+            }
+
+            // Non-migrated teacher: record in current active year
+            $stmtCurr = $pdo->prepare("SELECT * FROM academic_years WHERE school_id = :sid AND is_current = 1 LIMIT 1");
+            $stmtCurr->execute([':sid' => $schoolId]);
+            $currYear = $stmtCurr->fetch(PDO::FETCH_ASSOC);
+            if (!$currYear) {
+                throw new ValidationException(['month' => 'No current active academic year found for recording this previous year salary expense.']);
+            }
+            $payYearId = (int)$currYear['id'];
+        } else {
+            $this->requireWritableAcademicYear($pdo, $schoolId);
+        }
 
         // Prevent duplicate payments
         $stmtDup = $pdo->prepare("
@@ -4576,7 +4805,7 @@ class SchoolAdminService extends BaseService
         $stmtDup->execute([
             ':sid' => $schoolId,
             ':staff_id' => $staffId,
-            ':ayid' => $academicYearId,
+            ':ayid' => $payYearId,
             ':month' => $month
         ]);
         if ((int)$stmtDup->fetchColumn() > 0) {
@@ -4594,12 +4823,13 @@ class SchoolAdminService extends BaseService
             // Fetch paid months for this teacher in the academic year
             $stmtPaid = $pdo->prepare("
                 SELECT payment_month FROM staff_payments 
-                WHERE school_id = :sid AND staff_id = :staff_id AND academic_year_id = :ayid
+                WHERE school_id = :sid AND staff_id = :staff_id AND (academic_year_id = :ayid OR academic_year_id = :selected_ayid)
             ");
             $stmtPaid->execute([
                 ':sid' => $schoolId,
                 ':staff_id' => $staffId,
-                ':ayid' => $academicYearId
+                ':ayid' => $payYearId,
+                ':selected_ayid' => $academicYearId
             ]);
             $paidMonths = $stmtPaid->fetchAll(\PDO::FETCH_COLUMN);
 
@@ -4622,9 +4852,170 @@ class SchoolAdminService extends BaseService
         $stmt->execute([
             ':sid' => $schoolId,
             ':staff_id' => $staffId,
-            ':ayid' => $academicYearId,
+            ':ayid' => $payYearId,
             ':amount_paid' => $salary,
             ':month' => $month,
+            ':payment_date' => $paymentDate
+        ]);
+
+        return ['success' => true, 'id' => (int)$pdo->lastInsertId()];
+    }
+
+    public function disbursePreviousYearStaffSalary(array $user, array $data): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->staffRepo->getPdo();
+
+        $staffId = (int)($data['staff_id'] ?? 0);
+        $months = $data['months'] ?? [];
+
+        if ($staffId <= 0 || empty($months) || !is_array($months)) {
+            throw new ValidationException(['message' => 'Staff ID and Months list are required.']);
+        }
+
+        // 1. Get current active academic year
+        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+        if (!$workingYear) {
+            throw new ValidationException(['message' => 'No active or draft academic year found.']);
+        }
+        if ($workingYear['status'] === 'Archived') {
+            throw new ValidationException(['message' => 'Cannot disburse salary under an Archived academic year. Please switch to the current year.']);
+        }
+        $this->requireWritableAcademicYear($pdo, $schoolId);
+
+        // Fetch staff member
+        $staff = $this->staffRepo->findById($staffId);
+        if (!$staff || (int)$staff['school_id'] !== $schoolId) {
+            throw new NotFoundException('Staff member not found.');
+        }
+
+        // 2. Find immediately previous academic year
+        $stmtPrevYear = $pdo->prepare("
+            SELECT * FROM academic_years 
+            WHERE school_id = :sid AND start_date < :curr_start_date 
+            ORDER BY start_date DESC LIMIT 1
+        ");
+        $stmtPrevYear->execute([':sid' => $schoolId, ':curr_start_date' => $workingYear['start_date']]);
+        $prevYear = $stmtPrevYear->fetch(PDO::FETCH_ASSOC);
+        if (!$prevYear) {
+            throw new ValidationException(['message' => 'No previous academic year found.']);
+        }
+
+        // Find matching staff record in previous year
+        $oldStaff = null;
+        if (!empty($staff['employee_id'])) {
+            $stmtOld = $pdo->prepare("SELECT * FROM staff WHERE school_id = :sid AND academic_year_id = :ayid AND employee_id = :emp_id LIMIT 1");
+            $stmtOld->execute([':sid' => $schoolId, ':ayid' => $prevYear['id'], ':emp_id' => $staff['employee_id']]);
+            $oldStaff = $stmtOld->fetch(PDO::FETCH_ASSOC);
+        } else if (!empty($staff['email'])) {
+            $stmtOld = $pdo->prepare("SELECT * FROM staff WHERE school_id = :sid AND academic_year_id = :ayid AND email = :email LIMIT 1");
+            $stmtOld->execute([':sid' => $schoolId, ':ayid' => $prevYear['id'], ':email' => $staff['email']]);
+            $oldStaff = $stmtOld->fetch(PDO::FETCH_ASSOC);
+        }
+
+        if (!$oldStaff) {
+            throw new ValidationException(['message' => 'No matching teacher profile found in the previous academic year.']);
+        }
+
+        // Fetch already paid months in previous year
+        $stmtOldPaid = $pdo->prepare("
+            SELECT payment_month FROM staff_payments 
+            WHERE staff_id = :sid AND academic_year_id = :ayid
+        ");
+        $stmtOldPaid->execute([':sid' => $oldStaff['id'], ':ayid' => $prevYear['id']]);
+        $oldPaidMonths = $stmtOldPaid->fetchAll(PDO::FETCH_COLUMN) ?: [];
+
+        // Fetch paid previous-year months in current year
+        $stmtCurrOldPaid = $pdo->prepare("
+            SELECT payment_month FROM staff_payments 
+            WHERE staff_id = :sid AND academic_year_id = :ayid AND payment_month LIKE 'Previous Year - %'
+        ");
+        $stmtCurrOldPaid->execute([':sid' => $staffId, ':ayid' => $workingYear['id']]);
+        $currOldPaid = $stmtCurrOldPaid->fetchAll(PDO::FETCH_COLUMN) ?: [];
+
+        // Extract individual month names
+        $resolvedCurrOldPaid = [];
+        foreach ($currOldPaid as $cop) {
+            $parts = explode('Previous Year - ', $cop);
+            if (count($parts) > 1) {
+                $monthsStr = trim($parts[1]);
+                $subMonths = array_map('trim', explode(',', $monthsStr));
+                foreach ($subMonths as $sm) {
+                    $rangeParts = preg_split('/[-–]/', $sm);
+                    if (count($rangeParts) > 1) {
+                        $allMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+                        $startIdx = array_search(trim($rangeParts[0]), $allMonths);
+                        $endIdx = array_search(trim($rangeParts[1]), $allMonths);
+                        if ($startIdx !== false && $endIdx !== false) {
+                            for ($i = $startIdx; $i <= $endIdx; $i++) {
+                                $resolvedCurrOldPaid[] = $allMonths[$i];
+                            }
+                        }
+                    } else {
+                        $resolvedCurrOldPaid[] = $sm;
+                    }
+                }
+            }
+        }
+
+        // Validate that requested months are not already paid
+        foreach ($months as $m) {
+            if (in_array($m, $oldPaidMonths, true) || in_array($m, $resolvedCurrOldPaid, true)) {
+                throw new ValidationException(['months' => "Salary for {$m} has already been paid."]);
+            }
+        }
+
+        // Format month range string
+        $allMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+        usort($months, function($a, $b) use ($allMonths) {
+            return array_search($a, $allMonths) <=> array_search($b, $allMonths);
+        });
+
+        $groups = [];
+        $currentGroup = [];
+        foreach ($months as $m) {
+            $idx = array_search($m, $allMonths);
+            if (empty($currentGroup)) {
+                $currentGroup[] = ['name' => $m, 'idx' => $idx];
+            } else {
+                $last = end($currentGroup);
+                if ($idx === $last['idx'] + 1) {
+                    $currentGroup[] = ['name' => $m, 'idx' => $idx];
+                } else {
+                    $groups[] = $currentGroup;
+                    $currentGroup = [['name' => $m, 'idx' => $idx]];
+                }
+            }
+        }
+        if (!empty($currentGroup)) {
+            $groups[] = $currentGroup;
+        }
+
+        $resultParts = [];
+        foreach ($groups as $g) {
+            if (count($g) === 1) {
+                $resultParts[] = $g[0]['name'];
+            } else {
+                $resultParts[] = $g[0]['name'] . '–' . end($g)['name'];
+            }
+        }
+        $monthsString = implode(', ', $resultParts);
+
+        $salary = (float)($oldStaff['salary'] ?? 0.0);
+        $totalPaid = $salary * count($months);
+        $paymentDate = date('Y-m-d');
+
+        // Insert staff payment
+        $stmt = $pdo->prepare("
+            INSERT INTO staff_payments (school_id, staff_id, academic_year_id, amount_paid, payment_month, payment_date)
+            VALUES (:sid, :staff_id, :ayid, :amount_paid, :month, :payment_date)
+        ");
+        $stmt->execute([
+            ':sid' => $schoolId,
+            ':staff_id' => $staffId,
+            ':ayid' => $workingYear['id'],
+            ':amount_paid' => $totalPaid,
+            ':month' => 'Previous Year - ' . $monthsString,
             ':payment_date' => $paymentDate
         ]);
 
@@ -4635,8 +5026,6 @@ class SchoolAdminService extends BaseService
     {
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->staffRepo->getPdo();
-        $this->requireWritableAcademicYear($pdo, $schoolId);
-
         // Fetch payment details first
         $stmtPayment = $pdo->prepare("SELECT * FROM staff_payments WHERE id = :id AND school_id = :sid LIMIT 1");
         $stmtPayment->execute([':id' => $id, ':sid' => $schoolId]);
@@ -4644,6 +5033,14 @@ class SchoolAdminService extends BaseService
 
         if (!$payment) {
             throw new NotFoundException('Salary payment record not found.');
+        }
+
+        // Validate that target year is writable
+        $stmtPayYear = $pdo->prepare("SELECT status FROM academic_years WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtPayYear->execute([':id' => (int)$payment['academic_year_id'], ':sid' => $schoolId]);
+        $payYearStatus = $stmtPayYear->fetchColumn();
+        if ($payYearStatus === 'Archived') {
+            throw new ValidationException(['fields' => 'Archived academic years are read-only and cannot be modified.']);
         }
 
         // Check if the payment date falls within any generated financial report
@@ -5001,7 +5398,16 @@ class SchoolAdminService extends BaseService
 
         // Fetch Student Fee Collections
         $stmtFeeList = $pdo->prepare("
-            SELECT s.name AS student_name, s.admission_no, c.name AS class_name, fp.payment_date, 'Tuition Fee' AS payment_type, fp.amount_paid AS amount
+            SELECT 
+                fp.created_at AS deposit_time, 
+                s.name AS student_name, 
+                c.name AS class_name, 
+                c.section AS class_section,
+                c.id AS class_id, 
+                s.roll_no, 
+                'Tuition Fee' AS fee_type, 
+                fp.fee_month AS months_covered, 
+                fp.amount_paid AS amount
             FROM fee_payments fp
             JOIN students s ON fp.student_id = s.id
             LEFT JOIN classes c ON s.class_id = c.id
@@ -5014,7 +5420,16 @@ class SchoolAdminService extends BaseService
         $feePayments = $stmtFeeList->fetchAll(PDO::FETCH_ASSOC);
 
         $stmtAddFeeList = $pdo->prepare("
-            SELECT s.name AS student_name, s.admission_no, c.name AS class_name, afp.payment_date, aft.name AS payment_type, afp.amount
+            SELECT 
+                afp.updated_at AS deposit_time, 
+                s.name AS student_name, 
+                c.name AS class_name, 
+                c.section AS class_section,
+                c.id AS class_id, 
+                s.roll_no, 
+                aft.name AS fee_type, 
+                'N/A' AS months_covered, 
+                afp.amount
             FROM additional_fee_payments afp
             JOIN students s ON afp.student_id = s.id
             LEFT JOIN classes c ON s.class_id = c.id
@@ -5028,13 +5443,30 @@ class SchoolAdminService extends BaseService
         $addPayments = $stmtAddFeeList->fetchAll(PDO::FETCH_ASSOC);
 
         $feeCollections = array_merge($feePayments, $addPayments);
+        
+        // Sort by class creation order, then deposit time, then name
         usort($feeCollections, function($a, $b) {
-            return strcmp($a['payment_date'] ?? '', $b['payment_date'] ?? '');
+            $classIdA = isset($a['class_id']) ? (int)$a['class_id'] : 999999;
+            $classIdB = isset($b['class_id']) ? (int)$b['class_id'] : 999999;
+            if ($classIdA !== $classIdB) {
+                return $classIdA <=> $classIdB;
+            }
+            $timeA = strtotime($a['deposit_time'] ?? '1970-01-01 00:00:00');
+            $timeB = strtotime($b['deposit_time'] ?? '1970-01-01 00:00:00');
+            if ($timeA !== $timeB) {
+                return $timeA <=> $timeB;
+            }
+            return strcmp($a['student_name'] ?? '', $b['student_name'] ?? '');
         });
 
-        // Fetch Expenses
         $stmtSalaryList = $pdo->prepare("
-            SELECT st.name AS description, 'Salary Payment' AS category, sp.payment_date AS expense_date, sp.amount_paid AS amount
+            SELECT 
+                CASE 
+                    WHEN sp.payment_month LIKE 'Previous Year - %' THEN CONCAT('Previous Year Salary - ', st.name, ' (', SUBSTRING(sp.payment_month, 17), ')')
+                    WHEN sp.academic_year_id != st.academic_year_id THEN CONCAT('Previous Year Salary - ', st.name)
+                    ELSE st.name 
+                END AS description, 
+                'Salary Payment' AS category, sp.payment_date AS expense_date, sp.amount_paid AS amount
             FROM staff_payments sp
             JOIN staff st ON sp.staff_id = st.id
             WHERE sp.school_id = :sid 
@@ -5067,7 +5499,10 @@ class SchoolAdminService extends BaseService
 
         // Excel file generation
         $excelData = ExcelGenerator::generate($feeCollections, $expenses, $summary);
-        $filename = "financial_statement_" . $report['report_id'] . ".xls";
+        
+        $fromFormatted = date('j M Y', strtotime($report['from_date']));
+        $toFormatted = date('j M Y', strtotime($report['to_date']));
+        $filename = "Financial Report - {$fromFormatted} to {$toFormatted}.xlsx";
 
         // Email variables
         $toEmail = isset($school['contact_email']) ? trim((string)$school['contact_email']) : '';
@@ -5274,6 +5709,239 @@ Only approve the settlement after reviewing all financial records.
         ]);
 
         return $this->renderOwnerResponseHtml("Rejected", "Settlement request rejected for report " . htmlspecialchars($report['report_id']) . ". The School Admin can now make changes and submit a new request.", true);
+    }
+
+    public function exportFinancialReport(array $user, int $id, string &$filename): string
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->financialReportRepo->getPdo();
+
+        $report = $this->financialReportRepo->findById($id);
+        if ($report === null || (int)$report['school_id'] !== $schoolId) {
+            throw new NotFoundException('Financial report not found.');
+        }
+
+        // Retrieve bounds of transactions contributing to this report
+        list($from_ts, $operator, $to_ts) = $this->getReportBounds($pdo, $schoolId, $report);
+
+        // Fetch Student Fee Collections
+        $stmtFeeList = $pdo->prepare("
+            SELECT 
+                fp.created_at AS deposit_time, 
+                s.name AS student_name, 
+                c.name AS class_name, 
+                c.section AS class_section,
+                c.id AS class_id, 
+                s.roll_no, 
+                'Tuition Fee' AS fee_type, 
+                fp.fee_month AS months_covered, 
+                fp.amount_paid AS amount
+            FROM fee_payments fp
+            JOIN students s ON fp.student_id = s.id
+            LEFT JOIN classes c ON s.class_id = c.id
+            WHERE fp.school_id = :sid 
+              AND fp.status = 'PAID'
+              AND fp.created_at {$operator} :from_ts 
+              AND fp.created_at <= :to_ts
+        ");
+        $stmtFeeList->execute([':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts]);
+        $feePayments = $stmtFeeList->fetchAll(PDO::FETCH_ASSOC);
+
+        $stmtAddFeeList = $pdo->prepare("
+            SELECT 
+                afp.updated_at AS deposit_time, 
+                s.name AS student_name, 
+                c.name AS class_name, 
+                c.section AS class_section,
+                c.id AS class_id, 
+                s.roll_no, 
+                aft.name AS fee_type, 
+                'N/A' AS months_covered, 
+                afp.amount
+            FROM additional_fee_payments afp
+            JOIN students s ON afp.student_id = s.id
+            LEFT JOIN classes c ON s.class_id = c.id
+            JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+            WHERE afp.school_id = :sid 
+              AND afp.status = 'Paid'
+              AND afp.updated_at {$operator} :from_ts 
+              AND afp.updated_at <= :to_ts
+        ");
+        $stmtAddFeeList->execute([':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts]);
+        $addPayments = $stmtAddFeeList->fetchAll(PDO::FETCH_ASSOC);
+
+        $feeCollections = array_merge($feePayments, $addPayments);
+        
+        // Sort by class creation order, then deposit time, then name
+        usort($feeCollections, function($a, $b) {
+            $classIdA = isset($a['class_id']) ? (int)$a['class_id'] : 999999;
+            $classIdB = isset($b['class_id']) ? (int)$b['class_id'] : 999999;
+            if ($classIdA !== $classIdB) {
+                return $classIdA <=> $classIdB;
+            }
+            $timeA = strtotime($a['deposit_time'] ?? '1970-01-01 00:00:00');
+            $timeB = strtotime($b['deposit_time'] ?? '1970-01-01 00:00:00');
+            if ($timeA !== $timeB) {
+                return $timeA <=> $timeB;
+            }
+            return strcmp($a['student_name'] ?? '', $b['student_name'] ?? '');
+        });
+
+        $stmtSalaryList = $pdo->prepare("
+            SELECT 
+                CASE 
+                    WHEN sp.payment_month LIKE 'Previous Year - %' THEN CONCAT('Previous Year Salary - ', st.name, ' (', SUBSTRING(sp.payment_month, 17), ')')
+                    WHEN sp.academic_year_id != st.academic_year_id THEN CONCAT('Previous Year Salary - ', st.name)
+                    ELSE st.name 
+                END AS description, 
+                'Salary Payment' AS category, sp.payment_date AS expense_date, sp.amount_paid AS amount
+            FROM staff_payments sp
+            JOIN staff st ON sp.staff_id = st.id
+            WHERE sp.school_id = :sid 
+              AND sp.created_at {$operator} :from_ts 
+              AND sp.created_at <= :to_ts
+        ");
+        $stmtSalaryList->execute([':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts]);
+        $salaryPayments = $stmtSalaryList->fetchAll(PDO::FETCH_ASSOC);
+
+        $stmtExpenseList = $pdo->prepare("
+            SELECT description, 'School Expense' AS category, expense_date, amount
+            FROM school_expenses
+            WHERE school_id = :sid 
+              AND created_at {$operator} :from_ts 
+              AND created_at <= :to_ts
+        ");
+        $stmtExpenseList->execute([':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts]);
+        $expensesItems = $stmtExpenseList->fetchAll(PDO::FETCH_ASSOC);
+
+        $expenses = array_merge($salaryPayments, $expensesItems);
+        usort($expenses, function($a, $b) {
+            return strcmp($a['expense_date'] ?? '', $b['expense_date'] ?? '');
+        });
+
+        // Profit / Loss Summary
+        $summary = [
+            'revenue' => (float)$report['fees_collected'],
+            'expenses' => (float)$report['salary_paid'],
+        ];
+
+        // Format filename
+        $fromFormatted = date('j M Y', strtotime($report['from_date']));
+        $toFormatted = date('j M Y', strtotime($report['to_date']));
+        $filename = "Financial Report - {$fromFormatted} to {$toFormatted}.xlsx";
+
+        return ExcelGenerator::generate($feeCollections, $expenses, $summary);
+    }
+
+    public function isStudentPromoted(PDO $pdo, int $studentId, int $schoolId): bool
+    {
+        // 1. Get the academic year of the student
+        $stmtStu = $pdo->prepare("
+            SELECT s.admission_no, s.name, s.father_name, s.academic_year_id, ay.start_date
+            FROM students s
+            JOIN academic_years ay ON s.academic_year_id = ay.id
+            WHERE s.id = :id AND s.school_id = :sid
+            LIMIT 1
+        ");
+        $stmtStu->execute([':id' => $studentId, ':sid' => $schoolId]);
+        $stu = $stmtStu->fetch(PDO::FETCH_ASSOC);
+        if (!$stu) {
+            return false;
+        }
+
+        $admissionNo = $stu['admission_no'];
+        $name = $stu['name'];
+        $fatherName = $stu['father_name'] ?? '';
+        $startDate = $stu['start_date'];
+
+        // 2. Check if there is a student in a newer academic year matching this student
+        if (!empty($admissionNo)) {
+            $stmtCheck = $pdo->prepare("
+                SELECT COUNT(*)
+                FROM students s
+                JOIN academic_years ay ON s.academic_year_id = ay.id
+                WHERE s.school_id = :sid
+                  AND ay.start_date > :start_date
+                  AND s.admission_no = :admission_no
+            ");
+            $stmtCheck->execute([
+                ':sid' => $schoolId,
+                ':start_date' => $startDate,
+                ':admission_no' => $admissionNo
+            ]);
+        } else {
+            $stmtCheck = $pdo->prepare("
+                SELECT COUNT(*)
+                FROM students s
+                JOIN academic_years ay ON s.academic_year_id = ay.id
+                WHERE s.school_id = :sid
+                  AND ay.start_date > :start_date
+                  AND s.name = :name
+                  AND COALESCE(s.father_name, '') = :father_name
+            ");
+            $stmtCheck->execute([
+                ':sid' => $schoolId,
+                ':start_date' => $startDate,
+                ':name' => $name,
+                ':father_name' => $fatherName
+            ]);
+        }
+
+        return ((int)$stmtCheck->fetchColumn()) > 0;
+    }
+
+    public function isStaffMigrated(PDO $pdo, int $staffId, int $schoolId): bool
+    {
+        // 1. Get the academic year and credentials of this staff member
+        $stmtStaff = $pdo->prepare("
+            SELECT st.employee_id, st.email, st.academic_year_id, ay.start_date
+            FROM staff st
+            JOIN academic_years ay ON st.academic_year_id = ay.id
+            WHERE st.id = :id AND st.school_id = :sid
+            LIMIT 1
+        ");
+        $stmtStaff->execute([':id' => $staffId, ':sid' => $schoolId]);
+        $st = $stmtStaff->fetch(PDO::FETCH_ASSOC);
+        if (!$st) {
+            return false;
+        }
+
+        $empId = $st['employee_id'];
+        $email = $st['email'];
+        $startDate = $st['start_date'];
+
+        // 2. Check if there is a staff record in a newer academic year matching this staff
+        if (!empty($empId)) {
+            $stmtCheck = $pdo->prepare("
+                SELECT COUNT(*)
+                FROM staff st
+                JOIN academic_years ay ON st.academic_year_id = ay.id
+                WHERE st.school_id = :sid
+                  AND ay.start_date > :start_date
+                  AND st.employee_id = :emp_id
+            ");
+            $stmtCheck->execute([
+                ':sid' => $schoolId,
+                ':start_date' => $startDate,
+                ':emp_id' => $empId
+            ]);
+        } else {
+            $stmtCheck = $pdo->prepare("
+                SELECT COUNT(*)
+                FROM staff st
+                JOIN academic_years ay ON st.academic_year_id = ay.id
+                WHERE st.school_id = :sid
+                  AND ay.start_date > :start_date
+                  AND st.email = :email
+            ");
+            $stmtCheck->execute([
+                ':sid' => $schoolId,
+                ':start_date' => $startDate,
+                ':email' => $email
+            ]);
+        }
+
+        return ((int)$stmtCheck->fetchColumn()) > 0;
     }
 
     private function getReportBounds(PDO $pdo, int $schoolId, array $report): array
@@ -5968,7 +6636,7 @@ Only approve the settlement after reviewing all financial records.
         }
 
         $stmtGetInfo = $pdo->prepare("
-            SELECT s.academic_year_id AS student_ay_id, s.status AS student_status, aft.academic_year_id AS fee_ay_id, aft.due_date, aft.name
+            SELECT afp.student_id, s.academic_year_id AS student_ay_id, s.status AS student_status, aft.academic_year_id AS fee_ay_id, aft.due_date, aft.name
             FROM additional_fee_payments afp
             JOIN students s ON s.id = afp.student_id
             JOIN additional_fee_types aft ON aft.id = afp.fee_type_id
@@ -5978,9 +6646,7 @@ Only approve the settlement after reviewing all financial records.
         $stmtGetInfo->execute([':id' => $id, ':sid' => $schoolId]);
         $info = $stmtGetInfo->fetch(PDO::FETCH_ASSOC);
         if ($info) {
-            $studentAyId = $info['student_ay_id'] !== null ? (int)$info['student_ay_id'] : 0;
-            $feeAyId = $info['fee_ay_id'] !== null ? (int)$info['fee_ay_id'] : 0;
-            if ($info['student_status'] === 'ACTIVE' && $studentAyId > $feeAyId) {
+            if ($this->isStudentPromoted($pdo, (int)$info['student_id'], $schoolId)) {
                 throw new ValidationException(['fields' => "This student's outstanding balance has already been migrated to the current Academic Year as 'Previous Year Dues'. Payment can only be collected from the current Academic Year."]);
             }
             if ($info['due_date'] !== null && $info['name'] !== 'Previous Year Dues') {
@@ -6043,7 +6709,7 @@ Only approve the settlement after reviewing all financial records.
             throw new ValidationException(['locked' => 'This payment has already been included in a generated Financial Report and can no longer be reverted.']);
         }
 
-        // 2. Outstanding migration lock check
+        // 2. Writable year check & Outstanding migration lock check
         $stmtGetInfo = $pdo->prepare("
             SELECT s.academic_year_id AS student_ay_id, s.status AS student_status, aft.academic_year_id AS fee_ay_id
             FROM additional_fee_payments afp
@@ -6055,8 +6721,15 @@ Only approve the settlement after reviewing all financial records.
         $stmtGetInfo->execute([':id' => $id, ':sid' => $schoolId]);
         $info = $stmtGetInfo->fetch(PDO::FETCH_ASSOC);
         if ($info) {
+            $feeAyId = (int)$info['fee_ay_id'];
+            $stmtPayYear = $pdo->prepare("SELECT status FROM academic_years WHERE id = :id AND school_id = :sid LIMIT 1");
+            $stmtPayYear->execute([':id' => $feeAyId, ':sid' => $schoolId]);
+            $payYearStatus = $stmtPayYear->fetchColumn();
+            if ($payYearStatus === 'Archived') {
+                throw new ValidationException(['fields' => 'Archived academic years are read-only and cannot be modified.']);
+            }
+
             $studentAyId = $info['student_ay_id'] !== null ? (int)$info['student_ay_id'] : 0;
-            $feeAyId = $info['fee_ay_id'] !== null ? (int)$info['fee_ay_id'] : 0;
             if ($info['student_status'] === 'ACTIVE' && $studentAyId > $feeAyId) {
                 throw new ValidationException(['fields' => "This student's outstanding balance has already been migrated to the current Academic Year as 'Previous Year Dues'. Payment can only be collected from the current Academic Year."]);
             }

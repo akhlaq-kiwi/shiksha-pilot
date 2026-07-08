@@ -39,30 +39,45 @@ class ExcelGenerator
         $xml .= ' <Worksheet ss:Name="Student Fee Collection">' . "\n";
         $xml .= '  <Table>' . "\n";
         $xml .= '   <Row ss:StyleID="Header">' . "\n";
+        $xml .= '    <Cell><Data ss:Type="String">Fee Deposit Date &amp; Time</Data></Cell>' . "\n";
         $xml .= '    <Cell><Data ss:Type="String">Student Name</Data></Cell>' . "\n";
-        $xml .= '    <Cell><Data ss:Type="String">Admission Number</Data></Cell>' . "\n";
         $xml .= '    <Cell><Data ss:Type="String">Class</Data></Cell>' . "\n";
-        $xml .= '    <Cell><Data ss:Type="String">Payment Date</Data></Cell>' . "\n";
-        $xml .= '    <Cell><Data ss:Type="String">Payment Type</Data></Cell>' . "\n";
-        $xml .= '    <Cell><Data ss:Type="String">Amount</Data></Cell>' . "\n";
+        $xml .= '    <Cell><Data ss:Type="String">Roll Number</Data></Cell>' . "\n";
+        $xml .= '    <Cell><Data ss:Type="String">Fee Type</Data></Cell>' . "\n";
+        $xml .= '    <Cell><Data ss:Type="String">Months Covered</Data></Cell>' . "\n";
+        $xml .= '    <Cell><Data ss:Type="String">Fee Amount</Data></Cell>' . "\n";
         $xml .= '   </Row>' . "\n";
 
         $totalFee = 0.0;
         foreach ($feeCollections as $row) {
             $totalFee += (float)$row['amount'];
+            
+            // Format deposit date & time
+            $depTime = '';
+            if (!empty($row['deposit_time'])) {
+                $depTime = date('j M Y (h:i A)', strtotime($row['deposit_time']));
+            }
+            
+            // Class name formatted with section if present
+            $className = $row['class_name'] ?? '';
+            if (!empty($row['class_section'])) {
+                $className .= ' - ' . $row['class_section'];
+            }
+            
             $xml .= '   <Row>' . "\n";
+            $xml .= '    <Cell><Data ss:Type="String">' . htmlspecialchars($depTime) . '</Data></Cell>' . "\n";
             $xml .= '    <Cell><Data ss:Type="String">' . htmlspecialchars($row['student_name'] ?? '') . '</Data></Cell>' . "\n";
-            $xml .= '    <Cell><Data ss:Type="String">' . htmlspecialchars($row['admission_no'] ?? '') . '</Data></Cell>' . "\n";
-            $xml .= '    <Cell><Data ss:Type="String">' . htmlspecialchars($row['class_name'] ?? '') . '</Data></Cell>' . "\n";
-            $xml .= '    <Cell><Data ss:Type="String">' . htmlspecialchars($row['payment_date'] ?? '') . '</Data></Cell>' . "\n";
-            $xml .= '    <Cell><Data ss:Type="String">' . htmlspecialchars($row['payment_type'] ?? '') . '</Data></Cell>' . "\n";
+            $xml .= '    <Cell><Data ss:Type="String">' . htmlspecialchars($className) . '</Data></Cell>' . "\n";
+            $xml .= '    <Cell><Data ss:Type="String">' . htmlspecialchars((string)($row['roll_no'] ?? '')) . '</Data></Cell>' . "\n";
+            $xml .= '    <Cell><Data ss:Type="String">' . htmlspecialchars($row['fee_type'] ?? '') . '</Data></Cell>' . "\n";
+            $xml .= '    <Cell><Data ss:Type="String">' . htmlspecialchars($row['months_covered'] ?? '') . '</Data></Cell>' . "\n";
             $xml .= '    <Cell><Data ss:Type="Number">' . $row['amount'] . '</Data></Cell>' . "\n";
             $xml .= '   </Row>' . "\n";
         }
         // Total row
         $xml .= '   <Row ss:StyleID="BoldText">' . "\n";
         $xml .= '    <Cell><Data ss:Type="String">Total Fee Collection</Data></Cell>' . "\n";
-        $xml .= '    <Cell ss:Index="6"><Data ss:Type="Number">' . $totalFee . '</Data></Cell>' . "\n";
+        $xml .= '    <Cell ss:Index="7"><Data ss:Type="Number">' . $totalFee . '</Data></Cell>' . "\n";
         $xml .= '   </Row>' . "\n";
         $xml .= '  </Table>' . "\n";
         $xml .= ' </Worksheet>' . "\n";

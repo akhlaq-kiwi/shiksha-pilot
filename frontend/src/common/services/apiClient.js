@@ -39,9 +39,9 @@ async function request(endpoint, options = {}) {
     throw new Error('Unauthorized session expired');
   }
 
-  // Handle PDF/blob exports
+  // Handle PDF/blob/excel exports
   const contentType = response.headers.get('content-type');
-  if (contentType && contentType.includes('application/pdf')) {
+  if (contentType && (contentType.includes('application/pdf') || contentType.includes('application/vnd.ms-excel') || contentType.includes('application/octet-stream'))) {
     return response.blob();
   }
 

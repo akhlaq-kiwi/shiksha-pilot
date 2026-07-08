@@ -305,6 +305,7 @@ function EditSchoolDetailsDialog({ school, onClose, onSaved }) {
   const [name, setName] = useState(school.name || '');
   const [contactPhone, setContactPhone] = useState(school.contact_phone || '');
   const [contactEmail, setContactEmail] = useState(school.contact_email || '');
+  const [status, setStatus] = useState(school.status || 'ACTIVE');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -325,6 +326,7 @@ function EditSchoolDetailsDialog({ school, onClose, onSaved }) {
         name: name.trim(),
         contact_phone: contactPhone.trim(),
         contact_email: trimmedEmail,
+        status: status,
       });
       onSaved(updated);
       toast.success(`School details updated successfully.`, 'Updated');
@@ -371,6 +373,14 @@ function EditSchoolDetailsDialog({ school, onClose, onSaved }) {
               <label className="text-xs font-bold text-text-secondary uppercase">School Owner Email *</label>
               <Input type="email" placeholder="owner@school.com" value={contactEmail} onChange={e => setContactEmail(e.target.value)} required />
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-text-secondary uppercase">School Status</label>
+            <Select value={status} onChange={e => setStatus(e.target.value)}>
+              <option value="ACTIVE">Active</option>
+              <option value="INACTIVE">Inactive</option>
+            </Select>
           </div>
 
           <div className="flex gap-3 pt-2">

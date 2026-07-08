@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Search, Edit, User, UserCog, Upload, AlertCircle, ArrowLeft, Check, Trash2, FileText, Download, Printer, MoreVertical, Lock, CheckCircle } from 'lucide-react';
+import { Plus, Search, Edit, User, UserCog, Upload, AlertCircle, ArrowLeft, Check, Trash2, FileText, Download, Printer, MoreVertical, Lock, CheckCircle, AlertTriangle, CreditCard } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
 import { Input } from '../../../common/ui/input';
@@ -196,6 +196,9 @@ export default function StaffPage() {
   const [isRevertDialogOpen, setIsRevertDialogOpen] = useState(false);
   const [isSalarySlipOpen, setIsSalarySlipOpen] = useState(false);
   const [selectedSlipPayment, setSelectedSlipPayment] = useState(null);
+  const [isPrevYearDisburseOpen, setIsPrevYearDisburseOpen] = useState(false);
+  const [prevYearDisburseMonths, setPrevYearDisburseMonths] = useState([]);
+  const [prevYearDisburseTotal, setPrevYearDisburseTotal] = useState(0);
   const [actionError, setActionError] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [activeMenuMonth, setActiveMenuMonth] = useState(null);
@@ -608,6 +611,17 @@ export default function StaffPage() {
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       console.error(err);
+      if (err.data && typeof err.data === 'object') {
+        const errors = { ...err.data };
+        if (errors.phone) {
+          errors.phone = "Phone number already exists. Please use a different mobile number.";
+        }
+        setFormErrors(errors);
+      } else if (err.message && (err.message.includes('contact number') || err.message.includes('phone') || err.message.includes('registered') || err.message.includes('exists'))) {
+        setFormErrors({
+          phone: "Phone number already exists. Please use a different mobile number."
+        });
+      }
       setError(err.message || 'Failed to save teacher details.');
     } finally {
       setSubmitting(false);
@@ -675,6 +689,38 @@ export default function StaffPage() {
         }
       } else {
         errorMsg = err.message || 'Failed to disburse salary.';
+      }
+      setActionError(errorMsg);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleConfirmPrevYearDisburse = async () => {
+    setActionLoading(true);
+    setActionError('');
+    try {
+      await schoolService.disbursePreviousYearStaffSalary({
+        staff_id: teacherDetails.id,
+        months: prevYearDisburseMonths
+      });
+      setIsPrevYearDisburseOpen(false);
+      await loadTeacherDetails(teacherDetails.id);
+    } catch (err) {
+      console.error(err);
+      let errorMsg = 'Failed to disburse previous year salary.';
+      if (err.data && typeof err.data === 'object') {
+        if (err.data.errors && typeof err.data.errors === 'object') {
+          const firstErrKey = Object.keys(err.data.errors)[0];
+          errorMsg = err.data.errors[firstErrKey];
+        } else {
+          const firstErrKey = Object.keys(err.data)[0];
+          if (typeof err.data[firstErrKey] === 'string') {
+            errorMsg = err.data[firstErrKey];
+          }
+        }
+      } else {
+        errorMsg = err.message || 'Failed to disburse previous year salary.';
       }
       setActionError(errorMsg);
     } finally {
@@ -1040,7 +1086,7 @@ export default function StaffPage() {
                                     <Lock className="h-3.5 w-3.5" />
                                   </span>
                                 )}
-                                {!isReadOnly && !isLocked && isPaid && (
+                                {(!isReadOnly || !t.is_migrated) && !isLocked && isPaid && (
                                    <DropdownMenu>
                                      <DropdownItem
                                        destructive
@@ -1079,13 +1125,13 @@ export default function StaffPage() {
                               </Button>
                             ) : (
                               <Button 
-                                disabled={isReadOnly}
+                                disabled={isReadOnly && t.is_migrated}
                                 onClick={() => {
-                                  if (isReadOnly) return;
+                                  if (isReadOnly && t.is_migrated) return;
                                   setDisburseMonth(month);
                                   setIsDisburseDialogOpen(true);
                                 }}
-                                className={`w-full h-8 text-xs font-bold ${isReadOnly ? 'bg-zinc-200 text-zinc-400 dark:bg-zinc-800 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 text-white'}`}
+                                className={`w-full h-8 text-xs font-bold ${(isReadOnly && t.is_migrated) ? 'bg-zinc-200 text-zinc-400 dark:bg-zinc-800 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 text-white'}`}
                               >
                                 Disburse
                               </Button>
@@ -1095,7 +1141,60 @@ export default function StaffPage() {
                       );
                     })}
                   </div>
-                </Card>
+                 </Card>
+                {t.previous_year_pending && (
+                  <Card className="p-6 bg-surface border border-amber-200 dark:border-amber-900/30 rounded-2xl shadow-xs mt-4 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between border-b border-border pb-4 mb-4">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4 text-amber-500" />
+                        <h3 className="text-sm font-extrabold text-text-primary uppercase tracking-wider">Previous Year Salary Card</h3>
+                      </div>
+                      <span className="text-xs text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full font-bold">
+                        AY: {t.previous_year_pending.academic_year_name}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div>
+                        <p className="text-xs text-text-secondary font-bold">Pending Salary Months:</p>
+                        <ul className="list-disc list-inside mt-1.5 space-y-1">
+                          {t.previous_year_pending.pending_months.map(m => (
+                            <li key={m} className="text-sm text-text-primary font-extrabold font-sans">
+                              {m}
+                            </li>
+                          ))}
+                        </ul>
+                        <div className="flex items-center gap-6 mt-4">
+                          <div>
+                            <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Monthly Salary Rate</p>
+                            <p className="text-sm font-black text-text-primary mt-0.5">
+                              ₹{parseFloat(t.previous_year_pending.salary).toLocaleString('en-IN')}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Total Pending Amount</p>
+                            <p className="text-sm font-black text-red-500 mt-0.5">
+                              ₹{parseFloat(t.previous_year_pending.total_pending).toLocaleString('en-IN')}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="self-end sm:self-center">
+                        <Button 
+                          onClick={() => {
+                            setPrevYearDisburseMonths(t.previous_year_pending.pending_months);
+                            setPrevYearDisburseTotal(t.previous_year_pending.total_pending);
+                            setIsPrevYearDisburseOpen(true);
+                          }}
+                          className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs h-9 px-4 rounded-xl flex items-center gap-1.5 shadow-xs"
+                        >
+                          <CreditCard className="h-4 w-4" /> Disburse Salary
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                )}
               </div>
             </div>
           </div>
@@ -1684,6 +1783,70 @@ export default function StaffPage() {
               </div>
             </div>
             <p className="text-xs text-zinc-500 leading-normal">This action will record the salary payment.</p>
+          </div>
+        </Dialog>
+      )}
+
+      {isPrevYearDisburseOpen && (
+        <Dialog
+          isOpen={isPrevYearDisburseOpen}
+          onClose={() => {
+            if (!actionLoading) {
+              setIsPrevYearDisburseOpen(false);
+              setActionError('');
+            }
+          }}
+          title="Disburse Previous Year Salary"
+          description="Please confirm previous year salary disbursement details below."
+          className="max-w-md animate-in fade-in duration-200"
+          footer={
+            <div className="flex gap-2 justify-end w-full">
+              <Button 
+                variant="secondary" 
+                onClick={() => {
+                  setIsPrevYearDisburseOpen(false);
+                  setActionError('');
+                }}
+                disabled={actionLoading}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleConfirmPrevYearDisburse}
+                disabled={actionLoading}
+                className="bg-amber-600 hover:bg-amber-700 text-white font-bold"
+              >
+                {actionLoading ? 'Disbursing...' : 'Confirm Disbursement'}
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-4 text-sm mt-2">
+            {actionError && (
+              <div className="p-3 bg-red-500/10 text-red-600 rounded-lg text-xs font-bold flex items-center gap-1.5 border border-red-500/25">
+                <AlertCircle className="h-4 w-4" /> {actionError}
+              </div>
+            )}
+            <p className="text-zinc-600 dark:text-zinc-400">You are about to disburse outstanding salary for:</p>
+            <div className="bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-xl border border-border space-y-3 font-medium">
+              <div className="flex justify-between">
+                <span className="text-zinc-500">Teacher:</span>
+                <span className="text-text-primary font-bold">{teacherDetails?.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-zinc-500">Academic Year:</span>
+                <span className="text-text-primary font-bold">{teacherDetails?.previous_year_pending?.academic_year_name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-zinc-500">Months:</span>
+                <span className="text-text-primary font-bold">{prevYearDisburseMonths.join(', ')}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-zinc-500">Total Amount:</span>
+                <span className="text-amber-600 font-extrabold">₹{parseFloat(prevYearDisburseTotal).toLocaleString('en-IN')}</span>
+              </div>
+            </div>
+            <p className="text-xs text-zinc-500 leading-normal">This action will record the salary payment inside the current academic year as an expense.</p>
           </div>
         </Dialog>
       )}

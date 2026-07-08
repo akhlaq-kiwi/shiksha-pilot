@@ -16,7 +16,7 @@ class AuthRepository extends BaseRepository
     public function findByPhone(string $phone): ?array
     {
         $stmt = $this->pdo->prepare(
-            "SELECT u.*, s.portal_theme AS school_portal_theme
+            "SELECT u.*, s.portal_theme AS school_portal_theme, s.status AS school_status
                FROM users u
                LEFT JOIN schools s ON s.id = u.school_id
               WHERE u.phone = :phone

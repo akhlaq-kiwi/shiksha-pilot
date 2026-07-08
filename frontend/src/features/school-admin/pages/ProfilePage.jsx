@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Edit, School, MapPin, Calendar, KeyRound, CreditCard, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Edit, School, MapPin, Calendar, KeyRound, CreditCard, AlertCircle, CheckCircle2, Copy, Phone, Mail, AlertTriangle } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
 import { Dialog } from '../../../common/ui/dialog';
@@ -7,6 +7,21 @@ import { Input } from '../../../common/ui/input';
 import { schoolService } from '../../../common/services/schoolService';
 import { authService } from '../../../common/services/authService';
 import { SearchableSelect, INDIAN_STATES_AND_CITIES } from '../../../common/ui/SearchableSelect';
+import { useToast } from '../../../common/components/Toast';
+
+const calculateDaysLeftText = (expiryDateStr) => {
+  if (!expiryDateStr) return 'Expired';
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const datePart = expiryDateStr.split(' ')[0];
+  const expiry = new Date(datePart.replace(/-/g, '/'));
+  expiry.setHours(0, 0, 0, 0);
+  const diffTime = expiry.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) return 'Expired';
+  if (diffDays === 0) return '0 Days Left';
+  return `${diffDays} ${diffDays === 1 ? 'Day' : 'Days'} Left`;
+}
 
 export default function ProfilePage({ mode = 'details' }) {
   const [profile, setProfile] = useState(null);
@@ -14,6 +29,7 @@ export default function ProfilePage({ mode = 'details' }) {
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isRemoveConfirmOpen, setIsRemoveConfirmOpen] = useState(false);
   const [logoError, setLogoError] = useState(false);
+  const [contactOpen, setContactOpen] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -31,6 +47,9 @@ export default function ProfilePage({ mode = 'details' }) {
   });
   const [formErrors, setFormErrors] = useState({});
 
+  const [plans, setPlans] = useState([]);
+  const [subHistory, setSubHistory] = useState([]);
+
   // Password Form State
   const [passwordForm, setPasswordForm] = useState({ newPassword: '', confirmPassword: '' });
   const [submittingPassword, setSubmittingPassword] = useState(false);
@@ -41,8 +60,14 @@ export default function ProfilePage({ mode = 'details' }) {
     setLoading(true);
     setError('');
     try {
-      const data = await schoolService.getSchoolProfile();
-      setProfile(data || null);
+      const [profileData, plansData, historyData] = await Promise.all([
+        schoolService.getSchoolProfile(),
+        schoolService.getActivePlans().catch(() => []),
+        schoolService.getSubscriptionHistory().catch(() => [])
+      ]);
+      setProfile(profileData || null);
+      setPlans(plansData || []);
+      setSubHistory(historyData || []);
     } catch (err) {
       console.error(err);
       setError('Failed to load school profile.');
@@ -483,7 +508,15 @@ export default function ProfilePage({ mode = 'details' }) {
                 <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Current Subscription Plan</p>
                 <div className="flex items-center gap-2">
                   <span className="text-xl font-black text-text-primary tracking-tight">{profile?.plan || 'Premium'}</span>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black uppercase bg-green-500/10 text-green-600 border border-green-500/20">Active</span>
+                  {(() => {
+                    const daysText = calculateDaysLeftText(profile?.subscription_expiry);
+                    const isExpired = daysText === 'Expired';
+                    return (
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${isExpired ? 'bg-red-500/10 text-red-600 border border-red-500/20' : 'bg-blue-500/10 text-blue-600 border border-blue-500/20'}`}>
+                        {daysText}
+                      </span>
+                    );
+                  })()}
                 </div>
               </div>
               <div className="text-xs text-text-secondary max-w-sm">
@@ -493,73 +526,120 @@ export default function ProfilePage({ mode = 'details' }) {
           </Card>
 
           {/* Plans comparison cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[
-              {
-                name: 'Standard',
-                price: '₹7,999',
-                limit: '1,500 Students',
-                desc: 'Includes standard gradebooks and audit logs up to 1,500 students.',
-                features: ['Gradebooks', 'Audit Logs', 'Timetables', 'Exams & Results', 'Standard Support']
-              },
-              {
-                name: 'Premium',
-                price: '₹19,999',
-                limit: '5,000 Students',
-                desc: 'Includes dynamic timetables, color themes, and multi-branch configurations.',
-                features: ['All Standard features', 'Dynamic Timetables', 'Color Themes', 'Multi-branch Configs', 'Priority Support']
-              },
-              {
-                name: 'Enterprise',
-                price: '₹39,999',
-                limit: 'Unlimited Students',
-                desc: 'Unlimited students, custom domain matching, and dedicated audit log exports.',
-                features: ['All Premium features', 'Unlimited Students', 'Custom Domain Matching', 'Dedicated Audit Logs', '24/7 Phone Support']
-              }
-            ].map(plan => {
-              const isCurrent = (profile?.plan || 'Premium').toLowerCase() === plan.name.toLowerCase();
-              return (
-                <Card key={plan.name} className={`shadow-xs flex flex-col justify-between overflow-hidden border ${isCurrent ? 'border-primary ring-1 ring-primary' : 'border-border'}`}>
-                  <div className="p-6 space-y-4">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h4 className="text-base font-black text-text-primary tracking-tight">{plan.name}</h4>
-                        <p className="text-[11px] text-text-muted mt-0.5">{plan.limit}</p>
+          {plans.length === 0 ? (
+            <div className="py-12 border-2 border-dashed border-border bg-surface rounded-2xl text-center text-text-muted text-sm font-medium">
+              No active subscription plans found. Please contact the Super Administrator.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {plans.map(plan => {
+                const isCurrent = (profile?.plan || '').toLowerCase() === plan.name.toLowerCase();
+                return (
+                  <Card key={plan.id} className={`shadow-xs flex flex-col justify-between overflow-hidden border ${isCurrent ? 'border-primary ring-1 ring-primary' : 'border-border'} min-h-[350px] relative p-6 rounded-2xl hover:shadow-md transition-all duration-200`}>
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-start border-b border-border/60 pb-4">
+                        <div>
+                          <h4 className="text-base font-black text-text-primary tracking-tight font-display">{plan.name}</h4>
+                          <p className="text-[10px] text-primary bg-primary/10 px-2 py-0.5 rounded-md inline-block font-extrabold uppercase mt-2">
+                            {plan.student_limit ? `Up to ${plan.student_limit.toLocaleString()} Students` : 'Unlimited Students'}
+                          </p>
+                        </div>
+                        {isCurrent && (
+                          <span className="text-[9px] font-black bg-primary text-zinc-50 px-2.5 py-1 rounded-full uppercase tracking-wider">Current</span>
+                        )}
                       </div>
-                      {isCurrent && (
-                        <span className="text-[9px] font-black bg-primary text-zinc-50 px-2 py-0.5 rounded uppercase">Current</span>
+                      
+                      <div className="flex items-baseline gap-1 py-1">
+                        <span className="text-2xl font-black text-text-primary">₹{parseFloat(plan.price).toLocaleString('en-IN')}</span>
+                        <span className="text-[10px] text-text-muted">/month</span>
+                      </div>
+
+                      <p className="text-xs text-text-secondary leading-relaxed font-medium">{plan.description}</p>
+                    </div>
+
+                    <div className="pt-6">
+                      <Button 
+                        className="w-full font-bold text-xs uppercase tracking-wider bg-amber-600 hover:bg-amber-700 text-white"
+                        onClick={() => setContactOpen(true)}
+                      >
+                        Contact Super Admin
+                      </Button>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Subscription History section */}
+          <div className="space-y-4 pt-6">
+            <h3 className="text-sm font-bold text-text-primary tracking-tight">Subscription History</h3>
+            <Card className="shadow-xs border-border bg-surface overflow-hidden">
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-border bg-zinc-50 dark:bg-zinc-900/50 text-text-secondary font-bold uppercase tracking-wider text-[10px]">
+                        <th className="p-4">Plan Name</th>
+                        <th className="p-4">Purchase Date</th>
+                        <th className="p-4">Expiry Date</th>
+                        <th className="p-4">Duration</th>
+                        <th className="p-4">Amount</th>
+                        <th className="p-4">Status</th>
+                        <th className="p-4">Features Included</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/60">
+                      {subHistory.length === 0 ? (
+                        <tr>
+                          <td colSpan="7" className="p-8 text-center text-text-muted font-medium">
+                            No subscription history records found.
+                          </td>
+                        </tr>
+                      ) : (
+                        subHistory.map((sub, idx) => {
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
+                          return (
+                            <tr key={idx} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20 transition-colors">
+                              <td className="p-4 font-extrabold text-text-primary">{sub.plan_name}</td>
+                              <td className="p-4 text-text-secondary font-medium">
+                                {new Date(sub.created_at).toLocaleDateString('en-IN', {
+                                  day: '2-digit',
+                                  month: 'short',
+                                  year: 'numeric'
+                                })}
+                              </td>
+                              <td className="p-4 text-text-secondary font-medium">
+                                {new Date(sub.expiry_date).toLocaleDateString('en-IN', {
+                                  day: '2-digit',
+                                  month: 'short',
+                                  year: 'numeric'
+                                })}
+                              </td>
+                              <td className="p-4 text-text-secondary font-semibold">
+                                {sub.duration_value} {sub.duration_unit}{sub.duration_value > 1 ? 's' : ''}
+                              </td>
+                              <td className="p-4 font-bold text-text-primary">
+                                ₹{parseFloat(sub.amount).toLocaleString('en-IN')}
+                              </td>
+                              <td className="p-4">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${sub.status === 'PAID' ? 'bg-green-500/10 text-green-600 border border-green-500/20' : 'bg-red-500/10 text-red-600 border border-red-500/20'}`}>
+                                  {sub.status}
+                                </span>
+                              </td>
+                              <td className="p-4 text-text-secondary leading-relaxed max-w-xs truncate font-medium" title={sub.features || '—'}>
+                                {sub.features || '—'}
+                              </td>
+                            </tr>
+                          );
+                        })
                       )}
-                    </div>
-                    
-                    <div className="flex items-baseline gap-1 py-1">
-                      <span className="text-2xl font-black text-text-primary">{plan.price}</span>
-                      <span className="text-[10px] text-text-muted">/month</span>
-                    </div>
-
-                    <p className="text-xs text-text-secondary leading-relaxed">{plan.desc}</p>
-
-                    <hr className="border-border" />
-
-                    <ul className="space-y-2 text-xs text-text-primary">
-                      {plan.features.map(f => (
-                        <li key={f} className="flex items-center gap-2 opacity-90">
-                          <span className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0"></span>
-                          <span>{f}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <div className="p-6 pt-0">
-                    {isCurrent ? (
-                      <Button disabled className="w-full font-bold text-xs uppercase tracking-wider">Current Plan</Button>
-                    ) : (
-                      <Button variant="outline" disabled className="w-full font-bold text-xs uppercase tracking-wider text-text-muted border-border">Contact Super Admin</Button>
-                    )}
-                  </div>
-                </Card>
-              );
-            })}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       )}
@@ -663,6 +743,73 @@ export default function ProfilePage({ mode = 'details' }) {
           </div>
         </div>
       </Dialog>
+
+      <ContactSuperAdminDialog isOpen={contactOpen} onClose={() => setContactOpen(false)} />
     </div>
+  );
+}
+
+function ContactSuperAdminDialog({ isOpen, onClose }) {
+  const toast = useToast();
+
+  const handleCopy = (text, type) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${type} copied successfully.`, 'Copied');
+  };
+
+  return (
+    <Dialog
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Contact Super Admin"
+      description="Get in touch with support to activate or renew subscription plans."
+      className="max-w-md animate-in fade-in zoom-in-95 duration-200"
+      footer={
+        <div className="flex justify-end w-full">
+          <Button onClick={onClose} variant="secondary">
+            Close
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-4 text-sm mt-3">
+        <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed font-medium">
+          To purchase or renew a subscription plan, please contact the ShikshaPilot Super Admin using any of the methods below.
+          Our team will assist you with plan activation and account renewal.
+        </p>
+
+        <div className="bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-xl border border-border space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Phone className="h-4 w-4 text-zinc-500" />
+              <span className="text-text-primary font-bold">8650302499</span>
+            </div>
+            <Button 
+              size="xs" 
+              variant="outline" 
+              className="flex items-center gap-1 font-bold text-[10px] py-1 px-2.5 h-7 rounded-lg"
+              onClick={() => handleCopy('8650302499', 'Phone number')}
+            >
+              <Copy className="h-3 w-3" /> Copy
+            </Button>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Mail className="h-4 w-4 text-zinc-500" />
+              <span className="text-text-primary font-bold">Shikshapilot@gmail.com</span>
+            </div>
+            <Button 
+              size="xs" 
+              variant="outline" 
+              className="flex items-center gap-1 font-bold text-[10px] py-1 px-2.5 h-7 rounded-lg"
+              onClick={() => handleCopy('Shikshapilot@gmail.com', 'Email address')}
+            >
+              <Copy className="h-3 w-3" /> Copy
+            </Button>
+          </div>
+        </div>
+      </div>
+    </Dialog>
   );
 }
