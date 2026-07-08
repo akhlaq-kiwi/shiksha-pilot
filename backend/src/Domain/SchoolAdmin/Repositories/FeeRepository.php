@@ -74,15 +74,17 @@ class FeeRepository extends BaseRepository
                       AND (
                         fp.academic_year_id = :ayid
                         OR (
-                          fp.created_at >= (SELECT created_at FROM academic_years WHERE id = :ayid LIMIT 1)
-                          AND fp.academic_year_id != :ayid
+                          fp.created_at >= (SELECT created_at FROM academic_years WHERE id = :ayid_2 LIMIT 1)
+                          AND fp.academic_year_id != :ayid_3
                           AND (s.status = 'Inactive' OR s.status = 'Alumni' OR s.status = 'Archived')
                         )
                       )
                 ");
                 $stmt->execute([
                     ':sid' => $schoolId, 
-                    ':ayid' => $academicYearId
+                    ':ayid' => $academicYearId,
+                    ':ayid_2' => $academicYearId,
+                    ':ayid_3' => $academicYearId
                 ]);
             } else {
                 $stmt = $this->pdo->prepare("
@@ -93,13 +95,18 @@ class FeeRepository extends BaseRepository
                       AND (
                         fp.academic_year_id = :ayid
                         OR (
-                          fp.created_at >= (SELECT created_at FROM academic_years WHERE id = :ayid LIMIT 1)
-                          AND fp.academic_year_id != :ayid
+                          fp.created_at >= (SELECT created_at FROM academic_years WHERE id = :ayid_2 LIMIT 1)
+                          AND fp.academic_year_id != :ayid_3
                           AND (s.status = 'Inactive' OR s.status = 'Alumni' OR s.status = 'Archived')
                         )
                       )
                 ");
-                $stmt->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+                $stmt->execute([
+                    ':sid' => $schoolId, 
+                    ':ayid' => $academicYearId,
+                    ':ayid_2' => $academicYearId,
+                    ':ayid_3' => $academicYearId
+                ]);
             }
             $monthlyCollected = (float)$stmt->fetchColumn();
 
@@ -113,15 +120,17 @@ class FeeRepository extends BaseRepository
                       AND (
                         aft.academic_year_id = :ayid
                         OR (
-                          afp.updated_at >= (SELECT created_at FROM academic_years WHERE id = :ayid LIMIT 1)
-                          AND aft.academic_year_id != :ayid
+                          afp.updated_at >= (SELECT created_at FROM academic_years WHERE id = :ayid_2 LIMIT 1)
+                          AND aft.academic_year_id != :ayid_3
                           AND (s.status = 'Inactive' OR s.status = 'Alumni' OR s.status = 'Archived')
                         )
                       )
                 ");
                 $stmtAdd->execute([
                     ':sid' => $schoolId, 
-                    ':ayid' => $academicYearId
+                    ':ayid' => $academicYearId,
+                    ':ayid_2' => $academicYearId,
+                    ':ayid_3' => $academicYearId
                 ]);
             } else {
                 $stmtAdd = $this->pdo->prepare("
@@ -133,13 +142,18 @@ class FeeRepository extends BaseRepository
                       AND (
                         aft.academic_year_id = :ayid
                         OR (
-                          afp.updated_at >= (SELECT created_at FROM academic_years WHERE id = :ayid LIMIT 1)
-                          AND aft.academic_year_id != :ayid
+                          afp.updated_at >= (SELECT created_at FROM academic_years WHERE id = :ayid_2 LIMIT 1)
+                          AND aft.academic_year_id != :ayid_3
                           AND (s.status = 'Inactive' OR s.status = 'Alumni' OR s.status = 'Archived')
                         )
                       )
                 ");
-                $stmtAdd->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+                $stmtAdd->execute([
+                    ':sid' => $schoolId, 
+                    ':ayid' => $academicYearId,
+                    ':ayid_2' => $academicYearId,
+                    ':ayid_3' => $academicYearId
+                ]);
             }
             $additionalCollected = (float)$stmtAdd->fetchColumn();
         } else {

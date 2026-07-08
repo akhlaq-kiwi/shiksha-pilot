@@ -5104,8 +5104,8 @@ class SchoolAdminService extends BaseService
                   AND (
                     fp.academic_year_id = :ayid
                     OR (
-                      fp.created_at >= (SELECT created_at FROM academic_years WHERE id = :ayid LIMIT 1)
-                      AND fp.academic_year_id != :ayid
+                      fp.created_at >= (SELECT created_at FROM academic_years WHERE id = :ayid_2 LIMIT 1)
+                      AND fp.academic_year_id != :ayid_3
                       AND (s.status = 'Inactive' OR s.status = 'Alumni' OR s.status = 'Archived')
                     )
                   )
@@ -5114,6 +5114,8 @@ class SchoolAdminService extends BaseService
             $stmtFees->execute([
                 ':sid' => $schoolId,
                 ':ayid' => $workingYear['id'],
+                ':ayid_2' => $workingYear['id'],
+                ':ayid_3' => $workingYear['id'],
                 ':latest_rep_ts' => $latestReportCreatedAt
             ]);
         } else {
@@ -5125,15 +5127,17 @@ class SchoolAdminService extends BaseService
                   AND (
                     fp.academic_year_id = :ayid
                     OR (
-                      fp.created_at >= (SELECT created_at FROM academic_years WHERE id = :ayid LIMIT 1)
-                      AND fp.academic_year_id != :ayid
+                      fp.created_at >= (SELECT created_at FROM academic_years WHERE id = :ayid_2 LIMIT 1)
+                      AND fp.academic_year_id != :ayid_3
                       AND (s.status = 'Inactive' OR s.status = 'Alumni' OR s.status = 'Archived')
                     )
                   )
             ");
             $stmtFees->execute([
                 ':sid' => $schoolId,
-                ':ayid' => $workingYear['id']
+                ':ayid' => $workingYear['id'],
+                ':ayid_2' => $workingYear['id'],
+                ':ayid_3' => $workingYear['id']
             ]);
         }
         $tuitionCollected = (float)$stmtFees->fetchColumn();
@@ -5150,8 +5154,8 @@ class SchoolAdminService extends BaseService
                   AND (
                     aft.academic_year_id = :ayid
                     OR (
-                      afp.updated_at >= (SELECT created_at FROM academic_years WHERE id = :ayid LIMIT 1)
-                      AND aft.academic_year_id != :ayid
+                      afp.updated_at >= (SELECT created_at FROM academic_years WHERE id = :ayid_2 LIMIT 1)
+                      AND aft.academic_year_id != :ayid_3
                       AND (s.status = 'Inactive' OR s.status = 'Alumni' OR s.status = 'Archived')
                     )
                   )
@@ -5160,6 +5164,8 @@ class SchoolAdminService extends BaseService
             $stmtAddFees->execute([
                 ':sid' => $schoolId,
                 ':ayid' => $workingYear['id'],
+                ':ayid_2' => $workingYear['id'],
+                ':ayid_3' => $workingYear['id'],
                 ':latest_rep_ts' => $latestReportCreatedAt
             ]);
         } else {
@@ -5173,15 +5179,17 @@ class SchoolAdminService extends BaseService
                   AND (
                     aft.academic_year_id = :ayid
                     OR (
-                      afp.updated_at >= (SELECT created_at FROM academic_years WHERE id = :ayid LIMIT 1)
-                      AND aft.academic_year_id != :ayid
+                      afp.updated_at >= (SELECT created_at FROM academic_years WHERE id = :ayid_2 LIMIT 1)
+                      AND aft.academic_year_id != :ayid_3
                       AND (s.status = 'Inactive' OR s.status = 'Alumni' OR s.status = 'Archived')
                     )
                   )
             ");
             $stmtAddFees->execute([
                 ':sid' => $schoolId,
-                ':ayid' => $workingYear['id']
+                ':ayid' => $workingYear['id'],
+                ':ayid_2' => $workingYear['id'],
+                ':ayid_3' => $workingYear['id']
             ]);
         }
         $addFeesCollected = (float)$stmtAddFees->fetchColumn();
