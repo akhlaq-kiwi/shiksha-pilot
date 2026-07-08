@@ -2327,7 +2327,8 @@ class SchoolAdminService extends BaseService
                             ':class_id' => $newClassId
                         ]);
                     }
-                        $teachersMigratedCount = count($activeStaff);
+                }
+                $teachersMigratedCount = count($activeStaff);
                 $studentsPromotedCount = 0;
                 $studentsRepeatedCount = 0;
                 $studentsGraduatedCount = 0;
@@ -2574,7 +2575,7 @@ class SchoolAdminService extends BaseService
                             ':sid' => $schoolId
                         ]);
                     }
-                }         }
+                }
             }
 
             if ($prevYearId !== false && $prevYearId !== null) {
