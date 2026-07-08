@@ -20,18 +20,24 @@ export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating
   const [form, setForm] = useState({ ...EMPTY, admin_password: generatePassword() });
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [localErrors, setLocalErrors] = useState({});
+
+  useEffect(() => {
+    setLocalErrors(validationErrors || {});
+  }, [validationErrors]);
 
   useEffect(() => {
     if (isOpen) {
       setLoading(true);
+      setLocalErrors({});
       platformService.getPlans()
         .then(data => {
           const activePlans = (data || []).filter(p => p.is_active === 1 || p.is_active === '1' || p.is_active === true);
           setPlans(activePlans);
           if (activePlans.length > 0) {
-            setForm(prev => ({ ...prev, plan: activePlans[0].name, admin_password: generatePassword() }));
+            setForm({ ...EMPTY, plan: activePlans[0].name, admin_password: generatePassword() });
           } else {
-            setForm(prev => ({ ...prev, plan: '', admin_password: generatePassword() }));
+            setForm({ ...EMPTY, plan: '', admin_password: generatePassword() });
           }
         })
         .catch(err => {
@@ -43,7 +49,31 @@ export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating
     }
   }, [isOpen]);
 
-  const set = (key) => (e) => setForm(prev => ({ ...prev, [key]: e.target.value }));
+  const set = (key) => (e) => {
+    setForm(prev => ({ ...prev, [key]: e.target.value }));
+    if (localErrors[key]) {
+      setLocalErrors(prev => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    }
+    // Cross-clear duplicate phone alerts on typing
+    if (key === 'admin_phone' && localErrors.contact_phone) {
+      setLocalErrors(prev => {
+        const next = { ...prev };
+        delete next.contact_phone;
+        return next;
+      });
+    }
+    if (key === 'contact_phone' && localErrors.admin_phone) {
+      setLocalErrors(prev => {
+        const next = { ...prev };
+        delete next.admin_phone;
+        return next;
+      });
+    }
+  };
 
   const refreshPassword = useCallback(() => {
     setForm(prev => ({ ...prev, admin_password: generatePassword() }));
@@ -101,7 +131,15 @@ export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-text-secondary uppercase">Contact Phone</label>
-            <Input placeholder="e.g. 9900000001" value={form.contact_phone} onChange={set('contact_phone')} />
+            <Input
+              placeholder="e.g. 9900000001"
+              value={form.contact_phone}
+              onChange={set('contact_phone')}
+              className={localErrors?.contact_phone ? 'border-red-500 ring-1 ring-red-500' : ''}
+            />
+            {localErrors?.contact_phone && (
+              <p className="text-[10px] font-bold text-red-500 mt-0.5">{localErrors.contact_phone}</p>
+            )}
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-text-secondary uppercase">School Owner Email Address *</label>
@@ -111,10 +149,10 @@ export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating
               value={form.contact_email}
               onChange={set('contact_email')}
               required
-              className={validationErrors?.contact_email ? 'border-red-500 ring-1 ring-red-500' : ''}
+              className={localErrors?.contact_email ? 'border-red-500 ring-1 ring-red-500' : ''}
             />
-            {validationErrors?.contact_email && (
-              <p className="text-[10px] font-bold text-red-500 mt-0.5">{validationErrors.contact_email}</p>
+            {localErrors?.contact_email && (
+              <p className="text-[10px] font-bold text-red-500 mt-0.5">{localErrors.contact_email}</p>
             )}
           </div>
         </div>
@@ -130,10 +168,10 @@ export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating
                 value={form.admin_phone}
                 onChange={set('admin_phone')}
                 required
-                className={validationErrors?.admin_phone ? 'border-red-500 ring-1 ring-red-500' : ''}
+                className={localErrors?.admin_phone ? 'border-red-500 ring-1 ring-red-500' : ''}
               />
-              {validationErrors?.admin_phone && (
-                <p className="text-[10px] font-bold text-red-500 mt-0.5">{validationErrors.admin_phone}</p>
+              {localErrors?.admin_phone && (
+                <p className="text-[10px] font-bold text-red-500 mt-0.5">{localErrors.admin_phone}</p>
               )}
             </div>
             <div className="space-y-1.5">

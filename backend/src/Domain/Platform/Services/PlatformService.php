@@ -175,14 +175,13 @@ class PlatformService extends BaseService
 
         $pdo = $this->schools->getPdo();
 
+        $errors = [];
+
         // Check if email already exists in users table
         $stmtEmail = $pdo->prepare("SELECT COUNT(*) FROM users WHERE email = :email");
         $stmtEmail->execute([':email' => $data['contact_email']]);
         if ((int)$stmtEmail->fetchColumn() > 0) {
-            throw new \App\Shared\Exceptions\ValidationException(
-                ['contact_email' => 'This email address is already registered.'],
-                'Validation failed.'
-            );
+            $errors['contact_email'] = 'This email address is already registered. Please use a different email address.';
         }
 
         // Check if admin phone already exists in users table
@@ -190,11 +189,13 @@ class PlatformService extends BaseService
             $stmtPhone = $pdo->prepare("SELECT COUNT(*) FROM users WHERE phone = :phone");
             $stmtPhone->execute([':phone' => $data['admin_phone']]);
             if ((int)$stmtPhone->fetchColumn() > 0) {
-                throw new \App\Shared\Exceptions\ValidationException(
-                    ['admin_phone' => 'This phone number is already registered.'],
-                    'Validation failed.'
-                );
+                $errors['admin_phone'] = 'This mobile number is already registered. Please use a different mobile number.';
+                $errors['contact_phone'] = 'This mobile number is already registered. Please use a different mobile number.';
             }
+        }
+
+        if (!empty($errors)) {
+            throw new \App\Shared\Exceptions\ValidationException($errors, 'Validation failed.');
         }
 
         $subdomain = strtolower((string) $data['subdomain']);
