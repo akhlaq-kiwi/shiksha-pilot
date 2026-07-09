@@ -111,6 +111,10 @@ return function (App $app) {
     $app->get('/api/school/exams-new/{id}/class-status', [SchoolAdminController::class, 'getExamClassStatuses']);
     $app->get('/api/school/exams-new/{id}/instructions', [SchoolAdminController::class, 'getExamInstructions']);
     $app->post('/api/school/exams-new/{id}/instructions', [SchoolAdminController::class, 'saveExamInstructions']);
+    $app->get('/api/school/exams-new/{id}/seating-plan', [SchoolAdminController::class, 'getSeatingPlan']);
+    $app->post('/api/school/exams-new/{id}/seating-plan/preview', [SchoolAdminController::class, 'previewSeatingPlan']);
+    $app->post('/api/school/exams-new/{id}/seating-plan', [SchoolAdminController::class, 'generateSeatingPlan']);
+    $app->delete('/api/school/exams-new/{id}/seating-plan', [SchoolAdminController::class, 'deleteSeatingPlan']);
     
     // Grade configurations
     $app->get('/api/school/grade-configurations', [SchoolAdminController::class, 'getGradeConfigurations']);

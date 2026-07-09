@@ -8606,5 +8606,388 @@ Only approve the settlement after reviewing all financial records.
         
         return $staffName;
     }
+
+    public function previewSeatingPlan(array $user, int $examId, array $data): array
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        $classIds = $data['classes'] ?? [];
+        $studentsPerBench = (int)($data['students_per_bench'] ?? 2);
+        $roomConfigs = $data['room_configs'] ?? [];
+
+        if (empty($classIds)) {
+            throw new ValidationException(['classes' => 'Please select at least one class.']);
+        }
+        if (empty($roomConfigs)) {
+            throw new ValidationException(['room_configs' => 'Please configure at least one room.']);
+        }
+
+        // Count active students per class
+        $classCounts = [];
+        $totalStudents = 0;
+        $maxClassStudents = 0;
+
+        $placeholders = implode(',', array_map('intval', $classIds));
+        $stmtCount = $pdo->prepare("
+            SELECT class_id, COUNT(*) as count 
+            FROM students 
+            WHERE school_id = :sid AND class_id IN ({$placeholders}) AND status = 'ACTIVE'
+            GROUP BY class_id
+        ");
+        $stmtCount->execute([':sid' => $schoolId]);
+        $counts = $stmtCount->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($counts as $c) {
+            $classCounts[(int)$c['class_id']] = (int)$c['count'];
+            $totalStudents += (int)$c['count'];
+            if ((int)$c['count'] > $maxClassStudents) {
+                $maxClassStudents = (int)$c['count'];
+            }
+        }
+
+        // Calculate available benches
+        $availableBenches = 0;
+        foreach ($roomConfigs as $rc) {
+            $availableBenches += (int)($rc['bench_count'] ?? 0);
+        }
+
+        // Benches required: ceiling of total_students / students_per_bench
+        $requiredBenches = (int)ceil($totalStudents / $studentsPerBench);
+        $remaining = $availableBenches - $requiredBenches;
+        $enough = $availableBenches >= $requiredBenches;
+
+        // Perform mock calculation to get room utilization details
+        $calculated = $this->generateSeatingPlanData($schoolId, $examId, $classIds, $studentsPerBench, $roomConfigs);
+
+        return [
+            'total_students' => $totalStudents,
+            'students_per_bench' => $studentsPerBench,
+            'required_benches' => $requiredBenches,
+            'available_benches' => $availableBenches,
+            'remaining' => $remaining,
+            'enough_benches' => $enough,
+            'room_details' => $calculated['room_details']
+        ];
+    }
+
+    public function generateSeatingPlan(array $user, int $examId, array $data): array
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+        $academicYearId = $workingYear ? (int)$workingYear['id'] : 0;
+
+        if ($academicYearId === 0) {
+            throw new ValidationException(['academic_year' => 'No active academic year found.']);
+        }
+
+        $classIds = $data['classes'] ?? [];
+        $studentsPerBench = (int)($data['students_per_bench'] ?? 2);
+        $roomConfigs = $data['room_configs'] ?? [];
+
+        if (empty($classIds)) {
+            throw new ValidationException(['classes' => 'Please select at least one class.']);
+        }
+        if (empty($roomConfigs)) {
+            throw new ValidationException(['room_configs' => 'Please configure at least one room.']);
+        }
+
+        // Perform seating plan generation data calculations
+        $calculated = $this->generateSeatingPlanData($schoolId, $examId, $classIds, $studentsPerBench, $roomConfigs);
+        $totalStudents = $calculated['total_students'];
+        
+        $maxClassStudents = 0;
+        $classCounts = [];
+        $placeholders = implode(',', array_map('intval', $classIds));
+        $stmtCount = $pdo->prepare("
+            SELECT class_id, COUNT(*) as count 
+            FROM students 
+            WHERE school_id = :sid AND class_id IN ({$placeholders}) AND status = 'ACTIVE'
+            GROUP BY class_id
+        ");
+        $stmtCount->execute([':sid' => $schoolId]);
+        $counts = $stmtCount->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($counts as $c) {
+            if ((int)$c['count'] > $maxClassStudents) {
+                $maxClassStudents = (int)$c['count'];
+            }
+        }
+
+        $availableBenches = 0;
+        foreach ($roomConfigs as $rc) {
+            $availableBenches += (int)($rc['bench_count'] ?? 0);
+        }
+
+        $requiredBenches = (int)ceil($totalStudents / $studentsPerBench);
+
+        if ($availableBenches < $requiredBenches) {
+            throw new ValidationException(['benches' => 'Insufficient benches available to generate the seating plan.']);
+        }
+
+        $pdo->beginTransaction();
+        try {
+            // Delete existing seating plan (cascades to allocations)
+            $stmtDel = $pdo->prepare("DELETE FROM examination_seating_plans WHERE exam_id = :exam_id");
+            $stmtDel->execute([':exam_id' => $examId]);
+
+            // Save new seating plan
+            $stmtInsPlan = $pdo->prepare("
+                INSERT INTO examination_seating_plans (school_id, exam_id, academic_year_id, students_per_bench, room_configs)
+                VALUES (:school_id, :exam_id, :academic_year_id, :students_per_bench, :room_configs)
+            ");
+            $stmtInsPlan->execute([
+                ':school_id' => $schoolId,
+                ':exam_id' => $examId,
+                ':academic_year_id' => $academicYearId,
+                ':students_per_bench' => $studentsPerBench,
+                ':room_configs' => json_encode($roomConfigs)
+            ]);
+
+            $seatingPlanId = (int)$pdo->lastInsertId();
+
+            // Save allocations
+            if (!empty($calculated['allocations'])) {
+                $stmtInsAlloc = $pdo->prepare("
+                    INSERT INTO examination_seating_allocations (seating_plan_id, student_id, room_name, bench_number, seat_position, seat_number)
+                    VALUES (:seating_plan_id, :student_id, :room_name, :bench_number, :seat_position, :seat_number)
+                ");
+                foreach ($calculated['allocations'] as $alloc) {
+                    $stmtInsAlloc->execute([
+                        ':seating_plan_id' => $seatingPlanId,
+                        ':student_id' => $alloc['student_id'],
+                        ':room_name' => $alloc['room_name'],
+                        ':bench_number' => $alloc['bench_number'],
+                        ':seat_position' => $alloc['seat_position'],
+                        ':seat_number' => $alloc['seat_number']
+                    ]);
+                }
+            }
+
+            $pdo->commit();
+        } catch (\Exception $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+
+        return ['success' => true];
+    }
+
+    public function getSeatingPlan(array $user, int $examId): ?array
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        $stmtPlan = $pdo->prepare("
+            SELECT * FROM examination_seating_plans 
+            WHERE exam_id = :exam_id AND school_id = :sid 
+            LIMIT 1
+        ");
+        $stmtPlan->execute([':exam_id' => $examId, ':sid' => $schoolId]);
+        $plan = $stmtPlan->fetch(PDO::FETCH_ASSOC);
+
+        if (!$plan) {
+            return null;
+        }
+
+        $plan['room_configs'] = json_decode($plan['room_configs'], true);
+
+        $stmtAlloc = $pdo->prepare("
+            SELECT sa.*, s.name AS student_name, s.roll_no, s.class_id, s.photo_path AS student_photo, c.name AS class_name
+            FROM examination_seating_allocations sa
+            LEFT JOIN students s ON sa.student_id = s.id
+            LEFT JOIN classes c ON s.class_id = c.id
+            WHERE sa.seating_plan_id = :spid
+            ORDER BY sa.room_name ASC, sa.bench_number ASC, sa.seat_position ASC
+        ");
+        $stmtAlloc->execute([':spid' => $plan['id']]);
+        $allocations = $stmtAlloc->fetchAll(PDO::FETCH_ASSOC);
+
+        $stmtSchool = $pdo->prepare("SELECT name, logo_path FROM schools WHERE id = :sid LIMIT 1");
+        $stmtSchool->execute([':sid' => $schoolId]);
+        $school = $stmtSchool->fetch(PDO::FETCH_ASSOC);
+
+        $stmtExam = $pdo->prepare("SELECT name FROM examinations WHERE id = :exam_id LIMIT 1");
+        $stmtExam->execute([':exam_id' => $examId]);
+        $examName = $stmtExam->fetchColumn();
+
+        return [
+            'plan' => $plan,
+            'allocations' => $allocations,
+            'school_name' => $school['name'] ?? '',
+            'school_logo' => $school['logo_path'] ?? null,
+            'exam_name' => $examName ?: ''
+        ];
+    }
+
+    public function deleteSeatingPlan(array $user, int $examId): array
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        $pdo->beginTransaction();
+        try {
+            $stmtDel = $pdo->prepare("DELETE FROM examination_seating_plans WHERE exam_id = :exam_id AND school_id = :sid");
+            $stmtDel->execute([':exam_id' => $examId, ':sid' => $schoolId]);
+            $pdo->commit();
+        } catch (\Exception $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+
+        return ['success' => true];
+    }
+
+    private function generateSeatingPlanData(int $schoolId, int $examId, array $classIds, int $studentsPerBench, array $roomConfigs): array
+    {
+        $pdo = $this->classRepo->getPdo();
+
+        $studentsByClass = [];
+        foreach ($classIds as $classId) {
+            $studentsByClass[$classId] = [];
+        }
+
+        $placeholders = implode(',', array_map('intval', $classIds));
+        if (empty($placeholders)) {
+            return [
+                'allocations' => [],
+                'room_details' => [],
+                'total_allocated' => 0,
+                'total_students' => 0
+            ];
+        }
+
+        $stmt = $pdo->prepare("
+            SELECT s.id, s.name, s.roll_no, s.class_id, s.photo_path AS student_photo, c.name AS class_name
+            FROM students s
+            LEFT JOIN classes c ON s.class_id = c.id
+            WHERE s.school_id = :sid 
+              AND s.class_id IN ({$placeholders}) 
+              AND s.status = 'ACTIVE'
+            ORDER BY s.class_id ASC, COALESCE(CAST(s.roll_no AS UNSIGNED), 999999) ASC, s.roll_no ASC, s.name ASC
+        ");
+        $stmt->execute([':sid' => $schoolId]);
+        $allStudents = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($allStudents as $stu) {
+            $studentsByClass[$stu['class_id']][] = $stu;
+        }
+
+        $activeClassQueues = [];
+        foreach ($studentsByClass as $classId => $queue) {
+            if (!empty($queue)) {
+                $activeClassQueues[$classId] = $queue;
+            }
+        }
+
+        $seats = [];
+        $roomDetails = [];
+
+        foreach ($roomConfigs as $rc) {
+            $roomName = $rc['room_name'];
+            $benchCount = (int)$rc['bench_count'];
+            $capacity = $benchCount * $studentsPerBench;
+
+            $roomDetails[$roomName] = [
+                'room_name' => $roomName,
+                'bench_count' => $benchCount,
+                'capacity' => $capacity,
+                'allocated' => 0,
+                'remaining' => $capacity
+            ];
+
+            for ($b = 1; $b <= $benchCount; $b++) {
+                if ($studentsPerBench === 1) {
+                    $positions = ['L'];
+                } elseif ($studentsPerBench === 2) {
+                    $positions = ['L', 'R'];
+                } else {
+                    $positions = ['L', 'M', 'R'];
+                }
+
+                foreach ($positions as $pos) {
+                    $seats[] = [
+                        'room_name' => $roomName,
+                        'bench_number' => $b,
+                        'seat_position' => $pos,
+                        'seat_number' => "B-{$b}-{$pos}"
+                    ];
+                }
+            }
+        }
+
+        $benches = [];
+        foreach ($seats as $seat) {
+            $key = $seat['room_name'] . '|||' . $seat['bench_number'];
+            if (!isset($benches[$key])) {
+                $benches[$key] = [
+                    'room_name' => $seat['room_name'],
+                    'bench_number' => $seat['bench_number'],
+                    'seats' => []
+                ];
+            }
+            $benches[$key]['seats'][] = $seat;
+        }
+
+        $allocations = [];
+        $totalAllocated = 0;
+
+        foreach ($benches as $benchKey => $benchData) {
+            $roomName = $benchData['room_name'];
+            $benchNo = $benchData['bench_number'];
+            $benchSeats = $benchData['seats'];
+            $seatCount = count($benchSeats);
+
+            uasort($activeClassQueues, function($a, $b) {
+                return count($b) <=> count($a);
+            });
+
+            $selectedClasses = [];
+            $i = 0;
+            foreach ($activeClassQueues as $classId => $queue) {
+                if ($i >= $seatCount) {
+                    break;
+                }
+                if (!empty($queue)) {
+                    $selectedClasses[] = $classId;
+                    $i++;
+                }
+            }
+
+            for ($sIdx = 0; $sIdx < count($selectedClasses); $sIdx++) {
+                $classId = $selectedClasses[$sIdx];
+                $student = array_shift($activeClassQueues[$classId]);
+
+                if (empty($activeClassQueues[$classId])) {
+                    unset($activeClassQueues[$classId]);
+                }
+
+                $seat = $benchSeats[$sIdx];
+                $allocations[] = [
+                    'student_id' => $student['id'],
+                    'student_name' => $student['name'],
+                    'student_photo' => $student['student_photo'] ?? null,
+                    'roll_no' => $student['roll_no'],
+                    'class_id' => $student['class_id'],
+                    'class_name' => $student['class_name'],
+                    'room_name' => $seat['room_name'],
+                    'bench_number' => $seat['bench_number'],
+                    'seat_position' => $seat['seat_position'],
+                    'seat_number' => $seat['seat_number']
+                ];
+
+                $roomDetails[$seat['room_name']]['allocated']++;
+                $roomDetails[$seat['room_name']]['remaining']--;
+                $totalAllocated++;
+            }
+        }
+
+        return [
+            'allocations' => $allocations,
+            'room_details' => array_values($roomDetails),
+            'total_allocated' => $totalAllocated,
+            'total_students' => count($allStudents)
+        ];
+    }
 }
 

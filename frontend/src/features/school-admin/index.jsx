@@ -15,6 +15,7 @@ import StaffPage from './pages/StaffPage';
 import TimetablePage from './pages/TimetablePage';
 import AttendancePage from './pages/AttendancePage';
 import ExamsPage from './pages/ExamsPage';
+import SeatingPlanPage from './pages/SeatingPlanPage';
 import FinancePage from './pages/FinancePage';
 import ReportsPage from './pages/ReportsPage';
 import FinancialReportsPage from './pages/FinancialReportsPage';
@@ -288,9 +289,13 @@ export default function SchoolAdminPortal() {
       <button
         key={item.path}
         onClick={() => nav(item.path)}
-        className={`flex items-center justify-start gap-3 pl-1 pr-3 py-2 rounded-lg text-sm font-semibold transition-all flex-shrink-0 w-full text-left ${active ? 'bg-zinc-900 text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900' : 'text-text-secondary hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800'}`}
+        className={`flex items-center justify-start gap-3 py-2 rounded-lg transition-all flex-shrink-0 w-full text-left ${
+          item.isSubmenu 
+            ? 'pl-8 pr-3 text-xs font-medium text-text-secondary dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800' 
+            : 'pl-1 pr-3 text-sm font-semibold text-text-secondary hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800'
+        } ${active ? 'bg-zinc-900 text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900 font-bold' : ''}`}
       >
-        <Icon className="h-4 w-4 flex-shrink-0" />
+        <Icon className={`flex-shrink-0 ${item.isSubmenu ? 'h-3.5 w-3.5 ml-1' : 'h-4 w-4'}`} />
         <span>{item.label}</span>
       </button>
     );
@@ -369,6 +374,7 @@ export default function SchoolAdminPortal() {
             <Route path="timetable" element={<TimetablePage />} />
             <Route path="attendance" element={<AttendancePage />} />
             <Route path="exams" element={<ExamsPage />} />
+            <Route path="exams/seating-plan" element={<SeatingPlanPage />} />
             <Route path="finance" element={<FinancePage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="audits-settings" element={<AuditsSettingsPage onYearsUpdated={() => refreshYears()} />} />

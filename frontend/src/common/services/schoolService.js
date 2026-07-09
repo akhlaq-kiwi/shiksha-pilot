@@ -161,6 +161,22 @@ export const schoolService = {
     return apiClient.post(`/api/school/exams-new/${examId}/instructions?class_id=${classId}`, data);
   },
 
+  getSeatingPlan(examId) {
+    return apiClient.get(`/api/school/exams-new/${examId}/seating-plan`);
+  },
+
+  previewSeatingPlan(examId, data) {
+    return apiClient.post(`/api/school/exams-new/${examId}/seating-plan/preview`, data);
+  },
+
+  generateSeatingPlan(examId, data) {
+    return apiClient.post(`/api/school/exams-new/${examId}/seating-plan`, data);
+  },
+
+  deleteSeatingPlan(examId) {
+    return apiClient.delete(`/api/school/exams-new/${examId}/seating-plan`);
+  },
+
   getGradeConfigurations() {
     return apiClient.get('/api/school/grade-configurations');
   },

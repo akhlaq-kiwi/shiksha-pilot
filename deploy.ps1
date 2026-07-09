@@ -103,13 +103,8 @@ Write-Host "Archiving deployment package..." -ForegroundColor Yellow
 # Cleanup temp folder
 Remove-Item $TEMP_DIR -Recurse -Force
 
-# 5. Upload to Hostinger remote server
-Write-Host "Uploading package to remote server..." -ForegroundColor Yellow
-& scp.exe -P $SSH_PORT $TAR_FILE "${SSH_USER}@${SSH_HOST}:${REMOTE_PATH}/"
-
-# 6. Extract package on remote server and run migrations
-Write-Host "Extracting package on remote server and running database migrations..." -ForegroundColor Yellow
-$EXTRACT_CMD = "cd $REMOTE_PATH && rm -rf assets api index.html && tar -xzf deploy.tar.gz && rm deploy.tar.gz && echo 'Running composer install...' && composer install --no-dev --optimize-autoloader --working-dir=$REMOTE_PATH/api && echo 'Running migrations...' && php api/src/Database/migrate.php"
-& ssh.exe -p $SSH_PORT "${SSH_USER}@${SSH_HOST}" $EXTRACT_CMD
+# 5. Run Python deployment script to upload and extract
+Write-Host "Uploading and deploying using deploy_qa.py..." -ForegroundColor Yellow
+python deploy_qa.py
 
 Write-Host "QA deployment completed successfully!" -ForegroundColor Green

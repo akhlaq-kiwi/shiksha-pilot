@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Plus, ArrowLeft, Calendar, Clock, BookOpen, UserCheck, 
   Settings, Award, Printer, Trash, FileText, CheckCircle, 
-  XCircle, Save, AlertCircle, Edit3, Trash2, LayoutDashboard, ChevronRight, Download, X
+  XCircle, Save, AlertCircle, Edit3, Trash2, LayoutDashboard, ChevronRight, Download, X,
+  Users
 } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
@@ -574,6 +576,7 @@ const CalendarDatePicker = ({ value, onChange, min, max, required, className, on
 };
 
 export default function ExamsPage() {
+  const navigate = useNavigate();
   const { isReadOnly } = useAcademicYear();
   const [activeView, setActiveView] = useState('dashboard'); // 'dashboard', 'classes', 'timetable', 'marks', 'reports'
   
@@ -591,6 +594,7 @@ export default function ExamsPage() {
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const [examClassStatuses, setExamClassStatuses] = useState([]);
+  const [hasSeatingPlan, setHasSeatingPlan] = useState(false);
 
   // Dialog States
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -734,8 +738,12 @@ export default function ExamsPage() {
     setPendingValidationSource('');
     setLoading(true);
     try {
-      const statuses = await schoolService.getExamClassStatuses(exam.id);
+      const [statuses, planDetails] = await Promise.all([
+        schoolService.getExamClassStatuses(exam.id),
+        schoolService.getSeatingPlan(exam.id).catch(() => null)
+      ]);
       setExamClassStatuses(statuses || []);
+      setHasSeatingPlan(!!(planDetails && planDetails.plan));
       if (statuses && statuses.length > 0) {
         setSelectedClassId(statuses[0].id.toString());
       }
@@ -2138,6 +2146,34 @@ export default function ExamsPage() {
                           <AlertCircle className="h-4 w-4" /> Move to Draft
                         </Button>
                       )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* CARD 5: Seating Plan */}
+                <Card className="hover:border-primary/20 transition-all shadow-xs flex flex-col justify-between">
+                  <CardContent className="p-6 space-y-4 flex-1 flex flex-col justify-between">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-primary">
+                        <Users className="h-5 w-5" />
+                        <h4 className="text-base font-bold text-text-primary">Seating Plan</h4>
+                      </div>
+                      <p className="text-xs text-text-secondary leading-relaxed">
+                        Generate examination seating arrangements, room allocation, student seating slips, and printable seating plans.
+                      </p>
+                    </div>
+                    <div className="pt-2">
+                      <Button 
+                        className="w-full flex items-center justify-center gap-2 text-xs font-bold" 
+                        onClick={() => navigate('/school-admin/exams/seating-plan', { 
+                          state: { 
+                            examId: selectedExam.id, 
+                            view: hasSeatingPlan ? 'slips' : 'config' 
+                          } 
+                        })}
+                      >
+                        <Users className="h-4 w-4" /> {hasSeatingPlan ? 'Open Seating Plan' : 'Create Seating Plan'}
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>

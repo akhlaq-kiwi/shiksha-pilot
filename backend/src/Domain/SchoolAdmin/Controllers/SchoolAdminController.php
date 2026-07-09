@@ -1168,6 +1168,44 @@ class SchoolAdminController extends BaseController
         return $this->success($response, null, 'Examination instructions saved successfully');
     }
 
+    public function previewSeatingPlan(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $examId = (int)$args['id'];
+        $body = RequestParser::body($request);
+        $data = $this->service->previewSeatingPlan($user, $examId, $body);
+        return $this->success($response, $data);
+    }
+
+    public function generateSeatingPlan(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $examId = (int)$args['id'];
+        $body = RequestParser::body($request);
+        $data = $this->service->generateSeatingPlan($user, $examId, $body);
+        return $this->success($response, $data, 'Seating plan generated successfully');
+    }
+
+    public function getSeatingPlan(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $examId = (int)$args['id'];
+        $data = $this->service->getSeatingPlan($user, $examId);
+        return $this->success($response, $data);
+    }
+
+    public function deleteSeatingPlan(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $examId = (int)$args['id'];
+        $data = $this->service->deleteSeatingPlan($user, $examId);
+        return $this->success($response, $data, 'Seating plan deleted successfully');
+    }
+
     public function getSchoolAuditLogs(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
