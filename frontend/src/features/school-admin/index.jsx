@@ -325,7 +325,7 @@ export default function SchoolAdminPortal() {
     <div className="flex flex-col md:flex-row gap-6 w-full min-h-[calc(100vh-140px)]">
 
       {/* Sidebar */}
-      <aside className="w-full md:w-[240px] flex-shrink-0 flex flex-col justify-between border-r border-border pr-4 md:pr-10 pb-6 pt-2 md:sticky md:top-24 md:h-[calc(100vh-180px)]">
+      <aside className="w-full md:w-[240px] flex-shrink-0 flex flex-col justify-between border-r border-border pr-4 pb-6 pt-2 md:sticky md:top-24 md:h-[calc(100vh-180px)]">
         <div className="overflow-y-auto scrollbar-none flex-1 min-h-0">
           <nav className="flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 scrollbar-none">
             {NAV_ITEMS.map(navBtn)}
