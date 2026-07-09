@@ -631,7 +631,7 @@ export default function SeatingPlanPage() {
 
                   {/* Validation Warning Message */}
                   {totalEnteredBenches < requiredBenches && (
-                    <div className="p-3.5 bg-red-500/10 border border-red-500/20 text-red-600 rounded-lg text-xs font-semibold flex items-center gap-2">
+                    <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 rounded-lg text-xs font-semibold flex items-center gap-2">
                       <AlertCircle className="h-4 w-4 flex-shrink-0" />
                       <span>You still need to distribute {remainingBenches} more benches before continuing.</span>
                     </div>
