@@ -30,7 +30,7 @@ except Exception as e:
 if not connected:
     try:
         print("Attempting connection using password from environment...")
-        password = "Ga@1219!"
+        password = "Billu@9012"
         ssh.connect(hostname, port=port, username=username, password=password, timeout=15)
         connected = True
         print("Connected successfully via password!")

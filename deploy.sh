@@ -7,7 +7,7 @@ set -e
 SSH_USER="u554613359"
 SSH_HOST="92.249.46.170"
 SSH_PORT="65002"
-SSH_PASS='Ga@1219!'
+SSH_PASS='Billu@9012'
 REMOTE_PATH="/home/u554613359/domains/qa.shikshapilot.com/public_html"
 
 # SMTP Configuration (not stored in .qa.env)
