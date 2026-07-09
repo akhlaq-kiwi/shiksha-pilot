@@ -51,11 +51,14 @@ export default function SeatingPlanPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Initial data loading
+  // Unified initial data & seating plan loading
   useEffect(() => {
     const loadInitialData = async () => {
       try {
         setLoading(true);
+        setError('');
+        
+        // 1. Fetch initial configuration lists
         const [examsList, classesList, studentsList] = await Promise.all([
           schoolService.getExaminations(),
           schoolAdminService.getClasses(),
@@ -64,63 +67,47 @@ export default function SeatingPlanPage() {
         setExams(examsList || []);
         setClasses(classesList || []);
         setStudents(studentsList || []);
+
+        // 2. Pre-select exam and load its seating plan if passed via router state
+        const passedExamId = location.state?.examId;
+        if (passedExamId) {
+          const examIdStr = String(passedExamId);
+          setSelectedExamId(examIdStr);
+
+          const planDetails = await schoolService.getSeatingPlan(examIdStr);
+          if (planDetails && planDetails.plan) {
+            setGeneratedPlan(planDetails);
+            // Pre-populate configs
+            setSelectedClassIds(planDetails.plan.room_configs ? planDetails.plan.room_configs.map(rc => rc.class_id).filter(Boolean) : []);
+            setStudentsPerBench(String(planDetails.plan.students_per_bench));
+            setRoomConfigs(planDetails.plan.room_configs || []);
+            setRoomCount(String(planDetails.plan.room_configs ? planDetails.plan.room_configs.length : 1));
+            setSelectedRoomFilter('all');
+
+            // Respect passed view state from navigation
+            if (location.state?.view) {
+              setCurrentView(location.state.view);
+            } else {
+              setCurrentView('slips');
+            }
+          } else {
+            setGeneratedPlan(null);
+            setPreviewData(null);
+            setCurrentView('config');
+          }
+        } else {
+          setCurrentView('config');
+        }
       } catch (err) {
-        console.error(err);
+        console.error('Failed to load initial configuration data:', err);
         setError('Failed to load initial configuration data.');
       } finally {
         setLoading(false);
       }
     };
+
     loadInitialData();
-  }, []);
-
-  // Pre-select exam if passed via router state from dashboard
-  useEffect(() => {
-    if (location.state?.examId) {
-      setSelectedExamId(String(location.state.examId));
-    }
   }, [location.state]);
-
-  // When selected exam changes, fetch existing seating plan if any
-  useEffect(() => {
-    if (!selectedExamId) {
-      setGeneratedPlan(null);
-      setPreviewData(null);
-      return;
-    }
-
-    const checkExistingPlan = async () => {
-      try {
-        setError('');
-        const planDetails = await schoolService.getSeatingPlan(selectedExamId);
-        if (planDetails && planDetails.plan) {
-          setGeneratedPlan(planDetails);
-          // Pre-populate configs just in case they want to edit
-          setSelectedClassIds(planDetails.plan.room_configs ? planDetails.plan.room_configs.map(rc => rc.class_id).filter(Boolean) : []);
-          setStudentsPerBench(String(planDetails.plan.students_per_bench));
-          setRoomConfigs(planDetails.plan.room_configs || []);
-          setRoomCount(String(planDetails.plan.room_configs ? planDetails.plan.room_configs.length : 1));
-          setSelectedRoomFilter('all');
-
-          // Respect passed view parameter if specified, otherwise show slips since plan exists
-          if (location.state?.view) {
-            setCurrentView(location.state.view);
-          } else {
-            setCurrentView('slips');
-          }
-        } else {
-          setGeneratedPlan(null);
-          setPreviewData(null);
-          setCurrentView('config');
-        }
-      } catch (err) {
-        console.error('Failed to fetch seating plan details', err);
-        setGeneratedPlan(null);
-        setCurrentView('config');
-      }
-    };
-    checkExistingPlan();
-  }, [selectedExamId, location.state]);
 
   // Handle class selection checkbox toggle
   const handleClassToggle = (classId) => {
