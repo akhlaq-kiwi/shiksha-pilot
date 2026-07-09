@@ -838,22 +838,15 @@ class SchoolAdminService extends BaseService
                 $section = trim($matches[2]);
             }
             
-            $stmtClass = $pdo->prepare("SELECT id FROM classes WHERE school_id = :school_id AND name = :name AND (section = :section OR (section IS NULL AND :section_null = 1)) LIMIT 1");
-            $stmtClass->execute([
-                ':school_id' => $schoolId,
-                ':name' => $finalName,
-                ':section' => $section,
-                ':section_null' => $section === null ? 1 : 0
-            ]);
-            $existingClassId = $stmtClass->fetchColumn();
-            if ($existingClassId !== false) {
-                $classId = (int)$existingClassId;
+            $existingClassId = $this->findClassByNameAndSection($pdo, $schoolId, $academicYearId > 0 ? $academicYearId : null, $finalName, $section);
+            if ($existingClassId !== null) {
+                $classId = $existingClassId;
             } else {
                 $insStmt = $pdo->prepare("INSERT INTO classes (school_id, name, section, academic_year_id) VALUES (:school_id, :name, :section, :academic_year_id)");
                 $insStmt->execute([
                     ':school_id' => $schoolId,
-                    ':name' => $finalName,
-                    ':section' => $section,
+                    ':name' => trim($finalName),
+                    ':section' => $section !== null ? trim((string)$section) : null,
                     ':academic_year_id' => $academicYearId > 0 ? $academicYearId : null
                 ]);
                 $classId = (int)$pdo->lastInsertId();
@@ -1068,22 +1061,15 @@ class SchoolAdminService extends BaseService
                 $section = trim($matches[2]);
             }
             
-            $stmtClass = $pdo->prepare("SELECT id FROM classes WHERE school_id = :school_id AND name = :name AND (section = :section OR (section IS NULL AND :section_null = 1)) LIMIT 1");
-            $stmtClass->execute([
-                ':school_id' => $schoolId,
-                ':name' => $finalName,
-                ':section' => $section,
-                ':section_null' => $section === null ? 1 : 0
-            ]);
-            $existingClassId = $stmtClass->fetchColumn();
-            if ($existingClassId !== false) {
-                $classId = (int)$existingClassId;
+            $existingClassId = $this->findClassByNameAndSection($pdo, $schoolId, $academicYearId > 0 ? $academicYearId : null, $finalName, $section);
+            if ($existingClassId !== null) {
+                $classId = $existingClassId;
             } else {
                 $insStmt = $pdo->prepare("INSERT INTO classes (school_id, name, section, academic_year_id) VALUES (:school_id, :name, :section, :academic_year_id)");
                 $insStmt->execute([
                     ':school_id' => $schoolId,
-                    ':name' => $finalName,
-                    ':section' => $section,
+                    ':name' => trim($finalName),
+                    ':section' => $section !== null ? trim((string)$section) : null,
                     ':academic_year_id' => $academicYearId > 0 ? $academicYearId : null
                 ]);
                 $classId = (int)$pdo->lastInsertId();
@@ -1803,23 +1789,9 @@ class SchoolAdminService extends BaseService
                 $secVal = null;
             }
 
-            // Check if combination already exists to prevent duplicates
-            $stmtCheck = $pdo->prepare("
-                SELECT id FROM classes 
-                WHERE school_id = :school_id AND name = :name 
-                AND (section = :section OR (section IS NULL AND :section_null = 1)) 
-                LIMIT 1
-            ");
-            $stmtCheck->execute([
-                ':school_id' => $schoolId,
-                ':name' => trim((string)$data['name']),
-                ':section' => $secVal,
-                ':section_null' => $secVal === null ? 1 : 0
-            ]);
-            $existsId = $stmtCheck->fetchColumn();
-
-            if ($existsId !== false) {
-                $lastInsertedClass = $this->classRepo->findById((int)$existsId);
+            $existsId = $this->findClassByNameAndSection($pdo, $schoolId, $academicYearId, (string)$data['name'], $secVal, $data['stream'] ?? null);
+            if ($existsId !== null) {
+                $lastInsertedClass = $this->classRepo->findById($existsId);
                 continue;
             }
 
@@ -2371,23 +2343,15 @@ class SchoolAdminService extends BaseService
                             }
 
                             if ($nextClassName !== null) {
-                                $stmtFindClass = $pdo->prepare("SELECT id FROM classes WHERE school_id = :sid AND academic_year_id = :new_ay_id AND name = :name AND (section = :section OR (section IS NULL AND :section_null = 1)) LIMIT 1");
-                                $stmtFindClass->execute([
-                                    ':sid' => $schoolId,
-                                    ':new_ay_id' => $newYearId,
-                                    ':name' => $nextClassName,
-                                    ':section' => $section,
-                                    ':section_null' => $section === null ? 1 : 0
-                                ]);
-                                $fId = $stmtFindClass->fetchColumn();
-                                if ($fId !== false) {
-                                    $newClassId = (int)$fId;
+                                $fId = $this->findClassByNameAndSection($pdo, $schoolId, $newYearId, $nextClassName, $section, $stuInfo['stream'] ?? null);
+                                if ($fId !== null) {
+                                    $newClassId = $fId;
                                 } else {
                                     $stmtCreateC = $pdo->prepare("INSERT INTO classes (school_id, name, section, academic_year_id) VALUES (:sid, :name, :section, :new_ay_id)");
                                     $stmtCreateC->execute([
                                         ':sid' => $schoolId,
-                                        ':name' => $nextClassName,
-                                        ':section' => $section,
+                                        ':name' => trim($nextClassName),
+                                        ':section' => $section !== null ? trim((string)$section) : null,
                                         ':new_ay_id' => $newYearId
                                     ]);
                                     $newClassId = (int)$pdo->lastInsertId();
@@ -2399,23 +2363,15 @@ class SchoolAdminService extends BaseService
                             $section = $stuInfo['section'];
 
                             if (!empty($currentClassName)) {
-                                $stmtFindClass = $pdo->prepare("SELECT id FROM classes WHERE school_id = :sid AND academic_year_id = :new_ay_id AND name = :name AND (section = :section OR (section IS NULL AND :section_null = 1)) LIMIT 1");
-                                $stmtFindClass->execute([
-                                    ':sid' => $schoolId,
-                                    ':new_ay_id' => $newYearId,
-                                    ':name' => $currentClassName,
-                                    ':section' => $section,
-                                    ':section_null' => $section === null ? 1 : 0
-                                ]);
-                                $fId = $stmtFindClass->fetchColumn();
-                                if ($fId !== false) {
-                                    $newClassId = (int)$fId;
+                                $fId = $this->findClassByNameAndSection($pdo, $schoolId, $newYearId, $currentClassName, $section, $stuInfo['stream'] ?? null);
+                                if ($fId !== null) {
+                                    $newClassId = $fId;
                                 } else {
                                     $stmtCreateC = $pdo->prepare("INSERT INTO classes (school_id, name, section, academic_year_id) VALUES (:sid, :name, :section, :new_ay_id)");
                                     $stmtCreateC->execute([
                                         ':sid' => $schoolId,
-                                        ':name' => $currentClassName,
-                                        ':section' => $section,
+                                        ':name' => trim($currentClassName),
+                                        ':section' => $section !== null ? trim((string)$section) : null,
                                         ':new_ay_id' => $newYearId
                                     ]);
                                     $newClassId = (int)$pdo->lastInsertId();
@@ -4308,24 +4264,11 @@ class SchoolAdminService extends BaseService
                 $processedIds[] = (int)$oc['id'];
                 $lastClass = $this->classRepo->findById((int)$oc['id']);
             } else {
-                // Check if there is an existing one under the new name already to prevent duplicates
-                $stmtCheck = $pdo->prepare("
-                    SELECT id FROM classes 
-                    WHERE school_id = :school_id AND name = :name 
-                    AND (section = :section OR (section IS NULL AND :section_null = 1)) 
-                    LIMIT 1
-                ");
-                $stmtCheck->execute([
-                    ':school_id' => $schoolId,
-                    ':name' => $newName,
-                    ':section' => $dbSecVal,
-                    ':section_null' => $dbSecVal === null ? 1 : 0
-                ]);
-                $existsId = $stmtCheck->fetchColumn();
+                $existsId = $this->findClassByNameAndSection($pdo, $schoolId, $academicYearId, $newName, $dbSecVal, $oc['stream'] ?? null);
 
-                if ($existsId !== false) {
-                    $processedIds[] = (int)$existsId;
-                    $lastClass = $this->classRepo->findById((int)$existsId);
+                if ($existsId !== null) {
+                    $processedIds[] = $existsId;
+                    $lastClass = $this->classRepo->findById($existsId);
                 } else {
                     // Create new section
                     $id = $this->classRepo->create([
@@ -8836,6 +8779,40 @@ Only approve the settlement after reviewing all financial records.
         }
 
         return ['success' => true];
+    }
+
+    private function findClassByNameAndSection(PDO $pdo, int $schoolId, ?int $academicYearId, string $name, ?string $section, ?string $stream = null): ?int
+    {
+        $name = trim($name);
+        $section = $section !== null ? trim((string)$section) : '';
+        $stream = $stream !== null ? trim((string)$stream) : '';
+        
+        $sql = "SELECT id FROM classes 
+                WHERE school_id = :sid 
+                  AND TRIM(name) = :name 
+                  AND TRIM(COALESCE(section, '')) = :section
+                  AND TRIM(COALESCE(stream, '')) = :stream";
+                  
+        $params = [
+            ':sid' => $schoolId,
+            ':name' => $name,
+            ':section' => $section,
+            ':stream' => $stream
+        ];
+        
+        if ($academicYearId !== null) {
+            $sql .= " AND academic_year_id = :ayid";
+            $params[':ayid'] = $academicYearId;
+        } else {
+            $sql .= " AND academic_year_id IS NULL";
+        }
+        
+        $sql .= " LIMIT 1";
+        
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $id = $stmt->fetchColumn();
+        return $id !== false ? (int)$id : null;
     }
 
     private function generateSeatingPlanData(int $schoolId, int $examId, array $classIds, int $studentsPerBench, array $roomConfigs): array
