@@ -447,7 +447,7 @@ export default function FinancePage() {
                       {formatCurrency(s.outstanding_dues)}
                     </TableCell>
                     <TableCell className="py-3.5">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase border ${getStatusBadgeStyles(s.calculated_status)}`}>
+                      <span className={`inline-flex items-center justify-center w-[74px] py-0.5 rounded-full text-[9px] font-black uppercase border ${getStatusBadgeStyles(s.calculated_status)}`}>
                         {s.calculated_status}
                       </span>
                     </TableCell>
