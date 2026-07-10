@@ -930,7 +930,9 @@ export default function TimetablePage() {
                 </div>
               </div>
 
-              {isDayLocked ? (
+              {loading || !dateStr ? (
+                <div className="h-9 w-full bg-zinc-100 dark:bg-zinc-850 rounded-xl animate-pulse mt-4"></div>
+              ) : isDayLocked ? (
                 <div className="flex items-center justify-center gap-1.5 py-3 mt-4 border-t border-border bg-zinc-500/5 text-zinc-500 text-xs font-bold font-sans rounded-b-2xl">
                   <Lock className="h-3.5 w-3.5" />
                   <span>Schedule locked (Past day)</span>
