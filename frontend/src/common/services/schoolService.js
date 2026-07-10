@@ -385,6 +385,10 @@ export const schoolService = {
     return apiClient.put(`/api/school/fee-follow-ups/${id}/extend`, data);
   },
 
+  updateFeeFollowUpStatus(id, data) {
+    return apiClient.put(`/api/school/fee-follow-ups/${id}/status`, data);
+  },
+
   addFollowUpNote(id, data) {
     return apiClient.post(`/api/school/fee-follow-ups/${id}/notes`, data);
   },

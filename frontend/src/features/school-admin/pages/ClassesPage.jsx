@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Plus, Search, Users, User, X, MoreVertical } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardContent } from '../../../common/ui/card';
@@ -21,15 +22,21 @@ const StudentAvatar = ({ src, name, updatedAt }) => {
         src={cleanUrl} 
         alt={name} 
         onError={() => setError(true)} 
-        className="w-full h-full object-cover" 
+        className="w-8 h-8 rounded-full object-cover border border-border" 
       />
     );
   }
   
-  return <User className="h-10 w-10 text-zinc-400" />;
+  const initials = name ? name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'ST';
+  return (
+    <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-text-secondary flex items-center justify-center font-bold text-xs uppercase border border-border select-none">
+      {initials}
+    </div>
+  );
 };
 
 export default function ClassesPage() {
+  const [searchParams] = useSearchParams();
   const [view, setView] = useState('list'); // 'list', 'roster', 'enroll', 'edit', 'details'
   const [classes, setClasses] = useState([]);
   const [students, setStudents] = useState([]);
@@ -39,6 +46,14 @@ export default function ClassesPage() {
   // Selection states
   const [selectedClassName, setSelectedClassName] = useState('');
   const [selectedStudentId, setSelectedStudentId] = useState(null);
+
+  useEffect(() => {
+    const studentIdParam = searchParams.get('studentId');
+    if (studentIdParam) {
+      setSelectedStudentId(parseInt(studentIdParam, 10));
+      setView('details');
+    }
+  }, [searchParams]);
 
   // New Class Form State (Modal)
   const [showCreateForm, setShowCreateForm] = useState(false);

@@ -136,6 +136,7 @@ return function (App $app) {
     $app->put('/api/school/fee-follow-ups/{id}', [SchoolAdminController::class, 'updateFeeFollowUp']);
     $app->delete('/api/school/fee-follow-ups/{id}', [SchoolAdminController::class, 'deleteFeeFollowUp']);
     $app->put('/api/school/fee-follow-ups/{id}/extend', [SchoolAdminController::class, 'extendFeeFollowUp']);
+    $app->put('/api/school/fee-follow-ups/{id}/status', [SchoolAdminController::class, 'updateFeeFollowUpStatus']);
     $app->post('/api/school/fee-follow-ups/{id}/notes', [SchoolAdminController::class, 'addFollowUpNote']);
     $app->post('/api/school/fee-follow-ups/{id}/contacted', [SchoolAdminController::class, 'markFollowUpContacted']);
     $app->get('/api/school/students/{id}/outstanding-fee', [SchoolAdminController::class, 'getStudentOutstandingFee']);

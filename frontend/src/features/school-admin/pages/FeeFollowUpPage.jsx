@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import { 
   Phone, Eye, Edit2, PhoneCall, CheckCircle, Trash2, Plus, Search, 
   Filter, X, Calendar, DollarSign, User, AlertCircle, FileText, ChevronDown, Check,
@@ -15,6 +16,7 @@ import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 
 export default function FeeFollowUpPage() {
   const toast = useToast();
+  const navigate = useNavigate();
   const { currentYear, academicYears } = useAcademicYear();
 
   // Listing / Filter States
@@ -159,6 +161,22 @@ export default function FeeFollowUpPage() {
       }
     } finally {
       setSubmitting(false);
+    }
+  };
+  const handleStatusChange = async (itemId, newStatus) => {
+    try {
+      await schoolService.updateFeeFollowUpStatus(itemId, { status: newStatus });
+      toast.success(`Status updated to ${newStatus}`);
+      setItems(prev => prev.map(item => {
+        if (item.id === itemId) {
+          return { ...item, status: newStatus };
+        }
+        return item;
+      }));
+      fetchFollowUps(pagination.page);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to update status');
     }
   };
 
@@ -416,21 +434,17 @@ export default function FeeFollowUpPage() {
       {/* Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {[
-          { label: 'Pending Follow-ups', count: stats.pending, color: 'text-blue-600 bg-blue-500/10', icon: Clock, status: 'PENDING' },
-          { label: 'Due Today', count: stats.due_today, color: 'text-orange-600 bg-orange-500/10', icon: AlertCircle, status: 'DUE_TODAY' },
-          { label: 'Upcoming', count: stats.upcoming, color: 'text-purple-600 bg-purple-500/10', icon: Calendar, status: 'UPCOMING' },
-          { label: 'Overdue', count: stats.overdue, color: 'text-red-600 bg-red-500/10 animate-pulse', icon: AlertTriangle, status: 'OVERDUE' },
-          { label: 'Completed', count: stats.completed, color: 'text-emerald-600 bg-emerald-500/10', icon: CheckCircle, status: 'COMPLETED' }
+          { label: 'Pending Follow-ups', count: stats.pending, color: 'text-blue-600 bg-blue-500/10', icon: Clock },
+          { label: 'Due Today', count: stats.due_today, color: 'text-orange-600 bg-orange-500/10', icon: AlertCircle },
+          { label: 'Upcoming', count: stats.upcoming, color: 'text-purple-600 bg-purple-500/10', icon: Calendar },
+          { label: 'Overdue', count: stats.overdue, color: 'text-red-600 bg-red-500/10 animate-pulse', icon: AlertTriangle },
+          { label: 'Completed', count: stats.completed, color: 'text-emerald-600 bg-emerald-500/10', icon: CheckCircle }
         ].map((c, i) => {
           const Icon = c.icon;
-          const isActive = filters.status === c.status;
           return (
             <Card 
               key={i} 
-              onClick={() => handleCardClick(c.status)}
-              className={`shadow-2xs border cursor-pointer select-none transition-all duration-200 bg-surface ${
-                isActive ? 'border-primary ring-2 ring-primary/10 scale-102 z-10' : 'border-border hover:border-zinc-400'
-              }`}
+              className="shadow-2xs border border-border bg-surface select-none"
             >
               <CardContent className="p-4 flex flex-col justify-between h-24">
                 <span className="text-[10px] text-text-muted font-bold uppercase tracking-wider">{c.label}</span>
@@ -449,17 +463,35 @@ export default function FeeFollowUpPage() {
       {/* Filters Section */}
       <Card className="shadow-2xs border border-border bg-surface p-4">
         <CardContent className="p-0">
-          <div className="flex flex-col gap-1.5 max-w-sm">
-            <label className="text-[10px] text-text-secondary font-bold uppercase">Search Student</label>
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-text-muted" />
-              <Input
-                type="text"
-                placeholder="Search by name, admission no or roll no..."
-                value={filters.student_search}
-                onChange={e => setFilters(prev => ({ ...prev, student_search: e.target.value }))}
-                className="pl-8 text-xs font-semibold text-text-primary border border-border bg-surface rounded-lg w-full focus:outline-hidden"
-              />
+          <div className="flex flex-col md:flex-row items-end gap-4 max-w-xl">
+            <div className="flex-1 space-y-1.5 w-full">
+              <label className="text-[10px] text-text-secondary font-bold uppercase">Search Student</label>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-text-muted" />
+                <Input
+                  type="text"
+                  placeholder="Search by name, admission no or roll no..."
+                  value={filters.student_search}
+                  onChange={e => setFilters(prev => ({ ...prev, student_search: e.target.value }))}
+                  className="pl-8 text-xs font-semibold text-text-primary border border-border bg-surface rounded-lg w-full focus:outline-hidden"
+                />
+              </div>
+            </div>
+
+            <div className="w-full md:w-48 space-y-1.5">
+              <label className="text-[10px] text-text-secondary font-bold uppercase">Status Filter</label>
+              <select
+                value={filters.status}
+                onChange={e => setFilters(prev => ({ ...prev, status: e.target.value }))}
+                className="w-full bg-surface border border-border rounded-lg p-2 text-xs font-semibold focus:outline-hidden text-text-primary"
+              >
+                <option value="ALL">All Commitments</option>
+                <option value="PENDING">Pending</option>
+                <option value="COMPLETED">Completed</option>
+                <option value="DUE_TODAY">Due Today</option>
+                <option value="UPCOMING">Upcoming</option>
+                <option value="OVERDUE">Overdue</option>
+              </select>
             </div>
           </div>
         </CardContent>
@@ -483,13 +515,13 @@ export default function FeeFollowUpPage() {
                 <tr className="border-b border-border text-[10px] text-text-muted font-bold uppercase tracking-wider">
                   <th className="py-3 px-4 whitespace-nowrap">Student Name</th>
                   <th className="py-3 px-4 whitespace-nowrap">Class</th>
-                  <th className="py-3 px-4 whitespace-nowrap">Roll Number</th>
+                  <th className="py-3 px-4 whitespace-nowrap">Roll No.</th>
                   <th className="py-3 px-4 whitespace-nowrap">Mobile</th>
-                  <th className="py-3 px-4 text-right whitespace-nowrap">Pending Amount</th>
+                  <th className="py-3 px-4 text-right whitespace-nowrap">Amount</th>
                   <th className="py-3 px-4 whitespace-nowrap">Promise Date</th>
                   <th className="py-3 px-4 whitespace-nowrap">Status</th>
-                  <th className="py-3 px-4 text-center select-none no-pdf whitespace-nowrap">Actions</th>
                   <th className="py-3 px-4 text-center whitespace-nowrap">Extended</th>
+                  <th className="py-3 px-4 text-center select-none no-pdf whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -507,11 +539,15 @@ export default function FeeFollowUpPage() {
                   </tr>
                 ) : (
                   items.map((item) => (
-                    <tr key={item.id} className="hover:bg-hover transition-colors font-medium text-text-secondary">
+                    <tr 
+                      key={item.id} 
+                      onClick={() => navigate(`/school-admin/classes?studentId=${item.student_id}`)}
+                      className="hover:bg-hover transition-colors font-medium text-text-secondary cursor-pointer"
+                    >
                       <td className="py-3.5 px-4 font-bold text-text-primary whitespace-nowrap">{item.student_name}</td>
                       <td className="py-3.5 px-4 text-text-primary uppercase font-bold whitespace-nowrap">{item.class_name || '—'}</td>
-                      <td className="py-3.5 px-4 font-mono whitespace-nowrap">{item.roll_no || '—'}</td>
-                      <td className="py-3.5 px-4 font-mono whitespace-nowrap">{item.mobile_number || '—'}</td>
+                      <td className="py-3.5 px-4 font-mono font-bold text-text-primary whitespace-nowrap">{item.roll_no || '—'}</td>
+                      <td className="py-3.5 px-4 font-mono font-bold text-text-primary whitespace-nowrap">{item.mobile_number || '—'}</td>
                       <td className="py-3.5 px-4 text-right font-mono font-bold text-text-primary whitespace-nowrap">
                         ₹{number_format(item.pending_amount, 2)}
                       </td>
@@ -519,7 +555,8 @@ export default function FeeFollowUpPage() {
                         {new Date(item.promised_date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
                       </td>
                       <td className="py-3.5 px-4 whitespace-nowrap">{getStatusBadge(item.status)}</td>
-                      <td className="py-3.5 px-4 text-center select-none no-pdf relative whitespace-nowrap">
+                      <td className="py-3.5 px-4 text-center font-mono font-bold whitespace-nowrap" onClick={(e) => e.stopPropagation()}>{item.extended_count || 0}</td>
+                      <td className="py-3.5 px-4 text-center select-none no-pdf relative whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         <button 
                           onClick={(ev) => {
                             ev.stopPropagation();
@@ -540,7 +577,6 @@ export default function FeeFollowUpPage() {
                           <MoreVertical className="h-4 w-4 text-text-muted" />
                         </button>
                       </td>
-                      <td className="py-3.5 px-4 text-center font-mono font-bold whitespace-nowrap">{item.extended_count || 0}</td>
                     </tr>
                   ))
                 )}
@@ -963,54 +999,64 @@ export default function FeeFollowUpPage() {
                 >
                   <Eye className="h-3.5 w-3.5 text-text-muted" /> View Details
                 </button>
-                {item.status !== 'COMPLETED' && (
-                  <>
-                    <button 
-                      onClick={() => {
-                        setSelectedItem(item);
-                        setModalMode('edit');
-                        setForm({
-                          student_id: item.student_id,
-                          student_name: item.student_name,
-                          pending_amount: item.pending_amount,
-                          promised_date: item.promised_date,
-                          reason: item.reason,
-                        });
-                        setStudentSearchVal(item.student_name);
-                        setFormErrors({});
-                        setShowAddEditModal(true);
-                        setActiveDropdownId(null);
-                      }}
-                      className="w-full px-3 py-1.5 hover:bg-hover flex items-center gap-1.5 font-semibold text-text-secondary"
-                    >
-                      <Edit2 className="h-3.5 w-3.5 text-text-muted" /> Edit
-                    </button>
-                    <button 
-                      onClick={() => {
-                        handleMarkContacted(item);
-                        setActiveDropdownId(null);
-                      }}
-                      className="w-full px-3 py-1.5 hover:bg-hover flex items-center gap-1.5 font-semibold text-text-secondary"
-                    >
-                      <PhoneCall className="h-3.5 w-3.5 text-text-muted" /> Call Parent
-                    </button>
-                    <button 
-                      onClick={() => {
-                        setSelectedItem(item);
-                        setExtendForm({
-                          promised_date: '',
-                          reason: '',
-                        });
-                        setExtendFormErrors({});
-                        setShowExtendModal(true);
-                        setActiveDropdownId(null);
-                      }}
-                      className="w-full px-3 py-1.5 hover:bg-hover flex items-center gap-1.5 font-semibold text-text-secondary"
-                    >
-                      <Calendar className="h-3.5 w-3.5 text-text-muted" /> Extend Commitment
-                    </button>
-                  </>
+                <button 
+                  onClick={() => {
+                    setSelectedItem(item);
+                    setModalMode('edit');
+                    setForm({
+                      student_id: item.student_id,
+                      student_name: item.student_name,
+                      pending_amount: item.pending_amount,
+                      promised_date: item.promised_date,
+                      reason: item.reason,
+                    });
+                    setStudentSearchVal(item.student_name);
+                    setFormErrors({});
+                    setShowAddEditModal(true);
+                    setActiveDropdownId(null);
+                  }}
+                  className="w-full px-3 py-1.5 hover:bg-hover flex items-center gap-1.5 font-semibold text-text-secondary"
+                >
+                  <Edit2 className="h-3.5 w-3.5 text-text-muted" /> Edit
+                </button>
+                <button 
+                  onClick={() => {
+                    setSelectedItem(item);
+                    setExtendForm({
+                      promised_date: '',
+                      reason: '',
+                    });
+                    setExtendFormErrors({});
+                    setShowExtendModal(true);
+                    setActiveDropdownId(null);
+                  }}
+                  className="w-full px-3 py-1.5 hover:bg-hover flex items-center gap-1.5 font-semibold text-text-secondary"
+                >
+                  <Calendar className="h-3.5 w-3.5 text-text-muted" /> Extend Commitment
+                </button>
+                
+                {item.status === 'COMPLETED' ? (
+                  <button 
+                    onClick={() => {
+                      handleStatusChange(item.id, 'PENDING');
+                      setActiveDropdownId(null);
+                    }}
+                    className="w-full px-3 py-1.5 hover:bg-hover flex items-center gap-1.5 font-semibold text-text-secondary"
+                  >
+                    <Clock className="h-3.5 w-3.5 text-text-muted" /> Mark Pending
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => {
+                      handleStatusChange(item.id, 'COMPLETED');
+                      setActiveDropdownId(null);
+                    }}
+                    className="w-full px-3 py-1.5 hover:bg-hover flex items-center gap-1.5 font-semibold text-text-secondary"
+                  >
+                    <CheckCircle className="h-3.5 w-3.5 text-text-muted" /> Mark Complete
+                  </button>
                 )}
+
                 <button 
                   onClick={() => {
                     setSelectedItem(item);

@@ -9702,30 +9702,71 @@ Only approve the settlement after reviewing all financial records.
 
     public function syncFollowUpStatus(PDO $pdo, int $studentId, int $schoolId): void
     {
-        $stmtAy = $pdo->prepare("SELECT academic_year_id FROM students WHERE id = :id AND school_id = :sid LIMIT 1");
-        $stmtAy->execute([':id' => $studentId, ':sid' => $schoolId]);
-        $ayId = $stmtAy->fetchColumn();
-        if ($ayId === false || $ayId === null) {
-            return;
+        // Automatic status change is disabled: managed manually by teachers.
+    }
+
+    public function updateFeeFollowUpStatus(array $user, int $id, array $data): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->classRepo->getPdo();
+
+        $stmtCheck = $pdo->prepare("SELECT id, status, promised_date FROM fee_follow_ups WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtCheck->execute([':id' => $id, ':sid' => $schoolId]);
+        $followUp = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+        if (!$followUp) {
+            throw new NotFoundException('Fee follow-up not found.');
         }
 
-        $dues = $this->getStudentCurrentOutstandingBalance($pdo, $studentId, $schoolId, (int)$ayId);
-        
-        if ($dues <= 0.0) {
-            $stmtUpdate = $pdo->prepare("
-                UPDATE fee_follow_ups 
-                SET status = 'COMPLETED', completed_at = CURRENT_TIMESTAMP
-                WHERE student_id = :student_id AND school_id = :school_id AND status != 'COMPLETED'
-            ");
-            $stmtUpdate->execute([
-                ':student_id' => $studentId,
-                ':school_id' => $schoolId
-            ]);
-            
-            if ($stmtUpdate->rowCount() > 0) {
-                $this->log('Fee follow-up completed automatically', ['student_id' => $studentId, 'school_id' => $schoolId]);
+        if (empty($data['status'])) {
+            throw new ValidationException(['status' => 'Status is required']);
+        }
+
+        $newStatus = strtoupper(trim($data['status']));
+        if (!in_array($newStatus, ['PENDING', 'COMPLETED', 'DUE_TODAY', 'OVERDUE'], true)) {
+            throw new ValidationException(['status' => 'Invalid status']);
+        }
+
+        if ($newStatus === 'PENDING') {
+            $today = date('Y-m-d');
+            $promisedDate = $followUp['promised_date'];
+            if ($promisedDate > $today) {
+                $newStatus = 'PENDING';
+            } elseif ($promisedDate === $today) {
+                $newStatus = 'DUE_TODAY';
+            } else {
+                $newStatus = 'OVERDUE';
             }
         }
+
+        $completedAt = ($newStatus === 'COMPLETED') ? date('Y-m-d H:i:s') : null;
+
+        $stmtUp = $pdo->prepare("
+            UPDATE fee_follow_ups 
+            SET status = :status, completed_at = :completed_at
+            WHERE id = :id AND school_id = :sid
+        ");
+        $stmtUp->execute([
+            ':status' => $newStatus,
+            ':completed_at' => $completedAt,
+            ':id' => $id,
+            ':sid' => $schoolId
+        ]);
+
+        $creatorId = (int)$user['id'];
+        $logComment = "Status updated manually to " . $newStatus;
+        $stmtNote = $pdo->prepare("
+            INSERT INTO fee_follow_up_notes (follow_up_id, comment, created_by)
+            VALUES (:fid, :comment, :creator)
+        ");
+        $stmtNote->execute([
+            ':fid' => $id,
+            ':comment' => $logComment,
+            ':creator' => $creatorId
+        ]);
+
+        $this->log('Fee follow-up status updated manually', ['id' => $id, 'status' => $newStatus]);
+
+        return ['success' => true];
     }
 }
 
