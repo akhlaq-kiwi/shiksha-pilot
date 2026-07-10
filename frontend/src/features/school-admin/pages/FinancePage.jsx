@@ -159,7 +159,10 @@ export default function FinancePage() {
       if (!paymentsByStudent[p.student_id]) {
         paymentsByStudent[p.student_id] = [];
       }
-      paymentsByStudent[p.student_id].push(p.fee_month);
+      paymentsByStudent[p.student_id].push({
+        fee_month: p.fee_month,
+        academic_year_id: p.academic_year_id
+      });
     }
   });
 
@@ -186,7 +189,7 @@ export default function FinancePage() {
   const hasPreviousYearDuesByStudent = {};
 
   additionalFeePayments.forEach(p => {
-    if (p.status === 'Pending' && (!p.due_date || p.due_date <= todayStr)) {
+    if (p.status === 'Pending' && (!p.due_date || p.due_date <= todayStr || p.fee_name === 'Previous Year Dues')) {
       const studentId = parseInt(p.student_id, 10);
       if (!additionalUnpaidByStudent[studentId]) {
         additionalUnpaidByStudent[studentId] = 0;
@@ -206,7 +209,10 @@ export default function FinancePage() {
 
   // Process students status & outstanding dues
   const processedStudents = students.map(student => {
-    const paidMonths = paymentsByStudent[student.id] || [];
+    const paidMonthsList = paymentsByStudent[student.id] || [];
+    const paidMonths = paidMonthsList
+      .filter(p => parseInt(p.academic_year_id, 10) === parseInt(student.academic_year_id, 10))
+      .map(p => p.fee_month);
     const monthlyFees = feeConfigMap[student.class_id] || {};
     
     // Check if monthly fees are configured at all
