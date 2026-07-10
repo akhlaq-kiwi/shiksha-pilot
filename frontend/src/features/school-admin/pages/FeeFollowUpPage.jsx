@@ -996,9 +996,9 @@ export default function FeeFollowUpPage() {
                     setShowDetailsModal(true);
                     setActiveDropdownId(null);
                   }}
-                  className="w-full px-3 py-1.5 hover:bg-hover flex items-center gap-1.5 font-semibold text-text-secondary"
+                  className="w-full px-3 py-2 hover:bg-hover flex items-center gap-2 font-semibold text-text-secondary select-none text-left leading-none"
                 >
-                  <Eye className="h-3.5 w-3.5 text-text-muted" /> View Details
+                  <Eye className="h-4 w-4 text-text-muted flex-shrink-0" /> View Details
                 </button>
                 <button 
                   onClick={() => {
@@ -1016,9 +1016,9 @@ export default function FeeFollowUpPage() {
                     setShowAddEditModal(true);
                     setActiveDropdownId(null);
                   }}
-                  className="w-full px-3 py-1.5 hover:bg-hover flex items-center gap-1.5 font-semibold text-text-secondary"
+                  className="w-full px-3 py-2 hover:bg-hover flex items-center gap-2 font-semibold text-text-secondary select-none text-left leading-none"
                 >
-                  <Edit2 className="h-3.5 w-3.5 text-text-muted" /> Edit
+                  <Edit2 className="h-4 w-4 text-text-muted flex-shrink-0" /> Edit
                 </button>
                 <button 
                   onClick={() => {
@@ -1031,9 +1031,9 @@ export default function FeeFollowUpPage() {
                     setShowExtendModal(true);
                     setActiveDropdownId(null);
                   }}
-                  className="w-full px-3 py-1.5 hover:bg-hover flex items-center gap-1.5 font-semibold text-text-secondary"
+                  className="w-full px-3 py-2 hover:bg-hover flex items-center gap-2 font-semibold text-text-secondary select-none text-left leading-none"
                 >
-                  <Calendar className="h-3.5 w-3.5 text-text-muted" /> Extend Commitment
+                  <Calendar className="h-4 w-4 text-text-muted flex-shrink-0" /> Extend
                 </button>
                 
                 {item.status === 'COMPLETED' ? (
@@ -1042,9 +1042,9 @@ export default function FeeFollowUpPage() {
                       handleStatusChange(item.id, 'PENDING');
                       setActiveDropdownId(null);
                     }}
-                    className="w-full px-3 py-1.5 hover:bg-hover flex items-center gap-1.5 font-semibold text-text-secondary"
+                    className="w-full px-3 py-2 hover:bg-hover flex items-center gap-2 font-semibold text-text-secondary select-none text-left leading-none"
                   >
-                    <Clock className="h-3.5 w-3.5 text-text-muted" /> Mark Pending
+                    <Clock className="h-4 w-4 text-text-muted flex-shrink-0" /> Mark Pending
                   </button>
                 ) : (
                   <button 
@@ -1052,9 +1052,9 @@ export default function FeeFollowUpPage() {
                       handleStatusChange(item.id, 'COMPLETED');
                       setActiveDropdownId(null);
                     }}
-                    className="w-full px-3 py-1.5 hover:bg-hover flex items-center gap-1.5 font-semibold text-text-secondary"
+                    className="w-full px-3 py-2 hover:bg-hover flex items-center gap-2 font-semibold text-text-secondary select-none text-left leading-none"
                   >
-                    <CheckCircle className="h-3.5 w-3.5 text-text-muted" /> Mark Complete
+                    <CheckCircle className="h-4 w-4 text-text-muted flex-shrink-0" /> Mark Complete
                   </button>
                 )}
 
@@ -1064,9 +1064,9 @@ export default function FeeFollowUpPage() {
                     setShowDeleteModal(true);
                     setActiveDropdownId(null);
                   }}
-                  className="w-full px-3 py-1.5 hover:bg-hover flex items-center gap-1.5 font-semibold text-red-600 border-t border-border mt-1 pt-1.5"
+                  className="w-full px-3 py-2 hover:bg-hover flex items-center gap-2 font-semibold text-red-600 select-none text-left leading-none border-t border-border mt-1 pt-2"
                 >
-                  <Trash2 className="h-3.5 w-3.5 text-red-400" /> Delete
+                  <Trash2 className="h-4 w-4 text-red-400 flex-shrink-0" /> Delete
                 </button>
               </>
             );

@@ -278,8 +278,18 @@ export default function FinancePage() {
 
   // Filter students based on UI selections (Search strictly by Student Name only)
   const filteredStudents = sortedProcessedStudents.filter(student => {
-    const term = searchTerm.toLowerCase().trim();
-    const matchesSearch = !term || (student.name && student.name.toLowerCase().includes(term));
+    const term = searchTerm.toLowerCase().trim().replace(/\s+/g, ' ');
+    let matchesSearch = true;
+    if (term) {
+      const studentName = (student.name || '').toLowerCase().trim().replace(/\s+/g, ' ');
+      const firstName = (student.first_name || '').toLowerCase().trim().replace(/\s+/g, ' ');
+      const lastName = (student.last_name || '').toLowerCase().trim().replace(/\s+/g, ' ');
+      
+      const queryWords = term.split(' ');
+      matchesSearch = queryWords.every(word => 
+        studentName.includes(word) || firstName.includes(word) || lastName.includes(word)
+      );
+    }
     const matchesClass = selectedClassId === 'ALL' || String(student.class_id) === String(selectedClassId);
     const matchesStatus = selectedStatus === 'ALL' || student.calculated_status === selectedStatus;
 
