@@ -937,18 +937,12 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                     </TableCell>
                     <TableCell className="text-right">
                       {!isReadOnly && !!(year.status === 'ACTIVE' || year.is_current) && (
-                        year.migration_status === 'Completed' ? (
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold uppercase bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 border border-border select-none">
-                            Archived
-                          </span>
-                        ) : (
-                          <Button 
-                            onClick={() => handleMigrateClick(year)}
-                            className="h-7 px-3 text-[10px] font-bold bg-primary hover:bg-primary/95 text-white"
-                          >
-                            Migrate
-                          </Button>
-                        )
+                        <Button 
+                          onClick={() => handleMigrateClick(year)}
+                          className="h-7 px-3 text-[10px] font-bold bg-primary hover:bg-primary/95 text-white"
+                        >
+                          Migrate
+                        </Button>
                       )}
                     </TableCell>
                   </TableRow>
