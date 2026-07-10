@@ -3975,8 +3975,8 @@ class SchoolAdminService extends BaseService
         });
 
         // 4. Fetch already paid months
-        $stmtPaid = $pdo->prepare("SELECT fee_month FROM fee_payments WHERE student_id = :student_id AND status = 'PAID'");
-        $stmtPaid->execute([':student_id' => $studentId]);
+        $stmtPaid = $pdo->prepare("SELECT fee_month FROM fee_payments WHERE student_id = :student_id AND status = 'PAID' AND academic_year_id = :academic_year_id");
+        $stmtPaid->execute([':student_id' => $studentId, ':academic_year_id' => $academicYearId]);
         $alreadyPaid = $stmtPaid->fetchAll(PDO::FETCH_COLUMN);
 
         $tempPaid = $alreadyPaid;
