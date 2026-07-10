@@ -682,6 +682,7 @@ export default function FeeFollowUpPage() {
       {/* ADD / EDIT FOLLOW-UP MODAL */}
       {showAddEditModal && (
         <Dialog
+          isOpen={showAddEditModal}
           title={modalMode === 'add' ? 'Create Payment Commitment' : 'Edit Commitment Details'}
           onClose={() => setShowAddEditModal(false)}
         >
@@ -828,6 +829,7 @@ export default function FeeFollowUpPage() {
       {/* VIEW DETAILS & NOTES HISTORY TIMELINE MODAL */}
       {showDetailsModal && selectedItem && (
         <Dialog
+          isOpen={showDetailsModal}
           title="Payment Commitment Details"
           onClose={() => setShowDetailsModal(false)}
         >
@@ -936,6 +938,7 @@ export default function FeeFollowUpPage() {
       {/* DELETE CONFIRMATION MODAL */}
       {showDeleteModal && selectedItem && (
         <Dialog
+          isOpen={showDeleteModal}
           title="Delete Follow-up commitment"
           onClose={() => setShowDeleteModal(false)}
         >
