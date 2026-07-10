@@ -487,7 +487,6 @@ export default function FeeFollowUpPage() {
                 className="w-full bg-surface border border-border rounded-lg p-2 text-xs font-semibold focus:outline-hidden text-text-primary"
               >
                 <option value="ALL">All Commitments</option>
-                <option value="PENDING">Pending</option>
                 <option value="COMPLETED">Completed</option>
                 <option value="DUE_TODAY">Due Today</option>
                 <option value="UPCOMING">Upcoming</option>
