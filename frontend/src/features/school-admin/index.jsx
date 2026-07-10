@@ -177,20 +177,21 @@ function SubscriptionExpiredScreen({ profile }) {
             Your subscription has expired.
           </p>
           <p className="text-sm text-text-secondary leading-relaxed font-medium mt-1">
-            Please purchase a new subscription plan to continue using ShikshaPilot.
+            Please purchase a new subscription plan to continue using <span className="font-extrabold text-text-primary">ShikshaPilot</span>
           </p>
         </div>
 
         <div>
-          <h3 className="text-xs font-bold text-text-muted uppercase tracking-widest mb-6">Available Active Plans</h3>
+          <h3 className="text-xs font-bold text-text-muted uppercase tracking-widest mb-6">Available Plans</h3>
           {loading ? (
             <div className="flex flex-col items-center gap-2 py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Fetching plans...</p>
             </div>
           ) : plans.length === 0 ? (
-            <div className="py-12 border-2 border-dashed border-border bg-surface rounded-2xl text-text-muted text-sm font-medium">
-              No active subscription plans found. Please contact support.
+            <div className="py-12 border border-border bg-surface rounded-2xl text-text-muted text-sm font-semibold max-w-lg mx-auto space-y-1.5 p-6">
+              <p className="text-text-primary font-black">No subscription plans are currently available.</p>
+              <p className="text-xs font-medium">Please contact the Super Admin for assistance.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto text-left">
@@ -201,9 +202,9 @@ function SubscriptionExpiredScreen({ profile }) {
                       <h4 className="text-base font-black text-text-primary font-display">{p.name}</h4>
                       <p className="text-2xl font-black text-text-primary tracking-tight mt-1">
                         ₹{parseFloat(p.price).toLocaleString('en-IN')}
-                        <span className="text-xs font-bold text-text-secondary tracking-normal">/mo</span>
+                        <span className="text-xs font-bold text-text-secondary tracking-normal">/{p.duration_unit}</span>
                       </p>
-                      <p className="text-[10px] text-primary bg-primary/10 px-2 py-0.5 rounded-md inline-block font-extrabold uppercase mt-2.5">
+                      <p className="text-[10px] text-primary font-extrabold uppercase mt-2.5 block">
                         {p.student_limit ? `Up to ${p.student_limit.toLocaleString()} Students` : 'Unlimited Students'}
                       </p>
                     </div>
