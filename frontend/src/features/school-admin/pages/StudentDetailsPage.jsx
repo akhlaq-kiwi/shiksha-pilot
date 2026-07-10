@@ -1277,17 +1277,23 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                       }
                     });
 
-                    const today = new Date();
-                    const yyyy = today.getFullYear();
-                    const mm = String(today.getMonth() + 1).padStart(2, '0');
-                    const dd = String(today.getDate()).padStart(2, '0');
-                    const todayStr = `${yyyy}-${mm}-${dd}`;
                     const additionalFeeDue = (data.additional_fee_payments || [])
-                      .filter(p => p.status === 'Pending' && (p.due_date <= todayStr || p.fee_name === 'Previous Year Dues' || !p.due_date))
+                      .filter(p => p.status === 'Pending')
                       .reduce((sum, p) => sum + parseFloat(p.amount), 0);
 
                     return (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                        <Card 
+                          className="shadow-xs p-5 bg-surface border border-border rounded-2xl flex flex-col justify-between"
+                        >
+                          <div>
+                            <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">
+                              Total Outstanding Dues
+                            </p>
+                            <p className="text-2xl font-black text-red-500 mt-1 font-display">₹{(student.outstanding_balance !== undefined ? parseFloat(student.outstanding_balance) : (monthlyFeeDue + additionalFeeDue)).toLocaleString()}</p>
+                          </div>
+                        </Card>
+
                         <Card 
                           onClick={() => setActiveLedgerTab('monthly')}
                           className={`shadow-xs p-5 bg-surface border flex flex-col justify-between cursor-pointer select-none transition-all duration-200 rounded-2xl ${

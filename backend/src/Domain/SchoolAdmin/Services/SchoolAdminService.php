@@ -430,8 +430,7 @@ class SchoolAdminService extends BaseService
                 }
             }
 
-            // Calculate pending additional fees that are due
-            $today = date('Y-m-d');
+            // Calculate pending additional fees
             if ($activeYear['status'] === 'Archived') {
                 $stmtAddPending = $pdo->prepare("
                     SELECT afp.amount, afp.student_id
@@ -440,12 +439,10 @@ class SchoolAdminService extends BaseService
                     WHERE afp.school_id = :sid
                       AND afp.status = 'Pending'
                       AND aft.academic_year_id = :ayid_fee
-                      AND (aft.due_date <= :today OR aft.name = 'Previous Year Dues')
                 ");
                 $stmtAddPending->execute([
                     ':sid' => $schoolId,
-                    ':ayid_fee' => $activeYear['id'],
-                    ':today' => $today
+                    ':ayid_fee' => $activeYear['id']
                 ]);
                 $addPayments = $stmtAddPending->fetchAll(PDO::FETCH_ASSOC) ?: [];
                 $pendingAddFees = 0.0;
@@ -465,13 +462,11 @@ class SchoolAdminService extends BaseService
                       AND s.status = 'ACTIVE'
                       AND s.academic_year_id = :ayid_stu
                       AND aft.academic_year_id = :ayid_fee
-                      AND (aft.due_date <= :today OR aft.name = 'Previous Year Dues')
                 ");
                 $stmtAddPending->execute([
                     ':sid' => $schoolId,
                     ':ayid_stu' => $activeYear['id'],
-                    ':ayid_fee' => $activeYear['id'],
-                    ':today' => $today
+                    ':ayid_fee' => $activeYear['id']
                 ]);
                 $pendingAddFees = (float)$stmtAddPending->fetchColumn();
             }
@@ -583,6 +578,7 @@ class SchoolAdminService extends BaseService
             $filters['academic_year_id'] = (int)$workingYear['id'];
         }
         $students = $this->studentRepo->findBySchool($schoolId, $filters);
+        $this->calculateOutstandingDuesForStudents($user, $students);
         return $students;
     }
 
@@ -704,6 +700,8 @@ class SchoolAdminService extends BaseService
             $ap['amount'] = (float)$ap['amount'];
             return $ap;
         }, $additionalPayments);
+
+        $student['outstanding_balance'] = $this->getStudentOutstandingBalanceForYear($pdo, $id, $schoolId, $workingYearId);
 
         return [
             'student' => $student,
@@ -2317,7 +2315,7 @@ class SchoolAdminService extends BaseService
                     $studentName = $stuInfo['student_name'] ?? 'Student';
                     
                     if ($action === 'promote' || $action === 'repeat') {
-                        $outstanding = $this->getStudentOutstandingBalanceForYear($pdo, $studentId, $schoolId, $prevYearId);
+                        $outstanding = $this->getStudentOutstandingBalanceForYear($pdo, $studentId, $schoolId, $prevYearId, true);
                         
                         $newClassId = null;
                         if ($action === 'promote') {
@@ -2679,7 +2677,7 @@ class SchoolAdminService extends BaseService
         }
     }
 
-    public function getStudentOutstandingBalanceForYear(PDO $pdo, int $studentId, int $schoolId, int $academicYearId): float
+    public function getStudentOutstandingBalanceForYear(PDO $pdo, int $studentId, int $schoolId, int $academicYearId, bool $evaluateAllMonths = false): float
     {
         $stmtStu = $pdo->prepare("SELECT class_id FROM students WHERE id = :id AND school_id = :sid LIMIT 1");
         $stmtStu->execute([':id' => $studentId, ':sid' => $schoolId]);
@@ -2716,8 +2714,19 @@ class SchoolAdminService extends BaseService
         $paidMonths = $stmtPaid->fetchAll(PDO::FETCH_COLUMN);
 
         $academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+        
+        $monthsToEvaluate = $academicMonths;
+        if (!$evaluateAllMonths) {
+            $stmtAY = $pdo->prepare("SELECT start_date, end_date, status FROM academic_years WHERE id = :ayid AND school_id = :sid LIMIT 1");
+            $stmtAY->execute([':ayid' => $academicYearId, ':sid' => $schoolId]);
+            $ayRow = $stmtAY->fetch(PDO::FETCH_ASSOC);
+            if ($ayRow) {
+                $monthsToEvaluate = $this->getMonthsDueUpToCurrent($ayRow['start_date'], $ayRow['end_date'], $ayRow['status']);
+            }
+        }
+
         $outstanding = 0.0;
-        foreach ($academicMonths as $m) {
+        foreach ($monthsToEvaluate as $m) {
             if (!in_array($m, $paidMonths, true)) {
                 $outstanding += isset($monthlyFees[$m]) ? (float)$monthlyFees[$m] : 0.0;
             }
@@ -2740,6 +2749,133 @@ class SchoolAdminService extends BaseService
         $outstanding += (float)$stmtAddPending->fetchColumn();
 
         return $outstanding;
+    }
+
+    public function calculateOutstandingDuesForStudents(array $user, array &$students): void
+    {
+        if (empty($students)) {
+            return;
+        }
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->studentRepo->getPdo();
+        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+        if (!$workingYear) {
+            foreach ($students as &$s) {
+                $s['outstanding_balance'] = 0.0;
+                $s['fee_status'] = '—';
+            }
+            return;
+        }
+
+        $academicYearId = (int)$workingYear['id'];
+        $monthsToEvaluate = $this->getMonthsDueUpToCurrent($workingYear['start_date'], $workingYear['end_date'], $workingYear['status']);
+
+        // 1. Fetch class configs for this school and year
+        $stmtCfg = $pdo->prepare("
+            SELECT class_id, monthly_fees FROM class_fee_configurations 
+            WHERE school_id = :sid AND academic_year_id = :ayid
+        ");
+        $stmtCfg->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+        $configs = $stmtCfg->fetchAll(PDO::FETCH_ASSOC);
+        $classConfigs = [];
+        foreach ($configs as $cfg) {
+            $classConfigs[$cfg['class_id']] = json_decode($cfg['monthly_fees'], true);
+        }
+
+        // 2. Fetch all paid months for these students in this academic year
+        $studentIds = array_column($students, 'id');
+        $studentIdsStr = implode(',', array_map('intval', $studentIds));
+
+        $stmtPaid = $pdo->prepare("
+            SELECT student_id, fee_month FROM fee_payments 
+            WHERE status = 'PAID' AND school_id = :sid AND academic_year_id = :ayid AND student_id IN ($studentIdsStr)
+        ");
+        $stmtPaid->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+        $paidRows = $stmtPaid->fetchAll(PDO::FETCH_ASSOC);
+        $paidMap = [];
+        $studentPaidCount = [];
+        foreach ($paidRows as $row) {
+            $paidMap[$row['student_id']][] = $row['fee_month'];
+            if (!isset($studentPaidCount[$row['student_id']])) {
+                $studentPaidCount[$row['student_id']] = 0;
+            }
+            $studentPaidCount[$row['student_id']]++;
+        }
+
+        // 3. Fetch all pending additional fees for these students in this academic year
+        $stmtAdd = $pdo->prepare("
+            SELECT afp.student_id, SUM(afp.amount) AS total_add, COUNT(afp.id) AS pending_add_count
+            FROM additional_fee_payments afp
+            JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+            WHERE afp.status = 'Pending' AND afp.school_id = :sid AND aft.academic_year_id = :ayid AND afp.student_id IN ($studentIdsStr)
+            GROUP BY afp.student_id
+        ");
+        $stmtAdd->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+        $addRows = $stmtAdd->fetchAll(PDO::FETCH_ASSOC);
+        $addMap = [];
+        $pendingAddCountMap = [];
+        foreach ($addRows as $row) {
+            $addMap[$row['student_id']] = (float)$row['total_add'];
+            $pendingAddCountMap[$row['student_id']] = (int)$row['pending_add_count'];
+        }
+
+        // 4. Fetch all paid additional fees count for hasPayments flag
+        $stmtPaidAdd = $pdo->prepare("
+            SELECT student_id, COUNT(id) AS paid_add_count 
+            FROM additional_fee_payments 
+            WHERE status = 'Paid' AND school_id = :sid AND student_id IN ($studentIdsStr)
+            GROUP BY student_id
+        ");
+        $stmtPaidAdd->execute([':sid' => $schoolId]);
+        $paidAddRows = $stmtPaidAdd->fetchAll(PDO::FETCH_ASSOC);
+        $paidAddCountMap = [];
+        foreach ($paidAddRows as $row) {
+            $paidAddCountMap[$row['student_id']] = (int)$row['paid_add_count'];
+        }
+
+        // 5. Compute outstanding for each student
+        foreach ($students as &$s) {
+            $studentId = (int)$s['id'];
+            $classId = isset($s['class_id']) ? (int)$s['class_id'] : 0;
+            $outstanding = 0.0;
+            
+            $hasConfiguredFees = false;
+            if ($classId && isset($classConfigs[$classId])) {
+                $monthlyFees = $classConfigs[$classId];
+                $hasConfiguredFees = !empty($monthlyFees) && array_sum(array_map('floatval', array_values($monthlyFees))) > 0;
+                
+                $paidMonths = $paidMap[$studentId] ?? [];
+                foreach ($monthsToEvaluate as $m) {
+                    if (!in_array($m, $paidMonths, true)) {
+                        $outstanding += isset($monthlyFees[$m]) ? (float)$monthlyFees[$m] : 0.0;
+                    }
+                }
+            }
+
+            $outstanding += $addMap[$studentId] ?? 0.0;
+            $s['outstanding_balance'] = $outstanding;
+
+            // Determine status
+            $paidMonthsCount = $studentPaidCount[$studentId] ?? 0;
+            $paidAddCount = $paidAddCountMap[$studentId] ?? 0;
+            $hasPayments = ($paidMonthsCount > 0 || $paidAddCount > 0);
+
+            $status = 'PAID';
+            if (!$hasConfiguredFees) {
+                if ($outstanding > 0) {
+                    $status = $hasPayments ? 'PARTIAL' : 'PENDING';
+                } else {
+                    $status = '—';
+                }
+            } else if ($outstanding > 0) {
+                if ($hasPayments) {
+                    $status = 'PARTIAL';
+                } else {
+                    $status = 'PENDING';
+                }
+            }
+            $s['fee_status'] = $status;
+        }
     }
 
     public function activateAcademicYear(array $user, int $newYearId, array $body): array

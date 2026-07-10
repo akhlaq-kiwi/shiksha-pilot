@@ -206,46 +206,10 @@ export default function FinancePage() {
 
   // Process students status & outstanding dues
   const processedStudents = students.map(student => {
-    const paidMonths = paymentsByStudent[student.id] || [];
-    const monthlyFees = feeConfigMap[student.class_id] || {};
-    
-    // Check if monthly fees are configured at all
-    const hasConfiguredFees = Object.keys(monthlyFees).length > 0 && Object.values(monthlyFees).some(v => parseFloat(v) > 0);
-
-    let unpaidCount = 0;
-    let outstandingDues = 0;
-
-    monthsToEvaluate.forEach(m => {
-      if (!paidMonths.includes(m)) {
-        const amt = monthlyFees[m] !== undefined ? parseFloat(monthlyFees[m]) : 0;
-        if (amt > 0) {
-          unpaidCount++;
-          outstandingDues += amt;
-        }
-      }
-    });
-
-    const unpaidAddAmt = additionalUnpaidByStudent[student.id] || 0;
-    outstandingDues += unpaidAddAmt;
-
-    const paidAddCount = additionalFeePayments.filter(p => parseInt(p.student_id, 10) === student.id && p.status === 'Paid').length;
-    const hasPayments = paidMonths.length > 0 || paidAddCount > 0;
-
-    let status = 'PAID';
-    if (!hasConfiguredFees) {
-      status = '—';
-    } else if (outstandingDues > 0) {
-      if (hasPayments) {
-        status = 'PARTIAL';
-      } else {
-        status = 'PENDING';
-      }
-    }
-
     return {
       ...student,
-      outstanding_dues: outstandingDues,
-      calculated_status: status
+      outstanding_dues: student.outstanding_balance !== undefined ? parseFloat(student.outstanding_balance) : 0,
+      calculated_status: student.fee_status || '—'
     };
   });
 
