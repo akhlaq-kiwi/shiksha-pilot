@@ -19,6 +19,28 @@ const getLocalDateStr = () => {
   return `${year}-${month}-${day}`;
 };
 
+const getWeekDates = (baseDateStr) => {
+  if (!baseDateStr) return {};
+  const [year, month, day] = baseDateStr.split('-').map(Number);
+  const baseDate = new Date(year, month - 1, day);
+  const dayOfWeek = baseDate.getDay();
+  const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday = new Date(baseDate);
+  monday.setDate(baseDate.getDate() + diffToMonday);
+  
+  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const dates = {};
+  days.forEach((dayName, idx) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + idx);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dateNum = String(d.getDate()).padStart(2, '0');
+    dates[dayName] = `${y}-${m}-${dateNum}`;
+  });
+  return dates;
+};
+
 export default function TimetablePage() {
   const { currentYear, isReadOnly } = useAcademicYear();
   const toast = useToast();
@@ -191,10 +213,17 @@ export default function TimetablePage() {
 
   // Check if a resolved Sunday is in the past
   const checkIsPastWeek = () => {
-    if (!timetableData || !timetableData.Sunday) return false;
-    const sundayDate = timetableData.Sunday.date;
-    const todayStr = new Date().toISOString().substring(0, 10);
-    return sundayDate < todayStr;
+    if (!currentDate) return false;
+    const weekDates = getWeekDates(currentDate);
+    if (!weekDates.Monday) return false;
+    const [year, month, day] = weekDates.Monday.split('-').map(Number);
+    const sunday = new Date(year, month - 1, day);
+    sunday.setDate(sunday.getDate() + 6);
+    const y = sunday.getFullYear();
+    const m = String(sunday.getMonth() + 1).padStart(2, '0');
+    const dateNum = String(sunday.getDate()).padStart(2, '0');
+    const sundayDateStr = `${y}-${m}-${dateNum}`;
+    return sundayDateStr < getLocalDateStr();
   };
 
   const isWeekLocked = checkIsPastWeek() || isReadOnly;
@@ -646,8 +675,9 @@ export default function TimetablePage() {
 
   // Render Date range headers
   const getWeekRangeStr = () => {
-    if (!timetableData || !timetableData.Monday || !timetableData.Saturday) return 'Loading range...';
-    return `${formatLocalDate(timetableData.Monday.date)} – ${formatLocalDate(timetableData.Saturday.date)}`;
+    const weekDates = getWeekDates(currentDate);
+    if (!weekDates.Monday || !weekDates.Saturday) return 'Loading range...';
+    return `${formatLocalDate(weekDates.Monday)} – ${formatLocalDate(weekDates.Saturday)}`;
   };
 
   return (
@@ -767,8 +797,9 @@ export default function TimetablePage() {
       {/* Six working day cards grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(dayName => {
+          const weekDates = getWeekDates(currentDate);
           const dayData = timetableData[dayName] || { date: '', periods: [] };
-          const dateStr = dayData.date;
+          const dateStr = dayData.date || weekDates[dayName] || '';
           const periodsList = dayData.periods || [];
           const isPublished = periodsList.length > 0 && periodsList.every(p => p.is_published === 1);
           const scheduledNums = periodsList.map(p => p.period_number);
@@ -819,7 +850,7 @@ export default function TimetablePage() {
                     <div>
                       <h3 className="text-xl font-black text-blue-500 dark:text-blue-400 tracking-tight font-display">{dayName}</h3>
                       <p className="text-[10px] text-text-muted font-bold mt-0.5">
-                        {dateStr ? new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
+                        {formatLocalDate(dateStr)}
                       </p>
                     </div>
                   </div>
@@ -930,13 +961,13 @@ export default function TimetablePage() {
                 </div>
               </div>
 
-              {loading || !dateStr ? (
-                <div className="h-9 w-full bg-zinc-100 dark:bg-zinc-850 rounded-xl animate-pulse mt-4"></div>
-              ) : isDayLocked ? (
+              {isDayLocked ? (
                 <div className="flex items-center justify-center gap-1.5 py-3 mt-4 border-t border-border bg-zinc-500/5 text-zinc-500 text-xs font-bold font-sans rounded-b-2xl">
                   <Lock className="h-3.5 w-3.5" />
                   <span>Schedule locked (Past day)</span>
                 </div>
+              ) : loading || !dateStr ? (
+                <div className="h-9 w-full bg-zinc-100 dark:bg-zinc-850 rounded-xl animate-pulse mt-4"></div>
               ) : (
                 <div className="mt-4 pt-3 border-t border-border/80 space-y-2.5">
                   {periodsList.length < periodConfigs.length && (
