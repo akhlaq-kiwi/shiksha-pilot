@@ -157,7 +157,7 @@ const AppLayout = ({ children }) => {
     <div className="min-h-screen flex flex-col bg-background">
       {/* Sticky header */}
       <header className="sticky top-0 z-50 border-b border-border bg-surface">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+        <div className="w-full px-6">
           <div className="flex items-center justify-between h-14 gap-4">
             
             {/* Left side dynamic header */}
@@ -392,7 +392,7 @@ const AppLayout = ({ children }) => {
       )}
 
       {/* Page content */}
-      <main className="flex-1 w-full max-w-7xl mx-auto p-4 sm:p-6 md:p-8">
+      <main className="flex-1 w-full flex flex-col md:flex-row">
         {children}
       </main>
 

@@ -324,10 +324,10 @@ export default function SchoolAdminPortal() {
   const remainingDays = getRemainingDays(profile?.subscription_expiry);
 
   return (
-    <div className="flex flex-col md:flex-row gap-6 w-full min-h-[calc(100vh-140px)]">
+    <div className="flex flex-col md:flex-row w-full min-h-[calc(100vh-56px)] bg-background">
 
       {/* Sidebar */}
-      <aside className="w-full md:w-[240px] flex-shrink-0 flex flex-col justify-between border-r border-border pr-4 pb-6 pt-2 md:sticky md:top-24 md:h-[calc(100vh-180px)]">
+      <aside className="w-full md:w-[240px] flex-shrink-0 flex flex-col justify-between border-r border-border pl-6 pr-4 py-6 bg-surface md:sticky md:top-14 md:h-[calc(100vh-56px)]">
         <div className="overflow-y-auto scrollbar-none flex-1 min-h-0">
           <nav className="flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 scrollbar-none">
             {NAV_ITEMS.map(navBtn)}
@@ -336,7 +336,7 @@ export default function SchoolAdminPortal() {
       </aside>
 
       {/* Main Area */}
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 p-6 md:p-8 max-w-7xl mx-auto w-full">
         {remainingDays !== null && (remainingDays === 7 || remainingDays === 3 || remainingDays === 1) && (
           <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 rounded-2xl text-sm font-semibold flex items-start gap-3 animate-in slide-in-from-top-2 duration-300">
             <AlertCircle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />

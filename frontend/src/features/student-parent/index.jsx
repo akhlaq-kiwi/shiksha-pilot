@@ -161,7 +161,7 @@ function AppSidebar({ currentPage, onNavigate, isParent, user, selectedChild, on
   ];
 
   return (
-    <aside className="w-full md:w-[240px] flex-shrink-0 flex flex-col justify-between border-r border-border pr-6 py-2 space-y-6 md:sticky md:top-24 md:h-[calc(100vh-180px)] md:overflow-y-auto scrollbar-none">
+    <aside className="w-full md:w-[240px] flex-shrink-0 flex flex-col justify-between border-r border-border pl-6 pr-4 py-6 bg-surface md:sticky md:top-14 md:h-[calc(100vh-56px)] md:overflow-y-auto scrollbar-none">
       <div>
         {/* Identity card */}
         <div className="mb-5 p-4 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-border">
@@ -249,7 +249,7 @@ export default function StudentParentPortal() {
   const handlePayNow = () => setCurrentPage('fees');
 
   return (
-    <div className="flex flex-col md:flex-row gap-8 w-full min-h-[calc(100vh-140px)]">
+    <div className="flex flex-col md:flex-row w-full min-h-[calc(100vh-56px)] bg-background">
       <AppSidebar
         currentPage={currentPage}
         onNavigate={setCurrentPage}
@@ -261,7 +261,7 @@ export default function StudentParentPortal() {
         onPayNow={handlePayNow}
       />
 
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 p-6 md:p-8 max-w-7xl mx-auto w-full">
         {currentPage === 'dashboard' && (
           <DashboardPage
             homework={data.homework}

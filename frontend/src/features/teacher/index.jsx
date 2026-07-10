@@ -69,7 +69,7 @@ export default function TeacherPortal() {
   useEffect(() => { loadData(); }, [loadData]);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 max-w-7xl mx-auto w-full p-6 md:p-8">
 
       {/* Portal identity strip */}
       <div className="flex items-center gap-3 pb-1 border-b border-border">

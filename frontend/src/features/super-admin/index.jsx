@@ -147,10 +147,10 @@ export default function SuperAdminPortal() {
     : location.pathname.startsWith(path);
 
   return (
-    <div className="flex flex-col md:flex-row gap-8 w-full min-h-[calc(100vh-140px)]">
+    <div className="flex flex-col md:flex-row w-full min-h-[calc(100vh-56px)] bg-background">
 
       {/* Sidebar */}
-      <aside className="w-full md:w-[240px] flex-shrink-0 flex flex-col justify-between border-r border-border pr-6 py-2 space-y-6 md:sticky md:top-24 md:h-[calc(100vh-180px)] md:overflow-y-auto scrollbar-none">
+      <aside className="w-full md:w-[240px] flex-shrink-0 flex flex-col justify-between border-r border-border pl-6 pr-4 py-6 bg-surface md:sticky md:top-14 md:h-[calc(100vh-56px)] md:overflow-y-auto scrollbar-none">
         <div>
           <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-4 px-3">Management</p>
           <nav className="flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 scrollbar-none">
@@ -173,7 +173,7 @@ export default function SuperAdminPortal() {
       </aside>
 
       {/* Main content */}
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 p-6 md:p-8 max-w-7xl mx-auto w-full">
         {error && (
           <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 text-red-600 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-2">
             <AlertCircle className="h-4 w-4 flex-shrink-0" />
