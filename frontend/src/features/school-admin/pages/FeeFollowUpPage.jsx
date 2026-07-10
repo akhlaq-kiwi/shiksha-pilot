@@ -103,7 +103,7 @@ export default function FeeFollowUpPage() {
       .catch(console.error);
 
     schoolService.getStudents({ limit: 1000 })
-      .then(res => setStudentsList(res.students || []))
+      .then(res => setStudentsList(res || []))
       .catch(console.error);
   }, []);
 
