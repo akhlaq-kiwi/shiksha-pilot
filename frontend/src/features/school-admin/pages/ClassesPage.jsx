@@ -22,14 +22,14 @@ const StudentAvatar = ({ src, name, updatedAt }) => {
         src={cleanUrl} 
         alt={name} 
         onError={() => setError(true)} 
-        className="w-8 h-8 rounded-full object-cover border border-border" 
+        className="w-full h-full object-cover" 
       />
     );
   }
   
   const initials = name ? name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'ST';
   return (
-    <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-text-secondary flex items-center justify-center font-bold text-xs uppercase border border-border select-none">
+    <div className="w-full h-full bg-zinc-100 dark:bg-zinc-800 text-text-secondary flex items-center justify-center font-bold text-lg uppercase select-none">
       {initials}
     </div>
   );
