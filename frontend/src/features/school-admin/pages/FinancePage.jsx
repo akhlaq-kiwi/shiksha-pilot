@@ -59,6 +59,7 @@ export default function FinancePage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClassId, setSelectedClassId] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
+  const [sortByOutstanding, setSortByOutstanding] = useState('NONE');
   
   // Inline Detail View State
   const [selectedStudentId, setSelectedStudentId] = useState(null);
@@ -241,14 +242,8 @@ export default function FinancePage() {
     const hasPayments = paidMonths.length > 0 || paidAddCount > 0;
 
     let status = 'PAID';
-    if (!hasConfiguredFees) {
-      status = '—';
-    } else if (outstandingDues > 0) {
-      if (hasPayments) {
-        status = 'PARTIAL';
-      } else {
-        status = 'PENDING';
-      }
+    if (outstandingDues > 0) {
+      status = 'PENDING';
     }
 
     return {
@@ -266,6 +261,16 @@ export default function FinancePage() {
   });
 
   const sortedProcessedStudents = [...processedStudents].sort((a, b) => {
+    if (sortByOutstanding === 'DESC') {
+      if (b.outstanding_dues !== a.outstanding_dues) {
+        return b.outstanding_dues - a.outstanding_dues;
+      }
+    } else if (sortByOutstanding === 'ASC') {
+      if (a.outstanding_dues !== b.outstanding_dues) {
+        return a.outstanding_dues - b.outstanding_dues;
+      }
+    }
+
     const orderA = classIdOrderMap[a.class_id] !== undefined ? classIdOrderMap[a.class_id] : 999999;
     const orderB = classIdOrderMap[b.class_id] !== undefined ? classIdOrderMap[b.class_id] : 999999;
     if (orderA !== orderB) {
@@ -330,7 +335,7 @@ export default function FinancePage() {
         </div>
 
         {/* Dynamic Filters Row */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="relative">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-text-muted animate-pulse" />
             <Input 
@@ -345,7 +350,7 @@ export default function FinancePage() {
             <Select 
               value={selectedClassId} 
               onChange={e => setSelectedClassId(e.target.value)}
-              className="text-xs cursor-pointer"
+              className="text-xs cursor-pointer font-bold text-text-primary"
             >
               <option value="ALL">All Classes</option>
               {classes.map(c => (
@@ -358,13 +363,23 @@ export default function FinancePage() {
             <Select 
               value={selectedStatus} 
               onChange={e => setSelectedStatus(e.target.value)}
-              className="text-xs cursor-pointer"
+              className="text-xs cursor-pointer font-bold text-text-primary"
             >
               <option value="ALL">All Statuses</option>
               <option value="PAID">PAID</option>
               <option value="PENDING">PENDING</option>
-              <option value="PARTIAL">PARTIAL</option>
-              <option value="—">NOT CONFIGURD (—)</option>
+            </Select>
+          </div>
+
+          <div>
+            <Select 
+              value={sortByOutstanding} 
+              onChange={e => setSortByOutstanding(e.target.value)}
+              className="text-xs cursor-pointer font-bold text-text-primary"
+            >
+              <option value="NONE">Sort Outstanding</option>
+              <option value="DESC">Highest to Lowest</option>
+              <option value="ASC">Lowest to Highest</option>
             </Select>
           </div>
         </div>
