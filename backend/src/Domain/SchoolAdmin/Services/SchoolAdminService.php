@@ -9149,7 +9149,7 @@ Only approve the settlement after reviewing all financial records.
                     LEFT JOIN classes c ON s.class_id = c.id
                     LEFT JOIN users u ON f.created_by = u.id
                     WHERE f.school_id = :sid" . $whereSql . "
-                    ORDER BY f.id DESC 
+                    ORDER BY (CASE WHEN f.status = 'COMPLETED' THEN 1 ELSE 0 END) ASC, f.promised_date ASC, f.id DESC 
                     LIMIT {$limit} OFFSET {$offset}";
 
         $stmtData = $pdo->prepare($dataSql);
