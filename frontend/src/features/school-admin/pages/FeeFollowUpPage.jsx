@@ -711,7 +711,10 @@ export default function FeeFollowUpPage() {
                   {showStudentDropdown && studentSearchVal.trim() !== '' && (
                     <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-surface border border-border rounded-xl shadow-lg z-50">
                       {studentsList
-                        .filter(s => s.name.toLowerCase().includes(studentSearchVal.toLowerCase()) || s.admission_no.toLowerCase().includes(studentSearchVal.toLowerCase()))
+                        .filter(s => 
+                          (s.name && s.name.toLowerCase().includes(studentSearchVal.toLowerCase())) || 
+                          (s.admission_no && s.admission_no.toLowerCase().includes(studentSearchVal.toLowerCase()))
+                        )
                         .slice(0, 10)
                         .map(s => (
                           <div
