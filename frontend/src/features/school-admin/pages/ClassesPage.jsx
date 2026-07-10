@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { Plus, Search, Users, User, X, MoreVertical } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardContent } from '../../../common/ui/card';
@@ -37,6 +37,8 @@ const StudentAvatar = ({ src, name, updatedAt }) => {
 
 export default function ClassesPage() {
   const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [view, setView] = useState('list'); // 'list', 'roster', 'enroll', 'edit', 'details'
   const [classes, setClasses] = useState([]);
   const [students, setStudents] = useState([]);
@@ -254,6 +256,14 @@ export default function ClassesPage() {
       <StudentDetailsPage 
         studentId={selectedStudentId} 
         onBack={async () => {
+          if (location.state && location.state.from) {
+            navigate(location.state.from);
+            return;
+          }
+          if (searchParams.get('studentId')) {
+            navigate('/school-admin/classes');
+            return;
+          }
           await loadData();
           setView('roster');
         }} 

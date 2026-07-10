@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Search, ChevronRight, AlertCircle, Landmark } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
@@ -44,6 +45,8 @@ const SkeletonRow = () => (
 );
 
 export default function FinancePage() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [students, setStudents] = useState([]);
   const [classes, setClasses] = useState([]);
   const [feePayments, setFeePayments] = useState([]);
@@ -426,8 +429,7 @@ export default function FinancePage() {
                     <TableCell className="text-right py-3.5">
                       <button 
                         onClick={() => {
-                          setSelectedStudentId(s.id);
-                          setView('details');
+                          navigate(`/school-admin/classes?studentId=${s.id}`, { state: { from: location.pathname + location.search } });
                         }}
                         className="px-4 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-text-primary border border-border transition-all inline-flex items-center gap-1 leading-none h-[22px]"
                       >

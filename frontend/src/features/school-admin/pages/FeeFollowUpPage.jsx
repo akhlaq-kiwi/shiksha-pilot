@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Phone, Eye, Edit2, PhoneCall, CheckCircle, Trash2, Plus, Search, 
   Filter, X, Calendar, DollarSign, User, AlertCircle, FileText, ChevronDown, Check,
@@ -17,6 +17,7 @@ import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 export default function FeeFollowUpPage() {
   const toast = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const { currentYear, academicYears } = useAcademicYear();
 
   // Listing / Filter States
@@ -541,7 +542,7 @@ export default function FeeFollowUpPage() {
                   items.map((item) => (
                     <tr 
                       key={item.id} 
-                      onClick={() => navigate(`/school-admin/classes?studentId=${item.student_id}`)}
+                      onClick={() => navigate(`/school-admin/classes?studentId=${item.student_id}`, { state: { from: location.pathname + location.search } })}
                       className="hover:bg-hover transition-colors font-medium text-text-secondary cursor-pointer"
                     >
                       <td className="py-3.5 px-4 font-bold text-text-primary whitespace-nowrap">{item.student_name}</td>
