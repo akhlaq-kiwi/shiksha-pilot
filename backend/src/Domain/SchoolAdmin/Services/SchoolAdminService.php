@@ -4027,6 +4027,8 @@ class SchoolAdminService extends BaseService
             $lastPayment = $this->feeRepo->findPaymentById($id);
         }
 
+        $this->syncFollowUpStatus($pdo, $studentId, $schoolId);
+
         if ($lastPayment === null) {
             throw new NotFoundException('Payment not found after recording');
         }
@@ -6728,6 +6730,8 @@ Only approve the settlement after reviewing all financial records.
             $pay['student_id'] = (int)$pay['student_id'];
             $pay['fee_type_id'] = (int)$pay['fee_type_id'];
             $pay['amount'] = (float)$pay['amount'];
+
+            $this->syncFollowUpStatus($pdo, $pay['student_id'], $schoolId);
         }
 
         return $pay ?: [];
@@ -8965,6 +8969,599 @@ Only approve the settlement after reviewing all financial records.
             'total_allocated' => $totalAllocated,
             'total_students' => count($allStudents)
         ];
+    }
+
+    public function getFeeFollowUps(array $user, array $filters): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->classRepo->getPdo();
+        $today = date('Y-m-d');
+
+        // 1. Auto-transition PENDING promised dates that are due today
+        $stmtDue = $pdo->prepare("
+            UPDATE fee_follow_ups 
+            SET status = 'DUE_TODAY' 
+            WHERE school_id = :sid 
+              AND status = 'PENDING' 
+              AND promised_date = :today
+        ");
+        $stmtDue->execute([':sid' => $schoolId, ':today' => $today]);
+
+        // 2. Auto-transition PENDING/DUE_TODAY promised dates that are overdue
+        $stmtOverdue = $pdo->prepare("
+            UPDATE fee_follow_ups 
+            SET status = 'OVERDUE' 
+            WHERE school_id = :sid 
+              AND status IN ('PENDING', 'DUE_TODAY') 
+              AND promised_date < :today
+        ");
+        $stmtOverdue->execute([':sid' => $schoolId, ':today' => $today]);
+
+        // 3. Generate dashboard notifications for DUE_TODAY followups
+        $stmtGetDue = $pdo->prepare("
+            SELECT f.*, s.name AS student_name, c.name AS class_name
+            FROM fee_follow_ups f
+            JOIN students s ON f.student_id = s.id
+            LEFT JOIN classes c ON s.class_id = c.id
+            WHERE f.school_id = :sid AND f.status = 'DUE_TODAY'
+        ");
+        $stmtGetDue->execute([':sid' => $schoolId]);
+        $duesToday = $stmtGetDue->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($duesToday as $d) {
+            $stmtNotifCheck = $pdo->prepare("
+                SELECT COUNT(*) FROM dashboard_notifications 
+                WHERE school_id = :sid 
+                  AND title = 'Fee Follow-up Due Today' 
+                  AND message LIKE :msg
+            ");
+            $likeMsg = '%' . $d['student_name'] . '%';
+            $stmtNotifCheck->execute([':sid' => $schoolId, ':msg' => $likeMsg]);
+            if ((int)$stmtNotifCheck->fetchColumn() === 0) {
+                $stmtInsNotif = $pdo->prepare("
+                    INSERT INTO dashboard_notifications (school_id, user_role, title, message, link)
+                    VALUES (:sid, 'SCHOOL_ADMIN', 'Fee Follow-up Due Today', :msg, :link)
+                ");
+                $msg = "{$d['student_name']} (Class {$d['class_name']}) - ₹" . number_format((float)$d['pending_amount'], 2) . " Pending\nPromise Date: " . date('d M Y', strtotime($d['promised_date']));
+                $link = "/school-admin/fee-follow-ups?id=" . $d['id'];
+                $stmtInsNotif->execute([':sid' => $schoolId, ':msg' => $msg, ':link' => $link]);
+            }
+        }
+
+        // 4. Generate dashboard notifications for OVERDUE followups
+        $stmtGetOverdue = $pdo->prepare("
+            SELECT f.*, s.name AS student_name, c.name AS class_name
+            FROM fee_follow_ups f
+            JOIN students s ON f.student_id = s.id
+            LEFT JOIN classes c ON s.class_id = c.id
+            WHERE f.school_id = :sid AND f.status = 'OVERDUE'
+        ");
+        $stmtGetOverdue->execute([':sid' => $schoolId]);
+        $overdues = $stmtGetOverdue->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($overdues as $o) {
+            $daysOverdue = (int)floor((time() - strtotime($o['promised_date'])) / (60 * 60 * 24));
+            if ($daysOverdue < 0) $daysOverdue = 0;
+            
+            $stmtNotifCheck = $pdo->prepare("
+                SELECT COUNT(*) FROM dashboard_notifications 
+                WHERE school_id = :sid 
+                  AND title = 'Overdue Fee Follow-up' 
+                  AND message LIKE :msg
+            ");
+            $likeMsg = '%' . $o['student_name'] . '%';
+            $stmtNotifCheck->execute([':sid' => $schoolId, ':msg' => $likeMsg]);
+            if ((int)$stmtNotifCheck->fetchColumn() === 0) {
+                $stmtInsNotif = $pdo->prepare("
+                    INSERT INTO dashboard_notifications (school_id, user_role, title, message, link)
+                    VALUES (:sid, 'SCHOOL_ADMIN', 'Overdue Fee Follow-up', :msg, :link)
+                ");
+                $msg = "Student Name: {$o['student_name']}\nPending Amount: ₹" . number_format((float)$o['pending_amount'], 2) . "\nDays Overdue: {$daysOverdue} days";
+                $link = "/school-admin/fee-follow-ups?id=" . $o['id'];
+                $stmtInsNotif->execute([':sid' => $schoolId, ':msg' => $msg, ':link' => $link]);
+            }
+        }
+
+        // Count cards
+        $stmtPending = $pdo->prepare("SELECT COUNT(*) FROM fee_follow_ups WHERE school_id = :sid AND status = 'PENDING'");
+        $stmtPending->execute([':sid' => $schoolId]);
+        $countPending = (int)$stmtPending->fetchColumn();
+
+        $stmtDueToday = $pdo->prepare("SELECT COUNT(*) FROM fee_follow_ups WHERE school_id = :sid AND status = 'DUE_TODAY'");
+        $stmtDueToday->execute([':sid' => $schoolId]);
+        $countDueToday = (int)$stmtDueToday->fetchColumn();
+
+        $stmtOverdueCard = $pdo->prepare("SELECT COUNT(*) FROM fee_follow_ups WHERE school_id = :sid AND status = 'OVERDUE'");
+        $stmtOverdueCard->execute([':sid' => $schoolId]);
+        $countOverdue = (int)$stmtOverdueCard->fetchColumn();
+
+        $stmtUpcoming = $pdo->prepare("SELECT COUNT(*) FROM fee_follow_ups WHERE school_id = :sid AND status = 'PENDING' AND promised_date > :today");
+        $stmtUpcoming->execute([':sid' => $schoolId, ':today' => $today]);
+        $countUpcoming = (int)$stmtUpcoming->fetchColumn();
+
+        $stmtCompleted = $pdo->prepare("SELECT COUNT(*) FROM fee_follow_ups WHERE school_id = :sid AND status = 'COMPLETED'");
+        $stmtCompleted->execute([':sid' => $schoolId]);
+        $countCompleted = (int)$stmtCompleted->fetchColumn();
+
+        $stats = [
+            'pending' => $countPending,
+            'due_today' => $countDueToday,
+            'upcoming' => $countUpcoming,
+            'overdue' => $countOverdue,
+            'completed' => $countCompleted,
+        ];
+
+        // Search & filters
+        $whereSql = "";
+        $whereParams = [':sid' => $schoolId];
+
+        if (!empty($filters['status'])) {
+            if ($filters['status'] === 'UPCOMING') {
+                $whereSql .= " AND f.status = 'PENDING' AND f.promised_date > :today";
+                $whereParams[':today'] = $today;
+            } elseif ($filters['status'] !== 'ALL') {
+                $whereSql .= " AND f.status = :status";
+                $whereParams[':status'] = $filters['status'];
+            }
+        }
+
+        if (!empty($filters['class_id'])) {
+            $whereSql .= " AND s.class_id = :class_id";
+            $whereParams[':class_id'] = (int)$filters['class_id'];
+        }
+
+        if (!empty($filters['academic_year_id'])) {
+            $whereSql .= " AND f.academic_year_id = :academic_year_id";
+            $whereParams[':academic_year_id'] = (int)$filters['academic_year_id'];
+        }
+
+        if (!empty($filters['start_date']) && !empty($filters['end_date'])) {
+            $whereSql .= " AND f.promised_date BETWEEN :start_date AND :end_date";
+            $whereParams[':start_date'] = $filters['start_date'];
+            $whereParams[':end_date'] = $filters['end_date'];
+        }
+
+        if (!empty($filters['student_search'])) {
+            $whereSql .= " AND (s.name LIKE :search OR s.admission_no LIKE :search)";
+            $whereParams[':search'] = '%' . $filters['student_search'] . '%';
+        }
+
+        if (!empty($filters['parent_mobile'])) {
+            $whereSql .= " AND s.mobile LIKE :mobile";
+            $whereParams[':mobile'] = '%' . $filters['parent_mobile'] . '%';
+        }
+
+        // Count total matching
+        $countSql = "SELECT COUNT(*) FROM fee_follow_ups f 
+                     JOIN students s ON f.student_id = s.id 
+                     WHERE f.school_id = :sid" . $whereSql;
+        $stmtCountTotal = $pdo->prepare($countSql);
+        $stmtCountTotal->execute($whereParams);
+        $totalItems = (int)$stmtCountTotal->fetchColumn();
+
+        // Get matching data
+        $page = !empty($filters['page']) ? (int)$filters['page'] : 1;
+        $limit = !empty($filters['limit']) ? (int)$filters['limit'] : 10;
+        $offset = ($page - 1) * $limit;
+
+        $dataSql = "SELECT f.*, s.name AS student_name, s.admission_no, c.name AS class_name, 
+                           s.father_name AS parent_name, s.mobile AS mobile_number, u.name AS creator_name
+                    FROM fee_follow_ups f
+                    JOIN students s ON f.student_id = s.id
+                    LEFT JOIN classes c ON s.class_id = c.id
+                    LEFT JOIN users u ON f.created_by = u.id
+                    WHERE f.school_id = :sid" . $whereSql . "
+                    ORDER BY f.id DESC 
+                    LIMIT {$limit} OFFSET {$offset}";
+
+        $stmtData = $pdo->prepare($dataSql);
+        $stmtData->execute($whereParams);
+        $items = $stmtData->fetchAll(PDO::FETCH_ASSOC);
+
+        return [
+            'stats' => $stats,
+            'items' => $items,
+            'pagination' => [
+                'total_items' => $totalItems,
+                'page' => $page,
+                'limit' => $limit,
+                'total_pages' => (int)ceil($totalItems / $limit)
+            ]
+        ];
+    }
+
+    public function createFeeFollowUp(array $user, array $data): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->classRepo->getPdo();
+
+        if (empty($data['student_id'])) {
+            throw new ValidationException(['student_id' => 'Student is required']);
+        }
+        if (empty($data['promised_date'])) {
+            throw new ValidationException(['promised_date' => 'Promised Payment Date is required']);
+        }
+        if (empty($data['reason'])) {
+            throw new ValidationException(['reason' => 'Reason / Commitment is required']);
+        }
+
+        $studentId = (int)$data['student_id'];
+        $promisedDate = $data['promised_date'];
+        $reason = trim($data['reason']);
+
+        if (strlen($reason) > 500) {
+            throw new ValidationException(['reason' => 'Reason cannot exceed 500 characters.']);
+        }
+
+        $today = date('Y-m-d');
+        if ($promisedDate <= $today) {
+            throw new ValidationException(['promised_date' => 'Promised Date must be in the future.']);
+        }
+
+        // Get student's academic year
+        $stmtStu = $pdo->prepare("SELECT academic_year_id, class_id FROM students WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtStu->execute([':id' => $studentId, ':sid' => $schoolId]);
+        $student = $stmtStu->fetch(PDO::FETCH_ASSOC);
+        if (!$student) {
+            throw new NotFoundException('Student not found');
+        }
+        $academicYearId = (int)$student['academic_year_id'];
+
+        // Get pending amount
+        $dues = $this->getStudentOutstandingBalanceForYear($pdo, $studentId, $schoolId, $academicYearId);
+        $pendingAmount = isset($data['pending_amount']) && $data['pending_amount'] !== '' ? (float)$data['pending_amount'] : $dues;
+
+        if ($pendingAmount < 0.0) {
+            throw new ValidationException(['pending_amount' => 'Pending Amount cannot be negative.']);
+        }
+
+        // Insert follow-up record
+        $stmtIns = $pdo->prepare("
+            INSERT INTO fee_follow_ups (school_id, student_id, academic_year_id, pending_amount, promised_date, reason, reminder_notes, status, created_by)
+            VALUES (:sid, :student_id, :ayid, :amount, :promised_date, :reason, :notes, 'PENDING', :created_by)
+        ");
+        $stmtIns->execute([
+            ':sid' => $schoolId,
+            ':student_id' => $studentId,
+            ':ayid' => $academicYearId,
+            ':amount' => $pendingAmount,
+            ':promised_date' => $promisedDate,
+            ':reason' => $reason,
+            ':notes' => !empty($data['reminder_notes']) ? trim($data['reminder_notes']) : null,
+            ':created_by' => $user['id']
+        ]);
+        $followUpId = (int)$pdo->lastInsertId();
+
+        $this->log('Fee follow-up created', ['id' => $followUpId, 'student_id' => $studentId]);
+
+        return ['id' => $followUpId];
+    }
+
+    public function getFeeFollowUpDetails(array $user, int $id): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->classRepo->getPdo();
+
+        $stmt = $pdo->prepare("
+            SELECT f.*, s.name AS student_name, s.admission_no, c.name AS class_name, 
+                   s.father_name AS parent_name, s.mobile AS mobile_number, u.name AS creator_name
+            FROM fee_follow_ups f
+            JOIN students s ON f.student_id = s.id
+            LEFT JOIN classes c ON s.class_id = c.id
+            LEFT JOIN users u ON f.created_by = u.id
+            WHERE f.id = :id AND f.school_id = :sid
+            LIMIT 1
+        ");
+        $stmt->execute([':id' => $id, ':sid' => $schoolId]);
+        $followUp = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$followUp) {
+            throw new NotFoundException('Fee follow-up not found.');
+        }
+
+        // Fetch notes
+        $stmtNotes = $pdo->prepare("
+            SELECT n.*, u.name AS user_name
+            FROM fee_follow_up_notes n
+            LEFT JOIN users u ON n.created_by = u.id
+            WHERE n.follow_up_id = :fid
+            ORDER BY n.id DESC
+        ");
+        $stmtNotes->execute([':fid' => $id]);
+        $followUp['notes'] = $stmtNotes->fetchAll(PDO::FETCH_ASSOC);
+
+        return $followUp;
+    }
+
+    public function updateFeeFollowUp(array $user, int $id, array $data): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->classRepo->getPdo();
+
+        $stmtCheck = $pdo->prepare("SELECT id, status FROM fee_follow_ups WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtCheck->execute([':id' => $id, ':sid' => $schoolId]);
+        $followUp = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+        if (!$followUp) {
+            throw new NotFoundException('Fee follow-up not found.');
+        }
+
+        if (empty($data['promised_date'])) {
+            throw new ValidationException(['promised_date' => 'Promised Payment Date is required']);
+        }
+        if (empty($data['reason'])) {
+            throw new ValidationException(['reason' => 'Reason / Commitment is required']);
+        }
+
+        $promisedDate = $data['promised_date'];
+        $reason = trim($data['reason']);
+        $pendingAmount = (float)$data['pending_amount'];
+
+        if (strlen($reason) > 500) {
+            throw new ValidationException(['reason' => 'Reason cannot exceed 500 characters.']);
+        }
+        if ($pendingAmount < 0.0) {
+            throw new ValidationException(['pending_amount' => 'Pending Amount cannot be negative.']);
+        }
+
+        $today = date('Y-m-d');
+        $status = $followUp['status'];
+        if ($status !== 'COMPLETED') {
+            if ($promisedDate > $today) {
+                $status = 'PENDING';
+            } elseif ($promisedDate === $today) {
+                $status = 'DUE_TODAY';
+            } else {
+                $status = 'OVERDUE';
+            }
+        }
+
+        $stmtUp = $pdo->prepare("
+            UPDATE fee_follow_ups 
+            SET promised_date = :promised_date, reason = :reason, pending_amount = :amount, 
+                reminder_notes = :notes, status = :status
+            WHERE id = :id AND school_id = :sid
+        ");
+        $stmtUp->execute([
+            ':promised_date' => $promisedDate,
+            ':reason' => $reason,
+            ':amount' => $pendingAmount,
+            ':notes' => !empty($data['reminder_notes']) ? trim($data['reminder_notes']) : null,
+            ':status' => $status,
+            ':id' => $id,
+            ':sid' => $schoolId
+        ]);
+
+        $this->log('Fee follow-up updated', ['id' => $id]);
+
+        return ['success' => true];
+    }
+
+    public function deleteFeeFollowUp(array $user, int $id): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->classRepo->getPdo();
+
+        $stmtCheck = $pdo->prepare("SELECT id FROM fee_follow_ups WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtCheck->execute([':id' => $id, ':sid' => $schoolId]);
+        if ($stmtCheck->fetchColumn() === false) {
+            throw new NotFoundException('Fee follow-up not found.');
+        }
+
+        $stmtDel = $pdo->prepare("DELETE FROM fee_follow_ups WHERE id = :id AND school_id = :sid");
+        $stmtDel->execute([':id' => $id, ':sid' => $schoolId]);
+
+        $this->log('Fee follow-up deleted', ['id' => $id]);
+
+        return ['success' => true];
+    }
+
+    public function addFollowUpNote(array $user, int $id, array $data): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->classRepo->getPdo();
+
+        $stmtCheck = $pdo->prepare("SELECT id FROM fee_follow_ups WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtCheck->execute([':id' => $id, ':sid' => $schoolId]);
+        if ($stmtCheck->fetchColumn() === false) {
+            throw new NotFoundException('Fee follow-up not found.');
+        }
+
+        if (empty($data['comment'])) {
+            throw new ValidationException(['comment' => 'Comment note is required']);
+        }
+
+        $comment = trim($data['comment']);
+
+        $stmtIns = $pdo->prepare("
+            INSERT INTO fee_follow_up_notes (follow_up_id, comment, created_by)
+            VALUES (:fid, :comment, :created_by)
+        ");
+        $stmtIns->execute([
+            ':fid' => $id,
+            ':comment' => $comment,
+            ':created_by' => $user['id']
+        ]);
+
+        $this->log('Fee follow-up note added', ['id' => $id]);
+
+        return ['id' => (int)$pdo->lastInsertId()];
+    }
+
+    public function markFollowUpContacted(array $user, int $id, array $data): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->classRepo->getPdo();
+
+        $stmtCheck = $pdo->prepare("SELECT id FROM fee_follow_ups WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtCheck->execute([':id' => $id, ':sid' => $schoolId]);
+        if ($stmtCheck->fetchColumn() === false) {
+            throw new NotFoundException('Fee follow-up not found.');
+        }
+
+        $note = !empty($data['comment']) ? trim($data['comment']) : 'Contacted parent.';
+        $comment = "Contacted parent: " . $note;
+
+        $stmtIns = $pdo->prepare("
+            INSERT INTO fee_follow_up_notes (follow_up_id, comment, created_by)
+            VALUES (:fid, :comment, :created_by)
+        ");
+        $stmtIns->execute([
+            ':fid' => $id,
+            ':comment' => $comment,
+            ':created_by' => $user['id']
+        ]);
+
+        return ['success' => true];
+    }
+
+    public function getStudentOutstandingFee(array $user, int $studentId): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->classRepo->getPdo();
+
+        $stmtStu = $pdo->prepare("SELECT academic_year_id FROM students WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtStu->execute([':id' => $studentId, ':sid' => $schoolId]);
+        $student = $stmtStu->fetch(PDO::FETCH_ASSOC);
+        if (!$student) {
+            throw new NotFoundException('Student not found');
+        }
+        
+        $dues = $this->getStudentOutstandingBalanceForYear($pdo, $studentId, $schoolId, (int)$student['academic_year_id']);
+
+        return ['outstanding_balance' => $dues];
+    }
+
+    public function getStudentFollowUps(array $user, int $studentId): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->classRepo->getPdo();
+
+        $stmt = $pdo->prepare("
+            SELECT f.*, u.name AS creator_name 
+            FROM fee_follow_ups f
+            LEFT JOIN users u ON f.created_by = u.id
+            WHERE f.student_id = :student_id AND f.school_id = :school_id
+            ORDER BY f.id DESC
+        ");
+        $stmt->execute([':student_id' => $studentId, ':school_id' => $schoolId]);
+        $followUps = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        $timeline = [];
+        foreach ($followUps as $f) {
+            $timeline[] = [
+                'date' => date('d M Y', strtotime($f['created_at'])),
+                'timestamp' => strtotime($f['created_at']),
+                'type' => 'created',
+                'title' => "Parent promised payment on " . date('d M Y', strtotime($f['promised_date'])),
+                'description' => "Amount: ₹" . number_format((float)$f['pending_amount'], 2) . " | Reason: " . $f['reason'],
+                'user' => $f['creator_name']
+            ];
+            
+            if ($f['status'] === 'COMPLETED' && $f['completed_at'] !== null) {
+                $timeline[] = [
+                    'date' => date('d M Y', strtotime($f['completed_at'])),
+                    'timestamp' => strtotime($f['completed_at']),
+                    'type' => 'completed',
+                    'title' => "Follow-up completed",
+                    'description' => "Pending dues became zero. Status changed to Completed.",
+                    'user' => 'System'
+                ];
+            }
+            
+            $stmtNotes = $pdo->prepare("
+                SELECT n.*, u.name AS user_name 
+                FROM fee_follow_up_notes n
+                LEFT JOIN users u ON n.created_by = u.id
+                WHERE n.follow_up_id = :fid
+                ORDER BY n.id ASC
+            ");
+            $stmtNotes->execute([':fid' => $f['id']]);
+            $notes = $stmtNotes->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($notes as $n) {
+                $timeline[] = [
+                    'date' => date('d M Y', strtotime($n['created_at'])),
+                    'timestamp' => strtotime($n['created_at']),
+                    'type' => 'note',
+                    'title' => "Note added",
+                    'description' => $n['comment'],
+                    'user' => $n['user_name']
+                ];
+            }
+        }
+        
+        usort($timeline, function($a, $b) {
+            return $b['timestamp'] - $a['timestamp'];
+        });
+        
+        return $timeline;
+    }
+
+    public function getNotifications(array $user): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->classRepo->getPdo();
+
+        $stmt = $pdo->prepare("
+            SELECT * FROM dashboard_notifications
+            WHERE school_id = :sid AND user_role = 'SCHOOL_ADMIN'
+            ORDER BY id DESC
+            LIMIT 15
+        ");
+        $stmt->execute([':sid' => $schoolId]);
+        $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $stmtUnread = $pdo->prepare("
+            SELECT COUNT(*) FROM dashboard_notifications
+            WHERE school_id = :sid AND user_role = 'SCHOOL_ADMIN' AND is_read = 0
+        ");
+        $stmtUnread->execute([':sid' => $schoolId]);
+        $unreadCount = (int)$stmtUnread->fetchColumn();
+
+        return [
+            'notifications' => $notifications,
+            'unread_count' => $unreadCount
+        ];
+    }
+
+    public function markNotificationRead(array $user, int $id): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->classRepo->getPdo();
+
+        $stmt = $pdo->prepare("
+            UPDATE dashboard_notifications 
+            SET is_read = 1 
+            WHERE id = :id AND school_id = :sid
+        ");
+        $stmt->execute([':id' => $id, ':sid' => $schoolId]);
+
+        return ['success' => true];
+    }
+
+    public function syncFollowUpStatus(PDO $pdo, int $studentId, int $schoolId): void
+    {
+        $stmtAy = $pdo->prepare("SELECT academic_year_id FROM students WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtAy->execute([':id' => $studentId, ':sid' => $schoolId]);
+        $ayId = $stmtAy->fetchColumn();
+        if ($ayId === false || $ayId === null) {
+            return;
+        }
+
+        $dues = $this->getStudentOutstandingBalanceForYear($pdo, $studentId, $schoolId, (int)$ayId);
+        
+        if ($dues <= 0.0) {
+            $stmtUpdate = $pdo->prepare("
+                UPDATE fee_follow_ups 
+                SET status = 'COMPLETED', completed_at = CURRENT_TIMESTAMP
+                WHERE student_id = :student_id AND school_id = :school_id AND status != 'COMPLETED'
+            ");
+            $stmtUpdate->execute([
+                ':student_id' => $studentId,
+                ':school_id' => $schoolId
+            ]);
+            
+            if ($stmtUpdate->rowCount() > 0) {
+                $this->log('Fee follow-up completed automatically', ['student_id' => $studentId, 'school_id' => $schoolId]);
+            }
+        }
     }
 }
 

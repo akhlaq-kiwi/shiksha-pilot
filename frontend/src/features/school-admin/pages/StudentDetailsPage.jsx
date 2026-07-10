@@ -547,6 +547,8 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeSubTab, setActiveSubTab] = useState('finance'); // 'finance', 'profile', 'academic'
+  const [followUpHistory, setFollowUpHistory] = useState([]);
+  const [followUpLoading, setFollowUpLoading] = useState(false);
   const [activeLedgerTab, setActiveLedgerTab] = useState('monthly'); // 'monthly' | 'additional'
   
   // Accordion toggle for Documents (closed by default)
@@ -593,6 +595,22 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
     
     return [targetPayment.fee_month];
   };
+
+  useEffect(() => {
+    if (activeSubTab === 'followup' && studentId) {
+      setFollowUpLoading(true);
+      schoolService.getStudentFollowUps(studentId)
+        .then(res => {
+          setFollowUpHistory(res || []);
+        })
+        .catch(err => {
+          console.error(err);
+        })
+        .finally(() => {
+          setFollowUpLoading(false);
+        });
+    }
+  }, [activeSubTab, studentId]);
 
   const loadDetails = async () => {
     setLoading(true);
@@ -979,7 +997,8 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
             {[
               { id: 'finance', label: 'Finance' },
               { id: 'profile', label: 'Student & Parents' },
-              { id: 'academic', label: 'Academic Results' }
+              { id: 'academic', label: 'Academic Results' },
+              { id: 'followup', label: 'Follow-up History' }
             ].map(tab => (
               <button
                 key={tab.id}
@@ -1466,6 +1485,63 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                   </Card>
                 </>
               )}
+            </div>
+          )}
+
+          {/* Sub-tab 4: Follow-up Timeline */}
+          {activeSubTab === 'followup' && (
+            <div className="space-y-6 animate-in fade-in duration-200">
+              <Card className="shadow-xs border border-border bg-surface">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-2 border-b border-border pb-3 mb-5">
+                    <Phone className="h-4 w-4 text-primary" />
+                    <h4 className="text-xs font-bold text-text-primary uppercase tracking-wider">Fee Follow-up Timeline</h4>
+                  </div>
+                  
+                  {followUpLoading ? (
+                    <div className="flex justify-center py-10">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+                    </div>
+                  ) : followUpHistory.length === 0 ? (
+                    <div className="text-center py-10 text-text-muted text-xs">
+                      No follow-ups recorded for this student.
+                    </div>
+                  ) : (
+                    <div className="relative pl-6 border-l-2 border-border space-y-8 ml-2 mt-2">
+                      {followUpHistory.map((item, idx) => {
+                        let dotColor = 'bg-primary border-primary/20';
+                        if (item.type === 'completed') {
+                          dotColor = 'bg-emerald-500 border-emerald-500/20';
+                        } else if (item.type === 'note') {
+                          dotColor = 'bg-amber-500 border-amber-500/20';
+                        }
+                        
+                        return (
+                          <div key={idx} className="relative">
+                            {/* Connector dot */}
+                            <span className={`absolute -left-[31px] top-1.5 w-4 h-4 rounded-full border-4 ${dotColor}`} />
+                            
+                            <div className="space-y-1 text-xs">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-bold text-text-primary text-sm">{item.title}</span>
+                                <span className="text-[10px] text-text-muted shrink-0 font-mono">{item.date}</span>
+                              </div>
+                              <p className="text-text-secondary whitespace-pre-line leading-relaxed mt-1">
+                                {item.description}
+                              </p>
+                              {item.user && (
+                                <div className="text-[10px] text-text-muted font-medium pt-1">
+                                  Logged by: <span className="text-text-secondary">{item.user}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           )}
 

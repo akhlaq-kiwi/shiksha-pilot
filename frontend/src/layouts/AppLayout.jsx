@@ -46,6 +46,11 @@ const AppLayout = ({ children }) => {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const dropdownRef = useRef(null);
 
+  const [notifications, setNotifications] = useState([]);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+  const notifRef = useRef(null);
+
   // Apply the school-scoped portal theme once on mount (non-SUPER_ADMIN only)
   useEffect(() => {
     if (role && role !== 'SUPER_ADMIN' && user?.school_portal_theme) {
@@ -85,6 +90,34 @@ const AppLayout = ({ children }) => {
   useEffect(() => {
     setLogoError(false);
   }, [schoolProfile?.logo_path]);
+
+  useEffect(() => {
+    if (!isSchoolAdmin) return;
+    
+    const fetchNotifs = async () => {
+      try {
+        const res = await schoolService.getNotifications();
+        setNotifications(res.notifications || []);
+        setUnreadNotifCount(res.unread_count || 0);
+      } catch (err) {
+        console.error("Failed to load notifications", err);
+      }
+    };
+
+    fetchNotifs();
+    const interval = setInterval(fetchNotifs, 30000);
+    return () => clearInterval(interval);
+  }, [isSchoolAdmin]);
+
+  useEffect(() => {
+    const handleOutsideClickNotif = (e) => {
+      if (notifRef.current && !notifRef.current.contains(e.target)) {
+        setShowNotifDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClickNotif);
+    return () => document.removeEventListener('mousedown', handleOutsideClickNotif);
+  }, []);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -189,16 +222,74 @@ const AppLayout = ({ children }) => {
             <div className="flex items-center gap-1.5">
               
               {/* Notification Bell */}
-              {role !== 'SUPER_ADMIN' && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Notifications"
-                  title="Notifications"
-                  className="text-text-secondary"
-                >
-                  <Bell className="w-4 h-4" />
-                </Button>
+              {isSchoolAdmin && (
+                <div className="relative" ref={notifRef}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Notifications"
+                    title="Notifications"
+                    className="text-text-secondary relative"
+                    onClick={() => setShowNotifDropdown(!showNotifDropdown)}
+                  >
+                    <Bell className="w-4 h-4" />
+                    {unreadNotifCount > 0 && (
+                      <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                    )}
+                  </Button>
+                  
+                  {showNotifDropdown && (
+                    <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto bg-surface border border-border rounded-xl shadow-xl z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                      <div className="p-3.5 border-b border-border flex items-center justify-between">
+                        <span className="font-bold text-xs tracking-tight text-text-primary">Notifications</span>
+                        {unreadNotifCount > 0 && (
+                          <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-bold">
+                            {unreadNotifCount} New
+                          </span>
+                        )}
+                      </div>
+                      <div className="py-1 divide-y divide-border">
+                        {notifications.length === 0 ? (
+                          <div className="p-6 text-center text-text-muted text-xs">
+                            No notifications yet.
+                          </div>
+                        ) : (
+                          notifications.map((n) => (
+                            <div 
+                              key={n.id}
+                              onClick={async () => {
+                                try {
+                                  await schoolService.markNotificationRead(n.id);
+                                  setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, is_read: 1 } : item));
+                                  setUnreadNotifCount(prev => Math.max(0, prev - 1));
+                                  setShowNotifDropdown(false);
+                                  if (n.link) {
+                                    navigate(n.link);
+                                  }
+                                } catch (err) {
+                                  console.error(err);
+                                }
+                              }}
+                              className={`p-3 text-left hover:bg-hover cursor-pointer transition-colors ${!n.is_read ? 'bg-primary/5' : ''}`}
+                            >
+                              <div className="flex items-start justify-between gap-1">
+                                <span className={`text-xs font-bold ${!n.is_read ? 'text-primary' : 'text-text-primary'}`}>
+                                  {n.title}
+                                </span>
+                                <span className="text-[9px] text-text-muted shrink-0 font-mono">
+                                  {new Date(n.created_at).toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-text-secondary mt-1 whitespace-pre-line leading-relaxed">
+                                {n.message}
+                              </p>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
 
               {/* Dark/light toggle */}

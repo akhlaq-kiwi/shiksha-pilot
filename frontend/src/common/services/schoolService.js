@@ -359,6 +359,50 @@ export const schoolService = {
 
   getHolidays() {
     return apiClient.get('/api/school/holidays');
+  },
+
+  getFeeFollowUps(params = {}) {
+    return apiClient.get(buildUrl('/api/school/fee-follow-ups', params));
+  },
+
+  createFeeFollowUp(data) {
+    return apiClient.post('/api/school/fee-follow-ups', data);
+  },
+
+  getFeeFollowUpDetails(id) {
+    return apiClient.get(`/api/school/fee-follow-ups/${id}`);
+  },
+
+  updateFeeFollowUp(id, data) {
+    return apiClient.put(`/api/school/fee-follow-ups/${id}`, data);
+  },
+
+  deleteFeeFollowUp(id) {
+    return apiClient.delete(`/api/school/fee-follow-ups/${id}`);
+  },
+
+  addFollowUpNote(id, data) {
+    return apiClient.post(`/api/school/fee-follow-ups/${id}/notes`, data);
+  },
+
+  markFollowUpContacted(id, data = {}) {
+    return apiClient.post(`/api/school/fee-follow-ups/${id}/contacted`, data);
+  },
+
+  getStudentOutstandingFee(studentId) {
+    return apiClient.get(`/api/school/students/${studentId}/outstanding-fee`);
+  },
+
+  getStudentFollowUps(studentId) {
+    return apiClient.get(`/api/school/students/${studentId}/follow-ups`);
+  },
+
+  getNotifications() {
+    return apiClient.get('/api/school/notifications');
+  },
+
+  markNotificationRead(id) {
+    return apiClient.post(`/api/school/notifications/${id}/read`);
   }
 };
 

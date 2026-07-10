@@ -129,6 +129,21 @@ return function (App $app) {
     $app->post('/api/school/class-fee-configurations', [SchoolAdminController::class, 'saveClassFeeConfiguration']);
     $app->post('/api/school/class-fee-configurations/lock', [SchoolAdminController::class, 'lockClassFeeConfiguration']);
 
+    // Fee Follow-up System
+    $app->get('/api/school/fee-follow-ups', [SchoolAdminController::class, 'getFeeFollowUps']);
+    $app->post('/api/school/fee-follow-ups', [SchoolAdminController::class, 'createFeeFollowUp']);
+    $app->get('/api/school/fee-follow-ups/{id}', [SchoolAdminController::class, 'getFeeFollowUpDetails']);
+    $app->put('/api/school/fee-follow-ups/{id}', [SchoolAdminController::class, 'updateFeeFollowUp']);
+    $app->delete('/api/school/fee-follow-ups/{id}', [SchoolAdminController::class, 'deleteFeeFollowUp']);
+    $app->post('/api/school/fee-follow-ups/{id}/notes', [SchoolAdminController::class, 'addFollowUpNote']);
+    $app->post('/api/school/fee-follow-ups/{id}/contacted', [SchoolAdminController::class, 'markFollowUpContacted']);
+    $app->get('/api/school/students/{id}/outstanding-fee', [SchoolAdminController::class, 'getStudentOutstandingFee']);
+    $app->get('/api/school/students/{id}/follow-ups', [SchoolAdminController::class, 'getStudentFollowUps']);
+    
+    // Persisted Dashboard Notifications
+    $app->get('/api/school/notifications', [SchoolAdminController::class, 'getNotifications']);
+    $app->post('/api/school/notifications/{id}/read', [SchoolAdminController::class, 'markNotificationRead']);
+
     $app->get('/api/school/timetable', [SchoolAdminController::class, 'getTimetable']);
     $app->post('/api/school/timetable', [SchoolAdminController::class, 'addTimetablePeriod']);
     $app->delete('/api/school/timetable/{id}', [SchoolAdminController::class, 'deleteTimetablePeriod']);

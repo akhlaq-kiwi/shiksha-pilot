@@ -1233,5 +1233,106 @@ class SchoolAdminController extends BaseController
         $data = $this->service->getSchoolLoginHistory($user, $params);
         return $this->success($response, $data);
     }
+
+    public function getFeeFollowUps(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $params = $request->getQueryParams();
+        $data = $this->service->getFeeFollowUps($user, $params);
+        return $this->success($response, $data);
+    }
+
+    public function createFeeFollowUp(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $body = RequestParser::body($request);
+        $data = $this->service->createFeeFollowUp($user, $body);
+        return $this->success($response, $data, 'Fee follow-up saved successfully', 201);
+    }
+
+    public function getFeeFollowUpDetails(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $id = (int)$args['id'];
+        $data = $this->service->getFeeFollowUpDetails($user, $id);
+        return $this->success($response, $data);
+    }
+
+    public function updateFeeFollowUp(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $id = (int)$args['id'];
+        $body = RequestParser::body($request);
+        $data = $this->service->updateFeeFollowUp($user, $id, $body);
+        return $this->success($response, $data, 'Fee follow-up updated successfully');
+    }
+
+    public function deleteFeeFollowUp(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $id = (int)$args['id'];
+        $data = $this->service->deleteFeeFollowUp($user, $id);
+        return $this->success($response, $data, 'Fee follow-up deleted successfully');
+    }
+
+    public function addFollowUpNote(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $id = (int)$args['id'];
+        $body = RequestParser::body($request);
+        $data = $this->service->addFollowUpNote($user, $id, $body);
+        return $this->success($response, $data, 'Note added successfully');
+    }
+
+    public function markFollowUpContacted(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $id = (int)$args['id'];
+        $body = RequestParser::body($request);
+        $data = $this->service->markFollowUpContacted($user, $id, $body);
+        return $this->success($response, $data, 'Marked as contacted');
+    }
+
+    public function getStudentOutstandingFee(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $studentId = (int)$args['id'];
+        $data = $this->service->getStudentOutstandingFee($user, $studentId);
+        return $this->success($response, $data);
+    }
+
+    public function getStudentFollowUps(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $studentId = (int)$args['id'];
+        $data = $this->service->getStudentFollowUps($user, $studentId);
+        return $this->success($response, $data);
+    }
+
+    public function getNotifications(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $data = $this->service->getNotifications($user);
+        return $this->success($response, $data);
+    }
+
+    public function markNotificationRead(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $id = (int)$args['id'];
+        $data = $this->service->markNotificationRead($user, $id);
+        return $this->success($response, $data, 'Notification marked as read');
+    }
 }
 

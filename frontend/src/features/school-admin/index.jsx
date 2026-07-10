@@ -3,7 +3,7 @@ import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-
 import {
   LayoutDashboard, School, BookOpen, Users, UserCog, Clock,
   ClipboardCheck, FileText, DollarSign, BarChart2, Shield, Settings, RefreshCw, Landmark,
-  AlertCircle, AlertTriangle, Copy, Phone, Mail, ExternalLink
+  AlertCircle, AlertTriangle, Copy, Phone, Mail, ExternalLink, PhoneCall
 } from 'lucide-react';
 import { useToast } from '../../common/components/Toast';
 
@@ -23,6 +23,7 @@ import FinanceManagementPage from './pages/FinanceManagementPage';
 import AuditsSettingsPage from './pages/AuditsSettingsPage';
 import SecurityPage from './pages/SecurityPage';
 import SalaryDisbursementPage from './pages/SalaryDisbursementPage';
+import FeeFollowUpPage from './pages/FeeFollowUpPage';
 
 import { schoolService } from '../../common/services/schoolService';
 import { apiClient } from '../../common/services/apiClient';
@@ -45,7 +46,8 @@ const NAV_ITEMS = [
   { path: '/school-admin/finance',    label: 'Fees Portal', icon: DollarSign },
   { path: '/school-admin/financial-reports', label: 'Financial Reports', icon: FileText },
   { path: '/school-admin/finance-management', label: 'Finance Management', icon: Landmark },
-  { path: '/school-admin/audits-settings', label: 'Audits & Settings', icon: Settings },
+  { path: '/school-admin/fee-follow-ups',     label: 'Fee Follow-up', icon: PhoneCall },
+  { path: '/school-admin/audits-settings',    label: 'Audits & Settings', icon: Settings },
   { path: '/school-admin/security',   label: 'Security', icon: Shield },
 ];
 
@@ -381,6 +383,7 @@ export default function SchoolAdminPortal() {
             <Route path="financial-reports" element={<FinancialReportsPage />} />
             <Route path="finance-management" element={<FinanceManagementPage />} />
             <Route path="salary-disbursement" element={<SalaryDisbursementPage />} />
+            <Route path="fee-follow-ups" element={<FeeFollowUpPage />} />
             <Route path="security" element={<SecurityPage />} />
             <Route path="*" element={<Navigate to="/school-admin" replace />} />
           </Routes>
