@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Phone, Eye, Edit2, PhoneCall, CheckCircle, Trash2, Plus, Search, 
-  Filter, X, Calendar, DollarSign, User, AlertCircle, FileText, ChevronDown, Check
+  Filter, X, Calendar, DollarSign, User, AlertCircle, FileText, ChevronDown, Check,
+  Clock, AlertTriangle
 } from 'lucide-react';
 import { schoolService } from '../../../common/services/schoolService';
 import { Card, CardContent } from '../../../common/ui/card';
@@ -386,22 +387,27 @@ export default function FeeFollowUpPage() {
       {/* Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {[
-          { label: 'Pending Follow-ups', count: stats.pending, color: 'text-blue-600 bg-blue-500/10' },
-          { label: 'Due Today', count: stats.due_today, color: 'text-orange-600 bg-orange-500/10' },
-          { label: 'Upcoming', count: stats.upcoming, color: 'text-purple-600 bg-purple-500/10' },
-          { label: 'Overdue', count: stats.overdue, color: 'text-red-600 bg-red-500/10 animate-pulse' },
-          { label: 'Completed', count: stats.completed, color: 'text-emerald-600 bg-emerald-500/10' }
-        ].map((c, i) => (
-          <Card key={i} className="shadow-2xs border border-border bg-surface">
-            <CardContent className="p-4 flex flex-col justify-between h-24">
-              <span className="text-[10px] text-text-muted font-bold uppercase tracking-wider">{c.label}</span>
-              <div className="flex items-baseline justify-between mt-2">
-                <span className="text-2xl font-black text-text-primary font-display">{c.count}</span>
-                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${c.color}`}>{c.count}</span>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+          { label: 'Pending Follow-ups', count: stats.pending, color: 'text-blue-600 bg-blue-500/10', icon: Clock },
+          { label: 'Due Today', count: stats.due_today, color: 'text-orange-600 bg-orange-500/10', icon: AlertCircle },
+          { label: 'Upcoming', count: stats.upcoming, color: 'text-purple-600 bg-purple-500/10', icon: Calendar },
+          { label: 'Overdue', count: stats.overdue, color: 'text-red-600 bg-red-500/10 animate-pulse', icon: AlertTriangle },
+          { label: 'Completed', count: stats.completed, color: 'text-emerald-600 bg-emerald-500/10', icon: CheckCircle }
+        ].map((c, i) => {
+          const Icon = c.icon;
+          return (
+            <Card key={i} className="shadow-2xs border border-border bg-surface">
+              <CardContent className="p-4 flex flex-col justify-between h-24">
+                <span className="text-[10px] text-text-muted font-bold uppercase tracking-wider">{c.label}</span>
+                <div className="flex items-baseline justify-between mt-2">
+                  <span className="text-2xl font-black text-text-primary font-display">{c.count}</span>
+                  <span className={`w-6 h-6 rounded-full flex items-center justify-center ${c.color}`}>
+                    <Icon className="h-3.5 w-3.5" />
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {/* Filters Section */}
