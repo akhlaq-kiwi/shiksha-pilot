@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Calendar, Users, Check, AlertCircle, Edit2, Save, FileText, CheckCircle2, Trash2, Plus, MoreVertical, Lock } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
@@ -14,6 +15,7 @@ import { Dialog } from '../../../common/ui/dialog';
 export default function AttendancePage() {
   const { isReadOnly, currentYear } = useAcademicYear();
   const toast = useToast();
+  const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState('daily'); // 'daily', 'report', or 'leave'
 
@@ -433,9 +435,19 @@ export default function AttendancePage() {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* Title section */}
-      <div>
-        <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">Attendance</h2>
-        <p className="text-text-secondary text-sm mt-1">Mark student daily attendance and review reports.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">Attendance</h2>
+          <p className="text-text-secondary text-sm mt-1">Mark student daily attendance and review reports.</p>
+        </div>
+        {isReadOnly && (
+          <Button
+            onClick={() => navigate('/school-admin/attendance/leaderboard')}
+            className="h-10 px-5 font-black text-xs bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white rounded-xl shadow-lg shadow-amber-500/25 border-0 hover:scale-[1.03] active:scale-[0.98] transition-all flex items-center gap-2 tracking-wide uppercase"
+          >
+            🏆 Attendance Leaderboard
+          </Button>
+        )}
       </div>
 
       {/* Tabs */}
@@ -793,50 +805,52 @@ export default function AttendancePage() {
         /* Leave Days Section */
         <div className="space-y-6">
           {/* Top Form */}
-          <Card className="border border-border shadow-sm">
-            <CardHeader className="pb-3 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
-              <CardTitle className="text-sm font-bold text-text-primary flex items-center gap-1.5">
-                <Plus className="h-4 w-4" /> Add Holiday / Leave Day
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-4">
-              <form onSubmit={handleCreateHoliday} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-text-secondary uppercase">Leave Title</label>
-                  <Input
-                    type="text"
-                    placeholder="e.g. Republic Day"
-                    value={newLeaveTitle}
-                    onChange={e => setNewLeaveTitle(e.target.value)}
-                    className="h-9"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-text-secondary uppercase">Leave Date</label>
-                  <Input
-                    type="date"
-                    value={newLeaveDate}
-                    onChange={e => setNewLeaveDate(e.target.value)}
-                    min={currentYear?.start_date || ''}
-                    max={currentYear?.end_date || ''}
-                    className="h-9"
-                  />
-                </div>
-                <div>
-                  <Button type="submit" className="w-full h-9 font-semibold" disabled={savingHoliday}>
-                    {savingHoliday ? 'Saving...' : 'Save'}
-                  </Button>
-                </div>
-                {holidayFormError && (
-                  <div className="col-span-1 md:col-span-3">
-                    <p className="text-xs font-bold text-red-500 flex items-center gap-1">
-                      <AlertCircle className="h-3 w-3" /> {holidayFormError}
-                    </p>
+          {!isReadOnly && (
+            <Card className="border border-border shadow-sm">
+              <CardHeader className="pb-3 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
+                <CardTitle className="text-sm font-bold text-text-primary flex items-center gap-1.5">
+                  <Plus className="h-4 w-4" /> Add Holiday / Leave Day
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <form onSubmit={handleCreateHoliday} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-text-secondary uppercase">Leave Title</label>
+                    <Input
+                      type="text"
+                      placeholder="e.g. Republic Day"
+                      value={newLeaveTitle}
+                      onChange={e => setNewLeaveTitle(e.target.value)}
+                      className="h-9"
+                    />
                   </div>
-                )}
-              </form>
-            </CardContent>
-          </Card>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-text-secondary uppercase">Leave Date</label>
+                    <Input
+                      type="date"
+                      value={newLeaveDate}
+                      onChange={e => setNewLeaveDate(e.target.value)}
+                      min={currentYear?.start_date || ''}
+                      max={currentYear?.end_date || ''}
+                      className="h-9"
+                    />
+                  </div>
+                  <div>
+                    <Button type="submit" className="w-full h-9 font-semibold" disabled={savingHoliday}>
+                      {savingHoliday ? 'Saving...' : 'Save'}
+                    </Button>
+                  </div>
+                  {holidayFormError && (
+                    <div className="col-span-1 md:col-span-3">
+                      <p className="text-xs font-bold text-red-500 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" /> {holidayFormError}
+                      </p>
+                    </div>
+                  )}
+                </form>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Below Holidays List */}
           <Card className="border border-border shadow-sm">
@@ -907,7 +921,7 @@ export default function AttendancePage() {
                                 </p>
                               </div>
                               
-                              {!isPast && (
+                              {!isReadOnly && !isPast && (
                                 <DropdownMenu>
                                   <DropdownItem onClick={() => startEditHoliday(h)}>
                                     Edit

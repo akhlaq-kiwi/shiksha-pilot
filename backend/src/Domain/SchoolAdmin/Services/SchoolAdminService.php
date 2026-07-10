@@ -2797,6 +2797,205 @@ class SchoolAdminService extends BaseService
         return $this->attendanceRepo->findBySchool($this->getSchoolId($user), $filters);
     }
 
+    public function getAttendanceLeaderboard(array $user, array $params): array
+    {
+        if (empty($params['academic_year_id'])) {
+            throw new ValidationException(['academic_year_id' => 'Academic Year ID is required.']);
+        }
+        $academicYearId = (int)$params['academic_year_id'];
+        $classIdFilter = isset($params['class_id']) && $params['class_id'] !== 'ALL' && $params['class_id'] !== '' ? (int)$params['class_id'] : null;
+
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->attendanceRepo->getPdo();
+
+        // 1. Verify academic year exists and is Archived
+        $stmtAY = $pdo->prepare("SELECT * FROM academic_years WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtAY->execute([':id' => $academicYearId, ':sid' => $schoolId]);
+        $academicYear = $stmtAY->fetch(PDO::FETCH_ASSOC);
+
+        if (!$academicYear) {
+            throw new NotFoundException('Academic year not found.');
+        }
+
+        if ($academicYear['status'] !== 'Archived') {
+            throw new ValidationException(['academic_year_id' => 'Leaderboard is only available for completed (Archived) academic years.']);
+        }
+
+        // 2. Check if snapshot already exists
+        $stmtSnapshotCheck = $pdo->prepare("
+            SELECT COUNT(*) 
+            FROM academic_achievement_snapshots 
+            WHERE academic_year_id = :ay_id AND school_id = :sid AND feature_type = 'attendance_leaderboard'
+        ");
+        $stmtSnapshotCheck->execute([':ay_id' => $academicYearId, ':sid' => $schoolId]);
+        $snapshotCount = (int)$stmtSnapshotCheck->fetchColumn();
+
+        // 3. Generate snapshots if they do not exist
+        if ($snapshotCount === 0) {
+            $stmtCalc = $pdo->prepare("
+                SELECT 
+                    s.id AS student_id,
+                    s.name AS student_name,
+                    s.photo_path AS student_photo,
+                    s.roll_no AS roll_number,
+                    c.name AS class_name,
+                    c.id AS class_id,
+                    COUNT(a.id) AS total_working_days,
+                    SUM(CASE WHEN UPPER(a.status) IN ('PRESENT', 'LATE') THEN 1 ELSE 0 END) AS present_days
+                FROM students s
+                INNER JOIN classes c ON s.class_id = c.id
+                INNER JOIN attendance a ON s.id = a.student_id
+                WHERE c.academic_year_id = :ay_id AND c.school_id = :sid
+                GROUP BY s.id, c.id
+                HAVING total_working_days > 0
+            ");
+            $stmtCalc->execute([':ay_id' => $academicYearId, ':sid' => $schoolId]);
+            $studentsList = $stmtCalc->fetchAll(PDO::FETCH_ASSOC);
+
+            if (!empty($studentsList)) {
+                $overallList = [];
+                foreach ($studentsList as $stu) {
+                    $total = (int)$stu['total_working_days'];
+                    $present = (int)$stu['present_days'];
+                    $pct = $total > 0 ? round(($present / $total) * 100, 2) : 0.00;
+                    $overallList[] = array_merge($stu, ['percentage' => $pct]);
+                }
+
+                // Sort overall list: percentage DESC, present_days DESC, student_name ASC
+                usort($overallList, function ($a, $b) {
+                    if ($b['percentage'] != $a['percentage']) {
+                        return $b['percentage'] <=> $a['percentage'];
+                    }
+                    if ($b['present_days'] != $a['present_days']) {
+                        return $b['present_days'] <=> $a['present_days'];
+                    }
+                    return strcasecmp($a['student_name'], $b['student_name']);
+                });
+
+                $overallTop3 = array_slice($overallList, 0, 3);
+
+                // Group by Class
+                $classGroups = [];
+                foreach ($overallList as $stu) {
+                    $classGroups[$stu['class_id']][] = $stu;
+                }
+
+                $classWiseTop3 = [];
+                foreach ($classGroups as $classId => $roster) {
+                    usort($roster, function ($a, $b) {
+                        if ($b['percentage'] != $a['percentage']) {
+                            return $b['percentage'] <=> $a['percentage'];
+                        }
+                        if ($b['present_days'] != $a['present_days']) {
+                            return $b['present_days'] <=> $a['present_days'];
+                        }
+                        return strcasecmp($a['student_name'], $b['student_name']);
+                    });
+                    $classWiseTop3[$classId] = array_slice($roster, 0, 3);
+                }
+
+                // Batch Insert Snapshots in Transaction
+                $pdo->beginTransaction();
+                try {
+                    $stmtInsert = $pdo->prepare("
+                        INSERT INTO academic_achievement_snapshots (
+                            school_id, academic_year_id, feature_type, class_id, 
+                            student_id, student_name, student_photo, class_name, roll_number, 
+                            achievement_score, `rank`, metadata
+                        ) VALUES (
+                            :sid, :ay_id, 'attendance_leaderboard', :class_id,
+                            :stu_id, :stu_name, :stu_photo, :cls_name, :roll,
+                            :score, :rank, :meta
+                        )
+                    ");
+
+                    // 3a. Save school-wide overall
+                    foreach ($overallTop3 as $idx => $row) {
+                        $stmtInsert->execute([
+                            ':sid' => $schoolId,
+                            ':ay_id' => $academicYearId,
+                            ':class_id' => null,
+                            ':stu_id' => $row['student_id'],
+                            ':stu_name' => $row['student_name'],
+                            ':stu_photo' => $row['student_photo'],
+                            ':cls_name' => $row['class_name'],
+                            ':roll' => $row['roll_number'],
+                            ':score' => $row['percentage'],
+                            ':rank' => $idx + 1,
+                            ':meta' => json_encode([
+                                'present_days' => $row['present_days'],
+                                'total_working_days' => $row['total_working_days']
+                            ])
+                        ]);
+                    }
+
+                    // 3b. Save class-wise
+                    foreach ($classWiseTop3 as $classId => $roster) {
+                        foreach ($roster as $idx => $row) {
+                            $stmtInsert->execute([
+                                ':sid' => $schoolId,
+                                ':ay_id' => $academicYearId,
+                                ':class_id' => $classId,
+                                ':stu_id' => $row['student_id'],
+                                ':stu_name' => $row['student_name'],
+                                ':stu_photo' => $row['student_photo'],
+                                ':cls_name' => $row['class_name'],
+                                ':roll' => $row['roll_number'],
+                                ':score' => $row['percentage'],
+                                ':rank' => $idx + 1,
+                                ':meta' => json_encode([
+                                    'present_days' => $row['present_days'],
+                                    'total_working_days' => $row['total_working_days']
+                                ])
+                            ]);
+                        }
+                    }
+
+                    $pdo->commit();
+                } catch (\Exception $e) {
+                    $pdo->rollBack();
+                    throw $e;
+                }
+            }
+        }
+
+        // 4. Query and return matching snapshots
+        if ($classIdFilter === null) {
+            $stmtSelect = $pdo->prepare("
+                SELECT * 
+                FROM academic_achievement_snapshots 
+                WHERE academic_year_id = :ay_id AND school_id = :sid AND feature_type = 'attendance_leaderboard' AND class_id IS NULL
+                ORDER BY `rank` ASC
+            ");
+            $stmtSelect->execute([':ay_id' => $academicYearId, ':sid' => $schoolId]);
+        } else {
+            $stmtSelect = $pdo->prepare("
+                SELECT * 
+                FROM academic_achievement_snapshots 
+                WHERE academic_year_id = :ay_id AND school_id = :sid AND feature_type = 'attendance_leaderboard' AND class_id = :class_id
+                ORDER BY `rank` ASC
+            ");
+            $stmtSelect->execute([':ay_id' => $academicYearId, ':sid' => $schoolId, ':class_id' => $classIdFilter]);
+        }
+
+        $results = $stmtSelect->fetchAll(PDO::FETCH_ASSOC);
+
+        $formatted = [];
+        foreach ($results as $r) {
+            $formatted[] = [
+                'rank' => (int)$r['rank'],
+                'student_name' => $r['student_name'],
+                'student_photo' => $r['student_photo'],
+                'class_name' => $r['class_name'],
+                'roll_number' => $r['roll_number'],
+                'achievement_score' => (float)$r['achievement_score'],
+                'metadata' => json_decode($r['metadata'], true)
+            ];
+        }
+
+        return $formatted;
+    }
+
     public function markAttendance(array $user, array $data): array
     {
         $schoolId = $this->getSchoolId($user);

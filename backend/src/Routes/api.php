@@ -87,6 +87,7 @@ return function (App $app) {
     $app->post('/api/school/academic-years/{id}/migrate', [SchoolAdminController::class, 'migrateAcademicYear']);
     $app->get('/api/school/attendance', [SchoolAdminController::class, 'getAttendance']);
     $app->post('/api/school/attendance', [SchoolAdminController::class, 'markAttendance']);
+    $app->get('/api/school/attendance/leaderboard', [SchoolAdminController::class, 'getAttendanceLeaderboard']);
     $app->get('/api/school/holidays', [SchoolAdminController::class, 'getHolidays']);
     $app->post('/api/school/holidays', [SchoolAdminController::class, 'createHoliday']);
     $app->put('/api/school/holidays/{id}', [SchoolAdminController::class, 'updateHoliday']);

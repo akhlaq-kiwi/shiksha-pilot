@@ -997,3 +997,15 @@ A feature is complete only when:
 * Documentation is updated
 * Graphify is updated
 * Deployment path is verified
+
+---
+
+# Historical Snapshot Pattern
+
+For academic achievements, annual records, and certifications (e.g., Attendance Leaderboards, Merit Lists, Academic Awards, Annual Achievements, Student Honors), follow the **Historical Snapshot Pattern** to guarantee long-term data integrity:
+
+1. **Information Isolation**: Store snapshot details (e.g., student name, roll number, class name, dob, profile photo path, scores/marks, rankings) directly inside a dedicated snapshot table (e.g., `academic_achievement_snapshots`).
+2. **De-coupling from Profiles**: Do not rely on dynamic joins to user/student profiles for historical records. If student profile parameters (such as name, profile photo, or current class) are modified in subsequent academic sessions, the historical achievements must remain frozen as they were captured.
+3. **One-Time Generation**: Compute the scores and ranks once (upon academic year rollover or upon first lookup of the archived academic year) and write them directly to the snapshots table.
+4. **Read-Only Access**: Once written, snapshots are immutable. The API must only expose read/export workflows for archived sessions. No edit, deletion, or manual recalculation is permitted.
+5. **Metadata Extensibility**: Utilize a JSON columns schema (e.g. `metadata`) to support custom variables per achievement type (e.g., `present_days` and `total_working_days` for attendance leaderboard, total marks for merit lists).

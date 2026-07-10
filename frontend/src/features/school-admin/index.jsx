@@ -14,6 +14,7 @@ import ClassesPage from './pages/ClassesPage';
 import StaffPage from './pages/StaffPage';
 import TimetablePage from './pages/TimetablePage';
 import AttendancePage from './pages/AttendancePage';
+import AttendanceLeaderboardPage from './pages/AttendanceLeaderboardPage';
 import ExamsPage from './pages/ExamsPage';
 import SeatingPlanPage from './pages/SeatingPlanPage';
 import FinancePage from './pages/FinancePage';
@@ -375,6 +376,7 @@ export default function SchoolAdminPortal() {
             <Route path="staff" element={<StaffPage />} />
             <Route path="timetable" element={<TimetablePage />} />
             <Route path="attendance" element={<AttendancePage />} />
+            <Route path="attendance/leaderboard" element={<AttendanceLeaderboardPage />} />
             <Route path="exams" element={<ExamsPage />} />
             <Route path="exams/seating-plan" element={<SeatingPlanPage />} />
             <Route path="finance" element={<FinancePage />} />

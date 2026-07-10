@@ -234,6 +234,17 @@ class SchoolAdminController extends BaseController
         return $this->success($response, $result);
     }
 
+    public function getAttendanceLeaderboard(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $params = $request->getQueryParams();
+        $data = $this->service->getAttendanceLeaderboard($user, $params);
+
+        return $this->success($response, $data);
+    }
+
     // -------------------------------------------------------------------------
     // Holidays / Leave Days
     // -------------------------------------------------------------------------
