@@ -802,49 +802,6 @@ export default function FeeFollowUpPage() {
               </div>
             </div>
 
-            {/* Notes history timeline */}
-            <div className="space-y-4">
-              <span className="text-[10px] text-text-primary font-extrabold uppercase tracking-wider block">Follow-up Activity Logs</span>
-              
-              <div className="max-h-48 overflow-y-auto space-y-3.5 pl-3 border-l border-border ml-1.5 mt-2">
-                {selectedItem.notes && selectedItem.notes.length === 0 ? (
-                  <p className="text-text-muted text-[11px] italic pl-2">No custom activity logs yet.</p>
-                ) : (
-                  selectedItem.notes?.map((note, idx) => (
-                    <div key={idx} className="relative space-y-0.5">
-                      <span className="absolute -left-[17px] top-1.5 w-2 h-2 rounded-full bg-primary border-2 border-surface" />
-                      <div className="flex items-center justify-between text-[10px] text-text-muted font-mono">
-                        <span>{note.user_name}</span>
-                        <span>{new Date(note.created_at).toLocaleString()}</span>
-                      </div>
-                      <p className="text-text-primary text-[11px] whitespace-pre-line font-medium leading-relaxed">
-                        {note.comment}
-                      </p>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              {/* Add Note Form */}
-              {selectedItem.status !== 'COMPLETED' && (
-                <form onSubmit={handleAddNote} className="flex gap-2 pt-2 border-t border-border select-none">
-                  <Input
-                    type="text"
-                    placeholder="Add activity note e.g. parent called, promised 2 more days..."
-                    value={newNote}
-                    onChange={e => setNewNote(e.target.value)}
-                    className="flex-1 text-xs font-semibold text-text-primary border border-border bg-surface rounded-lg focus:outline-hidden"
-                  />
-                  <Button
-                    type="submit"
-                    className="font-bold text-xs px-3 shadow-xs"
-                  >
-                    Add Note
-                  </Button>
-                </form>
-              )}
-            </div>
-
             {/* Footer */}
             <div className="flex items-center justify-end border-t border-border pt-4 mt-2 select-none">
               <Button
