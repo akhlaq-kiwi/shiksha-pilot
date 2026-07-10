@@ -9417,16 +9417,85 @@ Only approve the settlement after reviewing all financial records.
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->classRepo->getPdo();
 
-        $stmtStu = $pdo->prepare("SELECT academic_year_id FROM students WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtStu = $pdo->prepare("SELECT class_id, academic_year_id FROM students WHERE id = :id AND school_id = :sid LIMIT 1");
         $stmtStu->execute([':id' => $studentId, ':sid' => $schoolId]);
         $student = $stmtStu->fetch(PDO::FETCH_ASSOC);
         if (!$student) {
             throw new NotFoundException('Student not found');
         }
         
-        $dues = $this->getStudentOutstandingBalanceForYear($pdo, $studentId, $schoolId, (int)$student['academic_year_id']);
+        $classId = $student['class_id'];
+        $academicYearId = (int)$student['academic_year_id'];
+        
+        if ($classId === null) {
+            return ['outstanding_balance' => 0.0];
+        }
 
-        return ['outstanding_balance' => $dues];
+        // Fetch monthly fees config
+        $stmtCfg = $pdo->prepare("
+            SELECT monthly_fees FROM class_fee_configurations 
+            WHERE school_id = :school_id AND class_id = :class_id AND academic_year_id = :academic_year_id
+            LIMIT 1
+        ");
+        $stmtCfg->execute([
+            ':school_id' => $schoolId,
+            ':class_id' => $classId,
+            ':academic_year_id' => $academicYearId
+        ]);
+        $cfgRow = $stmtCfg->fetch(PDO::FETCH_ASSOC);
+        $monthlyFees = [];
+        if ($cfgRow) {
+            $monthlyFees = json_decode($cfgRow['monthly_fees'], true);
+        }
+
+        // Fetch paid months for this student in this academic year
+        $stmtPaid = $pdo->prepare("
+            SELECT fee_month FROM fee_payments 
+            WHERE student_id = :student_id AND school_id = :school_id AND status = 'PAID' AND academic_year_id = :academic_year_id
+        ");
+        $stmtPaid->execute([
+            ':student_id' => $studentId,
+            ':school_id' => $schoolId,
+            ':academic_year_id' => $academicYearId
+        ]);
+        $paidMonths = $stmtPaid->fetchAll(PDO::FETCH_COLUMN);
+
+        // Determine months to evaluate (up to current calendar month)
+        $academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+        $monthsToEvaluate = $academicMonths;
+        
+        $stmtAY = $pdo->prepare("SELECT start_date, end_date, status FROM academic_years WHERE id = :ayid AND school_id = :sid LIMIT 1");
+        $stmtAY->execute([':ayid' => $academicYearId, ':sid' => $schoolId]);
+        $ayRow = $stmtAY->fetch(PDO::FETCH_ASSOC);
+        if ($ayRow) {
+            $monthsToEvaluate = $this->getMonthsDueUpToCurrent($ayRow['start_date'], $ayRow['end_date'], $ayRow['status']);
+        }
+
+        $outstanding = 0.0;
+        foreach ($monthsToEvaluate as $m) {
+            if (!in_array($m, $paidMonths, true)) {
+                $outstanding += isset($monthlyFees[$m]) ? (float)$monthlyFees[$m] : 0.0;
+            }
+        }
+
+        // Fetch all pending additional fees
+        $stmtAddPending = $pdo->prepare("
+            SELECT COALESCE(SUM(afp.amount), 0)
+            FROM additional_fee_payments afp
+            JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+            WHERE afp.student_id = :student_id
+              AND afp.school_id = :school_id
+              AND afp.status = 'Pending'
+              AND (aft.academic_year_id = :academic_year_id OR aft.name = 'Previous Year Dues')
+        ");
+        $stmtAddPending->execute([
+            ':student_id' => $studentId,
+            ':school_id' => $schoolId,
+            ':academic_year_id' => $academicYearId
+        ]);
+        $outstanding += (float)$stmtAddPending->fetchColumn();
+
+        return ['outstanding_balance' => $outstanding];
     }
 
     public function getStudentFollowUps(array $user, int $studentId): array
