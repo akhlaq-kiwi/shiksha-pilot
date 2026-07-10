@@ -1271,6 +1271,16 @@ class SchoolAdminController extends BaseController
         return $this->success($response, $data, 'Fee follow-up updated successfully');
     }
 
+    public function extendFeeFollowUp(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $id = (int)$args['id'];
+        $body = RequestParser::body($request);
+        $data = $this->service->extendFeeFollowUp($user, $id, $body);
+        return $this->success($response, $data, 'Fee commitment extended successfully');
+    }
+
     public function deleteFeeFollowUp(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);

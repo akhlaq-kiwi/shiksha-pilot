@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Phone, Eye, Edit2, PhoneCall, CheckCircle, Trash2, Plus, Search, 
   Filter, X, Calendar, DollarSign, User, AlertCircle, FileText, ChevronDown, Check,
-  Clock, AlertTriangle
+  Clock, AlertTriangle, MoreVertical
 } from 'lucide-react';
 import { schoolService } from '../../../common/services/schoolService';
 import { Card, CardContent } from '../../../common/ui/card';
@@ -72,6 +73,94 @@ export default function FeeFollowUpPage() {
   });
 
   const [formErrors, setFormErrors] = useState({});
+
+  const [activeDropdownId, setActiveDropdownId] = useState(null);
+  const [dropdownCoords, setDropdownCoords] = useState(null);
+  const dropdownRef = useRef(null);
+
+  // Extend commitment form state
+  const [showExtendModal, setShowExtendModal] = useState(false);
+  const [extendForm, setExtendForm] = useState({
+    promised_date: '',
+    reason: ''
+  });
+  const [extendFormErrors, setExtendFormErrors] = useState({});
+
+  // Helper to count words
+  const countWords = (str) => {
+    return str.trim() === '' ? 0 : str.trim().split(/\s+/).length;
+  };
+
+  // Click outside to close actions dropdown
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setActiveDropdownId(null);
+        setDropdownCoords(null);
+      }
+    };
+    const handleScroll = () => {
+      setActiveDropdownId(null);
+      setDropdownCoords(null);
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    window.addEventListener('scroll', handleScroll, true);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      window.removeEventListener('scroll', handleScroll, true);
+    };
+  }, []);
+
+  const handleCardClick = (cardStatus) => {
+    setFilters(prev => ({
+      ...prev,
+      status: prev.status === cardStatus ? 'ALL' : cardStatus
+    }));
+  };
+
+  const handleSaveExtendFollowUp = async (e) => {
+    e.preventDefault();
+    setExtendFormErrors({});
+
+    const errors = {};
+    if (!extendForm.promised_date) errors.promised_date = 'New promised date is required';
+    
+    const today = new Date().toISOString().split('T')[0];
+    if (extendForm.promised_date && extendForm.promised_date <= today) {
+      errors.promised_date = 'Date must be in the future';
+    }
+    if (selectedItem && extendForm.promised_date && extendForm.promised_date <= selectedItem.promised_date) {
+      errors.promised_date = 'New date must be later than current promise date';
+    }
+    if (extendForm.reason && countWords(extendForm.reason) > 25) {
+      errors.reason = 'Maximum 25 words allowed.';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setExtendFormErrors(errors);
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await schoolService.extendFeeFollowUp(selectedItem.id, {
+        promised_date: extendForm.promised_date,
+        reason: extendForm.reason
+      });
+      toast.success('Commitment extended successfully');
+      setShowExtendModal(false);
+      fetchFollowUps(pagination.page);
+    } catch (err) {
+      console.error(err);
+      if (err.fields) {
+        setExtendFormErrors(err.fields);
+      } else {
+        toast.error('Failed to extend commitment');
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   // 1. Fetch listing and filters on mount / change
   const fetchFollowUps = async (pageNumber = 1) => {
@@ -268,53 +357,7 @@ export default function FeeFollowUpPage() {
     }
   };
 
-  // Export CSV Reports
-  const handleExportReport = () => {
-    const headers = ["Student Name", "Admission Number", "Class", "Parent Name", "Mobile Number", "Pending Amount", "Promised Payment Date", "Status", "Created By", "Created On"];
-    const rows = items.map(item => [
-      item.student_name,
-      item.admission_no,
-      item.class_name || '-',
-      item.parent_name || '-',
-      item.mobile_number || '-',
-      item.pending_amount,
-      item.promised_date,
-      item.status,
-      item.creator_name || '-',
-      new Date(item.created_at).toLocaleDateString()
-    ]);
 
-    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" 
-      + [headers.join(","), ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(","))].join("\n");
-      
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Fee_FollowUps_Report_${new Date().toISOString().slice(0,10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  // Export PDF Report
-  const handleExportPDF = () => {
-    const element = document.getElementById('followup-report-area');
-    if (!element) return;
-
-    const opt = {
-      margin: 10,
-      filename: `Fee_Followups_Report_${new Date().toISOString().slice(0,10)}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
-    };
-    
-    // Set loading indicator
-    toast.info('Generating PDF report...');
-    window.html2pdf().from(element).set(opt).save()
-      .then(() => toast.success('PDF exported successfully'))
-      .catch(() => toast.error('Failed to generate PDF'));
-  };
 
   // Badge Status Mappings
   const getStatusBadge = (status) => {
@@ -367,35 +410,28 @@ export default function FeeFollowUpPage() {
           >
             <Plus className="h-4 w-4" /> Add Follow-up
           </Button>
-          <Button 
-            variant="outline" 
-            onClick={handleExportReport}
-            className="flex items-center gap-1.5 font-bold text-xs text-text-primary border-border bg-surface hover:bg-hover"
-          >
-            Export Excel
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={handleExportPDF}
-            className="flex items-center gap-1.5 font-bold text-xs text-text-primary border-border bg-surface hover:bg-hover"
-          >
-            Export PDF
-          </Button>
         </div>
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {[
-          { label: 'Pending Follow-ups', count: stats.pending, color: 'text-blue-600 bg-blue-500/10', icon: Clock },
-          { label: 'Due Today', count: stats.due_today, color: 'text-orange-600 bg-orange-500/10', icon: AlertCircle },
-          { label: 'Upcoming', count: stats.upcoming, color: 'text-purple-600 bg-purple-500/10', icon: Calendar },
-          { label: 'Overdue', count: stats.overdue, color: 'text-red-600 bg-red-500/10 animate-pulse', icon: AlertTriangle },
-          { label: 'Completed', count: stats.completed, color: 'text-emerald-600 bg-emerald-500/10', icon: CheckCircle }
+          { label: 'Pending Follow-ups', count: stats.pending, color: 'text-blue-600 bg-blue-500/10', icon: Clock, status: 'PENDING' },
+          { label: 'Due Today', count: stats.due_today, color: 'text-orange-600 bg-orange-500/10', icon: AlertCircle, status: 'DUE_TODAY' },
+          { label: 'Upcoming', count: stats.upcoming, color: 'text-purple-600 bg-purple-500/10', icon: Calendar, status: 'UPCOMING' },
+          { label: 'Overdue', count: stats.overdue, color: 'text-red-600 bg-red-500/10 animate-pulse', icon: AlertTriangle, status: 'OVERDUE' },
+          { label: 'Completed', count: stats.completed, color: 'text-emerald-600 bg-emerald-500/10', icon: CheckCircle, status: 'COMPLETED' }
         ].map((c, i) => {
           const Icon = c.icon;
+          const isActive = filters.status === c.status;
           return (
-            <Card key={i} className="shadow-2xs border border-border bg-surface">
+            <Card 
+              key={i} 
+              onClick={() => handleCardClick(c.status)}
+              className={`shadow-2xs border cursor-pointer select-none transition-all duration-200 bg-surface ${
+                isActive ? 'border-primary ring-2 ring-primary/10 scale-102 z-10' : 'border-border hover:border-zinc-400'
+              }`}
+            >
               <CardContent className="p-4 flex flex-col justify-between h-24">
                 <span className="text-[10px] text-text-muted font-bold uppercase tracking-wider">{c.label}</span>
                 <div className="flex items-baseline justify-between mt-2">
@@ -412,119 +448,19 @@ export default function FeeFollowUpPage() {
 
       {/* Filters Section */}
       <Card className="shadow-2xs border border-border bg-surface p-4">
-        <CardContent className="p-0 space-y-4">
-          <div className="flex items-center justify-between border-b border-border pb-2">
-            <span className="text-xs font-bold text-text-primary uppercase tracking-wider flex items-center gap-1.5">
-              <Filter className="h-3.5 w-3.5" /> Filters
-            </span>
-            <button 
-              onClick={handleClearFilters}
-              className="text-[10px] text-primary hover:underline font-bold"
-            >
-              Clear Filters
-            </button>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            
-            {/* Status Filter */}
-            <div className="space-y-1.5">
-              <label className="text-[10px] text-text-secondary font-bold uppercase">Status</label>
-              <select
-                value={filters.status}
-                onChange={e => setFilters(prev => ({ ...prev, status: e.target.value }))}
-                className="w-full bg-surface border border-border rounded-lg p-2 text-xs font-semibold focus:outline-hidden text-text-primary"
-              >
-                <option value="ALL">All Commitments</option>
-                <option value="PENDING">Pending</option>
-                <option value="DUE_TODAY">Due Today</option>
-                <option value="UPCOMING">Upcoming</option>
-                <option value="OVERDUE">Overdue</option>
-                <option value="COMPLETED">Completed</option>
-              </select>
-            </div>
-
-            {/* Class Filter */}
-            <div className="space-y-1.5">
-              <label className="text-[10px] text-text-secondary font-bold uppercase">Class</label>
-              <select
-                value={filters.class_id}
-                onChange={e => setFilters(prev => ({ ...prev, class_id: e.target.value }))}
-                className="w-full bg-surface border border-border rounded-lg p-2 text-xs font-semibold focus:outline-hidden text-text-primary"
-              >
-                <option value="">All Classes</option>
-                {classes.map(c => (
-                  <option key={c.id} value={c.id}>{c.name} {c.section ? `- ${c.section}` : ''}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Academic Year Filter */}
-            <div className="space-y-1.5">
-              <label className="text-[10px] text-text-secondary font-bold uppercase">Academic Year</label>
-              <select
-                value={filters.academic_year_id}
-                onChange={e => setFilters(prev => ({ ...prev, academic_year_id: e.target.value }))}
-                className="w-full bg-surface border border-border rounded-lg p-2 text-xs font-semibold focus:outline-hidden text-text-primary"
-              >
-                {academicYears.map(y => (
-                  <option key={y.id} value={y.id}>{y.name} {y.status === 'ACTIVE' ? '(Current)' : ''}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Date Range Start */}
-            <div className="space-y-1.5">
-              <label className="text-[10px] text-text-secondary font-bold uppercase">Promised From Date</label>
+        <CardContent className="p-0">
+          <div className="flex flex-col gap-1.5 max-w-sm">
+            <label className="text-[10px] text-text-secondary font-bold uppercase">Search Student</label>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-text-muted" />
               <Input
-                type="date"
-                value={filters.start_date}
-                onChange={e => setFilters(prev => ({ ...prev, start_date: e.target.value }))}
-                className="w-full text-xs font-semibold text-text-primary p-2 border border-border rounded-lg bg-surface focus:outline-hidden"
+                type="text"
+                placeholder="Search by name, admission no or roll no..."
+                value={filters.student_search}
+                onChange={e => setFilters(prev => ({ ...prev, student_search: e.target.value }))}
+                className="pl-8 text-xs font-semibold text-text-primary border border-border bg-surface rounded-lg w-full focus:outline-hidden"
               />
             </div>
-
-            {/* Date Range End */}
-            <div className="space-y-1.5">
-              <label className="text-[10px] text-text-secondary font-bold uppercase">Promised To Date</label>
-              <Input
-                type="date"
-                value={filters.end_date}
-                onChange={e => setFilters(prev => ({ ...prev, end_date: e.target.value }))}
-                className="w-full text-xs font-semibold text-text-primary p-2 border border-border rounded-lg bg-surface focus:outline-hidden"
-              />
-            </div>
-
-            {/* Student Search */}
-            <div className="space-y-1.5">
-              <label className="text-[10px] text-text-secondary font-bold uppercase">Student Search</label>
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-text-muted" />
-                <Input
-                  type="text"
-                  placeholder="Search student or admission no..."
-                  value={filters.student_search}
-                  onChange={e => setFilters(prev => ({ ...prev, student_search: e.target.value }))}
-                  className="pl-8 text-xs font-semibold text-text-primary border border-border bg-surface rounded-lg w-full focus:outline-hidden"
-                />
-              </div>
-            </div>
-
-            {/* Parent Mobile Search */}
-            <div className="space-y-1.5">
-              <label className="text-[10px] text-text-secondary font-bold uppercase">Parent Mobile</label>
-              <div className="relative">
-                <Phone className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-text-muted" />
-                <Input
-                  type="text"
-                  placeholder="Mobile number..."
-                  value={filters.parent_mobile}
-                  onChange={e => setFilters(prev => ({ ...prev, parent_mobile: e.target.value }))}
-                  className="pl-8 text-xs font-semibold text-text-primary border border-border bg-surface rounded-lg w-full focus:outline-hidden"
-                />
-              </div>
-            </div>
-
           </div>
         </CardContent>
       </Card>
@@ -545,109 +481,66 @@ export default function FeeFollowUpPage() {
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-border text-[10px] text-text-muted font-bold uppercase tracking-wider">
-                  <th className="py-3 px-4">Student Name</th>
-                  <th className="py-3 px-4">Adm. No</th>
-                  <th className="py-3 px-4">Class</th>
-                  <th className="py-3 px-4">Parent Name</th>
-                  <th className="py-3 px-4">Mobile</th>
-                  <th className="py-3 px-4 text-right">Pending Amount</th>
-                  <th className="py-3 px-4">Promise Date</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4">Created By</th>
-                  <th className="py-3 px-4 text-center select-none no-pdf">Actions</th>
+                  <th className="py-3 px-4 whitespace-nowrap">Student Name</th>
+                  <th className="py-3 px-4 whitespace-nowrap">Class</th>
+                  <th className="py-3 px-4 whitespace-nowrap">Roll Number</th>
+                  <th className="py-3 px-4 whitespace-nowrap">Mobile</th>
+                  <th className="py-3 px-4 text-right whitespace-nowrap">Pending Amount</th>
+                  <th className="py-3 px-4 whitespace-nowrap">Promise Date</th>
+                  <th className="py-3 px-4 whitespace-nowrap">Status</th>
+                  <th className="py-3 px-4 text-center select-none no-pdf whitespace-nowrap">Actions</th>
+                  <th className="py-3 px-4 text-center whitespace-nowrap">Extended</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {loading ? (
                   <tr>
-                    <td colSpan={10} className="text-center py-10">
+                    <td colSpan={9} className="text-center py-10">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto" />
                     </td>
                   </tr>
                 ) : items.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="text-center py-10 text-text-muted font-medium">
+                    <td colSpan={9} className="text-center py-10 text-text-muted font-medium">
                       No follow-up records found matching filter criteria.
                     </td>
                   </tr>
                 ) : (
                   items.map((item) => (
                     <tr key={item.id} className="hover:bg-hover transition-colors font-medium text-text-secondary">
-                      <td className="py-3.5 px-4 font-bold text-text-primary">{item.student_name}</td>
-                      <td className="py-3.5 px-4 font-mono">{item.admission_no}</td>
-                      <td className="py-3.5 px-4 text-text-primary uppercase font-bold">{item.class_name || '-'}</td>
-                      <td className="py-3.5 px-4">{item.parent_name || '-'}</td>
-                      <td className="py-3.5 px-4 font-mono">{item.mobile_number || '-'}</td>
-                      <td className="py-3.5 px-4 text-right font-mono font-bold text-text-primary">
+                      <td className="py-3.5 px-4 font-bold text-text-primary whitespace-nowrap">{item.student_name}</td>
+                      <td className="py-3.5 px-4 text-text-primary uppercase font-bold whitespace-nowrap">{item.class_name || '—'}</td>
+                      <td className="py-3.5 px-4 font-mono whitespace-nowrap">{item.roll_no || '—'}</td>
+                      <td className="py-3.5 px-4 font-mono whitespace-nowrap">{item.mobile_number || '—'}</td>
+                      <td className="py-3.5 px-4 text-right font-mono font-bold text-text-primary whitespace-nowrap">
                         ₹{number_format(item.pending_amount, 2)}
                       </td>
-                      <td className="py-3.5 px-4 font-semibold text-text-primary">
+                      <td className="py-3.5 px-4 font-semibold text-text-primary whitespace-nowrap">
                         {new Date(item.promised_date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
                       </td>
-                      <td className="py-3.5 px-4">{getStatusBadge(item.status)}</td>
-                      <td className="py-3.5 px-4 text-[11px]">{item.creator_name || '-'}</td>
-                      <td className="py-3.5 px-4 flex items-center justify-center gap-1.5 select-none no-pdf">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          title="View Details"
-                          onClick={() => {
-                            setSelectedItem(item);
-                            setShowDetailsModal(true);
+                      <td className="py-3.5 px-4 whitespace-nowrap">{getStatusBadge(item.status)}</td>
+                      <td className="py-3.5 px-4 text-center select-none no-pdf relative whitespace-nowrap">
+                        <button 
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            if (activeDropdownId === item.id) {
+                              setActiveDropdownId(null);
+                              setDropdownCoords(null);
+                            } else {
+                              const rect = ev.currentTarget.getBoundingClientRect();
+                              setDropdownCoords({
+                                top: rect.bottom + window.scrollY,
+                                left: rect.right - 145 + window.scrollX,
+                              });
+                              setActiveDropdownId(item.id);
+                            }
                           }}
-                          className="h-7 w-7 text-text-secondary hover:text-primary hover:bg-primary/10 rounded-lg"
+                          className="p-1.5 hover:bg-hover rounded-lg transition-all"
                         >
-                          <Eye className="h-3.5 w-3.5" />
-                        </Button>
-                        {item.status !== 'COMPLETED' && (
-                          <>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              title="Edit Followup"
-                              onClick={() => {
-                                setSelectedItem(item);
-                                setModalMode('edit');
-                                setForm({
-                                  student_id: item.student_id,
-                                  student_name: item.student_name,
-                                  pending_amount: item.pending_amount,
-                                  promised_date: item.promised_date,
-                                  reason: item.reason,
-                                  reminder_notes: item.reminder_notes || ''
-                                });
-                                setStudentSearchVal(item.student_name);
-                                setFormErrors({});
-                                setShowAddEditModal(true);
-                              }}
-                              className="h-7 w-7 text-text-secondary hover:text-primary hover:bg-primary/10 rounded-lg"
-                            >
-                              <Edit2 className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              title="Mark Contacted"
-                              onClick={() => handleMarkContacted(item)}
-                              className="h-7 w-7 text-text-secondary hover:text-orange-600 hover:bg-orange-500/10 rounded-lg"
-                            >
-                              <PhoneCall className="h-3.5 w-3.5" />
-                            </Button>
-                          </>
-                        )}
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          title="Delete Record"
-                          onClick={() => {
-                            setSelectedItem(item);
-                            setShowDeleteModal(true);
-                          }}
-                          className="h-7 w-7 text-text-secondary hover:text-red-600 hover:bg-red-500/10 rounded-lg"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                          <MoreVertical className="h-4 w-4 text-text-muted" />
+                        </button>
                       </td>
+                      <td className="py-3.5 px-4 text-center font-mono font-bold whitespace-nowrap">{item.extended_count || 0}</td>
                     </tr>
                   ))
                 )}
@@ -719,7 +612,8 @@ export default function FeeFollowUpPage() {
                       {studentsList
                         .filter(s => 
                           (s.name && s.name.toLowerCase().includes(studentSearchVal.toLowerCase())) || 
-                          (s.admission_no && s.admission_no.toLowerCase().includes(studentSearchVal.toLowerCase()))
+                          (s.admission_no && s.admission_no.toLowerCase().includes(studentSearchVal.toLowerCase())) ||
+                          (s.roll_no && s.roll_no.toString().toLowerCase().includes(studentSearchVal.toLowerCase()))
                         )
                         .slice(0, 10)
                         .map(s => (
@@ -730,12 +624,15 @@ export default function FeeFollowUpPage() {
                           >
                             <div>
                               <div className="font-bold text-text-primary text-xs">{s.name}</div>
-                              <div className="text-[10px] text-text-muted mt-0.5">Adm. No: {s.admission_no} | Class: {s.class_name}</div>
+                              <div className="text-[10px] text-text-muted mt-0.5">Roll No: {s.roll_no || '—'} | Class: {s.class_name}</div>
                             </div>
                             <ChevronDown className="h-3 w-3 text-text-muted -rotate-90" />
                           </div>
                         ))}
-                      {studentsList.filter(s => s.name.toLowerCase().includes(studentSearchVal.toLowerCase())).length === 0 && (
+                      {studentsList.filter(s => 
+                        s.name.toLowerCase().includes(studentSearchVal.toLowerCase()) ||
+                        (s.roll_no && s.roll_no.toString().toLowerCase().includes(studentSearchVal.toLowerCase()))
+                      ).length === 0 && (
                         <div className="p-4 text-center text-text-muted text-xs">No matching students found</div>
                       )}
                     </div>
@@ -794,22 +691,12 @@ export default function FeeFollowUpPage() {
                 className="w-full border border-border bg-surface rounded-lg p-2.5 text-xs text-text-primary font-semibold focus:outline-hidden focus:border-primary resize-y"
               />
               <div className="flex items-center justify-between text-[9px] text-text-muted">
-                <span>Maximum 500 characters</span>
-                <span>{form.reason.length}/500</span>
+                <span>Maximum 25 words allowed</span>
+                <span className={countWords(form.reason) > 25 ? "text-red-500 font-bold" : ""}>
+                  {countWords(form.reason)} / 25 words
+                </span>
               </div>
               {formErrors.reason && <p className="text-red-600 text-[10px] font-bold">{formErrors.reason}</p>}
-            </div>
-
-            {/* Reminder Notes */}
-            <div className="space-y-1.5">
-              <label className="text-[10px] text-text-secondary font-bold uppercase">Internal Reminder Notes (Optional)</label>
-              <Input
-                type="text"
-                placeholder="Call next Monday morning..."
-                value={form.reminder_notes}
-                onChange={e => setForm(prev => ({ ...prev, reminder_notes: e.target.value }))}
-                className="text-xs font-semibold text-text-primary border border-border bg-surface rounded-lg w-full focus:outline-hidden"
-              />
             </div>
 
             {/* Actions */}
@@ -849,7 +736,7 @@ export default function FeeFollowUpPage() {
               <div>
                 <span className="text-[9px] text-text-muted uppercase font-bold block">Student</span>
                 <span className="font-extrabold text-text-primary text-sm mt-0.5 block">{selectedItem.student_name}</span>
-                <span className="text-[10px] text-text-muted mt-0.5 block">Adm: {selectedItem.admission_no} | Class {selectedItem.class_name}</span>
+                <span className="text-[10px] text-text-muted mt-0.5 block">Roll No: {selectedItem.roll_no || '—'} | Class {selectedItem.class_name}</span>
               </div>
               <div className="text-right">
                 <span className="text-[9px] text-text-muted uppercase font-bold block">Status</span>
@@ -870,19 +757,13 @@ export default function FeeFollowUpPage() {
             {/* Commitment Details */}
             <div className="space-y-2 border-b border-border pb-4">
               <div>
-                <span className="text-[9px] text-text-muted uppercase font-bold block">Parent / Mobile</span>
-                <span className="font-bold text-text-primary text-xs block">{selectedItem.parent_name || '-'} (Mobile: {selectedItem.mobile_number || '-'})</span>
+                <span className="text-[9px] text-text-muted uppercase font-bold block">Contact Mobile</span>
+                <span className="font-bold text-text-primary text-xs block">{selectedItem.mobile_number || '—'}</span>
               </div>
               <div>
                 <span className="text-[9px] text-text-muted uppercase font-bold block">Commitment Reason</span>
                 <p className="text-text-primary text-xs italic leading-relaxed pt-0.5 whitespace-pre-line">{selectedItem.reason}</p>
               </div>
-              {selectedItem.reminder_notes && (
-                <div>
-                  <span className="text-[9px] text-text-muted uppercase font-bold block">Reminder Notes</span>
-                  <p className="text-text-primary text-xs leading-relaxed pt-0.5">{selectedItem.reminder_notes}</p>
-                </div>
-              )}
             </div>
 
             {/* Notes history timeline */}
@@ -984,6 +865,167 @@ export default function FeeFollowUpPage() {
             </div>
           </div>
         </Dialog>
+      )}
+      {/* EXTEND COMMITMENT MODAL */}
+      {showExtendModal && selectedItem && (
+        <Dialog
+          isOpen={showExtendModal}
+          title="Extend Payment Commitment"
+          onClose={() => setShowExtendModal(false)}
+        >
+          <form onSubmit={handleSaveExtendFollowUp} className="space-y-4 text-xs font-medium text-text-secondary max-w-md">
+            <div>
+              <span className="text-[10px] text-text-muted uppercase font-bold block">Student</span>
+              <span className="font-extrabold text-text-primary text-sm mt-0.5 block">{selectedItem.student_name}</span>
+              <span className="text-[10px] text-text-muted mt-0.5 block">Roll No: {selectedItem.roll_no || '—'} | Class {selectedItem.class_name}</span>
+            </div>
+
+            {/* New Promised Date */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] text-text-secondary font-bold uppercase">New Promised Date *</label>
+              <div className="relative">
+                <Calendar className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-text-muted" />
+                <Input
+                  type="date"
+                  value={extendForm.promised_date}
+                  onChange={e => setExtendForm(prev => ({ ...prev, promised_date: e.target.value }))}
+                  className="pl-8 text-xs font-semibold text-text-primary border border-border bg-surface rounded-lg w-full focus:outline-hidden"
+                />
+              </div>
+              {extendFormErrors.promised_date && <p className="text-red-600 text-[10px] font-bold">{extendFormErrors.promised_date}</p>}
+            </div>
+
+            {/* New Reason */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] text-text-secondary font-bold uppercase">Reason / Update Notes (Optional)</label>
+              <textarea
+                rows={3}
+                maxLength={500}
+                placeholder="Reason for extension e.g. delay in crop sale, medical urgency..."
+                value={extendForm.reason}
+                onChange={e => setExtendForm(prev => ({ ...prev, reason: e.target.value }))}
+                className="w-full border border-border bg-surface rounded-lg p-2.5 text-xs text-text-primary font-semibold focus:outline-hidden focus:border-primary resize-y"
+              />
+              <div className="flex items-center justify-between text-[9px] text-text-muted">
+                <span>Maximum 25 words allowed</span>
+                <span className={countWords(extendForm.reason) > 25 ? "text-red-500 font-bold" : ""}>
+                  {countWords(extendForm.reason)} / 25 words
+                </span>
+              </div>
+              {extendFormErrors.reason && <p className="text-red-600 text-[10px] font-bold">{extendFormErrors.reason}</p>}
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-2 border-t border-border pt-4 mt-2 select-none">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setShowExtendModal(false)}
+                className="font-bold text-xs hover:bg-hover px-4 py-2"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={submitting}
+                className="font-bold text-xs px-4 py-2 shadow-xs"
+              >
+                {submitting ? 'Extending...' : 'Extend Commitment'}
+              </Button>
+            </div>
+          </form>
+        </Dialog>
+      )}
+
+      {/* Actions Dropdown Portal */}
+      {activeDropdownId && dropdownCoords && createPortal(
+        <div 
+          ref={dropdownRef}
+          style={{
+            position: 'absolute',
+            top: `${dropdownCoords.top}px`,
+            left: `${dropdownCoords.left}px`,
+          }}
+          className="w-40 bg-surface border border-border shadow-md rounded-xl py-1.5 z-[9999] text-left text-xs text-text-primary animate-in fade-in duration-100"
+        >
+          {(() => {
+            const item = items.find(i => i.id === activeDropdownId);
+            if (!item) return null;
+            return (
+              <>
+                <button 
+                  onClick={() => {
+                    setSelectedItem(item);
+                    setShowDetailsModal(true);
+                    setActiveDropdownId(null);
+                  }}
+                  className="w-full px-3 py-1.5 hover:bg-hover flex items-center gap-1.5 font-semibold text-text-secondary"
+                >
+                  <Eye className="h-3.5 w-3.5 text-text-muted" /> View Details
+                </button>
+                {item.status !== 'COMPLETED' && (
+                  <>
+                    <button 
+                      onClick={() => {
+                        setSelectedItem(item);
+                        setModalMode('edit');
+                        setForm({
+                          student_id: item.student_id,
+                          student_name: item.student_name,
+                          pending_amount: item.pending_amount,
+                          promised_date: item.promised_date,
+                          reason: item.reason,
+                        });
+                        setStudentSearchVal(item.student_name);
+                        setFormErrors({});
+                        setShowAddEditModal(true);
+                        setActiveDropdownId(null);
+                      }}
+                      className="w-full px-3 py-1.5 hover:bg-hover flex items-center gap-1.5 font-semibold text-text-secondary"
+                    >
+                      <Edit2 className="h-3.5 w-3.5 text-text-muted" /> Edit
+                    </button>
+                    <button 
+                      onClick={() => {
+                        handleMarkContacted(item);
+                        setActiveDropdownId(null);
+                      }}
+                      className="w-full px-3 py-1.5 hover:bg-hover flex items-center gap-1.5 font-semibold text-text-secondary"
+                    >
+                      <PhoneCall className="h-3.5 w-3.5 text-text-muted" /> Call Parent
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setSelectedItem(item);
+                        setExtendForm({
+                          promised_date: '',
+                          reason: '',
+                        });
+                        setExtendFormErrors({});
+                        setShowExtendModal(true);
+                        setActiveDropdownId(null);
+                      }}
+                      className="w-full px-3 py-1.5 hover:bg-hover flex items-center gap-1.5 font-semibold text-text-secondary"
+                    >
+                      <Calendar className="h-3.5 w-3.5 text-text-muted" /> Extend Commitment
+                    </button>
+                  </>
+                )}
+                <button 
+                  onClick={() => {
+                    setSelectedItem(item);
+                    setShowDeleteModal(true);
+                    setActiveDropdownId(null);
+                  }}
+                  className="w-full px-3 py-1.5 hover:bg-hover flex items-center gap-1.5 font-semibold text-red-600 border-t border-border mt-1 pt-1.5"
+                >
+                  <Trash2 className="h-3.5 w-3.5 text-red-400" /> Delete
+                </button>
+              </>
+            );
+          })()}
+        </div>,
+        document.body
       )}
 
     </div>

@@ -9120,7 +9120,7 @@ Only approve the settlement after reviewing all financial records.
         }
 
         if (!empty($filters['student_search'])) {
-            $whereSql .= " AND (s.name LIKE :search OR s.admission_no LIKE :search)";
+            $whereSql .= " AND (s.name LIKE :search OR s.admission_no LIKE :search OR s.roll_no LIKE :search)";
             $whereParams[':search'] = '%' . $filters['student_search'] . '%';
         }
 
@@ -9142,8 +9142,8 @@ Only approve the settlement after reviewing all financial records.
         $limit = !empty($filters['limit']) ? (int)$filters['limit'] : 10;
         $offset = ($page - 1) * $limit;
 
-        $dataSql = "SELECT f.*, s.name AS student_name, s.admission_no, c.name AS class_name, 
-                           s.father_name AS parent_name, s.parent_phone AS mobile_number, u.name AS creator_name
+        $dataSql = "SELECT f.*, s.name AS student_name, s.roll_no, c.name AS class_name, 
+                           COALESCE(NULLIF(s.parent_phone, ''), NULLIF(s.father_phone, ''), NULLIF(s.mother_phone, ''), NULLIF(s.student_mobile, ''), '—') AS mobile_number
                     FROM fee_follow_ups f
                     JOIN students s ON f.student_id = s.id
                     LEFT JOIN classes c ON s.class_id = c.id
@@ -9191,6 +9191,11 @@ Only approve the settlement after reviewing all financial records.
             throw new ValidationException(['reason' => 'Reason cannot exceed 500 characters.']);
         }
 
+        $wordCount = count(preg_split('/\s+/', $reason));
+        if ($wordCount > 25) {
+            throw new ValidationException(['reason' => 'Maximum 25 words allowed.']);
+        }
+
         $today = date('Y-m-d');
         if ($promisedDate <= $today) {
             throw new ValidationException(['promised_date' => 'Promised Date must be in the future.']);
@@ -9206,7 +9211,7 @@ Only approve the settlement after reviewing all financial records.
         $academicYearId = (int)$student['academic_year_id'];
 
         // Get pending amount
-        $dues = $this->getStudentOutstandingBalanceForYear($pdo, $studentId, $schoolId, $academicYearId);
+        $dues = $this->getStudentCurrentOutstandingBalance($pdo, $studentId, $schoolId, $academicYearId);
         $pendingAmount = isset($data['pending_amount']) && $data['pending_amount'] !== '' ? (float)$data['pending_amount'] : $dues;
 
         if ($pendingAmount < 0.0) {
@@ -9216,7 +9221,7 @@ Only approve the settlement after reviewing all financial records.
         // Insert follow-up record
         $stmtIns = $pdo->prepare("
             INSERT INTO fee_follow_ups (school_id, student_id, academic_year_id, pending_amount, promised_date, reason, reminder_notes, status, created_by)
-            VALUES (:sid, :student_id, :ayid, :amount, :promised_date, :reason, :notes, 'PENDING', :created_by)
+            VALUES (:sid, :student_id, :ayid, :amount, :promised_date, :reason, NULL, 'PENDING', :created_by)
         ");
         $stmtIns->execute([
             ':sid' => $schoolId,
@@ -9225,7 +9230,6 @@ Only approve the settlement after reviewing all financial records.
             ':amount' => $pendingAmount,
             ':promised_date' => $promisedDate,
             ':reason' => $reason,
-            ':notes' => !empty($data['reminder_notes']) ? trim($data['reminder_notes']) : null,
             ':created_by' => $user['id']
         ]);
         $followUpId = (int)$pdo->lastInsertId();
@@ -9297,6 +9301,12 @@ Only approve the settlement after reviewing all financial records.
         if (strlen($reason) > 500) {
             throw new ValidationException(['reason' => 'Reason cannot exceed 500 characters.']);
         }
+
+        $wordCount = count(preg_split('/\s+/', $reason));
+        if ($wordCount > 25) {
+            throw new ValidationException(['reason' => 'Maximum 25 words allowed.']);
+        }
+
         if ($pendingAmount < 0.0) {
             throw new ValidationException(['pending_amount' => 'Pending Amount cannot be negative.']);
         }
@@ -9316,20 +9326,97 @@ Only approve the settlement after reviewing all financial records.
         $stmtUp = $pdo->prepare("
             UPDATE fee_follow_ups 
             SET promised_date = :promised_date, reason = :reason, pending_amount = :amount, 
-                reminder_notes = :notes, status = :status
+                reminder_notes = NULL, status = :status
             WHERE id = :id AND school_id = :sid
         ");
         $stmtUp->execute([
             ':promised_date' => $promisedDate,
             ':reason' => $reason,
             ':amount' => $pendingAmount,
-            ':notes' => !empty($data['reminder_notes']) ? trim($data['reminder_notes']) : null,
             ':status' => $status,
             ':id' => $id,
             ':sid' => $schoolId
         ]);
 
         $this->log('Fee follow-up updated', ['id' => $id]);
+
+        return ['success' => true];
+    }
+
+    public function extendFeeFollowUp(array $user, int $id, array $data): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->classRepo->getPdo();
+
+        $stmtCheck = $pdo->prepare("SELECT id, status, promised_date FROM fee_follow_ups WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtCheck->execute([':id' => $id, ':sid' => $schoolId]);
+        $followUp = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+        if (!$followUp) {
+            throw new NotFoundException('Fee follow-up not found.');
+        }
+
+        if (empty($data['promised_date'])) {
+            throw new ValidationException(['promised_date' => 'New Promised Payment Date is required']);
+        }
+
+        $promisedDate = $data['promised_date'];
+        $reason = !empty($data['reason']) ? trim($data['reason']) : '';
+
+        if (strlen($reason) > 500) {
+            throw new ValidationException(['reason' => 'Reason cannot exceed 500 characters.']);
+        }
+
+        $today = date('Y-m-d');
+        if ($promisedDate <= $today) {
+            throw new ValidationException(['promised_date' => 'New promised date must be in the future.']);
+        }
+        if ($promisedDate <= $followUp['promised_date']) {
+            throw new ValidationException(['promised_date' => 'New promised date must be later than the current promised date.']);
+        }
+
+        if (!empty($reason)) {
+            $wordCount = count(preg_split('/\s+/', trim($reason)));
+            if ($wordCount > 25) {
+                throw new ValidationException(['reason' => 'Maximum 25 words allowed.']);
+            }
+        }
+
+        $status = $followUp['status'];
+        if ($status !== 'COMPLETED') {
+            $status = 'PENDING';
+        }
+
+        $stmtUp = $pdo->prepare("
+            UPDATE fee_follow_ups 
+            SET promised_date = :promised_date, reason = CASE WHEN :reason != '' THEN :reason ELSE reason END, 
+                status = :status, extended_count = extended_count + 1
+            WHERE id = :id AND school_id = :sid
+        ");
+        $stmtUp->execute([
+            ':promised_date' => $promisedDate,
+            ':reason' => $reason,
+            ':status' => $status,
+            ':id' => $id,
+            ':sid' => $schoolId
+        ]);
+
+        $creatorId = (int)$user['id'];
+        $logComment = "Commitment extended to " . date('d M Y', strtotime($promisedDate));
+        if (!empty($reason)) {
+            $logComment .= ". Reason: " . $reason;
+        }
+
+        $stmtNote = $pdo->prepare("
+            INSERT INTO fee_follow_up_notes (follow_up_id, comment, created_by)
+            VALUES (:fid, :comment, :creator)
+        ");
+        $stmtNote->execute([
+            ':fid' => $id,
+            ':comment' => $logComment,
+            ':creator' => $creatorId
+        ]);
+
+        $this->log('Fee follow-up extended', ['id' => $id, 'new_date' => $promisedDate]);
 
         return ['success' => true];
     }
@@ -9412,23 +9499,13 @@ Only approve the settlement after reviewing all financial records.
         return ['success' => true];
     }
 
-    public function getStudentOutstandingFee(array $user, int $studentId): array
+    public function getStudentCurrentOutstandingBalance(PDO $pdo, int $studentId, int $schoolId, int $academicYearId): float
     {
-        $schoolId = $this->getSchoolId($user);
-        $pdo = $this->classRepo->getPdo();
-
-        $stmtStu = $pdo->prepare("SELECT class_id, academic_year_id FROM students WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtStu = $pdo->prepare("SELECT class_id FROM students WHERE id = :id AND school_id = :sid LIMIT 1");
         $stmtStu->execute([':id' => $studentId, ':sid' => $schoolId]);
-        $student = $stmtStu->fetch(PDO::FETCH_ASSOC);
-        if (!$student) {
-            throw new NotFoundException('Student not found');
-        }
-        
-        $classId = $student['class_id'];
-        $academicYearId = (int)$student['academic_year_id'];
-        
-        if ($classId === null) {
-            return ['outstanding_balance' => 0.0];
+        $classId = $stmtStu->fetchColumn();
+        if ($classId === false || $classId === null) {
+            return 0.0;
         }
 
         // Fetch monthly fees config
@@ -9495,7 +9572,25 @@ Only approve the settlement after reviewing all financial records.
         ]);
         $outstanding += (float)$stmtAddPending->fetchColumn();
 
-        return ['outstanding_balance' => $outstanding];
+        return $outstanding;
+    }
+
+    public function getStudentOutstandingFee(array $user, int $studentId): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->classRepo->getPdo();
+
+        $stmtStu = $pdo->prepare("SELECT academic_year_id FROM students WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtStu->execute([':id' => $studentId, ':sid' => $schoolId]);
+        $student = $stmtStu->fetch(PDO::FETCH_ASSOC);
+        if (!$student) {
+            throw new NotFoundException('Student not found');
+        }
+        
+        $academicYearId = (int)$student['academic_year_id'];
+        $dues = $this->getStudentCurrentOutstandingBalance($pdo, $studentId, $schoolId, $academicYearId);
+
+        return ['outstanding_balance' => $dues];
     }
 
     public function getStudentFollowUps(array $user, int $studentId): array
@@ -9614,7 +9709,7 @@ Only approve the settlement after reviewing all financial records.
             return;
         }
 
-        $dues = $this->getStudentOutstandingBalanceForYear($pdo, $studentId, $schoolId, (int)$ayId);
+        $dues = $this->getStudentCurrentOutstandingBalance($pdo, $studentId, $schoolId, (int)$ayId);
         
         if ($dues <= 0.0) {
             $stmtUpdate = $pdo->prepare("
