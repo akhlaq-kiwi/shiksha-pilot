@@ -9125,7 +9125,7 @@ Only approve the settlement after reviewing all financial records.
         }
 
         if (!empty($filters['parent_mobile'])) {
-            $whereSql .= " AND s.mobile LIKE :mobile";
+            $whereSql .= " AND s.parent_phone LIKE :mobile";
             $whereParams[':mobile'] = '%' . $filters['parent_mobile'] . '%';
         }
 
@@ -9143,7 +9143,7 @@ Only approve the settlement after reviewing all financial records.
         $offset = ($page - 1) * $limit;
 
         $dataSql = "SELECT f.*, s.name AS student_name, s.admission_no, c.name AS class_name, 
-                           s.father_name AS parent_name, s.mobile AS mobile_number, u.name AS creator_name
+                           s.father_name AS parent_name, s.parent_phone AS mobile_number, u.name AS creator_name
                     FROM fee_follow_ups f
                     JOIN students s ON f.student_id = s.id
                     LEFT JOIN classes c ON s.class_id = c.id
@@ -9242,7 +9242,7 @@ Only approve the settlement after reviewing all financial records.
 
         $stmt = $pdo->prepare("
             SELECT f.*, s.name AS student_name, s.admission_no, c.name AS class_name, 
-                   s.father_name AS parent_name, s.mobile AS mobile_number, u.name AS creator_name
+                   s.father_name AS parent_name, s.parent_phone AS mobile_number, u.name AS creator_name
             FROM fee_follow_ups f
             JOIN students s ON f.student_id = s.id
             LEFT JOIN classes c ON s.class_id = c.id

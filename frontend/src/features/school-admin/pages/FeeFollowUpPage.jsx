@@ -12,7 +12,7 @@ import { useToast } from '../../../common/components/Toast';
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 
 export default function FeeFollowUpPage() {
-  const { addToast } = useToast();
+  const toast = useToast();
   const { currentYear, academicYears } = useAcademicYear();
 
   // Listing / Filter States
@@ -86,7 +86,7 @@ export default function FeeFollowUpPage() {
       setPagination(res.pagination || { total_items: 0, page: 1, limit: 10, total_pages: 1 });
     } catch (err) {
       console.error(err);
-      addToast('error', 'Failed to load fee follow-ups');
+      toast.error('Failed to load fee follow-ups');
     } finally {
       setLoading(false);
     }
@@ -197,7 +197,7 @@ export default function FeeFollowUpPage() {
           pending_amount: form.pending_amount,
           reminder_notes: form.reminder_notes
         });
-        addToast('success', 'Follow-up saved successfully');
+        toast.success('Follow-up saved successfully');
       } else {
         await schoolService.updateFeeFollowUp(selectedItem.id, {
           promised_date: form.promised_date,
@@ -205,7 +205,7 @@ export default function FeeFollowUpPage() {
           pending_amount: form.pending_amount,
           reminder_notes: form.reminder_notes
         });
-        addToast('success', 'Follow-up updated successfully');
+        toast.success('Follow-up updated successfully');
       }
       setShowAddEditModal(false);
       fetchFollowUps(pagination.page);
@@ -214,7 +214,7 @@ export default function FeeFollowUpPage() {
       if (err.fields) {
         setFormErrors(err.fields);
       } else {
-        addToast('error', 'Failed to save follow-up');
+        toast.error('Failed to save follow-up');
       }
     } finally {
       setSubmitting(false);
@@ -226,12 +226,12 @@ export default function FeeFollowUpPage() {
     setSubmitting(true);
     try {
       await schoolService.deleteFeeFollowUp(selectedItem.id);
-      addToast('success', 'Follow-up deleted successfully');
+      toast.success('Follow-up deleted successfully');
       setShowDeleteModal(false);
       fetchFollowUps(pagination.page);
     } catch (err) {
       console.error(err);
-      addToast('error', 'Failed to delete follow-up');
+      toast.error('Failed to delete follow-up');
     } finally {
       setSubmitting(false);
     }
@@ -241,11 +241,11 @@ export default function FeeFollowUpPage() {
   const handleMarkContacted = async (item) => {
     try {
       await schoolService.markFollowUpContacted(item.id, { comment: 'Contacted parent.' });
-      addToast('success', 'Marked parent as contacted.');
+      toast.success('Marked parent as contacted.');
       fetchFollowUps(pagination.page);
     } catch (err) {
       console.error(err);
-      addToast('error', 'Failed to mark contacted');
+      toast.error('Failed to mark contacted');
     }
   };
 
@@ -260,10 +260,10 @@ export default function FeeFollowUpPage() {
       // Reload details to show updated logs
       const updated = await schoolService.getFeeFollowUpDetails(selectedItem.id);
       setSelectedItem(updated);
-      addToast('success', 'Note added successfully');
+      toast.success('Note added successfully');
     } catch (err) {
       console.error(err);
-      addToast('error', 'Failed to add note');
+      toast.error('Failed to add note');
     }
   };
 
@@ -309,10 +309,10 @@ export default function FeeFollowUpPage() {
     };
     
     // Set loading indicator
-    addToast('info', 'Generating PDF report...');
+    toast.info('Generating PDF report...');
     window.html2pdf().from(element).set(opt).save()
-      .then(() => addToast('success', 'PDF exported successfully'))
-      .catch(() => addToast('error', 'Failed to generate PDF'));
+      .then(() => toast.success('PDF exported successfully'))
+      .catch(() => toast.error('Failed to generate PDF'));
   };
 
   // Badge Status Mappings
