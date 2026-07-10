@@ -9348,7 +9348,7 @@ Only approve the settlement after reviewing all financial records.
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->classRepo->getPdo();
 
-        $stmtCheck = $pdo->prepare("SELECT id, status, promised_date FROM fee_follow_ups WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtCheck = $pdo->prepare("SELECT id, status, promised_date, reason FROM fee_follow_ups WHERE id = :id AND school_id = :sid LIMIT 1");
         $stmtCheck->execute([':id' => $id, ':sid' => $schoolId]);
         $followUp = $stmtCheck->fetch(PDO::FETCH_ASSOC);
         if (!$followUp) {
@@ -9386,15 +9386,17 @@ Only approve the settlement after reviewing all financial records.
             $status = 'PENDING';
         }
 
+        $updateReason = ($reason !== '') ? $reason : $followUp['reason'];
+
         $stmtUp = $pdo->prepare("
             UPDATE fee_follow_ups 
-            SET promised_date = :promised_date, reason = CASE WHEN :reason != '' THEN :reason ELSE reason END, 
+            SET promised_date = :promised_date, reason = :reason, 
                 status = :status, extended_count = extended_count + 1
             WHERE id = :id AND school_id = :sid
         ");
         $stmtUp->execute([
             ':promised_date' => $promisedDate,
-            ':reason' => $reason,
+            ':reason' => $updateReason,
             ':status' => $status,
             ':id' => $id,
             ':sid' => $schoolId
