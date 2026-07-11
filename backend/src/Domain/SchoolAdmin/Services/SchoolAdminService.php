@@ -8573,8 +8573,11 @@ Only approve the settlement after reviewing all financial records.
 
         if (!empty($params['search'])) {
             $searchTerm = '%' . $params['search'] . '%';
-            $conditions[] = "(action LIKE :search OR description LIKE :search OR performed_by LIKE :search OR module LIKE :search)";
-            $queryParams[':search'] = $searchTerm;
+            $conditions[] = "(action LIKE :search_action OR description LIKE :search_desc OR performed_by LIKE :search_perf OR module LIKE :search_mod)";
+            $queryParams[':search_action'] = $searchTerm;
+            $queryParams[':search_desc'] = $searchTerm;
+            $queryParams[':search_perf'] = $searchTerm;
+            $queryParams[':search_mod'] = $searchTerm;
         }
 
         $whereSql = implode(' AND ', $conditions);
@@ -9319,8 +9322,10 @@ Only approve the settlement after reviewing all financial records.
         }
 
         if (!empty($filters['student_search'])) {
-            $whereSql .= " AND (s.name LIKE :search OR s.admission_no LIKE :search OR s.roll_no LIKE :search)";
-            $whereParams[':search'] = '%' . $filters['student_search'] . '%';
+            $whereSql .= " AND (s.name LIKE :search_name OR s.admission_no LIKE :search_adm OR s.roll_no LIKE :search_roll)";
+            $whereParams[':search_name'] = '%' . $filters['student_search'] . '%';
+            $whereParams[':search_adm'] = '%' . $filters['student_search'] . '%';
+            $whereParams[':search_roll'] = '%' . $filters['student_search'] . '%';
         }
 
         if (!empty($filters['parent_mobile'])) {

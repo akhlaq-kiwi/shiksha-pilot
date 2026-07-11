@@ -32,8 +32,12 @@ class StudentRepository extends BaseRepository
         }
 
         if (!empty($filters['search'])) {
-            $where .= ' AND (s.name LIKE :search OR s.admission_no LIKE :search OR s.sr_no LIKE :search OR s.first_name LIKE :search OR s.last_name LIKE :search)';
-            $bindings[':search'] = '%' . $filters['search'] . '%';
+            $where .= ' AND (s.name LIKE :search_name OR s.admission_no LIKE :search_adm OR s.sr_no LIKE :search_sr OR s.first_name LIKE :search_first OR s.last_name LIKE :search_last)';
+            $bindings[':search_name'] = '%' . $filters['search'] . '%';
+            $bindings[':search_adm'] = '%' . $filters['search'] . '%';
+            $bindings[':search_sr'] = '%' . $filters['search'] . '%';
+            $bindings[':search_first'] = '%' . $filters['search'] . '%';
+            $bindings[':search_last'] = '%' . $filters['search'] . '%';
         }
 
         // Handle sorting

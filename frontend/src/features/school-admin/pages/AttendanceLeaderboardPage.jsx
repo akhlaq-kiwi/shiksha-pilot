@@ -88,14 +88,15 @@ export default function AttendanceLeaderboardPage() {
       filename: `Attendance_Leaderboard_${currentYear?.name || 'Session'}_${selectedClassId === 'ALL' ? 'Overall' : 'Class'}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true, letterRendering: true },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+      pagebreak: { mode: 'avoid-all' }
     };
 
     html2pdf().from(printAreaRef.current).set(opt).save();
   };
 
   const handlePrint = () => {
-    const printContent = printAreaRef.current?.innerHTML;
+    const printContent = printAreaRef.current?.outerHTML;
     if (!printContent) return;
 
     const iframe = document.createElement('iframe');
@@ -127,98 +128,12 @@ export default function AttendanceLeaderboardPage() {
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
               }
-              .no-print {
-                display: none !important;
-              }
             }
             body {
               font-family: sans-serif;
-              padding: 20px;
-            }
-            /* Copy Tailwind CSS variables or standard print styling */
-            .podium-container {
-              display: flex;
-              justify-content: center;
-              align-items: flex-end;
-              gap: 20px;
-              margin-top: 40px;
-              padding-bottom: 20px;
-            }
-            .card-print {
-              border: 2px solid #e4e4e7;
-              border-radius: 16px;
-              padding: 20px;
-              text-align: center;
-              width: 200px;
-              background-color: #fafafa;
-            }
-            .rank-1-print {
-              border-color: #fbbf24;
-              background-color: #fffbeb;
-              width: 220px;
-            }
-            .rank-2-print {
-              border-color: #9ca3af;
-              background-color: #f3f4f6;
-            }
-            .rank-3-print {
-              border-color: #d97706;
-              background-color: #fff7ed;
-            }
-            .avatar-print {
-              width: 80px;
-              height: 80px;
-              border-radius: 50%;
-              margin: 0 auto 12px;
-              background-color: #e4e4e7;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              font-weight: bold;
-              overflow: hidden;
-            }
-            .badge-print {
-              font-size: 24px;
-              margin-bottom: 8px;
-            }
-            .name-print {
-              font-weight: 800;
-              font-size: 14px;
-              color: #18181b;
-              margin: 8px 0;
-            }
-            .pct-print {
-              font-size: 20px;
-              font-weight: 900;
-              color: #059669;
-            }
-            .meta-print {
-              font-size: 11px;
-              color: #71717a;
-              margin-top: 6px;
-            }
-            .header-print {
-              text-align: center;
-              border-bottom: 2px solid #e4e4e7;
-              padding-bottom: 20px;
-              margin-bottom: 20px;
-            }
-            .header-title {
-              font-size: 24px;
-              font-weight: 900;
-              margin: 4px 0;
-              text-transform: uppercase;
-              letter-spacing: 1px;
-            }
-            .header-school {
-              font-size: 16px;
-              font-weight: 800;
-              color: #4b5563;
-            }
-            .header-year {
-              font-size: 12px;
-              font-weight: 700;
-              color: #6b7280;
+              padding: 0;
+              margin: 0;
+              background-color: white !important;
             }
           </style>
         </head>
@@ -228,6 +143,11 @@ export default function AttendanceLeaderboardPage() {
       </html>
     `);
     doc.close();
+
+    // Copy styles from main document to iframe to preserve tailwind styling
+    Array.from(document.head.querySelectorAll('link[rel="stylesheet"], style')).forEach(style => {
+      doc.head.appendChild(style.cloneNode(true));
+    });
 
     iframe.contentWindow.focus();
     setTimeout(() => {
@@ -466,9 +386,100 @@ export default function AttendanceLeaderboardPage() {
           </div>
 
           {/* Hidden Print Area: Styled for Landscape Print/PDF Certificate Frame */}
-          <div className="hidden">
-            <div ref={printAreaRef} className="bg-white text-zinc-900 p-12 border-[16px] border-double border-yellow-500 rounded-3xl max-w-5xl mx-auto text-center space-y-8" style={{ width: '268mm', boxSizing: 'border-box' }}>
+          <div style={{ position: 'absolute', left: '-9999px', top: '-9999px', opacity: 0, pointerEvents: 'none' }}>
+            <div ref={printAreaRef} className="bg-white text-zinc-900 pt-5 pb-8 px-8 border-[16px] border-double border-yellow-500 rounded-3xl max-w-5xl mx-auto text-center space-y-4" style={{ width: '277mm', height: '180mm', boxSizing: 'border-box' }}>
               
+              <style>{`
+                .podium-container {
+                  display: flex;
+                  justify-content: center;
+                  align-items: flex-end;
+                  gap: 20px;
+                  margin-top: 16px;
+                  padding-bottom: 8px;
+                }
+                .card-print {
+                  border: 2px solid #e4e4e7;
+                  border-radius: 16px;
+                  padding: 16px;
+                  text-align: center;
+                  width: 190px;
+                  background-color: #fafafa;
+                  box-sizing: border-box;
+                }
+                .rank-1-print {
+                  border-color: #fbbf24;
+                  background-color: #fffbeb;
+                  width: 205px;
+                }
+                .rank-2-print {
+                  border-color: #9ca3af;
+                  background-color: #f3f4f6;
+                }
+                .rank-3-print {
+                  border-color: #d97706;
+                  background-color: #fff7ed;
+                }
+                .avatar-print {
+                  width: 70px;
+                  height: 70px;
+                  border-radius: 50%;
+                  margin: 8px auto 8px;
+                  background-color: #e4e4e7;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  font-weight: bold;
+                  overflow: hidden;
+                  border: 2px solid #e4e4e7;
+                }
+                .badge-print {
+                  font-size: 24px;
+                  margin-bottom: 8px;
+                }
+                .name-print {
+                  font-weight: 800;
+                  font-size: 14px;
+                  color: #18181b;
+                  margin: 8px 0;
+                }
+                .pct-print {
+                  font-size: 20px;
+                  font-weight: 900;
+                  color: #059669;
+                }
+                .meta-print {
+                  font-size: 11px;
+                  color: #71717a;
+                  margin-top: 6px;
+                }
+                .header-print {
+                  text-align: center;
+                  border-bottom: 2px solid #e4e4e7;
+                  padding-bottom: 12px;
+                  margin-bottom: 12px;
+                }
+                .header-title {
+                  font-size: 24px;
+                  font-weight: 900;
+                  margin: 4px 0;
+                  text-transform: uppercase;
+                  letter-spacing: 1px;
+                }
+                .header-school {
+                  font-size: 16px;
+                  font-weight: 800;
+                  color: #4b5563;
+                  margin: 0;
+                }
+                .header-year {
+                  font-size: 12px;
+                  font-weight: 700;
+                  color: #6b7280;
+                  margin: 4px 0 0 0;
+                }
+              `}</style>
+
               {/* Header details */}
               <div className="header-print">
                 <p className="header-school">{schoolProfile?.name || 'SHIKSHA PILOT ACADEMY'}</p>
@@ -477,14 +488,14 @@ export default function AttendanceLeaderboardPage() {
               </div>
 
               {/* Award category description */}
-              <div className="space-y-2 py-4">
-                <p style={{ fontSize: '16px', fontWeight: '500', margin: 0, fontStyle: 'italic', color: '#4b5563' }}>
+              <div className="space-y-1.5 py-1.5">
+                <p style={{ fontSize: '15px', fontWeight: '500', margin: 0, fontStyle: 'italic', color: '#4b5563' }}>
                   This certificate is honorably presented to the top attendance achievers of
                 </p>
-                <h2 style={{ fontSize: '20px', fontWeight: '900', color: '#1f2937', margin: 0, textTransform: 'uppercase' }}>
+                <h2 style={{ fontSize: '18px', fontWeight: '900', color: '#1f2937', margin: 0, textTransform: 'uppercase' }}>
                   {selectedClassNameText}
                 </h2>
-                <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>
+                <p style={{ fontSize: '12px', color: '#6b7280', margin: 0 }}>
                   For demonstrating exceptional commitment, consistency, and dedication to learning throughout the academic session.
                 </p>
               </div>
@@ -514,6 +525,18 @@ export default function AttendanceLeaderboardPage() {
                       <div className="badge-print">{isRank1 ? '🥇' : isRank2 ? '🥈' : '🥉'}</div>
                       <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#b45309' }}>Rank #{winner.rank}</div>
                       
+                      <div className="avatar-print">
+                        {winner.student_photo ? (
+                          <img 
+                            src={winner.student_photo} 
+                            alt={winner.student_name}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        ) : (
+                          <span style={{ fontSize: '24px' }}>{getStudentInitials(winner.student_name)}</span>
+                        )}
+                      </div>
+
                       <div className="name-print">{winner.student_name}</div>
                       <div style={{ fontSize: '10px', color: '#4b5563', marginBottom: '8px' }}>
                         Roll No. {winner.roll_number || '—'} · Class {winner.class_name}
@@ -529,14 +552,14 @@ export default function AttendanceLeaderboardPage() {
               </div>
 
               {/* Footer details */}
-              <div className="flex justify-between items-end pt-8 border-t border-zinc-200 text-left text-xs text-zinc-500 font-medium">
-                <div>
-                  <p>Date Generated: {new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-                  <p>System Record Verification Code: SP-ACH-{currentYear?.id}-{selectedClassId}</p>
+              <div className="flex justify-between items-end pt-4 border-t border-zinc-200 text-left text-xs text-zinc-500 font-medium">
+                <div style={{ textAlign: 'left' }}>
+                  <div style={{ borderBottom: '1px solid #9ca3af', width: '150px', marginBottom: '6px' }}></div>
+                  <p style={{ fontWeight: 'bold', color: '#374151', margin: 0 }}>Teacher Sign</p>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <p style={{ fontWeight: 'bold', color: '#374151' }}>Shiksha Pilot Verification Authority</p>
-                  <p>Secure Academic Achievement Registry</p>
+                  <div style={{ borderBottom: '1px solid #9ca3af', width: '150px', marginBottom: '6px', marginLeft: 'auto' }}></div>
+                  <p style={{ fontWeight: 'bold', color: '#374151', margin: 0 }}>Principal Sign</p>
                 </div>
               </div>
 
