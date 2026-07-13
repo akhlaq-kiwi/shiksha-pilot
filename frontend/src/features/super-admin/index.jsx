@@ -158,14 +158,14 @@ export default function SuperAdminPortal() {
               const Icon = item.icon;
               const active = isActive(item.path, item.exact);
               return (
-                <button
-                  key={item.path}
-                  onClick={() => nav(item.path)}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all flex-shrink-0 ${active ? 'bg-primary text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900' : 'text-text-secondary hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800'}`}
-                >
-                  <Icon className="h-4 w-4" />
-                  <span>{item.label}</span>
-                </button>
+                 <button
+                   key={item.path}
+                   onClick={() => nav(item.path)}
+                   className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all flex-shrink-0 focus-visible:outline-none ${active ? 'bg-primary text-surface dark:bg-primary dark:text-background font-extrabold shadow-xs' : 'text-text-secondary hover:bg-secondary/70 hover:text-text-primary'}`}
+                 >
+                   <Icon className="h-3.5 w-3.5 flex-shrink-0" />
+                   <span>{item.label}</span>
+                 </button>
               );
             })}
           </nav>

@@ -31,6 +31,9 @@ use App\Domain\SchoolAdmin\Repositories\AttendanceRepository;
 use App\Domain\SchoolAdmin\Repositories\ExamRepository;
 use App\Domain\SchoolAdmin\Repositories\FeeRepository;
 use App\Domain\SchoolAdmin\Repositories\FinancialReportRepository;
+use App\Domain\SchoolAdmin\Repositories\LeaveRequestRepository;
+use App\Domain\SchoolAdmin\Services\LeaveRequestService;
+use App\Domain\SchoolAdmin\Controllers\LeaveRequestController;
 use App\Domain\SchoolAdmin\Services\SchoolAdminService;
 use App\Domain\SchoolAdmin\Controllers\SchoolAdminController;
 
@@ -125,7 +128,7 @@ class App
             },
 
             // ── Shared ────────────────────────────────────────────────────────
-            TokenService::class => fn() => new TokenService(),
+            TokenService::class => fn($c) => new TokenService($c->get(Connection::class)),
             \App\Shared\Http\AuditLoggingMiddleware::class => function ($c) {
                 return new \App\Shared\Http\AuditLoggingMiddleware(
                     $c->get(TokenService::class),
@@ -226,6 +229,26 @@ class App
             SchoolAdminController::class => function ($c) {
                 return new SchoolAdminController(
                     $c->get(TokenService::class),
+                    $c->get(SchoolAdminService::class),
+                );
+            },
+
+            LeaveRequestRepository::class => function ($c) {
+                return new LeaveRequestRepository($c->get(Connection::class)->getPdo());
+            },
+
+            LeaveRequestService::class => function ($c) {
+                return new LeaveRequestService(
+                    $c->get(LeaveRequestRepository::class),
+                    $c->get(SchoolAdminService::class),
+                    $c->get(AttendanceRepository::class),
+                );
+            },
+
+            LeaveRequestController::class => function ($c) {
+                return new LeaveRequestController(
+                    $c->get(TokenService::class),
+                    $c->get(LeaveRequestService::class),
                     $c->get(SchoolAdminService::class),
                 );
             },

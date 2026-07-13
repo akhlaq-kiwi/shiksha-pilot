@@ -252,7 +252,7 @@ class SchoolAdminController extends BaseController
     public function getHolidays(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'TEACHER', 'PARENT', 'STUDENT']);
 
         $data = $this->service->getHolidays($user);
         return $this->success($response, $data);
@@ -718,6 +718,58 @@ class SchoolAdminController extends BaseController
         $this->requireRole($user, ['SCHOOL_ADMIN']);
 
         $data = $this->service->getSubscriptionHistory($user);
+
+        return $this->success($response, $data);
+    }
+
+    public function getMenuPermissions(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $data = $this->service->getMenuPermissions($user);
+
+        return $this->success($response, $data);
+    }
+
+    public function saveMenuPermissions(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body = $request->getParsedBody() ?? [];
+        $data = $this->service->saveMenuPermissions($user, $body);
+
+        return $this->success($response, $data, 'Menu permissions updated successfully');
+    }
+
+    public function getClassTeacherAssignments(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $data = $this->service->getClassTeacherAssignments($user);
+
+        return $this->success($response, $data);
+    }
+
+    public function saveClassTeacherAssignments(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body = $request->getParsedBody() ?? [];
+        $data = $this->service->saveClassTeacherAssignments($user, $body);
+
+        return $this->success($response, $data, 'Class teacher assignments saved successfully');
+    }
+
+    public function getMyPermissions(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'TEACHER']);
+
+        $data = $this->service->getMyPermissions($user);
 
         return $this->success($response, $data);
     }
@@ -1364,6 +1416,30 @@ class SchoolAdminController extends BaseController
         $id = (int)$args['id'];
         $data = $this->service->markNotificationRead($user, $id);
         return $this->success($response, $data, 'Notification marked as read');
+    }
+
+    public function getCredentials(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $role = $args['role'] ?? '';
+        $id = (int)($args['id'] ?? 0);
+
+        $data = $this->service->getCredentials($user, $role, $id);
+
+        return $this->success($response, $data);
+    }
+
+    public function generateCredentials(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body = RequestParser::body($request);
+        $result = $this->service->generateCredentials($user, $body);
+
+        return $this->success($response, $result, 'Credentials updated successfully.');
     }
 }
 

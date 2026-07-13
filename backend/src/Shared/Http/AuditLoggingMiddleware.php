@@ -95,6 +95,11 @@ class AuditLoggingMiddleware
                     $stmt = $pdo->prepare("SELECT fp.*, s.name AS student_name FROM additional_fee_payments fp JOIN students s ON fp.student_id = s.id WHERE fp.id = :id AND fp.school_id = :sid LIMIT 1");
                     $stmt->execute([':id' => $id, ':sid' => $schoolId]);
                     $preFetched = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+                } elseif (preg_match('#^/api/school/leave-requests/(\d+)/status$#', $path, $matches) || preg_match('#^/api/school/leave-requests/(\d+)/cancel$#', $path, $matches)) {
+                    $id = (int)$matches[1];
+                    $stmt = $pdo->prepare("SELECT * FROM leave_requests WHERE id = :id AND school_id = :sid LIMIT 1");
+                    $stmt->execute([':id' => $id, ':sid' => $schoolId]);
+                    $preFetched = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
                 }
             }
         }
@@ -398,6 +403,10 @@ class AuditLoggingMiddleware
                 $statusVal = $body['status'] ?? 'Present';
                 $dateVal = $body['date'] ?? date('Y-m-d');
                 $desc = "Attendance marked as {$statusVal} for {$studentName} on {$dateVal}.";
+            } elseif ($path === '/api/school/leave-requests') {
+                $module = 'Leave Requests';
+                $action = 'Leave Applied';
+                $desc = "Leave request applied for type \"" . ($body['leave_type'] ?? '') . "\" from " . ($body['from_date'] ?? '') . " to " . ($body['to_date'] ?? '') . ".";
             }
         } elseif ($method === 'PUT' || $method === 'PATCH') {
             if ($preFetched) {
@@ -487,6 +496,15 @@ class AuditLoggingMiddleware
                     $module = 'Examinations';
                     $action = 'Exam Update';
                     $desc = "Exam \"" . ($body['name'] ?? $preFetched['name'] ?? '') . "\" updated.";
+                } elseif (preg_match('#^/api/school/leave-requests/(\d+)/status$#', $path)) {
+                    $module = 'Leave Requests';
+                    $action = 'Leave Status Update';
+                    $newStatus = $body['status'] ?? 'PENDING';
+                    $desc = "Leave request status updated to {$newStatus}.";
+                } elseif (preg_match('#^/api/school/leave-requests/(\d+)/cancel$#', $path)) {
+                    $module = 'Leave Requests';
+                    $action = 'Leave Request Cancelled';
+                    $desc = "Leave request cancelled.";
                 }
             }
         } elseif ($method === 'DELETE') {

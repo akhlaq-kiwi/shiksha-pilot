@@ -15,6 +15,7 @@ import AttendancePage  from './pages/AttendancePage';
 import AssignmentsPage from './pages/AssignmentsPage';
 import ExaminationPage from './pages/ExaminationPage';
 import MaterialsPage   from './pages/MaterialsPage';
+import TeacherLeavePage from './pages/TeacherLeavePage';
 
 const NAV_ITEMS = [
   { id: 'dashboard',   label: 'Dashboard',         icon: LayoutDashboard },
@@ -23,6 +24,7 @@ const NAV_ITEMS = [
   { id: 'assignments', label: 'Assignments',        icon: FileText },
   { id: 'examination', label: 'Examination',        icon: Award },
   { id: 'materials',   label: 'Learning Materials', icon: FolderOpen },
+  { id: 'leaves',      label: 'Leave Requests',     icon: CheckSquare },
 ];
 
 export default function TeacherPortal() {
@@ -88,13 +90,13 @@ export default function TeacherPortal() {
           <button
             key={id}
             onClick={() => setCurrentPage(id)}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/50 ${
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all focus-visible:outline-none ${
               currentPage === id
-                ? 'bg-primary text-white shadow-sm'
-                : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+                ? 'bg-primary text-surface dark:bg-primary dark:text-background font-extrabold shadow-xs'
+                : 'text-text-secondary hover:text-text-primary hover:bg-secondary/70'
             }`}
           >
-            <Icon className="h-4 w-4 flex-shrink-0" />
+            <Icon className="h-3.5 w-3.5 flex-shrink-0" />
             <span className="hidden sm:inline">{label}</span>
           </button>
         ))}
@@ -115,6 +117,7 @@ export default function TeacherPortal() {
             {currentPage === 'assignments' && <AssignmentsPage classes={classes} assignments={assignments} />}
             {currentPage === 'examination' && <ExaminationPage classes={classes} exams={exams} allStudents={allStudents} />}
             {currentPage === 'materials'   && <MaterialsPage   classes={classes} materials={materials} />}
+            {currentPage === 'leaves'      && <TeacherLeavePage />}
           </>
         )}
       </div>

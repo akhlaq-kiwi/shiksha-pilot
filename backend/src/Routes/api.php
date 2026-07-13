@@ -10,12 +10,14 @@ use App\Domain\Platform\Controllers\PlatformController;
 use App\Domain\SchoolAdmin\Controllers\SchoolAdminController;
 use App\Domain\Teacher\Controllers\TeacherController;
 use App\Domain\Student\Controllers\StudentController;
+use App\Domain\SchoolAdmin\Controllers\LeaveRequestController;
 
 return function (App $app) {
     // Auth Domain
     $app->post('/api/auth/identify', [AuthController::class, 'identify']);
     $app->post('/api/auth/login', [AuthController::class, 'login']);
     $app->post('/api/auth/change-password', [AuthController::class, 'changePassword']);
+    $app->get('/api/auth/profile', [AuthController::class, 'getProfile']);
     
     // Platform / Super Admin Domain
     $app->get('/api/platform/schools', [PlatformController::class, 'getSchools']);
@@ -147,6 +149,18 @@ return function (App $app) {
     $app->get('/api/school/notifications', [SchoolAdminController::class, 'getNotifications']);
     $app->post('/api/school/notifications/{id}/read', [SchoolAdminController::class, 'markNotificationRead']);
 
+    // Leave Requests System
+    $app->get('/api/school/leave-requests', [LeaveRequestController::class, 'getLeaveRequests']);
+    $app->post('/api/school/leave-requests', [LeaveRequestController::class, 'applyLeaveRequest']);
+    $app->put('/api/school/leave-requests/{id}/status', [LeaveRequestController::class, 'updateLeaveStatus']);
+    $app->put('/api/school/leave-requests/{id}/cancel', [LeaveRequestController::class, 'cancelLeaveRequest']);
+    $app->post('/api/school/leave-requests/upload', [LeaveRequestController::class, 'uploadAttachment']);
+    $app->get('/api/parent/children', [LeaveRequestController::class, 'getChildren']);
+
+    // Credentials management
+    $app->get('/api/school/credentials/{role}/{id}', [SchoolAdminController::class, 'getCredentials']);
+    $app->post('/api/school/credentials/generate', [SchoolAdminController::class, 'generateCredentials']);
+
     $app->get('/api/school/timetable', [SchoolAdminController::class, 'getTimetable']);
     $app->post('/api/school/timetable', [SchoolAdminController::class, 'addTimetablePeriod']);
     $app->delete('/api/school/timetable/{id}', [SchoolAdminController::class, 'deleteTimetablePeriod']);
@@ -171,6 +185,13 @@ return function (App $app) {
     $app->get('/api/school/plans', [SchoolAdminController::class, 'getActivePlans']);
     $app->get('/api/school/subscriptions', [SchoolAdminController::class, 'getSubscriptionHistory']);
 
+    // Menu Permissions & Class Assignments
+    $app->get('/api/school/menu-permissions', [SchoolAdminController::class, 'getMenuPermissions']);
+    $app->post('/api/school/menu-permissions', [SchoolAdminController::class, 'saveMenuPermissions']);
+    $app->get('/api/school/class-teacher-assignments', [SchoolAdminController::class, 'getClassTeacherAssignments']);
+    $app->post('/api/school/class-teacher-assignments', [SchoolAdminController::class, 'saveClassTeacherAssignments']);
+    $app->get('/api/school/my-permissions', [SchoolAdminController::class, 'getMyPermissions']);
+
     // Security Domain
     $app->get('/api/school/security/audit-logs', [SchoolAdminController::class, 'getSchoolAuditLogs']);
     $app->post('/api/school/security/audit-logs/log', [SchoolAdminController::class, 'logClientAuditAction']);
@@ -188,6 +209,8 @@ return function (App $app) {
     $app->get('/api/teacher/exams', [TeacherController::class, 'getExams']);
     $app->post('/api/teacher/marks', [TeacherController::class, 'enterMarks']);
     $app->get('/api/teacher/schedule/today', [TeacherController::class, 'getTodaySchedule']);
+    $app->get('/api/teacher/salaries', [TeacherController::class, 'getSalaries']);
+    $app->get('/api/teacher/salaries/receipt', [TeacherController::class, 'getSalarySlip']);
 
     // Student / Parent Domain
     $app->get('/api/student/dashboard', [StudentController::class, 'getDashboard']);
@@ -198,5 +221,9 @@ return function (App $app) {
     $app->get('/api/student/assignments', [StudentController::class, 'getAssignments']);
     $app->get('/api/student/fees', [StudentController::class, 'getFees']);
     $app->get('/api/student/fee-payments', [StudentController::class, 'getFeePayments']);
+    $app->get('/api/student/fees/card', [StudentController::class, 'getFeesCard']);
+    $app->get('/api/student/fees/receipt', [StudentController::class, 'getFeeReceipt']);
     $app->get('/api/student/materials', [StudentController::class, 'getMaterials']);
+    $app->get('/api/student/notifications', [StudentController::class, 'getNotifications']);
+    $app->post('/api/student/notifications/read-all', [StudentController::class, 'markAllNotificationsRead']);
 };

@@ -110,10 +110,10 @@ export function DropdownItem({ children, className, onClick, destructive = false
       onClick={onClick}
       className={twMerge(
         clsx(
-          "block w-full text-left px-4 py-2 font-semibold transition-colors whitespace-nowrap",
+          "block w-full text-left px-4 py-2 font-semibold transition-all text-xs whitespace-nowrap rounded-md",
           destructive 
-            ? "text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20" 
-            : "text-text-primary hover:bg-zinc-100 dark:hover:bg-zinc-900",
+            ? "text-red-600 hover:bg-red-500/10" 
+            : "text-text-primary hover:bg-secondary/80",
           className
         )
       )}

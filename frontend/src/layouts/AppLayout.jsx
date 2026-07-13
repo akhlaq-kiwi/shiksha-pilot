@@ -314,7 +314,7 @@ const AppLayout = ({ children }) => {
                     className="flex items-center gap-2.5 hover:opacity-85 transition-all text-left focus:outline-hidden"
                   >
                     {/* Avatar */}
-                    <div className="w-8 h-8 rounded-full border border-border flex items-center justify-center overflow-hidden bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100 text-xs font-black uppercase flex-shrink-0">
+                    <div className="w-8 h-8 rounded-full border border-border flex items-center justify-center overflow-hidden bg-secondary text-text-primary text-xs font-black uppercase flex-shrink-0">
                       {!logoError && schoolProfile?.logo_path ? (
                         <img 
                           src={schoolProfile.logo_path} 
@@ -333,26 +333,26 @@ const AppLayout = ({ children }) => {
                     <div className="absolute right-0 top-10 w-48 bg-surface border border-border shadow-lg rounded-xl py-1.5 z-50 text-left text-xs animate-in fade-in slide-in-from-top-1 duration-100">
                       <button 
                         onClick={() => { setIsDropdownOpen(false); navigate('/school-admin/profile'); }}
-                        className="w-full px-4 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-900 flex items-center gap-2 font-bold text-text-primary text-left"
+                        className="w-full px-4 py-2 hover:bg-secondary/80 flex items-center gap-2 font-bold text-text-primary text-left"
                       >
                         Profile
                       </button>
                       <button 
                         onClick={() => { setIsDropdownOpen(false); navigate('/school-admin/profile/change-password'); }}
-                        className="w-full px-4 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-900 flex items-center gap-2 font-bold text-text-primary text-left"
+                        className="w-full px-4 py-2 hover:bg-secondary/80 flex items-center gap-2 font-bold text-text-primary text-left"
                       >
                         Change Password
                       </button>
                       <button 
                         onClick={() => { setIsDropdownOpen(false); navigate('/school-admin/profile/subscription'); }}
-                        className="w-full px-4 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-900 flex items-center gap-2 font-bold text-text-primary text-left"
+                        className="w-full px-4 py-2 hover:bg-secondary/80 flex items-center gap-2 font-bold text-text-primary text-left"
                       >
                         Subscription Plans
                       </button>
                       <div className="border-t border-border my-1"></div>
                       <button 
                         onClick={() => { setIsDropdownOpen(false); handleLogout(); }}
-                        className="w-full px-4 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-900 flex items-center gap-2 font-bold text-red-600 text-left"
+                        className="w-full px-4 py-2 hover:bg-secondary/80 flex items-center gap-2 font-bold text-red-600 text-left"
                       >
                         Sign Out
                       </button>

@@ -9,6 +9,8 @@ import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 import StudentEnrollmentForm from './StudentEnrollmentForm';
 import { DropdownMenu, DropdownItem } from '../../../common/ui/DropdownMenu';
 import StudentDetailsPage from './StudentDetailsPage';
+import { Dialog } from '../../../common/ui/dialog';
+import CredentialsDialog from '../../../common/components/CredentialsDialog';
 
 // Self-healing avatar image component to handle loading errors gracefully
 const StudentAvatar = ({ src, name, updatedAt }) => {
@@ -63,6 +65,7 @@ export default function ClassesPage() {
   const [sectionsInput, setSectionsInput] = useState('');
   const [savingClass, setSavingClass] = useState(false);
   const [classFormError, setClassFormError] = useState('');
+  const [sectionsFieldError, setSectionsFieldError] = useState('');
   
   // Class Editing & Dropdown menu states
   const [openMenuClass, setOpenMenuClass] = useState(null);
@@ -73,6 +76,10 @@ export default function ClassesPage() {
   const [rosterSearch, setRosterSearch] = useState('');
   const [rosterSectionFilter, setRosterSectionFilter] = useState('All');
   const [rosterStatusFilter, setRosterStatusFilter] = useState('All');
+
+  // Credentials dialog state
+  const [isCredentialsOpen, setIsCredentialsOpen] = useState(false);
+  const [credentialsTarget, setCredentialsTarget] = useState(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -111,6 +118,7 @@ export default function ClassesPage() {
     setClassNameInput(gc.name);
     setSectionsInput(gc.sections.join(', '));
     setClassFormError('');
+    setSectionsFieldError('');
     setShowCreateForm(true);
   };
 
@@ -121,6 +129,7 @@ export default function ClassesPage() {
     setClassNameInput('');
     setSectionsInput('');
     setClassFormError('');
+    setSectionsFieldError('');
   };
 
   const handleCreateClass = async (e) => {
@@ -132,6 +141,7 @@ export default function ClassesPage() {
 
     setSavingClass(true);
     setClassFormError('');
+    setSectionsFieldError('');
     try {
       if (isEditing) {
         await schoolService.updateClass({
@@ -153,7 +163,11 @@ export default function ClassesPage() {
       await loadData();
     } catch (err) {
       console.error(err);
-      setClassFormError(err.message || 'Failed to save class.');
+      if (err.data?.errors?.sections) {
+        setSectionsFieldError(err.data.errors.sections);
+      } else {
+        setClassFormError(err.message || 'Failed to save class.');
+      }
     } finally {
       setSavingClass(false);
     }
@@ -318,102 +332,128 @@ export default function ClassesPage() {
     };
 
     return (
-      <div className="space-y-6 animate-in fade-in duration-300">
-        
-        {/* Roster Header (Left Back Button minimal design, Right Class Name) */}
-        <div className="flex items-center justify-between border-b border-border pb-4 gap-4 bg-surface p-4 rounded-2xl shadow-2xs">
-          <div className="flex items-center gap-6">
-            <button 
-              onClick={handleBackToClasses} 
-              className="font-bold text-zinc-900 dark:text-zinc-50 border border-zinc-200 dark:border-zinc-800 bg-surface hover:bg-zinc-50 px-4 py-2 rounded-lg text-sm transition-all shadow-2xs"
-            >
-              Back
-            </button>
-            <h2 className="text-2xl font-black text-text-primary tracking-tight font-display">{selectedClassName} ({rosterStudents.length})</h2>
+      <>
+        <div className="space-y-6 animate-in fade-in duration-300">
+          
+          {/* Roster Header (Left Back Button minimal design, Right Class Name) */}
+          <div className="flex items-center justify-between border-b border-border pb-4 gap-4 bg-surface p-4 rounded-2xl shadow-2xs">
+            <div className="flex items-center gap-6">
+              <button 
+                onClick={handleBackToClasses} 
+                className="font-bold text-zinc-900 dark:text-zinc-50 border border-zinc-200 dark:border-zinc-800 bg-surface hover:bg-zinc-50 px-4 py-2 rounded-lg text-sm transition-all shadow-2xs"
+              >
+                Back
+              </button>
+              <h2 className="text-2xl font-black text-text-primary tracking-tight font-display">{selectedClassName} ({rosterStudents.length})</h2>
+            </div>
+            {!isReadOnly && (
+              <Button className="flex items-center gap-2 font-bold" onClick={() => { setView('enroll'); setSelectedStudentId(null); }}>
+                <Plus className="h-4 w-4" /> Enroll Student
+              </Button>
+            )}
           </div>
-          {!isReadOnly && (
-            <Button className="flex items-center gap-2 font-bold" onClick={() => { setView('enroll'); setSelectedStudentId(null); }}>
-              <Plus className="h-4 w-4" /> Enroll Student
-            </Button>
+
+          {/* Combined Filter Toolbar */}
+          <div className="bg-surface border border-border rounded-xl p-4 shadow-xs flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div className="relative w-full md:max-w-xs">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-text-muted" />
+              <Input 
+                placeholder="Search roster by name or roll number..." 
+                className="pl-9" 
+                value={rosterSearch} 
+                onChange={e => setRosterSearch(e.target.value)} 
+              />
+            </div>
+
+            <div className="flex flex-col md:flex-row gap-4 items-center w-full md:w-auto justify-end">
+              {/* Section Filter (Only if sections exist for class) */}
+              {rosterSections.length > 0 && (
+                <div className="w-full md:w-40">
+                  <select
+                    value={rosterSectionFilter}
+                    onChange={e => setRosterSectionFilter(e.target.value)}
+                    className="flex h-9 w-full rounded-md border border-zinc-200 bg-surface px-3 py-1.5 text-sm text-text-primary shadow-xs transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-950 dark:border-zinc-800"
+                  >
+                    <option value="All">All Sections</option>
+                    {rosterSections.map(sec => (
+                      <option key={sec} value={sec}>Section {sec}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Student Status Filter */}
+              <div className="w-full md:w-40">
+                <select
+                  value={rosterStatusFilter}
+                  onChange={e => setRosterStatusFilter(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-zinc-200 bg-surface px-3 py-1.5 text-sm text-text-primary shadow-xs transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-950 dark:border-zinc-800"
+                >
+                  <option value="All">All Statuses</option>
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Vertical centered cards grid (Finalized Student card design) */}
+          {filteredRoster.length === 0 ? (
+            <Card className="p-8 text-center text-text-muted text-xs shadow-xs">
+              No students found in this class roster.
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {sortedRoster.map(s => (
+                <div 
+                  key={s.id}
+                  onClick={() => { setSelectedStudentId(s.id); setView('details'); }}
+                  className="relative flex flex-col items-center justify-center p-6 bg-surface border border-border rounded-2xl hover:border-primary/50 hover:shadow-md cursor-pointer transition-all duration-200 text-center select-none"
+                >
+                  <div className="absolute top-3 right-3 z-10" onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenu>
+                      <DropdownItem onClick={() => { setSelectedStudentId(s.id); setView('details'); }}>
+                        View Details
+                      </DropdownItem>
+                      <DropdownItem onClick={() => {
+                        setCredentialsTarget(s);
+                        setIsCredentialsOpen(true);
+                      }}>
+                        Credentials
+                      </DropdownItem>
+                    </DropdownMenu>
+                  </div>
+
+                  {/* Photo / Avatar */}
+                  <div className="w-20 h-20 rounded-full border border-border bg-zinc-50 dark:bg-zinc-900/50 flex items-center justify-center overflow-hidden mb-4 shadow-2xs">
+                    <StudentAvatar src={s.photo_path} name={s.name} updatedAt={s.updated_at} />
+                  </div>
+                  
+                  {/* Name */}
+                  <h3 className="font-extrabold text-text-primary text-base hover:text-primary transition-colors leading-tight truncate w-full px-1">
+                    {s.name}
+                  </h3>
+                  
+                  {/* Roll Number */}
+                  <p className="text-xs text-text-muted mt-2 font-bold uppercase tracking-wider">
+                    Roll No: <span className="font-mono text-text-primary font-extrabold">{s.roll_no || s.roll || '-'}</span>
+                  </p>
+                </div>
+              ))}
+            </div>
           )}
         </div>
 
-        {/* Combined Filter Toolbar */}
-        <div className="bg-surface border border-border rounded-xl p-4 shadow-xs flex flex-col md:flex-row gap-4 items-center justify-between">
-          <div className="relative w-full md:max-w-xs">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-text-muted" />
-            <Input 
-              placeholder="Search roster by name or roll number..." 
-              className="pl-9" 
-              value={rosterSearch} 
-              onChange={e => setRosterSearch(e.target.value)} 
-            />
-          </div>
-
-          <div className="flex flex-col md:flex-row gap-4 items-center w-full md:w-auto justify-end">
-            {/* Section Filter (Only if sections exist for class) */}
-            {rosterSections.length > 0 && (
-              <div className="w-full md:w-40">
-                <select
-                  value={rosterSectionFilter}
-                  onChange={e => setRosterSectionFilter(e.target.value)}
-                  className="flex h-9 w-full rounded-md border border-zinc-200 bg-surface px-3 py-1.5 text-sm text-text-primary shadow-xs transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-950 dark:border-zinc-800"
-                >
-                  <option value="All">All Sections</option>
-                  {rosterSections.map(sec => (
-                    <option key={sec} value={sec}>Section {sec}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {/* Student Status Filter */}
-            <div className="w-full md:w-40">
-              <select
-                value={rosterStatusFilter}
-                onChange={e => setRosterStatusFilter(e.target.value)}
-                className="flex h-9 w-full rounded-md border border-zinc-200 bg-surface px-3 py-1.5 text-sm text-text-primary shadow-xs transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-950 dark:border-zinc-800"
-              >
-                <option value="All">All Statuses</option>
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Vertical centered cards grid (Finalized Student card design) */}
-        {filteredRoster.length === 0 ? (
-          <Card className="p-8 text-center text-text-muted text-xs shadow-xs">
-            No students found in this class roster.
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {sortedRoster.map(s => (
-              <div 
-                key={s.id}
-                onClick={() => { setSelectedStudentId(s.id); setView('details'); }}
-                className="flex flex-col items-center justify-center p-6 bg-surface border border-border rounded-2xl hover:border-primary/50 hover:shadow-md cursor-pointer transition-all duration-200 text-center select-none"
-              >
-                {/* Photo / Avatar */}
-                <div className="w-20 h-20 rounded-full border border-border bg-zinc-50 dark:bg-zinc-900/50 flex items-center justify-center overflow-hidden mb-4 shadow-2xs">
-                  <StudentAvatar src={s.photo_path} name={s.name} updatedAt={s.updated_at} />
-                </div>
-                
-                {/* Name */}
-                <h3 className="font-extrabold text-text-primary text-base hover:text-primary transition-colors leading-tight truncate w-full px-1">
-                  {s.name}
-                </h3>
-                
-                {/* Roll Number */}
-                <p className="text-xs text-text-muted mt-2 font-bold uppercase tracking-wider">
-                  Roll No: <span className="font-mono text-text-primary font-extrabold">{s.roll_no || s.roll || '-'}</span>
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+        <CredentialsDialog
+          isOpen={isCredentialsOpen}
+          onClose={() => {
+            setIsCredentialsOpen(false);
+            setCredentialsTarget(null);
+          }}
+          role="PARENT"
+          target={credentialsTarget}
+        />
+      </>
     );
   }
 
@@ -511,12 +551,19 @@ export default function ClassesPage() {
                 <label className="text-xs font-bold text-text-secondary uppercase">Sections (Optional, Comma-Separated)</label>
                 <Input 
                   value={sectionsInput} 
-                  onChange={e => setSectionsInput(e.target.value)} 
+                  onChange={e => { setSectionsInput(e.target.value); setSectionsFieldError(''); }} 
                   placeholder="e.g. A, B, C" 
+                  className={sectionsFieldError ? 'border-red-500 focus-visible:ring-red-500' : ''}
                 />
-                <p className="text-[10px] text-text-muted mt-1 leading-normal">
-                  Specify optional sections separating them with commas (e.g. "A, B"). Leave blank if this class doesn't have sections.
-                </p>
+                {sectionsFieldError ? (
+                  <p className="text-[11px] text-red-500 font-semibold mt-1">
+                    {sectionsFieldError}
+                  </p>
+                ) : (
+                  <p className="text-[10px] text-text-muted mt-1 leading-normal">
+                    Specify optional sections separating them with commas (e.g. "A, B"). Leave blank if this class doesn't have sections.
+                  </p>
+                )}
               </div>
 
               {/* Action Buttons */}
@@ -531,6 +578,16 @@ export default function ClassesPage() {
           </div>
         </div>
       )}
+
+      <CredentialsDialog
+        isOpen={isCredentialsOpen}
+        onClose={() => {
+          setIsCredentialsOpen(false);
+          setCredentialsTarget(null);
+        }}
+        role="PARENT"
+        target={credentialsTarget}
+      />
 
     </div>
   );

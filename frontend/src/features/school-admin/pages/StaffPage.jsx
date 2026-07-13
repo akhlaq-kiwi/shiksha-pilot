@@ -13,6 +13,7 @@ import { SearchableSelect, INDIAN_STATES_AND_CITIES } from '../../../common/ui/S
 import html2pdf from 'html2pdf.js';
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 import { DropdownMenu, DropdownItem } from '../../../common/ui/DropdownMenu';
+import CredentialsDialog from '../../../common/components/CredentialsDialog';
 
 // Self-healing avatar image component to handle loading errors gracefully
 const TeacherAvatar = ({ src, name, updatedAt }) => {
@@ -202,6 +203,10 @@ export default function StaffPage() {
   const [actionError, setActionError] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [activeMenuMonth, setActiveMenuMonth] = useState(null);
+  
+  // Credentials dialog state
+  const [isCredentialsOpen, setIsCredentialsOpen] = useState(false);
+  const [credentialsTarget, setCredentialsTarget] = useState(null);
 
   const [newStaff, setNewStaff] = useState({ 
     id: null,
@@ -1356,8 +1361,24 @@ export default function StaffPage() {
                   <div 
                     key={t.id}
                     onClick={() => { setSelectedTeacherId(t.id); setView('details'); }}
-                    className="flex flex-col items-center justify-between p-6 bg-surface border border-border rounded-2xl hover:border-primary/50 hover:shadow-md cursor-pointer transition-all duration-200 text-center select-none min-h-[220px]"
+                    className="relative flex flex-col items-center justify-between p-6 bg-surface border border-border rounded-2xl hover:border-primary/50 hover:shadow-md cursor-pointer transition-all duration-200 text-center select-none min-h-[220px]"
                   >
+                    {!isReadOnly && (
+                      <div className="absolute top-3 right-3 z-10" onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenu>
+                          <DropdownItem onClick={() => { setSelectedTeacherId(t.id); setView('details'); }}>
+                            View Details
+                          </DropdownItem>
+                          <DropdownItem onClick={() => {
+                            setCredentialsTarget(t);
+                            setIsCredentialsOpen(true);
+                          }}>
+                            Credentials
+                          </DropdownItem>
+                        </DropdownMenu>
+                      </div>
+                    )}
+
                     <div className="flex flex-col items-center w-full">
                       {/* Photo / Avatar */}
                       <div className="w-20 h-20 rounded-full border border-border bg-zinc-50 dark:bg-zinc-900/50 flex items-center justify-center overflow-hidden mb-4 shadow-2xs">
@@ -2202,6 +2223,16 @@ export default function StaffPage() {
 
         </div>
       </Dialog>
+
+      <CredentialsDialog
+        isOpen={isCredentialsOpen}
+        onClose={() => {
+          setIsCredentialsOpen(false);
+          setCredentialsTarget(null);
+        }}
+        role="TEACHER"
+        target={credentialsTarget}
+      />
 
     </div>
   );

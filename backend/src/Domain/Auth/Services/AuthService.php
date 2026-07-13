@@ -83,6 +83,7 @@ class AuthService extends BaseService
             'role'      => $user['role'] ?? null,
             'phone'     => $user['phone'] ?? null,
             'school_id' => isset($user['school_id']) ? (int) $user['school_id'] : null,
+            'pwd'       => isset($user['password']) ? substr($user['password'], 0, 10) : '',
         ]);
 
         $this->log('User logged in', ['id' => $user['id']]);
@@ -189,5 +190,15 @@ class AuthService extends BaseService
         }
 
         return "$browser ($os)";
+    }
+
+    public function getProfile(int $id): array
+    {
+        $user = $this->repo->findById($id);
+        if ($user === null) {
+            throw new NotFoundException('User not found.');
+        }
+
+        return array_diff_key($user, ['password' => true]);
     }
 }

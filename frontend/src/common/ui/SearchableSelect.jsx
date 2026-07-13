@@ -186,10 +186,10 @@ export function SearchableSelect({ label, placeholder, value, onChange, options,
         }}
         onFocus={() => setIsOpen(true)}
         disabled={disabled}
-        className="flex h-9 w-full rounded-md border border-zinc-200 bg-surface px-3 py-1 text-sm shadow-xs transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-zinc-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-800 dark:bg-zinc-950 dark:ring-offset-zinc-950 dark:placeholder:text-zinc-400 dark:focus-visible:ring-zinc-300"
+        className="flex h-9 w-full rounded-lg border border-border bg-surface px-3 py-1 text-sm shadow-xs transition-all placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary disabled:cursor-not-allowed disabled:opacity-50"
       />
       {isOpen && !disabled && (
-        <div className="absolute left-0 right-0 top-[60px] max-h-40 overflow-y-auto bg-surface border border-border rounded-md shadow-lg z-50 py-1 bg-white dark:bg-zinc-950 animate-in fade-in slide-in-from-top-1 duration-200">
+        <div className="absolute left-0 right-0 top-[60px] max-h-40 overflow-y-auto bg-surface border border-border rounded-xl shadow-lg z-50 py-1 bg-white dark:bg-zinc-950 animate-in fade-in slide-in-from-top-1 duration-200">
           {filteredOptions.length === 0 ? (
             <div className="px-3 py-2 text-xs text-text-muted">No options found</div>
           ) : (
@@ -201,7 +201,7 @@ export function SearchableSelect({ label, placeholder, value, onChange, options,
                   onChange(opt);
                   setIsOpen(false);
                 }}
-                className="w-full text-left px-3 py-2 text-xs font-bold text-text-primary hover:bg-zinc-100 dark:hover:bg-zinc-900 border-b border-border last:border-b-0"
+                className="w-full text-left px-3 py-2 text-xs font-semibold text-text-primary hover:bg-secondary border-b border-border last:border-b-0"
               >
                 {opt}
               </button>

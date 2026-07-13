@@ -13,17 +13,16 @@ const AppSidebar = ({ navItems = [], currentPage, onNavigate }) => {
               key={item.id}
               onClick={() => onNavigate(item.id)}
               className={`
-                flex items-center gap-3 w-full px-3 py-2.5 rounded-md text-sm font-medium
-                transition-colors duration-100 text-left focus-visible:outline-none
-                focus-visible:ring-1 focus-visible:ring-zinc-950 dark:focus-visible:ring-zinc-300
+                flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider
+                transition-all duration-150 text-left focus-visible:outline-none
                 ${isActive
-                  ? 'bg-zinc-900 text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900'
-                  : 'text-text-secondary hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-text-primary'
+                  ? 'bg-primary text-surface dark:bg-primary dark:text-background shadow-xs font-extrabold'
+                  : 'text-text-secondary hover:bg-secondary/70 hover:text-text-primary'
                 }
               `}
             >
               {Icon && (
-                <Icon className="w-4 h-4 flex-shrink-0" />
+                <Icon className="w-3.5 h-3.5 flex-shrink-0" />
               )}
               <span className="truncate">{item.label}</span>
             </button>

@@ -15,6 +15,192 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
   const location = useLocation();
   const [academicYears, setAcademicYears] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // --- User Role & Class Assignment States ---
+  const [teachersWithPerms, setTeachersWithPerms] = useState([]);
+  const [classesWithTeachers, setClassesWithTeachers] = useState([]);
+  const [selectedPermTeacherId, setSelectedPermTeacherId] = useState('');
+  const [selectedPermMenus, setSelectedPermMenus] = useState([]);
+  const [savingPermissions, setSavingPermissions] = useState(false);
+  const [savingAssignments, setSavingAssignments] = useState(false);
+  const [savingClassId, setSavingClassId] = useState(null);
+
+  const [permSuccess, setPermSuccess] = useState('');
+  const [permError, setPermError] = useState('');
+  const [assignSuccess, setAssignSuccess] = useState('');
+  const [assignError, setAssignError] = useState('');
+
+  const [localAssignments, setLocalAssignments] = useState({});
+
+  const [showReplaceConfirm, setShowReplaceConfirm] = useState(false);
+  const [replaceClassId, setReplaceClassId] = useState(null);
+  const [replacePrevTeacherName, setReplacePrevTeacherName] = useState('');
+  const [replaceNewTeacherId, setReplaceNewTeacherId] = useState('');
+  const [replaceNewTeacherName, setReplaceNewTeacherName] = useState('');
+
+  const MENU_OPTIONS = [
+    'Dashboard',
+    'Classes',
+    'Teachers',
+    'Attendance',
+    'Leave Requests',
+    'Examinations',
+    'Fees Portal',
+    'Financial Reports',
+    'Finance Management',
+    'Fee Follow-up',
+    'Timetable',
+    'Audits & Settings',
+    'Security'
+  ];
+
+  const loadPermissionsAndAssignments = async () => {
+    try {
+      const [permData, assignData] = await Promise.all([
+        schoolService.getMenuPermissions(),
+        schoolService.getClassTeacherAssignments()
+      ]);
+      
+      const teachers = permData.teachers || [];
+      setTeachersWithPerms(teachers);
+
+      const clsList = assignData.classes || [];
+      setClassesWithTeachers(clsList);
+      
+      const localMap = {};
+      clsList.forEach(c => {
+        localMap[c.id] = c.assigned_teacher_id || '';
+      });
+      setLocalAssignments(localMap);
+    } catch (err) {
+      console.error("Failed to load permissions/assignments", err);
+    }
+  };
+
+  const handleTeacherSelectForPermissions = (teacherId) => {
+    setSelectedPermTeacherId(teacherId);
+    setPermSuccess('');
+    setPermError('');
+    if (!teacherId) {
+      setSelectedPermMenus([]);
+      return;
+    }
+    const matched = teachersWithPerms.find(t => String(t.id) === String(teacherId));
+    setSelectedPermMenus(matched ? matched.menus : []);
+  };
+
+  const handleMenuCheckboxChange = async (menuLabel) => {
+    if (!selectedPermTeacherId) return;
+
+    setPermSuccess('');
+    setPermError('');
+
+    const currentMenus = [...selectedPermMenus];
+    const updatedMenus = currentMenus.includes(menuLabel)
+      ? currentMenus.filter(m => m !== menuLabel)
+      : [...currentMenus, menuLabel];
+
+    // Optimistically update UI state
+    setSelectedPermMenus(updatedMenus);
+    setSavingPermissions(true);
+
+    try {
+      await schoolService.saveMenuPermissions({
+        teacher_id: selectedPermTeacherId,
+        menus: updatedMenus
+      });
+      setPermSuccess('Permissions updated successfully.');
+      await loadPermissionsAndAssignments();
+    } catch (err) {
+      console.error(err);
+      setPermError('Unable to save changes. Please try again.');
+      // Revert UI state on error
+      setSelectedPermMenus(currentMenus);
+    } finally {
+      setSavingPermissions(false);
+    }
+  };
+
+  const executeAutoSaveClassAssignment = async (classId, newTeacherId, previousTeacherId) => {
+    setSavingClassId(classId);
+    setAssignSuccess('');
+    setAssignError('');
+    
+    // Optimistically update local assignments state
+    setLocalAssignments(prev => ({ ...prev, [classId]: newTeacherId }));
+
+    try {
+      // Build assignments payload (updating all to match localAssignments, but with the new one)
+      const payloadAssignments = Object.entries({
+        ...localAssignments,
+        [classId]: newTeacherId
+      }).map(([cId, tId]) => ({
+        class_id: parseInt(cId),
+        teacher_id: tId ? parseInt(tId) : null
+      }));
+
+      await schoolService.saveClassTeacherAssignments({
+        assignments: payloadAssignments
+      });
+      
+      setAssignSuccess(newTeacherId ? 'Class teacher assigned successfully.' : 'Class teacher unassigned successfully.');
+      await loadPermissionsAndAssignments();
+    } catch (err) {
+      console.error(err);
+      setAssignError('Unable to save changes. Please try again.');
+      // Revert local assignments state on error
+      setLocalAssignments(prev => ({ ...prev, [classId]: previousTeacherId || '' }));
+    } finally {
+      setSavingClassId(null);
+    }
+  };
+
+  const handleClassTeacherChange = (classId, newTeacherId) => {
+    setAssignSuccess('');
+    setAssignError('');
+
+    const previousTeacherId = localAssignments[classId] || '';
+
+    if (!newTeacherId) {
+      executeAutoSaveClassAssignment(classId, '', previousTeacherId);
+      return;
+    }
+
+    const currentClassWithThisTeacher = Object.entries(localAssignments).find(
+      ([cId, tId]) => String(tId) === String(newTeacherId) && String(cId) !== String(classId)
+    );
+
+    if (currentClassWithThisTeacher) {
+      const otherClassId = currentClassWithThisTeacher[0];
+      const otherClass = classesWithTeachers.find(c => String(c.id) === String(otherClassId));
+      const otherClassName = otherClass ? (otherClass.name + (otherClass.section ? '-' + otherClass.section : '')) : 'another class';
+      
+      const teacher = teachersWithPerms.find(t => String(t.id) === String(newTeacherId));
+      const tName = teacher ? teacher.name : 'This teacher';
+
+      setAssignError(`This teacher is already assigned to ${otherClassName}.`);
+      return;
+    }
+
+    if (previousTeacherId && String(previousTeacherId) !== String(newTeacherId)) {
+      const prevTeacher = teachersWithPerms.find(t => String(t.id) === String(previousTeacherId));
+      const newTeacher = teachersWithPerms.find(t => String(t.id) === String(newTeacherId));
+
+      setReplaceClassId(classId);
+      setReplacePrevTeacherName(prevTeacher ? prevTeacher.name : 'Unknown');
+      setReplaceNewTeacherId(newTeacherId);
+      setReplaceNewTeacherName(newTeacher ? newTeacher.name : 'Unknown');
+      setShowReplaceConfirm(true);
+    } else {
+      executeAutoSaveClassAssignment(classId, newTeacherId, previousTeacherId);
+    }
+  };
+
+  const handleConfirmReplacement = () => {
+    setShowReplaceConfirm(false);
+    const previousTeacherId = localAssignments[replaceClassId] || '';
+    executeAutoSaveClassAssignment(replaceClassId, replaceNewTeacherId, previousTeacherId);
+  };
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -69,70 +255,16 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
   const [showInactiveTeachers, setShowInactiveTeachers] = useState(false);
   const [showInactiveStudents, setShowInactiveStudents] = useState(false);
 
-  // Grade Configuration States
-  const [gradeScales, setGradeScales] = useState([]);
-  const [gradeLoading, setGradeLoading] = useState(false);
-  const [gradeError, setGradeError] = useState('');
-  const [gradeSuccess, setGradeSuccess] = useState('');
 
-  // Reusable report card remark state variables
-  const [reportCardRemark, setReportCardRemark] = useState('');
-  const [isRemarkModalOpen, setIsRemarkModalOpen] = useState(false);
-  const [tempRemark, setTempRemark] = useState('');
-  const [remarkError, setRemarkError] = useState('');
-  const [remarkLoading, setRemarkLoading] = useState(false);
-
-  const getWordCount = (text) => {
-    if (!text) return 0;
-    const words = text.trim().split(/\s+/);
-    return words.filter(word => word.length > 0).length;
-  };
-
-  const handleOpenRemarkModal = () => {
-    setTempRemark(reportCardRemark);
-    setRemarkError('');
-    setRemarkLoading(false);
-    setIsRemarkModalOpen(true);
-  };
-
-  const handleSaveRemark = async () => {
-    setRemarkError('');
-    
-    const wordCount = getWordCount(tempRemark);
-    if (wordCount > 12) {
-      setRemarkError('Maximum 12 words are allowed.');
-      return;
-    }
-
-    setRemarkLoading(true);
-    try {
-      const updatedProfile = await schoolService.updateSchoolProfile({
-        report_card_remark: tempRemark.trim()
-      });
-      setReportCardRemark(updatedProfile.report_card_remark || '');
-      setIsRemarkModalOpen(false);
-    } catch (err) {
-      console.error(err);
-      setRemarkError(err.message || 'Failed to save remark.');
-    } finally {
-      setRemarkLoading(false);
-    }
-  };
 
   const loadData = async () => {
     setLoading(true);
     setError('');
     try {
-      const [years, grades, profile] = await Promise.all([
-        schoolService.getAcademicYears(),
-        schoolService.getGradeConfigurations(),
-        schoolService.getSchoolProfile().catch(() => null)
+      const [years] = await Promise.all([
+        schoolService.getAcademicYears()
       ]);
       setAcademicYears(years || []);
-      setGradeScales(grades || []);
-      if (profile) {
-        setReportCardRemark(profile.report_card_remark || '');
-      }
       if (onYearsUpdated) {
         onYearsUpdated(years || []);
       }
@@ -162,82 +294,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
   const [initialTotalPeriods, setInitialTotalPeriods] = useState(null);
   const [showConfirmConfig, setShowConfirmConfig] = useState(false);
 
-  const handleSaveGradeScale = async () => {
-    setGradeLoading(true);
-    setGradeError('');
-    setGradeSuccess('');
-    
-    // Quick validate client-side
-    for (let i = 0; i < gradeScales.length; i++) {
-      const s1 = gradeScales[i];
-      const min1 = parseFloat(s1.min_percentage);
-      const max1 = parseFloat(s1.max_percentage);
-      if (max1 < min1) {
-        setGradeError(`Grade ${s1.grade}: Max percentage cannot be less than Min percentage.`);
-        setGradeLoading(false);
-        return;
-      }
-      for (let j = i + 1; j < gradeScales.length; j++) {
-        const s2 = gradeScales[j];
-        const min2 = parseFloat(s2.min_percentage);
-        const max2 = parseFloat(s2.max_percentage);
-        if (min1 <= max2 && min2 <= max1) {
-          setGradeError(`Overlapping ranges detected between Grade ${s1.grade} and Grade ${s2.grade}.`);
-          setGradeLoading(false);
-          return;
-        }
-      }
-    }
 
-    try {
-      await schoolService.saveGradeConfigurations({ scales: gradeScales });
-      setGradeSuccess('Grading configurations saved successfully.');
-    } catch (err) {
-      console.error(err);
-      setGradeError(err.message || 'Failed to save grading configurations.');
-    } finally {
-      setGradeLoading(false);
-    }
-  };
-
-  const handleAddGradeRow = () => {
-    setGradeScales([
-      ...gradeScales,
-      { min_percentage: 0, max_percentage: 0, grade: '', grade_point: 0, remark: '' }
-    ]);
-  };
-
-  const handleRemoveGradeRow = (idx) => {
-    setGradeScales(gradeScales.filter((_, i) => i !== idx));
-  };
-
-  const handleGradeFieldChange = (idx, field, value) => {
-    const updated = gradeScales.map((s, i) => {
-      if (i === idx) {
-        let val = value;
-        if (field === 'min_percentage' || field === 'max_percentage') {
-          val = parseFloat(value) || 0;
-        } else if (field === 'grade_point') {
-          val = parseInt(value) || 0;
-        }
-        return { ...s, [field]: val };
-      }
-      return s;
-    });
-    setGradeScales(updated);
-  };
-
-  const handleResetGradesDefault = () => {
-    setGradeScales([
-      { min_percentage: 91, max_percentage: 100, grade: 'A+', grade_point: 10, remark: 'Outstanding' },
-      { min_percentage: 81, max_percentage: 90, grade: 'A', grade_point: 9, remark: 'Excellent' },
-      { min_percentage: 71, max_percentage: 80, grade: 'B+', grade_point: 8, remark: 'Very Good' },
-      { min_percentage: 61, max_percentage: 70, grade: 'B', grade_point: 7, remark: 'Good' },
-      { min_percentage: 51, max_percentage: 60, grade: 'C', grade_point: 6, remark: 'Average' },
-      { min_percentage: 41, max_percentage: 50, grade: 'D', grade_point: 5, remark: 'Pass' },
-      { min_percentage: 0, max_percentage: 40, grade: 'F', grade_point: 0, remark: 'Fail' }
-    ]);
-  };
 
   const getLocalDateStr = () => {
     const d = new Date();
@@ -352,6 +409,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
   useEffect(() => {
     loadData();
     loadPeriodConfigs();
+    loadPermissionsAndAssignments();
     const fetchClasses = async () => {
       try {
         const list = await schoolService.getClasses();
@@ -366,6 +424,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
       loadData();
       fetchClasses();
       loadPeriodConfigs();
+      loadPermissionsAndAssignments();
     };
     window.addEventListener('academic-year-switched', handleYearSwitch);
     return () => {
@@ -1227,145 +1286,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
         </CardContent>
       </Card>
 
-      {/* Grade Configurations Card */}
-      <Card className="shadow-sm">
-        <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
-          <CardTitle className="text-sm font-bold text-text-primary">Grade Configuration Scale</CardTitle>
-        </CardHeader>
-        <CardContent className="p-6 space-y-4">
-          {gradeError && (
-            <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl text-xs font-semibold">
-              {gradeError}
-            </div>
-          )}
 
-          {gradeSuccess && (
-            <div className="p-3 bg-green-500/10 border border-green-500/20 text-green-600 rounded-xl text-xs font-semibold">
-              {gradeSuccess}
-            </div>
-          )}
-
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <p className="text-xs text-text-secondary">
-                Configure grade scale ranges to automatically calculate marks grades.
-              </p>
-              {!isReadOnly && (
-                <div className="flex gap-2">
-                  <Button variant="outline" className="h-8 text-xs font-bold" onClick={handleOpenRemarkModal}>
-                    Add Remark
-                  </Button>
-                  <Button variant="outline" className="h-8 text-xs font-bold" onClick={handleResetGradesDefault}>
-                    Reset to Defaults
-                  </Button>
-                  <Button className="h-8 text-xs font-bold flex items-center gap-1" onClick={handleAddGradeRow}>
-                    <Plus className="h-3.5 w-3.5" /> Add Grade Row
-                  </Button>
-                </div>
-              )}
-            </div>
-
-            {/* Report Card Remark Block */}
-            <div className="p-4 bg-zinc-50 dark:bg-zinc-900/20 border border-border rounded-xl flex flex-col gap-1.5 shadow-2xs">
-              <span className="text-[10px] font-black text-text-secondary uppercase tracking-wider">Report Card Remark</span>
-              {reportCardRemark ? (
-                <p className="text-xs text-green-700 dark:text-green-400 font-bold italic leading-relaxed">
-                  "{reportCardRemark}"
-                </p>
-              ) : (
-                <p className="text-xs text-text-muted italic leading-relaxed">
-                  No report card remark has been configured.
-                </p>
-              )}
-            </div>
-
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Grade Code</TableHead>
-                  <TableHead>Min Percentage (%)</TableHead>
-                  <TableHead>Max Percentage (%)</TableHead>
-                  <TableHead>Grade Points</TableHead>
-                  <TableHead>Remarks</TableHead>
-                  {!isReadOnly && <TableHead className="text-right w-20">Actions</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {gradeScales.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={isReadOnly ? 5 : 6} className="text-center py-6 text-text-muted text-xs">
-                      No grading configurations found. Click "Reset to Defaults" to populate standard ranges.
-                    </TableCell>
-                  </TableRow>
-                ) : gradeScales.map((s, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell>
-                      <Input
-                        value={s.grade}
-                        placeholder="e.g. A+"
-                        disabled={isReadOnly}
-                        className="h-8 text-xs font-bold text-primary max-w-[80px]"
-                        onChange={e => handleGradeFieldChange(idx, 'grade', e.target.value)}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        value={s.min_percentage}
-                        disabled={isReadOnly}
-                        className="h-8 text-xs font-mono max-w-[120px]"
-                        onChange={e => handleGradeFieldChange(idx, 'min_percentage', e.target.value)}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        value={s.max_percentage}
-                        disabled={isReadOnly}
-                        className="h-8 text-xs font-mono max-w-[120px]"
-                        onChange={e => handleGradeFieldChange(idx, 'max_percentage', e.target.value)}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        value={s.grade_point}
-                        disabled={isReadOnly}
-                        className="h-8 text-xs font-mono max-w-[100px]"
-                        onChange={e => handleGradeFieldChange(idx, 'grade_point', e.target.value)}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        value={s.remark || ''}
-                        placeholder="e.g. Excellent"
-                        disabled={isReadOnly}
-                        className="h-8 text-xs max-w-[200px]"
-                        onChange={e => handleGradeFieldChange(idx, 'remark', e.target.value)}
-                      />
-                    </TableCell>
-                    {!isReadOnly && (
-                      <TableCell className="text-right">
-                        <Button variant="outline" className="h-7 w-7 p-0 text-red-500 hover:text-red-700" onClick={() => handleRemoveGradeRow(idx)}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </TableCell>
-                    )}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-
-            {!isReadOnly && gradeScales.length > 0 && (
-              <div className="flex justify-end pt-2">
-                <Button className="font-bold flex items-center gap-1.5" onClick={handleSaveGradeScale} disabled={gradeLoading}>
-                  <Save className="h-4 w-4" /> {gradeLoading ? 'Saving...' : 'Save Grading Scale'}
-                </Button>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Save Confirmation Modal */}
       {showLockConfirm && (
@@ -1392,6 +1313,202 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
           </div>
         </div>
       )}
+
+      {/* Assign User Role Panel */}
+      <Card className="shadow-sm">
+        <CardHeader className="py-5 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
+          <CardTitle className="text-lg font-bold text-text-primary tracking-tight">Assign User Role</CardTitle>
+          <p className="text-xs text-text-secondary mt-1">Configure teacher menu permissions and assign class teachers.</p>
+        </CardHeader>
+        <CardContent className="p-6 space-y-8">
+          
+          {/* Section 1: Teacher Menu Permissions */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-bold text-text-primary border-b border-border pb-2">Teacher Menu Permissions</h3>
+            
+            {permSuccess && (
+              <div className="p-3 bg-green-500/10 border border-green-500/20 text-green-600 rounded-xl text-xs font-semibold flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4" /> {permSuccess}
+              </div>
+            )}
+            {permError && (
+              <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl text-xs font-semibold">
+                {permError}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="space-y-1.5 md:col-span-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-text-secondary uppercase">Select Teacher</label>
+                  {savingPermissions && (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                  )}
+                </div>
+                <select
+                  value={selectedPermTeacherId}
+                  disabled={savingPermissions}
+                  onChange={e => handleTeacherSelectForPermissions(e.target.value)}
+                  className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs cursor-pointer text-text-primary"
+                >
+                  <option value="">-- Choose Teacher --</option>
+                  {teachersWithPerms.map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}{t.department ? ` (${t.department})` : ''}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-text-muted">Choose an active teacher to assign their School Admin Portal permissions.</p>
+              </div>
+
+              <div className="space-y-1.5 md:col-span-2">
+                <label className="text-xs font-bold text-text-secondary uppercase block mb-2">Menus Access</label>
+                {selectedPermTeacherId ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 border border-border rounded-xl p-4 bg-zinc-50/35 dark:bg-zinc-900/35">
+                    {MENU_OPTIONS.map(menu => {
+                      const isChecked = selectedPermMenus.includes(menu);
+                      return (
+                        <button
+                          key={menu}
+                          type="button"
+                          disabled={savingPermissions}
+                          onClick={() => handleMenuCheckboxChange(menu)}
+                          className={`flex items-center justify-start gap-2.5 px-3 py-2.5 rounded-xl border text-left text-xs font-bold tracking-tight transition-all duration-150 ${
+                            savingPermissions ? 'opacity-70 cursor-not-allowed' : ''
+                          } ${
+                            isChecked
+                              ? 'bg-primary/5 border-primary text-primary font-black shadow-3xs'
+                              : 'bg-surface border-border text-text-secondary hover:border-text-secondary/35'
+                          }`}
+                        >
+                          <div className={`h-4 w-4 rounded-md border flex items-center justify-center transition-all ${
+                            isChecked ? 'bg-primary border-primary text-surface' : 'border-zinc-300 bg-surface'
+                          }`}>
+                            {isChecked && <Check className="h-3 w-3 stroke-[3]" />}
+                          </div>
+                          <span className="truncate">{menu}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 border border-dashed border-border rounded-xl text-text-muted text-xs font-semibold bg-zinc-50/20">
+                    Please select a teacher to configure menu permissions.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <hr className="border-border" />
+
+          {/* Section 2: Class Teacher Assignment */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-bold text-text-primary border-b border-border pb-2">Class Teacher Assignment</h3>
+
+            {assignSuccess && (
+              <div className="p-3 bg-green-500/10 border border-green-500/20 text-green-600 rounded-xl text-xs font-semibold flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4" /> {assignSuccess}
+              </div>
+            )}
+            {assignError && (
+              <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl text-xs font-semibold">
+                {assignError}
+              </div>
+            )}
+
+            <div className="border border-border rounded-xl overflow-hidden shadow-3xs bg-surface w-full">
+              <Table>
+                <TableHeader className="bg-zinc-50/50 dark:bg-zinc-900/50">
+                  <TableRow>
+                    <TableHead className="w-1/2">Class</TableHead>
+                    <TableHead className="w-1/2">Assigned Teacher</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {classesWithTeachers.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={2} className="text-center py-6 text-text-muted text-xs font-semibold">
+                        No classes found in active academic year.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    classesWithTeachers.map(c => {
+                      const classLabel = c.name + (c.section ? `-${c.section}` : '');
+                      const val = localAssignments[c.id] || '';
+                      return (
+                        <TableRow key={c.id}>
+                          <TableCell className="font-extrabold text-text-primary text-xs tracking-tight">
+                            {classLabel}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <select
+                                value={val}
+                                disabled={isReadOnly || savingClassId === c.id}
+                                onChange={e => handleClassTeacherChange(c.id, e.target.value)}
+                                className="w-full max-w-md h-9 px-2 rounded-lg border border-border bg-surface text-xs font-bold focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer text-text-primary"
+                              >
+                                <option value="">-- Unassigned --</option>
+                                {teachersWithPerms.map(t => (
+                                  <option key={t.id} value={t.id}>
+                                    {t.name}{t.department ? ` (${t.department})` : ''}
+                                  </option>
+                                ))}
+                              </select>
+                              {savingClassId === c.id && (
+                                <Loader2 className="h-4 w-4 animate-spin text-primary flex-shrink-0" />
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+
+        </CardContent>
+      </Card>
+
+      {/* Replace Class Teacher Confirmation Dialog */}
+      <Dialog
+        isOpen={showReplaceConfirm}
+        onClose={() => setShowReplaceConfirm(false)}
+        title="Replace Existing Class Teacher?"
+        description="Verify changes before replacing the current class teacher."
+      >
+        <div className="space-y-4 pt-3 text-sm">
+          <p className="text-text-secondary leading-relaxed text-xs font-medium">
+            Selecting this teacher will replace the currently assigned teacher for this class.
+          </p>
+          
+          <div className="bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-xl border border-border space-y-3">
+            <div className="flex justify-between text-xs font-bold">
+              <span className="text-text-secondary">Previous Teacher:</span>
+              <span className="text-red-500 font-extrabold">{replacePrevTeacherName}</span>
+            </div>
+            <div className="flex justify-between text-xs font-bold">
+              <span className="text-text-secondary">New Teacher:</span>
+              <span className="text-primary font-extrabold">{replaceNewTeacherName}</span>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 border-t border-border pt-4">
+            <Button variant="secondary" onClick={() => setShowReplaceConfirm(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleConfirmReplacement}
+              className="font-bold bg-primary hover:bg-primary/95 text-white"
+            >
+              Replace
+            </Button>
+          </div>
+        </div>
+      </Dialog>
 
       {/* Create Academic Year Dialog */}
       <Dialog 
@@ -1890,47 +2007,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
         </div>
       )}
 
-      {/* Add Report Card Remark Dialog */}
-      <Dialog
-        isOpen={isRemarkModalOpen}
-        onClose={() => setIsRemarkModalOpen(false)}
-        title="Add Report Card Remark"
-        description="Configure a reusable final remark that will appear on student report cards."
-      >
-        <div className="space-y-4 pt-4">
-          {remarkError && (
-            <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl text-xs font-semibold">
-              {remarkError}
-            </div>
-          )}
 
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-text-secondary uppercase tracking-wide">Remark</label>
-            <textarea
-              rows={3}
-              value={tempRemark}
-              onChange={e => setTempRemark(e.target.value)}
-              placeholder="e.g. Excellent performance throughout the examination. Keep improving."
-              className="w-full p-3.5 text-xs bg-background border border-border rounded-xl focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs resize-none text-text-primary font-medium"
-            />
-            <div className="flex justify-between items-center text-[10px] text-text-muted mt-1 px-1">
-              <span>Maximum 12 words</span>
-              <span className={`font-semibold ${getWordCount(tempRemark) > 12 ? 'text-red-500 font-bold' : ''}`}>
-                {getWordCount(tempRemark)} / 12 words
-              </span>
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-3 border-t border-border pt-4">
-            <Button variant="outline" onClick={() => setIsRemarkModalOpen(false)} disabled={remarkLoading}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveRemark} disabled={remarkLoading} className="font-bold">
-              {remarkLoading ? 'Saving...' : 'Save Remark'}
-            </Button>
-          </div>
-        </div>
-      </Dialog>
 
       {/* Migration Alert Dialog Modal */}
       <Dialog

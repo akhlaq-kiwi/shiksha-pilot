@@ -8,22 +8,22 @@ export const Button = React.forwardRef(({
   size = 'default', 
   ...props 
 }, ref) => {
-  const baseStyles = 'inline-flex items-center justify-center rounded-md text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-950 disabled:pointer-events-none disabled:opacity-50 active:scale-95 duration-100';
+  const baseStyles = 'inline-flex items-center justify-center rounded-lg text-xs font-semibold uppercase tracking-wider transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.97] duration-150 ease-in-out';
   
   const variants = {
-    default: 'bg-primary text-zinc-50 hover:bg-primary/90 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-50/90 shadow-sm',
-    secondary: 'bg-zinc-100 text-zinc-900 hover:bg-zinc-100/80 dark:bg-zinc-800 dark:text-zinc-50 dark:hover:bg-zinc-800/80',
-    outline: 'border border-zinc-200 bg-transparent text-zinc-900 hover:bg-zinc-100 hover:text-zinc-900 dark:border-zinc-800 dark:text-zinc-50 dark:hover:bg-zinc-800 dark:hover:text-zinc-50',
-    ghost: 'text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-50',
-    destructive: 'bg-red-500 text-zinc-50 hover:bg-red-500/90 dark:bg-red-900 dark:text-zinc-50 dark:hover:bg-red-900/90 shadow-sm',
-    accent: 'bg-teal-600 text-zinc-50 hover:bg-teal-600/90 dark:bg-teal-500 dark:text-zinc-950 dark:hover:bg-teal-500/90 shadow-sm',
+    default: 'bg-primary text-surface hover:bg-primary/95 dark:bg-primary dark:text-background dark:hover:bg-primary/90 shadow-xs hover:-translate-y-[1px] hover:shadow-sm',
+    secondary: 'bg-secondary text-text-primary hover:bg-secondary/85 dark:bg-secondary dark:text-text-primary dark:hover:bg-secondary/90',
+    outline: 'border border-border bg-transparent text-text-primary hover:bg-secondary hover:text-text-primary',
+    ghost: 'text-text-secondary hover:bg-secondary hover:text-text-primary',
+    destructive: 'bg-red-600 text-white hover:bg-red-700 dark:bg-red-700 dark:text-white dark:hover:bg-red-800 shadow-xs hover:-translate-y-[1px]',
+    accent: 'bg-accent text-white hover:bg-accent/90 shadow-xs hover:-translate-y-[1px]',
   };
 
   const sizes = {
     default: 'h-9 px-4 py-2',
-    sm: 'h-8 rounded-md px-3 text-xs',
-    lg: 'h-10 rounded-md px-8',
-    icon: 'h-9 w-9 p-0',
+    sm: 'h-8 rounded-md px-3 text-[10px]',
+    lg: 'h-10 rounded-xl px-8',
+    icon: 'h-9 w-9 p-0 rounded-lg',
   };
 
   return (
@@ -36,3 +36,4 @@ export const Button = React.forwardRef(({
 });
 
 Button.displayName = 'Button';
+

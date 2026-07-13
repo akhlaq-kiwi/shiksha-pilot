@@ -243,4 +243,12 @@ export const schoolAdminService = {
   async logClientAudit(data) {
     return apiClient.post('/api/school/security/audit-logs/log', data);
   },
+
+  // Credentials Management
+  async getCredentials(role, id) {
+    return apiClient.get(`/api/school/credentials/${role}/${id}`);
+  },
+  async generateCredentials(role, id, password) {
+    return apiClient.post('/api/school/credentials/generate', { role, id, password });
+  },
 };

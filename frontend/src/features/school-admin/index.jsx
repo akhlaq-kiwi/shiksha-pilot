@@ -25,6 +25,7 @@ import AuditsSettingsPage from './pages/AuditsSettingsPage';
 import SecurityPage from './pages/SecurityPage';
 import SalaryDisbursementPage from './pages/SalaryDisbursementPage';
 import FeeFollowUpPage from './pages/FeeFollowUpPage';
+import LeaveRequestsPage from './pages/LeaveRequestsPage';
 
 import { schoolService } from '../../common/services/schoolService';
 import { apiClient } from '../../common/services/apiClient';
@@ -43,6 +44,7 @@ const NAV_ITEMS = [
   { path: '/school-admin/staff',      label: 'Teachers', icon: UserCog },
   { path: '/school-admin/timetable',  label: 'Timetable', icon: Clock },
   { path: '/school-admin/attendance', label: 'Attendance', icon: ClipboardCheck },
+  { path: '/school-admin/leave-requests', label: 'Leave Requests', icon: FileText },
   { path: '/school-admin/exams',      label: 'Examinations', icon: FileText },
   { path: '/school-admin/finance',    label: 'Fees Portal', icon: DollarSign },
   { path: '/school-admin/financial-reports', label: 'Financial Reports', icon: FileText },
@@ -245,6 +247,30 @@ export default function SchoolAdminPortal() {
   const [profile, setProfile] = useState(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
 
+  // --- User Permissions Hook ---
+  const [permissions, setPermissions] = useState(null);
+  const [loadingPermissions, setLoadingPermissions] = useState(true);
+
+  useEffect(() => {
+    const role = localStorage.getItem('shiksha_pilot_role');
+    if (role === 'TEACHER') {
+      schoolService.getMyPermissions()
+        .then(data => {
+          setPermissions(data.permissions || []);
+        })
+        .catch(err => {
+          console.error("Failed to load user permissions", err);
+          setPermissions([]);
+        })
+        .finally(() => {
+          setLoadingPermissions(false);
+        });
+    } else {
+      setPermissions(null); // SCHOOL_ADMIN has all permissions
+      setLoadingPermissions(false);
+    }
+  }, []);
+
   useEffect(() => {
     const loadProfile = async () => {
       try {
@@ -293,19 +319,21 @@ export default function SchoolAdminPortal() {
       <button
         key={item.path}
         onClick={() => nav(item.path)}
-        className={`flex items-center justify-start gap-3 py-2 rounded-lg transition-all flex-shrink-0 w-full text-left ${
+        className={`flex items-center justify-start gap-3 rounded-lg transition-all flex-shrink-0 w-full text-left ${
           item.isSubmenu 
-            ? 'pl-8 pr-3 text-xs font-medium text-text-secondary dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800' 
-            : 'pl-1 pr-3 text-sm font-semibold text-text-secondary hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800'
-        } ${active ? 'bg-zinc-900 text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900 font-bold' : ''}`}
+            ? 'pl-8 pr-3 py-2 text-[10px] font-bold uppercase tracking-wider' 
+            : 'px-3 py-2.5 text-xs font-bold uppercase tracking-wider'
+        } ${active ? 'bg-primary text-surface dark:bg-primary dark:text-background font-extrabold shadow-xs' : 'text-text-secondary hover:bg-secondary/70 hover:text-text-primary'}`}
       >
-        <Icon className={`flex-shrink-0 ${item.isSubmenu ? 'h-3.5 w-3.5 ml-1' : 'h-4 w-4'}`} />
+        <Icon className={`flex-shrink-0 ${item.isSubmenu ? 'h-3 w-3 ml-1' : 'h-3.5 w-3.5'}`} />
         <span>{item.label}</span>
       </button>
     );
   };
 
-  if (loadingYears || loadingProfile) {
+  const role = localStorage.getItem('shiksha_pilot_role') || '';
+
+  if (loadingYears || loadingProfile || (role === 'TEACHER' && loadingPermissions)) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] w-full gap-3">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -325,6 +353,27 @@ export default function SchoolAdminPortal() {
   const hasYear = academicYears.length > 0;
   const remainingDays = getRemainingDays(profile?.subscription_expiry);
 
+  // Sidebar dynamic navigation list filtering
+  const visibleNavItems = NAV_ITEMS.filter(item => {
+    if (role !== 'TEACHER') return true;
+    if (loadingPermissions || permissions === null) return false;
+    return permissions.includes(item.label);
+  });
+
+  // URL route guard access logic
+  const currentItem = NAV_ITEMS.find(item => {
+    if (item.exact) return location.pathname === item.path;
+    return location.pathname.startsWith(item.path);
+  });
+
+  const hasAccess = (() => {
+    if (role !== 'TEACHER') return true;
+    if (loadingPermissions) return true;
+    if (!currentItem) return true; // Profile pages, change-password are open to all logged in users
+    if (permissions === null) return true;
+    return permissions.includes(currentItem.label);
+  })();
+
   return (
     <div className="flex flex-col md:flex-row w-full min-h-[calc(100vh-56px)] bg-background">
 
@@ -332,7 +381,7 @@ export default function SchoolAdminPortal() {
       <aside className="w-full md:w-[240px] flex-shrink-0 flex flex-col justify-between border-r border-border pl-6 pr-4 py-6 bg-surface md:sticky md:top-14 md:h-[calc(100vh-56px)]">
         <div className="overflow-y-auto scrollbar-none flex-1 min-h-0">
           <nav className="flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 scrollbar-none">
-            {NAV_ITEMS.map(navBtn)}
+            {visibleNavItems.map(navBtn)}
           </nav>
         </div>
       </aside>
@@ -365,7 +414,22 @@ export default function SchoolAdminPortal() {
           </div>
         )}
 
-        {!hasYear && location.pathname !== '/school-admin/audits-settings' ? (
+        {!hasAccess ? (
+          <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] w-full px-4 text-center animate-in fade-in duration-300">
+            <div className="mx-auto w-12 h-12 rounded-full bg-red-100 dark:bg-red-950/20 flex items-center justify-center mb-4 text-red-600">
+              <AlertTriangle className="h-6 w-6" />
+            </div>
+            <h3 className="text-xl font-black text-text-primary tracking-tight font-display">Access Denied</h3>
+            <p className="text-xs text-text-secondary mt-3 leading-relaxed max-w-sm">
+              You do not have permission to access this module.
+            </p>
+            <div className="mt-6">
+              <Button onClick={() => nav('/school-admin')} className="font-bold py-2 px-6 shadow-sm bg-primary text-white">
+                Go to Dashboard
+              </Button>
+            </div>
+          </div>
+        ) : !hasYear && location.pathname !== '/school-admin/audits-settings' ? (
           <OnboardingScreen />
         ) : (
           <Routes>
@@ -377,6 +441,7 @@ export default function SchoolAdminPortal() {
             <Route path="staff" element={<StaffPage />} />
             <Route path="timetable" element={<TimetablePage />} />
             <Route path="attendance" element={<AttendancePage />} />
+            <Route path="leave-requests" element={<LeaveRequestsPage />} />
             <Route path="attendance/leaderboard" element={<AttendanceLeaderboardPage />} />
             <Route path="exams" element={<ExamsPage />} />
             <Route path="exams/seating-plan" element={<SeatingPlanPage />} />

@@ -5,10 +5,18 @@ declare(strict_types=1);
 namespace App\Shared\Auth;
 
 use Psr\Http\Message\ServerRequestInterface as Request;
+use App\Database\Connection;
 
 class TokenService
 {
     private const TOKEN_TTL = 86400; // 24 hours in seconds
+
+    public function __construct(private readonly Connection $connection) {}
+
+    public function getPdo(): \PDO
+    {
+        return $this->connection->getPdo();
+    }
 
     /**
      * Encode a payload into a base64 token.

@@ -79,4 +79,18 @@ class AuthController extends BaseController
 
         return $this->success($response, null, 'Password updated successfully.');
     }
+
+    /**
+     * GET /api/auth/profile
+     *
+     * Requires a valid auth token.
+     */
+    public function getProfile(Request $request, Response $response): Response
+    {
+        $claims = $this->authenticate($request);
+
+        $profile = $this->authService->getProfile((int) $claims['id']);
+
+        return $this->success($response, $profile, 'Profile fetched successfully.');
+    }
 }

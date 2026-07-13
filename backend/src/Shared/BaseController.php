@@ -32,6 +32,18 @@ abstract class BaseController
             throw new UnauthorizedException();
         }
 
+        // Verify active account status and handle token invalidation if password changed
+        if (isset($user['id']) && isset($user['pwd'])) {
+            $pdo = $this->tokenService->getPdo();
+            $stmt = $pdo->prepare("SELECT password, status FROM users WHERE id = :id LIMIT 1");
+            $stmt->execute(['id' => $user['id']]);
+            $dbUser = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+            if (!$dbUser || $dbUser['status'] !== 'ACTIVE' || substr($dbUser['password'], 0, 10) !== $user['pwd']) {
+                throw new UnauthorizedException("Session invalid or password changed. Please login again.");
+            }
+        }
+
         return $user;
     }
 

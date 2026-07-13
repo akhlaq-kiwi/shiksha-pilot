@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   LayoutDashboard, BookOpen, ClipboardList, CalendarCheck,
-  CreditCard, Library, Users
+  CreditCard, Library, Users, FileText
 } from 'lucide-react';
 import { Select } from '../../common/ui/select';
 import { Button } from '../../common/ui/button';
@@ -14,6 +14,7 @@ import AttendancePage from './pages/AttendancePage';
 import FeesPage from './pages/FeesPage';
 import ResourcesPage from './pages/ResourcesPage';
 import ParentPage from './pages/ParentPage';
+import ParentLeavePage from './pages/ParentLeavePage';
 
 // ─── Mock Data ─────────────────────────────────────────────────────────────────
 
@@ -155,6 +156,7 @@ function AppSidebar({ currentPage, onNavigate, isParent, user, selectedChild, on
     { id: 'academics', icon: BookOpen, label: 'Academics' },
     { id: 'assignments', icon: ClipboardList, label: 'Assignments' },
     { id: 'attendance', icon: CalendarCheck, label: 'Attendance' },
+    { id: 'leaves', icon: FileText, label: 'Leave Requests' },
     { id: 'fees', icon: CreditCard, label: 'Fees' },
     { id: 'resources', icon: Library, label: 'Resources' },
     ...(isParent ? [{ id: 'parent', icon: Users, label: 'My Children' }] : []),
@@ -198,13 +200,13 @@ function AppSidebar({ currentPage, onNavigate, isParent, user, selectedChild, on
             <button
               key={id}
               onClick={() => onNavigate(id)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all flex-shrink-0 ${
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all flex-shrink-0 focus-visible:outline-none ${
                 currentPage === id
-                  ? 'bg-zinc-900 text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900'
-                  : 'text-text-secondary hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800'
+                  ? 'bg-primary text-surface dark:bg-primary dark:text-background font-extrabold shadow-xs'
+                  : 'text-text-secondary hover:bg-secondary/70 hover:text-text-primary'
               }`}
             >
-              <Icon className="h-4 w-4" />
+              <Icon className="h-3.5 w-3.5 flex-shrink-0" />
               <span>{label}</span>
             </button>
           ))}
@@ -287,6 +289,9 @@ export default function StudentParentPortal() {
         )}
         {currentPage === 'attendance' && (
           <AttendancePage attendance={data.attendance} />
+        )}
+        {currentPage === 'leaves' && (
+          <ParentLeavePage />
         )}
         {currentPage === 'fees' && (
           <FeesPage fees={data.feeStatus} payments={data.receipts} />

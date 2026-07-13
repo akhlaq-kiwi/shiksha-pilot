@@ -115,4 +115,52 @@ class StudentController extends BaseController
 
         return $this->success($response, $data);
     }
+
+    public function getFeesCard(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, self::ALLOWED_ROLES);
+
+        $data = $this->service->getFeesCard($user);
+
+        return $this->success($response, $data);
+    }
+
+    public function getFeeReceipt(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, self::ALLOWED_ROLES);
+
+        $params = $request->getQueryParams();
+        $id = isset($params['id']) ? (int)$params['id'] : 0;
+        $isAdditional = isset($params['additional']) && (int)$params['additional'] === 1;
+
+        $receipt = $this->service->getFeeReceipt($user, $id, $isAdditional);
+
+        $response->getBody()->write($receipt['data']);
+        return $response
+            ->withHeader('Content-Type', 'application/pdf')
+            ->withHeader('Content-Disposition', 'attachment; filename="' . $receipt['filename'] . '"')
+            ->withStatus(200);
+    }
+
+    public function getNotifications(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, self::ALLOWED_ROLES);
+
+        $data = $this->service->getNotifications($user);
+
+        return $this->success($response, $data);
+    }
+
+    public function markAllNotificationsRead(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, self::ALLOWED_ROLES);
+
+        $data = $this->service->markAllNotificationsRead($user);
+
+        return $this->success($response, $data);
+    }
 }

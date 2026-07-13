@@ -2,61 +2,61 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ShadCN / Zinc Theme Variables */
+/* Premium Slate & Obsidian Theme variables */
 :root {
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-display: 'Outfit', var(--font-sans);
 
-  /* Light Theme Variables */
-  --bg-app: #fafafa;
+  /* Light Theme Variables (Premium Crisp Slate) */
+  --bg-app: #f8fafc;        /* slate-50 */
   --bg-surface: #ffffff;
   --bg-card: #ffffff;
-  --border-color: #e4e4e7; /* zinc-200 */
-  --border-glow: rgba(24, 24, 27, 0.05);
+  --border-color: #e2e8f0;   /* slate-200 */
+  --border-glow: rgba(15, 23, 42, 0.02);
 
-  --color-primary: #18181b; /* zinc-900 */
-  --color-primary-hover: #27272a;
-  --color-primary-rgb: 24, 24, 27;
-  --color-secondary: #f4f4f5; /* zinc-100 */
-  --color-accent: #0f766e; /* teal-700 */
+  --color-primary: #0f172a;  /* slate-900 */
+  --color-primary-hover: #1e293b;
+  --color-primary-rgb: 15, 23, 42;
+  --color-secondary: #f1f5f9; /* slate-100 */
+  --color-accent: #0f766e;    /* teal-700 */
 
-  --text-primary: #09090b; /* zinc-950 */
-  --text-secondary: #71717a; /* zinc-500 */
-  --text-muted: #a1a1aa; /* zinc-400 */
+  --text-primary: #0f172a;   /* slate-900 */
+  --text-secondary: #475569; /* slate-600 */
+  --text-muted: #94a3b8;     /* slate-400 */
   
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  --shadow-sm: 0 1px 2px 0 rgba(15, 23, 42, 0.03);
+  --shadow-md: 0 4px 12px -1px rgba(15, 23, 42, 0.05), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
+  --shadow-lg: 0 12px 24px -4px rgba(15, 23, 42, 0.06), 0 4px 12px -2px rgba(15, 23, 42, 0.04);
   
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
 
   --transition-fast: 0.15s cubic-bezier(0.16, 1, 0.3, 1);
   --transition-normal: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Dark Mode Variables Override */
+/* Dark Mode Variables Override (Obsidian Space) */
 .dark {
-  --bg-app: #09090b; /* zinc-950 */
-  --bg-surface: #09090b;
-  --bg-card: #09090b;
-  --border-color: #27272a; /* zinc-800 */
-  --border-glow: rgba(250, 250, 250, 0.05);
+  --bg-app: #090d16;        /* deep black-slate space */
+  --bg-surface: #0f172a;    /* slate-900 */
+  --bg-card: #0f172a;
+  --border-color: #1e293b;   /* slate-800 */
+  --border-glow: rgba(248, 250, 252, 0.02);
 
-  --color-primary: #fafafa; /* zinc-50 */
-  --color-primary-hover: #f4f4f5;
-  --color-primary-rgb: 250, 250, 250;
-  --color-secondary: #27272a; /* zinc-800 */
-  --color-accent: #2dd4bf; /* teal-400 */
+  --color-primary: #f8fafc;  /* slate-50 */
+  --color-primary-hover: #e2e8f0;
+  --color-primary-rgb: 248, 250, 252;
+  --color-secondary: #1e293b; /* slate-800 */
+  --color-accent: #2dd4bf;    /* teal-400 */
 
-  --text-primary: #fafafa; /* zinc-50 */
-  --text-secondary: #a1a1aa; /* zinc-400 */
-  --text-muted: #71717a; /* zinc-500 */
+  --text-primary: #f8fafc;   /* slate-50 */
+  --text-secondary: #94a3b8; /* slate-400 */
+  --text-muted: #64748b;     /* slate-500 */
   
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px -1px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 24px -4px rgba(0, 0, 0, 0.5);
 }
 
 *, *::before, *::after {
@@ -78,10 +78,10 @@ body {
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display);
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
 }
 
-/* Scrollbars */
+/* Thinner, elegant, rounded scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -92,29 +92,49 @@ h1, h2, h3, h4, h5, h6 {
 ::-webkit-scrollbar-thumb {
   background: var(--border-color);
   border-radius: 9999px;
+  transition: background var(--transition-fast);
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
 }
 
-/* Flat ShadCN Card Styles - Solid colors and clean minimal borders */
+/* Premium Card & Panel classes */
 .glass-panel {
   background-color: var(--bg-surface);
   border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
 }
 
 .glass-card {
   background-color: var(--bg-surface);
   border: 1px solid var(--border-color);
   box-shadow: var(--shadow-sm);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
 }
 
 .glass-card:hover {
+  transform: translateY(-2px);
   box-shadow: var(--shadow-md);
-  border-color: var(--text-muted);
+  border-color: rgba(var(--color-primary-rgb), 0.25);
 }
 
-/* Accent pulse for key buttons */
+/* Skeleton Loading Shimmer */
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton-loader {
+  background: linear-gradient(90deg, var(--color-secondary) 25%, var(--border-color) 50%, var(--color-secondary) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s infinite linear;
+}
+
+/* Accent pulse for key indicators */
 @keyframes border-glow-pulse {
   0%, 100% {
     border-color: var(--border-color);
@@ -126,6 +146,22 @@ h1, h2, h3, h4, h5, h6 {
 
 .animate-glow {
   animation: border-glow-pulse 3s infinite ease-in-out;
+}
+
+/* Page Entry Transitions */
+.page-fade-in {
+  animation: pageFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes pageFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Remove default browser Number Input Spinner Controls */

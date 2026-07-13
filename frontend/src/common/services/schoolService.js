@@ -411,6 +411,46 @@ export const schoolService = {
 
   markNotificationRead(id) {
     return apiClient.post(`/api/school/notifications/${id}/read`);
+  },
+
+  getLeaveRequests(params = {}) {
+    return apiClient.get(buildUrl('/api/school/leave-requests', params));
+  },
+
+  applyLeaveRequest(data) {
+    return apiClient.post('/api/school/leave-requests', data);
+  },
+
+  updateLeaveRequestStatus(id, data) {
+    return apiClient.put(`/api/school/leave-requests/${id}/status`, data);
+  },
+
+  cancelLeaveRequest(id) {
+    return apiClient.put(`/api/school/leave-requests/${id}/cancel`);
+  },
+
+  uploadLeaveAttachment(formData) {
+    return apiClient.post('/api/school/leave-requests/upload', formData);
+  },
+
+  getMenuPermissions() {
+    return apiClient.get('/api/school/menu-permissions');
+  },
+
+  saveMenuPermissions(payload) {
+    return apiClient.post('/api/school/menu-permissions', payload);
+  },
+
+  getClassTeacherAssignments() {
+    return apiClient.get('/api/school/class-teacher-assignments');
+  },
+
+  saveClassTeacherAssignments(payload) {
+    return apiClient.post('/api/school/class-teacher-assignments', payload);
+  },
+
+  getMyPermissions() {
+    return apiClient.get('/api/school/my-permissions');
   }
 };
 

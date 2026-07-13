@@ -38,7 +38,10 @@ class TeacherController extends BaseController
         $user = $this->authenticate($request);
         $this->requireRole($user, 'TEACHER');
 
-        $data = $this->service->getMyClasses((int) $user['id'], (int) $user['school_id']);
+        $params = $request->getQueryParams();
+        $onlyAssigned = isset($params['only_assigned']) && $params['only_assigned'] === '1';
+
+        $data = $this->service->getMyClasses((int) $user['id'], (int) $user['school_id'], $onlyAssigned);
 
         return $this->success($response, $data);
     }
@@ -159,5 +162,32 @@ class TeacherController extends BaseController
         $result = $this->service->enterMarks($body);
 
         return $this->success($response, $result);
+    }
+
+    public function getSalaries(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, 'TEACHER');
+
+        $data = $this->service->getSalaries((int) $user['id'], (int) $user['school_id']);
+
+        return $this->success($response, $data);
+    }
+
+    public function getSalarySlip(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, 'TEACHER');
+
+        $params = $request->getQueryParams();
+        $id = isset($params['id']) ? (int)$params['id'] : 0;
+
+        $slip = $this->service->getSalarySlip((int) $user['id'], (int) $user['school_id'], $id);
+
+        $response->getBody()->write($slip['data']);
+        return $response
+            ->withHeader('Content-Type', 'application/pdf')
+            ->withHeader('Content-Disposition', 'attachment; filename="' . $slip['filename'] . '"')
+            ->withStatus(200);
     }
 }

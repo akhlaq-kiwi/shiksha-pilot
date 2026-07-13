@@ -1772,6 +1772,11 @@ class SchoolAdminService extends BaseService
             } else {
                 $sections = array_filter(array_map('trim', explode(',', (string)$data['sections'])));
             }
+            $sections = array_unique($sections);
+        }
+
+        if (!empty($sections) && count($sections) === 1) {
+            throw new ValidationException(['sections' => 'At least 2 sections are required, or leave blank for no sections.']);
         }
 
         if (empty($sections)) {
@@ -4226,6 +4231,10 @@ class SchoolAdminService extends BaseService
             $lastPayment = $this->feeRepo->findPaymentById($id);
         }
 
+        foreach ($monthsToPay as $m) {
+            $this->sendStudentNotification($pdo, $schoolId, $studentId, "Monthly Fee Deposited", "Your {$m} fee payment has been successfully recorded.");
+        }
+
         $this->syncFollowUpStatus($pdo, $studentId, $schoolId);
 
         if ($lastPayment === null) {
@@ -4425,7 +4434,13 @@ class SchoolAdminService extends BaseService
             } else {
                 $newSections = array_filter(array_map('trim', explode(',', (string)$data['sections'])));
             }
+            $newSections = array_unique($newSections);
         }
+
+        if (!empty($newSections) && count($newSections) === 1) {
+            throw new ValidationException(['sections' => 'At least 2 sections are required, or leave blank to remove all sections.']);
+        }
+
         if (empty($newSections)) {
             $newSections = [null];
         }
@@ -4490,8 +4505,44 @@ class SchoolAdminService extends BaseService
             if (!in_array((int)$oc['id'], $processedIds, true)) {
                 $oldClassId = (int)$oc['id'];
                 
-                if (!empty($processedIds)) {
+                // Find the target class ID for this deleted class row (alphabetically previous section)
+                $targetClassId = null;
+                if (!empty($newSections) && $newSections[0] !== null) {
+                    $deletedSec = $oc['section'] !== null ? trim((string)$oc['section']) : '';
+                    
+                    // Collect and sort all old sections alphabetically
+                    $oldSecList = [];
+                    foreach ($oldClasses as $oldC) {
+                        $oldSecList[] = $oldC['section'] !== null ? trim((string)$oldC['section']) : '';
+                    }
+                    $oldSecList = array_unique($oldSecList);
+                    sort($oldSecList);
+                    
+                    $deletedIdx = array_search($deletedSec, $oldSecList);
+                    $targetSec = null;
+                    if ($deletedIdx !== false && $deletedIdx > 0) {
+                        $targetSec = $oldSecList[$deletedIdx - 1];
+                    } else {
+                        // Fall back to first available section in $newSections
+                        $targetSec = $newSections[0];
+                    }
+                    
+                    // Find the class ID matching $targetSec in the updated classes list
+                    $stmtFindTarget = $pdo->prepare("SELECT id FROM classes WHERE school_id = :sid AND name = :name AND academic_year_id = :ayid AND (section = :sec OR (section IS NULL AND :sec = '')) LIMIT 1");
+                    $stmtFindTarget->execute([
+                        ':sid' => $schoolId,
+                        ':name' => $newName,
+                        ':ayid' => $academicYearId,
+                        ':sec' => $targetSec === '' ? null : $targetSec
+                    ]);
+                    $targetClassId = (int)$stmtFindTarget->fetchColumn();
+                }
+
+                if (empty($targetClassId) && !empty($processedIds)) {
                     $targetClassId = (int)$processedIds[0];
+                }
+
+                if (!empty($targetClassId)) {
                     $tablesToMigrate = ['students', 'subjects', 'attendance', 'exams', 'fee_structures'];
                     foreach ($tablesToMigrate as $tbl) {
                         $stmtMigrate = $pdo->prepare("UPDATE {$tbl} SET class_id = :target_id WHERE class_id = :old_id");
@@ -4504,6 +4555,28 @@ class SchoolAdminService extends BaseService
 
                 $this->classRepo->delete($oldClassId);
                 $this->log('Class section deleted on edit', ['id' => $oldClassId, 'school_id' => $schoolId]);
+            }
+        }
+
+        // Roll Number Reassignment for all affected class IDs in $processedIds
+        if (!empty($processedIds)) {
+            foreach ($processedIds as $cid) {
+                // Fetch active students in random order
+                $stmtSt = $pdo->prepare("SELECT id FROM students WHERE class_id = :cid AND status = 'ACTIVE' ORDER BY RAND()");
+                $stmtSt->execute([':cid' => $cid]);
+                $stIds = $stmtSt->fetchAll(PDO::FETCH_COLUMN);
+
+                if (!empty($stIds)) {
+                    $roll = 1;
+                    $stmtUpRoll = $pdo->prepare("UPDATE students SET roll_no = :roll WHERE id = :id");
+                    foreach ($stIds as $stId) {
+                        $stmtUpRoll->execute([
+                            ':roll' => (string)$roll,
+                            ':id'   => $stId
+                        ]);
+                        $roll++;
+                    }
+                }
             }
         }
 
@@ -6930,6 +7003,7 @@ Only approve the settlement after reviewing all financial records.
             $pay['fee_type_id'] = (int)$pay['fee_type_id'];
             $pay['amount'] = (float)$pay['amount'];
 
+            $this->sendStudentNotification($pdo, $schoolId, $pay['student_id'], "Additional Fee Deposited", "{$pay['fee_name']} have been successfully recorded.");
             $this->syncFollowUpStatus($pdo, $pay['student_id'], $schoolId);
         }
 
@@ -9973,6 +10047,525 @@ Only approve the settlement after reviewing all financial records.
         $this->log('Fee follow-up status updated manually', ['id' => $id, 'status' => $newStatus]);
 
         return ['success' => true];
+    }
+
+    public function getCredentials(array $user, string $role, int $id): ?array
+    {
+        $pdo = $this->studentRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+        $role = strtoupper($role);
+
+        if ($role === 'TEACHER') {
+            $stmt = $pdo->prepare("SELECT phone, name FROM staff WHERE id = :id AND school_id = :sid LIMIT 1");
+            $stmt->execute(['id' => $id, 'sid' => $schoolId]);
+            $staff = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if (!$staff) {
+                throw new NotFoundException('Teacher not found in this school.');
+            }
+            $phone = $staff['phone'] ?? '';
+            $userRole = 'TEACHER';
+        } else if ($role === 'PARENT') {
+            $stmt = $pdo->prepare("SELECT student_mobile, name FROM students WHERE id = :id AND school_id = :sid LIMIT 1");
+            $stmt->execute(['id' => $id, 'sid' => $schoolId]);
+            $student = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if (!$student) {
+                throw new NotFoundException('Student not found in this school.');
+            }
+            $phone = $student['student_mobile'] ?? '';
+            $userRole = 'PARENT';
+        } else {
+            throw new ValidationException(['role' => 'Invalid role specified.']);
+        }
+
+        if (empty($phone)) {
+            return null;
+        }
+
+        $stmtUser = $pdo->prepare("SELECT phone, plain_password FROM users WHERE phone = :phone AND role = :role LIMIT 1");
+        $stmtUser->execute(['phone' => $phone, 'role' => $userRole]);
+        $row = $stmtUser->fetch(\PDO::FETCH_ASSOC);
+
+        return $row !== false ? $row : null;
+    }
+
+    public function generateCredentials(array $user, array $data): array
+    {
+        $pdo = $this->studentRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+        
+        if (empty($data['role']) || empty($data['id'])) {
+            throw new ValidationException(['fields' => 'Role and ID are required.']);
+        }
+
+        $role = strtoupper($data['role']);
+        $id = (int)$data['id'];
+
+        if ($role === 'TEACHER') {
+            $stmt = $pdo->prepare("SELECT phone, name FROM staff WHERE id = :id AND school_id = :sid LIMIT 1");
+            $stmt->execute(['id' => $id, 'sid' => $schoolId]);
+            $staff = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if (!$staff) {
+                throw new NotFoundException('Teacher not found in this school.');
+            }
+            $phone = $staff['phone'] ?? '';
+            $name = $staff['name'] ?? '';
+            $userRole = 'TEACHER';
+        } else if ($role === 'PARENT') {
+            $stmt = $pdo->prepare("SELECT student_mobile, name FROM students WHERE id = :id AND school_id = :sid LIMIT 1");
+            $stmt->execute(['id' => $id, 'sid' => $schoolId]);
+            $student = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if (!$student) {
+                throw new NotFoundException('Student not found in this school.');
+            }
+            $phone = $student['student_mobile'] ?? '';
+            $name = $student['name'] ?? '';
+            $userRole = 'PARENT';
+        } else {
+            throw new ValidationException(['role' => 'Invalid role specified.']);
+        }
+
+        if (empty($phone)) {
+            throw new ValidationException(['phone' => 'Mobile number is not registered for this profile. Please update the profile first.']);
+        }
+
+        // Generate or use manual password
+        if (!empty($data['password'])) {
+            $password = trim($data['password']);
+            if (strlen($password) < 6) {
+                throw new ValidationException(['password' => 'Password must be at least 6 characters long.']);
+            }
+        } else {
+            $chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            $password = '';
+            for ($i = 0; $i < 8; $i++) {
+                $password .= $chars[random_int(0, strlen($chars) - 1)];
+            }
+        }
+        $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
+
+        // Check if user already exists
+        $stmtCheck = $pdo->prepare("SELECT id FROM users WHERE phone = :phone LIMIT 1");
+        $stmtCheck->execute(['phone' => $phone]);
+        $existingUser = $stmtCheck->fetch(\PDO::FETCH_ASSOC);
+
+        if ($existingUser) {
+            $stmtUpdate = $pdo->prepare("
+                UPDATE users 
+                SET password = :password, plain_password = :plain, role = :role, name = :name, school_id = :sid, status = 'ACTIVE'
+                WHERE id = :id
+            ");
+            $stmtUpdate->execute([
+                ':password' => $hashedPassword,
+                ':plain' => $password,
+                ':role' => $userRole,
+                ':name' => $name,
+                ':sid' => $schoolId,
+                ':id' => $existingUser['id']
+            ]);
+        } else {
+            $stmtInsert = $pdo->prepare("
+                INSERT INTO users (phone, password, plain_password, role, name, school_id, status)
+                VALUES (:phone, :password, :plain, :role, :name, :sid, 'ACTIVE')
+            ");
+            $stmtInsert->execute([
+                ':phone' => $phone,
+                ':password' => $hashedPassword,
+                ':plain' => $password,
+                ':role' => $userRole,
+                ':name' => $name,
+                ':sid' => $schoolId
+            ]);
+        }
+
+        $this->log('Credentials generated/updated', ['phone' => $phone, 'role' => $userRole]);
+
+        return [
+            'phone' => $phone,
+            'plain_password' => $password
+        ];
+    }
+
+    private function sendStudentNotification(PDO $pdo, int $schoolId, int $studentId, string $title, string $message): void
+    {
+        // Find student user ID
+        $stmtUser = $pdo->prepare("
+            SELECT id FROM users 
+            WHERE school_id = :sid AND role = 'STUDENT' 
+              AND email = (SELECT email FROM students WHERE id = :stid LIMIT 1)
+            LIMIT 1
+        ");
+        $stmtUser->execute([':sid' => $schoolId, ':stid' => $studentId]);
+        $userId = $stmtUser->fetchColumn();
+        
+        if ($userId) {
+            $stmtInsert = $pdo->prepare("
+                INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, is_read)
+                VALUES (:school_id, 'STUDENT', :user_id, :title, :message, 0)
+            ");
+            $stmtInsert->execute([
+                ':school_id' => $schoolId,
+                ':user_id' => $userId,
+                ':title' => $title,
+                ':message' => $message
+            ]);
+        }
+    }
+
+    public function getMenuPermissions(array $user): array
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        // Get working academic year
+        $requestYearId = $_SERVER['HTTP_X_ACADEMIC_YEAR_ID'] ?? $_SERVER['X_ACADEMIC_YEAR_ID'] ?? null;
+        $workingYear = null;
+        if ($requestYearId !== null && is_numeric($requestYearId)) {
+            $stmt = $pdo->prepare("SELECT * FROM academic_years WHERE id = :id AND school_id = :sid LIMIT 1");
+            $stmt->execute([':id' => (int)$requestYearId, ':sid' => $schoolId]);
+            $workingYear = $stmt->fetch(\PDO::FETCH_ASSOC);
+        }
+        if (!$workingYear) {
+            $stmt = $pdo->prepare("SELECT * FROM academic_years WHERE school_id = :sid AND is_current = 1 LIMIT 1");
+            $stmt->execute([':sid' => $schoolId]);
+            $workingYear = $stmt->fetch(\PDO::FETCH_ASSOC);
+        }
+        $academicYearId = $workingYear ? (int)$workingYear['id'] : 0;
+
+        // Get all active teachers
+        $stmt = $pdo->prepare("
+            SELECT id, name, employee_id, phone, role, department
+            FROM staff 
+            WHERE school_id = :sid AND academic_year_id = :ayid AND (role = 'TEACHER' OR role = 'Teacher') AND status = 'ACTIVE'
+            ORDER BY name ASC
+        ");
+        $stmt->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+        $teachers = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        // Fetch permissions for each teacher
+        foreach ($teachers as &$t) {
+            $stmtPerms = $pdo->prepare("
+                SELECT menu_label 
+                FROM teacher_menu_permissions 
+                WHERE school_id = :sid AND teacher_id = :tid
+            ");
+            $stmtPerms->execute([':sid' => $schoolId, ':tid' => $t['id']]);
+            $t['menus'] = $stmtPerms->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+        }
+
+        return [
+            'teachers' => $teachers
+        ];
+    }
+
+    public function saveMenuPermissions(array $user, array $data): array
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        $teacherId = isset($data['teacher_id']) ? (int)$data['teacher_id'] : null;
+        $menus = isset($data['menus']) && is_array($data['menus']) ? $data['menus'] : [];
+
+        if (!$teacherId) {
+            throw new \App\Shared\Exceptions\ValidationException('Teacher ID is required');
+        }
+
+        // Get teacher name for logging
+        $stmtTeacher = $pdo->prepare("SELECT name FROM staff WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtTeacher->execute([':id' => $teacherId, ':sid' => $schoolId]);
+        $teacherName = $stmtTeacher->fetchColumn() ?: 'Teacher';
+
+        $pdo->beginTransaction();
+        try {
+            // Delete current permissions
+            $stmtDel = $pdo->prepare("DELETE FROM teacher_menu_permissions WHERE school_id = :sid AND teacher_id = :tid");
+            $stmtDel->execute([':sid' => $schoolId, ':tid' => $teacherId]);
+
+            // Insert new permissions
+            if (!empty($menus)) {
+                $stmtInsert = $pdo->prepare("
+                    INSERT INTO teacher_menu_permissions (school_id, teacher_id, menu_label)
+                    VALUES (:sid, :tid, :label)
+                ");
+                foreach ($menus as $m) {
+                    $stmtInsert->execute([
+                        ':sid' => $schoolId,
+                        ':tid' => $teacherId,
+                        ':label' => trim($m)
+                    ]);
+                }
+                $desc = "Updated menu permissions for teacher {$teacherName}: " . implode(', ', $menus);
+            } else {
+                $desc = "Removed all menu permissions for teacher {$teacherName}";
+            }
+
+            // Log Audit
+            $this->logAudit($pdo, $user, 'Audits & Settings', 'Assign User Role', $desc);
+
+            $pdo->commit();
+        } catch (\Exception $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+
+        return ['success' => true];
+    }
+
+    public function getClassTeacherAssignments(array $user): array
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        // Get working academic year
+        $requestYearId = $_SERVER['HTTP_X_ACADEMIC_YEAR_ID'] ?? $_SERVER['X_ACADEMIC_YEAR_ID'] ?? null;
+        $workingYear = null;
+        if ($requestYearId !== null && is_numeric($requestYearId)) {
+            $stmt = $pdo->prepare("SELECT * FROM academic_years WHERE id = :id AND school_id = :sid LIMIT 1");
+            $stmt->execute([':id' => (int)$requestYearId, ':sid' => $schoolId]);
+            $workingYear = $stmt->fetch(\PDO::FETCH_ASSOC);
+        }
+        if (!$workingYear) {
+            $stmt = $pdo->prepare("SELECT * FROM academic_years WHERE school_id = :sid AND is_current = 1 LIMIT 1");
+            $stmt->execute([':sid' => $schoolId]);
+            $workingYear = $stmt->fetch(\PDO::FETCH_ASSOC);
+        }
+        $academicYearId = $workingYear ? (int)$workingYear['id'] : 0;
+
+        // Get all classes of this active academic year
+        $stmtClasses = $pdo->prepare("
+            SELECT id, name, section, stream
+            FROM classes 
+            WHERE school_id = :sid AND academic_year_id = :ayid
+            ORDER BY name ASC, section ASC
+        ");
+        $stmtClasses->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+        $classes = $stmtClasses->fetchAll(\PDO::FETCH_ASSOC);
+
+        // Get all active teachers of this academic year for dropdown list
+        $stmtTeachers = $pdo->prepare("
+            SELECT id, name, phone, employee_id, department
+            FROM staff 
+            WHERE school_id = :sid AND academic_year_id = :ayid AND (role = 'TEACHER' OR role = 'Teacher') AND status = 'ACTIVE'
+            ORDER BY name ASC
+        ");
+        $stmtTeachers->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+        $teachers = $stmtTeachers->fetchAll(\PDO::FETCH_ASSOC);
+
+        // Fetch assignments
+        foreach ($classes as &$c) {
+            $stmtAssign = $pdo->prepare("
+                SELECT cta.teacher_id, s.name AS teacher_name
+                FROM class_teacher_assignments cta
+                JOIN staff s ON cta.teacher_id = s.id
+                WHERE cta.school_id = :sid AND cta.class_id = :cid
+            ");
+            $stmtAssign->execute([':sid' => $schoolId, ':cid' => $c['id']]);
+            $assignment = $stmtAssign->fetch(\PDO::FETCH_ASSOC);
+            if ($assignment) {
+                $c['assigned_teacher_id'] = (int)$assignment['teacher_id'];
+                $c['assigned_teacher_name'] = $assignment['teacher_name'];
+            } else {
+                $c['assigned_teacher_id'] = null;
+                $c['assigned_teacher_name'] = null;
+            }
+        }
+
+        return [
+            'classes' => $classes,
+            'teachers' => $teachers
+        ];
+    }
+
+    public function saveClassTeacherAssignments(array $user, array $data): array
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        // We expect an array of assignments, e.g. [{class_id: 1, teacher_id: 2}, ...]
+        $assignments = isset($data['assignments']) && is_array($data['assignments']) ? $data['assignments'] : [];
+
+        $pdo->beginTransaction();
+        try {
+            // First check if there is any teacher duplicate assignment *within* this payload itself
+            $payloadTeachers = [];
+            foreach ($assignments as $a) {
+                $classId = isset($a['class_id']) ? (int)$a['class_id'] : null;
+                $teacherId = isset($a['teacher_id']) ? (int)$a['teacher_id'] : null;
+                if ($classId && $teacherId) {
+                    if (isset($payloadTeachers[$teacherId])) {
+                        // Duplicate teacher in payload
+                        $stmtTeacher = $pdo->prepare("SELECT name FROM staff WHERE id = :id AND school_id = :sid LIMIT 1");
+                        $stmtTeacher->execute([':id' => $teacherId, ':sid' => $schoolId]);
+                        $tName = $stmtTeacher->fetchColumn() ?: 'This teacher';
+                        
+                        $pdo->rollBack();
+                        throw new \App\Shared\Exceptions\ValidationException([
+                            'assignments' => "{$tName} is assigned to multiple classes in the request. One teacher can only be assigned to one class."
+                        ]);
+                    }
+                    $payloadTeachers[$teacherId] = $classId;
+                }
+            }
+
+            // Verify teacher uniqueness check from the DB (excluding unassigned)
+            foreach ($assignments as $a) {
+                $classId = isset($a['class_id']) ? (int)$a['class_id'] : null;
+                $teacherId = isset($a['teacher_id']) ? (int)$a['teacher_id'] : null;
+
+                if ($classId && $teacherId) {
+                    // Check if teacher is already assigned to another class
+                    $stmtCheck = $pdo->prepare("
+                        SELECT cta.class_id, c.name, c.section 
+                        FROM class_teacher_assignments cta
+                        JOIN classes c ON cta.class_id = c.id
+                        WHERE cta.school_id = :sid AND cta.teacher_id = :tid AND cta.class_id != :cid
+                    ");
+                    $stmtCheck->execute([':sid' => $schoolId, ':tid' => $teacherId, ':cid' => $classId]);
+                    $exists = $stmtCheck->fetch(\PDO::FETCH_ASSOC);
+
+                    if ($exists) {
+                        $clsName = $exists['name'] . ($exists['section'] ? '-' . $exists['section'] : '');
+                        $stmtTeacher = $pdo->prepare("SELECT name FROM staff WHERE id = :id AND school_id = :sid LIMIT 1");
+                        $stmtTeacher->execute([':id' => $teacherId, ':sid' => $schoolId]);
+                        $tName = $stmtTeacher->fetchColumn() ?: 'This teacher';
+
+                        $pdo->rollBack();
+                        throw new \App\Shared\Exceptions\ValidationException([
+                            'assignments' => "{$tName} is already assigned to {$clsName}. One teacher can only be assigned to one class."
+                        ]);
+                    }
+                }
+            }
+
+            // Save / delete assignments
+            foreach ($assignments as $a) {
+                $classId = isset($a['class_id']) ? (int)$a['class_id'] : null;
+                $teacherId = isset($a['teacher_id']) ? (int)$a['teacher_id'] : null;
+
+                if ($classId) {
+                    // Get class name
+                    $stmtClass = $pdo->prepare("SELECT name, section FROM classes WHERE id = :id LIMIT 1");
+                    $stmtClass->execute([':id' => $classId]);
+                    $cls = $stmtClass->fetch(\PDO::FETCH_ASSOC);
+                    $clsName = $cls ? ($cls['name'] . ($cls['section'] ? '-' . $cls['section'] : '')) : "Class";
+
+                    // Check previous assignment
+                    $stmtPrev = $pdo->prepare("
+                        SELECT cta.teacher_id, s.name 
+                        FROM class_teacher_assignments cta
+                        JOIN staff s ON cta.teacher_id = s.id
+                        WHERE cta.school_id = :sid AND cta.class_id = :cid
+                    ");
+                    $stmtPrev->execute([':sid' => $schoolId, ':cid' => $classId]);
+                    $prev = $stmtPrev->fetch(\PDO::FETCH_ASSOC);
+
+                    if ($teacherId === null || $teacherId === 0 || $teacherId === '') {
+                        // Delete assignment
+                        $stmtDel = $pdo->prepare("DELETE FROM class_teacher_assignments WHERE school_id = :sid AND class_id = :cid");
+                        $stmtDel->execute([':sid' => $schoolId, ':cid' => $classId]);
+
+                        if ($prev) {
+                            $this->logAudit($pdo, $user, 'Audits & Settings', 'Assign User Role', "Removed class teacher assignment for {$clsName} (Previous: {$prev['name']})");
+                        }
+                    } else {
+                        // Insert or Update assignment
+                        $stmtTeacher = $pdo->prepare("SELECT name FROM staff WHERE id = :id AND school_id = :sid LIMIT 1");
+                        $stmtTeacher->execute([':id' => $teacherId, ':sid' => $schoolId]);
+                        $tName = $stmtTeacher->fetchColumn() ?: 'Teacher';
+
+                        $stmtUpsert = $pdo->prepare("
+                            INSERT INTO class_teacher_assignments (school_id, class_id, teacher_id)
+                            VALUES (:sid, :cid, :tid)
+                            ON DUPLICATE KEY UPDATE teacher_id = VALUES(teacher_id)
+                        ");
+                        $stmtUpsert->execute([
+                            ':sid' => $schoolId,
+                            ':cid' => $classId,
+                            ':tid' => $teacherId
+                        ]);
+
+                        if ($prev) {
+                            if ((int)$prev['teacher_id'] !== $teacherId) {
+                                $this->logAudit($pdo, $user, 'Audits & Settings', 'Assign User Role', "Replaced class teacher for {$clsName}: {$tName} replaces {$prev['name']}");
+                            }
+                        } else {
+                            $this->logAudit($pdo, $user, 'Audits & Settings', 'Assign User Role', "Assigned {$tName} as class teacher of {$clsName}");
+                        }
+                    }
+                }
+            }
+
+            $pdo->commit();
+        } catch (\Exception $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+
+        return ['success' => true];
+    }
+
+    public function getMyPermissions(array $user): array
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = (int)$user['school_id'];
+        $role = $user['role'] ?? '';
+
+        if ($role === 'SCHOOL_ADMIN') {
+            // SCHOOL_ADMIN has full permissions
+            return [
+                'role' => $role,
+                'permissions' => [
+                    'Dashboard', 'Classes', 'Teachers', 'Attendance', 'Leave Requests', 
+                    'Examinations', 'Fees Portal', 'Financial Reports', 'Finance Management', 
+                    'Fee Follow-up', 'Timetable', 'Audits & Settings', 'Security'
+                ]
+            ];
+        }
+
+        if ($role === 'TEACHER') {
+            // Find staff record
+            $stmtUser = $pdo->prepare("SELECT phone FROM users WHERE id = :id LIMIT 1");
+            $stmtUser->execute([':id' => $user['id']]);
+            $phone = $stmtUser->fetchColumn();
+
+            if (!$phone) {
+                return ['role' => $role, 'permissions' => []];
+            }
+
+            // Get active year
+            $stmtYear = $pdo->prepare("SELECT id FROM academic_years WHERE school_id = :sid AND (status = 'ACTIVE' OR is_current = 1) LIMIT 1");
+            $stmtYear->execute([':sid' => $schoolId]);
+            $workingYearId = $stmtYear->fetchColumn();
+
+            if (!$workingYearId) {
+                return ['role' => $role, 'permissions' => []];
+            }
+
+            $stmtStaff = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND academic_year_id = :ayid AND phone = :phone LIMIT 1");
+            $stmtStaff->execute([':sid' => $schoolId, ':ayid' => $workingYearId, ':phone' => $phone]);
+            $staff = $stmtStaff->fetch();
+
+            if (!$staff) {
+                return ['role' => $role, 'permissions' => []];
+            }
+
+            $staffId = (int)$staff['id'];
+
+            // Fetch permissions
+            $stmtPerms = $pdo->prepare("
+                SELECT menu_label 
+                FROM teacher_menu_permissions 
+                WHERE school_id = :sid AND teacher_id = :tid
+            ");
+            $stmtPerms->execute([':sid' => $schoolId, ':tid' => $staffId]);
+            $perms = $stmtPerms->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+
+            return [
+                'role' => $role,
+                'permissions' => $perms
+            ];
+        }
+
+        return ['role' => $role, 'permissions' => []];
     }
 }
 
