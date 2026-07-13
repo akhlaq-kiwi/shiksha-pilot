@@ -159,7 +159,7 @@ class TeacherService extends BaseService
             FROM students s
             LEFT JOIN classes c ON s.class_id = c.id
             WHERE s.class_id = :class_id AND s.school_id = :school_id AND s.status = 'ACTIVE'
-            ORDER BY name
+            ORDER BY CASE WHEN s.roll_no IS NULL OR s.roll_no = '' THEN 1 ELSE 0 END, CAST(s.roll_no AS UNSIGNED) ASC, name
         ");
         $stmt->execute([':class_id' => $classId, ':school_id' => $schoolId]);
 

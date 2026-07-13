@@ -58,7 +58,7 @@ class TeacherController extends BaseController
         $params  = $request->getQueryParams();
         $classId = isset($params['class_id']) ? (int) $params['class_id'] : null;
 
-        $data = $this->service->getStudentList((int) $user['school_id'], $classId);
+        $data = $this->service->getStudentList((int) $user['school_id'], $classId, $user);
 
         return $this->success($response, $data);
     }
@@ -84,7 +84,7 @@ class TeacherController extends BaseController
         $this->requireRole($user, 'TEACHER');
 
         $filters = $request->getQueryParams();
-        $data    = $this->service->getAttendanceHistory((int) $user['id'], $filters);
+        $data    = $this->service->getAttendanceHistory((int) $user['id'], $filters, $user);
 
         return $this->success($response, $data);
     }

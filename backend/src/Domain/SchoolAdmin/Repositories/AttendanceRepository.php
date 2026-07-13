@@ -75,12 +75,14 @@ class AttendanceRepository extends BaseRepository
      */
     public function findByMarker(int $teacherId, array $filters = []): array
     {
-        $where    = 'a.marked_by = :teacher_id';
-        $bindings = [':teacher_id' => $teacherId];
-
+        $bindings = [];
+        
         if (!empty($filters['class_id'])) {
-            $where .= ' AND a.class_id = :class_id';
+            $where = 'a.class_id = :class_id';
             $bindings[':class_id'] = $filters['class_id'];
+        } else {
+            $where = 'a.marked_by = :teacher_id';
+            $bindings[':teacher_id'] = $teacherId;
         }
 
         if (!empty($filters['date'])) {

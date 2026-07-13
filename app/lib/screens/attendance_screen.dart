@@ -46,6 +46,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   bool _isLoadingTeacherData = false;
   bool _isTeacherSubmitting = false;
   bool _isSubmittedForSelectedDate = false;
+  bool _isLoadingAttendanceForDate = false;
   late DateTime _teacherToday;
   late DateTime _teacherAcademicYearStart;
   late int _teacherTotalDays;
@@ -197,6 +198,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   Future<void> _loadTeacherData() async {
     setState(() {
       _isLoadingTeacherData = true;
+      _isLoadingAttendanceForDate = true;
     });
 
     try {
@@ -242,6 +244,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     if (_selectedClassId == null) return;
     setState(() {
       _isLoadingTeacherData = true;
+      _isLoadingAttendanceForDate = true;
     });
 
     try {
@@ -295,6 +298,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           SnackBar(content: Text(e.toString().replaceAll('Exception:', '').trim())),
         );
       }
+    } finally {
+      setState(() {
+        _isLoadingAttendanceForDate = false;
+      });
     }
   }
 
@@ -954,6 +961,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               setState(() {
                 _teacherCurrentPageIndex = idx;
                 _teacherSelectedDate = _teacherAcademicYearStart.add(Duration(days: idx));
+                _isLoadingAttendanceForDate = true;
               });
               _fetchTeacherAttendanceForDate();
             },
@@ -1058,7 +1066,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                         final sName = student['name'] ?? '';
                         final currentMark = _tempAttendance[sId];
 
-                        final isEditable = !_isSubmittedForSelectedDate;
+                        final isEditable = !_isSubmittedForSelectedDate && !_isLoadingAttendanceForDate;
                         final isHighlighted = sId == _highlightedStudentId;
 
                         return Container(
@@ -1124,7 +1132,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         ),
 
         // Submit Button (only for past/today if not already submitted, and not Sunday/holiday)
-        if (_teacherSelectedDate != null && 
+        if (!_isLoadingAttendanceForDate &&
+            _teacherSelectedDate != null && 
             !_teacherSelectedDate!.isAfter(_teacherToday) && 
             !_isSubmittedForSelectedDate && 
             _students.isNotEmpty &&
@@ -1194,53 +1203,52 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   Widget _buildTeacherStatusBadge() {
     if (_isSubmittedForSelectedDate) {
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: Colors.blue.shade50,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.blue.shade200),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.check_circle_rounded, size: 14, color: Colors.blue.shade700),
-            const SizedBox(width: 4),
+            Icon(Icons.check_circle_rounded, size: 16, color: Colors.blue.shade700),
+            const SizedBox(width: 6),
             Text(
               'Attendance Submitted',
-              style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.bold, fontSize: 10),
+              style: TextStyle(
+                color: Colors.blue.shade700,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
             ),
           ],
         ),
       );
     }
 
-    final isSelectedDateToday = _teacherSelectedDate != null &&
-        _teacherSelectedDate!.day == _teacherToday.day &&
-        _teacherSelectedDate!.month == _teacherToday.month &&
-        _teacherSelectedDate!.year == _teacherToday.year;
-
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: isSelectedDateToday ? Colors.amber.shade50 : Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: isSelectedDateToday ? Colors.amber.shade200 : Colors.grey.shade300),
+        color: Colors.amber.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.amber.shade200),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            isSelectedDateToday ? Icons.pending_actions_rounded : Icons.lock_outline_rounded,
-            size: 14,
-            color: isSelectedDateToday ? Colors.amber.shade800 : Colors.grey.shade600,
+            Icons.pending_actions_rounded,
+            size: 16,
+            color: Colors.amber.shade800,
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 6),
           Text(
-            isSelectedDateToday ? 'Pending Submission' : 'Read Only',
+            'Attendance Pending',
             style: TextStyle(
-              color: isSelectedDateToday ? Colors.amber.shade800 : Colors.grey.shade600,
+              color: Colors.amber.shade800,
               fontWeight: FontWeight.bold,
-              fontSize: 10,
+              fontSize: 12,
             ),
           ),
         ],
