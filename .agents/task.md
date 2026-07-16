@@ -1,0 +1,8 @@
+- `[x]` Create database migration for status column
+- `[x]` Apply database migration
+- `[x]` Modify backend `SchoolAdminService` (support status & notifications)
+- `[x]` Modify backend `StudentService` (filter draft notices)
+- `[x]` Redesign frontend `AnnouncementsPage` layout, modal, live preview, list table, badges, actions, validations
+- `[x]` Implement mobile unread dot color and date format update in `notice_screen.dart`
+- `[x]` Implement mobile notification click navigation in `notification_center_screen.dart`
+- `[ ]` Run build checks & verify execution

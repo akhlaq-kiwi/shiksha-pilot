@@ -732,4 +732,55 @@ class StudentService extends BaseService
 
         return ['success' => true];
     }
+
+    public function getActiveNotices(array $user): array
+    {
+        $schoolId = (int)($user['school_id'] ?? 0);
+        $userId = (int)($user['id'] ?? 0);
+        $role = strtoupper($user['role'] ?? '');
+        $pdo = $this->repo->getPdo();
+
+        $allowedAud = [];
+        if ($role === 'TEACHER') {
+            $allowedAud = ['Teachers', 'Both'];
+        } elseif ($role === 'PARENT' || $role === 'STUDENT') {
+            $allowedAud = ['Students', 'Both'];
+        } elseif ($role === 'SCHOOL_ADMIN' || $role === 'PRINCIPAL') {
+            $allowedAud = ['Teachers', 'Students', 'Both'];
+        } else {
+            return []; // Unauthorized roles see nothing
+        }
+
+        // Build in clause query
+        $inQuery = implode(',', array_fill(0, count($allowedAud), '?'));
+        $stmt = $pdo->prepare("
+            SELECT a.*, 
+                   (CASE WHEN ar.id IS NOT NULL THEN 1 ELSE 0 END) AS is_read
+            FROM announcements a
+            LEFT JOIN announcement_reads ar ON a.id = ar.announcement_id AND ar.user_id = ?
+            WHERE a.school_id = ? AND a.audience IN ({$inQuery}) AND a.status = 'Published'
+            ORDER BY a.created_at DESC
+        ");
+
+        $params = array_merge([$userId, $schoolId], $allowedAud);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function markNoticeRead(array $user, int $announcementId): array
+    {
+        $userId = (int)$user['id'];
+        $pdo = $this->repo->getPdo();
+
+        $stmt = $pdo->prepare("
+            INSERT IGNORE INTO announcement_reads (announcement_id, user_id)
+            VALUES (:ann, :uid)
+        ");
+        $stmt->execute([
+            ':ann' => $announcementId,
+            ':uid' => $userId
+        ]);
+
+        return ['success' => true];
+    }
 }

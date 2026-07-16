@@ -9,6 +9,7 @@ import 'package:school_hub/screens/attendance_screen.dart';
 import 'package:school_hub/screens/fees_card_screen.dart';
 import 'package:school_hub/screens/salary_card_screen.dart';
 import 'package:school_hub/screens/notification_center_screen.dart';
+import 'package:school_hub/screens/notice_screen.dart';
 import 'package:school_hub/services/attendance_service.dart';
 import 'package:school_hub/main.dart';
 
@@ -115,10 +116,11 @@ class _HomeScreenState extends State<HomeScreen> {
       allowedRoles: ['SCHOOL_ADMIN', 'PRINCIPAL'],
     ),
     LauncherFeature(
-      name: 'Notices',
+      name: 'Notice',
       icon: Icons.campaign_rounded,
       color: Colors.orange.shade700,
       allowedRoles: ['PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL'],
+      isAvailable: true,
     ),
     LauncherFeature(
       name: 'Transport',
@@ -217,7 +219,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _syncProfileDetails(String token) async {
     try {
-      final authService = AuthService(baseUrl: 'http://10.168.169.71:8000');
+      final authService = AuthService(baseUrl: 'http://10.227.152.71:8000');
       final profile = await authService.fetchProfile(token);
       
       final latestPhoto = (profile['staff_photo_path'] as String?) ?? '';
@@ -444,7 +446,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           try {
                             final prefs = await SharedPreferences.getInstance();
                             final token = prefs.getString('auth_token') ?? '';
-                            final authService = AuthService(baseUrl: 'http://10.168.169.71:8000');
+                            final authService = AuthService(baseUrl: 'http://10.227.152.71:8000');
                             await authService.changePassword(token, _newPasswordController.text.trim());
                             
                             if (context.mounted) {
@@ -505,7 +507,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
         Widget avatarChild;
         if (photoUrl.isNotEmpty) {
-          final fullUrl = photoUrl.startsWith('http') ? photoUrl : 'http://10.168.169.71:8000' + photoUrl;
+          final fullUrl = photoUrl.startsWith('http') ? photoUrl : 'http://10.227.152.71:8000' + photoUrl;
           avatarChild = ClipOval(
             child: Image.network(
               fullUrl,
@@ -681,7 +683,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _onFeatureTap(LauncherFeature feature) {
+  void _onFeatureTap(LauncherFeature feature) async {
     if (feature.isAvailable) {
       if (feature.name == 'Leave') {
         Navigator.push(
@@ -730,6 +732,20 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         );
+      } else if (feature.name == 'Notice') {
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('auth_token') ?? '';
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => NoticeScreen(
+              baseUrl: widget.leaveService.baseUrl,
+              token: token,
+              userRole: widget.userRole,
+              studentId: _activeStudentId,
+            ),
+          ),
+        ).then((_) => _fetchUnreadNotificationsCount());
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -843,7 +859,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               }
 
                               if (photoUrl.isNotEmpty) {
-                                final fullUrl = photoUrl.startsWith('http') ? photoUrl : 'http://10.168.169.71:8000' + photoUrl;
+                                final fullUrl = photoUrl.startsWith('http') ? photoUrl : 'http://10.227.152.71:8000' + photoUrl;
                                 return ClipOval(
                                   child: Image.network(
                                     fullUrl,

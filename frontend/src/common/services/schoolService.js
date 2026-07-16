@@ -349,12 +349,16 @@ export const schoolService = {
     return apiClient.get('/api/school/additional-fees/payments');
   },
 
-  collectAdditionalFeePayment(id) {
-    return apiClient.post(`/api/school/additional-fees/payments/${id}/pay`);
+  collectAdditionalFeePayment(id, data = {}) {
+    return apiClient.post(`/api/school/additional-fees/payments/${id}/pay`, data);
   },
 
   revertAdditionalFeePayment(id) {
     return apiClient.post(`/api/school/additional-fees/payments/${id}/revert`);
+  },
+
+  getCollectionHistory(params = {}) {
+    return apiClient.get(buildUrl('/api/school/collection-history', params));
   },
 
   getHolidays() {
@@ -451,6 +455,18 @@ export const schoolService = {
 
   getMyPermissions() {
     return apiClient.get('/api/school/my-permissions');
+  },
+  getAnnouncements() {
+    return apiClient.get('/api/school/announcements');
+  },
+  createAnnouncement(data) {
+    return apiClient.post('/api/school/announcements', data);
+  },
+  updateAnnouncement(id, data) {
+    return apiClient.put(`/api/school/announcements/${id}`, data);
+  },
+  deleteAnnouncement(id) {
+    return apiClient.delete(`/api/school/announcements/${id}`);
   }
 };
 

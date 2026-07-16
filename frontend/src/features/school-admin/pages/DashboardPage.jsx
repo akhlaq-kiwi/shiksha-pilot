@@ -500,11 +500,15 @@ export default function DashboardPage({ onNavigate }) {
         {[
           { label: 'Total Students', value: totalStudents },
           { label: 'Total Teachers', value: totalStaff },
-          { label: 'Fee Collected', value: formatCurrency(totalFeeCollected) },
+          { label: 'Fee Collected', value: formatCurrency(totalFeeCollected), clickPath: currentYear?.status === 'ACTIVE' ? 'collection-history' : null },
           { label: 'Dues Pending', value: formatCurrency(pendingFees) },
         ].map(card => {
           return (
-            <Card key={card.label} className="shadow-sm">
+            <Card 
+              key={card.label} 
+              className={`shadow-sm ${card.clickPath ? 'cursor-pointer hover:border-primary/50 transition-all duration-200 hover:shadow-md' : ''}`}
+              onClick={card.clickPath && onNavigate ? () => onNavigate(card.clickPath) : undefined}
+            >
               <CardContent className="p-5">
                 <p className="text-text-muted text-[10px] font-bold uppercase tracking-wider">{card.label}</p>
                 <p className="text-2xl font-black text-text-primary mt-0.5 font-display">{card.value}</p>

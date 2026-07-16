@@ -163,4 +163,21 @@ class StudentController extends BaseController
 
         return $this->success($response, $data);
     }
+
+    public function getActiveNotices(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['STUDENT', 'PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL']);
+        $data = $this->service->getActiveNotices($user);
+        return $this->success($response, $data);
+    }
+
+    public function markNoticeRead(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['STUDENT', 'PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL']);
+        $id = (int)$args['id'];
+        $data = $this->service->markNoticeRead($user, $id);
+        return $this->success($response, $data, 'Notice marked as read');
+    }
 }

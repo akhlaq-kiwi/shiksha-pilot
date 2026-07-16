@@ -692,6 +692,17 @@ class SchoolAdminController extends BaseController
         return $this->success($response, $payment, 'Fee payment recorded', 201);
     }
 
+    public function getCollectionHistory(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $params = $request->getQueryParams();
+        $data = $this->service->getCollectionHistory($user, $params);
+
+        return $this->success($response, $data);
+    }
+
     public function getSchoolProfile(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
@@ -1192,7 +1203,8 @@ class SchoolAdminController extends BaseController
         $this->requireRole($user, ['SCHOOL_ADMIN']);
 
         $id = (int)$args['id'];
-        $data = $this->service->collectAdditionalFeePayment($user, $id);
+        $body = $request->getParsedBody() ?? [];
+        $data = $this->service->collectAdditionalFeePayment($user, $id, $body);
 
         return $this->success($response, $data, 'Additional fee payment collected successfully');
     }
@@ -1441,5 +1453,40 @@ class SchoolAdminController extends BaseController
 
         return $this->success($response, $result, 'Credentials updated successfully.');
     }
-}
 
+    public function getAnnouncements(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $data = $this->service->getAnnouncements($user);
+        return $this->success($response, $data);
+    }
+
+    public function createAnnouncement(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $body = RequestParser::body($request);
+        $data = $this->service->createAnnouncement($user, $body);
+        return $this->success($response, $data, 'Announcement published successfully');
+    }
+
+    public function updateAnnouncement(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $id = (int)$args['id'];
+        $body = RequestParser::body($request);
+        $data = $this->service->updateAnnouncement($user, $id, $body);
+        return $this->success($response, $data, 'Announcement updated successfully');
+    }
+
+    public function deleteAnnouncement(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $id = (int)$args['id'];
+        $data = $this->service->deleteAnnouncement($user, $id);
+        return $this->success($response, $data, 'Announcement deleted successfully');
+    }
+}

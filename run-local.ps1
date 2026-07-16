@@ -32,7 +32,7 @@ if ($backendRunning) {
     Write-Host "[OK] Slim PHP Backend is already running on port 8000." -ForegroundColor Green
 } else {
     Write-Host "[...] Starting Slim PHP Backend on port 8000..." -ForegroundColor Yellow
-    Start-Process -FilePath "powershell.exe" -ArgumentList "-NoExit", "-Command", "`$env:PATH = 'C:\Users\bilal\AppData\Local\Microsoft\WinGet\Packages\PHP.PHP.8.3_Microsoft.Winget.Source_8wekyb3d8bbwe;' + `$env:PATH; cd backend; php -S localhost:8000 -t public" -WindowStyle Minimized
+    Start-Process -FilePath "powershell.exe" -ArgumentList "-NoExit", "-Command", "`$env:PATH = 'C:\Users\bilal\AppData\Local\Microsoft\WinGet\Packages\PHP.PHP.8.3_Microsoft.Winget.Source_8wekyb3d8bbwe;' + `$env:PATH; cd backend; php -S 0.0.0.0:8000 -t public" -WindowStyle Minimized
     Start-Sleep -Seconds 2
 }
 

@@ -49,7 +49,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
 
-  final String _baseUrl = 'http://10.168.169.71:8000';
+  final String _baseUrl = 'http://10.227.152.71:8000';
 
   @override
   void initState() {
@@ -233,7 +233,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   String _errorMessage = '';
 
-  final String _baseUrl = 'http://10.168.169.71:8000';
+  final String _baseUrl = 'http://10.227.152.71:8000';
 
   @override
   void dispose() {

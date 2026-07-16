@@ -125,6 +125,7 @@ return function (App $app) {
     $app->get('/api/school/fee-structures', [SchoolAdminController::class, 'getFeeStructures']);
     $app->post('/api/school/fee-structures', [SchoolAdminController::class, 'createFeeStructure']);
     $app->get('/api/school/fee-payments', [SchoolAdminController::class, 'getFeePayments']);
+    $app->get('/api/school/collection-history', [SchoolAdminController::class, 'getCollectionHistory']);
     $app->post('/api/school/fee-payments', [SchoolAdminController::class, 'createFeePayment']);
     $app->delete('/api/school/fee-payments/{id}', [SchoolAdminController::class, 'deleteFeePayment']);
 
@@ -148,6 +149,12 @@ return function (App $app) {
     // Persisted Dashboard Notifications
     $app->get('/api/school/notifications', [SchoolAdminController::class, 'getNotifications']);
     $app->post('/api/school/notifications/{id}/read', [SchoolAdminController::class, 'markNotificationRead']);
+
+    // Announcements Domain
+    $app->get('/api/school/announcements', [SchoolAdminController::class, 'getAnnouncements']);
+    $app->post('/api/school/announcements', [SchoolAdminController::class, 'createAnnouncement']);
+    $app->put('/api/school/announcements/{id}', [SchoolAdminController::class, 'updateAnnouncement']);
+    $app->delete('/api/school/announcements/{id}', [SchoolAdminController::class, 'deleteAnnouncement']);
 
     // Leave Requests System
     $app->get('/api/school/leave-requests', [LeaveRequestController::class, 'getLeaveRequests']);
@@ -226,4 +233,8 @@ return function (App $app) {
     $app->get('/api/student/materials', [StudentController::class, 'getMaterials']);
     $app->get('/api/student/notifications', [StudentController::class, 'getNotifications']);
     $app->post('/api/student/notifications/read-all', [StudentController::class, 'markAllNotificationsRead']);
+
+    // Mobile Notices Domain
+    $app->get('/api/student/announcements', [StudentController::class, 'getActiveNotices']);
+    $app->post('/api/student/announcements/{id}/read', [StudentController::class, 'markNoticeRead']);
 };

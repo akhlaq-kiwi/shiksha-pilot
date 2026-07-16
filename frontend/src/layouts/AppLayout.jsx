@@ -166,7 +166,7 @@ const AppLayout = ({ children }) => {
                 schoolProfile ? (
                   <div className="flex items-center gap-3">
                     <span 
-                      className="text-sm font-black text-text-primary font-display tracking-tight leading-none truncate"
+                      className="text-sm font-black text-text-primary font-display tracking-tight leading-none truncate uppercase"
                       style={{ fontWeight: 900 }}
                     >
                       {schoolProfile.name}
@@ -176,9 +176,6 @@ const AppLayout = ({ children }) => {
                       <>
                         <div className="h-4 w-px bg-border"></div>
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider whitespace-nowrap hidden sm:inline">
-                            Academic Year
-                          </span>
                           <select
                             value={currentYear.id}
                             onChange={(e) => {

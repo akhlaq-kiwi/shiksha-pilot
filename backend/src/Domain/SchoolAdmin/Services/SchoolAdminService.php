@@ -331,6 +331,29 @@ class SchoolAdminService extends BaseService
         return $val !== false ? (int) $val : 0;
     }
 
+    private function generateUniqueRefNo(PDO $pdo): string
+    {
+        do {
+            $ref = sprintf('%010d%02d', time(), rand(10, 99));
+            
+            // Check if any digit repeats more than 2 times consecutively (e.g. 222 or 000)
+            $hasThree = preg_match('/(\d)\1\1/', $ref) === 1;
+            if ($hasThree) {
+                continue;
+            }
+            
+            $stmt1 = $pdo->prepare("SELECT COUNT(*) FROM fee_payments WHERE receipt_no = :ref");
+            $stmt1->execute([':ref' => $ref]);
+            $c1 = (int)$stmt1->fetchColumn();
+            
+            $stmt2 = $pdo->prepare("SELECT COUNT(*) FROM additional_fee_payments WHERE receipt_no = :ref");
+            $stmt2->execute([':ref' => $ref]);
+            $c2 = (int)$stmt2->fetchColumn();
+        } while ($hasThree || $c1 > 0 || $c2 > 0);
+        
+        return $ref;
+    }
+
     // -------------------------------------------------------------------------
     // Dashboard
     // -------------------------------------------------------------------------
@@ -4209,8 +4232,20 @@ class SchoolAdminService extends BaseService
         }
 
         // 6. Insert payments
+        $paymentMethod = !empty($data['payment_method']) ? trim($data['payment_method']) : (!empty($data['payment_mode']) ? trim($data['payment_mode']) : 'Cash');
+        $userId = (int) ($user['id'] ?? 0);
+        $collectedBy = 'School Admin';
+        if ($userId > 0) {
+            $stmtUser = $pdo->prepare("SELECT name FROM users WHERE id = :id LIMIT 1");
+            $stmtUser->execute([':id' => $userId]);
+            $uName = $stmtUser->fetchColumn();
+            if ($uName !== false) {
+                $collectedBy = $uName;
+            }
+        }
+
         $lastPayment = null;
-        $receiptNo = 'REC-' . time() . '-' . rand(1000, 9999);
+        $receiptNo = $this->generateUniqueRefNo($pdo);
         foreach ($monthsToPay as $m) {
             $monthAmount = $amountPaid;
             if ($classFeeConfig !== null && isset($classFeeConfig[$m])) {
@@ -4226,7 +4261,9 @@ class SchoolAdminService extends BaseService
                 'receipt_no'       => $receiptNo,
                 'status'           => 'PAID',
                 'fee_month'        => $m,
-                'academic_year_id' => $academicYearId
+                'academic_year_id' => $academicYearId,
+                'payment_method'   => $paymentMethod,
+                'collected_by'     => $collectedBy
             ]);
             $lastPayment = $this->feeRepo->findPaymentById($id);
         }
@@ -4242,6 +4279,336 @@ class SchoolAdminService extends BaseService
         }
 
         return $lastPayment;
+    }
+
+    public function getCollectionHistory(array $user, array $params = []): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->feeRepo->getPdo();
+
+        // 1. Fetch current academic year dates
+        $stmtYear = $pdo->prepare("SELECT start_date, end_date FROM academic_years WHERE school_id = :school_id AND is_current = 1 LIMIT 1");
+        $stmtYear->execute([':school_id' => $schoolId]);
+        $ay = $stmtYear->fetch(PDO::FETCH_ASSOC);
+
+        // 2. Fetch monthly fee payments
+        $stmtMonthly = $pdo->prepare("
+            SELECT 
+                fp.id,
+                'monthly' AS type,
+                fp.receipt_no,
+                s.name AS student_name,
+                s.roll_no AS student_roll_no,
+                c.name AS class_name,
+                CONCAT('Monthly Fee (', fp.fee_month, ')') AS fee_name,
+                fp.collected_by,
+                fp.payment_method,
+                fp.amount_paid AS amount,
+                fp.amount_paid AS amount_paid,
+                fp.fee_month AS fee_month,
+                fp.payment_date,
+                fp.created_at,
+                'Completed' AS status,
+                ay.name AS academic_year_name,
+                ay.status AS academic_year_status
+            FROM fee_payments fp
+            JOIN students s ON fp.student_id = s.id
+            JOIN classes c ON s.class_id = c.id
+            JOIN academic_years ay ON fp.academic_year_id = ay.id
+            WHERE fp.school_id = :school_id AND fp.status = 'PAID' AND ay.status IN ('ACTIVE', 'Draft')
+        ");
+        $stmtMonthly->execute([':school_id' => $schoolId]);
+        $monthly = $stmtMonthly->fetchAll(PDO::FETCH_ASSOC);
+
+        // 3. Fetch additional fee payments
+        $stmtAdditional = $pdo->prepare("
+            SELECT 
+                afp.id,
+                'additional' AS type,
+                afp.receipt_no,
+                s.name AS student_name,
+                s.roll_no AS student_roll_no,
+                c.name AS class_name,
+                aft.name AS fee_name,
+                afp.collected_by,
+                afp.payment_method,
+                afp.amount AS amount,
+                afp.amount AS amount_paid,
+                aft.name AS fee_month,
+                afp.payment_date,
+                afp.created_at,
+                'Completed' AS status,
+                ay.name AS academic_year_name,
+                ay.status AS academic_year_status
+            FROM additional_fee_payments afp
+            JOIN students s ON afp.student_id = s.id
+            JOIN classes c ON c.id = s.class_id
+            JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+            JOIN academic_years ay ON aft.academic_year_id = ay.id
+            WHERE afp.school_id = :school_id AND afp.status = 'Paid' AND ay.status IN ('ACTIVE', 'Draft')
+        ");
+        $stmtAdditional->execute([':school_id' => $schoolId]);
+        $additional = $stmtAdditional->fetchAll(PDO::FETCH_ASSOC);
+
+        // Merge
+        $merged = array_merge($monthly, $additional);
+
+        // Standardize types and fallback fields
+        $merged = array_map(function($t) {
+            $t['amount'] = (float)$t['amount'];
+            if (empty($t['payment_method'])) {
+                $t['payment_method'] = 'Cash';
+            }
+            if (empty($t['collected_by'])) {
+                $t['collected_by'] = 'School Admin';
+            }
+            if (empty($t['receipt_no'])) {
+                if ($t['type'] === 'additional') {
+                    $t['receipt_no'] = 'AFP-' . str_pad((string)$t['id'], 5, '0', STR_PAD_LEFT);
+                } else {
+                    $t['receipt_no'] = 'REC-' . str_pad((string)$t['id'], 5, '0', STR_PAD_LEFT);
+                }
+            }
+
+            // Clean up receipt_no to be exactly 12 numeric digits
+            $cleanRef = preg_replace('/\D/', '', $t['receipt_no']);
+            if ($cleanRef === '') {
+                $cleanRef = (string)$t['id'];
+            }
+            
+            if (strlen($cleanRef) < 12) {
+                $paddingNeeded = 12 - strlen($cleanRef);
+                $padPattern = '123456789012';
+                $prefix = substr($padPattern, 0, $paddingNeeded);
+                $cleanRef = $prefix . $cleanRef;
+            } else {
+                $cleanRef = substr($cleanRef, 0, 12);
+            }
+
+            // Correct any 3 consecutive repeating digits dynamically
+            $chars = str_split($cleanRef);
+            for ($i = 2; $i < count($chars); $i++) {
+                if ($chars[$i] === $chars[$i-1] && $chars[$i] === $chars[$i-2]) {
+                    $prevVal = (int)$chars[$i-1];
+                    $newVal = ($prevVal + 1) % 10;
+                    $chars[$i] = (string)$newVal;
+                }
+            }
+            $t['receipt_no'] = implode('', $chars);
+
+            return $t;
+        }, $merged);
+
+        // Group by receipt_no (combining multi-month tuition payments into one transaction row)
+        $groups = [];
+        foreach ($merged as $t) {
+            $rNo = $t['receipt_no'];
+            if (!isset($groups[$rNo])) {
+                $groups[$rNo] = $t;
+                $groups[$rNo]['months_list'] = [];
+                if ($t['type'] === 'monthly' && !empty($t['fee_month'])) {
+                    $groups[$rNo]['months_list'][] = $t['fee_month'];
+                }
+            } else {
+                // Add to amount and amount_paid
+                $groups[$rNo]['amount'] += (float)$t['amount'];
+                $groups[$rNo]['amount_paid'] += (float)$t['amount_paid'];
+                if ($t['type'] === 'monthly' && !empty($t['fee_month'])) {
+                    $groups[$rNo]['months_list'][] = $t['fee_month'];
+                }
+            }
+        }
+
+        // Now re-process grouped transactions to build fee_name and clean up months_list
+        $mergedGrouped = [];
+        $academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+        
+        foreach ($groups as $rNo => $t) {
+            if ($t['type'] === 'monthly' && !empty($t['months_list'])) {
+                // Sort months according to academic cycle
+                usort($t['months_list'], function($a, $b) use ($academicMonths) {
+                    $idxA = array_search($a, $academicMonths, true);
+                    $idxB = array_search($b, $academicMonths, true);
+                    return ($idxA === false ? 99 : $idxA) - ($idxB === false ? 99 : $idxB);
+                });
+                
+                // Remove duplicates in months_list
+                $t['months_list'] = array_values(array_unique($t['months_list']));
+                
+                // Generate formatted fee name
+                if (count($t['months_list']) > 1) {
+                    $firstMonth = $t['months_list'][0];
+                    $lastMonth = $t['months_list'][count($t['months_list']) - 1];
+                    $t['fee_name'] = "Monthly Fee ($firstMonth to $lastMonth)";
+                    $t['fee_month'] = implode(', ', $t['months_list']);
+                } else {
+                    $t['fee_name'] = "Monthly Fee (" . $t['months_list'][0] . ")";
+                    $t['fee_month'] = $t['months_list'][0];
+                }
+            }
+            // Re-apply the Draft suffix if applicable
+            if (isset($t['academic_year_status']) && strcasecmp($t['academic_year_status'], 'Draft') === 0) {
+                $t['fee_name'] = $t['fee_name'] . ' [Draft Year: ' . ($t['academic_year_name'] ?? '') . ']';
+            }
+            unset($t['months_list']);
+            $mergedGrouped[] = $t;
+        }
+
+        // Sort chronologically ascending to calculate running balances
+        usort($mergedGrouped, function($a, $b) {
+            $dateCompare = strcmp($a['payment_date'], $b['payment_date']);
+            if ($dateCompare !== 0) {
+                return $dateCompare;
+            }
+            $timeCompare = strcmp($a['created_at'], $b['created_at']);
+            if ($timeCompare !== 0) {
+                return $timeCompare;
+            }
+            return $a['id'] - $b['id'];
+        });
+
+        // Compute running balance
+        $runningBalance = 0.0;
+        $withBalance = [];
+        foreach ($mergedGrouped as $t) {
+            $prev = $runningBalance;
+            $updated = $runningBalance + $t['amount'];
+            $runningBalance = $updated;
+
+            $t['previous_total'] = $prev;
+            $t['updated_total'] = $updated;
+            $withBalance[] = $t;
+        }
+
+        // Generate list of available months in academic year + any months with transactions
+        $months = [];
+        if ($ay) {
+            $start = new \DateTime($ay['start_date']);
+            $end = new \DateTime($ay['end_date']);
+            $interval = new \DateInterval('P1M');
+            $period = new \DatePeriod($start, $interval, $end->modify('+1 day'));
+            foreach ($period as $dt) {
+                $months[] = $dt->format('F Y');
+            }
+        }
+        foreach ($withBalance as $t) {
+            $timestamp = strtotime($t['payment_date']);
+            if ($timestamp !== false) {
+                $mName = date('F Y', $timestamp);
+                if (!in_array($mName, $months, true)) {
+                    $months[] = $mName;
+                }
+            }
+        }
+        // Unique and maintain order
+        $months = array_values(array_unique($months));
+        
+        // Prepend "All Months" to the dropdown options
+        array_unshift($months, 'All Months');
+
+        // Default month filter to "All Months" if not provided
+        $selectedMonth = !empty($params['month']) ? trim($params['month']) : 'All Months';
+        
+        // Apply filters
+        $filtered = $withBalance;
+        if ($selectedMonth && strcasecmp($selectedMonth, 'All Months') !== 0) {
+            $filtered = array_filter($filtered, function($t) use ($selectedMonth) {
+                $timestamp = strtotime($t['payment_date']);
+                if ($timestamp === false) return false;
+                
+                $tMonthNameYear = date('F Y', $timestamp); // 'July 2027'
+                $tMonthNumYear = date('Y-m', $timestamp);  // '2027-07'
+                
+                return (strcasecmp($tMonthNameYear, $selectedMonth) === 0 || strcasecmp($tMonthNumYear, $selectedMonth) === 0);
+            });
+        }
+
+        $search = !empty($params['search']) ? trim($params['search']) : '';
+        if ($search !== '') {
+            $filtered = array_filter($filtered, function($t) use ($search) {
+                return (
+                    stripos($t['student_name'], $search) !== false ||
+                    stripos((string)$t['student_roll_no'], $search) !== false ||
+                    stripos($t['receipt_no'], $search) !== false ||
+                    stripos($t['class_name'], $search) !== false
+                );
+            });
+        }
+
+        // Calculate dynamic summary stats on the filtered set
+        // Calculate dynamic summary stats
+        $totalCollected = 0.0;
+        $todayCollection = 0.0;
+        $thisMonthCollection = 0.0;
+
+        $todayStr = date('Y-m-d');
+        // Get month number of the selected month
+        $selectedMonthNum = '';
+        if ($selectedMonth && strcasecmp($selectedMonth, 'All Months') !== 0) {
+            $selectedTime = strtotime($selectedMonth);
+            if ($selectedTime !== false) {
+                $selectedMonthNum = date('Y-m', $selectedTime);
+            }
+        }
+
+        // Total Fee Collected and Today's Collection represent overall history sums, unaffected by active filters
+        foreach ($withBalance as $t) {
+            $totalCollected += $t['amount'];
+            if ($t['payment_date'] === $todayStr) {
+                $todayCollection += $t['amount'];
+            }
+        }
+
+        // Calculate dynamic values for filtered stats (This Month collections)
+        foreach ($filtered as $t) {
+            if ($selectedMonthNum) {
+                if (str_starts_with($t['payment_date'], $selectedMonthNum)) {
+                    $thisMonthCollection += $t['amount'];
+                }
+            } else {
+                // If "All Months" is selected, thisMonthCollection is equal to the total of the filtered set
+                $thisMonthCollection += $t['amount'];
+            }
+        }
+
+        // Sort chronologically descending (newest first, latest time first)
+        usort($filtered, function($a, $b) {
+            $dateCompare = strcmp($b['payment_date'], $a['payment_date']);
+            if ($dateCompare !== 0) {
+                return $dateCompare;
+            }
+            $timeCompare = strcmp($b['created_at'], $a['created_at']);
+            if ($timeCompare !== 0) {
+                return $timeCompare;
+            }
+            return $b['id'] - $a['id'];
+        });
+
+        // Pagination
+        $page = !empty($params['page']) ? (int)$params['page'] : 1;
+        $limit = !empty($params['limit']) ? (int)$params['limit'] : 50; // Increased to 50 for banking dashboard feel
+        $offset = ($page - 1) * $limit;
+
+        $totalFiltered = count($filtered);
+        $paginated = array_slice(array_values($filtered), $offset, $limit);
+
+        return [
+            'transactions' => $paginated,
+            'stats' => [
+                'total_collected' => $totalCollected,
+                'today_collection' => $todayCollection,
+                'this_month_collection' => $thisMonthCollection,
+                'total_transactions' => $totalFiltered
+            ],
+            'pagination' => [
+                'page' => $page,
+                'limit' => $limit,
+                'total' => $totalFiltered,
+                'pages' => (int)ceil($totalFiltered / $limit)
+            ],
+            'available_months' => $months,
+            'selected_month' => $selectedMonth
+        ];
     }
 
     public function getSchoolProfile(array $user): array
@@ -6939,7 +7306,7 @@ Only approve the settlement after reviewing all financial records.
         }, $payments);
     }
 
-    public function collectAdditionalFeePayment(array $user, int $id): array
+    public function collectAdditionalFeePayment(array $user, int $id, array $data = []): array
     {
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->staffRepo->getPdo();
@@ -6973,15 +7340,31 @@ Only approve the settlement after reviewing all financial records.
         }
 
         $paymentDate = date('Y-m-d');
+        $paymentMethod = !empty($data['payment_method']) ? trim($data['payment_method']) : (!empty($data['payment_mode']) ? trim($data['payment_mode']) : 'Cash');
+        $userId = (int) ($user['id'] ?? 0);
+        $collectedBy = 'School Admin';
+        if ($userId > 0) {
+            $stmtUser = $pdo->prepare("SELECT name FROM users WHERE id = :id LIMIT 1");
+            $stmtUser->execute([':id' => $userId]);
+            $uName = $stmtUser->fetchColumn();
+            if ($uName !== false) {
+                $collectedBy = $uName;
+            }
+        }
+        $receiptNo = $this->generateUniqueRefNo($pdo);
+
         $stmtUpdate = $pdo->prepare("
             UPDATE additional_fee_payments 
-            SET status = 'Paid', payment_date = :pdate 
+            SET status = 'Paid', payment_date = :pdate, payment_method = :pmethod, collected_by = :collected_by, receipt_no = :receipt_no
             WHERE id = :id AND school_id = :sid
         ");
         $stmtUpdate->execute([
             ':id' => $id,
             ':sid' => $schoolId,
-            ':pdate' => $paymentDate
+            ':pdate' => $paymentDate,
+            ':pmethod' => $paymentMethod,
+            ':collected_by' => $collectedBy,
+            ':receipt_no' => $receiptNo
         ]);
 
         // Fetch updated payment detail
@@ -10566,6 +10949,209 @@ Only approve the settlement after reviewing all financial records.
         }
 
         return ['role' => $role, 'permissions' => []];
+    }
+
+    public function getAnnouncements(array $user): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->studentRepo->getPdo();
+        $stmt = $pdo->prepare("
+            SELECT * FROM announcements 
+            WHERE school_id = :sid 
+            ORDER BY created_at DESC
+        ");
+        $stmt->execute([':sid' => $schoolId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function createAnnouncement(array $user, array $data): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->studentRepo->getPdo();
+
+        $subject = isset($data['subject']) ? trim((string)$data['subject']) : '';
+        $description = isset($data['description']) ? trim((string)$data['description']) : '';
+        $audience = isset($data['audience']) ? trim((string)$data['audience']) : '';
+        $status = isset($data['status']) ? trim((string)$data['status']) : 'Draft';
+
+        // Validation
+        if ($subject === '') {
+            throw new ValidationException(['subject' => 'Subject is mandatory.']);
+        }
+        if (mb_strlen($subject) > 100) {
+            throw new ValidationException(['subject' => 'Subject cannot exceed 100 characters.']);
+        }
+        
+        // Strip tags to check if description has actual text content
+        $textCheck = trim(strip_tags($description));
+        if ($textCheck === '') {
+            throw new ValidationException(['description' => 'Description is mandatory.']);
+        }
+
+        $validAudiences = ['Teachers', 'Students', 'Both'];
+        if (!in_array($audience, $validAudiences, true)) {
+            throw new ValidationException(['audience' => 'Audience selection is mandatory.']);
+        }
+
+        if ($status !== 'Draft' && $status !== 'Published') {
+            $status = 'Draft';
+        }
+
+        $publishedAt = ($status === 'Published') ? date('Y-m-d H:i:s') : null;
+        $actorName = $user['name'] ?? $user['phone'] ?? $user['email'] ?? 'School Admin';
+
+        // Insert
+        $stmt = $pdo->prepare("
+            INSERT INTO announcements (school_id, subject, description, audience, status, published_at, created_by)
+            VALUES (:sch, :sub, :desc, :aud, :status, :pub, :by)
+        ");
+        $stmt->execute([
+            ':sch' => $schoolId,
+            ':sub' => $subject,
+            ':desc' => $description,
+            ':aud' => $audience,
+            ':status' => $status,
+            ':pub' => $publishedAt,
+            ':by' => $actorName
+        ]);
+        $announcementId = (int)$pdo->lastInsertId();
+
+        // Broadcast notifications if published
+        if ($status === 'Published') {
+            $this->broadcastAnnouncementNotification($pdo, $schoolId, $subject, $description, $audience);
+            $this->logAudit($pdo, $user, 'Announcements', 'Announcement Published', "Published announcement: '{$subject}'");
+        } else {
+            $this->logAudit($pdo, $user, 'Announcements', 'Announcement Draft Created', "Created announcement draft: '{$subject}'");
+        }
+
+        return ['id' => $announcementId, 'subject' => $subject, 'status' => $status];
+    }
+
+    public function updateAnnouncement(array $user, int $id, array $data): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->studentRepo->getPdo();
+
+        // Check if exists
+        $stmtCheck = $pdo->prepare("SELECT * FROM announcements WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtCheck->execute([':id' => $id, ':sid' => $schoolId]);
+        $ann = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+        if (!$ann) {
+            throw new NotFoundException('Announcement not found.');
+        }
+
+        $subject = isset($data['subject']) ? trim((string)$data['subject']) : '';
+        $description = isset($data['description']) ? trim((string)$data['description']) : '';
+        $audience = isset($data['audience']) ? trim((string)$data['audience']) : '';
+        $status = isset($data['status']) ? trim((string)$data['status']) : $ann['status'];
+
+        // Validation
+        if ($subject === '') {
+            throw new ValidationException(['subject' => 'Subject is mandatory.']);
+        }
+        if (mb_strlen($subject) > 100) {
+            throw new ValidationException(['subject' => 'Subject cannot exceed 100 characters.']);
+        }
+        
+        $textCheck = trim(strip_tags($description));
+        if ($textCheck === '') {
+            throw new ValidationException(['description' => 'Description is mandatory.']);
+        }
+
+        $validAudiences = ['Teachers', 'Students', 'Both'];
+        if (!in_array($audience, $validAudiences, true)) {
+            throw new ValidationException(['audience' => 'Audience selection is mandatory.']);
+        }
+
+        if ($status !== 'Draft' && $status !== 'Published') {
+            $status = $ann['status'];
+        }
+
+        $publishedAt = $ann['published_at'];
+        if ($status === 'Published' && $ann['status'] !== 'Published') {
+            $publishedAt = date('Y-m-d H:i:s');
+        } elseif ($status === 'Draft') {
+            $publishedAt = null;
+        }
+
+        // Update
+        $stmt = $pdo->prepare("
+            UPDATE announcements 
+            SET subject = :sub, description = :desc, audience = :aud, status = :status, published_at = :pub
+            WHERE id = :id AND school_id = :sid
+        ");
+        $stmt->execute([
+            ':sub' => $subject,
+            ':desc' => $description,
+            ':aud' => $audience,
+            ':status' => $status,
+            ':pub' => $publishedAt,
+            ':id' => $id,
+            ':sid' => $schoolId
+        ]);
+
+        // If newly published or updating an already published announcement, broadcast notification
+        if ($status === 'Published') {
+            $this->broadcastAnnouncementNotification($pdo, $schoolId, $subject, $description, $audience);
+            $this->logAudit($pdo, $user, 'Announcements', 'Announcement Published', "Published announcement ID {$id}: '{$subject}'");
+        } else {
+            $this->logAudit($pdo, $user, 'Announcements', 'Announcement Edited', "Edited announcement ID {$id}: '{$subject}'");
+        }
+
+        return ['id' => $id, 'subject' => $subject, 'status' => $status];
+    }
+
+    public function deleteAnnouncement(array $user, int $id): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->studentRepo->getPdo();
+
+        // Check if exists
+        $stmtCheck = $pdo->prepare("SELECT * FROM announcements WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtCheck->execute([':id' => $id, ':sid' => $schoolId]);
+        $ann = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+        if (!$ann) {
+            throw new NotFoundException('Announcement not found.');
+        }
+
+        // Delete
+        $stmt = $pdo->prepare("DELETE FROM announcements WHERE id = :id AND school_id = :sid");
+        $stmt->execute([':id' => $id, ':sid' => $schoolId]);
+
+        // Audit Logging
+        $this->logAudit($pdo, $user, 'Announcements', 'Announcement Deleted', "Deleted announcement ID {$id}: '{$ann['subject']}'");
+
+        return ['id' => $id];
+    }
+
+    private function broadcastAnnouncementNotification($pdo, $schoolId, $subject, $description, $audience): void
+    {
+        $rolesToNotify = [];
+        if ($audience === 'Teachers') {
+            $rolesToNotify = ['TEACHER'];
+        } elseif ($audience === 'Students') {
+            $rolesToNotify = ['PARENT', 'STUDENT'];
+        } else {
+            $rolesToNotify = ['TEACHER', 'PARENT', 'STUDENT'];
+        }
+
+        $plainText = trim(preg_replace('/\s+/', ' ', strip_tags($description)));
+        if (mb_strlen($plainText) > 120) {
+            $plainText = mb_substr($plainText, 0, 117) . '...';
+        }
+
+        $stmtNotif = $pdo->prepare("
+            INSERT INTO dashboard_notifications (school_id, user_role, title, message, is_read)
+            VALUES (:sch, :role, :title, :msg, 0)
+        ");
+        foreach ($rolesToNotify as $role) {
+            $stmtNotif->execute([
+                ':sch' => $schoolId,
+                ':role' => $role,
+                ':title' => $subject,
+                ':msg' => $plainText
+            ]);
+        }
     }
 }
 

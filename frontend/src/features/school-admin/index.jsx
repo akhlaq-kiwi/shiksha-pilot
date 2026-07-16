@@ -3,7 +3,7 @@ import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-
 import {
   LayoutDashboard, School, BookOpen, Users, UserCog, Clock,
   ClipboardCheck, FileText, DollarSign, BarChart2, Shield, Settings, RefreshCw, Landmark,
-  AlertCircle, AlertTriangle, Copy, Phone, Mail, ExternalLink, PhoneCall
+  AlertCircle, AlertTriangle, Copy, Phone, Mail, ExternalLink, PhoneCall, Megaphone
 } from 'lucide-react';
 import { useToast } from '../../common/components/Toast';
 
@@ -26,6 +26,8 @@ import SecurityPage from './pages/SecurityPage';
 import SalaryDisbursementPage from './pages/SalaryDisbursementPage';
 import FeeFollowUpPage from './pages/FeeFollowUpPage';
 import LeaveRequestsPage from './pages/LeaveRequestsPage';
+import CollectionHistoryPage from './pages/CollectionHistoryPage';
+import AnnouncementsPage from './pages/AnnouncementsPage';
 
 import { schoolService } from '../../common/services/schoolService';
 import { apiClient } from '../../common/services/apiClient';
@@ -50,6 +52,7 @@ const NAV_ITEMS = [
   { path: '/school-admin/financial-reports', label: 'Financial Reports', icon: FileText },
   { path: '/school-admin/finance-management', label: 'Finance Management', icon: Landmark },
   { path: '/school-admin/fee-follow-ups',     label: 'Fee Follow-up', icon: PhoneCall },
+  { path: '/school-admin/announcements',      label: 'Announcements', icon: Megaphone },
   { path: '/school-admin/audits-settings',    label: 'Audits & Settings', icon: Settings },
   { path: '/school-admin/security',   label: 'Security', icon: Shield },
 ];
@@ -236,6 +239,47 @@ function SubscriptionExpiredScreen({ profile }) {
   );
 }
 
+function ServerConnectionErrorScreen({ onRetry, retrying }) {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-140px)] w-full px-4 py-12 bg-zinc-50/50 dark:bg-zinc-950/20">
+      <Card className="max-w-md w-full shadow-xl border border-border bg-surface/80 backdrop-blur-md p-8 text-center animate-in fade-in zoom-in-95 duration-200 rounded-3xl relative overflow-hidden">
+        {/* Decorative background glow */}
+        <div className="absolute -top-10 -left-10 w-40 h-40 bg-red-500/10 rounded-full blur-3xl" />
+        <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-amber-500/10 rounded-full blur-3xl" />
+
+        <div className="relative space-y-6">
+          <div className="mx-auto w-16 h-16 rounded-2xl bg-red-500/10 flex items-center justify-center animate-pulse">
+            <AlertTriangle className="h-8 w-8 text-red-500" />
+          </div>
+          
+          <div className="space-y-2">
+            <h3 className="text-2xl font-black text-text-primary tracking-tight font-display">
+              Connection Failed
+            </h3>
+            <p className="text-sm text-text-secondary leading-relaxed font-medium">
+              We are unable to connect to the backend server.
+            </p>
+            <p className="text-xs text-text-muted leading-relaxed mt-1">
+              Please make sure your backend development server is running and accessible, then try again.
+            </p>
+          </div>
+
+          <div className="pt-2">
+            <Button 
+              onClick={onRetry} 
+              disabled={retrying}
+              className="w-full font-bold bg-primary hover:bg-primary/95 text-white flex items-center justify-center gap-2 py-2.5 rounded-xl shadow-md transition-all duration-200"
+            >
+              <RefreshCw className={`h-4 w-4 ${retrying ? 'animate-spin' : ''}`} />
+              {retrying ? 'Connecting...' : 'Retry Connection'}
+            </Button>
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 // ─── Portal Root ──────────────────────────────────────────────────────────────
 
 export default function SchoolAdminPortal() {
@@ -244,8 +288,17 @@ export default function SchoolAdminPortal() {
 
   const { academicYears, loading: loadingYears, refreshYears } = useAcademicYear();
 
-  const [profile, setProfile] = useState(null);
+  const [profile, setProfile] = useState(() => {
+    try {
+      const cached = localStorage.getItem('cached_school_profile');
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
   const [loadingProfile, setLoadingProfile] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [retrying, setRetrying] = useState(false);
 
   // --- User Permissions Hook ---
   const [permissions, setPermissions] = useState(null);
@@ -271,17 +324,23 @@ export default function SchoolAdminPortal() {
     }
   }, []);
 
-  useEffect(() => {
-    const loadProfile = async () => {
-      try {
-        const data = await schoolService.getSchoolProfile();
-        setProfile(data || null);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoadingProfile(false);
+  const loadProfile = async () => {
+    try {
+      const data = await schoolService.getSchoolProfile();
+      setProfile(data || null);
+      if (data) {
+        localStorage.setItem('cached_school_profile', JSON.stringify(data));
       }
-    };
+      setLoadError(false);
+    } catch (err) {
+      console.error("Failed to load school profile in portal index", err);
+      setLoadError(true);
+    } finally {
+      setLoadingProfile(false);
+    }
+  };
+
+  useEffect(() => {
     loadProfile();
 
     const handleProfileUpdate = (e) => {
@@ -292,6 +351,20 @@ export default function SchoolAdminPortal() {
     window.addEventListener('school-profile-updated', handleProfileUpdate);
     return () => window.removeEventListener('school-profile-updated', handleProfileUpdate);
   }, []);
+
+  const handleRetry = async () => {
+    setRetrying(true);
+    try {
+      await Promise.all([
+        refreshYears(),
+        loadProfile()
+      ]);
+    } catch (err) {
+      console.error("Retry failed", err);
+    } finally {
+      setRetrying(false);
+    }
+  };
 
   const getRemainingDays = (expiryDateStr) => {
     if (!expiryDateStr) return null;
@@ -332,6 +405,10 @@ export default function SchoolAdminPortal() {
   };
 
   const role = localStorage.getItem('shiksha_pilot_role') || '';
+
+  if (loadError) {
+    return <ServerConnectionErrorScreen onRetry={handleRetry} retrying={retrying} />;
+  }
 
   if (loadingYears || loadingProfile || (role === 'TEACHER' && loadingPermissions)) {
     return (
@@ -452,6 +529,8 @@ export default function SchoolAdminPortal() {
             <Route path="finance-management" element={<FinanceManagementPage />} />
             <Route path="salary-disbursement" element={<SalaryDisbursementPage />} />
             <Route path="fee-follow-ups" element={<FeeFollowUpPage />} />
+            <Route path="announcements" element={<AnnouncementsPage />} />
+            <Route path="collection-history" element={<CollectionHistoryPage />} />
             <Route path="security" element={<SecurityPage />} />
             <Route path="*" element={<Navigate to="/school-admin" replace />} />
           </Routes>

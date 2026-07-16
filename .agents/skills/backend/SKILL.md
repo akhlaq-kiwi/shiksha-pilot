@@ -1002,6 +1002,201 @@ A feature is complete only when:
 
 # Historical Snapshot Pattern
 
+# Logging Standards
+
+Log:
+
+* Authentication events
+* Critical business actions
+* Exceptions
+* External integrations
+
+Never log:
+
+* Passwords
+* Secrets
+* Tokens
+* Sensitive personal data
+
+---
+
+# Testing Strategy
+
+Priority Order:
+
+1. Domain Services
+2. Business Rules
+3. Repositories
+4. Controllers
+5. Middleware
+
+---
+
+## Test Types
+
+```text
+Unit Tests
+Integration Tests
+Feature Tests
+Contract Tests
+End-to-End Tests
+```
+
+Mock interfaces, not implementations.
+
+---
+
+# Performance Standards
+
+Use:
+
+* Redis Cache
+* Queue Workers
+* Pagination
+* Database Indexing
+* Lazy Loading
+* Efficient Queries
+
+Avoid:
+
+* N+1 Queries
+* Fat Controllers
+* Fat Repositories
+* Shared Mutable State
+* Excessive Inheritance
+
+---
+
+# Graphify Backend Context
+
+Graphify is the knowledge layer.
+
+```text
+graphify/
+│
+├── domains/
+├── workflows/
+├── api-contracts/
+├── schemas/
+├── integrations/
+├── architecture/
+└── decisions/
+```
+
+---
+
+## Graphify Responsibilities
+
+Store:
+
+* Domain definitions
+* Business workflows
+* Database schemas
+* API contracts
+* Event definitions
+* Integration specifications
+* Architecture decisions
+
+---
+
+## Development Workflow
+
+Before implementation:
+
+1. Read Graphify context
+2. Validate domain model
+3. Validate workflow
+4. Validate schema
+5. Validate API contract
+6. Implement
+7. Update Graphify
+
+Graphify remains the single source of truth.
+
+---
+
+# CI/CD Standards
+
+Pipeline must execute:
+
+1. Coding Standards
+2. Static Analysis
+3. Unit Tests
+4. Integration Tests
+5. Build Validation
+6. Migration Validation
+7. Security Checks
+8. Deployment
+
+---
+
+# Code Review Checklist
+
+## Architecture
+
+* Separation of concerns maintained
+* Proper dependency injection
+* Domain boundaries respected
+* Graphify updated
+
+## Database
+
+* Migration created
+* Constraints verified
+* Indexes verified
+
+## Security
+
+* Validation implemented
+* Authorization checked
+* Sensitive data protected
+
+## Quality
+
+* Tests added
+* Error handling included
+* Logging included
+
+---
+
+# Golden Rule
+
+Controllers orchestrate.
+
+Services execute business rules.
+
+Repositories access data.
+
+Infrastructure provides implementations.
+
+Database persists truth.
+
+Graphify defines context.
+
+Every backend module must be:
+
+* Modular
+* Testable
+* Reusable
+* Observable
+* Secure
+* Documented
+* Scalable
+* Replaceable
+
+A feature is complete only when:
+
+* Business logic is implemented
+* Tests pass
+* Migration exists
+* Documentation is updated
+* Graphify is updated
+* Deployment path is verified
+
+---
+
+# Historical Snapshot Pattern
+
 For academic achievements, annual records, and certifications (e.g., Attendance Leaderboards, Merit Lists, Academic Awards, Annual Achievements, Student Honors), follow the **Historical Snapshot Pattern** to guarantee long-term data integrity:
 
 1. **Information Isolation**: Store snapshot details (e.g., student name, roll number, class name, dob, profile photo path, scores/marks, rankings) directly inside a dedicated snapshot table (e.g., `academic_achievement_snapshots`).
@@ -1009,3 +1204,40 @@ For academic achievements, annual records, and certifications (e.g., Attendance 
 3. **One-Time Generation**: Compute the scores and ranks once (upon academic year rollover or upon first lookup of the archived academic year) and write them directly to the snapshots table.
 4. **Read-Only Access**: Once written, snapshots are immutable. The API must only expose read/export workflows for archived sessions. No edit, deletion, or manual recalculation is permitted.
 5. **Metadata Extensibility**: Utilize a JSON columns schema (e.g. `metadata`) to support custom variables per achievement type (e.g., `present_days` and `total_working_days` for attendance leaderboard, total marks for merit lists).
+
+---
+
+# Financial Audits and Transaction Ledgers
+
+For financial records, cash books, and collection histories (e.g. Fee Collections, Expenses, Salary Disbursements), follow these guidelines to establish complete transparency and audit integrity:
+
+1. **Audit Immutability**: Every transaction must be permanently recorded. Once a payment is recorded, it must never be updated, edited, or deleted from history. If a payment is reverted or refunded, insert a new transaction representing the reversal (or mark a separate state of reversal while leaving the initial row intact) to preserve the historical audit trail.
+2. **Dynamic Cumulative Running Balance**: Every ledger statement or transaction view must display the running balance progression:
+   * **Previous Total**: The running sum of all preceding payments up to this transaction.
+   * **Current Transaction**: The amount of the current transaction (e.g., `+ ₹800`).
+   * **Updated Total**: The sum of the previous total and the current transaction amount.
+   * **Chronological Summation**: To compute this correctly, always query all transactions, sort them in chronological order ascending (oldest first), accumulate the running balance, and then apply user search filters or descending sort for the UI display.
+3. **Immutable Metadata**: Explicitly record transaction details like `payment_method`, `collected_by` (actor name), and `receipt_no` at the time of creation instead of joining dynamically with tables whose entities might change, get archived, or be deleted in the future.
+4. **Globally Unique Reference Numbers**: Reference numbers must be purely numeric (e.g. `783680993041`), exactly 12 digits, and unique across the entire school, system, and all academic years. Generate these numbers using a collision-free method (e.g. timestamp + random padding) and check for uniqueness in the database.
+5. **Grouping Multi-Month Transactions**: In the transaction history ledger, a multi-month payment (e.g. paying for July + August in a single action) must render as exactly *one* transaction row with a single unique Ref No, summing the total amount paid, and displaying the fee description in the format `Monthly Fee (Month1 to Month2)`.
+6. **All Months Filter & Card Title**: Provide an "All Months" default filter option. Metric summary cards (like this month or transaction count) must dynamically update labels and values matching the filter, and default to total collections if "All Months" is active. Today's live collection must be computed independently from the month filter.
+
+---
+
+# Announcements and Mobile Notice System
+
+For publishing global announcements and managing mobile notice boards with push notifications, follow these guidelines to ensure consistency, correct audience visibility, and zero regression:
+
+1. **Rich Text Formatting Control**:
+   * To prevent layout breakage and color mismatch, limit web text editor outputs strictly to three styling tags: bold (`<b>`/`<strong>`), italic (`<i>`/`<em>`), and underline (`<u>`).
+   * No font families, font sizes, text alignments, or color styles must be injected into the database to guarantee clean cross-platform compatibility.
+2. **Broadcast Notification Routing**:
+   * Immediate notifications are broadcast using the `dashboard_notifications` table with role-based routing. Set `user_id` to `NULL` to notify all users matching the specified `user_role` within the school.
+   * Restrict notification creation strictly to the initial publish action. Subsequent edits to an announcement must update the database record and reflect in the notice board *without* dispatching duplicate notifications.
+3. **Audience-Based Scoping**:
+   * Enforce audience target validation: `Teachers Only` targets `'TEACHER'`, `Students Only` targets `'STUDENT'` and `'PARENT'`, and `Both` targets all three roles.
+   * Filter notice API responses using in-clause matching against the user's authenticated role to ensure no unauthorized role can fetch or read notices.
+4. **Native Mobile HTML Parsing**:
+   * Instead of using heavy, version-sensitive external HTML rendering packages, utilize a lightweight regex-based custom parser in Dart to split HTML strings into formatted `TextSpan` elements. This provides 100% native rendering speeds and removes dependency overheads.
+5. **Read/Unread State Synchronicity**:
+   * Maintain a link table (e.g. `announcement_reads`) to track read status per user. Mark a notice as read automatically as soon as the user opens the notice detail screen, updating state indicators instantly.

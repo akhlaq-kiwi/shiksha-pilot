@@ -9,7 +9,7 @@ import html2pdf from 'html2pdf.js';
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 import { 
   User, BookOpen, Users, Home, Calendar, FileText, 
-  Download, Printer, AlertCircle, Eye, ChevronDown, ChevronUp, X, ShieldAlert 
+  Download, Printer, AlertCircle, Eye, ChevronDown, ChevronUp, X, ShieldAlert, Phone 
 } from 'lucide-react';
 
 // Self-healing avatar image component to handle loading errors gracefully
@@ -178,6 +178,14 @@ function ReceiptModal({ receipt, student, schoolName, allPayments = [], onClose 
     html2pdf().set(opt).from(element).save();
   };
 
+  const getModeOfPayment = (method) => {
+    if (!method) return 'Cash';
+    const m = method.toLowerCase();
+    if (m === 'cash') return 'Cash';
+    if (m === 'cheque') return 'Cheque';
+    return 'Online'; // UPI, Card, Bank Transfer -> Online
+  };
+
   const formatDate = (dateStr) => {
     if (!dateStr) return '—';
     const date = new Date(dateStr);
@@ -186,9 +194,11 @@ function ReceiptModal({ receipt, student, schoolName, allPayments = [], onClose 
     return date.toLocaleDateString('en-GB', options);
   };
 
-  const groupPayments = allPayments.length 
-    ? allPayments.filter(p => p.receipt_no === receipt.receipt_no) 
-    : [receipt];
+  const groupPayments = receipt.is_additional
+    ? [receipt]
+    : (allPayments.length 
+        ? allPayments.filter(p => p.receipt_no === receipt.receipt_no) 
+        : [receipt]);
 
   const academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
   
@@ -231,11 +241,12 @@ function ReceiptModal({ receipt, student, schoolName, allPayments = [], onClose 
           </div>
 
           <div className="border-y border-dashed border-border py-4 space-y-2 text-xs">
+            <div className="flex justify-between"><span className="text-text-muted">Mode of Payment:</span> <span className="font-extrabold text-text-primary">{getModeOfPayment(receipt.payment_method)}</span></div>
             <div className="flex justify-between"><span className="text-text-muted">Student Name:</span> <span className="font-extrabold text-text-primary uppercase">{student.name}</span></div>
             <div className="flex justify-between"><span className="text-text-muted">Class & Section:</span> <span className="font-bold text-text-primary">{student.class_name}</span></div>
             <div className="flex justify-between"><span className="text-text-muted">Roll Number / SR No:</span> <span className="font-bold text-text-primary">{student.roll_no || '—'} / {student.sr_no || '—'}</span></div>
-            <div className="flex justify-between"><span className="text-text-muted">Receipt No:</span> <span className="font-mono font-bold text-text-primary">{receipt.receipt_no}</span></div>
-            <div className="flex justify-between"><span className="text-text-muted">Academic Session:</span> <span className="font-bold text-text-primary">{student.academic_year_name || student.academic_year || '2025–2026'}</span></div>
+            <div className="flex justify-between"><span className="text-text-muted">Ref No:</span> <span className="font-mono font-bold text-text-primary">{receipt.receipt_no}</span></div>
+            <div className="flex justify-between"><span className="text-text-muted">Academic Year:</span> <span className="font-bold text-text-primary">{student.academic_year_name || student.academic_year || '2025–2026'}</span></div>
             <div className="flex justify-between"><span className="text-text-muted">Payment Date:</span> <span className="font-bold text-text-primary">{formatDate(receipt.payment_date)}</span></div>
           </div>
 
@@ -301,6 +312,7 @@ function DepositModal({ student, availableMonths, paidMonths, classFeeConfig, on
   const [selectedMonths, setSelectedMonths] = useState([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('Cash');
 
   const academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
 
@@ -363,7 +375,8 @@ function DepositModal({ student, availableMonths, paidMonths, classFeeConfig, on
     try {
       await schoolService.createFeePayment({
         student_id: student.id,
-        months: selectedMonths
+        months: selectedMonths,
+        payment_method: paymentMethod
       });
       onSave();
     } catch (err) {
@@ -390,6 +403,21 @@ function DepositModal({ student, availableMonths, paidMonths, classFeeConfig, on
             Select the months to deposit for <strong className="text-text-primary uppercase">{student.name}</strong>.
             Payments must follow the academic sequence chronologically.
           </p>
+
+          {/* Payment Method Selector */}
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black text-text-muted uppercase tracking-wider block">Payment Method</label>
+            <select
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value)}
+              className="w-full rounded-xl border border-border bg-surface text-text-primary px-3 py-2 text-xs font-bold focus:border-primary focus:ring-primary outline-none"
+            >
+              <option value="Cash">Cash</option>
+              <option value="UPI">UPI</option>
+              <option value="Card">Card</option>
+              <option value="Bank Transfer">Bank Transfer</option>
+            </select>
+          </div>
 
           {error && (
             <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-lg text-[11px] font-semibold leading-relaxed flex items-start gap-2">
@@ -450,6 +478,7 @@ function AdditionalDepositModal({ student, unpaidFees, initialSelectedIds = [], 
   const [selectedIds, setSelectedIds] = useState(initialSelectedIds);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('Cash');
 
   const handleToggle = (id) => {
     setSelectedIds(prev => 
@@ -465,7 +494,7 @@ function AdditionalDepositModal({ student, unpaidFees, initialSelectedIds = [], 
     setSaving(true);
     setError('');
     try {
-      await Promise.all(selectedIds.map(id => schoolService.collectAdditionalFeePayment(id)));
+      await Promise.all(selectedIds.map(id => schoolService.collectAdditionalFeePayment(id, { payment_method: paymentMethod })));
       onSave();
     } catch (err) {
       console.error(err);
@@ -490,6 +519,21 @@ function AdditionalDepositModal({ student, unpaidFees, initialSelectedIds = [], 
           <p className="text-xs text-text-secondary leading-relaxed">
             Select the Additional Fee(s) to deposit for <strong className="text-text-primary uppercase">{student.name}</strong>. Only unpaid Additional Fees are shown below.
           </p>
+
+          {/* Payment Method Selector */}
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black text-text-muted uppercase tracking-wider block">Payment Method</label>
+            <select
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value)}
+              className="w-full rounded-xl border border-border bg-surface text-text-primary px-3 py-2 text-xs font-bold focus:border-primary focus:ring-primary outline-none"
+            >
+              <option value="Cash">Cash</option>
+              <option value="UPI">UPI</option>
+              <option value="Card">Card</option>
+              <option value="Bank Transfer">Bank Transfer</option>
+            </select>
+          </div>
 
           {error && (
             <div className="p-2.5 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl text-xs font-semibold">
