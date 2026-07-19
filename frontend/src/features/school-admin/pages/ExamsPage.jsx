@@ -603,6 +603,8 @@ export default function ExamsPage() {
   const [publishTarget, setPublishTarget] = useState(null); // { exam, classId }
   const [isUnpublishConfirmOpen, setIsUnpublishConfirmOpen] = useState(false);
   const [unpublishTarget, setUnpublishTarget] = useState(null); // { exam, classId }
+  const [showTogglePublishModal, setShowTogglePublishModal] = useState(false);
+  const [togglePublishTarget, setTogglePublishTarget] = useState(null);
   const [isDeletePaperConfirmOpen, setIsDeletePaperConfirmOpen] = useState(false);
   const [deletePaperTarget, setDeletePaperTarget] = useState(null);
   const [editingPaper, setEditingPaper] = useState(null);
@@ -955,23 +957,31 @@ export default function ExamsPage() {
     }
   };
 
-  const handleToggleExamPublishStatus = async (exam) => {
+  const handleToggleExamPublishStatus = (exam) => {
+    setTogglePublishTarget(exam);
+    setShowTogglePublishModal(true);
+  };
+
+  const confirmToggleExamPublishStatus = async () => {
+    if (!togglePublishTarget) return;
     setSubmitting(true);
     setError('');
     setSuccess('');
     try {
-      const nextStatus = exam.status === 'Draft' ? 'Published' : 'Draft';
-      await schoolService.updateExamination(exam.id, {
-        ...exam,
+      const nextStatus = togglePublishTarget.status === 'Draft' ? 'Published' : 'Draft';
+      await schoolService.updateExamination(togglePublishTarget.id, {
+        ...togglePublishTarget,
         status: nextStatus
       });
       setSuccess(nextStatus === 'Published' ? 'Examination published successfully.' : 'Examination moved to Draft successfully.');
+      setShowTogglePublishModal(false);
       await loadDashboard();
     } catch (err) {
       console.error(err);
       setError(err.message || 'Failed to update examination status.');
     } finally {
       setSubmitting(false);
+      setTogglePublishTarget(null);
     }
   };
 
@@ -3033,6 +3043,37 @@ export default function ExamsPage() {
           </div>
           <p className="text-xs text-center text-text-secondary leading-relaxed">
             Are you sure you want to revert the examination scheme to Draft? Once reverted, it will disappear from the mobile application, and students/parents will receive a notification alert.
+          </p>
+        </div>
+      </Dialog>
+
+      {/* CONFIRM TOGGLE PUBLISH EXAM DIALOG */}
+      <Dialog 
+        isOpen={showTogglePublishModal} 
+        onClose={() => setShowTogglePublishModal(false)}
+        title={togglePublishTarget?.status === 'Draft' ? "Publish Examination" : "Move Examination to Draft"}
+        footer={<>
+          <Button variant="secondary" onClick={() => setShowTogglePublishModal(false)}>Cancel</Button>
+          <Button 
+            className={togglePublishTarget?.status === 'Draft' ? "bg-green-600 hover:bg-green-700 text-white font-bold" : "bg-rose-600 hover:bg-rose-700 text-white font-bold"} 
+            onClick={confirmToggleExamPublishStatus} 
+            disabled={submitting}
+          >
+            {submitting ? 'Updating...' : (togglePublishTarget?.status === 'Draft' ? 'Publish' : 'Revert to Draft')}
+          </Button>
+        </>}>
+        <div className="space-y-3 p-1">
+          <div className={`mx-auto w-12 h-12 rounded-full flex items-center justify-center ${
+            togglePublishTarget?.status === 'Draft' ? 'bg-green-100 text-green-600' : 'bg-rose-100 text-rose-600'
+          }`}>
+            {togglePublishTarget?.status === 'Draft' ? <CheckCircle className="h-6 w-6" /> : <AlertCircle className="h-6 w-6" />}
+          </div>
+          <p className="text-xs text-center text-text-secondary leading-relaxed font-semibold">
+            {togglePublishTarget?.status === 'Draft' ? (
+              `You are about to publish "${togglePublishTarget?.name}". Once published, this examination will start showing up in the student/parent mobile application. Do you want to continue?`
+            ) : (
+              `Are you sure you want to move "${togglePublishTarget?.name}" back to Draft? Once reverted to draft, this examination will disappear from the mobile application. Do you want to continue?`
+            )}
           </p>
         </div>
       </Dialog>

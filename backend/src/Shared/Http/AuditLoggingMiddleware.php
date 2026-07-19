@@ -67,7 +67,7 @@ class AuditLoggingMiddleware
                     $preFetched = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
                 } elseif (preg_match('#^/api/school/exams-new/(\d+)$#', $path, $matches)) {
                     $id = (int)$matches[1];
-                    $stmt = $pdo->prepare("SELECT * FROM exams_new WHERE id = :id AND school_id = :sid LIMIT 1");
+                    $stmt = $pdo->prepare("SELECT * FROM examinations WHERE id = :id AND school_id = :sid LIMIT 1");
                     $stmt->execute([':id' => $id, ':sid' => $schoolId]);
                     $preFetched = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
                 } elseif (preg_match('#^/api/school/fee-payments/(\d+)$#', $path, $matches)) {
