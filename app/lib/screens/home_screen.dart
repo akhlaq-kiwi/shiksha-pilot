@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
+import 'package:school_hub/services/http_service.dart' as http;
 import 'package:school_hub/services/leave_service.dart';
 import 'package:school_hub/services/auth_service.dart';
 import 'package:school_hub/screens/leave_list_screen.dart';

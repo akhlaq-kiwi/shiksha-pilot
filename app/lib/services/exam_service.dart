@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:school_hub/services/http_service.dart' as http;
 
 class ExamService {
   final String baseUrl;
