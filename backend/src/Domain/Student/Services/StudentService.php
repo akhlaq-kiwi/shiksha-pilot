@@ -504,8 +504,13 @@ class StudentService extends BaseService
         $studentId = (int)$student['id'];
         $classId = (int)$student['class_id'];
         $schoolId = (int)($user['school_id'] ?? 0);
+        $academicYearId = (int)($student['academic_year_id'] ?? 0);
         
         $pdo = $this->repo->getPdo();
+
+        if ($academicYearId > 0) {
+            $this->syncTransportFees($schoolId, $academicYearId, $pdo);
+        }
 
         // 1. Fetch class fee config
         $stmtCfg = $pdo->prepare("SELECT * FROM class_fee_configurations WHERE school_id = :sid AND class_id = :cid LIMIT 1");
@@ -572,7 +577,7 @@ class StudentService extends BaseService
 
         // 4. Fetch additional fee payments
         $stmtAdd = $pdo->prepare("
-            SELECT afp.*, aft.name AS fee_name
+            SELECT afp.*, aft.name AS fee_name, aft.due_date AS type_due_date
             FROM additional_fee_payments afp
             JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
             WHERE afp.school_id = :sid AND afp.student_id = :stid
@@ -585,11 +590,23 @@ class StudentService extends BaseService
         foreach ($additionalPayments as $row) {
             $amt = (float)$row['amount'];
             $isPaid = strtolower($row['status']) === 'paid';
+            
+            $dueDate = $row['type_due_date'];
+            if ($row['fee_name'] === 'Transport Fees' && !empty($row['fee_month'])) {
+                try {
+                    $dt = new \DateTime("last day of " . $row['fee_month']);
+                    $dueDate = $dt->format('Y-m-d');
+                } catch (\Exception $e) {
+                    $dueDate = null;
+                }
+            }
+
             $additionalFees[] = [
                 'id' => (int)$row['id'],
-                'description' => $row['fee_name'],
+                'description' => $row['fee_name'] === 'Transport Fees' ? 'Transport Fee' : $row['fee_name'],
                 'amount' => $amt,
                 'payment_date' => $row['payment_date'],
+                'due_date' => $dueDate,
                 'status' => $isPaid ? 'Paid' : 'Pending'
             ];
             if (!$isPaid) {
@@ -960,5 +977,133 @@ class StudentService extends BaseService
         }
 
         return $response;
+    }
+
+    private function calculateTransportCharge(string $startDateStr, float $monthlyFee, string $targetMonthStr): float
+    {
+        $startDate = new \DateTime($startDateStr);
+        $targetMonthDate = new \DateTime($targetMonthStr);
+
+        $startYearMonth = $startDate->format('Y-m');
+        $targetYearMonth = $targetMonthDate->format('Y-m');
+
+        if ($targetYearMonth < $startYearMonth) {
+            return 0.0;
+        }
+
+        if ($targetYearMonth === $startYearMonth) {
+            $startDay = (int)$startDate->format('d');
+            if ($startDay === 1) {
+                return $monthlyFee;
+            }
+            $totalDays = (int)$startDate->format('t');
+            $remainingDays = $totalDays - $startDay + 1;
+            if ($remainingDays < 0) {
+                $remainingDays = 0;
+            }
+            $dailyFee = round($monthlyFee / $totalDays, 2);
+            return round($dailyFee * $remainingDays, 2);
+        }
+
+        return $monthlyFee;
+    }
+
+    public function syncTransportFees(int $schoolId, int $academicYearId, PDO $pdo): void
+    {
+        $stmtAY = $pdo->prepare("SELECT start_date, end_date FROM academic_years WHERE id = :ayid AND school_id = :sid LIMIT 1");
+        $stmtAY->execute([':ayid' => $academicYearId, ':sid' => $schoolId]);
+        $ay = $stmtAY->fetch(PDO::FETCH_ASSOC);
+        if (!$ay) {
+            return;
+        }
+
+        $ayStartDate = new \DateTime($ay['start_date']);
+        $ayEndDate = new \DateTime($ay['end_date']);
+        $currentDate = new \DateTime();
+
+        $targetDate = $currentDate < $ayEndDate ? $currentDate : $ayEndDate;
+
+        $stmtType = $pdo->prepare("SELECT id FROM additional_fee_types WHERE school_id = :sid AND academic_year_id = :ayid AND name = 'Transport Fees' LIMIT 1");
+        $stmtType->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+        $typeId = $stmtType->fetchColumn();
+
+        if ($typeId === false) {
+            $stmtInsType = $pdo->prepare("
+                INSERT INTO additional_fee_types (school_id, name, amount, academic_year_id, category)
+                VALUES (:sid, 'Transport Fees', 0.0, :ayid, 'System Generated')
+            ");
+            $stmtInsType->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+            $typeId = (int)$pdo->lastInsertId();
+        } else {
+            $typeId = (int)$typeId;
+        }
+
+        $stmtConfigs = $pdo->prepare("SELECT * FROM student_transport_fees WHERE school_id = :sid AND academic_year_id = :ayid AND status = 'Active'");
+        $stmtConfigs->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+        $configs = $stmtConfigs->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        $stmtCheck = $pdo->prepare("
+            SELECT id FROM additional_fee_payments 
+            WHERE school_id = :sid AND student_id = :student_id AND fee_type_id = :fee_type_id AND fee_month = :fee_month 
+            LIMIT 1
+        ");
+
+        $stmtInsPay = $pdo->prepare("
+            INSERT INTO additional_fee_payments (school_id, student_id, fee_type_id, amount, status, fee_month)
+            VALUES (:sid, :student_id, :fee_type_id, :amount, 'Pending', :fee_month)
+        ");
+
+        $stmtInsNotif = $pdo->prepare("
+            INSERT INTO dashboard_notifications (school_id, user_role, title, message)
+            VALUES (:sid, 'STUDENT', 'Transport Fee Generated', :msg)
+        ");
+
+        foreach ($configs as $cfg) {
+            $studentId = (int)$cfg['student_id'];
+            $monthlyFee = (float)$cfg['monthly_fee'];
+            $startDateStr = $cfg['start_date'];
+            $startDate = new \DateTime($startDateStr);
+
+            $temp = new \DateTime($startDate->format('Y-m-01'));
+            $endTemp = new \DateTime($targetDate->format('Y-m-01'));
+
+            while ($temp <= $endTemp) {
+                $tempStart = new \DateTime($temp->format('Y-m-01'));
+                $tempEnd = new \DateTime($temp->format('Y-m-t'));
+
+                if ($tempEnd >= $ayStartDate && $tempStart <= $ayEndDate) {
+                    $monthStr = $temp->format('F Y');
+                    $monthDateStr = $temp->format('Y-m-d');
+
+                    $stmtCheck->execute([
+                        ':sid' => $schoolId,
+                        ':student_id' => $studentId,
+                        ':fee_type_id' => $typeId,
+                        ':fee_month' => $monthStr
+                    ]);
+                    $existingPaymentId = $stmtCheck->fetchColumn();
+
+                    if ($existingPaymentId === false) {
+                        $amount = $this->calculateTransportCharge($startDateStr, $monthlyFee, $monthDateStr);
+                        if ($amount > 0) {
+                            $stmtInsPay->execute([
+                                ':sid' => $schoolId,
+                                ':student_id' => $studentId,
+                                ':fee_type_id' => $typeId,
+                                ':amount' => $amount,
+                                ':fee_month' => $monthStr
+                            ]);
+
+                            $msg = "Transport Fee for {$monthStr} has been added to your fee ledger.";
+                            $stmtInsNotif->execute([
+                                ':sid' => $schoolId,
+                                ':msg' => $msg
+                            ]);
+                        }
+                    }
+                }
+                $temp->modify('+1 month');
+            }
+        }
     }
 }

@@ -545,7 +545,7 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
                                       Text(
                                         isPaid
                                             ? 'Paid: ${_formatDate(item['payment_date'])}'
-                                            : 'Amount: ₹${(item['amount'] ?? 0.0).toStringAsFixed(2)}',
+                                            : 'Amount: ₹${(item['amount'] ?? 0.0).toStringAsFixed(2)}${item['due_date'] != null && item['due_date'].toString().isNotEmpty ? '   •   Due: ${_formatDate(item['due_date'])}' : ''}',
                                         style: TextStyle(
                                           fontSize: 12,
                                           color: Colors.grey.shade600,

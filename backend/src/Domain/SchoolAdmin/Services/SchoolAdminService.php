@@ -8001,14 +8001,12 @@ Only approve the settlement after reviewing all financial records.
             if ($startDay === 1) {
                 return $monthlyFee;
             }
-            $remainingDays = 30 - $startDay + 1;
+            $totalDays = (int)$startDate->format('t');
+            $remainingDays = $totalDays - $startDay + 1;
             if ($remainingDays < 0) {
                 $remainingDays = 0;
             }
-            if ($remainingDays > 30) {
-                $remainingDays = 30;
-            }
-            $dailyFee = $monthlyFee / 30.0;
+            $dailyFee = round($monthlyFee / $totalDays, 2);
             return round($dailyFee * $remainingDays, 2);
         }
 

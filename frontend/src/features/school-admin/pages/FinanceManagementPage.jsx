@@ -70,6 +70,7 @@ export default function FinanceManagementPage() {
   const [transportStatus, setTransportStatus] = useState('Active');
   const [transportSubmitting, setTransportSubmitting] = useState(false);
   const [transportFormErrors, setTransportFormErrors] = useState({});
+  const [viewingTransportDetails, setViewingTransportDetails] = useState(null);
 
   // Delete Transport Confirmation
   const [deletingTransportId, setDeletingTransportId] = useState(null);
@@ -1596,6 +1597,56 @@ export default function FinanceManagementPage() {
         </Dialog>
       )}
 
+      {/* View Transport Details Dialog */}
+      <Dialog
+        isOpen={viewingTransportDetails !== null}
+        onClose={() => setViewingTransportDetails(null)}
+        title="Transport Fee Details"
+        description="View student transport configuration and billing status."
+        footer={
+          <Button variant="secondary" onClick={() => setViewingTransportDetails(null)}>Close</Button>
+        }
+      >
+        {viewingTransportDetails && (
+          <div className="grid grid-cols-2 gap-4 py-3 text-xs leading-relaxed">
+            <div className="flex flex-col gap-1">
+              <span className="text-text-muted font-medium">Student Name</span>
+              <span className="text-text-primary font-bold">{viewingTransportDetails.student_name}</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-text-muted font-medium">SR No.</span>
+              <span className="text-text-primary font-bold">{viewingTransportDetails.sr_no || '—'}</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-text-muted font-medium">Class</span>
+              <span className="text-text-primary font-bold">
+                {viewingTransportDetails.class_name ? `${viewingTransportDetails.class_name}${viewingTransportDetails.class_section ? ` - ${viewingTransportDetails.class_section}` : ''}` : '—'}
+              </span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-text-muted font-medium">Monthly Transport Fee</span>
+              <span className="text-text-primary font-bold">₹{viewingTransportDetails.monthly_fee}</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-text-muted font-medium">Transport Start Date</span>
+              <span className="text-text-primary font-bold">{formatDateFull(viewingTransportDetails.start_date)}</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-text-muted font-medium">Status</span>
+              <span className="text-text-primary font-bold">
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${viewingTransportDetails.status === 'Active' ? 'bg-green-50 text-green-700' : 'bg-zinc-100 text-zinc-600'}`}>
+                  {viewingTransportDetails.status}
+                </span>
+              </span>
+            </div>
+            <div className="flex flex-col gap-1 col-span-2 border-t border-border pt-3 mt-1">
+              <span className="text-text-muted font-medium">Next Charge Amount</span>
+              <span className="text-primary font-extrabold text-sm">₹{viewingTransportDetails.next_charge}</span>
+            </div>
+          </div>
+        )}
+      </Dialog>
+
       {/* Transport Row Three-Dot Portal Menu */}
       {activeTransportDropdownId && dropdownCoords && (
         (() => {
@@ -1614,7 +1665,7 @@ export default function FinanceManagementPage() {
               <button
                 onClick={() => {
                   setActiveTransportDropdownId(null);
-                  alert(`Student: ${tf.student_name}\nAdmission Number: ${tf.admission_no || '—'}\nClass: ${tf.class_name || '—'}\nMonthly Fee: ₹${tf.monthly_fee}\nStart Date: ${formatDateFull(tf.start_date)}\nStatus: ${tf.status}\nNext Charge Amount: ₹${tf.next_charge}`);
+                  setViewingTransportDetails(tf);
                 }}
                 className="w-full px-3 py-1.5 hover:bg-zinc-50 flex items-center gap-1.5"
               >
