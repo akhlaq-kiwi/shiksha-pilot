@@ -150,8 +150,16 @@ export const schoolService = {
     return apiClient.post(`/api/school/exams-new/${examId}/publish-scheme`, { class_id: classId });
   },
 
+  unpublishExamScheme(examId, classId) {
+    return apiClient.post(`/api/school/exams-new/${examId}/unpublish-scheme`, { class_id: classId });
+  },
+
   publishExamAdmitCards(examId, classId) {
     return apiClient.post(`/api/school/exams-new/${examId}/publish-admit-card`, { class_id: classId });
+  },
+
+  unpublishExamAdmitCards(examId, classId) {
+    return apiClient.post(`/api/school/exams-new/${examId}/unpublish-admit-card`, { class_id: classId });
   },
 
   getReportCards(examId, classId, studentId = null) {

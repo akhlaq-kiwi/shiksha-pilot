@@ -478,6 +478,28 @@ class SchoolAdminController extends BaseController
         return $this->success($response, null, 'Admit cards published successfully');
     }
 
+    public function unpublishExamScheme(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $examId = (int)$args['id'];
+        $body = RequestParser::body($request);
+        $classId = (int)($body['class_id'] ?? 0);
+        $this->service->unpublishExamScheme($user, $examId, $classId);
+        return $this->success($response, null, 'Examination scheme reverted to Draft successfully');
+    }
+
+    public function unpublishExamAdmitCards(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $examId = (int)$args['id'];
+        $body = RequestParser::body($request);
+        $classId = (int)($body['class_id'] ?? 0);
+        $this->service->unpublishExamAdmitCards($user, $examId, $classId);
+        return $this->success($response, null, 'Admit cards reverted to Draft successfully');
+    }
+
     public function getReportCards(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);

@@ -1350,34 +1350,58 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                     const SizedBox(height: 16),
 
                     // 1. Exam Scheme Card
-                    _buildFeatureCard(
-                      title: 'Exam Scheme',
-                      subtitle: schemePub ? 'View examination timetable scheme' : 'Not Published Yet',
-                      icon: Icons.calendar_month_rounded,
-                      isPublished: schemePub,
-                      onTap: _showSchemeModal,
-                    ),
+                    if (schemePub)
+                      _buildFeatureCard(
+                        title: 'Exam Scheme',
+                        subtitle: 'View examination timetable scheme',
+                        icon: Icons.calendar_month_rounded,
+                        isPublished: schemePub,
+                        onTap: _showSchemeModal,
+                      ),
 
                     // 2. Admit Card Card (STUDENT/PARENT only)
-                    if (widget.userRole != 'TEACHER')
+                    if (widget.userRole != 'TEACHER' && admitPub)
                       _buildFeatureCard(
                         title: 'Admit Card',
-                        subtitle: admitPub ? 'View room & seat allocations' : 'Not Published Yet',
+                        subtitle: 'View room & seat allocations',
                         icon: Icons.badge_rounded,
                         isPublished: admitPub,
                         onTap: _showAdmitCardModal,
                       ),
 
                     // 3. Result Card
-                    _buildFeatureCard(
-                      title: widget.userRole == 'TEACHER' ? 'Student Results' : 'Exam Result',
-                      subtitle: resultPub 
-                          ? (widget.userRole == 'TEACHER' ? 'View class performance breakdown' : 'View your report card')
-                          : 'Not Published Yet',
-                      icon: Icons.workspace_premium_rounded,
-                      isPublished: resultPub,
-                      onTap: _showResultModal,
-                    ),
+                    if (resultPub)
+                      _buildFeatureCard(
+                        title: widget.userRole == 'TEACHER' ? 'Student Results' : 'Exam Result',
+                        subtitle: widget.userRole == 'TEACHER' ? 'View class performance breakdown' : 'View your report card',
+                        icon: Icons.workspace_premium_rounded,
+                        isPublished: resultPub,
+                        onTap: _showResultModal,
+                      ),
+
+                    // Placeholder if nothing is published
+                    if (!schemePub && (widget.userRole == 'TEACHER' || !admitPub) && !resultPub)
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 40),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.assignment_outlined, size: 64, color: Colors.grey.shade400),
+                              const SizedBox(height: 16),
+                              Text(
+                                'No components published for this examination yet.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  color: Colors.grey.shade600,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                   ],
                 ),
     );

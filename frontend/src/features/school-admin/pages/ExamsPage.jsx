@@ -4,7 +4,7 @@ import {
   Plus, ArrowLeft, Calendar, Clock, BookOpen, UserCheck, 
   Settings, Award, Printer, Trash, FileText, CheckCircle, 
   XCircle, Save, AlertCircle, Edit3, Trash2, LayoutDashboard, ChevronRight, Download, X,
-  Users, Check
+  Users, Check, RotateCcw
 } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
@@ -610,6 +610,8 @@ export default function ExamsPage() {
   // Publish Scheme States
   const [showPublishSchemeModal, setShowPublishSchemeModal] = useState(false);
   const [submittingPublishScheme, setSubmittingPublishScheme] = useState(false);
+  const [showUnpublishSchemeModal, setShowUnpublishSchemeModal] = useState(false);
+  const [submittingUnpublishScheme, setSubmittingUnpublishScheme] = useState(false);
 
   // Instructions States
   const [instructions, setInstructions] = useState([]);
@@ -1611,6 +1613,32 @@ export default function ExamsPage() {
     }
   };
 
+  const handleUnpublishSchemeClick = () => {
+    setError('');
+    setSuccess('');
+    setShowUnpublishSchemeModal(true);
+  };
+
+  const confirmUnpublishScheme = async () => {
+    setSubmittingUnpublishScheme(true);
+    setError('');
+    setSuccess('');
+    try {
+      await schoolService.unpublishExamScheme(selectedExam.id, parseInt(selectedClassId));
+      setSuccess('Examination Scheme Reverted to Draft Successfully.');
+      setShowUnpublishSchemeModal(false);
+      
+      // Reload class statuses
+      const statuses = await schoolService.getExamClassStatuses(selectedExam.id);
+      setExamClassStatuses(statuses || []);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to revert examination scheme.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } finally {
+      setSubmittingUnpublishScheme(false);
+    }
+  };
+
   const handleOpenSingleReportCard = (card) => {
     setSelectedReportCard(card);
     setIsReportCardOpen(true);
@@ -2426,7 +2454,7 @@ export default function ExamsPage() {
                 <CardContent className="p-4">
                   <form id="add-paper-form" onSubmit={handleAddPaperLocal} className="space-y-4">
                     {/* Row 1 */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       {/* Subject */}
                       <div className="space-y-1.5">
                         <label className="text-xs font-bold text-text-secondary uppercase">Subject</label>
@@ -2479,12 +2507,6 @@ export default function ExamsPage() {
                           holidays={holidays}
                           required
                         />
-                      </div>
-
-                      {/* Room */}
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-text-secondary uppercase">Room / Classroom (Optional)</label>
-                        <Input placeholder="e.g. Room 102" value={newPaper.room} onChange={e => setNewPaper(p => ({ ...p, room: e.target.value }))} />
                       </div>
                     </div>
 
@@ -2541,19 +2563,27 @@ export default function ExamsPage() {
                       >
                         <BookOpen className="h-4 w-4" /> Instructions
                       </Button>
-                      <Button 
-                        type="button" 
-                        variant={isSchemePublished ? "secondary" : "default"}
-                        className="flex items-center gap-2 text-xs font-bold py-1.5 px-3 cursor-pointer"
-                        onClick={handlePublishSchemeClick}
-                        disabled={isSchemePublished || isReadOnly}
-                      >
-                        {isSchemePublished ? (
-                          <><Check className="h-4 w-4 text-green-600" /> Scheme Published</>
-                        ) : (
-                          <><Check className="h-4 w-4" /> Publish Scheme</>
-                        )}
-                      </Button>
+                      {isSchemePublished ? (
+                        <Button 
+                          type="button" 
+                          variant="secondary"
+                          className="flex items-center gap-2 text-xs font-bold py-1.5 px-3 cursor-pointer border-rose-200 text-rose-600 hover:bg-rose-50"
+                          onClick={handleUnpublishSchemeClick}
+                          disabled={isReadOnly}
+                        >
+                          <RotateCcw className="h-4 w-4" /> Revert to Draft
+                        </Button>
+                      ) : (
+                        <Button 
+                          type="button" 
+                          variant="default"
+                          className="flex items-center gap-2 text-xs font-bold py-1.5 px-3 cursor-pointer"
+                          onClick={handlePublishSchemeClick}
+                          disabled={isReadOnly}
+                        >
+                          <Check className="h-4 w-4" /> Publish Scheme
+                        </Button>
+                      )}
                       <Button 
                         type="button"
                         className="flex items-center gap-2 text-xs font-bold py-1.5 px-3 cursor-pointer"
@@ -2574,14 +2604,13 @@ export default function ExamsPage() {
                     <TableHead>Time</TableHead>
                     <TableHead>Max Marks</TableHead>
                     <TableHead>Passing Marks</TableHead>
-                    <TableHead>Room</TableHead>
                     {!isReadOnly && (examClassStatuses.find(c => c.id === parseInt(selectedClassId))?.status || 'Draft') === 'Draft' && <TableHead className="text-right">Action</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {timetablePapers.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-text-muted">
+                      <TableCell colSpan={7} className="text-center py-8 text-text-muted">
                         No papers scheduled for this examination yet. Use the form above to add papers.
                       </TableCell>
                     </TableRow>
@@ -2593,7 +2622,6 @@ export default function ExamsPage() {
                       <TableCell className="text-xs font-mono">{formatTimeString(paper.start_time)} – {formatTimeString(paper.end_time)}</TableCell>
                       <TableCell className="text-xs font-mono">{paper.max_marks}</TableCell>
                       <TableCell className="text-xs font-mono">{paper.passing_marks}</TableCell>
-                      <TableCell className="text-xs text-text-secondary">{paper.room || '—'}</TableCell>
                       {!isReadOnly && (examClassStatuses.find(c => c.id === parseInt(selectedClassId))?.status || 'Draft') === 'Draft' && (
                         <TableCell className="text-right">
                           <DropdownMenu>
@@ -2986,6 +3014,25 @@ export default function ExamsPage() {
           </div>
           <p className="text-xs text-center text-text-secondary leading-relaxed">
             You are about to publish the examination scheme. Once published, students and class teachers will be able to access the examination scheme in the mobile application. Do you want to continue?
+          </p>
+        </div>
+      </Dialog>
+
+      {/* UNPUBLISH SCHEME DIALOG */}
+      <Dialog isOpen={showUnpublishSchemeModal} onClose={() => setShowUnpublishSchemeModal(false)}
+        title="Revert Scheme to Draft"
+        footer={<>
+          <Button variant="secondary" onClick={() => setShowUnpublishSchemeModal(false)}>Cancel</Button>
+          <Button className="bg-rose-600 hover:bg-rose-700 text-white" onClick={confirmUnpublishScheme} disabled={submittingUnpublishScheme}>
+            {submittingUnpublishScheme ? 'Reverting...' : 'Confirm Revert'}
+          </Button>
+        </>}>
+        <div className="space-y-3 p-1">
+          <div className="mx-auto w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center text-rose-600">
+            <AlertCircle className="h-6 w-6" />
+          </div>
+          <p className="text-xs text-center text-text-secondary leading-relaxed">
+            Are you sure you want to revert the examination scheme to Draft? Once reverted, it will disappear from the mobile application, and students/parents will receive a notification alert.
           </p>
         </div>
       </Dialog>

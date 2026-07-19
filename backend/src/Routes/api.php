@@ -119,7 +119,9 @@ return function (App $app) {
     $app->post('/api/school/exams-new/{id}/marks', [SchoolAdminController::class, 'saveExamMark']);
     $app->post('/api/school/exams-new/{id}/publish', [SchoolAdminController::class, 'publishExamResults']);
     $app->post('/api/school/exams-new/{id}/publish-scheme', [SchoolAdminController::class, 'publishExamScheme']);
+    $app->post('/api/school/exams-new/{id}/unpublish-scheme', [SchoolAdminController::class, 'unpublishExamScheme']);
     $app->post('/api/school/exams-new/{id}/publish-admit-card', [SchoolAdminController::class, 'publishExamAdmitCards']);
+    $app->post('/api/school/exams-new/{id}/unpublish-admit-card', [SchoolAdminController::class, 'unpublishExamAdmitCards']);
     $app->get('/api/school/exams-new/{id}/report-cards', [SchoolAdminController::class, 'getReportCards']);
     $app->get('/api/school/exams-new/{id}/class-status', [SchoolAdminController::class, 'getExamClassStatuses']);
     $app->get('/api/school/exams-new/{id}/instructions', [SchoolAdminController::class, 'getExamInstructions']);

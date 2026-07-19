@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, FileText, CheckCircle, AlertCircle, Plus, 
-  Trash2, Printer, ChevronRight, Check, Building, RefreshCw, Download
+  Trash2, Printer, ChevronRight, Check, Building, RefreshCw, Download, RotateCcw
 } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
@@ -50,6 +50,8 @@ export default function SeatingPlanPage() {
   // Publish Admit Cards States
   const [showPublishAdmitModal, setShowPublishAdmitModal] = useState(false);
   const [submittingPublishAdmit, setSubmittingPublishAdmit] = useState(false);
+  const [showUnpublishAdmitModal, setShowUnpublishAdmitModal] = useState(false);
+  const [submittingUnpublishAdmit, setSubmittingUnpublishAdmit] = useState(false);
   const [examClassStatuses, setExamClassStatuses] = useState([]);
 
   // Alerts
@@ -432,6 +434,34 @@ export default function SeatingPlanPage() {
     }
   };
 
+  const handleUnpublishAdmitClick = () => {
+    setError('');
+    setSuccess('');
+    setShowUnpublishAdmitModal(true);
+  };
+
+  const confirmUnpublishAdmitCards = async () => {
+    setSubmittingUnpublishAdmit(true);
+    setError('');
+    setSuccess('');
+    try {
+      await Promise.all(selectedClassIds.map(classId => 
+        schoolService.unpublishExamAdmitCards(selectedExamId, classId)
+      ));
+      setSuccess('Admit Cards Reverted to Draft Successfully.');
+      setShowUnpublishAdmitModal(false);
+
+      // Reload class statuses
+      const statuses = await schoolService.getExamClassStatuses(selectedExamId);
+      setExamClassStatuses(statuses || []);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to revert admit cards to draft.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } finally {
+      setSubmittingUnpublishAdmit(false);
+    }
+  };
+
   // Download PDF function
   const handleDownloadPDF = (elementId, filename) => {
     const element = document.getElementById(elementId);
@@ -807,14 +837,24 @@ export default function SeatingPlanPage() {
                   const allAdmitCardsPublished = selectedClassIds.length > 0 && selectedClassIds.every(classId => 
                     examClassStatuses.find(c => c.id === classId)?.admit_card_published === 1
                   );
+                  if (allAdmitCardsPublished) {
+                    return (
+                      <Button 
+                        variant="secondary"
+                        className="flex items-center gap-1.5 font-bold border-rose-200 text-rose-600 hover:bg-rose-50 cursor-pointer"
+                        onClick={handleUnpublishAdmitClick}
+                      >
+                        <RotateCcw className="h-4 w-4" /> Revert to Draft
+                      </Button>
+                    );
+                  }
                   return (
                     <Button 
-                      variant={allAdmitCardsPublished ? "secondary" : "default"}
-                      className="flex items-center gap-1.5 font-bold"
+                      variant="default"
+                      className="flex items-center gap-1.5 font-bold cursor-pointer"
                       onClick={handlePublishAdmitClick}
-                      disabled={allAdmitCardsPublished}
                     >
-                      <Check className="h-4 w-4" /> {allAdmitCardsPublished ? 'Admit Cards Published' : 'Publish Admit Cards'}
+                      <Check className="h-4 w-4" /> Publish Admit Cards
                     </Button>
                   );
                 })()}
@@ -1069,9 +1109,38 @@ export default function SeatingPlanPage() {
           </div>
         }
       >
+        </div>
+      </Dialog>
+
+      {/* UNPUBLISH ADMIT CARDS DIALOG */}
+      <Dialog
+        isOpen={showUnpublishAdmitModal}
+        onClose={() => !submittingUnpublishAdmit && setShowUnpublishAdmitModal(false)}
+        title="Revert Admit Cards to Draft"
+        className="max-w-md animate-in fade-in zoom-in-95 duration-200"
+        footer={
+          <div className="flex justify-end gap-3 w-full">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowUnpublishAdmitModal(false)}
+              disabled={submittingUnpublishAdmit}
+              className="font-bold"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={confirmUnpublishAdmitCards}
+              disabled={submittingUnpublishAdmit}
+              className="font-black bg-rose-600 hover:bg-rose-700 text-white"
+            >
+              {submittingUnpublishAdmit ? 'Reverting...' : 'Confirm Revert'}
+            </Button>
+          </div>
+        }
+      >
         <div className="space-y-3">
           <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed font-medium">
-            You are about to publish the admit cards. Once published, students will be able to access the admit cards in the mobile application. Do you want to continue?
+            Are you sure you want to revert the admit cards to Draft? Once reverted, they will disappear from the mobile application, and students/parents will receive a notification alert.
           </p>
         </div>
       </Dialog>

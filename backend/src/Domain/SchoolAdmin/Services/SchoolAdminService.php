@@ -9110,6 +9110,92 @@ Only approve the settlement after reviewing all financial records.
         $this->sendExamNotification($pdo, $schoolId, $examId, $classId, 'ADMIT_CARD', $exam['name']);
     }
 
+    public function unpublishExamScheme(array $user, int $examId, int $classId): void
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        // 1. Check exam exists
+        $stmtCheck = $pdo->prepare("SELECT id, name FROM examinations WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtCheck->execute([':id' => $examId, ':sid' => $schoolId]);
+        $exam = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+        if (!$exam) {
+            throw new NotFoundException('Examination not found.');
+        }
+
+        // 2. Update status in examination_class_status
+        $stmt = $pdo->prepare("
+            INSERT INTO examination_class_status (exam_id, class_id, scheme_published)
+            VALUES (:exam_id, :class_id, 0)
+            ON DUPLICATE KEY UPDATE scheme_published = 0
+        ");
+        $stmt->execute([
+            ':exam_id' => $examId,
+            ':class_id' => $classId
+        ]);
+
+        // 3. Log audit
+        $stmtInfo = $pdo->prepare("
+            SELECT c.name AS class_name, ay.name AS academic_year_name
+            FROM classes c
+            JOIN academic_years ay ON c.academic_year_id = ay.id
+            WHERE c.id = :class_id
+            LIMIT 1
+        ");
+        $stmtInfo->execute([':class_id' => $classId]);
+        $info = $stmtInfo->fetch(PDO::FETCH_ASSOC);
+        $className = $info ? $info['class_name'] : '';
+        $ayName = $info ? $info['academic_year_name'] : '';
+
+        $this->logAudit($pdo, $user, 'Examinations', 'Unpublish Scheme', "Reverted Scheme to Draft for exam '{$exam['name']}' (Class: {$className})", $ayName);
+
+        // 4. Send unpublish notification
+        $this->sendExamNotification($pdo, $schoolId, $examId, $classId, 'UNPUBLISH_SCHEME', $exam['name']);
+    }
+
+    public function unpublishExamAdmitCards(array $user, int $examId, int $classId): void
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        // 1. Check exam exists
+        $stmtCheck = $pdo->prepare("SELECT id, name FROM examinations WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtCheck->execute([':id' => $examId, ':sid' => $schoolId]);
+        $exam = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+        if (!$exam) {
+            throw new NotFoundException('Examination not found.');
+        }
+
+        // 2. Update status in examination_class_status
+        $stmt = $pdo->prepare("
+            INSERT INTO examination_class_status (exam_id, class_id, admit_card_published)
+            VALUES (:exam_id, :class_id, 0)
+            ON DUPLICATE KEY UPDATE admit_card_published = 0
+        ");
+        $stmt->execute([
+            ':exam_id' => $examId,
+            ':class_id' => $classId
+        ]);
+
+        // 3. Log audit
+        $stmtInfo = $pdo->prepare("
+            SELECT c.name AS class_name, ay.name AS academic_year_name
+            FROM classes c
+            JOIN academic_years ay ON c.academic_year_id = ay.id
+            WHERE c.id = :class_id
+            LIMIT 1
+        ");
+        $stmtInfo->execute([':class_id' => $classId]);
+        $info = $stmtInfo->fetch(PDO::FETCH_ASSOC);
+        $className = $info ? $info['class_name'] : '';
+        $ayName = $info ? $info['academic_year_name'] : '';
+
+        $this->logAudit($pdo, $user, 'Examinations', 'Unpublish Admit Cards', "Reverted Admit Cards to Draft for exam '{$exam['name']}' (Class: {$className})", $ayName);
+
+        // 4. Send unpublish notification
+        $this->sendExamNotification($pdo, $schoolId, $examId, $classId, 'UNPUBLISH_ADMIT_CARD', $exam['name']);
+    }
+
     private function sendExamNotification(PDO $pdo, int $schoolId, int $examId, int $classId, string $type, string $examName): void
     {
         $title = $examName;
@@ -9122,6 +9208,10 @@ Only approve the settlement after reviewing all financial records.
             $message = 'Your admit card has been published. Tap here to view or download it.';
         } elseif ($type === 'RESULT') {
             $message = 'The examination result has been published. Tap here to view the result.';
+        } elseif ($type === 'UNPUBLISH_SCHEME') {
+            $message = 'The examination scheme has been reverted to draft. Please stay tuned for updates.';
+        } elseif ($type === 'UNPUBLISH_ADMIT_CARD') {
+            $message = 'Your admit card has been reverted to draft. Please stay tuned for updates.';
         }
 
         // Get student and parent user IDs in the class
