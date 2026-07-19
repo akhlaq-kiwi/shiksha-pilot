@@ -8567,22 +8567,6 @@ Only approve the settlement after reviewing all financial records.
                 WHERE exam_id = :exam_id
             ");
             $stmtClassReset->execute([':exam_id' => $id]);
-        } elseif ($status === 'Published' && $exam['status'] === 'Draft') {
-            $stmtClasses = $pdo->prepare("
-                SELECT id FROM classes 
-                WHERE school_id = :sid AND academic_year_id = :ay_id
-            ");
-            $stmtClasses->execute([':sid' => $schoolId, ':ay_id' => $exam['academic_year_id']]);
-            $classes = $stmtClasses->fetchAll(PDO::FETCH_COLUMN);
-
-            foreach ($classes as $cId) {
-                $stmt = $pdo->prepare("
-                    INSERT INTO examination_class_status (exam_id, class_id, status, publish_date)
-                    VALUES (:exam_id, :class_id, 'Published', CURRENT_DATE())
-                    ON DUPLICATE KEY UPDATE status = 'Published', publish_date = CURRENT_DATE()
-                ");
-                $stmt->execute([':exam_id' => $id, ':class_id' => (int)$cId]);
-            }
         }
     }
 

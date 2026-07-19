@@ -80,16 +80,32 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
   String _formatTime(String timeStr) {
     try {
       final parts = timeStr.split(':');
-      if (parts.length >= 2) {
-        final hour = int.parse(parts[0]);
-        final min = parts[1];
-        final period = hour >= 12 ? 'PM' : 'AM';
-        final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
-        return '$displayHour:$min $period';
-      }
-      return timeStr;
+      if (parts.length < 2) return timeStr;
+      int hour = int.parse(parts[0]);
+      final minute = parts[1];
+      final ampm = hour >= 12 ? 'PM' : 'AM';
+      hour = hour % 12;
+      if (hour == 0) hour = 12;
+      return '$hour:$minute $ampm';
     } catch (_) {
       return timeStr;
+    }
+  }
+
+  String _formatMarks(String? marksStr) {
+    if (marksStr == null) return '0';
+    try {
+      final double val = double.parse(marksStr);
+      if (val == val.toInt()) {
+        return val.toInt().toString();
+      }
+      String s = val.toString();
+      if (s.endsWith('.0')) {
+        s = s.substring(0, s.length - 2);
+      }
+      return s;
+    } catch (_) {
+      return marksStr;
     }
   }
 
@@ -164,15 +180,19 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                               const SizedBox(height: 12),
                               Row(
                                 children: [
-                                  Icon(Icons.calendar_today_rounded, size: 14, color: Colors.indigo.shade600),
-                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Date: ',
+                                    style: TextStyle(fontSize: 13, color: Colors.indigo.shade800, fontWeight: FontWeight.bold),
+                                  ),
                                   Text(
                                     _formatDate(date),
                                     style: TextStyle(fontSize: 13, color: Colors.grey.shade700, fontWeight: FontWeight.bold),
                                   ),
-                                  const SizedBox(width: 16),
-                                  Icon(Icons.access_time_rounded, size: 14, color: Colors.indigo.shade600),
-                                  const SizedBox(width: 6),
+                                  const SizedBox(width: 20),
+                                  Text(
+                                    'Time: ',
+                                    style: TextStyle(fontSize: 13, color: Colors.indigo.shade800, fontWeight: FontWeight.bold),
+                                  ),
                                   Text(
                                     '${_formatTime(start)} - ${_formatTime(end)}',
                                     style: TextStyle(fontSize: 13, color: Colors.grey.shade700, fontWeight: FontWeight.bold),
@@ -180,18 +200,9 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                 ],
                               ),
                               const SizedBox(height: 12),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                  Text(
-                                    'Max/Pass: $maxM/$passM',
-                                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
-                                  ),
-                                  Text(
-                                    'Room: $room',
-                                    style: TextStyle(fontSize: 12, color: Colors.indigo.shade800, fontWeight: FontWeight.bold),
-                                  ),
-                                ],
+                              Text(
+                                'Max: ${_formatMarks(maxM)} Marks and Pass: ${_formatMarks(passM)} Marks',
+                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
                               ),
                             ],
                           ),
@@ -1375,7 +1386,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                           ? (widget.userRole == 'TEACHER' ? 'View class performance breakdown' : 'View your report card')
                           : 'Not Published Yet',
                       icon: Icons.workspace_premium_rounded,
-                      isPublished: resultPub,
+                      isPublished: widget.userRole == 'TEACHER' ? true : resultPub,
                       onTap: _showResultModal,
                     ),
                   ],
