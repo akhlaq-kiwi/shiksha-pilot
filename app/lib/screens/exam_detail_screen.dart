@@ -200,9 +200,26 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                 ],
                               ),
                               const SizedBox(height: 12),
-                              Text(
-                                'Max: ${_formatMarks(maxM)} Marks and Pass: ${_formatMarks(passM)} Marks',
-                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
+                              Row(
+                                children: [
+                                  Text(
+                                    'Max: ',
+                                    style: TextStyle(fontSize: 12, color: Colors.indigo.shade800, fontWeight: FontWeight.bold),
+                                  ),
+                                  Text(
+                                    '${_formatMarks(maxM)} Marks',
+                                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
+                                  ),
+                                  const SizedBox(width: 20),
+                                  Text(
+                                    'Pass: ',
+                                    style: TextStyle(fontSize: 12, color: Colors.indigo.shade800, fontWeight: FontWeight.bold),
+                                  ),
+                                  Text(
+                                    '${_formatMarks(passM)} Marks',
+                                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
