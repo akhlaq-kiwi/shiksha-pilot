@@ -799,7 +799,7 @@ class StudentService extends BaseService
             FROM examinations e
             JOIN examination_papers ep ON e.id = ep.exam_id
             LEFT JOIN examination_class_status ecs ON e.id = ecs.exam_id AND ecs.class_id = :class_id_1
-            WHERE ep.class_id = :class_id_2 AND e.school_id = :school_id
+            WHERE ep.class_id = :class_id_2 AND e.school_id = :school_id AND e.status = 'Published'
             ORDER BY e.start_date DESC
         ");
         $stmt->execute([
@@ -853,7 +853,7 @@ class StudentService extends BaseService
         $resultPublished = ($statusInfo && $statusInfo['result_status'] === 'Published') ? 1 : 0;
 
         // Fetch Exam basic info
-        $stmtExam = $pdo->prepare("SELECT name, start_date, end_date FROM examinations WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtExam = $pdo->prepare("SELECT name, start_date, end_date FROM examinations WHERE id = :id AND school_id = :sid AND status = 'Published' LIMIT 1");
         $stmtExam->execute([':id' => $examId, ':sid' => $schoolId]);
         $exam = $stmtExam->fetch(PDO::FETCH_ASSOC);
         if (!$exam) {
