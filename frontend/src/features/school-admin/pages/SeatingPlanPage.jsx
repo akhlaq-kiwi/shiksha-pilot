@@ -1109,6 +1109,10 @@ export default function SeatingPlanPage() {
           </div>
         }
       >
+        <div className="space-y-3">
+          <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed font-medium">
+            You are about to publish the admit cards. Once published, students will be able to access the admit cards in the mobile application. Do you want to continue?
+          </p>
         </div>
       </Dialog>
 
