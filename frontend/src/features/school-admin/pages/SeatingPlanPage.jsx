@@ -87,8 +87,11 @@ export default function SeatingPlanPage() {
 
           if (planDetails && planDetails.plan) {
             setGeneratedPlan(planDetails);
-            // Pre-populate configs
-            setSelectedClassIds(planDetails.plan.room_configs ? planDetails.plan.room_configs.map(rc => rc.class_id).filter(Boolean) : []);
+            // Pre-populate configs by extracting class IDs from actual seating allocations
+            const classIdsFromAllocations = planDetails.allocations 
+              ? Array.from(new Set(planDetails.allocations.map(a => Number(a.class_id)).filter(Boolean)))
+              : [];
+            setSelectedClassIds(classIdsFromAllocations);
             setStudentsPerBench(String(planDetails.plan.students_per_bench));
             setRoomConfigs(planDetails.plan.room_configs || []);
             setRoomCount(String(planDetails.plan.room_configs ? planDetails.plan.room_configs.length : 1));

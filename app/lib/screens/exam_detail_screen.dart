@@ -1,5 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:school_hub/services/exam_service.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:file_picker/file_picker.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:flutter/services.dart';
 
 class ExamDetailScreen extends StatefulWidget {
   final ExamService examService;
@@ -24,6 +31,7 @@ class ExamDetailScreen extends StatefulWidget {
 class _ExamDetailScreenState extends State<ExamDetailScreen> {
   Map<String, dynamic> _details = {};
   bool _isLoading = true;
+  bool _isDownloading = false;
   String? _errorMessage;
 
   @override
@@ -197,120 +205,719 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
     );
   }
 
-  void _showAdmitCardModal() {
-    final Map<String, dynamic>? admit = _details['admit_card'] != null 
-        ? Map<String, dynamic>.from(_details['admit_card']) 
-        : null;
+  String _getFullPositionName(String pos) {
+    if (pos == 'L' || pos.toLowerCase() == 'left') return 'LEFT';
+    if (pos == 'M' || pos.toLowerCase() == 'middle' || pos.toLowerCase() == 'center') return 'CENTER';
+    if (pos == 'R' || pos.toLowerCase() == 'right') return 'RIGHT';
+    return pos;
+  }
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.6,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(24),
-            topRight: Radius.circular(24),
+  void _showToast(String message) {
+    if (!mounted) return;
+    final overlay = Overlay.of(context);
+    final overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        bottom: 100,
+        left: 24,
+        right: 24,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade900.withOpacity(0.9),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.check_circle_rounded, color: Colors.green, size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    message,
+                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-        child: Column(
-          children: [
-            const SizedBox(height: 12),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
+      ),
+    );
+
+    overlay.insert(overlayEntry);
+    Future.delayed(const Duration(seconds: 3), () {
+      overlayEntry.remove();
+    });
+  }
+
+  void _showErrorToast(String message) {
+    if (!mounted) return;
+    final overlay = Overlay.of(context);
+    final overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        bottom: 100,
+        left: 24,
+        right: 24,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.red.shade900.withOpacity(0.9),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline_rounded, color: Colors.white, size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    message,
+                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    overlay.insert(overlayEntry);
+    Future.delayed(const Duration(seconds: 3), () {
+      overlayEntry.remove();
+    });
+  }
+
+  Future<void> _downloadAdmitCardPDF(Map<String, dynamic> admit, StateSetter setModalState) async {
+    setModalState(() {
+      _isDownloading = true;
+    });
+    try {
+      final pdf = pw.Document();
+      
+      final String rawAcademicYear = (admit['academic_year'] ?? '2026-2027').toString();
+      final String academicYear = rawAcademicYear
+          .replaceAll('–', '-')
+          .replaceAll('—', '-')
+          .replaceAll('−', '-');
+
+      pdf.addPage(
+        pw.Page(
+          pageFormat: const PdfPageFormat(406, 296, marginAll: 3),
+          build: (pw.Context context) {
+            return pw.Container(
+              width: 400,
+              height: 290,
+              padding: const pw.EdgeInsets.all(16),
+              decoration: pw.BoxDecoration(
+                color: PdfColors.white,
+                borderRadius: pw.BorderRadius.circular(16),
+                border: pw.Border.all(color: PdfColors.black, width: 3),
               ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Examination Admit Card',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.black87),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              widget.examName,
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
-            ),
-            const Divider(height: 24),
-            Expanded(
-              child: admit == null
-                  ? const Center(child: Text('No seating allocation details found.'))
-                  : SingleChildScrollView(
-                      padding: const EdgeInsets.all(24),
-                      child: Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.indigo.shade100, width: 2),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.indigo.shade50.withOpacity(0.5),
-                              blurRadius: 15,
-                              offset: const Offset(0, 5),
-                            ),
-                          ],
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                mainAxisSize: pw.MainAxisSize.max,
+                children: [
+                  pw.Center(
+                    child: pw.Text(
+                      (admit['school_name'] ?? 'School Name').toString().toUpperCase(),
+                      style: pw.TextStyle(
+                        fontSize: 16,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.black,
+                      ),
+                      textAlign: pw.TextAlign.center,
+                    ),
+                  ),
+                  pw.SizedBox(height: 8),
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Text(
+                        widget.examName.toUpperCase(),
+                        style: pw.TextStyle(
+                          fontSize: 10,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.black,
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      ),
+                      pw.Text(
+                        'AY ${academicYear.toUpperCase()}',
+                        style: pw.TextStyle(
+                          fontSize: 10,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.black,
+                        ),
+                      ),
+                    ],
+                  ),
+                  pw.SizedBox(height: 4),
+                  pw.Divider(color: PdfColors.black, thickness: 2),
+                  pw.SizedBox(height: 6),
+                  pw.Text(
+                    'CANDIDATE NAME',
+                    style: const pw.TextStyle(
+                      fontSize: 8,
+                      color: PdfColors.grey600,
+                    ),
+                  ),
+                  pw.SizedBox(height: 2),
+                  pw.Text(
+                    (admit['student_name'] ?? 'STUDENT NAME').toString().toUpperCase(),
+                    style: pw.TextStyle(
+                      fontSize: 18,
+                      fontWeight: pw.FontWeight.bold,
+                      color: PdfColors.black,
+                    ),
+                  ),
+                  pw.SizedBox(height: 12),
+                  pw.Row(
+                    children: [
+                      pw.Expanded(
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
                           children: [
-                            Center(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: Colors.indigo.shade50,
-                                  borderRadius: BorderRadius.circular(30),
-                                ),
-                                child: Text(
-                                  'OFFICIAL ADMIT CARD',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w900,
-                                    color: Colors.indigo.shade800,
-                                    letterSpacing: 1.2,
-                                  ),
-                                ),
+                            pw.Text(
+                              'CLASS',
+                              style: const pw.TextStyle(
+                                fontSize: 8,
+                                color: PdfColors.grey600,
                               ),
                             ),
-                            const SizedBox(height: 24),
-                            _buildInfoRow('Exam Name', widget.examName),
-                            const Divider(height: 20),
-                            _buildInfoRow('Seat Number', admit['seat_number']?.toString() ?? '—', isHighlight: true),
-                            const Divider(height: 20),
-                            _buildInfoRow('Room / Hall', admit['room']?.toString() ?? '—', isHighlight: true),
-                            const SizedBox(height: 24),
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.amber.shade50,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.amber.shade200),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.info_outline_rounded, color: Colors.amber.shade800, size: 20),
-                                  const SizedBox(width: 10),
-                                  const Expanded(
-                                    child: Text(
-                                      'Please carry this admit card info. Verification will be done before entering the exam room.',
-                                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87),
-                                    ),
-                                  ),
-                                ],
+                            pw.SizedBox(height: 2),
+                            pw.Text(
+                              (admit['class_name'] ?? 'CLASS').toString().toUpperCase(),
+                              style: pw.TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: PdfColors.black,
                               ),
                             ),
                           ],
                         ),
                       ),
+                      pw.Expanded(
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Text(
+                              'ROLL NUMBER',
+                              style: const pw.TextStyle(
+                                fontSize: 8,
+                                color: PdfColors.grey600,
+                              ),
+                            ),
+                            pw.SizedBox(height: 2),
+                            pw.Text(
+                              (admit['roll_no'] ?? '—').toString().toUpperCase(),
+                              style: pw.TextStyle(
+                                fontSize: 13,
+                                fontWeight: pw.FontWeight.bold,
+                                color: PdfColors.black,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  pw.SizedBox(height: 10),
+                  pw.Divider(color: PdfColors.grey300, thickness: 1),
+                  pw.SizedBox(height: 10),
+                  pw.Row(
+                    children: [
+                      pw.Expanded(
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Text(
+                              'EXAM ROOM',
+                              style: const pw.TextStyle(
+                                fontSize: 8,
+                                color: PdfColors.grey600,
+                              ),
+                            ),
+                            pw.SizedBox(height: 2),
+                            pw.Text(
+                              (admit['room_name'] ?? '—').toString().toUpperCase(),
+                              style: pw.TextStyle(
+                                fontSize: 13,
+                                fontWeight: pw.FontWeight.bold,
+                                color: PdfColors.black,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      pw.Expanded(
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Text(
+                              'BENCH',
+                              style: const pw.TextStyle(
+                                fontSize: 8,
+                                color: PdfColors.grey600,
+                              ),
+                            ),
+                            pw.SizedBox(height: 2),
+                            pw.Text(
+                              'BENCH ${admit['bench_number'] ?? '—'}'.toUpperCase(),
+                              style: pw.TextStyle(
+                                fontSize: 13,
+                                fontWeight: pw.FontWeight.bold,
+                                color: PdfColors.black,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      pw.Expanded(
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Text(
+                              'POSITION',
+                              style: const pw.TextStyle(
+                                fontSize: 8,
+                                color: PdfColors.grey600,
+                              ),
+                            ),
+                            pw.SizedBox(height: 2),
+                            pw.Text(
+                              _getFullPositionName(admit['seat_position']?.toString() ?? '—').toUpperCase(),
+                              style: pw.TextStyle(
+                                fontSize: 13,
+                                fontWeight: pw.FontWeight.bold,
+                                color: PdfColors.black,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  pw.Spacer(),
+                  pw.Divider(color: PdfColors.grey300, thickness: 1),
+                  pw.SizedBox(height: 4),
+                  pw.Center(
+                    child: pw.Text(
+                      'OFFICIAL ADMIT CARD',
+                      style: const pw.TextStyle(
+                        fontSize: 10,
+                        color: PdfColors.grey500,
+                      ),
                     ),
-            ),
-          ],
+                  ),
+                ],
+              ),
+            );
+          },
         ),
+      );
+
+      final pdfBytes = await pdf.save();
+      final timestamp = DateTime.now().millisecondsSinceEpoch.toString().substring(8);
+      final defaultFilename = 'Admit_Card_${(admit['student_name'] ?? 'Student').toString().replaceAll(RegExp(r'\s+'), '_')}_$timestamp.pdf';
+      
+      String? savedPath;
+
+      if (Platform.isAndroid) {
+        const platform = MethodChannel('com.shikshapilot.schoolhub/battery');
+        try {
+          final savedUri = await platform.invokeMethod<String>(
+            'saveFileToDownloads',
+            {
+              'fileName': defaultFilename,
+              'bytes': pdfBytes,
+            },
+          );
+          savedPath = savedUri;
+        } catch (e) {
+          debugPrint('MethodChannel save failed: $e');
+          final appExternalDir = await getExternalStorageDirectory();
+          if (appExternalDir != null) {
+            final fallbackFile = File('${appExternalDir.path}/$defaultFilename');
+            await fallbackFile.writeAsBytes(pdfBytes);
+            savedPath = fallbackFile.path;
+          }
+        }
+      } else {
+        final appDocDir = await getApplicationDocumentsDirectory();
+        final file = File('${appDocDir.path}/$defaultFilename');
+        await file.writeAsBytes(pdfBytes);
+        savedPath = file.path;
+      }
+
+      if (savedPath != null) {
+        _showToast('Downloaded successfully');
+      } else {
+        _showErrorToast('Failed to download Admit Card.');
+      }
+    } catch (e) {
+      _showErrorToast('Failed to download Admit Card: ${e.toString()}');
+    } finally {
+      setModalState(() {
+        _isDownloading = false;
+      });
+    }
+  }
+
+  void _showAdmitCardModal() {
+    final Map<String, dynamic>? admit = _details['admit_card'] != null 
+        ? Map<String, dynamic>.from(_details['admit_card']) 
+        : null;
+
+    final String rawAcademicYear = admit != null ? (admit['academic_year'] ?? '2026-2027').toString() : '2026-2027';
+    final String academicYear = rawAcademicYear
+        .replaceAll('–', '-')
+        .replaceAll('—', '-')
+        .replaceAll('−', '-');
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => StatefulBuilder(
+        builder: (BuildContext context, StateSetter setModalState) {
+          return Container(
+            height: MediaQuery.of(context).size.height * 0.85,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(24),
+                topRight: Radius.circular(24),
+              ),
+            ),
+            child: Column(
+              children: [
+                const SizedBox(height: 12),
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Examination Admit Card',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.black87),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  widget.examName,
+                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
+                ),
+                const Divider(height: 24),
+                Expanded(
+                  child: admit == null
+                      ? const Center(child: Text('No seating allocation details found.'))
+                      : SingleChildScrollView(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            children: [
+                              AspectRatio(
+                                aspectRatio: 1.38,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: Colors.black, width: 3),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Center(
+                                        child: Text(
+                                          (admit['school_name'] ?? 'School Name').toString().toUpperCase(),
+                                          style: const TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w900,
+                                            color: Colors.black,
+                                            letterSpacing: 0.5,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(
+                                            widget.examName.toUpperCase(),
+                                            style: const TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w900,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
+                                          Text(
+                                            'AY ${academicYear.toUpperCase()}',
+                                            style: const TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w900,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 2),
+                                      const Divider(color: Colors.black, thickness: 2, height: 6),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        'CANDIDATE NAME',
+                                        style: TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.grey.shade600,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        (admit['student_name'] ?? 'STUDENT NAME').toString().toUpperCase(),
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w900,
+                                          color: Colors.black,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 10),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  'CLASS',
+                                                  style: TextStyle(
+                                                    fontSize: 9,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.grey.shade600,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  (admit['class_name'] ?? 'CLASS').toString().toUpperCase(),
+                                                  style: const TextStyle(
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.w900,
+                                                    color: Colors.black,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  'ROLL NUMBER',
+                                                  style: TextStyle(
+                                                    fontSize: 9,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.grey.shade600,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  (admit['roll_no'] ?? '—').toString().toUpperCase(),
+                                                  style: const TextStyle(
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.w900,
+                                                    color: Colors.black,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Divider(color: Colors.grey.shade300, thickness: 1, height: 6),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  'EXAM ROOM',
+                                                  style: TextStyle(
+                                                    fontSize: 9,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.grey.shade600,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  (admit['room_name'] ?? '—').toString().toUpperCase(),
+                                                  style: const TextStyle(
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.w900,
+                                                    color: Colors.black,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  'BENCH',
+                                                  style: TextStyle(
+                                                    fontSize: 9,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.grey.shade600,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  'BENCH ${admit['bench_number'] ?? '—'}'.toUpperCase(),
+                                                  style: const TextStyle(
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.w900,
+                                                    color: Colors.black,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  'POSITION',
+                                                  style: TextStyle(
+                                                    fontSize: 9,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.grey.shade600,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  _getFullPositionName(admit['seat_position']?.toString() ?? '—').toUpperCase(),
+                                                  style: const TextStyle(
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.w900,
+                                                    color: Colors.black,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const Spacer(),
+                                      Divider(color: Colors.grey.shade300, thickness: 1, height: 6),
+                                      const SizedBox(height: 4),
+                                      Center(
+                                        child: Text(
+                                          'OFFICIAL ADMIT CARD',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.grey.shade500,
+                                            letterSpacing: 1.2,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              ElevatedButton.icon(
+                                onPressed: _isDownloading ? null : () => _downloadAdmitCardPDF(admit, setModalState),
+                                icon: _isDownloading
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Icon(Icons.download_rounded),
+                                label: Text(_isDownloading ? 'Downloading...' : 'Download Admit Card (PDF)'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.black,
+                                  foregroundColor: Colors.white,
+                                  minimumSize: const Size.fromHeight(50),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.amber.shade50,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.amber.shade200),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.info_outline_rounded, color: Colors.amber.shade800, size: 20),
+                                    const SizedBox(width: 10),
+                                    const Expanded(
+                                      child: Text(
+                                        'Please carry this admit card info. Verification will be done before entering the exam room.',
+                                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

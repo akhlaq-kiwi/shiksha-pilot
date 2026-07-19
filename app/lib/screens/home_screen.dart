@@ -187,7 +187,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _activeStudentId = widget.selectedStudentId;
     _loadSessionInfo();
     _fetchChildrenList();
-    _notifTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+    _notifTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
       _fetchUnreadNotificationsCount();
     });
     // Request ignoring battery optimizations so that WorkManager runs instantly in the background!

@@ -888,9 +888,15 @@ class StudentService extends BaseService
         // 3. Fetch admit card if published
         if ($admitCardPublished) {
             $stmtAdmit = $pdo->prepare("
-                SELECT esa.seat_number, esa.room
+                SELECT esa.seat_number, esa.room_name, esa.bench_number, esa.seat_position,
+                       s.name AS school_name, ay.name AS academic_year, c.name AS class_name,
+                       std.name AS student_name, std.roll_no
                 FROM examination_seating_allocations esa
                 JOIN examination_seating_plans esp ON esa.seating_plan_id = esp.id
+                JOIN academic_years ay ON esp.academic_year_id = ay.id
+                JOIN schools s ON esp.school_id = s.id
+                JOIN students std ON esa.student_id = std.id
+                LEFT JOIN classes c ON std.class_id = c.id
                 WHERE esp.exam_id = :exam_id AND esa.student_id = :student_id
                 LIMIT 1
             ");
@@ -898,8 +904,15 @@ class StudentService extends BaseService
             $admit = $stmtAdmit->fetch(PDO::FETCH_ASSOC);
             if ($admit) {
                 $response['admit_card'] = [
+                    'school_name' => $admit['school_name'],
+                    'academic_year' => $admit['academic_year'],
+                    'student_name' => $admit['student_name'],
+                    'class_name' => $admit['class_name'] ?: '—',
+                    'roll_no' => $admit['roll_no'] ?: '—',
+                    'room_name' => $admit['room_name'],
+                    'bench_number' => $admit['bench_number'],
+                    'seat_position' => $admit['seat_position'],
                     'seat_number' => $admit['seat_number'],
-                    'room' => $admit['room'] ?: 'As scheduled'
                 ];
             }
         }

@@ -5,6 +5,9 @@ import 'notice_screen.dart';
 import 'timetable_screen.dart';
 import 'leave_list_screen.dart';
 import '../services/leave_service.dart';
+import 'exam_list_screen.dart';
+import 'exam_detail_screen.dart';
+import '../services/exam_service.dart';
 
 class NotificationCenterScreen extends StatefulWidget {
   final String baseUrl;
@@ -238,6 +241,80 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                     ),
                                   ),
                                 );
+                                return;
+                              }
+
+                              if (linkStr.contains('exams') || titleLower.contains('admit card') || msgLower.contains('admit card') || titleLower.contains('exam') || msgLower.contains('exam')) {
+                                showDialog(
+                                  context: context,
+                                  barrierDismissible: false,
+                                  builder: (context) => const Center(child: CircularProgressIndicator()),
+                                );
+
+                                try {
+                                  final examService = ExamService(
+                                    baseUrl: widget.baseUrl,
+                                    token: widget.token,
+                                  );
+                                  final userRole = widget.studentId != null ? 'PARENT' : 'STUDENT';
+                                  final exams = await examService.getExamsList(userRole, widget.studentId);
+                                  
+                                  if (Navigator.canPop(context)) {
+                                    Navigator.pop(context);
+                                  }
+
+                                  final targetExam = exams.firstWhere(
+                                    (e) => e['name'].toString().trim().toLowerCase() == notif['title'].toString().trim().toLowerCase(),
+                                    orElse: () => null,
+                                  );
+
+                                  if (context.mounted) {
+                                    if (targetExam != null) {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => ExamDetailScreen(
+                                            examService: examService,
+                                            examId: targetExam['id'] as int,
+                                            examName: targetExam['name'] ?? 'Exam Detail',
+                                            userRole: userRole,
+                                            studentId: widget.studentId,
+                                          ),
+                                        ),
+                                      );
+                                    } else {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => ExamListScreen(
+                                            examService: examService,
+                                            userRole: userRole,
+                                            selectedStudentId: widget.studentId,
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  }
+                                } catch (_) {
+                                  if (Navigator.canPop(context)) {
+                                    Navigator.pop(context);
+                                  }
+                                  if (context.mounted) {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => ExamListScreen(
+                                          examService: ExamService(
+                                            baseUrl: widget.baseUrl,
+                                            token: widget.token,
+                                          ),
+                                          userRole: widget.studentId != null ? 'PARENT' : 'STUDENT',
+                                          selectedStudentId: widget.studentId,
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                }
                                 return;
                               }
 
