@@ -32,6 +32,14 @@ class SchoolAdminService extends BaseService
         parent::__construct($logger);
     }
 
+    private function isDateHoliday(int $schoolId, string $date): bool
+    {
+        $pdo = $this->classRepo->getPdo();
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM holidays WHERE school_id = :sid AND date = :date");
+        $stmt->execute([':sid' => $schoolId, ':date' => $date]);
+        return ((int)$stmt->fetchColumn()) > 0;
+    }
+
     public function pasteTimetableSchedule(array $user, array $data): void
     {
         $pdo = $this->classRepo->getPdo();
@@ -45,6 +53,10 @@ class SchoolAdminService extends BaseService
         $sourceDay = $data['source_day'];
         $destDay = $data['destination_day'];
         $destDate = $data['destination_date'];
+
+        if ($this->isDateHoliday($schoolId, $destDate)) {
+            throw new ValidationException(['date' => 'Cannot create or publish timetable on a school holiday.']);
+        }
 
         $startDate = $destDate;
 
@@ -1232,6 +1244,118 @@ class SchoolAdminService extends BaseService
         return $this->studentRepo->findDetailById($schoolId, $id);
     }
 
+    public function advanceStudent(array $user, int $id, int $targetClassId): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $student = $this->studentRepo->findById($id);
+        if ($student === null || (int)$student['school_id'] !== $schoolId) {
+            throw new NotFoundException('Student not found');
+        }
+
+        $pdo = $this->studentRepo->getPdo();
+        $this->requireWritableAcademicYear($pdo, $schoolId);
+
+        // 1. Validate that student is active
+        if (($student['status'] ?? 'ACTIVE') !== 'ACTIVE') {
+            throw new ValidationException(['status' => 'Only active students can be advanced.']);
+        }
+
+        // 2. Fetch target class details
+        $stmtC = $pdo->prepare("SELECT * FROM classes WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtC->execute([':id' => $targetClassId, ':sid' => $schoolId]);
+        $targetClass = $stmtC->fetch(PDO::FETCH_ASSOC);
+        if (!$targetClass) {
+            throw new NotFoundException('Target class not found');
+        }
+
+        // 3. Fetch current class details
+        $currentClassId = (int)$student['class_id'];
+        $stmtCurr = $pdo->prepare("SELECT * FROM classes WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtCurr->execute([':id' => $currentClassId, ':sid' => $schoolId]);
+        $currentClass = $stmtCurr->fetch(PDO::FETCH_ASSOC);
+        if (!$currentClass) {
+            throw new NotFoundException('Current class not found');
+        }
+
+        // 4. Validate that target class is higher than current class
+        $currentClassName = $currentClass['name'];
+        $targetClassName = $targetClass['name'];
+
+        $classOrder = ['Nursery', 'LKG', 'UKG', 'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5', 'Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10', 'Class 11', 'Class 12'];
+
+        $currentClassIndex = -1;
+        foreach ($classOrder as $idx => $cName) {
+            if (strcasecmp(trim($currentClassName), $cName) === 0) {
+                $currentClassIndex = $idx;
+                break;
+            }
+        }
+
+        $targetClassIndex = -1;
+        foreach ($classOrder as $idx => $cName) {
+            if (strcasecmp(trim($targetClassName), $cName) === 0) {
+                $targetClassIndex = $idx;
+                break;
+            }
+        }
+
+        // Fallbacks for numeric class parsing
+        if ($currentClassIndex === -1 && preg_match('/Class\s+(\d+)/i', $currentClassName, $matches)) {
+            $currentClassIndex = 2 + (int)$matches[1];
+        }
+        if ($targetClassIndex === -1 && preg_match('/Class\s+(\d+)/i', $targetClassName, $matches)) {
+            $targetClassIndex = 2 + (int)$matches[1];
+        }
+
+        if ($targetClassIndex <= $currentClassIndex) {
+            throw new ValidationException(['class_id' => 'Only higher classes are allowed.']);
+        }
+
+        // 5. Auto-calculate new Roll Number in the target class
+        $rollNo = $student['roll_no'];
+        $academicYearId = (int)$student['academic_year_id'];
+        if ($academicYearId <= 0) {
+            $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+            $academicYearId = $workingYear ? (int)$workingYear['id'] : 0;
+        }
+
+        if ($targetClassId !== $currentClassId && $academicYearId > 0) {
+            $stmtRoll = $pdo->prepare("
+                SELECT MAX(CAST(roll_no AS UNSIGNED)) 
+                FROM students 
+                WHERE class_id = :class_id AND academic_year_id = :academic_year_id AND school_id = :school_id
+            ");
+            $stmtRoll->execute([
+                ':class_id' => $targetClassId,
+                ':academic_year_id' => $academicYearId,
+                ':school_id' => $schoolId
+            ]);
+            $maxRoll = (int)$stmtRoll->fetchColumn();
+            $rollNo = (string)($maxRoll + 1);
+        }
+
+        // 6. Update student record
+        $this->studentRepo->update($id, [
+            'class_id' => $targetClassId,
+            'roll_no' => $rollNo
+        ]);
+
+        // 7. Write Audit Log
+        $module = 'Classes';
+        $action = 'Student Advanced';
+        $actorName = $user['name'] ?? $user['email'] ?? $user['phone'] ?? 'School Admin';
+        $studentName = $student['name'];
+        
+        $desc = "Student Advanced\nStudent: " . $studentName . "\nPrevious Class: " . $currentClassName . "\nAdvanced To: " . $targetClassName . "\nAdvanced By: " . $actorName . "\nDate: " . date('d F Y');
+
+        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+        $ayName = $workingYear ? $workingYear['name'] : null;
+        $this->logAudit($pdo, $user, $module, $action, $desc, $ayName);
+
+        return $this->studentRepo->findDetailById($schoolId, $id);
+    }
+
+
     public function handleFileUpload($uploadedFile): string
     {
         // QA uses '/api' as the deployment folder, Local uses '/backend'
@@ -2207,63 +2331,15 @@ class SchoolAdminService extends BaseService
                         $newClassId = (int)$pdo->lastInsertId();
                         $classMap[(int)$oc['id']] = $newClassId;
                     }
-                }
-
-                // 4. Duplicate subjects to new classes (assigning teacher only if migrated)
-                $subjectMap = []; // [old_subject_id => new_subject_id]
-                $stmtSubjects = $pdo->prepare("SELECT * FROM subjects WHERE school_id = :sid AND class_id IS NOT NULL");
+                       // 4. Duplicate subjects - no longer needed since they are school-level master subjects.
+                // We just map the subject IDs to themselves to maintain compatibility.
+                $subjectMap = []; 
+                $stmtSubjects = $pdo->prepare("SELECT id FROM subjects WHERE school_id = :sid");
                 $stmtSubjects->execute([':sid' => $schoolId]);
-                $oldSubjects = $stmtSubjects->fetchAll(PDO::FETCH_ASSOC);
-
-                $oldClassIds = array_keys($classMap);
-                $teacherMigrations = $body['teacher_migrations'] ?? []; // Array of staff.id checked for migration
-
-                $stmtFindSubject = $pdo->prepare("
-                    SELECT id FROM subjects 
-                    WHERE school_id = :sid 
-                      AND class_id = :class_id 
-                      AND name = :name
-                    LIMIT 1
-                ");
-                $stmtInsSubj = $pdo->prepare("INSERT INTO subjects (school_id, name, code, class_id, teacher_id) VALUES (:school_id, :name, :code, :class_id, :teacher_id)");
-                foreach ($oldSubjects as $os) {
-                    $oldClassId = (int)$os['class_id'];
-                    if (in_array($oldClassId, $oldClassIds, true)) {
-                        $newClassId = $classMap[$oldClassId];
-
-                        $teacherId = null;
-                        if ($os['teacher_id'] !== null) {
-                            // Find matching staff record by email and prev academic year
-                            $stmtStaff = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND academic_year_id = :prev_ayid AND email = (SELECT email FROM users WHERE id = :uid LIMIT 1) LIMIT 1");
-                            $stmtStaff->execute([':sid' => $schoolId, ':prev_ayid' => $prevYearId, ':uid' => $os['teacher_id']]);
-                            $staffId = $stmtStaff->fetchColumn();
-                            if ($staffId !== false && in_array((int)$staffId, $teacherMigrations, true)) {
-                                $teacherId = $os['teacher_id'];
-                            }
-                        }
-
-                        // Check if subject already exists
-                        $stmtFindSubject->execute([
-                            ':sid' => $schoolId,
-                            ':class_id' => $newClassId,
-                            ':name' => $os['name']
-                        ]);
-                        $existingSubjId = $stmtFindSubject->fetchColumn();
-                        if ($existingSubjId !== false) {
-                            $subjectMap[(int)$os['id']] = (int)$existingSubjId;
-                        } else {
-                            $stmtInsSubj->execute([
-                                ':school_id' => $schoolId,
-                                ':name' => $os['name'],
-                                ':code' => $os['code'],
-                                ':class_id' => $newClassId,
-                                ':teacher_id' => $teacherId
-                            ]);
-                            $newSubjectId = (int)$pdo->lastInsertId();
-                            $subjectMap[(int)$os['id']] = $newSubjectId;
-                        }
-                    }
-                }
+                $subjectIds = $stmtSubjects->fetchAll(PDO::FETCH_COLUMN) ?: [];
+                foreach ($subjectIds as $sid) {
+                    $subjectMap[(int)$sid] = (int)$sid;
+                }             }
 
                 // 4. Duplicate timetable entries
                 $stmtTimetable = $pdo->prepare("SELECT * FROM timetable WHERE school_id = :sid AND class_id IS NOT NULL");
@@ -2535,6 +2611,29 @@ class SchoolAdminService extends BaseService
                                 ':user' => $user['email'] ?? 'admin',
                                 ':ip_address' => '127.0.0.1'
                             ]);
+                            // Migrate Transport Fee if student had one
+                            $stmtTrans = $pdo->prepare("SELECT * FROM student_transport_fees WHERE school_id = :sid AND academic_year_id = :prev_ayid AND student_id = :prev_stu_id LIMIT 1");
+                            $stmtTrans->execute([':sid' => $schoolId, ':prev_ayid' => $prevYearId, ':prev_stu_id' => $studentId]);
+                            $oldTrans = $stmtTrans->fetch(PDO::FETCH_ASSOC);
+                            if ($oldTrans) {
+                                // Check if already exists in new academic year
+                                $stmtCheckTrans = $pdo->prepare("SELECT COUNT(*) FROM student_transport_fees WHERE school_id = :sid AND academic_year_id = :new_ayid AND student_id = :new_stu_id");
+                                $stmtCheckTrans->execute([':sid' => $schoolId, ':new_ayid' => $newYearId, ':new_stu_id' => $newStudentId]);
+                                if ((int)$stmtCheckTrans->fetchColumn() === 0) {
+                                    $stmtInsTrans = $pdo->prepare("
+                                        INSERT INTO student_transport_fees (school_id, academic_year_id, student_id, monthly_fee, start_date, status)
+                                        VALUES (:sid, :new_ayid, :new_stu_id, :monthly_fee, :start_date, :status)
+                                    ");
+                                    $stmtInsTrans->execute([
+                                        ':sid' => $schoolId,
+                                        ':new_ayid' => $newYearId,
+                                        ':new_stu_id' => $newStudentId,
+                                        ':monthly_fee' => $oldTrans['monthly_fee'],
+                                        ':start_date' => $oldTrans['start_date'],
+                                        ':status' => $oldTrans['status']
+                                    ]);
+                                }
+                            }
                         }
                     } elseif ($action === 'graduate_alumni') {
                         $studentsGraduatedCount++;
@@ -2709,6 +2808,8 @@ class SchoolAdminService extends BaseService
 
     public function getStudentOutstandingBalanceForYear(PDO $pdo, int $studentId, int $schoolId, int $academicYearId): float
     {
+        $this->syncTransportFees($schoolId, $academicYearId, $pdo);
+
         $stmtStu = $pdo->prepare("SELECT class_id FROM students WHERE id = :id AND school_id = :sid LIMIT 1");
         $stmtStu->execute([':id' => $studentId, ':sid' => $schoolId]);
         $classId = $stmtStu->fetchColumn();
@@ -3355,6 +3456,10 @@ class SchoolAdminService extends BaseService
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
         $startDate = $data['start_date'] ?? ($workingYear ? $workingYear['start_date'] : date('Y-m-d'));
 
+        if ($this->isDateHoliday($schoolId, $startDate)) {
+            throw new ValidationException(['date' => 'Cannot create or publish timetable on a school holiday.']);
+        }
+
         $stmtTeacherCheck = $pdo->prepare("
             SELECT t.id, c.name AS class_name FROM timetable t
             JOIN classes c ON t.class_id = c.id
@@ -3509,6 +3614,10 @@ class SchoolAdminService extends BaseService
             throw new ValidationException(['fields' => 'All fields (timetable ID, date, backup teacher) are required.']);
         }
 
+        if ($this->isDateHoliday($schoolId, $data['date'])) {
+            throw new ValidationException(['date' => 'Cannot create or publish timetable on a school holiday.']);
+        }
+
         if ($this->isPastWeek($data['date'])) {
             throw new ValidationException(['date' => 'Past weeks are locked and cannot be edited.']);
         }
@@ -3602,6 +3711,10 @@ class SchoolAdminService extends BaseService
 
         if (empty($data['timetable_id']) || empty($data['date']) || empty($data['new_teacher_id'])) {
             throw new ValidationException(['fields' => 'All fields (timetable ID, date, new teacher) are required.']);
+        }
+
+        if ($this->isDateHoliday($schoolId, $data['date'])) {
+            throw new ValidationException(['date' => 'Cannot create or publish timetable on a school holiday.']);
         }
 
         $stmtEntry = $pdo->prepare("SELECT * FROM timetable WHERE id = :id AND school_id = :sid");
@@ -3732,6 +3845,30 @@ class SchoolAdminService extends BaseService
         }
 
         $dayOfWeek = $data['day_of_week'] ?? null;
+
+        if (!empty($data['date'])) {
+            if ($dayOfWeek) {
+                if ($this->isDateHoliday($schoolId, $data['date'])) {
+                    throw new ValidationException(['date' => 'Cannot create or publish timetable on a school holiday.']);
+                }
+            } else {
+                $baseDate = new \DateTime($data['date']);
+                $dayOfWeekNum = (int)$baseDate->format('N'); // 1 = Monday, 7 = Sunday
+                if ($dayOfWeekNum !== 1) {
+                    $baseDate->modify('last monday');
+                }
+                
+                for ($i = 0; $i < 6; $i++) {
+                    $currentDay = clone $baseDate;
+                    $currentDay->modify("+$i days");
+                    $currentDayStr = $currentDay->format('Y-m-d');
+                    
+                    if ($this->isDateHoliday($schoolId, $currentDayStr)) {
+                        throw new ValidationException(['date' => 'Cannot create or publish timetable on a school holiday.']);
+                    }
+                }
+            }
+        }
         if ($dayOfWeek) {
             $stmtPublish = $pdo->prepare("
                 UPDATE timetable 
@@ -3761,27 +3898,14 @@ class SchoolAdminService extends BaseService
         $pdo  = $this->classRepo->getPdo();
         $schoolId = $this->getSchoolId($user);
 
-        if ($classId) {
-            $stmt = $pdo->prepare("
-                SELECT s.*, c.name AS class_name, st.name AS teacher_name
-                FROM subjects s
-                LEFT JOIN classes c ON s.class_id   = c.id
-                LEFT JOIN staff   st ON s.teacher_id = st.id
-                WHERE s.school_id = :sid AND s.class_id = :cid
-                ORDER BY s.id DESC
-            ");
-            $stmt->execute([':sid' => $schoolId, ':cid' => $classId]);
-        } else {
-            $stmt = $pdo->prepare("
-                SELECT s.*, c.name AS class_name, st.name AS teacher_name
-                FROM subjects s
-                LEFT JOIN classes c ON s.class_id   = c.id
-                LEFT JOIN staff   st ON s.teacher_id = st.id
-                WHERE s.school_id = :sid
-                ORDER BY s.id DESC
-            ");
-            $stmt->execute([':sid' => $schoolId]);
-        }
+        $stmt = $pdo->prepare("
+            SELECT s.*, st.name AS teacher_name
+            FROM subjects s
+            LEFT JOIN staff   st ON s.teacher_id = st.id
+            WHERE s.school_id = :sid
+            ORDER BY s.id DESC
+        ");
+        $stmt->execute([':sid' => $schoolId]);
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
@@ -3795,36 +3919,25 @@ class SchoolAdminService extends BaseService
         
         $pdo = $this->classRepo->getPdo();
         $schoolId = $this->getSchoolId($user);
-        $classId = !empty($data['class_id']) ? (int)$data['class_id'] : null;
 
-        // Case-insensitive duplicate check within the class
-        if ($classId) {
-            $stmtCheck = $pdo->prepare("
-                SELECT COUNT(*) FROM subjects 
-                WHERE school_id = :sid AND LOWER(name) = LOWER(:name) AND class_id = :cid
-            ");
-            $stmtCheck->execute([':sid' => $schoolId, ':name' => $name, ':cid' => $classId]);
-        } else {
-            $stmtCheck = $pdo->prepare("
-                SELECT COUNT(*) FROM subjects 
-                WHERE school_id = :sid AND LOWER(name) = LOWER(:name) AND class_id IS NULL
-            ");
-            $stmtCheck->execute([':sid' => $schoolId, ':name' => $name]);
-        }
+        // Case-insensitive duplicate check within the school
+        $stmtCheck = $pdo->prepare("
+            SELECT COUNT(*) FROM subjects 
+            WHERE school_id = :sid AND LOWER(name) = LOWER(:name)
+        ");
+        $stmtCheck->execute([':sid' => $schoolId, ':name' => $name]);
 
         if ((int)$stmtCheck->fetchColumn() > 0) {
-            throw new ValidationException(['name' => 'This subject already exists for this class.']);
+            throw new ValidationException(['name' => 'This subject already exists.']);
         }
         
         $stmt = $pdo->prepare("
             INSERT INTO subjects (school_id, name, class_id, teacher_id)
-            VALUES (:sid, :name, :cid, :tid)
+            VALUES (:sid, :name, NULL, NULL)
         ");
         $stmt->execute([
             ':sid' => $schoolId,
-            ':name' => $name,
-            ':cid' => $classId,
-            ':tid' => !empty($data['teacher_id']) ? $data['teacher_id'] : null
+            ':name' => $name
         ]);
         return ['id' => (int)$pdo->lastInsertId()];
     }
@@ -3838,36 +3951,25 @@ class SchoolAdminService extends BaseService
         
         $pdo = $this->classRepo->getPdo();
         $schoolId = $this->getSchoolId($user);
-        $classId = !empty($data['class_id']) ? (int)$data['class_id'] : null;
 
-        // Case-insensitive duplicate check excluding self within the class
-        if ($classId) {
-            $stmtCheck = $pdo->prepare("
-                SELECT COUNT(*) FROM subjects 
-                WHERE school_id = :sid AND LOWER(name) = LOWER(:name) AND class_id = :cid AND id != :id
-            ");
-            $stmtCheck->execute([':sid' => $schoolId, ':name' => $name, ':cid' => $classId, ':id' => $id]);
-        } else {
-            $stmtCheck = $pdo->prepare("
-                SELECT COUNT(*) FROM subjects 
-                WHERE school_id = :sid AND LOWER(name) = LOWER(:name) AND class_id IS NULL AND id != :id
-            ");
-            $stmtCheck->execute([':sid' => $schoolId, ':name' => $name, ':id' => $id]);
-        }
+        // Case-insensitive duplicate check excluding self within the school
+        $stmtCheck = $pdo->prepare("
+            SELECT COUNT(*) FROM subjects 
+            WHERE school_id = :sid AND LOWER(name) = LOWER(:name) AND id != :id
+        ");
+        $stmtCheck->execute([':sid' => $schoolId, ':name' => $name, ':id' => $id]);
 
         if ((int)$stmtCheck->fetchColumn() > 0) {
-            throw new ValidationException(['name' => 'This subject already exists for this class.']);
+            throw new ValidationException(['name' => 'This subject already exists.']);
         }
         
         $stmt = $pdo->prepare("
             UPDATE subjects 
-            SET name = :name, class_id = :cid, teacher_id = :tid
+            SET name = :name, class_id = NULL, teacher_id = NULL
             WHERE id = :id AND school_id = :sid
         ");
         $stmt->execute([
             ':name' => $name,
-            ':cid' => $classId,
-            ':tid' => !empty($data['teacher_id']) ? $data['teacher_id'] : null,
             ':id' => $id,
             ':sid' => $schoolId
         ]);
@@ -7041,17 +7143,17 @@ Only approve the settlement after reviewing all financial records.
         }
         $types = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // Fetch unique classes for each fee type definition (by name, due_date)
-        $stmtClassNames = $pdo->prepare("
-            SELECT DISTINCT c.name 
-            FROM additional_fee_payments afp
+        // Fetch unique classes and custom amounts for each fee type definition
+        $stmtClassAmounts = $pdo->prepare("
+            SELECT DISTINCT c.name as class_name, aft.amount 
+            FROM additional_fee_types aft
+            JOIN additional_fee_payments afp ON afp.fee_type_id = aft.id
             JOIN students s ON s.id = afp.student_id
             JOIN classes c ON c.id = s.class_id
-            JOIN additional_fee_types aft ON aft.id = afp.fee_type_id
-            WHERE aft.name = :name AND aft.due_date = :due_date AND aft.academic_year_id = :ayid
+            WHERE aft.name = :name AND aft.due_date = :due_date AND aft.academic_year_id = :ayid AND aft.school_id = :school_id
         ");
 
-        return array_map(function($t) use ($stmtClassNames, $totalClassesCount) {
+        return array_map(function($t) use ($stmtClassAmounts, $totalClassesCount, $schoolId) {
             $t['id'] = (int)$t['id'];
             $t['amount'] = (float)$t['amount'];
             $t['academic_year_id'] = (int)$t['academic_year_id'];
@@ -7063,13 +7165,21 @@ Only approve the settlement after reviewing all financial records.
             $t['pending_amount'] = (float)($t['pending_amount'] ?? 0);
             $t['total_amount'] = $t['collected_amount'] + $t['pending_amount'];
 
-            // Fetch classes this type was assigned to
-            $stmtClassNames->execute([
+            // Fetch class names and amounts
+            $stmtClassAmounts->execute([
                 ':name' => $t['name'],
                 ':due_date' => $t['due_date'],
-                ':ayid' => $t['academic_year_id']
+                ':ayid' => $t['academic_year_id'],
+                ':school_id' => $schoolId
             ]);
-            $classNames = $stmtClassNames->fetchAll(PDO::FETCH_COLUMN);
+            $classAmounts = $stmtClassAmounts->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            
+            foreach ($classAmounts as &$ca) {
+                $ca['amount'] = (float)$ca['amount'];
+            }
+            $t['class_amounts'] = $classAmounts;
+
+            $classNames = array_column($classAmounts, 'class_name');
 
             // Determine if assigned to Entire School or class names
             if (empty($classNames)) {
@@ -7267,6 +7377,10 @@ Only approve the settlement after reviewing all financial records.
         $pdo = $this->staffRepo->getPdo();
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
         $workingYearId = $workingYear ? (int)$workingYear['id'] : null;
+
+        if ($workingYearId !== null) {
+            $this->syncTransportFees($schoolId, $workingYearId, $pdo);
+        }
 
         if ($workingYearId !== null) {
             $stmt = $pdo->prepare("
@@ -7611,6 +7725,397 @@ Only approve the settlement after reviewing all financial records.
         }
     }
 
+    public function getTransportFees(array $user, string $status = 'All'): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->staffRepo->getPdo();
+        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+        $workingYearId = $workingYear ? (int)$workingYear['id'] : null;
+
+        if ($workingYearId === null) {
+            return [];
+        }
+
+        $this->syncTransportFees($schoolId, $workingYearId, $pdo);
+
+        $sql = "
+            SELECT tf.*, s.name AS student_name, s.sr_no, s.roll_no, c.name AS class_name, c.section AS class_section
+            FROM student_transport_fees tf
+            JOIN students s ON tf.student_id = s.id
+            LEFT JOIN classes c ON s.class_id = c.id
+            WHERE tf.school_id = :sid AND tf.academic_year_id = :ayid
+        ";
+
+        if (strcasecmp($status, 'All') !== 0) {
+            $sql .= " AND tf.status = :status";
+        }
+
+        $sql .= " ORDER BY tf.id DESC";
+
+        $stmt = $pdo->prepare($sql);
+        $params = [':sid' => $schoolId, ':ayid' => $workingYearId];
+        if (strcasecmp($status, 'All') !== 0) {
+            $params[':status'] = $status;
+        }
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        foreach ($rows as &$row) {
+            $row['monthly_fee'] = (float)$row['monthly_fee'];
+            if ($row['status'] === 'Inactive') {
+                $row['next_charge'] = 0.0;
+            } else {
+                $row['next_charge'] = $this->getNextChargeAmount($schoolId, $workingYearId, (int)$row['student_id'], $row['monthly_fee'], $row['start_date'], $pdo);
+            }
+        }
+
+        return $rows;
+    }
+
+    private function getNextChargeAmount(int $schoolId, int $academicYearId, int $studentId, float $monthlyFee, string $startDateStr, PDO $pdo): float
+    {
+        $stmtType = $pdo->prepare("SELECT id FROM additional_fee_types WHERE school_id = :sid AND academic_year_id = :ayid AND name = 'Transport Fees' LIMIT 1");
+        $stmtType->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+        $typeId = $stmtType->fetchColumn();
+
+        $currentMonthStr = date('F Y');
+        $currentMonthDateStr = date('Y-m-01');
+
+        if ($typeId !== false) {
+            $stmtCheck = $pdo->prepare("
+                SELECT COUNT(*) FROM additional_fee_payments 
+                WHERE school_id = :sid AND student_id = :student_id AND fee_type_id = :fee_type_id AND fee_month = :fee_month
+            ");
+            $stmtCheck->execute([
+                ':sid' => $schoolId,
+                ':student_id' => $studentId,
+                ':fee_type_id' => (int)$typeId,
+                ':fee_month' => $currentMonthStr
+            ]);
+            $exists = (int)$stmtCheck->fetchColumn() > 0;
+            if ($exists) {
+                return $monthlyFee;
+            }
+        }
+
+        return $this->calculateTransportCharge($startDateStr, $monthlyFee, $currentMonthDateStr);
+    }
+
+    public function assignTransportFee(array $user, array $data): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->staffRepo->getPdo();
+        $this->requireWritableAcademicYear($pdo, $schoolId);
+
+        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+        if (!$workingYear) {
+            throw new ValidationException(['academic_year' => 'No active academic year found.']);
+        }
+        $academicYearId = (int)$workingYear['id'];
+
+        $studentId = isset($data['student_id']) ? (int)$data['student_id'] : 0;
+        $monthlyFee = isset($data['monthly_fee']) ? (float)$data['monthly_fee'] : 0.0;
+        $startDateStr = $data['start_date'] ?? '';
+        $status = $data['status'] ?? 'Active';
+
+        if ($studentId <= 0) {
+            throw new ValidationException(['student_id' => 'Student is required.']);
+        }
+        if ($monthlyFee < 0) {
+            throw new ValidationException(['monthly_fee' => 'Monthly transport fee cannot be negative.']);
+        }
+        if (empty($startDateStr)) {
+            throw new ValidationException(['start_date' => 'Transport start date is required.']);
+        }
+
+        $ayStart = $workingYear['start_date'];
+        $ayEnd = $workingYear['end_date'];
+        if ($startDateStr < $ayStart || $startDateStr > $ayEnd) {
+            throw new ValidationException(['start_date' => 'Start date must be within the active academic year (' . $ayStart . ' to ' . $ayEnd . ').']);
+        }
+
+        if ($status === 'Active') {
+            $stmtCheck = $pdo->prepare("SELECT COUNT(*) FROM student_transport_fees WHERE school_id = :sid AND academic_year_id = :ayid AND student_id = :student_id AND status = 'Active'");
+            $stmtCheck->execute([':sid' => $schoolId, ':ayid' => $academicYearId, ':student_id' => $studentId]);
+            if ((int)$stmtCheck->fetchColumn() > 0) {
+                throw new ValidationException(['student_id' => 'Student already has an active transport fee assignment.']);
+            }
+        }
+
+        $stmtIns = $pdo->prepare("
+            INSERT INTO student_transport_fees (school_id, academic_year_id, student_id, monthly_fee, start_date, status)
+            VALUES (:sid, :ayid, :student_id, :monthly_fee, :start_date, :status)
+        ");
+        $stmtIns->execute([
+            ':sid' => $schoolId,
+            ':ayid' => $academicYearId,
+            ':student_id' => $studentId,
+            ':monthly_fee' => $monthlyFee,
+            ':start_date' => $startDateStr,
+            ':status' => $status
+        ]);
+        $id = (int)$pdo->lastInsertId();
+
+        $this->syncTransportFees($schoolId, $academicYearId, $pdo);
+
+        $stmtStuName = $pdo->prepare("SELECT name FROM students WHERE id = :id LIMIT 1");
+        $stmtStuName->execute([':id' => $studentId]);
+        $studentName = $stmtStuName->fetchColumn();
+
+        $this->log("Assigned transport fee of ₹{$monthlyFee} to student {$studentName}", ['student_id' => $studentId]);
+
+        return ['id' => $id, 'success' => true];
+    }
+
+    public function updateTransportFee(array $user, int $id, array $data): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->staffRepo->getPdo();
+        $this->requireWritableAcademicYear($pdo, $schoolId);
+
+        $stmtExist = $pdo->prepare("SELECT * FROM student_transport_fees WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtExist->execute([':id' => $id, ':sid' => $schoolId]);
+        $config = $stmtExist->fetch(PDO::FETCH_ASSOC);
+        if (!$config) {
+            throw new ValidationException(['id' => 'Transport fee config not found.']);
+        }
+
+        $monthlyFee = isset($data['monthly_fee']) ? (float)$data['monthly_fee'] : (float)$config['monthly_fee'];
+        $startDateStr = $data['start_date'] ?? $config['start_date'];
+        $status = $data['status'] ?? $config['status'];
+        $academicYearId = (int)$config['academic_year_id'];
+
+        if ($monthlyFee < 0) {
+            throw new ValidationException(['monthly_fee' => 'Monthly transport fee cannot be negative.']);
+        }
+
+        $stmtAY = $pdo->prepare("SELECT start_date, end_date FROM academic_years WHERE id = :ayid LIMIT 1");
+        $stmtAY->execute([':ayid' => $academicYearId]);
+        $ay = $stmtAY->fetch(PDO::FETCH_ASSOC);
+        if ($ay) {
+            if ($startDateStr < $ay['start_date'] || $startDateStr > $ay['end_date']) {
+                throw new ValidationException(['start_date' => 'Start date must be within the academic year (' . $ay['start_date'] . ' to ' . $ay['end_date'] . ').']);
+            }
+        }
+
+        if ($status === 'Active' && $config['status'] !== 'Active') {
+            $stmtCheck = $pdo->prepare("SELECT COUNT(*) FROM student_transport_fees WHERE school_id = :sid AND academic_year_id = :ayid AND student_id = :student_id AND status = 'Active' AND id != :id");
+            $stmtCheck->execute([':sid' => $schoolId, ':ayid' => $academicYearId, ':student_id' => $config['student_id'], ':id' => $id]);
+            if ((int)$stmtCheck->fetchColumn() > 0) {
+                throw new ValidationException(['student_id' => 'Student already has an active transport fee assignment.']);
+            }
+        }
+
+        $stmtUp = $pdo->prepare("
+            UPDATE student_transport_fees 
+            SET monthly_fee = :monthly_fee, start_date = :start_date, status = :status
+            WHERE id = :id AND school_id = :sid
+        ");
+        $stmtUp->execute([
+            ':id' => $id,
+            ':sid' => $schoolId,
+            ':monthly_fee' => $monthlyFee,
+            ':start_date' => $startDateStr,
+            ':status' => $status
+        ]);
+
+        $this->syncTransportFees($schoolId, $academicYearId, $pdo);
+
+        return ['success' => true];
+    }
+
+    public function deleteTransportFee(array $user, int $id): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->staffRepo->getPdo();
+        $this->requireWritableAcademicYear($pdo, $schoolId);
+
+        $stmtExist = $pdo->prepare("SELECT * FROM student_transport_fees WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtExist->execute([':id' => $id, ':sid' => $schoolId]);
+        $config = $stmtExist->fetch(PDO::FETCH_ASSOC);
+        if (!$config) {
+            throw new ValidationException(['id' => 'Transport fee config not found.']);
+        }
+
+        $stmtCheck = $pdo->prepare("
+            SELECT COUNT(*) FROM additional_fee_payments afp
+            JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+            WHERE afp.student_id = :student_id AND aft.name = 'Transport Fees' AND afp.school_id = :sid
+        ");
+        $stmtCheck->execute([':student_id' => (int)$config['student_id'], ':sid' => $schoolId]);
+        if ((int)$stmtCheck->fetchColumn() > 0) {
+            throw new ValidationException(['payments' => 'Transport fee cannot be deleted because billing history already exists.']);
+        }
+
+        $stmtDel = $pdo->prepare("DELETE FROM student_transport_fees WHERE id = :id AND school_id = :sid");
+        $stmtDel->execute([':id' => $id, ':sid' => $schoolId]);
+
+        return ['success' => true];
+    }
+
+    public function toggleTransportFeeStatus(array $user, int $id, string $status): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->staffRepo->getPdo();
+        $this->requireWritableAcademicYear($pdo, $schoolId);
+
+        $stmtExist = $pdo->prepare("SELECT * FROM student_transport_fees WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtExist->execute([':id' => $id, ':sid' => $schoolId]);
+        $config = $stmtExist->fetch(PDO::FETCH_ASSOC);
+        if (!$config) {
+            throw new ValidationException(['id' => 'Transport fee config not found.']);
+        }
+
+        $academicYearId = (int)$config['academic_year_id'];
+
+        if ($status === 'Active') {
+            $stmtCheck = $pdo->prepare("SELECT COUNT(*) FROM student_transport_fees WHERE school_id = :sid AND academic_year_id = :ayid AND student_id = :student_id AND status = 'Active' AND id != :id");
+            $stmtCheck->execute([':sid' => $schoolId, ':ayid' => $academicYearId, ':student_id' => $config['student_id'], ':id' => $id]);
+            if ((int)$stmtCheck->fetchColumn() > 0) {
+                throw new ValidationException(['student_id' => 'Student already has an active transport fee assignment.']);
+            }
+        }
+
+        $stmtUp = $pdo->prepare("UPDATE student_transport_fees SET status = :status WHERE id = :id AND school_id = :sid");
+        $stmtUp->execute([':status' => $status, ':id' => $id, ':sid' => $schoolId]);
+
+        $this->syncTransportFees($schoolId, $academicYearId, $pdo);
+
+        return ['success' => true];
+    }
+
+    private function calculateTransportCharge(string $startDateStr, float $monthlyFee, string $targetMonthStr): float
+    {
+        $startDate = new \DateTime($startDateStr);
+        $targetMonthDate = new \DateTime($targetMonthStr);
+
+        $startYearMonth = $startDate->format('Y-m');
+        $targetYearMonth = $targetMonthDate->format('Y-m');
+
+        if ($targetYearMonth < $startYearMonth) {
+            return 0.0;
+        }
+
+        if ($targetYearMonth === $startYearMonth) {
+            $startDay = (int)$startDate->format('d');
+            if ($startDay === 1) {
+                return $monthlyFee;
+            }
+            $remainingDays = 30 - $startDay + 1;
+            if ($remainingDays < 0) {
+                $remainingDays = 0;
+            }
+            if ($remainingDays > 30) {
+                $remainingDays = 30;
+            }
+            $dailyFee = $monthlyFee / 30.0;
+            return round($dailyFee * $remainingDays, 2);
+        }
+
+        return $monthlyFee;
+    }
+
+    public function syncTransportFees(int $schoolId, int $academicYearId, ?PDO $externalPdo = null): void
+    {
+        $pdo = $externalPdo ?: $this->staffRepo->getPdo();
+
+        $stmtAY = $pdo->prepare("SELECT start_date, end_date FROM academic_years WHERE id = :ayid AND school_id = :sid LIMIT 1");
+        $stmtAY->execute([':ayid' => $academicYearId, ':sid' => $schoolId]);
+        $ay = $stmtAY->fetch(PDO::FETCH_ASSOC);
+        if (!$ay) {
+            return;
+        }
+
+        $ayStartDate = new \DateTime($ay['start_date']);
+        $ayEndDate = new \DateTime($ay['end_date']);
+        $currentDate = new \DateTime();
+
+        $targetDate = $currentDate < $ayEndDate ? $currentDate : $ayEndDate;
+
+        $stmtType = $pdo->prepare("SELECT id FROM additional_fee_types WHERE school_id = :sid AND academic_year_id = :ayid AND name = 'Transport Fees' LIMIT 1");
+        $stmtType->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+        $typeId = $stmtType->fetchColumn();
+
+        if ($typeId === false) {
+            $stmtInsType = $pdo->prepare("
+                INSERT INTO additional_fee_types (school_id, name, amount, academic_year_id, category)
+                VALUES (:sid, 'Transport Fees', 0.0, :ayid, 'System Generated')
+            ");
+            $stmtInsType->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+            $typeId = (int)$pdo->lastInsertId();
+        } else {
+            $typeId = (int)$typeId;
+        }
+
+        $stmtConfigs = $pdo->prepare("SELECT * FROM student_transport_fees WHERE school_id = :sid AND academic_year_id = :ayid AND status = 'Active'");
+        $stmtConfigs->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+        $configs = $stmtConfigs->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        $stmtCheck = $pdo->prepare("
+            SELECT id FROM additional_fee_payments 
+            WHERE school_id = :sid AND student_id = :student_id AND fee_type_id = :fee_type_id AND fee_month = :fee_month 
+            LIMIT 1
+        ");
+
+        $stmtInsPay = $pdo->prepare("
+            INSERT INTO additional_fee_payments (school_id, student_id, fee_type_id, amount, status, fee_month)
+            VALUES (:sid, :student_id, :fee_type_id, :amount, 'Pending', :fee_month)
+        ");
+
+        $stmtInsNotif = $pdo->prepare("
+            INSERT INTO dashboard_notifications (school_id, user_role, title, message)
+            VALUES (:sid, 'STUDENT', 'Transport Fee Generated', :msg)
+        ");
+
+        foreach ($configs as $cfg) {
+            $studentId = (int)$cfg['student_id'];
+            $monthlyFee = (float)$cfg['monthly_fee'];
+            $startDateStr = $cfg['start_date'];
+            $startDate = new \DateTime($startDateStr);
+
+            $temp = new \DateTime($startDate->format('Y-m-01'));
+            $endTemp = new \DateTime($targetDate->format('Y-m-01'));
+
+            while ($temp <= $endTemp) {
+                $tempStart = new \DateTime($temp->format('Y-m-01'));
+                $tempEnd = new \DateTime($temp->format('Y-m-t'));
+
+                if ($tempEnd >= $ayStartDate && $tempStart <= $ayEndDate) {
+                    $monthStr = $temp->format('F Y');
+                    $monthDateStr = $temp->format('Y-m-d');
+
+                    $stmtCheck->execute([
+                        ':sid' => $schoolId,
+                        ':student_id' => $studentId,
+                        ':fee_type_id' => $typeId,
+                        ':fee_month' => $monthStr
+                    ]);
+                    $existingPaymentId = $stmtCheck->fetchColumn();
+
+                    if ($existingPaymentId === false) {
+                        $amount = $this->calculateTransportCharge($startDateStr, $monthlyFee, $monthDateStr);
+                        if ($amount > 0) {
+                            $stmtInsPay->execute([
+                                ':sid' => $schoolId,
+                                ':student_id' => $studentId,
+                                ':fee_type_id' => $typeId,
+                                ':amount' => $amount,
+                                ':fee_month' => $monthStr
+                            ]);
+
+                            $msg = "Transport Fee for {$monthStr} has been added to your fee ledger.";
+                            $stmtInsNotif->execute([
+                                ':sid' => $schoolId,
+                                ':msg' => $msg
+                            ]);
+                        }
+                    }
+                }
+                $temp->modify('+1 month');
+            }
+        }
+    }
+
     private function isTransactionInReport(\PDO $pdo, int $schoolId, string $txTime): bool
     {
         $stmt = $pdo->prepare("SELECT * FROM financial_reports WHERE school_id = :sid ORDER BY created_at ASC");
@@ -7743,7 +8248,49 @@ Only approve the settlement after reviewing all financial records.
             ':date' => $date
         ]);
 
-        return ['id' => (int)$pdo->lastInsertId(), 'name' => trim($body['name']), 'date' => $date];
+        $holidayId = (int)$pdo->lastInsertId();
+        $holidayName = trim($body['name']);
+
+        // Send push/dashboard notifications to TEACHER, STUDENT, and PARENT roles
+        $stmtUsers = $pdo->prepare("
+            SELECT id, role FROM users 
+            WHERE school_id = :sid AND role IN ('TEACHER', 'STUDENT', 'PARENT') AND status = 'ACTIVE'
+        ");
+        $stmtUsers->execute([':sid' => $schoolId]);
+        $usersToNotify = $stmtUsers->fetchAll(PDO::FETCH_ASSOC);
+
+        if (!empty($usersToNotify)) {
+            $formattedDate = date('d F Y', strtotime($date));
+            $title = "New School Holiday";
+            $message = "{$holidayName} has been added.\n{$formattedDate}";
+
+            $stmtNotif = $pdo->prepare("
+                INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, is_read)
+                VALUES (:sid, :role, :uid, :title, :msg, :link, 0)
+            ");
+
+            foreach ($usersToNotify as $utn) {
+                $link = '';
+                if ($utn['role'] === 'TEACHER') {
+                    $link = '/teacher/leaves';
+                } elseif ($utn['role'] === 'PARENT') {
+                    $link = '/parent/leaves';
+                } elseif ($utn['role'] === 'STUDENT') {
+                    $link = '/student/leaves';
+                }
+
+                $stmtNotif->execute([
+                    ':sid' => $schoolId,
+                    ':role' => $utn['role'],
+                    ':uid' => $utn['id'],
+                    ':title' => $title,
+                    ':msg' => $message,
+                    ':link' => $link
+                ]);
+            }
+        }
+
+        return ['id' => $holidayId, 'name' => $holidayName, 'date' => $date];
     }
 
     public function updateHoliday(array $user, int $id, array $body): array
@@ -8325,13 +8872,56 @@ Only approve the settlement after reviewing all financial records.
         $pdo = $this->classRepo->getPdo();
         $schoolId = $this->getSchoolId($user);
 
-        $stmtCheck = $pdo->prepare("SELECT id, academic_year_id FROM examinations WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtCheck = $pdo->prepare("SELECT id, name, academic_year_id FROM examinations WHERE id = :id AND school_id = :sid LIMIT 1");
         $stmtCheck->execute([':id' => $examId, ':sid' => $schoolId]);
         $exam = $stmtCheck->fetch(PDO::FETCH_ASSOC);
         if (!$exam) {
             throw new NotFoundException('Examination not found.');
         }
 
+        // Complete result validation check
+        if ($status === 'Published') {
+            $classesToValidate = $classId > 0 ? [$classId] : [];
+            if ($classId === 0) {
+                $stmtClasses = $pdo->prepare("
+                    SELECT id FROM classes 
+                    WHERE school_id = :sid AND academic_year_id = :ay_id
+                ");
+                $stmtClasses->execute([':sid' => $schoolId, ':ay_id' => $exam['academic_year_id']]);
+                $classesToValidate = $stmtClasses->fetchAll(PDO::FETCH_COLUMN) ?: [];
+            }
+
+            foreach ($classesToValidate as $cId) {
+                // Get students count
+                $stmtSt = $pdo->prepare("SELECT COUNT(*) FROM students WHERE class_id = :class_id AND school_id = :sid");
+                $stmtSt->execute([':class_id' => $cId, ':sid' => $schoolId]);
+                $studentCount = (int)$stmtSt->fetchColumn();
+
+                // Get papers count
+                $stmtPp = $pdo->prepare("SELECT COUNT(*) FROM examination_papers WHERE exam_id = :exam_id AND class_id = :class_id");
+                $stmtPp->execute([':exam_id' => $examId, ':class_id' => $cId]);
+                $paperCount = (int)$stmtPp->fetchColumn();
+
+                if ($studentCount === 0 || $paperCount === 0) {
+                    throw new ValidationException(['message' => 'Complete result generation before publishing.']);
+                }
+
+                // Get marks count
+                $stmtMk = $pdo->prepare("
+                    SELECT COUNT(*) FROM examination_marks em
+                    JOIN examination_papers ep ON em.paper_id = ep.id
+                    WHERE ep.exam_id = :exam_id AND ep.class_id = :class_id
+                ");
+                $stmtMk->execute([':exam_id' => $examId, ':class_id' => $cId]);
+                $marksCount = (int)$stmtMk->fetchColumn();
+
+                if ($marksCount < ($studentCount * $paperCount)) {
+                    throw new ValidationException(['message' => 'Complete result generation before publishing.']);
+                }
+            }
+        }
+
+        $classes = [];
         if ($classId > 0) {
             $stmt = $pdo->prepare("
                 INSERT INTO examination_class_status (exam_id, class_id, status, publish_date)
@@ -8344,6 +8934,21 @@ Only approve the settlement after reviewing all financial records.
                 ':status' => $status,
                 ':status2' => $status
             ]);
+            
+            // Audit Log & Notification for single class
+            $stmtInfo = $pdo->prepare("SELECT name AS class_name, (SELECT name FROM academic_years WHERE id = :ay_id) AS academic_year_name FROM classes WHERE id = :class_id LIMIT 1");
+            $stmtInfo->execute([':ay_id' => $exam['academic_year_id'], ':class_id' => $classId]);
+            $info = $stmtInfo->fetch(PDO::FETCH_ASSOC);
+            $className = $info ? $info['class_name'] : '';
+            $ayName = $info ? $info['academic_year_name'] : '';
+
+            $actionText = $status === 'Published' ? 'Publish Results' : 'Unpublish Results';
+            $descText = $status === 'Published' ? "Published Results for exam '{$exam['name']}' (Class: {$className})" : "Unpublished Results for exam '{$exam['name']}' (Class: {$className})";
+            $this->logAudit($pdo, $user, 'Examinations', $actionText, $descText, $ayName);
+
+            if ($status === 'Published') {
+                $this->sendExamNotification($pdo, $schoolId, $examId, $classId, 'RESULT', $exam['name']);
+            }
         } else {
             // Update examinations table status
             $stmtUpdateExam = $pdo->prepare("
@@ -8359,7 +8964,15 @@ Only approve the settlement after reviewing all financial records.
                 WHERE school_id = :sid AND academic_year_id = :ay_id
             ");
             $stmtClasses->execute([':sid' => $schoolId, ':ay_id' => $exam['academic_year_id']]);
-            $classes = $stmtClasses->fetchAll(PDO::FETCH_COLUMN);
+            $classes = $stmtClasses->fetchAll(PDO::FETCH_COLUMN) ?: [];
+
+            $stmtInfo = $pdo->prepare("SELECT name FROM academic_years WHERE id = :ay_id LIMIT 1");
+            $stmtInfo->execute([':ay_id' => $exam['academic_year_id']]);
+            $ayName = $stmtInfo->fetchColumn() ?: '';
+
+            $actionText = $status === 'Published' ? 'Publish Results' : 'Unpublish Results';
+            $descText = $status === 'Published' ? "Published Results for exam '{$exam['name']}' (All Classes)" : "Unpublished Results for exam '{$exam['name']}' (All Classes)";
+            $this->logAudit($pdo, $user, 'Examinations', $actionText, $descText, $ayName);
 
             foreach ($classes as $cId) {
                 $stmt = $pdo->prepare("
@@ -8372,6 +8985,199 @@ Only approve the settlement after reviewing all financial records.
                     ':class_id' => (int)$cId,
                     ':status' => $status,
                     ':status2' => $status
+                ]);
+
+                if ($status === 'Published') {
+                    $this->sendExamNotification($pdo, $schoolId, $examId, (int)$cId, 'RESULT', $exam['name']);
+                }
+            }
+        }
+    }
+
+    public function publishExamScheme(array $user, int $examId, int $classId): void
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        // 1. Check exam exists
+        $stmtCheck = $pdo->prepare("SELECT id, name, academic_year_id FROM examinations WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtCheck->execute([':id' => $examId, ':sid' => $schoolId]);
+        $exam = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+        if (!$exam) {
+            throw new NotFoundException('Examination not found.');
+        }
+
+        // 2. Complete check (timetabled papers >= school subjects)
+        $stmtCountSubjects = $pdo->prepare("SELECT COUNT(*) FROM subjects WHERE school_id = :sid");
+        $stmtCountSubjects->execute([':sid' => $schoolId]);
+        $totalSubjects = (int)$stmtCountSubjects->fetchColumn();
+
+        $stmtCountPapers = $pdo->prepare("SELECT COUNT(*) FROM examination_papers WHERE exam_id = :exam_id AND class_id = :class_id");
+        $stmtCountPapers->execute([':exam_id' => $examId, ':class_id' => $classId]);
+        $scheduledPapers = (int)$stmtCountPapers->fetchColumn();
+
+        if ($scheduledPapers === 0 || $scheduledPapers < $totalSubjects) {
+            throw new ValidationException(['message' => 'Please complete the examination timetable before publishing.']);
+        }
+
+        // 3. Update/Insert in examination_class_status
+        $stmt = $pdo->prepare("
+            INSERT INTO examination_class_status (exam_id, class_id, scheme_published)
+            VALUES (:exam_id, :class_id, 1)
+            ON DUPLICATE KEY UPDATE scheme_published = 1
+        ");
+        $stmt->execute([
+            ':exam_id' => $examId,
+            ':class_id' => $classId
+        ]);
+
+        // 4. Fetch additional info for audit logging
+        $stmtInfo = $pdo->prepare("
+            SELECT c.name AS class_name, ay.name AS academic_year_name
+            FROM classes c
+            JOIN academic_years ay ON c.academic_year_id = ay.id
+            WHERE c.id = :class_id
+            LIMIT 1
+        ");
+        $stmtInfo->execute([':class_id' => $classId]);
+        $info = $stmtInfo->fetch(PDO::FETCH_ASSOC);
+        $className = $info ? $info['class_name'] : '';
+        $ayName = $info ? $info['academic_year_name'] : '';
+
+        // 5. Log audit
+        $this->logAudit($pdo, $user, 'Examinations', 'Publish Scheme', "Published Scheme for exam '{$exam['name']}' (Class: {$className})", $ayName);
+
+        // 6. Send notifications
+        $this->sendExamNotification($pdo, $schoolId, $examId, $classId, 'SCHEME', $exam['name']);
+    }
+
+    public function publishExamAdmitCards(array $user, int $examId, int $classId): void
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        // 1. Check exam exists
+        $stmtCheck = $pdo->prepare("SELECT id, name, academic_year_id FROM examinations WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtCheck->execute([':id' => $examId, ':sid' => $schoolId]);
+        $exam = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+        if (!$exam) {
+            throw new NotFoundException('Examination not found.');
+        }
+
+        // 2. Verify seating plan has been generated for this class
+        $stmtCountAllocations = $pdo->prepare("
+            SELECT COUNT(*) 
+            FROM examination_seating_allocations esa
+            JOIN students s ON esa.student_id = s.id
+            JOIN examination_seating_plans esp ON esa.seating_plan_id = esp.id
+            WHERE esp.exam_id = :exam_id AND s.class_id = :class_id AND s.school_id = :sid
+        ");
+        $stmtCountAllocations->execute([':exam_id' => $examId, ':class_id' => $classId, ':sid' => $schoolId]);
+        $allocationsCount = (int)$stmtCountAllocations->fetchColumn();
+
+        if ($allocationsCount === 0) {
+            throw new ValidationException(['message' => 'Generate the seating plan before publishing admit cards.']);
+        }
+
+        // 3. Update/Insert in examination_class_status
+        $stmt = $pdo->prepare("
+            INSERT INTO examination_class_status (exam_id, class_id, admit_card_published)
+            VALUES (:exam_id, :class_id, 1)
+            ON DUPLICATE KEY UPDATE admit_card_published = 1
+        ");
+        $stmt->execute([
+            ':exam_id' => $examId,
+            ':class_id' => $classId
+        ]);
+
+        // 4. Fetch additional info for audit logging
+        $stmtInfo = $pdo->prepare("
+            SELECT c.name AS class_name, ay.name AS academic_year_name
+            FROM classes c
+            JOIN academic_years ay ON c.academic_year_id = ay.id
+            WHERE c.id = :class_id
+            LIMIT 1
+        ");
+        $stmtInfo->execute([':class_id' => $classId]);
+        $info = $stmtInfo->fetch(PDO::FETCH_ASSOC);
+        $className = $info ? $info['class_name'] : '';
+        $ayName = $info ? $info['academic_year_name'] : '';
+
+        // 5. Log audit
+        $this->logAudit($pdo, $user, 'Examinations', 'Publish Admit Cards', "Published Admit Cards for exam '{$exam['name']}' (Class: {$className})", $ayName);
+
+        // 6. Send notifications
+        $this->sendExamNotification($pdo, $schoolId, $examId, $classId, 'ADMIT_CARD', $exam['name']);
+    }
+
+    private function sendExamNotification(PDO $pdo, int $schoolId, int $examId, int $classId, string $type, string $examName): void
+    {
+        $title = $examName;
+        $message = '';
+        $link = 'exams'; // deep link to exams
+
+        if ($type === 'SCHEME') {
+            $message = 'The examination scheme has been published. Tap to view the complete examination schedule.';
+        } elseif ($type === 'ADMIT_CARD') {
+            $message = 'Your admit card has been published. Tap here to view or download it.';
+        } elseif ($type === 'RESULT') {
+            $message = 'The examination result has been published. Tap here to view the result.';
+        }
+
+        // Get student and parent user IDs in the class
+        $stmtUsers = $pdo->prepare("
+            SELECT DISTINCT u.id AS user_id, u.role
+            FROM users u
+            JOIN students s ON u.school_id = s.school_id
+            WHERE s.class_id = :class_id 
+              AND u.school_id = :school_id
+              AND (
+                (u.role = 'STUDENT' AND u.email = s.email)
+                OR 
+                (u.role = 'PARENT' AND (u.phone = s.parent_phone OR u.phone = s.father_phone OR u.phone = s.guardian_phone OR u.phone = s.student_mobile))
+              )
+        ");
+        $stmtUsers->execute([':class_id' => $classId, ':school_id' => $schoolId]);
+        $studentParentUsers = $stmtUsers->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        // Insert notifications for students/parents
+        $stmtInsert = $pdo->prepare("
+            INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, is_read)
+            VALUES (:school_id, :role, :user_id, :title, :message, :link, 0)
+        ");
+
+        foreach ($studentParentUsers as $u) {
+            $stmtInsert->execute([
+                ':school_id' => $schoolId,
+                ':role' => $u['role'],
+                ':user_id' => (int)$u['user_id'],
+                ':title' => $title,
+                ':message' => $message,
+                ':link' => $link
+            ]);
+        }
+
+        // If not ADMIT_CARD, send to the class teacher as well
+        if ($type !== 'ADMIT_CARD') {
+            $stmtTeacher = $pdo->prepare("
+                SELECT u.id AS user_id
+                FROM users u
+                JOIN staff st ON u.phone = st.phone AND u.school_id = st.school_id
+                JOIN class_teacher_assignments cta ON st.id = cta.teacher_id AND st.school_id = cta.school_id
+                WHERE cta.class_id = :class_id AND u.role = 'TEACHER' AND u.school_id = :school_id
+                LIMIT 1
+            ");
+            $stmtTeacher->execute([':class_id' => $classId, ':school_id' => $schoolId]);
+            $teacherUserId = $stmtTeacher->fetchColumn();
+
+            if ($teacherUserId) {
+                $stmtInsert->execute([
+                    ':school_id' => $schoolId,
+                    ':role' => 'TEACHER',
+                    ':user_id' => (int)$teacherUserId,
+                    ':title' => $title,
+                    ':message' => $message,
+                    ':link' => $link
                 ]);
             }
         }
@@ -8834,7 +9640,11 @@ Only approve the settlement after reviewing all financial records.
 
         // Fetch all classes of the school for the exam's academic year
         $stmtClasses = $pdo->prepare("
-            SELECT c.id, c.name, c.section, COALESCE(ecs.status, 'Draft') AS status, ecs.publish_date
+            SELECT c.id, c.name, c.section, 
+                   COALESCE(ecs.status, 'Draft') AS status, 
+                   ecs.publish_date,
+                   COALESCE(ecs.scheme_published, 0) AS scheme_published,
+                   COALESCE(ecs.admit_card_published, 0) AS admit_card_published
             FROM classes c
             LEFT JOIN examination_class_status ecs ON ecs.exam_id = :exam_id AND ecs.class_id = c.id
             WHERE c.school_id = :sid AND c.academic_year_id = (SELECT academic_year_id FROM examinations WHERE id = :exam_id2 LIMIT 1)
@@ -10324,23 +11134,44 @@ Only approve the settlement after reviewing all financial records.
     public function getNotifications(array $user): array
     {
         $schoolId = $this->getSchoolId($user);
+        $role = $user['role'] ?? '';
+        $userId = (int)($user['id'] ?? 0);
         $pdo = $this->classRepo->getPdo();
 
-        $stmt = $pdo->prepare("
-            SELECT * FROM dashboard_notifications
-            WHERE school_id = :sid AND user_role = 'SCHOOL_ADMIN'
-            ORDER BY id DESC
-            LIMIT 15
-        ");
-        $stmt->execute([':sid' => $schoolId]);
-        $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if ($role === 'SCHOOL_ADMIN') {
+            $stmt = $pdo->prepare("
+                SELECT * FROM dashboard_notifications
+                WHERE school_id = :sid AND user_role = 'SCHOOL_ADMIN'
+                ORDER BY id DESC
+                LIMIT 15
+            ");
+            $stmt->execute([':sid' => $schoolId]);
+            $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        $stmtUnread = $pdo->prepare("
-            SELECT COUNT(*) FROM dashboard_notifications
-            WHERE school_id = :sid AND user_role = 'SCHOOL_ADMIN' AND is_read = 0
-        ");
-        $stmtUnread->execute([':sid' => $schoolId]);
-        $unreadCount = (int)$stmtUnread->fetchColumn();
+            $stmtUnread = $pdo->prepare("
+                SELECT COUNT(*) FROM dashboard_notifications
+                WHERE school_id = :sid AND user_role = 'SCHOOL_ADMIN' AND is_read = 0
+            ");
+            $stmtUnread->execute([':sid' => $schoolId]);
+            $unreadCount = (int)$stmtUnread->fetchColumn();
+        } else {
+            // TEACHER or any other staff role
+            $stmt = $pdo->prepare("
+                SELECT * FROM dashboard_notifications
+                WHERE school_id = :sid AND user_role = :role AND user_id = :uid
+                ORDER BY id DESC
+                LIMIT 15
+            ");
+            $stmt->execute([':sid' => $schoolId, ':role' => $role, ':uid' => $userId]);
+            $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            $stmtUnread = $pdo->prepare("
+                SELECT COUNT(*) FROM dashboard_notifications
+                WHERE school_id = :sid AND user_role = :role AND user_id = :uid AND is_read = 0
+            ");
+            $stmtUnread->execute([':sid' => $schoolId, ':role' => $role, ':uid' => $userId]);
+            $unreadCount = (int)$stmtUnread->fetchColumn();
+        }
 
         return [
             'notifications' => $notifications,

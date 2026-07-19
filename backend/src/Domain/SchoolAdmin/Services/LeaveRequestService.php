@@ -198,7 +198,7 @@ class LeaveRequestService extends BaseService
             $schoolId,
             'SCHOOL_ADMIN',
             'New Leave Request',
-            "Leave request submitted by $applicantName ($applicantRole) for period " . date('d M Y', strtotime($data['from_date'])) . " to " . date('d M Y', strtotime($data['to_date'])),
+            "Leave request submitted by $applicantName ($applicantRole)",
             '/school-admin/leave-requests'
         );
 
@@ -302,12 +302,17 @@ class LeaveRequestService extends BaseService
 
             // Notify applicant
             $applicantUserRole = $leave['applicant_role'] === 'TEACHER' ? 'TEACHER' : 'PARENT';
+            $title = $newStatus === 'APPROVED' ? "🎉 Leave Application Approved" : "⚠️ Leave Application Rejected";
+            $message = $newStatus === 'APPROVED' 
+                ? "Your leave request has been APPROVED by the School Admin."
+                : "Your leave request has been REJECTED. Reason: $rejectReason";
+
             $this->createNotification(
                 $pdo,
                 $schoolId,
                 $applicantUserRole,
-                "Leave Request " . ($newStatus === 'APPROVED' ? 'Approved' : 'Rejected'),
-                "Your leave request for " . date('d M Y', strtotime($leave['from_date'])) . " to " . date('d M Y', strtotime($leave['to_date'])) . " has been $newStatus." . ($rejectReason ? " Reason: $rejectReason" : ""),
+                $title,
+                $message,
                 $leave['applicant_role'] === 'TEACHER' ? '/teacher/leaves' : '/parent/leaves'
             );
 
@@ -394,7 +399,7 @@ class LeaveRequestService extends BaseService
                     $schoolId,
                     $applicantUserRole,
                     "Leave Request Cancelled by Admin",
-                    "Your leave request for " . date('d M Y', strtotime($leave['from_date'])) . " to " . date('d M Y', strtotime($leave['to_date'])) . " has been cancelled by an administrator.",
+                    "Your leave request has been cancelled by an administrator.",
                     $leave['applicant_role'] === 'TEACHER' ? '/teacher/leaves' : '/parent/leaves'
                 );
             }

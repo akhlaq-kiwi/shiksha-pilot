@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   LayoutDashboard, BookOpen, ClipboardList, CalendarCheck,
   CreditCard, ChevronRight, Clock, AlertTriangle, CheckCircle2
@@ -28,20 +28,29 @@ const statusConfig = {
 };
 
 export default function DashboardPage({ homework, upcomingExams, attendance, fees, isParent, selectedChild, displayName, onNavigate, onPayNow }) {
+  const [schoolName, setSchoolName] = useState(() => {
+    try {
+      const cached = localStorage.getItem('cached_school_profile');
+      return cached ? JSON.parse(cached)?.name || 'School Portal' : 'School Portal';
+    } catch {
+      return 'School Portal';
+    }
+  });
+
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">
-            {isParent ? `Welcome back` : `Good morning`}
+            {schoolName}
           </h2>
-          <p className="text-text-secondary text-sm mt-1">
-            {isParent
-              ? `Viewing ${selectedChild?.name}'s academic overview.`
-              : `Here's your academic snapshot for today, ${displayName?.split(' ')[0]}.`}
+          <p className="text-text-secondary text-sm mt-1 font-bold">
+            Student Portal
           </p>
         </div>
-        <div className="text-xs text-text-muted font-semibold">Wednesday, 25 June 2026</div>
+        <div className="text-xs text-text-muted font-semibold">
+          {new Date().toLocaleDateString('en-PK', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+        </div>
       </div>
 
       {/* Fee Banner */}

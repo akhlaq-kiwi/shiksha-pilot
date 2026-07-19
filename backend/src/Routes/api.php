@@ -51,6 +51,7 @@ return function (App $app) {
     $app->get('/api/school/students/{id}', [SchoolAdminController::class, 'getStudentById']);
     $app->post('/api/school/students', [SchoolAdminController::class, 'createStudent']);
     $app->put('/api/school/students/{id}', [SchoolAdminController::class, 'updateStudent']);
+    $app->post('/api/school/students/{id}/advance', [SchoolAdminController::class, 'advanceStudent']);
     $app->post('/api/school/upload', [SchoolAdminController::class, 'uploadDocument']);
     $app->get('/api/school/staff', [SchoolAdminController::class, 'getStaff']);
     $app->post('/api/school/staff', [SchoolAdminController::class, 'createStaff']);
@@ -79,6 +80,13 @@ return function (App $app) {
     $app->get('/api/school/additional-fees/payments', [SchoolAdminController::class, 'getAdditionalFeePayments']);
     $app->post('/api/school/additional-fees/payments/{id}/pay', [SchoolAdminController::class, 'collectAdditionalFeePayment']);
     $app->post('/api/school/additional-fees/payments/{id}/revert', [SchoolAdminController::class, 'revertAdditionalFeePayment']);
+
+    // Transport Fees Management
+    $app->get('/api/school/transport-fees', [SchoolAdminController::class, 'getTransportFees']);
+    $app->post('/api/school/transport-fees', [SchoolAdminController::class, 'assignTransportFee']);
+    $app->put('/api/school/transport-fees/{id}', [SchoolAdminController::class, 'updateTransportFee']);
+    $app->delete('/api/school/transport-fees/{id}', [SchoolAdminController::class, 'deleteTransportFee']);
+    $app->post('/api/school/transport-fees/{id}/toggle-status', [SchoolAdminController::class, 'toggleTransportFeeStatus']);
     $app->get('/api/school/classes', [SchoolAdminController::class, 'getClasses']);
     $app->post('/api/school/classes', [SchoolAdminController::class, 'createClass']);
     $app->put('/api/school/classes', [SchoolAdminController::class, 'updateClass']);
@@ -110,6 +118,8 @@ return function (App $app) {
     $app->get('/api/school/exams-new/{id}/marks', [SchoolAdminController::class, 'getExamMarksSheet']);
     $app->post('/api/school/exams-new/{id}/marks', [SchoolAdminController::class, 'saveExamMark']);
     $app->post('/api/school/exams-new/{id}/publish', [SchoolAdminController::class, 'publishExamResults']);
+    $app->post('/api/school/exams-new/{id}/publish-scheme', [SchoolAdminController::class, 'publishExamScheme']);
+    $app->post('/api/school/exams-new/{id}/publish-admit-card', [SchoolAdminController::class, 'publishExamAdmitCards']);
     $app->get('/api/school/exams-new/{id}/report-cards', [SchoolAdminController::class, 'getReportCards']);
     $app->get('/api/school/exams-new/{id}/class-status', [SchoolAdminController::class, 'getExamClassStatuses']);
     $app->get('/api/school/exams-new/{id}/instructions', [SchoolAdminController::class, 'getExamInstructions']);
@@ -205,6 +215,7 @@ return function (App $app) {
     $app->get('/api/school/security/login-history', [SchoolAdminController::class, 'getSchoolLoginHistory']);
 
     // Teacher Domain
+    $app->get('/api/teacher/dashboard', [TeacherController::class, 'getDashboard']);
     $app->get('/api/teacher/classes', [TeacherController::class, 'getMyClasses']);
     $app->get('/api/teacher/students', [TeacherController::class, 'getStudentList']);
     $app->post('/api/teacher/attendance', [TeacherController::class, 'markAttendance']);
@@ -215,6 +226,8 @@ return function (App $app) {
     $app->post('/api/teacher/materials', [TeacherController::class, 'createMaterial']);
     $app->get('/api/teacher/exams', [TeacherController::class, 'getExams']);
     $app->post('/api/teacher/marks', [TeacherController::class, 'enterMarks']);
+    $app->get('/api/teacher/exams-new', [TeacherController::class, 'getExamsList']);
+    $app->get('/api/teacher/exams-new/{id}/details', [TeacherController::class, 'getExamDetails']);
     $app->get('/api/teacher/schedule/today', [TeacherController::class, 'getTodaySchedule']);
     $app->get('/api/teacher/salaries', [TeacherController::class, 'getSalaries']);
     $app->get('/api/teacher/salaries/receipt', [TeacherController::class, 'getSalarySlip']);
@@ -224,6 +237,8 @@ return function (App $app) {
     $app->get('/api/student/timetable', [StudentController::class, 'getTimetable']);
     $app->get('/api/student/attendance', [StudentController::class, 'getAttendance']);
     $app->get('/api/student/results', [StudentController::class, 'getExamResults']);
+    $app->get('/api/student/exams-new', [StudentController::class, 'getExamsList']);
+    $app->get('/api/student/exams-new/{id}/details', [StudentController::class, 'getExamDetails']);
     $app->get('/api/student/exams-new/report-cards', [StudentController::class, 'getPublishedReportCards']);
     $app->get('/api/student/assignments', [StudentController::class, 'getAssignments']);
     $app->get('/api/student/fees', [StudentController::class, 'getFees']);
@@ -233,6 +248,7 @@ return function (App $app) {
     $app->get('/api/student/materials', [StudentController::class, 'getMaterials']);
     $app->get('/api/student/notifications', [StudentController::class, 'getNotifications']);
     $app->post('/api/student/notifications/read-all', [StudentController::class, 'markAllNotificationsRead']);
+    $app->post('/api/student/notifications/{id}/read', [StudentController::class, 'markNotificationRead']);
 
     // Mobile Notices Domain
     $app->get('/api/student/announcements', [StudentController::class, 'getActiveNotices']);

@@ -182,7 +182,7 @@ export default function ParentPage({ children, isParent, selectedChild, onSelect
       {/* Leave history */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-base font-bold text-text-primary">Leave Requests</h3>
+          <h3 className="text-base font-bold text-text-primary">Leaves</h3>
           <Button onClick={() => { setLeaveSent(false); setLeaveDialogOpen(true); }} variant="outline" className="text-xs font-bold flex items-center gap-1.5">
             <Send className="h-3 w-3" /> New Request
           </Button>

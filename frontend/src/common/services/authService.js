@@ -6,7 +6,7 @@ export const authService = {
   },
 
   async login(phone, password) {
-    const payload = await apiClient.post('/api/auth/login', { phone, password });
+    const payload = await apiClient.post('/api/auth/login', { phone, password, client_type: 'web' });
     if (payload?.token) {
       localStorage.setItem('shiksha_pilot_token', payload.token);
       localStorage.setItem('shiksha_pilot_role', payload.user.role);

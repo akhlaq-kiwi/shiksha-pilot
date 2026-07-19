@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Landmark, Plus, Search, Calendar, Clock, Eye, Edit, Trash2, MoreVertical, X, AlertTriangle } from 'lucide-react';
+import { Landmark, Plus, Search, Calendar, Clock, Eye, Edit, Trash2, MoreVertical, X, AlertTriangle, User, ChevronDown, RefreshCw } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
 import { Button } from '../../../common/ui/button';
 import { Input } from '../../../common/ui/input';
@@ -39,17 +39,41 @@ const getLocalDateString = () => {
 const ACADEMIC_MONTHS = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
 
 export default function FinanceManagementPage() {
-  const [activeTab, setActiveTab] = useState('expenses'); // 'expenses', 'additional-fee'
+  const [activeTab, setActiveTab] = useState('expenses'); // 'expenses', 'additional-fee', 'transport-fee'
   const [classes, setClasses] = useState([]);
   const [academicYears, setAcademicYears] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [feeTypes, setFeeTypes] = useState([]);
+  const [transportFees, setTransportFees] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Status notifications
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  // Transport Fees State & Filters
+  const [transportSearch, setTransportSearch] = useState('');
+  const [transportStatusFilter, setTransportStatusFilter] = useState('All');
+
+  // Searchable student select in Transport Modal
+  const [studentsList, setStudentsList] = useState([]);
+  const [studentSearchVal, setStudentSearchVal] = useState('');
+  const [showStudentDropdown, setShowStudentDropdown] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const studentSearchRef = useRef(null);
+
+  // Dialog Modal State for Transport Fee
+  const [isTransportModalOpen, setIsTransportModalOpen] = useState(false);
+  const [editingTransport, setEditingTransport] = useState(null); // null = add mode
+  const [transportMonthlyFee, setTransportMonthlyFee] = useState('');
+  const [transportStartDate, setTransportStartDate] = useState('');
+  const [transportStatus, setTransportStatus] = useState('Active');
+  const [transportSubmitting, setTransportSubmitting] = useState(false);
+  const [transportFormErrors, setTransportFormErrors] = useState({});
+
+  // Delete Transport Confirmation
+  const [deletingTransportId, setDeletingTransportId] = useState(null);
+  const [activeTransportDropdownId, setActiveTransportDropdownId] = useState(null);
   // Expenses Tab State & Filters
   const [expenseSearch, setExpenseSearch] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('ALL');
@@ -104,14 +128,18 @@ export default function FinanceManagementPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [clsList, ayList, typesList] = await Promise.all([
+      const [clsList, ayList, typesList, transList, studList] = await Promise.all([
         schoolService.getClasses(),
         schoolService.getAcademicYears(),
-        schoolService.getAdditionalFeeTypes()
+        schoolService.getAdditionalFeeTypes(),
+        schoolService.getTransportFees(),
+        schoolService.getStudents({ limit: 1000 })
       ]);
       setClasses(clsList || []);
       setAcademicYears(ayList || []);
       setFeeTypes(typesList || []);
+      setTransportFees(transList || []);
+      setStudentsList(studList || []);
 
       // Fetch expenses
       await loadExpensesList();
@@ -122,6 +150,21 @@ export default function FinanceManagementPage() {
       setLoading(false);
     }
   };
+
+  const loadTransportFeesList = async () => {
+    try {
+      const transList = await schoolService.getTransportFees({ status: transportStatusFilter });
+      setTransportFees(transList || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'transport-fee') {
+      loadTransportFeesList();
+    }
+  }, [transportStatusFilter, activeTab]);
 
   const loadExpensesList = async () => {
     try {
@@ -135,7 +178,7 @@ export default function FinanceManagementPage() {
     }
   };
 
-  const { isReadOnly } = useAcademicYear();
+  const { isReadOnly, currentYear } = useAcademicYear();
 
   useEffect(() => {
     loadData();
@@ -163,11 +206,13 @@ export default function FinanceManagementPage() {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setActiveExpenseDropdownId(null);
         setActiveFeeDropdownId(null);
+        setActiveTransportDropdownId(null);
       }
     };
     const handleScroll = () => {
       setActiveExpenseDropdownId(null);
       setActiveFeeDropdownId(null);
+      setActiveTransportDropdownId(null);
     };
     document.addEventListener('mousedown', handleOutsideClick);
     window.addEventListener('scroll', handleScroll, true);
@@ -176,6 +221,144 @@ export default function FinanceManagementPage() {
       window.removeEventListener('scroll', handleScroll, true);
     };
   }, []);
+
+  // Click outside searchable student picker
+  useEffect(() => {
+    const handleClickOutsideStudent = (e) => {
+      if (studentSearchRef.current && !studentSearchRef.current.contains(e.target)) {
+        setShowStudentDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutsideStudent);
+    return () => document.removeEventListener('mousedown', handleClickOutsideStudent);
+  }, []);
+
+  const handleTransportModalOpen = (transportToEdit = null) => {
+    if (!transportToEdit) {
+      setSelectedStudent(null);
+      setStudentSearchVal('');
+      setTransportMonthlyFee('');
+      setTransportStartDate(getLocalDateString());
+      setTransportStatus('Active');
+      setEditingTransport(null);
+    } else {
+      setEditingTransport(transportToEdit);
+      setSelectedStudent({
+        id: transportToEdit.student_id,
+        name: transportToEdit.student_name,
+        sr_no: transportToEdit.sr_no,
+        class_name: transportToEdit.class_name ? `${transportToEdit.class_name}${transportToEdit.class_section ? ` - ${transportToEdit.class_section}` : ''}` : '—',
+        roll_no: transportToEdit.roll_no
+      });
+      setStudentSearchVal(transportToEdit.student_name);
+      setTransportMonthlyFee(transportToEdit.monthly_fee.toString());
+      setTransportStartDate(transportToEdit.start_date);
+      setTransportStatus(transportToEdit.status);
+    }
+    setTransportFormErrors({});
+    setIsTransportModalOpen(true);
+  };
+
+  const handleSaveTransport = async (e) => {
+    if (e) e.preventDefault();
+    const errors = {};
+
+    if (!selectedStudent || !selectedStudent.id) {
+      errors.student = 'Student selection is required.';
+    }
+    if (!transportMonthlyFee) {
+      errors.monthly_fee = 'Monthly transport fee is required.';
+    } else if (parseFloat(transportMonthlyFee) < 0) {
+      errors.monthly_fee = 'Monthly transport fee cannot be negative.';
+    }
+    if (!transportStartDate) {
+      errors.start_date = 'Start date is required.';
+    } else if (currentYear) {
+      if (transportStartDate < currentYear.start_date || transportStartDate > currentYear.end_date) {
+        errors.start_date = `Start date must be within active year (${formatDateFull(currentYear.start_date)} to ${formatDateFull(currentYear.end_date)}).`;
+      }
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setTransportFormErrors(errors);
+      return;
+    }
+
+    setTransportFormErrors({});
+    setTransportSubmitting(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const payload = {
+        student_id: selectedStudent.id,
+        monthly_fee: parseFloat(transportMonthlyFee),
+        start_date: transportStartDate,
+        status: transportStatus
+      };
+
+      if (editingTransport) {
+        await schoolService.updateTransportFee(editingTransport.id, payload);
+        setSuccess('Transport fee assignment updated successfully.');
+      } else {
+        await schoolService.assignTransportFee(payload);
+        setSuccess('Transport fee successfully assigned.');
+      }
+      setIsTransportModalOpen(false);
+      setEditingTransport(null);
+      setSelectedStudent(null);
+      setStudentSearchVal('');
+      await loadTransportFeesList();
+      setTimeout(() => setSuccess(''), 4000);
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Failed to save transport fee.');
+    } finally {
+      setTransportSubmitting(false);
+    }
+  };
+
+  const handleDeleteTransport = async () => {
+    if (!deletingTransportId) return;
+    setError('');
+    setSuccess('');
+    try {
+      await schoolService.deleteTransportFee(deletingTransportId);
+      setSuccess('Transport fee deleted successfully.');
+      setDeletingTransportId(null);
+      await loadTransportFeesList();
+      setTimeout(() => setSuccess(''), 4000);
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Failed to delete transport fee assignment.');
+      setDeletingTransportId(null);
+    }
+  };
+
+  const handleToggleTransportStatus = async (item) => {
+    const nextStatus = item.status === 'Active' ? 'Inactive' : 'Active';
+    setError('');
+    setSuccess('');
+    try {
+      await schoolService.toggleTransportFeeStatus(item.id, nextStatus);
+      setSuccess(`Transport fee marked as ${nextStatus}.`);
+      await loadTransportFeesList();
+      setTimeout(() => setSuccess(''), 4000);
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Failed to update transport status.');
+    }
+  };
+
+  const handleTransportDropdownOpen = (tf, e) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    setDropdownCoords({
+      top: rect.bottom + window.scrollY,
+      left: rect.left - 120 + window.scrollX,
+    });
+    setActiveTransportDropdownId(tf.id);
+  };
 
   const handleExpenseModalOpen = (expenseToEdit = null) => {
     setError('');
@@ -475,6 +658,19 @@ export default function FinanceManagementPage() {
     return words.every(word => feeName.includes(word));
   });
 
+  const filteredTransportFees = transportFees.filter(tf => {
+    const term = transportSearch.toLowerCase().trim();
+    const matchesStatus = transportStatusFilter === 'All' || tf.status === transportStatusFilter;
+    if (!term) return matchesStatus;
+
+    const words = term.split(/\s+/);
+    const stuName = (tf.student_name || '').toLowerCase();
+    const admNo = (tf.admission_no || '').toLowerCase();
+
+    const matchesSearch = words.every(word => stuName.includes(word) || admNo.includes(word));
+    return matchesStatus && matchesSearch;
+  });
+
   const paginatedExpenses = expenses.slice(0, visibleExpensesCount);
   const paginatedFees = filteredFeeTypes.slice(0, visibleFeesCount);
 
@@ -518,7 +714,17 @@ export default function FinanceManagementPage() {
                 : 'border-transparent text-text-muted hover:text-text-primary'
             }`}
           >
-            🏷️ Additional Fee
+            🏷️ Additional Fees
+          </button>
+          <button 
+            onClick={() => { setActiveTab('transport-fee'); setError(''); setSuccess(''); }}
+            className={`pb-3 text-xs font-extrabold uppercase tracking-wider border-b-2 px-4 transition-all ${
+              activeTab === 'transport-fee' 
+                ? 'border-primary text-primary' 
+                : 'border-transparent text-text-muted hover:text-text-primary'
+            }`}
+          >
+            🚌 Transport Fees
           </button>
         </div>
       </div>
@@ -831,6 +1037,106 @@ export default function FinanceManagementPage() {
         </div>
       )}
 
+      {/* Tab 3: Transport Fees View */}
+      {!loading && activeTab === 'transport-fee' && (
+        <div className="flex-1 flex flex-col min-h-0 space-y-4 animate-in fade-in duration-200">
+          
+          {/* Header Row */}
+          <div className="flex-shrink-0 bg-surface border border-border p-5 rounded-2xl shadow-2xs space-y-4">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="relative flex-1 max-w-md w-full">
+                <Input 
+                  placeholder="Search by Student Name or Admission Number..." 
+                  value={transportSearch} 
+                  onChange={e => setTransportSearch(e.target.value)} 
+                  className="text-xs w-full"
+                />
+              </div>
+
+              <div className="flex items-center gap-4 w-full sm:w-auto">
+                <Select
+                  value={transportStatusFilter}
+                  onChange={e => setTransportStatusFilter(e.target.value)}
+                  className="text-xs w-full sm:w-40 cursor-pointer"
+                >
+                  <option value="All">All Statuses</option>
+                  <option value="Active">Active Only</option>
+                  <option value="Inactive">Inactive Only</option>
+                </Select>
+
+                {!isReadOnly && (
+                  <Button 
+                    className="font-bold uppercase tracking-wider text-xs flex items-center justify-center gap-1.5 shadow-2xs"
+                    onClick={() => handleTransportModalOpen(null)}
+                  >
+                    <Plus className="h-4 w-4" /> Assign Transport Fee
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Transport Fees Listing Table */}
+          <div 
+            className="flex-1 min-h-0 overflow-y-auto border border-border rounded-2xl bg-surface shadow-2xs relative"
+          >
+            {filteredTransportFees.length === 0 ? (
+              <div className="p-12 text-center text-text-muted text-xs font-bold leading-relaxed">
+                No transport fees configured.
+              </div>
+            ) : (
+              <Table>
+                <TableHeader className="sticky top-0 bg-surface z-10 border-b border-border shadow-3xs">
+                  <TableRow>
+                    <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Student Name</TableHead>
+                    <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">SR No</TableHead>
+                    <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Class</TableHead>
+                    <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Monthly Fee</TableHead>
+                    <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Start Date</TableHead>
+                    <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Status</TableHead>
+                    <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Next Charge Amount</TableHead>
+                    <TableHead className="text-right text-xs uppercase font-extrabold text-text-secondary bg-surface w-24">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredTransportFees.map(tf => (
+                    <TableRow key={tf.id} className="hover:bg-hover/30 transition-colors">
+                      <TableCell className="text-xs font-bold text-text-primary">{tf.student_name}</TableCell>
+                      <TableCell className="text-xs text-text-secondary">{tf.sr_no || '—'}</TableCell>
+                      <TableCell className="text-xs text-text-secondary">
+                        {tf.class_name ? `${tf.class_name}${tf.class_section ? ` - ${tf.class_section}` : ''}` : '—'}
+                      </TableCell>
+                      <TableCell className="text-xs font-semibold font-sans text-text-primary">{formatCurrency(tf.monthly_fee)}</TableCell>
+                      <TableCell className="text-xs text-text-secondary">{formatDateFull(tf.start_date)}</TableCell>
+                      <TableCell className="text-xs">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                          tf.status === 'Active' 
+                            ? 'bg-green-500/10 text-green-600' 
+                            : 'bg-zinc-500/10 text-zinc-500'
+                        }`}>
+                          {tf.status}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-xs font-extrabold font-sans text-primary">
+                        {tf.status === 'Active' ? formatCurrency(tf.next_charge) : '—'}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <button 
+                          onClick={(e) => handleTransportDropdownOpen(tf, e)}
+                          className="p-1 hover:bg-hover rounded-lg transition-colors text-text-muted hover:text-text-primary"
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Record/Edit Expense Dialog */}
       <Dialog 
         isOpen={isExpenseModalOpen} 
@@ -1084,11 +1390,37 @@ export default function FinanceManagementPage() {
                 <p className="text-[10px] text-text-muted font-black uppercase tracking-wider">Due Date</p>
                 <p className="font-bold mt-0.5 text-text-primary">{formatDateFull(viewingFeeType.due_date)}</p>
               </div>
-              <div>
-                <p className="text-[10px] text-text-muted font-black uppercase tracking-wider">Fee Amount</p>
-                <p className="font-bold mt-0.5 text-primary font-sans">{formatCurrency(viewingFeeType.amount)}</p>
-              </div>
+              {(!viewingFeeType.class_amounts || viewingFeeType.class_amounts.length <= 1) && (
+                <div>
+                  <p className="text-[10px] text-text-muted font-black uppercase tracking-wider">Fee Amount</p>
+                  <p className="font-bold mt-0.5 text-primary font-sans">{formatCurrency(viewingFeeType.amount)}</p>
+                </div>
+              )}
             </div>
+
+            {viewingFeeType.class_amounts && viewingFeeType.class_amounts.length > 0 && (
+              <div className="border-t border-border pt-4 space-y-2">
+                <p className="text-[10px] text-text-muted font-black uppercase tracking-wider">Class-Wise Fee Configuration</p>
+                <div className="space-y-1.5 bg-zinc-50 dark:bg-zinc-900/50 p-3.5 rounded-xl border border-border">
+                  {(() => {
+                    const groups = {};
+                    viewingFeeType.class_amounts.forEach(item => {
+                      const amtKey = item.amount.toFixed(2);
+                      if (!groups[amtKey]) {
+                        groups[amtKey] = [];
+                      }
+                      groups[amtKey].push(item.class_name);
+                    });
+                    return Object.entries(groups).map(([amt, classes], idx) => (
+                      <div key={idx} className="flex justify-between items-center py-1 border-b border-border/40 last:border-0 text-text-primary">
+                        <span className="font-bold pr-4 truncate">{classes.join(', ')}</span>
+                        <span className="font-black text-primary font-sans shrink-0">{formatCurrency(parseFloat(amt))}</span>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
+            )}
 
             <div className="border-t border-border pt-4 space-y-3">
               <h4 className="text-[10px] text-text-muted font-black uppercase tracking-wider">Fee Collection Summary</h4>
@@ -1111,6 +1443,228 @@ export default function FinanceManagementPage() {
           </div>
         )}
       </Dialog>
+
+      {/* Assign / Edit Transport Fee Dialog Modal */}
+      {isTransportModalOpen && (
+        <Dialog
+          isOpen={isTransportModalOpen}
+          title={editingTransport ? 'Edit Transport Fee Details' : 'Assign Transport Fee'}
+          onClose={() => setIsTransportModalOpen(false)}
+        >
+          <form onSubmit={handleSaveTransport} className="space-y-4 text-xs font-medium text-text-secondary max-w-md">
+            
+            {/* Student Search Picker */}
+            <div className="space-y-1.5 relative" ref={studentSearchRef}>
+              <label className="text-[10px] text-text-secondary font-bold uppercase font-black tracking-wider">Student *</label>
+              {!selectedStudent ? (
+                <>
+                  <div className="relative">
+                    <User className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-text-muted" />
+                    <Input
+                      type="text"
+                      placeholder="Search student by name, roll no, or SR no..."
+                      value={studentSearchVal}
+                      onChange={e => {
+                        setStudentSearchVal(e.target.value);
+                        setShowStudentDropdown(true);
+                        setSelectedStudent(null);
+                      }}
+                      onFocus={() => setShowStudentDropdown(true)}
+                      className="pl-8 text-xs font-semibold text-text-primary border border-border bg-surface rounded-lg w-full focus:outline-hidden"
+                    />
+                  </div>
+                  {showStudentDropdown && studentSearchVal.trim() !== '' && (
+                    <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-surface border border-border rounded-xl shadow-lg z-50">
+                      {studentsList
+                        .filter(s => 
+                          (s.name && s.name.toLowerCase().includes(studentSearchVal.toLowerCase())) || 
+                          (s.sr_no && s.sr_no.toLowerCase().includes(studentSearchVal.toLowerCase())) ||
+                          (s.roll_no && s.roll_no.toString().toLowerCase().includes(studentSearchVal.toLowerCase()))
+                        )
+                        .slice(0, 10)
+                        .map(s => (
+                          <div
+                            key={s.id}
+                            onClick={() => {
+                              setSelectedStudent(s);
+                              setStudentSearchVal(s.name);
+                              setShowStudentDropdown(false);
+                            }}
+                            className="p-2.5 hover:bg-hover cursor-pointer transition-colors text-left flex items-center justify-between border-b last:border-0 border-border"
+                          >
+                            <div>
+                              <div className="font-bold text-text-primary text-xs">{s.name}</div>
+                              <div className="text-[10px] text-text-muted mt-0.5">Class: {s.class_name} | Roll No: {s.roll_no || '—'} | SR No: {s.sr_no || '—'}</div>
+                            </div>
+                            <ChevronDown className="h-3 w-3 text-text-muted -rotate-90" />
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="p-3 bg-zinc-50 border border-border rounded-lg font-bold text-text-primary flex justify-between items-center">
+                  <span>{selectedStudent.name} (Class: {selectedStudent.class_name} | Roll No: {selectedStudent.roll_no || '—'} | SR No: {selectedStudent.sr_no || '—'})</span>
+                  {!editingTransport && (
+                    <button 
+                      type="button" 
+                      onClick={() => { setSelectedStudent(null); setStudentSearchVal(''); }}
+                      className="text-text-muted hover:text-red-500 font-extrabold text-xs"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              )}
+              {transportFormErrors.student && (
+                <p className="text-[10px] text-red-500 font-bold mt-1">{transportFormErrors.student}</p>
+              )}
+            </div>
+
+            {/* Monthly Transport Fee amount */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] text-text-secondary font-bold uppercase font-black tracking-wider">Monthly Transport Fee (₹) *</label>
+              <Input
+                type="number"
+                placeholder="e.g. 1000"
+                value={transportMonthlyFee}
+                onChange={e => setTransportMonthlyFee(e.target.value)}
+                className="text-xs"
+              />
+              {transportFormErrors.monthly_fee && (
+                <p className="text-[10px] text-red-500 font-bold mt-1">{transportFormErrors.monthly_fee}</p>
+              )}
+            </div>
+
+            {/* Transport Start Date */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] text-text-secondary font-bold uppercase font-black tracking-wider">Transport Start Date *</label>
+              <Input
+                type="date"
+                value={transportStartDate}
+                onChange={e => setTransportStartDate(e.target.value)}
+                className="text-xs"
+              />
+              {transportFormErrors.start_date && (
+                <p className="text-[10px] text-red-500 font-bold mt-1">{transportFormErrors.start_date}</p>
+              )}
+            </div>
+
+            {/* Status selection */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] text-text-secondary font-bold uppercase font-black tracking-wider">Status *</label>
+              <Select
+                value={transportStatus}
+                onChange={e => setTransportStatus(e.target.value)}
+                className="text-xs cursor-pointer"
+              >
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+              </Select>
+            </div>
+
+            {/* Form Footer */}
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="secondary" onClick={() => setIsTransportModalOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={transportSubmitting}>
+                {transportSubmitting ? 'Saving...' : 'Save'}
+              </Button>
+            </div>
+          </form>
+        </Dialog>
+      )}
+
+      {/* Delete Transport Confirmation Dialog */}
+      {deletingTransportId && (
+        <Dialog
+          isOpen={!!deletingTransportId}
+          onClose={() => setDeletingTransportId(null)}
+          title="Delete Transport Fee Assignment"
+          description="Verify transport fee assignment removal."
+          footer={<>
+            <Button variant="secondary" onClick={() => setDeletingTransportId(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDeleteTransport}>Delete</Button>
+          </>}
+        >
+          <div className="text-xs text-text-secondary leading-relaxed py-2">
+            Are you sure you want to delete this transport fee assignment? <br/>
+            <strong className="text-red-500 font-extrabold">This action cannot be undone.</strong>
+            <p className="text-[10px] text-text-muted mt-2">
+              Note: Deletion will fail if a billing invoice has already been generated.
+            </p>
+          </div>
+        </Dialog>
+      )}
+
+      {/* Transport Row Three-Dot Portal Menu */}
+      {activeTransportDropdownId && dropdownCoords && (
+        (() => {
+          const tf = transportFees.find(t => t.id === activeTransportDropdownId);
+          if (!tf) return null;
+          return createPortal(
+            <div 
+              ref={dropdownRef}
+              style={{
+                position: 'absolute',
+                top: `${dropdownCoords.top}px`,
+                left: `${dropdownCoords.left}px`,
+              }}
+              className="w-36 bg-surface border border-border shadow-md rounded-xl py-1.5 z-[9999] text-left text-xs text-text-primary animate-in fade-in duration-100 font-semibold"
+            >
+              <button
+                onClick={() => {
+                  setActiveTransportDropdownId(null);
+                  alert(`Student: ${tf.student_name}\nAdmission Number: ${tf.admission_no || '—'}\nClass: ${tf.class_name || '—'}\nMonthly Fee: ₹${tf.monthly_fee}\nStart Date: ${formatDateFull(tf.start_date)}\nStatus: ${tf.status}\nNext Charge Amount: ₹${tf.next_charge}`);
+                }}
+                className="w-full px-3 py-1.5 hover:bg-zinc-50 flex items-center gap-1.5"
+              >
+                <Eye className="h-3.5 w-3.5 text-text-muted" /> View Details
+              </button>
+
+              {!isReadOnly && (
+                <>
+                  <button
+                    onClick={() => {
+                      setEditingTransport(tf);
+                      setSelectedStudent({ id: tf.student_id, name: tf.student_name });
+                      setStudentSearchVal(tf.student_name);
+                      setTransportMonthlyFee(tf.monthly_fee.toString());
+                      setTransportStartDate(tf.start_date);
+                      setTransportStatus(tf.status);
+                      setIsTransportModalOpen(true);
+                      setActiveTransportDropdownId(null);
+                    }}
+                    className="w-full px-3 py-1.5 hover:bg-zinc-50 border-t border-border flex items-center gap-1.5"
+                  >
+                    <Edit className="h-3.5 w-3.5 text-text-muted" /> Edit Config
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      handleToggleTransportStatus(tf);
+                      setActiveTransportDropdownId(null);
+                    }}
+                    className="w-full px-3 py-1.5 hover:bg-zinc-50 flex items-center gap-1.5"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5 text-text-muted" /> Mark {tf.status === 'Active' ? 'Inactive' : 'Active'}
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setDeletingTransportId(tf.id);
+                      setActiveTransportDropdownId(null);
+                    }}
+                    className="w-full px-3 py-1.5 hover:bg-zinc-50 flex items-center gap-1.5 text-red-600 border-t border-border"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 text-red-400" /> Delete
+                  </button>
+                </>
+              )}
+            </div>,
+            document.body
+          );
+        })()
+      )}
 
     </div>
   );

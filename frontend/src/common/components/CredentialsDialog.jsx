@@ -3,7 +3,7 @@ import { Dialog } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { schoolAdminService } from '../services/schoolAdminService';
-import { Copy, Check, Key, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Copy, Check, RefreshCw, AlertTriangle } from 'lucide-react';
 
 export default function CredentialsDialog({ isOpen, onClose, role, target }) {
   const [loading, setLoading] = useState(false);
@@ -37,7 +37,19 @@ export default function CredentialsDialog({ isOpen, onClose, role, target }) {
     }
   }, [isOpen, target]);
 
+  const validatePassword = (pwd) => {
+    if (!pwd) return null;
+    if (pwd.length < 6) return 'Password must be at least 6 characters.';
+    if (!/[A-Z]/.test(pwd)) return 'Password must contain at least one uppercase letter.';
+    if (!/[0-9]/.test(pwd)) return 'Password must contain at least one digit.';
+    if (!/[a-zA-Z]/.test(pwd)) return 'Password must contain at least one alphabet character.';
+    return null;
+  };
+
+  const pwdError = validatePassword(customPassword);
+
   const handleUpdatePassword = async () => {
+    if (pwdError) return;
     setLoading(true);
     setError('');
     setCopied(false);
@@ -115,9 +127,15 @@ export default function CredentialsDialog({ isOpen, onClose, role, target }) {
                 onChange={(e) => setCustomPassword(e.target.value)}
                 className="w-full font-sans text-sm"
               />
-              <p className="text-[10px] text-text-muted leading-tight">
-                Must be at least 6 characters. If left empty, a secure password will be generated automatically.
-              </p>
+              {pwdError ? (
+                <p className="text-[11px] text-red-500 font-semibold leading-tight mt-1">
+                  {pwdError}
+                </p>
+              ) : (
+                <p className="text-[10px] text-text-muted leading-tight">
+                  Must be at least 6 characters. If left empty, a secure password will be generated automatically.
+                </p>
+              )}
             </div>
 
             {credentials ? (
@@ -160,28 +178,22 @@ export default function CredentialsDialog({ isOpen, onClose, role, target }) {
                   <Button 
                     onClick={handleUpdatePassword}
                     className="flex items-center gap-2"
+                    disabled={!!pwdError}
                   >
                     Update Password
                   </Button>
                 </div>
               </div>
             ) : (
-              <div className="space-y-4 text-center py-4">
-                <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto text-primary">
-                  <Key className="h-6 w-6" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-text-primary">No credentials generated</h4>
-                  <p className="text-xs text-text-muted mt-1 px-4 leading-relaxed">
-                    This account does not have mobile login credentials set up yet. Define a manual password or update to generate.
-                  </p>
-                </div>
-
+              <div className="space-y-4 pt-2">
                 <div className="flex justify-end gap-2 pt-4 border-t border-border">
                   <Button variant="secondary" onClick={onClose}>
                     Cancel
                   </Button>
-                  <Button onClick={handleUpdatePassword} disabled={!phone}>
+                  <Button 
+                    onClick={handleUpdatePassword} 
+                    disabled={!phone || !!pwdError}
+                  >
                     Update Password
                   </Button>
                 </div>

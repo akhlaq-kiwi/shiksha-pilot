@@ -49,11 +49,19 @@ export default function DashboardPage({ onNavigate }) {
     setLoading(true);
     try {
       const [stuData, stfData, exData, fpData, statsData, classesList, settings] = await Promise.all([
-        schoolService.getStudents(),
-        schoolService.getStaff(),
-        schoolService.getExams(),
-        schoolService.getFeePayments(),
-        schoolService.getStats(),
+        schoolService.getStudents().catch(() => []),
+        schoolService.getStaff().catch(() => []),
+        schoolService.getExams().catch(() => []),
+        schoolService.getFeePayments().catch(() => []),
+        schoolService.getStats().catch(() => ({
+          students_count: 0,
+          staff_count: 0,
+          classes_count: 0,
+          pending_fees: 0,
+          total_collected: 0,
+          fee_collection_chart: [],
+          salary_disbursement_chart: []
+        })),
         schoolService.getClasses().catch(() => []),
         schoolAdminService.getTimetableSettings().catch(() => null)
       ]);

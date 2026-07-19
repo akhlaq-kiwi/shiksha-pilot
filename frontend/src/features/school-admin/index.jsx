@@ -3,7 +3,7 @@ import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-
 import {
   LayoutDashboard, School, BookOpen, Users, UserCog, Clock,
   ClipboardCheck, FileText, DollarSign, BarChart2, Shield, Settings, RefreshCw, Landmark,
-  AlertCircle, AlertTriangle, Copy, Phone, Mail, ExternalLink, PhoneCall, Megaphone
+  AlertCircle, AlertTriangle, Copy, Phone, Mail, ExternalLink, PhoneCall, Megaphone, ShieldAlert
 } from 'lucide-react';
 import { useToast } from '../../common/components/Toast';
 
@@ -46,7 +46,7 @@ const NAV_ITEMS = [
   { path: '/school-admin/staff',      label: 'Teachers', icon: UserCog },
   { path: '/school-admin/timetable',  label: 'Timetable', icon: Clock },
   { path: '/school-admin/attendance', label: 'Attendance', icon: ClipboardCheck },
-  { path: '/school-admin/leave-requests', label: 'Leave Requests', icon: FileText },
+  { path: '/school-admin/leave-requests', label: 'Manage Leaves', icon: FileText },
   { path: '/school-admin/exams',      label: 'Examinations', icon: FileText },
   { path: '/school-admin/finance',    label: 'Fees Portal', icon: DollarSign },
   { path: '/school-admin/financial-reports', label: 'Financial Reports', icon: FileText },
@@ -303,13 +303,57 @@ export default function SchoolAdminPortal() {
   // --- User Permissions Hook ---
   const [permissions, setPermissions] = useState(null);
   const [loadingPermissions, setLoadingPermissions] = useState(true);
+  const [accessRemoved, setAccessRemoved] = useState(false);
+
+  const role = localStorage.getItem('shiksha_pilot_role') || '';
+
+  // Sidebar dynamic navigation list filtering
+  const visibleNavItems = NAV_ITEMS.filter(item => {
+    if (role !== 'TEACHER') return true;
+    if (loadingPermissions || permissions === null) return false;
+    return permissions.includes(item.label);
+  });
+
+  // URL route guard access logic
+  const currentItem = NAV_ITEMS.find(item => {
+    if (item.exact) return location.pathname === item.path;
+    return location.pathname.startsWith(item.path);
+  });
+
+  const hasAccess = (() => {
+    if (role !== 'TEACHER') return true;
+    if (loadingPermissions) return true;
+    if (!currentItem) return true; // Profile pages, change-password are open to all logged in users
+    if (permissions === null) return true;
+    return permissions.includes(currentItem.label);
+  })();
+
+  // Redirect unpermitted pages immediately
+  useEffect(() => {
+    if (role === 'TEACHER' && !loadingPermissions && permissions && permissions.length > 0) {
+      if (!hasAccess) {
+        const firstPermitted = visibleNavItems[0];
+        if (firstPermitted) {
+          nav(firstPermitted.path, { replace: true });
+        }
+      }
+    }
+  }, [permissions, hasAccess, location.pathname, role, loadingPermissions, visibleNavItems, nav]);
 
   useEffect(() => {
-    const role = localStorage.getItem('shiksha_pilot_role');
     if (role === 'TEACHER') {
       schoolService.getMyPermissions()
         .then(data => {
-          setPermissions(data.permissions || []);
+          const perms = data.permissions || [];
+          if (perms.length === 0) {
+            localStorage.removeItem('shiksha_pilot_token');
+            localStorage.removeItem('shiksha_pilot_role');
+            localStorage.removeItem('shiksha_pilot_user');
+            localStorage.removeItem('cached_school_profile');
+            setAccessRemoved(true);
+          } else {
+            setPermissions(perms);
+          }
         })
         .catch(err => {
           console.error("Failed to load user permissions", err);
@@ -323,6 +367,40 @@ export default function SchoolAdminPortal() {
       setLoadingPermissions(false);
     }
   }, []);
+
+  // Lightweight polling for permission changes
+  useEffect(() => {
+    if (role !== 'TEACHER' || accessRemoved) return;
+
+    const fetchPermissions = async () => {
+      try {
+        const data = await schoolService.getMyPermissions();
+        const newPerms = data.permissions || [];
+        
+        if (newPerms.length === 0) {
+          localStorage.removeItem('shiksha_pilot_token');
+          localStorage.removeItem('shiksha_pilot_role');
+          localStorage.removeItem('shiksha_pilot_user');
+          localStorage.removeItem('cached_school_profile');
+          setAccessRemoved(true);
+          return;
+        }
+
+        setPermissions(prevPerms => {
+          const prev = prevPerms || [];
+          if (prev.length !== newPerms.length || !newPerms.every(p => prev.includes(p))) {
+            return newPerms;
+          }
+          return prevPerms;
+        });
+      } catch (err) {
+        console.error("Failed to sync teacher permissions", err);
+      }
+    };
+
+    const interval = setInterval(fetchPermissions, 5000);
+    return () => clearInterval(interval);
+  }, [accessRemoved]);
 
   const loadProfile = async () => {
     try {
@@ -404,8 +482,6 @@ export default function SchoolAdminPortal() {
     );
   };
 
-  const role = localStorage.getItem('shiksha_pilot_role') || '';
-
   if (loadError) {
     return <ServerConnectionErrorScreen onRetry={handleRetry} retrying={retrying} />;
   }
@@ -427,29 +503,39 @@ export default function SchoolAdminPortal() {
     return <SubscriptionExpiredScreen profile={profile} />;
   }
 
-  const hasYear = academicYears.length > 0;
+  const hasYear = role === 'TEACHER' || academicYears.length > 0;
   const remainingDays = getRemainingDays(profile?.subscription_expiry);
 
-  // Sidebar dynamic navigation list filtering
-  const visibleNavItems = NAV_ITEMS.filter(item => {
-    if (role !== 'TEACHER') return true;
-    if (loadingPermissions || permissions === null) return false;
-    return permissions.includes(item.label);
-  });
-
-  // URL route guard access logic
-  const currentItem = NAV_ITEMS.find(item => {
-    if (item.exact) return location.pathname === item.path;
-    return location.pathname.startsWith(item.path);
-  });
-
-  const hasAccess = (() => {
-    if (role !== 'TEACHER') return true;
-    if (loadingPermissions) return true;
-    if (!currentItem) return true; // Profile pages, change-password are open to all logged in users
-    if (permissions === null) return true;
-    return permissions.includes(currentItem.label);
-  })();
+  if (accessRemoved) {
+    return (
+      <div className="fixed inset-0 bg-background flex items-center justify-center z-50 p-6 animate-in fade-in duration-300">
+        <Card className="max-w-md w-full shadow-2xl border border-border bg-surface p-8 text-center flex flex-col items-center space-y-6">
+          <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center text-red-500 animate-bounce">
+            <ShieldAlert className="h-8 w-8" />
+          </div>
+          <div className="space-y-2">
+            <h3 className="font-extrabold text-text-primary text-xl tracking-tight font-display">
+              Access Removed
+            </h3>
+            <p className="text-sm text-text-secondary leading-relaxed">
+              Your School Administrator has removed all your portal permissions.
+            </p>
+            <p className="text-xs text-text-muted leading-relaxed mt-1">
+              Please contact your School Administrator if you believe this is a mistake.
+            </p>
+          </div>
+          <Button 
+            onClick={() => {
+              window.location.href = '/login';
+            }} 
+            className="w-full font-bold bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-xl shadow-md transition-all duration-200"
+          >
+            Go to Login
+          </Button>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col md:flex-row w-full min-h-[calc(100vh-56px)] bg-background">

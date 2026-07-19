@@ -1,21 +1,102 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:workmanager/workmanager.dart';
+import 'package:http/http.dart' as http;
 import 'screens/leave_list_screen.dart';
 import 'screens/home_screen.dart';
 import 'services/leave_service.dart';
 import 'services/auth_service.dart';
+import 'services/notification_helper.dart';
 
-void main() {
+const String fetchNotificationsTask = "com.shikshapilot.schoolhub.fetchNotifications";
+
+@pragma('vm:entry-point')
+void callbackDispatcher() {
+  Workmanager().executeTask((taskName, inputData) async {
+    switch (taskName) {
+      case fetchNotificationsTask:
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final token = prefs.getString('auth_token') ?? '';
+          final userRole = prefs.getString('user_role') ?? '';
+          final baseUrl = prefs.getString('base_url') ?? 'http://10.227.152.71:8000';
+          if (token.isEmpty || userRole.isEmpty) return true;
+
+          final isSchoolStaff = userRole.toUpperCase() == 'TEACHER' || 
+                                userRole.toUpperCase() == 'SCHOOL_ADMIN' || 
+                                userRole.toUpperCase() == 'PRINCIPAL';
+
+          final path = isSchoolStaff 
+              ? '/api/school/notifications' 
+              : '/api/student/notifications';
+              
+          final studentId = prefs.getInt('selected_student_id');
+
+          final uri = Uri.parse('$baseUrl$path');
+          final headers = {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+            if (!isSchoolStaff && studentId != null) 'X-Student-Id': studentId.toString(),
+          };
+
+          final response = await http.get(uri, headers: headers);
+          if (response.statusCode == 200) {
+            final decodedBody = json.decode(response.body);
+            final List<dynamic> data = isSchoolStaff 
+                ? (decodedBody['notifications'] ?? decodedBody['data'] ?? [])
+                : (decodedBody['data'] ?? []);
+
+            if (data.isNotEmpty) {
+              final latestNotif = data.first;
+              final int latestId = latestNotif['id'] is int 
+                  ? latestNotif['id'] 
+                  : int.parse(latestNotif['id'].toString());
+              final isUnread = latestNotif['is_read'] == 0 || latestNotif['is_read'] == false || latestNotif['is_read'] == '0';
+
+              final lastNotifiedId = prefs.getInt('last_notified_id_$userRole') ?? 0;
+              if (isUnread && latestId > lastNotifiedId) {
+                await prefs.setInt('last_notified_id_$userRole', latestId);
+                await NotificationHelper.init();
+                await NotificationHelper.showNotification(latestNotif);
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('WorkManager task error: $e');
+        }
+        break;
+    }
+    return true;
+  });
+}
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await NotificationHelper.init();
+  await Workmanager().initialize(
+    callbackDispatcher,
+    isInDebugMode: false,
+  );
+  await Workmanager().registerPeriodicTask(
+    "1",
+    fetchNotificationsTask,
+    frequency: const Duration(minutes: 15),
+    existingWorkPolicy: ExistingPeriodicWorkPolicy.replace,
+  );
   runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
+  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
   const MyApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: 'Shiksha Pilot School Hub',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(

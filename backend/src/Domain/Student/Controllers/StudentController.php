@@ -41,7 +41,10 @@ class StudentController extends BaseController
         $user = $this->authenticate($request);
         $this->requireRole($user, self::ALLOWED_ROLES);
 
-        $data = $this->service->getTimetable($user);
+        $params = $request->getQueryParams();
+        $date = $params['date'] ?? null;
+
+        $data = $this->service->getTimetable($user, $date);
 
         return $this->success($response, $data);
     }
@@ -164,6 +167,17 @@ class StudentController extends BaseController
         return $this->success($response, $data);
     }
 
+    public function markNotificationRead(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, self::ALLOWED_ROLES);
+
+        $id = (int)$args['id'];
+        $data = $this->service->markNotificationRead($user, $id);
+
+        return $this->success($response, $data);
+    }
+
     public function getActiveNotices(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
@@ -179,5 +193,22 @@ class StudentController extends BaseController
         $id = (int)$args['id'];
         $data = $this->service->markNoticeRead($user, $id);
         return $this->success($response, $data, 'Notice marked as read');
+    }
+
+    public function getExamsList(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, self::ALLOWED_ROLES);
+        $data = $this->service->getExamsList($user);
+        return $this->success($response, $data);
+    }
+
+    public function getExamDetails(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, self::ALLOWED_ROLES);
+        $examId = (int)$args['id'];
+        $data = $this->service->getExamDetails($user, $examId);
+        return $this->success($response, $data);
     }
 }

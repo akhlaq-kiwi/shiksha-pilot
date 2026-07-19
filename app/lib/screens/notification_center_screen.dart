@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'notice_screen.dart';
+import 'timetable_screen.dart';
+import 'leave_list_screen.dart';
+import '../services/leave_service.dart';
 
 class NotificationCenterScreen extends StatefulWidget {
   final String baseUrl;
@@ -104,6 +107,24 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
     }
   }
 
+  String _getDynamicNotificationHeading(dynamic notif) {
+    final title = (notif['title'] ?? '').toString().toLowerCase();
+    final message = (notif['message'] ?? '').toString().toLowerCase();
+    final link = (notif['link'] ?? '').toString().toLowerCase();
+
+    if (link.contains('leave') || title.contains('leave') || message.contains('leave') ||
+        link.contains('holiday') || title.contains('holiday') || message.contains('holiday')) {
+      return 'Leave Notification';
+    } else if (link.contains('attendance') || title.contains('attendance') || message.contains('attendance')) {
+      return 'Attendance Notification';
+    } else if (link.contains('fee') || title.contains('fee') || message.contains('fee')) {
+      return 'Fee Notification';
+    } else if (link.contains('timetable') || title.contains('timetable') || message.contains('timetable')) {
+      return 'Timetable Notification';
+    }
+    return notif['title'] ?? 'Notification';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -167,6 +188,59 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                           child: InkWell(
                             borderRadius: BorderRadius.circular(12),
                             onTap: () async {
+                              final titleLower = (notif['title'] ?? '').toString().toLowerCase();
+                              final msgLower = (notif['message'] ?? '').toString().toLowerCase();
+                              final linkStr = (notif['link'] ?? '').toString().toLowerCase();
+
+                              // Instantly mark notification as read in UI state
+                              setState(() {
+                                notif['is_read'] = 1;
+                              });
+
+                              // Fire background API call to update notification state to read
+                              try {
+                                final isSchoolStaff = widget.studentId == null;
+                                final path = isSchoolStaff 
+                                    ? '/api/school/notifications/${notif['id']}/read'
+                                    : '/api/student/notifications/${notif['id']}/read';
+                                final uri = Uri.parse('${widget.baseUrl}$path');
+                                final headers = {
+                                  'Content-Type': 'application/json',
+                                  'Authorization': 'Bearer ${widget.token}',
+                                  if (widget.studentId != null) 'X-Student-Id': widget.studentId.toString(),
+                                };
+                                http.post(uri, headers: headers).catchError((_) => http.Response('', 500));
+                              } catch (_) {}
+
+                              if (linkStr.contains('leaves') || titleLower.contains('leave') || msgLower.contains('leave')) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => LeaveListScreen(
+                                      leaveService: LeaveService(baseUrl: widget.baseUrl, token: widget.token),
+                                      userRole: widget.studentId != null ? 'PARENT' : 'TEACHER',
+                                      selectedStudentId: widget.studentId,
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+
+                              if (linkStr.contains('timetable') || titleLower.contains('timetable') || msgLower.contains('timetable')) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => TimetableScreen(
+                                      baseUrl: widget.baseUrl,
+                                      token: widget.token,
+                                      userRole: widget.studentId != null ? 'PARENT' : 'TEACHER',
+                                      selectedStudentId: widget.studentId,
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+
                               showDialog(
                                 context: context,
                                 barrierDismissible: false,
@@ -276,7 +350,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                           children: [
                                             Expanded(
                                               child: Text(
-                                                notif['title'] ?? 'Notification',
+                                                _getDynamicNotificationHeading(notif),
                                                 style: TextStyle(
                                                   fontSize: 15,
                                                   fontWeight: isUnread ? FontWeight.w800 : FontWeight.bold,

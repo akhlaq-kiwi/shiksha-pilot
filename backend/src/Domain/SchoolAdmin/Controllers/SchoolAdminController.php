@@ -83,6 +83,21 @@ class SchoolAdminController extends BaseController
         return $this->success($response, $student, 'Student updated successfully');
     }
 
+    public function advanceStudent(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int) ($args['id'] ?? 0);
+        $body = RequestParser::body($request);
+        $targetClassId = (int) ($body['class_id'] ?? 0);
+
+        $result = $this->service->advanceStudent($user, $id, $targetClassId);
+
+        return $this->success($response, $result, 'Student advanced successfully');
+    }
+
+
     public function checkSrNo(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
@@ -441,6 +456,28 @@ class SchoolAdminController extends BaseController
         return $this->success($response, null, 'Exam results status updated successfully');
     }
 
+    public function publishExamScheme(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $examId = (int)$args['id'];
+        $body = RequestParser::body($request);
+        $classId = (int)($body['class_id'] ?? 0);
+        $this->service->publishExamScheme($user, $examId, $classId);
+        return $this->success($response, null, 'Examination scheme published successfully');
+    }
+
+    public function publishExamAdmitCards(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $examId = (int)$args['id'];
+        $body = RequestParser::body($request);
+        $classId = (int)($body['class_id'] ?? 0);
+        $this->service->publishExamAdmitCards($user, $examId, $classId);
+        return $this->success($response, null, 'Admit cards published successfully');
+    }
+
     public function getReportCards(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
@@ -787,6 +824,135 @@ class SchoolAdminController extends BaseController
 
     protected function requireRole(array $user, string|array $roles): void
     {
+        $userRole = $user['role'] ?? '';
+        if ($userRole === 'TEACHER') {
+            // Retrieve teacher permissions
+            $permsData = $this->service->getMyPermissions($user);
+            $permissions = $permsData['permissions'] ?? [];
+
+            // If teacher has zero web permissions, they are not authorized at all
+            if (empty($permissions)) {
+                throw new \App\Shared\Exceptions\ForbiddenException('Access Denied. No role assigned.');
+            }
+
+            // Route-to-Permission mapping
+            $uri = $_SERVER['REQUEST_URI'] ?? '';
+            $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+            
+            // 1. Shared/Bootstrap endpoints (always allowed for authorized teachers)
+            $isShared = false;
+            $sharedPaths = [
+                '/api/school/my-permissions',
+                '/api/school/profile',
+                '/api/school/academic-years',
+                '/api/school/notifications',
+                '/api/school/plans',
+                '/api/school/subscriptions',
+            ];
+            foreach ($sharedPaths as $path) {
+                if (str_contains($uri, $path)) {
+                    $isShared = true;
+                    break;
+                }
+            }
+
+            // Also allow GET requests to common entity resources for dropdowns/filters
+            if ($method === 'GET') {
+                $sharedGetPaths = [
+                    '/api/school/classes',
+                    '/api/school/subjects',
+                    '/api/school/students',
+                    '/api/school/staff',
+                    '/api/school/holidays',
+                    '/api/school/grade-configurations',
+                    '/api/school/period-configurations',
+                    '/api/school/timetable-settings',
+                ];
+                foreach ($sharedGetPaths as $path) {
+                    if (str_contains($uri, $path)) {
+                        $isShared = true;
+                        break;
+                    }
+                }
+            }
+
+            if ($isShared) {
+                // Check subscription expiry
+                if (!str_contains($uri, '/api/school/profile') && 
+                    !str_contains($uri, '/api/school/plans') && 
+                    !str_contains($uri, '/api/school/subscriptions') &&
+                    $this->service->checkSubscriptionExpired($user)) {
+                    throw new \App\Shared\Exceptions\ForbiddenException('Subscription Expired. Access Denied.');
+                }
+                return;
+            }
+
+            // Document Upload endpoint permission mapping
+            if (str_contains($uri, '/api/school/upload')) {
+                if (in_array('Classes', $permissions, true) || in_array('Leave Requests', $permissions, true)) {
+                    return;
+                }
+                throw new \App\Shared\Exceptions\ForbiddenException('Access Denied. Upload permission required.');
+            }
+
+            // 2. Specific module authorization check
+            $authorized = false;
+            
+            // Map URI pattern to menu label
+            $mappings = [
+                '/api/school/stats' => 'Dashboard',
+                '/api/school/students' => 'Classes',
+                '/api/school/classes' => 'Classes',
+                '/api/school/staff' => 'Teachers',
+                '/api/school/staff-payments' => 'Teachers',
+                '/api/school/timetable' => 'Timetable',
+                '/api/school/timetable-settings' => 'Timetable',
+                '/api/school/period-configurations' => 'Timetable',
+                '/api/school/attendance' => 'Attendance',
+                '/api/school/leave-requests' => 'Leave Requests',
+                '/api/school/exams' => 'Examinations',
+                '/api/school/exams-new' => 'Examinations',
+                '/api/school/exam-marks' => 'Examinations',
+                '/api/school/grade-configurations' => 'Examinations',
+                '/api/school/fee-structures' => 'Fees Portal',
+                '/api/school/fee-payments' => 'Fees Portal',
+                '/api/school/collection-history' => 'Fees Portal',
+                '/api/school/class-fee-configurations' => 'Fees Portal',
+                '/api/school/additional-fees' => 'Fees Portal',
+                '/api/school/financial-reports' => 'Financial Reports',
+                '/api/school/finance-management' => 'Finance Management',
+                '/api/school/expenses' => 'Finance Management',
+                '/api/school/transport-fees' => 'Finance Management',
+                '/api/school/fee-follow-ups' => 'Fee Follow-up',
+                '/api/school/announcements' => 'Announcements',
+                '/api/school/audits-settings' => 'Audits & Settings',
+                '/api/school/academic-years' => 'Audits & Settings',
+                '/api/school/menu-permissions' => 'Audits & Settings',
+                '/api/school/credentials' => 'Security',
+                '/api/school/holidays' => 'Security',
+            ];
+
+            foreach ($mappings as $pattern => $menuLabel) {
+                if (str_contains($uri, $pattern)) {
+                    if (in_array($menuLabel, $permissions, true)) {
+                        $authorized = true;
+                    }
+                    break;
+                }
+            }
+
+            if (!$authorized) {
+                throw new \App\Shared\Exceptions\ForbiddenException('Access Denied. You do not have permission to perform this action.');
+            }
+
+            // Check subscription expiry
+            if ($this->service->checkSubscriptionExpired($user)) {
+                throw new \App\Shared\Exceptions\ForbiddenException('Subscription Expired. Access Denied.');
+            }
+            return;
+        }
+
+        // Default role validation for non-teachers (e.g. SCHOOL_ADMIN)
         parent::requireRole($user, $roles);
 
         $uri = $_SERVER['REQUEST_URI'] ?? '';
@@ -1218,6 +1384,66 @@ class SchoolAdminController extends BaseController
         $data = $this->service->revertAdditionalFeePayment($user, $id);
 
         return $this->success($response, $data, 'Additional fee payment reverted successfully');
+    }
+
+    public function getTransportFees(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $params = $request->getQueryParams();
+        $status = $params['status'] ?? 'All';
+
+        $data = $this->service->getTransportFees($user, $status);
+
+        return $this->success($response, $data);
+    }
+
+    public function assignTransportFee(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body = RequestParser::body($request);
+        $data = $this->service->assignTransportFee($user, $body);
+
+        return $this->success($response, $data, 'Transport fee assigned successfully', 201);
+    }
+
+    public function updateTransportFee(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int)($args['id'] ?? 0);
+        $body = RequestParser::body($request);
+        $data = $this->service->updateTransportFee($user, $id, $body);
+
+        return $this->success($response, $data, 'Transport fee updated successfully');
+    }
+
+    public function deleteTransportFee(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int)($args['id'] ?? 0);
+        $data = $this->service->deleteTransportFee($user, $id);
+
+        return $this->success($response, $data, 'Transport fee deleted successfully');
+    }
+
+    public function toggleTransportFeeStatus(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int)($args['id'] ?? 0);
+        $body = RequestParser::body($request);
+        $status = $body['status'] ?? 'Active';
+        $data = $this->service->toggleTransportFeeStatus($user, $id, $status);
+
+        return $this->success($response, $data, 'Transport fee status updated successfully');
     }
 
     public function getExamInstructions(Request $request, Response $response, array $args): Response

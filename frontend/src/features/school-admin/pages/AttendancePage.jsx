@@ -44,21 +44,6 @@ export default function AttendancePage() {
   // Leave Days state
   const [holidays, setHolidays] = useState([]);
   const [loadingHolidays, setLoadingHolidays] = useState(false);
-  const [newLeaveTitle, setNewLeaveTitle] = useState('');
-  const [newLeaveDate, setNewLeaveDate] = useState('');
-  const [holidayFormError, setHolidayFormError] = useState('');
-  const [savingHoliday, setSavingHoliday] = useState(false);
-
-  // Three-dot menu and inline editing state
-  const [openMenuHolidayId, setOpenMenuHolidayId] = useState(null);
-  const [editingHolidayId, setEditingHolidayId] = useState(null);
-  const [editName, setEditName] = useState('');
-  const [editDate, setEditDate] = useState('');
-  const [editError, setEditError] = useState('');
-
-  // Delete Holiday state
-  const [holidayToDelete, setHolidayToDelete] = useState(null);
-  const [deletingHoliday, setDeletingHoliday] = useState(false);
 
   // Load classes initially
   useEffect(() => {
@@ -234,107 +219,6 @@ export default function AttendancePage() {
     }
   };
 
-  // Holiday creation
-  const handleCreateHoliday = async (e) => {
-    e.preventDefault();
-    setHolidayFormError('');
-    if (!newLeaveTitle.trim()) {
-      setHolidayFormError('Holiday title is required.');
-      return;
-    }
-    if (!newLeaveDate) {
-      setHolidayFormError('Holiday date is required.');
-      return;
-    }
-
-    if (currentYear) {
-      if (newLeaveDate < currentYear.start_date || newLeaveDate > currentYear.end_date) {
-        setHolidayFormError(`Holiday date must be within the active Academic Year (${currentYear.start_date} to ${currentYear.end_date}).`);
-        return;
-      }
-    }
-
-    setSavingHoliday(true);
-    try {
-      await schoolService.createHoliday({
-        name: newLeaveTitle.trim(),
-        date: newLeaveDate
-      });
-      toast.success('Holiday created successfully.');
-      setNewLeaveTitle('');
-      setNewLeaveDate('');
-      loadHolidays();
-    } catch (err) {
-      console.error(err);
-      const errMsg = err.response?.data?.message || 'Failed to create holiday.';
-      setHolidayFormError(errMsg);
-    } finally {
-      setSavingHoliday(false);
-    }
-  };
-
-  // Holiday updating
-  const handleUpdateHoliday = async (id) => {
-    setEditError('');
-    if (!editName.trim()) {
-      setEditError('Holiday name is required.');
-      return;
-    }
-    if (!editDate) {
-      setEditError('Holiday date is required.');
-      return;
-    }
-
-    if (currentYear) {
-      if (editDate < currentYear.start_date || editDate > currentYear.end_date) {
-        setEditError(`Holiday date must be within the active Academic Year (${currentYear.start_date} to ${currentYear.end_date}).`);
-        return;
-      }
-    }
-
-    try {
-      await schoolService.updateHoliday(id, {
-        name: editName.trim(),
-        date: editDate
-      });
-      toast.success('Holiday updated successfully.');
-      setEditingHolidayId(null);
-      loadHolidays();
-    } catch (err) {
-      console.error(err);
-      const errMsg = err.response?.data?.message || 'Failed to update holiday.';
-      setEditError(errMsg);
-    }
-  };
-
-  // Holiday deleting modal trigger
-  const handleDeleteHoliday = (h) => {
-    setHolidayToDelete(h);
-  };
-
-  const confirmDeleteHoliday = async () => {
-    if (!holidayToDelete) return;
-    setDeletingHoliday(true);
-    try {
-      await schoolService.deleteHoliday(holidayToDelete.id);
-      toast.success('Holiday deleted successfully.');
-      setHolidayToDelete(null);
-      loadHolidays();
-    } catch (err) {
-      console.error(err);
-      toast.error('Failed to delete holiday.');
-    } finally {
-      setDeletingHoliday(false);
-    }
-  };
-
-  const startEditHoliday = (h) => {
-    setEditingHolidayId(h.id);
-    setEditName(h.name);
-    setEditDate(h.date);
-    setEditError('');
-  };
-
   // Helper to check if a date is Sunday
   const getIsSunday = (dateStr) => {
     if (!dateStr) return false;
@@ -472,19 +356,9 @@ export default function AttendancePage() {
         >
           Monthly Report
         </button>
-        <button
-          onClick={() => setActiveTab('leave')}
-          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px ${
-            activeTab === 'leave'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-text-muted hover:text-text-primary'
-          }`}
-        >
-          Leave Days
-        </button>
       </div>
 
-      {activeTab !== 'leave' && (
+      {(
         /* Dropdown controls for Attendance marking and Report */
         <Card className="border border-border bg-zinc-50/40 dark:bg-zinc-900/40 shadow-sm">
           <CardContent className="p-4 flex flex-wrap gap-4 items-end">
@@ -731,7 +605,7 @@ export default function AttendancePage() {
             )}
           </div>
         )
-      ) : activeTab === 'report' ? (
+      ) : (
         !activeClass ? (
           <Card className="border-dashed border-2 py-12 text-center text-text-muted">
             <CardContent>Please select a Class and Section to view the monthly report.</CardContent>
@@ -801,184 +675,7 @@ export default function AttendancePage() {
             </Table>
           </Card>
         )
-      ) : (
-        /* Leave Days Section */
-        <div className="space-y-6">
-          {/* Top Form */}
-          {!isReadOnly && (
-            <Card className="border border-border shadow-sm">
-              <CardHeader className="pb-3 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
-                <CardTitle className="text-sm font-bold text-text-primary flex items-center gap-1.5">
-                  <Plus className="h-4 w-4" /> Add Holiday / Leave Day
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-4">
-                <form onSubmit={handleCreateHoliday} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-text-secondary uppercase">Leave Title</label>
-                    <Input
-                      type="text"
-                      placeholder="e.g. Republic Day"
-                      value={newLeaveTitle}
-                      onChange={e => setNewLeaveTitle(e.target.value)}
-                      className="h-9"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-text-secondary uppercase">Leave Date</label>
-                    <Input
-                      type="date"
-                      value={newLeaveDate}
-                      onChange={e => setNewLeaveDate(e.target.value)}
-                      min={currentYear?.start_date || ''}
-                      max={currentYear?.end_date || ''}
-                      className="h-9"
-                    />
-                  </div>
-                  <div>
-                    <Button type="submit" className="w-full h-9 font-semibold" disabled={savingHoliday}>
-                      {savingHoliday ? 'Saving...' : 'Save'}
-                    </Button>
-                  </div>
-                  {holidayFormError && (
-                    <div className="col-span-1 md:col-span-3">
-                      <p className="text-xs font-bold text-red-500 flex items-center gap-1">
-                        <AlertCircle className="h-3 w-3" /> {holidayFormError}
-                      </p>
-                    </div>
-                  )}
-                </form>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Below Holidays List */}
-          <Card className="border border-border shadow-sm">
-            <CardHeader className="pb-3 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
-              <CardTitle className="text-sm font-bold text-text-primary">School Holidays List</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-4">
-              {sortedHolidays.length === 0 ? (
-                <div className="text-center py-8 text-text-muted text-sm border-dashed border-2 rounded-xl">
-                  No holidays created for this academic year.
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                  {sortedHolidays.map(h => {
-                    const isEditingThis = editingHolidayId === h.id;
-                    const isPast = h.date < todayStr;
-                    const dateFormatted = new Date(h.date).toLocaleDateString('en-US', {
-                      day: 'numeric',
-                      month: 'long',
-                      year: 'numeric'
-                    });
-
-                    return (
-                      <Card key={h.id} className="border border-border hover:border-zinc-300 dark:hover:border-zinc-800 transition-all shadow-sm rounded-xl relative">
-                        <CardContent className="p-4">
-                          {isEditingThis ? (
-                            <div className="space-y-3">
-                              <div className="space-y-2">
-                                <div className="space-y-1">
-                                  <label className="text-[10px] font-black uppercase text-text-secondary">Holiday Name</label>
-                                  <Input 
-                                    value={editName} 
-                                    onChange={e => setEditName(e.target.value)} 
-                                    className="h-8 text-sm"
-                                  />
-                                </div>
-                                <div className="space-y-1">
-                                  <label className="text-[10px] font-black uppercase text-text-secondary">Date</label>
-                                  <Input 
-                                    type="date"
-                                    value={editDate} 
-                                    onChange={e => setEditDate(e.target.value)} 
-                                    min={currentYear?.start_date || ''}
-                                    max={currentYear?.end_date || ''}
-                                    className="h-8 text-sm"
-                                  />
-                                </div>
-                              </div>
-                              {editError && (
-                                <p className="text-xs font-bold text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" /> {editError}</p>
-                              )}
-                              <div className="flex justify-end gap-2">
-                                <Button variant="outline" size="sm" className="h-8 text-xs font-bold" onClick={() => setEditingHolidayId(null)}>
-                                  Cancel
-                                </Button>
-                                <Button size="sm" className="h-8 text-xs font-bold" onClick={() => handleUpdateHoliday(h.id)}>
-                                  Save
-                                </Button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex items-center justify-between gap-4">
-                              <div>
-                                <h4 className="font-bold text-text-primary text-sm tracking-tight">{h.name}</h4>
-                                <p className="text-[10px] font-bold text-text-secondary uppercase mt-0.5 flex items-center gap-1">
-                                  <Calendar className="h-3 w-3" /> {dateFormatted}
-                                  {isPast && <Lock className="h-3 w-3 ml-1 text-text-muted" />}
-                                </p>
-                              </div>
-                              
-                              {!isReadOnly && !isPast && (
-                                <DropdownMenu>
-                                  <DropdownItem onClick={() => startEditHoliday(h)}>
-                                    Edit
-                                  </DropdownItem>
-                                  <DropdownItem destructive onClick={() => handleDeleteHoliday(h)}>
-                                    Delete
-                                  </DropdownItem>
-                                </DropdownMenu>
-                              )}
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
       )}
-      {/* Delete Holiday Confirmation Modal */}
-      <Dialog
-        isOpen={holidayToDelete !== null}
-        onClose={() => setHolidayToDelete(null)}
-        title="Delete Holiday"
-        description="This action cannot be undone."
-        footer={
-          <div className="flex gap-2 justify-end">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setHolidayToDelete(null)}
-              disabled={deletingHoliday}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={confirmDeleteHoliday}
-              disabled={deletingHoliday}
-            >
-              {deletingHoliday ? 'Deleting...' : 'Delete'}
-            </Button>
-          </div>
-        }
-      >
-        <div className="space-y-3 py-1">
-          <p className="text-sm text-text-secondary">
-            Are you sure you want to delete the holiday <strong className="text-text-primary">"{holidayToDelete?.name}"</strong> scheduled for <strong className="text-text-primary">{holidayToDelete && new Date(holidayToDelete.date).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}</strong>?
-          </p>
-          <p className="text-xs text-red-500 font-medium">
-            This will remove the holiday from the academic calendar and restore this date as a working day for attendance tracking.
-          </p>
-        </div>
-      </Dialog>
     </div>
   );
 }

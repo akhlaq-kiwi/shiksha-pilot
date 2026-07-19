@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, BookOpen, ClipboardList, CalendarCheck,
   CreditCard, Library, Users, FileText
@@ -15,6 +16,7 @@ import FeesPage from './pages/FeesPage';
 import ResourcesPage from './pages/ResourcesPage';
 import ParentPage from './pages/ParentPage';
 import ParentLeavePage from './pages/ParentLeavePage';
+import SettingsPage from './pages/SettingsPage';
 
 // ─── Mock Data ─────────────────────────────────────────────────────────────────
 
@@ -156,7 +158,7 @@ function AppSidebar({ currentPage, onNavigate, isParent, user, selectedChild, on
     { id: 'academics', icon: BookOpen, label: 'Academics' },
     { id: 'assignments', icon: ClipboardList, label: 'Assignments' },
     { id: 'attendance', icon: CalendarCheck, label: 'Attendance' },
-    { id: 'leaves', icon: FileText, label: 'Leave Requests' },
+    { id: 'leaves', icon: FileText, label: 'Leaves' },
     { id: 'fees', icon: CreditCard, label: 'Fees' },
     { id: 'resources', icon: Library, label: 'Resources' },
     ...(isParent ? [{ id: 'parent', icon: Users, label: 'My Children' }] : []),
@@ -243,18 +245,44 @@ export default function StudentParentPortal() {
   const isParent = role === 'PARENT';
   const displayName = user?.name || (isParent ? 'PARENT' : 'STUDENT');
 
-  const [currentPage, setCurrentPage] = useState('dashboard');
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const getPageFromPath = useCallback(() => {
+    const path = location.pathname;
+    if (path.endsWith('/leaves')) return 'leaves';
+    if (path.endsWith('/academics')) return 'academics';
+    if (path.endsWith('/assignments')) return 'assignments';
+    if (path.endsWith('/attendance')) return 'attendance';
+    if (path.endsWith('/fees')) return 'fees';
+    if (path.endsWith('/resources')) return 'resources';
+    if (path.endsWith('/parent')) return 'parent';
+    if (path.endsWith('/settings')) return 'settings';
+    return 'dashboard';
+  }, [location.pathname]);
+
+  const [currentPage, setCurrentPage] = useState(getPageFromPath);
+
+  useEffect(() => {
+    setCurrentPage(getPageFromPath());
+  }, [location.pathname, getPageFromPath]);
+
+  const handleNavigate = (id) => {
+    const base = role === 'PARENT' ? '/parent' : '/student';
+    navigate(id === 'dashboard' ? base : `${base}/${id}`);
+  };
+
   const [selectedChild, setSelectedChild] = useState(MOCK_CHILDREN[0]);
 
   const data = MOCK_DATA;
 
-  const handlePayNow = () => setCurrentPage('fees');
+  const handlePayNow = () => handleNavigate('fees');
 
   return (
     <div className="flex flex-col md:flex-row w-full min-h-[calc(100vh-56px)] bg-background">
       <AppSidebar
         currentPage={currentPage}
-        onNavigate={setCurrentPage}
+        onNavigate={handleNavigate}
         isParent={isParent}
         user={user}
         selectedChild={selectedChild}
@@ -298,6 +326,9 @@ export default function StudentParentPortal() {
         )}
         {currentPage === 'resources' && (
           <ResourcesPage materials={data.resources} />
+        )}
+        {currentPage === 'settings' && (
+          <SettingsPage />
         )}
         {currentPage === 'parent' && isParent && (
           <ParentPage

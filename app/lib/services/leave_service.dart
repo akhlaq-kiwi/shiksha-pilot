@@ -119,6 +119,18 @@ class LeaveService {
     }
   }
 
+  Future<List<dynamic>> getHolidays() async {
+    final uri = Uri.parse('$baseUrl/api/school/holidays');
+    final response = await http.get(uri, headers: _headers);
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body)['data'] ?? [];
+    } else {
+      _handleErrorResponse(response, 'Failed to load holidays.');
+      throw Exception('Failed to load holidays.');
+    }
+  }
+
   void _handleErrorResponse(http.Response response, String defaultMsg) {
     try {
       final decoded = json.decode(response.body);

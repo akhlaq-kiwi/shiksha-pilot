@@ -48,33 +48,66 @@ class AuthService extends BaseService
      * @throws ValidationException     when the password does not match.
      * @throws ForbiddenException      when the account is not in ACTIVE status.
      */
-    public function login(string $phone, string $password, ?string $subdomain = null): array
+    public function login(string $phone, string $password, ?string $subdomain = null, ?string $clientType = null): array
     {
         $user = $this->repo->findByPhone($phone);
+        $isValid = true;
 
         if ($user === null) {
-            $this->logAuditDirect(['email' => $phone, 'role' => 'Guest'], 'Security', 'Failed Login Attempt', 'Failed login attempt for unregistered phone number ' . $phone);
-            throw new \App\Shared\Exceptions\ValidationException(['phone' => 'No account found with this mobile number.']);
+            $isValid = false;
+        } elseif (!password_verify($password, (string) ($user['password'] ?? ''))) {
+            $isValid = false;
+        } elseif (($user['status'] ?? '') !== 'ACTIVE') {
+            $isValid = false;
+        } elseif (isset($user['school_id']) && $user['school_id'] !== null && ($user['school_status'] ?? '') !== 'ACTIVE') {
+            $isValid = false;
         }
 
-        if (!password_verify($password, (string) ($user['password'] ?? ''))) {
-            $this->logAuditDirect($user, 'Security', 'Failed Login Attempt', 'Failed login attempt for user "' . ($user['name'] ?? $user['email']) . '" due to incorrect password');
-            throw new \App\Shared\Exceptions\ValidationException(['password' => 'Incorrect password. Please try again.']);
+        if (!$isValid) {
+            if ($user) {
+                $this->logAuditDirect($user, 'Security', 'Failed Login Attempt', 'Failed login attempt for user "' . ($user['name'] ?? $user['email']) . '"');
+            } else {
+                $this->logAuditDirect(['email' => $phone, 'role' => 'Guest'], 'Security', 'Failed Login Attempt', 'Failed login attempt for unregistered phone number ' . $phone);
+            }
+            throw new \App\Shared\Exceptions\ValidationException(['phone' => 'Invalid Credentials']);
         }
 
-        if (($user['status'] ?? '') !== 'ACTIVE') {
-            $this->logAuditDirect($user, 'Security', 'Failed Login Attempt', 'Failed login attempt for inactive account of user "' . ($user['name'] ?? $user['email']) . '"');
-            throw new ForbiddenException('Account is not active.');
-        }
-
-        if (isset($user['school_id']) && $user['school_id'] !== null) {
-            if (($user['school_status'] ?? '') !== 'ACTIVE') {
-                $this->logAuditDirect($user, 'Security', 'Failed Login Attempt', 'Failed login attempt for user "' . ($user['name'] ?? $user['email']) . '" because school status is inactive');
-                throw new ForbiddenException('Your school account has been deactivated. Please contact the Super Administrator.');
+        // Apply Login Matrix restrictions based on clientType
+        $role = strtoupper($user['role'] ?? '');
+        if ($clientType === 'web') {
+            if ($role === 'STUDENT' || $role === 'PARENT') {
+                $this->logAuditDirect($user, 'Security', 'Failed Login Attempt', 'Web login blocked: Student/Parent cannot log in to web portal');
+                throw new \App\Shared\Exceptions\ValidationException(['phone' => 'Invalid Credentials']);
+            }
+            if ($role === 'TEACHER') {
+                $pdo = $this->repo->getPdo();
+                $stmtAllowedCheck = $pdo->prepare("
+                    SELECT 1 
+                    FROM staff s 
+                    WHERE s.phone = :phone AND s.school_id = :school_id
+                      AND (
+                        EXISTS (SELECT 1 FROM teacher_menu_permissions tmp WHERE tmp.teacher_id = s.id)
+                        OR EXISTS (SELECT 1 FROM class_teacher_assignments cta WHERE cta.teacher_id = s.id)
+                      )
+                    LIMIT 1
+                ");
+                $stmtAllowedCheck->execute([
+                    ':phone' => $user['phone'],
+                    ':school_id' => $user['school_id']
+                ]);
+                $isAllowed = (bool)$stmtAllowedCheck->fetchColumn();
+                if (!$isAllowed) {
+                    $this->logAuditDirect($user, 'Security', 'Failed Login Attempt', 'Web login blocked: Teacher has no portal menu permissions or class assignments');
+                    throw new \App\Shared\Exceptions\ValidationException(['phone' => 'Invalid Credentials']);
+                }
+            }
+        } else {
+            // Mobile app login (anything not explicitly marked as web client type)
+            if ($role === 'SCHOOL_ADMIN' || $role === 'SUPER_ADMIN') {
+                $this->logAuditDirect($user, 'Security', 'Failed Login Attempt', 'Mobile login blocked: School/Super admin cannot log in to mobile app');
+                throw new \App\Shared\Exceptions\ValidationException(['phone' => 'Invalid Credentials']);
             }
         }
-
-
 
         $safeUser = array_diff_key($user, ['password' => true]);
 
@@ -100,19 +133,28 @@ class AuthService extends BaseService
      *
      * @throws ValidationException when the new password is too short.
      */
-    public function changePassword(int $userId, string $newPassword): void
+    public function changePassword(int $userId, ?string $currentPassword, string $newPassword, string $role): void
     {
+        $user = $this->repo->findById($userId);
+        if ($user === null) {
+            throw new \App\Shared\Exceptions\NotFoundException('User not found.');
+        }
+
+        // Strictly verify current password for mobile roles (TEACHER / STUDENT)
+        if ($currentPassword !== null || $role === 'TEACHER' || $role === 'STUDENT') {
+            if ($currentPassword === null || !password_verify($currentPassword, (string) ($user['password'] ?? ''))) {
+                throw new \App\Shared\Exceptions\ValidationException(['current_password' => 'Incorrect current password.']);
+            }
+        }
+
         if (strlen($newPassword) < 6) {
-            throw new ValidationException(['password' => 'Password must be at least 6 characters.']);
+            throw new \App\Shared\Exceptions\ValidationException(['password' => 'Password must be at least 6 characters.']);
         }
 
         $this->repo->updatePassword($userId, $newPassword);
         $this->log('Password changed', ['id' => $userId]);
 
-        $userObj = $this->repo->findById($userId);
-        if ($userObj) {
-            $this->logAuditDirect($userObj, 'Security', 'Password Changed', 'Password changed for user "' . ($userObj['name'] ?? $userObj['email']) . '"');
-        }
+        $this->logAuditDirect($user, 'Security', 'Password Changed', 'Password changed for user "' . ($user['name'] ?? $user['email']) . '"');
     }
 
     private function logAuditDirect(
@@ -199,6 +241,23 @@ class AuthService extends BaseService
             throw new NotFoundException('User not found.');
         }
 
-        return array_diff_key($user, ['password' => true]);
+        $profile = array_diff_key($user, ['password' => true]);
+
+        if ($user['role'] === 'TEACHER') {
+            $stmt = $this->repo->getPdo()->prepare("
+                SELECT department, employee_id, photo_path FROM staff 
+                WHERE phone = :phone AND school_id = :sid AND status = 'ACTIVE'
+                LIMIT 1
+            ");
+            $stmt->execute([':phone' => $user['phone'], ':sid' => $user['school_id']]);
+            $staff = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($staff) {
+                $profile['department'] = $staff['department'] ?? null;
+                $profile['employee_id'] = $staff['employee_id'] ?? null;
+                $profile['photo_path'] = $staff['photo_path'] ?? null;
+            }
+        }
+
+        return $profile;
     }
 }

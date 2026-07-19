@@ -19,6 +19,16 @@ class TeacherController extends BaseController
         parent::__construct($tokenService);
     }
 
+    public function getDashboard(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, 'TEACHER');
+
+        $data = $this->service->getDashboard((int) $user['id'], (int) $user['school_id']);
+
+        return $this->success($response, $data);
+    }
+
     // -------------------------------------------------------------------------
     // Schedule / Classes
     // -------------------------------------------------------------------------
@@ -28,7 +38,10 @@ class TeacherController extends BaseController
         $user = $this->authenticate($request);
         $this->requireRole($user, 'TEACHER');
 
-        $data = $this->service->getTodaySchedule((int) $user['id'], (int) $user['school_id']);
+        $params = $request->getQueryParams();
+        $date = $params['date'] ?? null;
+
+        $data = $this->service->getTodaySchedule((int) $user['id'], (int) $user['school_id'], $date);
 
         return $this->success($response, $data);
     }
@@ -189,5 +202,22 @@ class TeacherController extends BaseController
             ->withHeader('Content-Type', 'application/pdf')
             ->withHeader('Content-Disposition', 'attachment; filename="' . $slip['filename'] . '"')
             ->withStatus(200);
+    }
+
+    public function getExamsList(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, 'TEACHER');
+        $data = $this->service->getExamsList($user);
+        return $this->success($response, $data);
+    }
+
+    public function getExamDetails(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, 'TEACHER');
+        $examId = (int)$args['id'];
+        $data = $this->service->getExamDetails($user, $examId);
+        return $this->success($response, $data);
     }
 }

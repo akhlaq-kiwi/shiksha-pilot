@@ -32,7 +32,7 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
   File? _attachment;
   
   bool _isSubmitting = false;
-  int _wordCount = 0;
+  int _charCount = 0;
 
   final List<String> _leaveTypes = [
     'Sick Leave',
@@ -45,20 +45,20 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
   @override
   void initState() {
     super.initState();
-    _reasonController.addListener(_updateWordCount);
+    _reasonController.addListener(_updateCharCount);
   }
 
   @override
   void dispose() {
-    _reasonController.removeListener(_updateWordCount);
+    _reasonController.removeListener(_updateCharCount);
     _reasonController.dispose();
     super.dispose();
   }
 
-  void _updateWordCount() {
-    final text = _reasonController.text.trim();
+  void _updateCharCount() {
+    final text = _reasonController.text;
     setState(() {
-      _wordCount = text.isEmpty ? 0 : text.split(RegExp(r'\s+')).length;
+      _charCount = text.length;
     });
   }
 
@@ -110,9 +110,9 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
       return;
     }
 
-    if (_wordCount > 100) {
+    if (_charCount > 300) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Reason cannot exceed 100 words. Current: $_wordCount')),
+        const SnackBar(content: Text('Maximum 300 characters allowed.')),
       );
       return;
     }
@@ -307,9 +307,9 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
                           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                         ),
                         Text(
-                          '$_wordCount/100 Words',
+                          '$_charCount/300 Characters',
                           style: TextStyle(
-                            color: _wordCount > 100 ? Colors.red : Colors.grey[600],
+                            color: _charCount >= 300 ? Colors.red : Colors.grey[600],
                             fontWeight: FontWeight.bold,
                             fontSize: 11,
                           ),
@@ -320,8 +320,12 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
                     TextFormField(
                       controller: _reasonController,
                       maxLines: 4,
+                      maxLength: 300,
                       decoration: InputDecoration(
-                        hintText: 'Enter detailed reason (max 100 words)...',
+                        hintText: 'Enter detailed reason (max 300 characters)...',
+                        counterText: '',
+                        helperText: _charCount >= 300 ? 'Maximum 300 characters allowed.' : null,
+                        helperStyle: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -330,8 +334,8 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
                         if (val == null || val.trim().isEmpty) {
                           return 'Please enter the reason for leave.';
                         }
-                        if (_wordCount > 100) {
-                          return 'Reason cannot exceed 100 words.';
+                        if (val.length > 300) {
+                          return 'Maximum 300 characters allowed.';
                         }
                         return null;
                       },

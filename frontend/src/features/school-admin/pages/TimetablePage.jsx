@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Calendar, ChevronLeft, ChevronRight, Plus, Edit, Trash2, ShieldAlert, CheckCircle2, Lock, MoreVertical, RefreshCw, UserPlus, Users, FileText, Download, Printer } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
@@ -42,6 +43,7 @@ const getWeekDates = (baseDateStr) => {
 };
 
 export default function TimetablePage() {
+  const navigate = useNavigate();
   const { currentYear, isReadOnly } = useAcademicYear();
   const toast = useToast();
 
@@ -56,12 +58,15 @@ export default function TimetablePage() {
   const [staff, setStaff] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [allTimetableEntries, setAllTimetableEntries] = useState([]);
+  const [holidays, setHolidays] = useState([]);
 
   // Load state
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
   const [error, setError] = useState('');
   const [formErrors, setFormErrors] = useState({});
+  const [checkingPrereqs, setCheckingPrereqs] = useState(true);
+  const [hasSchoolSubjects, setHasSchoolSubjects] = useState(false);
 
   // Dialog states
   const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
@@ -101,33 +106,70 @@ export default function TimetablePage() {
     Saturday: { subject_id: '', teacher_id: '' }
   });
 
-  // Load initial options
+  // Load initial options and check prerequisites
   useEffect(() => {
-    const fetchClasses = async () => {
+    const initPage = async () => {
+      setCheckingPrereqs(true);
+      setError('');
       try {
-        const list = await schoolService.getClasses();
-        setClasses(list || []);
-        if (list && list.length > 0) {
-          setSelectedClassId(String(list[0].id));
+        const [classList, settings, subjectsList, holidaysList] = await Promise.all([
+          schoolService.getClasses().catch(err => {
+            console.error(err);
+            return [];
+          }),
+          schoolAdminService.getTimetableSettings().catch(err => {
+            console.error(err);
+            return null;
+          }),
+          schoolAdminService.getSubjects().catch(err => {
+            console.error(err);
+            return [];
+          }),
+          schoolService.getHolidays().catch(err => {
+            console.error(err);
+            return [];
+          })
+        ]);
+
+        const classesData = classList || [];
+        setClasses(classesData);
+        setHolidays(holidaysList || []);
+        
+        const hasSubjects = subjectsList && subjectsList.length > 0;
+        setHasSchoolSubjects(hasSubjects);
+        setModalSubjects(subjectsList || []);
+        
+        setTimetableSettings(settings || null);
+
+        if (classesData.length > 0) {
+          setSelectedClassId(String(classesData[0].id));
         }
+
+        const staffList = await schoolService.getStaff({ date: currentDate }).catch(err => {
+          console.error(err);
+          return [];
+        });
+        setStaff(staffList || []);
+
       } catch (err) {
         console.error(err);
+        setError('Failed to check timetable prerequisites.');
+      } finally {
+        setCheckingPrereqs(false);
       }
     };
-    fetchClasses();
-    loadStaff();
-    loadTimetableSettings();
+    initPage();
   }, []);
 
-  // Fetch timetable when class or date changes
+  // Fetch timetable when class or date changes, guarded by prerequisites
   useEffect(() => {
-    if (selectedClassId) {
+    if (selectedClassId && timetableSettings && hasSchoolSubjects) {
       loadTimetable();
       loadPeriodConfigs();
       loadSubjects();
       loadStaff();
     }
-  }, [selectedClassId, currentDate]);
+  }, [selectedClassId, currentDate, timetableSettings, hasSchoolSubjects]);
 
   const loadTimetableSettings = async () => {
     try {
@@ -538,34 +580,15 @@ export default function TimetablePage() {
   };
 
   const handleOpenSubjectModal = async () => {
-    const defaultClass = selectedClassId || (classes.length > 0 ? String(classes[0].id) : '');
-    setModalClassId(defaultClass);
     setNewSubject({ id: '', name: '' });
     setSubjectError('');
-    if (defaultClass) {
-      try {
-        const list = await schoolAdminService.getSubjects({ class_id: defaultClass });
-        setModalSubjects(list || []);
-      } catch (err) {
-        console.error(err);
-      }
-    } else {
-      setModalSubjects([]);
-    }
-    setIsSubjectModalOpen(true);
-  };
-
-  const loadModalSubjects = async (classId) => {
-    if (!classId) {
-      setModalSubjects([]);
-      return;
-    }
     try {
-      const list = await schoolAdminService.getSubjects({ class_id: classId });
+      const list = await schoolAdminService.getSubjects();
       setModalSubjects(list || []);
     } catch (err) {
       console.error(err);
     }
+    setIsSubjectModalOpen(true);
   };
 
   // Subject Management Dialog Action
@@ -576,10 +599,10 @@ export default function TimetablePage() {
       return;
     }
     
-    // Front-end case-insensitive check within current modal class subjects
+    // Front-end case-insensitive check within all modal subjects
     const exists = modalSubjects.some(s => s.name.toLowerCase() === trimmedName.toLowerCase() && s.id !== newSubject.id);
     if (exists) {
-      setSubjectError('This subject already exists for this class.');
+      setSubjectError('This subject already exists.');
       return;
     }
 
@@ -588,17 +611,17 @@ export default function TimetablePage() {
     try {
       if (newSubject.id) {
         await schoolAdminService.updateSubject(newSubject.id, {
-          name: trimmedName,
-          class_id: parseInt(modalClassId)
+          name: trimmedName
         });
       } else {
         await schoolAdminService.createSubject({
-          name: trimmedName,
-          class_id: parseInt(modalClassId)
+          name: trimmedName
         });
       }
       setNewSubject({ id: '', name: '' });
-      await loadModalSubjects(modalClassId);
+      const list = await schoolAdminService.getSubjects();
+      setModalSubjects(list || []);
+      setHasSchoolSubjects(list && list.length > 0);
       await loadSubjects();
     } catch (err) {
       console.error(err);
@@ -616,7 +639,9 @@ export default function TimetablePage() {
       await schoolAdminService.deleteSubject(subjectToDelete.id);
       setIsDeleteConfirmOpen(false);
       setSubjectToDelete(null);
-      await loadModalSubjects(modalClassId);
+      const list = await schoolAdminService.getSubjects();
+      setModalSubjects(list || []);
+      setHasSchoolSubjects(list && list.length > 0);
       await loadSubjects();
     } catch (err) {
       console.error(err);
@@ -680,6 +705,20 @@ export default function TimetablePage() {
     return `${formatLocalDate(weekDates.Monday)} – ${formatLocalDate(weekDates.Saturday)}`;
   };
 
+  if (checkingPrereqs) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px] w-full">
+        <div className="flex flex-col items-center gap-3">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <p className="text-xs font-bold text-text-muted uppercase tracking-wider">Loading Timetable...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const isTimetableConfigured = !!timetableSettings;
+  const showTimetable = isTimetableConfigured && hasSchoolSubjects;
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       
@@ -699,17 +738,19 @@ export default function TimetablePage() {
             <Users className="h-4 w-4" /> Manage Subjects
           </Button>
 
-          <Button 
-            variant="outline"
-            onClick={handleToggleSelectionMode}
-            className={`font-extrabold flex items-center gap-2 border border-border shadow-2xs transition-all ${
-              isSelectionMode 
-                ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-800' 
-                : 'hover:bg-zinc-50'
-            }`}
-          >
-            <Download className="h-4 w-4" /> {isSelectionMode ? 'Exit Download Mode' : 'Download Schedule'}
-          </Button>
+          {showTimetable && (
+            <Button 
+              variant="outline"
+              onClick={handleToggleSelectionMode}
+              className={`font-extrabold flex items-center gap-2 border border-border shadow-2xs transition-all ${
+                isSelectionMode 
+                  ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-800' 
+                  : 'hover:bg-zinc-50'
+              }`}
+            >
+              <Download className="h-4 w-4" /> {isSelectionMode ? 'Exit Download Mode' : 'Download Schedule'}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -720,346 +761,400 @@ export default function TimetablePage() {
         </div>
       )}
 
-      {/* Control Panel Filter bar */}
-      <Card className="p-4 shadow-2xs border border-border flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex flex-col gap-1">
-            <span className="text-[10px] font-black text-text-secondary uppercase">Class Selection</span>
-            <select
-              value={selectedClassId}
-              onChange={e => setSelectedClassId(e.target.value)}
-              className="h-10 px-3 pr-8 rounded-lg border border-border bg-surface text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs"
-            >
-              {classes.map(c => (
-                <option key={c.id} value={c.id}>{c.name} {c.section ? ` - ${c.section}` : ''}</option>
-              ))}
-            </select>
-          </div>
+      {!showTimetable ? (
+        <div className="flex flex-col items-center justify-center min-h-[400px] w-full px-4 py-12 gap-6 animate-in fade-in duration-300">
+          <div className="flex flex-col md:flex-row gap-6 w-full max-w-3xl justify-center items-stretch">
+            {/* Card 1: Timetable Settings Required */}
+            {!isTimetableConfigured && (
+              <Card className="flex-1 max-w-md w-full shadow-lg border border-border bg-surface p-8 rounded-3xl flex flex-col justify-between text-center">
+                <div>
+                  <div className="mx-auto w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center mb-4">
+                    <Calendar className="h-6 w-6 text-blue-500" />
+                  </div>
+                  <h3 className="text-xl font-black text-text-primary tracking-tight font-display">Timetable setup has not been completed yet.</h3>
+                  <p className="text-xs text-text-secondary mt-3 leading-relaxed">
+                    Configure your school timetable before creating daily schedules.
+                  </p>
+                </div>
+                <div className="mt-6">
+                  <Button onClick={() => navigate('/school-admin/audits-settings')} className="font-bold w-full py-2.5 shadow-sm bg-primary hover:bg-primary/95 text-white">
+                    Configure Timetable
+                  </Button>
+                </div>
+              </Card>
+            )}
 
-          <div className="flex flex-col gap-1">
-            <span className="text-[10px] font-black text-text-secondary uppercase">Weekly Calendar Navigation</span>
-            <div className="flex items-center gap-1">
-              <Button 
-                variant="outline" 
-                size="icon" 
-                onClick={handlePrevWeek} 
-                className="h-10 w-10 border border-border hover:bg-zinc-50"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              
-              <div className="relative">
-                <input
-                  type="date"
-                  value={currentDate}
-                  onChange={e => setCurrentDate(e.target.value)}
-                  className="h-10 px-3 pr-8 rounded-lg border border-border bg-surface text-xs font-bold text-text-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs cursor-pointer"
-                />
+            {/* Card 2: Subjects Required */}
+            {!hasSchoolSubjects && (
+              <Card className="flex-1 max-w-md w-full shadow-lg border border-border bg-surface p-8 rounded-3xl flex flex-col justify-between text-center">
+                <div>
+                  <div className="mx-auto w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center mb-4">
+                    <Users className="h-6 w-6 text-blue-500" />
+                  </div>
+                  <h3 className="text-xl font-black text-text-primary tracking-tight font-display">No subjects have been created yet.</h3>
+                  <p className="text-xs text-text-secondary mt-3 leading-relaxed">
+                    Create school subjects before assigning timetable periods.
+                  </p>
+                </div>
+                <div className="mt-6">
+                  <Button onClick={handleOpenSubjectModal} className="font-bold w-full py-2.5 shadow-sm bg-primary hover:bg-primary/95 text-white">
+                    Manage Subjects
+                  </Button>
+                </div>
+              </Card>
+            )}
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Control Panel Filter bar */}
+          <Card className="p-4 shadow-2xs border border-border flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-black text-text-secondary uppercase">Class Selection</span>
+                <select
+                  value={selectedClassId}
+                  onChange={e => setSelectedClassId(e.target.value)}
+                  className="h-10 px-3 pr-8 rounded-lg border border-border bg-surface text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs"
+                >
+                  {classes.map(c => (
+                    <option key={c.id} value={c.id}>{c.name} {c.section ? ` - ${c.section}` : ''}</option>
+                  ))}
+                </select>
               </div>
 
-              <Button 
-                variant="outline" 
-                size="icon" 
-                onClick={handleNextWeek} 
-                className="h-10 w-10 border border-border hover:bg-zinc-50"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Date range descriptor badge */}
-        <div className="flex flex-col items-end gap-1">
-          <span className="text-[10px] font-black text-text-secondary uppercase">Active Range</span>
-          <span className="text-sm font-black text-text-primary font-sans">{getWeekRangeStr()}</span>
-        </div>
-      </Card>
-
-      {/* Week Locked Banner */}
-      {isWeekLocked && (
-        <div className="p-4 bg-zinc-100 border border-zinc-200 dark:bg-zinc-900/50 dark:border-zinc-800 rounded-2xl flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center">
-              <Lock className="h-4 w-4 text-zinc-600" />
-            </div>
-            <div>
-              <p className="text-xs font-black text-text-primary font-display">Schedule Locked (Past Week)</p>
-              <p className="text-[10px] text-text-muted mt-0.5">{isReadOnly ? 'Timetable operations are read-only in archived years.' : 'Past dates are locked to preserve history. You cannot add, modify, or delete entries.'}</p>
-            </div>
-          </div>
-          <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-zinc-200 text-zinc-600 border border-zinc-300">
-            LOCKED
-          </span>
-        </div>
-      )}
-
-      {/* Six working day cards grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(dayName => {
-          const weekDates = getWeekDates(currentDate);
-          const dayData = timetableData[dayName] || { date: '', periods: [] };
-          const dateStr = dayData.date || weekDates[dayName] || '';
-          const periodsList = dayData.periods || [];
-          const isPublished = periodsList.length > 0 && periodsList.every(p => p.is_published === 1);
-          const scheduledNums = periodsList.map(p => p.period_number);
-          const availableConfig = periodConfigs.find(c => !scheduledNums.includes(c.period_number));
-          const nextPeriodNum = availableConfig ? availableConfig.period_number : null;
-          const isDayLocked = isReadOnly || isWeekLocked || (dateStr && dateStr < getLocalDateStr());
-          const isToday = dateStr === getLocalDateStr();
-
-          return (
-            <Card 
-              key={dayName} 
-              onClick={() => {
-                if (isSelectionMode) {
-                  handleToggleDaySelection(dayName);
-                }
-              }}
-              className={`flex flex-col justify-between border-2 rounded-3xl p-6 transition-all duration-300 min-h-[460px] bg-zinc-50 dark:bg-zinc-950/40 ${
-                isSelectionMode ? 'cursor-pointer select-none' : ''
-              } ${
-                isToday 
-                  ? 'border-blue-500/80 dark:border-blue-600/80 ring-2 ring-blue-500/10 shadow-md shadow-blue-500/5' 
-                  : 'border-border'
-              } ${
-                isSelectionMode && selectedDays.includes(dayName)
-                  ? 'ring-2 ring-blue-500 border-blue-500 dark:border-blue-500 bg-blue-50/20 dark:bg-blue-950/20'
-                  : ''
-              }`}
-            >
-              <div className="space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-border/80">
-                  <div className="flex items-center gap-3">
-                    {isSelectionMode && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleToggleDaySelection(dayName);
-                        }}
-                        className={`w-5 h-5 rounded-full flex items-center justify-center border transition-all ${
-                          selectedDays.includes(dayName)
-                            ? 'bg-blue-600 border-blue-600 text-white'
-                            : 'border-zinc-300 dark:border-zinc-700 bg-surface text-transparent'
-                        }`}
-                      >
-                        <div className="w-1.5 h-1.5 bg-current rounded-full" />
-                      </button>
-                    )}
-                    <div>
-                      <h3 className="text-xl font-black text-blue-500 dark:text-blue-400 tracking-tight font-display">{dayName}</h3>
-                      <p className="text-[10px] text-text-muted font-bold mt-0.5">
-                        {formatLocalDate(dateStr)}
-                      </p>
-                    </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-black text-text-secondary uppercase">Weekly Calendar Navigation</span>
+                <div className="flex items-center gap-1">
+                  <Button 
+                    variant="outline" 
+                    size="icon" 
+                    onClick={handlePrevWeek} 
+                    className="h-10 w-10 border border-border hover:bg-zinc-50"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  
+                  <div className="relative">
+                    <input
+                      type="date"
+                      value={currentDate}
+                      onChange={e => setCurrentDate(e.target.value)}
+                      className="h-10 px-3 pr-8 rounded-lg border border-border bg-surface text-xs font-bold text-text-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs cursor-pointer"
+                    />
                   </div>
-                  <div className="flex items-center gap-2">
-                    {periodsList.length > 0 && (
-                      <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
-                        isPublished 
-                          ? 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20'
-                          : 'bg-amber-500/10 text-amber-600 dark:text-amber-500 border-amber-500/20'
-                      }`}>
-                        {isPublished ? 'Published' : 'Draft'}
-                      </span>
-                    )}
-                    {!isDayLocked && !isSelectionMode && (
-                      <div className="flex-shrink-0">
-                        <DropdownMenu>
-                          <DropdownItem 
-                            disabled={periodsList.length === 0}
-                            onClick={() => handleCopySchedule(dayName)}
-                          >
-                            Copy Schedule
-                          </DropdownItem>
-                          <DropdownItem 
-                            disabled={!copiedSchedule || String(copiedSchedule.classId) !== String(selectedClassId)}
-                            onClick={() => handleOpenPasteConfirm(dayName)}
-                          >
-                            Paste Schedule
-                          </DropdownItem>
-                        </DropdownMenu>
-                      </div>
-                    )}
-                  </div>
+
+                  <Button 
+                    variant="outline" 
+                    size="icon" 
+                    onClick={handleNextWeek} 
+                    className="h-10 w-10 border border-border hover:bg-zinc-50"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
                 </div>
+              </div>
+            </div>
 
-                <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1 pb-1">
-                  {periodsList.length === 0 ? (
-                    <div className="py-12 text-center text-xs text-text-muted font-semibold">
-                      No periods scheduled.
-                    </div>
-                  ) : (
-                    periodsList.map((p) => {
-                      const timingStr = getPeriodTimingStr(p.period_number);
-                      const teacherText = p.is_backup ? (
-                        <span className="text-text-primary font-bold">{p.backup_teacher_name}</span>
-                      ) : (
-                        <span className="text-text-primary font-bold">{p.teacher_name}</span>
-                      );
+            {/* Date range descriptor badge */}
+            <div className="flex flex-col items-end gap-1">
+              <span className="text-[10px] font-black text-text-secondary uppercase">Active Range</span>
+              <span className="text-sm font-black text-text-primary font-sans">{getWeekRangeStr()}</span>
+            </div>
+          </Card>
 
-                      return (
-                        <div 
-                          key={p.id} 
-                          className="flex items-center justify-between py-2 px-3 bg-zinc-100/60 dark:bg-zinc-900/40 border border-border/80 rounded-xl relative transition-all group"
-                        >
-                          <div className="space-y-0.5 min-w-0 flex-1">
-                            <h4 className="text-xs font-black text-text-primary truncate">
-                              Period {p.period_number}: {p.subject_name}
-                              {p.is_backup && (
-                                <span className="text-amber-500 font-bold ml-1">(Backup)</span>
-                              )}
-                            </h4>
-                            {timingStr ? (
-                              <p className="text-[10px] text-text-secondary font-bold font-sans mt-0.5 truncate">
-                                {teacherText} | {timingStr}
-                              </p>
-                            ) : (
-                              <p className="text-[10px] text-text-secondary font-bold mt-0.5 truncate">
-                                Taught by: {teacherText}
-                              </p>
-                            )}
-                          </div>
-                          
-                          {!isDayLocked && (
-                            <div className="ml-2 flex-shrink-0">
-                              <DropdownMenu>
-                                <DropdownItem onClick={() => {
-                                  setActiveTimetableItem(p);
-                                  setActiveDate(dateStr);
-                                  setIsReplaceModalOpen(true);
-                                }}>
-                                  Replace Teacher
-                                </DropdownItem>
-                                <DropdownItem onClick={() => {
-                                  setActiveTimetableItem(p);
-                                  setActiveDate(dateStr);
-                                  setIsBackupModalOpen(true);
-                                }}>
-                                  Assign Backup
-                                </DropdownItem>
-                                <DropdownItem onClick={() => handleCopySchedule(dayName)}>
-                                  Copy Schedule
-                                </DropdownItem>
-                                <DropdownItem 
-                                  disabled={!copiedSchedule || String(copiedSchedule.classId) !== String(selectedClassId)}
-                                  onClick={() => handleOpenPasteConfirm(dayName)}
-                                >
-                                  Paste Schedule
-                                </DropdownItem>
-                                <DropdownItem destructive onClick={() => setPeriodToDelete({ id: p.id, date: dateStr })}>
-                                  Remove
-                                </DropdownItem>
-                              </DropdownMenu>
-                            </div>
-                          )}
+          {/* Week Locked Banner */}
+          {isWeekLocked && (
+            <div className="p-4 bg-zinc-100 border border-zinc-200 dark:bg-zinc-900/50 dark:border-zinc-800 rounded-2xl flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center">
+                  <Lock className="h-4 w-4 text-zinc-600" />
+                </div>
+                <div>
+                  <p className="text-xs font-black text-text-primary font-display">Schedule Locked (Past Week)</p>
+                  <p className="text-[10px] text-text-muted mt-0.5">{isReadOnly ? 'Timetable operations are read-only in archived years.' : 'Past dates are locked to preserve history. You cannot add, modify, or delete entries.'}</p>
+                </div>
+              </div>
+              <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-zinc-200 text-zinc-600 border border-zinc-300">
+                LOCKED
+              </span>
+            </div>
+          )}
+
+          {/* Six working day cards grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(dayName => {
+              const weekDates = getWeekDates(currentDate);
+              const dayData = timetableData[dayName] || { date: '', periods: [] };
+              const dateStr = dayData.date || weekDates[dayName] || '';
+              const periodsList = dayData.periods || [];
+              const isPublished = periodsList.length > 0 && periodsList.every(p => p.is_published === 1);
+              const scheduledNums = periodsList.map(p => p.period_number);
+              const availableConfig = periodConfigs.find(c => !scheduledNums.includes(c.period_number));
+              const nextPeriodNum = availableConfig ? availableConfig.period_number : null;
+              const isHoliday = dateStr && holidays.some(h => h.date === dateStr);
+              const isDayLocked = isReadOnly || isWeekLocked || (dateStr && dateStr < getLocalDateStr()) || isHoliday;
+              const isToday = dateStr === getLocalDateStr();
+
+              return (
+                <Card 
+                  key={dayName} 
+                  onClick={() => {
+                    if (isSelectionMode) {
+                      handleToggleDaySelection(dayName);
+                    }
+                  }}
+                  className={`flex flex-col justify-between border-2 rounded-3xl p-6 transition-all duration-300 min-h-[460px] bg-zinc-50 dark:bg-zinc-950/40 ${
+                    isSelectionMode ? 'cursor-pointer select-none' : ''
+                  } ${
+                    isToday 
+                      ? 'border-blue-500/80 dark:border-blue-600/80 ring-2 ring-blue-500/10 shadow-md shadow-blue-500/5' 
+                      : 'border-border'
+                  } ${
+                    isSelectionMode && selectedDays.includes(dayName)
+                      ? 'ring-2 ring-blue-500 border-blue-500 dark:border-blue-500 bg-blue-50/20 dark:bg-blue-950/20'
+                      : ''
+                  }`}
+                >
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-border/80">
+                      <div className="flex items-center gap-3">
+                        {isSelectionMode && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleDaySelection(dayName);
+                            }}
+                            className={`w-5 h-5 rounded-full flex items-center justify-center border transition-all ${
+                              selectedDays.includes(dayName)
+                                ? 'bg-blue-600 border-blue-600 text-white'
+                                : 'border-zinc-300 dark:border-zinc-700 bg-surface text-transparent'
+                            }`}
+                          >
+                            <div className="w-1.5 h-1.5 bg-current rounded-full" />
+                          </button>
+                        )}
+                        <div>
+                          <h3 className="text-xl font-black text-blue-500 dark:text-blue-400 tracking-tight font-display">{dayName}</h3>
+                          <p className="text-[10px] text-text-muted font-bold mt-0.5">
+                            {formatLocalDate(dateStr)}
+                          </p>
                         </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-
-              {isDayLocked ? (
-                <div className="flex items-center justify-center gap-1.5 py-3 mt-4 border-t border-border bg-zinc-500/5 text-zinc-500 text-xs font-bold font-sans rounded-b-2xl">
-                  <Lock className="h-3.5 w-3.5" />
-                  <span>Schedule locked (Past day)</span>
-                </div>
-              ) : loading || !dateStr ? (
-                <div className="h-9 w-full bg-zinc-100 dark:bg-zinc-850 rounded-xl animate-pulse mt-4"></div>
-              ) : (
-                <div className="mt-4 pt-3 border-t border-border/80 space-y-2.5">
-                  {periodsList.length < periodConfigs.length && (
-                    <div className="space-y-2">
-                      <div className="grid grid-cols-2 gap-2">
-                        <select
-                          value={addPeriodForm[dayName].subject_id}
-                          onChange={e => {
-                            const val = e.target.value;
-                            setAddPeriodForm(p => ({
-                              ...p,
-                              [dayName]: { ...p[dayName], subject_id: val }
-                            }));
-                            setFormErrors(prev => ({
-                              ...prev,
-                              [dayName]: ''
-                            }));
-                          }}
-                          className="w-full h-9 px-2.5 rounded-lg border border-border bg-surface text-xs font-bold focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs cursor-pointer"
-                        >
-                          <option value="">Select Subject</option>
-                          {subjects.filter(s => !periodsList.some(p => p.subject_id === s.id)).map(s => (
-                            <option key={s.id} value={s.id}>{s.name}</option>
-                          ))}
-                        </select>
-
-                        <select
-                          value={addPeriodForm[dayName].teacher_id}
-                          onChange={e => {
-                            const val = e.target.value;
-                            setAddPeriodForm(p => ({
-                              ...p,
-                              [dayName]: { ...p[dayName], teacher_id: val }
-                            }));
-                            setFormErrors(prev => ({
-                              ...prev,
-                              [dayName]: ''
-                            }));
-                          }}
-                          className="w-full h-9 px-2.5 rounded-lg border border-border bg-surface text-xs font-bold focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs cursor-pointer"
-                        >
-                          <option value="">Select Teacher</option>
-                          {staff.filter(t => {
-                            if (t.status !== 'ACTIVE' || t.role !== 'Teacher') return false;
-                            const isOccupiedInPeriod = allTimetableEntries.some(entry => {
-                              return entry.day_of_week === dayName &&
-                                     entry.period_number === nextPeriodNum &&
-                                     entry.active_teacher_id === t.id &&
-                                     String(entry.class_id) !== String(selectedClassId);
-                            });
-                            if (isOccupiedInPeriod) return false;
-
-                            const dailyAssigned = t.day_workloads?.[dayName] ?? 0;
-                            const max = periodConfigs.length;
-                            return dailyAssigned < max;
-                          }).map(t => (
-                            <option key={t.id} value={t.id}>
-                              {t.name}
-                            </option>
-                          ))}
-                        </select>
                       </div>
+                      <div className="flex items-center gap-2">
+                        {periodsList.length > 0 && (
+                          <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
+                            isPublished 
+                              ? 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20'
+                              : 'bg-amber-500/10 text-amber-600 dark:text-amber-500 border-amber-500/20'
+                          }`}>
+                            {isPublished ? 'Published' : 'Draft'}
+                          </span>
+                        )}
+                        {!isDayLocked && !isSelectionMode && (
+                          <div className="flex-shrink-0">
+                            <DropdownMenu>
+                              <DropdownItem 
+                                disabled={periodsList.length === 0}
+                                onClick={() => handleCopySchedule(dayName)}
+                              >
+                                Copy Schedule
+                              </DropdownItem>
+                              <DropdownItem 
+                                disabled={!copiedSchedule || String(copiedSchedule.classId) !== String(selectedClassId)}
+                                onClick={() => handleOpenPasteConfirm(dayName)}
+                              >
+                                Paste Schedule
+                              </DropdownItem>
+                            </DropdownMenu>
+                          </div>
+                        )}
+                      </div>
+                    </div>
 
-                      {formErrors[dayName] && (
-                        <p className="text-[10px] text-red-500 font-bold leading-normal font-sans">
-                          {formErrors[dayName]}
-                        </p>
+                    <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1 pb-1">
+                      {periodsList.length === 0 ? (
+                        <div className="py-12 text-center text-xs text-text-muted font-semibold">
+                          No periods scheduled.
+                        </div>
+                      ) : (
+                        periodsList.map((p) => {
+                          const timingStr = getPeriodTimingStr(p.period_number);
+                          const teacherText = p.is_backup ? (
+                            <span className="text-text-primary font-bold">{p.backup_teacher_name}</span>
+                          ) : (
+                            <span className="text-text-primary font-bold">{p.teacher_name}</span>
+                          );
+
+                          return (
+                            <div 
+                              key={p.id} 
+                              className="flex items-center justify-between py-2 px-3 bg-zinc-100/60 dark:bg-zinc-900/40 border border-border/80 rounded-xl relative transition-all group"
+                            >
+                              <div className="space-y-0.5 min-w-0 flex-1">
+                                <h4 className="text-xs font-black text-text-primary truncate">
+                                  Period {p.period_number}: {p.subject_name}
+                                  {p.is_backup && (
+                                    <span className="text-amber-500 font-bold ml-1">(Backup)</span>
+                                  )}
+                                </h4>
+                                {timingStr ? (
+                                  <p className="text-[10px] text-text-secondary font-bold font-sans mt-0.5 truncate">
+                                    {teacherText} | {timingStr}
+                                  </p>
+                                ) : (
+                                  <p className="text-[10px] text-text-secondary font-bold mt-0.5 truncate">
+                                    Taught by: {teacherText}
+                                  </p>
+                                )}
+                              </div>
+                              
+                              {!isDayLocked && (
+                                <div className="ml-2 flex-shrink-0">
+                                  <DropdownMenu>
+                                    <DropdownItem onClick={() => {
+                                      setActiveTimetableItem(p);
+                                      setActiveDate(dateStr);
+                                      setIsReplaceModalOpen(true);
+                                    }}>
+                                      Replace Teacher
+                                    </DropdownItem>
+                                    <DropdownItem onClick={() => {
+                                      setActiveTimetableItem(p);
+                                      setActiveDate(dateStr);
+                                      setIsBackupModalOpen(true);
+                                    }}>
+                                      Assign Backup
+                                    </DropdownItem>
+                                    <DropdownItem onClick={() => handleCopySchedule(dayName)}>
+                                      Copy Schedule
+                                    </DropdownItem>
+                                    <DropdownItem 
+                                      disabled={!copiedSchedule || String(copiedSchedule.classId) !== String(selectedClassId)}
+                                      onClick={() => handleOpenPasteConfirm(dayName)}
+                                    >
+                                      Paste Schedule
+                                    </DropdownItem>
+                                    <DropdownItem destructive onClick={() => setPeriodToDelete({ id: p.id, date: dateStr })}>
+                                      Remove
+                                    </DropdownItem>
+                                  </DropdownMenu>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+
+                  {isHoliday ? (
+                    <div className="flex items-center justify-center gap-1.5 py-3 mt-4 border-t border-border bg-zinc-500/5 text-zinc-500 text-xs font-bold font-sans rounded-b-2xl">
+                      <Lock className="h-3.5 w-3.5" />
+                      <span>School Holiday – Timetable cannot be created for this date.</span>
+                    </div>
+                  ) : isDayLocked ? (
+                    <div className="flex items-center justify-center gap-1.5 py-3 mt-4 border-t border-border bg-zinc-500/5 text-zinc-500 text-xs font-bold font-sans rounded-b-2xl">
+                      <Lock className="h-3.5 w-3.5" />
+                      <span>Schedule locked (Past day)</span>
+                    </div>
+                  ) : loading || !dateStr ? (
+                    <div className="h-9 w-full bg-zinc-100 dark:bg-zinc-850 rounded-xl animate-pulse mt-4"></div>
+                  ) : (
+                    <div className="mt-4 pt-3 border-t border-border/80 space-y-2.5">
+                      {periodsList.length < periodConfigs.length && (
+                        <div className="space-y-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            <select
+                              value={addPeriodForm[dayName].subject_id}
+                              onChange={e => {
+                                const val = e.target.value;
+                                setAddPeriodForm(p => ({
+                                  ...p,
+                                  [dayName]: { ...p[dayName], subject_id: val }
+                                }));
+                                setFormErrors(prev => ({
+                                  ...prev,
+                                  [dayName]: ''
+                                }));
+                              }}
+                              className="w-full h-9 px-2.5 rounded-lg border border-border bg-surface text-xs font-bold focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs cursor-pointer"
+                            >
+                              <option value="">Select Subject</option>
+                              {subjects.filter(s => !periodsList.some(p => p.subject_id === s.id)).map(s => (
+                                <option key={s.id} value={s.id}>{s.name}</option>
+                              ))}
+                            </select>
+
+                            <select
+                              value={addPeriodForm[dayName].teacher_id}
+                              onChange={e => {
+                                const val = e.target.value;
+                                setAddPeriodForm(p => ({
+                                  ...p,
+                                  [dayName]: { ...p[dayName], teacher_id: val }
+                                }));
+                                setFormErrors(prev => ({
+                                  ...prev,
+                                  [dayName]: ''
+                                }));
+                              }}
+                              className="w-full h-9 px-2.5 rounded-lg border border-border bg-surface text-xs font-bold focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs cursor-pointer"
+                            >
+                              <option value="">Select Teacher</option>
+                              {staff.filter(t => {
+                                if (t.status !== 'ACTIVE' || t.role !== 'Teacher') return false;
+                                const isOccupiedInPeriod = allTimetableEntries.some(entry => {
+                                  return entry.day_of_week === dayName &&
+                                         entry.period_number === nextPeriodNum &&
+                                         entry.active_teacher_id === t.id &&
+                                         String(entry.class_id) !== String(selectedClassId);
+                                });
+                                if (isOccupiedInPeriod) return false;
+
+                                const dailyAssigned = t.day_workloads?.[dayName] ?? 0;
+                                const max = periodConfigs.length;
+                                return dailyAssigned < max;
+                              }).map(t => (
+                                <option key={t.id} value={t.id}>
+                                  {t.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {formErrors[dayName] && (
+                            <p className="text-[10px] text-red-500 font-bold leading-normal font-sans">
+                              {formErrors[dayName]}
+                            </p>
+                          )}
+
+                          <Button
+                            onClick={() => handleAddPeriod(dayName)}
+                            disabled={actionLoading === 'add-' + dayName}
+                            className="w-full h-9 bg-blue-600 hover:bg-blue-700 text-white font-extrabold rounded-lg shadow-md transition-all flex items-center justify-center gap-1.5"
+                          >
+                            <Plus className="h-4 w-4" /> Add Period
+                          </Button>
+                        </div>
                       )}
 
                       <Button
-                        onClick={() => handleAddPeriod(dayName)}
-                        disabled={actionLoading === 'add-' + dayName}
-                        className="w-full h-9 bg-blue-600 hover:bg-blue-700 text-white font-extrabold rounded-lg shadow-md transition-all flex items-center justify-center gap-1.5"
+                        onClick={() => handlePublishDay(dayName, dateStr)}
+                        disabled={actionLoading === 'publish-' + dayName || isPublished || periodsList.length === 0}
+                        className="w-full h-9 bg-blue-600 hover:bg-blue-700 text-white font-extrabold rounded-lg shadow-md transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <Plus className="h-4 w-4" /> Add Period
+                        Publish
                       </Button>
                     </div>
                   )}
-
-                  <Button
-                    onClick={() => handlePublishDay(dayName, dateStr)}
-                    disabled={actionLoading === 'publish-' + dayName || isPublished || periodsList.length === 0}
-                    className="w-full h-9 bg-blue-600 hover:bg-blue-700 text-white font-extrabold rounded-lg shadow-md transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Publish
-                  </Button>
-                </div>
-              )}
-            </Card>
-          );
-        })}
-      </div>
+                </Card>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       {/* Modal: Subject Management */}
       <Dialog
@@ -1075,23 +1170,7 @@ export default function TimetablePage() {
         footer={<Button variant="secondary" onClick={() => setIsSubjectModalOpen(false)}>Close</Button>}
       >
         <div className="space-y-6 pt-4">
-          {/* Select Class Dropdown */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-text-secondary uppercase">Select Class</label>
-            <select
-              value={modalClassId}
-              onChange={e => {
-                setModalClassId(e.target.value);
-                loadModalSubjects(e.target.value);
-              }}
-              className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-xs font-semibold focus:outline-none shadow-2xs cursor-pointer"
-            >
-              <option value="">Select Class</option>
-              {classes.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </div>
+
 
           {/* Subject Add form */}
           <div className="p-4 border border-border bg-zinc-50/50 dark:bg-zinc-950/20 rounded-xl space-y-4">

@@ -1,6 +1,6 @@
-- `[x]` Create database migration for status column
+- `[x]` Create SQL migration file `052_migrate_subjects_to_school_level.sql` and run itdatabase migration
 - `[x]` Apply database migration
-- `[x]` Modify backend `SchoolAdminService` (support status & notifications)
+- `[x]` Update subject-related service methods in `SchoolAdminService.php` (support status & notifications)
 - `[x]` Modify backend `StudentService` (filter draft notices)
 - `[x]` Redesign frontend `AnnouncementsPage` layout, modal, live preview, list table, badges, actions, validations
 - `[x]` Implement mobile unread dot color and date format update in `notice_screen.dart`

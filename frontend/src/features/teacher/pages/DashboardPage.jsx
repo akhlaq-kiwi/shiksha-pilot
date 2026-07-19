@@ -1,14 +1,23 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BookOpen, Users, CheckSquare, Calendar, Clock, Star } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../../common/ui/card';
 import { SectionHeader, StatCard, StatusBadge, PriorityDot } from '../shared';
 
 export default function DashboardPage({ schedule, tasks, upcomingExams, classes }) {
+  const [schoolName, setSchoolName] = useState(() => {
+    try {
+      const cached = localStorage.getItem('cached_school_profile');
+      return cached ? JSON.parse(cached)?.name || 'School Portal' : 'School Portal';
+    } catch {
+      return 'School Portal';
+    }
+  });
+
   return (
     <div className="space-y-7">
       <SectionHeader
-        title="Good morning, Ms. Khalid"
-        description={`Today is ${new Date().toLocaleDateString('en-PK', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}`}
+        title={schoolName}
+        description="Teacher Portal"
       />
 
       {/* Stat row */}

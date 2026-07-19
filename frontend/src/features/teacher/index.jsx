@@ -8,6 +8,7 @@ import {
   FolderOpen,
   CheckSquare,
 } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { teacherService } from '../../common/services/teacherService';
 import DashboardPage   from './pages/DashboardPage';
 import ClassesPage     from './pages/ClassesPage';
@@ -16,6 +17,7 @@ import AssignmentsPage from './pages/AssignmentsPage';
 import ExaminationPage from './pages/ExaminationPage';
 import MaterialsPage   from './pages/MaterialsPage';
 import TeacherLeavePage from './pages/TeacherLeavePage';
+import SettingsPage from './pages/SettingsPage';
 
 const NAV_ITEMS = [
   { id: 'dashboard',   label: 'Dashboard',         icon: LayoutDashboard },
@@ -24,11 +26,35 @@ const NAV_ITEMS = [
   { id: 'assignments', label: 'Assignments',        icon: FileText },
   { id: 'examination', label: 'Examination',        icon: Award },
   { id: 'materials',   label: 'Learning Materials', icon: FolderOpen },
-  { id: 'leaves',      label: 'Leave Requests',     icon: CheckSquare },
+  { id: 'leaves',      label: 'Leaves',             icon: CheckSquare },
 ];
 
 export default function TeacherPortal() {
-  const [currentPage, setCurrentPage] = useState('dashboard');
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const getPageFromPath = useCallback(() => {
+    const path = location.pathname;
+    if (path.endsWith('/leaves')) return 'leaves';
+    if (path.endsWith('/classes')) return 'classes';
+    if (path.endsWith('/attendance')) return 'attendance';
+    if (path.endsWith('/assignments')) return 'assignments';
+    if (path.endsWith('/examination')) return 'examination';
+    if (path.endsWith('/materials')) return 'materials';
+    if (path.endsWith('/settings')) return 'settings';
+    return 'dashboard';
+  }, [location.pathname]);
+
+  const [currentPage, setCurrentPage] = useState(getPageFromPath);
+
+  useEffect(() => {
+    setCurrentPage(getPageFromPath());
+  }, [location.pathname, getPageFromPath]);
+
+  const handleNavigate = (id) => {
+    navigate(id === 'dashboard' ? '/teacher' : `/teacher/${id}`);
+  };
+
   const [loading, setLoading] = useState(true);
 
   const [schedule, setSchedule]         = useState([]);
@@ -89,7 +115,7 @@ export default function TeacherPortal() {
         {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
-            onClick={() => setCurrentPage(id)}
+            onClick={() => handleNavigate(id)}
             className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all focus-visible:outline-none ${
               currentPage === id
                 ? 'bg-primary text-surface dark:bg-primary dark:text-background font-extrabold shadow-xs'
@@ -118,6 +144,7 @@ export default function TeacherPortal() {
             {currentPage === 'examination' && <ExaminationPage classes={classes} exams={exams} allStudents={allStudents} />}
             {currentPage === 'materials'   && <MaterialsPage   classes={classes} materials={materials} />}
             {currentPage === 'leaves'      && <TeacherLeavePage />}
+            {currentPage === 'settings'    && <SettingsPage />}
           </>
         )}
       </div>

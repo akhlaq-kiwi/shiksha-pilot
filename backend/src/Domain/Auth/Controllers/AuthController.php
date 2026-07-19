@@ -57,7 +57,9 @@ class AuthController extends BaseController
             $subdomain = null;
         }
 
-        $result = $this->authService->login($phone, $password, $subdomain);
+        $clientType = $body['client_type'] ?? null;
+
+        $result = $this->authService->login($phone, $password, $subdomain, $clientType);
 
         return $this->success($response, $result, 'Login successful.');
     }
@@ -71,11 +73,26 @@ class AuthController extends BaseController
     public function changePassword(Request $request, Response $response): Response
     {
         $claims = $this->authenticate($request);
+        $role = strtoupper($claims['role'] ?? '');
 
         $body = RequestParser::body($request);
         RequestParser::required($body, ['new_password']);
 
-        $this->authService->changePassword((int) $claims['id'], (string) $body['new_password']);
+        $currentPassword = $body['current_password'] ?? null;
+
+        // Strictly require current password for TEACHER and STUDENT roles!
+        if ($role === 'TEACHER' || $role === 'STUDENT') {
+            if ($currentPassword === null || $currentPassword === '') {
+                throw new \App\Shared\Exceptions\ValidationException(['current_password' => 'Current password is required.']);
+            }
+        }
+
+        $this->authService->changePassword(
+            (int) $claims['id'], 
+            $currentPassword, 
+            (string) $body['new_password'], 
+            $role
+        );
 
         return $this->success($response, null, 'Password updated successfully.');
     }

@@ -23,7 +23,7 @@ const AppLayout = ({ children }) => {
 
   const user = authService.getCurrentUser();
   const role = authService.getUserRole();
-  const isSchoolAdmin = role === 'SCHOOL_ADMIN';
+  const isSchoolAdmin = role === 'SCHOOL_ADMIN' || role === 'TEACHER';
 
   const { academicYears, currentYear, selectYear } = isSchoolAdmin
     ? useAcademicYear()
@@ -219,7 +219,7 @@ const AppLayout = ({ children }) => {
             <div className="flex items-center gap-1.5">
               
               {/* Notification Bell */}
-              {isSchoolAdmin && (
+              {isSchoolAdmin && role === 'SCHOOL_ADMIN' && (
                 <div className="relative" ref={notifRef}>
                   <Button
                     variant="ghost"
@@ -290,24 +290,36 @@ const AppLayout = ({ children }) => {
               )}
 
               {/* Dark/light toggle */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={toggleTheme}
-                aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-                title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-              >
-                {theme === 'dark'
-                  ? <Sun className="w-4 h-4" />
-                  : <Moon className="w-4 h-4" />
-                }
-              </Button>
+              {(role === 'SCHOOL_ADMIN' || role === 'SUPER_ADMIN') && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={toggleTheme}
+                  aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                  title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                >
+                  {theme === 'dark'
+                    ? <Sun className="w-4 h-4" />
+                    : <Moon className="w-4 h-4" />
+                  }
+                </Button>
+              )}
 
               {/* User profile dropdown avatar controls */}
               {role !== 'SUPER_ADMIN' ? (
                 <div className="relative" ref={dropdownRef}>
                   <button 
-                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                    onClick={() => {
+                      if (role === 'TEACHER') {
+                        navigate('/teacher/settings');
+                      } else if (role === 'PARENT') {
+                        navigate('/parent/settings');
+                      } else if (role === 'STUDENT') {
+                        navigate('/student/settings');
+                      } else {
+                        setIsDropdownOpen(!isDropdownOpen);
+                      }
+                    }}
                     className="flex items-center gap-2.5 hover:opacity-85 transition-all text-left focus:outline-hidden"
                   >
                     {/* Avatar */}

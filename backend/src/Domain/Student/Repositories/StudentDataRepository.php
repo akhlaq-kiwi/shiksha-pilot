@@ -214,12 +214,12 @@ class StudentDataRepository extends BaseRepository
         $sql = "
             SELECT t.*,
                    s.name AS subject_name,
-                   u.name AS teacher_name,
+                   st.name AS teacher_name,
                    pc.start_time,
                    pc.end_time
             FROM timetable t
             LEFT JOIN subjects s ON t.subject_id = s.id
-            LEFT JOIN users   u ON t.teacher_id  = u.id
+            LEFT JOIN staff    st ON t.teacher_id  = st.id
             LEFT JOIN period_configurations pc ON t.period_number = pc.period_number AND t.school_id = pc.school_id AND pc.end_date IS NULL
             WHERE t.class_id  = :class_id
               AND t.school_id = :school_id

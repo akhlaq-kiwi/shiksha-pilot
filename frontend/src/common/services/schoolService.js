@@ -29,6 +29,10 @@ export const schoolService = {
     return apiClient.put(`/api/school/students/${id}`, studentData);
   },
 
+  advanceStudent(id, classId) {
+    return apiClient.post(`/api/school/students/${id}/advance`, { class_id: classId });
+  },
+
   uploadDocument(formData) {
     return apiClient.post('/api/school/upload', formData);
   },
@@ -140,6 +144,14 @@ export const schoolService = {
 
   publishExamResults(examId, classId, status = 'Published') {
     return apiClient.post(`/api/school/exams-new/${examId}/publish`, { class_id: classId, status });
+  },
+
+  publishExamScheme(examId, classId) {
+    return apiClient.post(`/api/school/exams-new/${examId}/publish-scheme`, { class_id: classId });
+  },
+
+  publishExamAdmitCards(examId, classId) {
+    return apiClient.post(`/api/school/exams-new/${examId}/publish-admit-card`, { class_id: classId });
   },
 
   getReportCards(examId, classId, studentId = null) {
@@ -347,6 +359,26 @@ export const schoolService = {
 
   getAdditionalFeePayments() {
     return apiClient.get('/api/school/additional-fees/payments');
+  },
+
+  getTransportFees(params = {}) {
+    return apiClient.get(buildUrl('/api/school/transport-fees', params));
+  },
+
+  assignTransportFee(data) {
+    return apiClient.post('/api/school/transport-fees', data);
+  },
+
+  updateTransportFee(id, data) {
+    return apiClient.put(`/api/school/transport-fees/${id}`, data);
+  },
+
+  deleteTransportFee(id) {
+    return apiClient.delete(`/api/school/transport-fees/${id}`);
+  },
+
+  toggleTransportFeeStatus(id, status) {
+    return apiClient.post(`/api/school/transport-fees/${id}/toggle-status`, { status });
   },
 
   collectAdditionalFeePayment(id, data = {}) {

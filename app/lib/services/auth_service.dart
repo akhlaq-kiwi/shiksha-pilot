@@ -25,7 +25,7 @@ class AuthService {
     }
   }
 
-  Future<void> changePassword(String token, String newPassword) async {
+  Future<void> changePassword(String token, String currentPassword, String newPassword) async {
     final uri = Uri.parse('$baseUrl/api/auth/change-password');
     final response = await http.post(
       uri,
@@ -34,6 +34,7 @@ class AuthService {
         'Authorization': 'Bearer $token',
       },
       body: json.encode({
+        'current_password': currentPassword,
         'new_password': newPassword,
       }),
     );

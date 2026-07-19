@@ -10,8 +10,8 @@ import ProtectedRoute from './routes/ProtectedRoute';
 import LoginPage from './features/auth/pages/LoginPage';
 import SuperAdminPortal from './features/super-admin/SuperAdminPortal';
 import SchoolAdminPortal from './features/school-admin/SchoolAdminPortal';
-import TeacherPortal from './features/teacher/TeacherPortal';
 import StudentParentPortal from './features/student-parent/StudentParentPortal';
+import TeacherPortal from './features/teacher/TeacherPortal';
 import { AcademicYearProvider } from './common/contexts/AcademicYearContext';
 
 function RootRedirect() {
@@ -64,7 +64,7 @@ export default function App() {
         } />
 
         <Route path="/school-admin/*" element={
-          <ProtectedRoute allowedRoles={['SCHOOL_ADMIN']}>
+          <ProtectedRoute allowedRoles={['SCHOOL_ADMIN', 'TEACHER']}>
             <AppLayout><SchoolAdminPortal /></AppLayout>
           </ProtectedRoute>
         } />

@@ -87,6 +87,7 @@ export function DropdownMenu({ trigger, children, align = 'right' }) {
               return React.cloneElement(child, {
                 onClick: (e) => {
                   e.stopPropagation();
+                  if (child.props.disabled) return;
                   if (child.props.onClick) {
                     child.props.onClick(e);
                   }

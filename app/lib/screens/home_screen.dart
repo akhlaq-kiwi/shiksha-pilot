@@ -1,17 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'dart:async';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:school_hub/services/leave_service.dart';
 import 'package:school_hub/services/auth_service.dart';
 import 'package:school_hub/screens/leave_list_screen.dart';
+import 'package:school_hub/screens/settings_screen.dart';
 import 'package:school_hub/screens/attendance_screen.dart';
 import 'package:school_hub/screens/fees_card_screen.dart';
 import 'package:school_hub/screens/salary_card_screen.dart';
 import 'package:school_hub/screens/notification_center_screen.dart';
 import 'package:school_hub/screens/notice_screen.dart';
+import 'package:school_hub/screens/timetable_screen.dart';
 import 'package:school_hub/services/attendance_service.dart';
+import 'package:school_hub/services/notification_helper.dart';
+import 'package:school_hub/screens/full_screen_image_screen.dart';
+import 'package:workmanager/workmanager.dart';
 import 'package:school_hub/main.dart';
+import 'package:school_hub/services/exam_service.dart';
+import 'package:school_hub/screens/exam_list_screen.dart';
 
 class LauncherFeature {
   final String name;
@@ -45,7 +54,8 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
+  Timer? _notifTimer;
   String _userName = '';
   String _userRoleDisplay = '';
   String _schoolName = '';
@@ -58,6 +68,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoadingChildren = false;
   String _searchQuery = '';
   int _unreadNotificationCount = 0;
+  bool _isFetchingNotifications = false;
   
   final TextEditingController _searchController = TextEditingController();
 
@@ -71,7 +82,7 @@ class _HomeScreenState extends State<HomeScreen> {
       isAvailable: true,
     ),
     LauncherFeature(
-      name: 'Leave',
+      name: 'Leaves',
       icon: Icons.edit_document,
       color: Colors.amber.shade800,
       allowedRoles: ['PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL'],
@@ -101,13 +112,15 @@ class _HomeScreenState extends State<HomeScreen> {
       name: 'Timetable',
       icon: Icons.schedule_rounded,
       color: Colors.blue,
-      allowedRoles: ['TEACHER'],
+      allowedRoles: ['PARENT', 'TEACHER'],
+      isAvailable: true,
     ),
     LauncherFeature(
       name: 'Exams',
       icon: Icons.assignment_turned_in_rounded,
       color: Colors.red,
-      allowedRoles: ['PARENT'],
+      allowedRoles: ['PARENT', 'TEACHER'],
+      isAvailable: true,
     ),
     LauncherFeature(
       name: 'Reports',
@@ -145,6 +158,7 @@ class _HomeScreenState extends State<HomeScreen> {
       icon: Icons.settings_rounded,
       color: Colors.grey.shade700,
       allowedRoles: ['PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL'],
+      isAvailable: true,
     ),
     LauncherFeature(
       name: 'Teachers',
@@ -169,19 +183,91 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _activeStudentId = widget.selectedStudentId;
     _loadSessionInfo();
     _fetchChildrenList();
+    _notifTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      _fetchUnreadNotificationsCount();
+    });
+    // Request ignoring battery optimizations so that WorkManager runs instantly in the background!
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndPromptBatteryOptimizations();
+    });
+  }
+
+  Future<void> _checkAndPromptBatteryOptimizations() async {
+    const platform = MethodChannel('com.shikshapilot.schoolhub/battery');
+    try {
+      final bool isIgnoring = await platform.invokeMethod('isIgnoringBatteryOptimizations');
+      if (!isIgnoring) {
+        if (mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Row(
+                children: [
+                  Icon(Icons.battery_alert_rounded, color: Colors.orange),
+                  SizedBox(width: 8),
+                  Text('Background Alerts', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                ],
+              ),
+              content: const Text(
+                'Please disable battery optimization for this app to ensure push notifications and background alerts arrive instantly, even when the screen is locked.',
+                style: TextStyle(fontSize: 14),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Later'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.indigo,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    await platform.invokeMethod('requestIgnoreBatteryOptimizations');
+                  },
+                  child: const Text('Enable'),
+                ),
+              ],
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking battery optimizations: $e');
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _notifTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      Workmanager().registerOneOffTask(
+        "oneoff_fetch_background_${DateTime.now().millisecondsSinceEpoch}",
+        fetchNotificationsTask,
+        initialDelay: const Duration(seconds: 5),
+        existingWorkPolicy: ExistingWorkPolicy.append,
+      );
+    }
+  }
+
   Future<void> _loadSessionInfo() async {
     final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('base_url', widget.leaveService.baseUrl);
+    await prefs.setString('user_role', widget.userRole);
     setState(() {
       _userName = prefs.getString('user_name') ?? 'User';
       _schoolName = prefs.getString('school_name') ?? 'Shiksha Pilot Academy';
@@ -222,18 +308,23 @@ class _HomeScreenState extends State<HomeScreen> {
       final authService = AuthService(baseUrl: 'http://10.227.152.71:8000');
       final profile = await authService.fetchProfile(token);
       
-      final latestPhoto = (profile['staff_photo_path'] as String?) ?? '';
+      final latestPhoto = (profile['photo_path'] as String?) ?? (profile['staff_photo_path'] as String?) ?? '';
       final latestName = (profile['name'] as String?) ?? '';
       
+      final role = widget.userRole.toUpperCase();
+      final isStaff = role == 'TEACHER' || role == 'SCHOOL_ADMIN' || role == 'PRINCIPAL';
+      
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('user_photo', latestPhoto);
-      await prefs.setString('user_name', latestName);
+      if (isStaff) {
+        await prefs.setString('user_photo', latestPhoto);
+        await prefs.setString('user_name', latestName);
 
-      if (mounted) {
-        setState(() {
-          _userPhoto = latestPhoto;
-          _userName = latestName;
-        });
+        if (mounted) {
+          setState(() {
+            _userPhoto = latestPhoto;
+            _userName = latestName;
+          });
+        }
       }
     } catch (e) {
       debugPrint('Error syncing profile details: $e');
@@ -277,36 +368,198 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _activeStudentName = active['name'] ?? '';
       });
+      SharedPreferences.getInstance().then((prefs) {
+        prefs.setString('user_name', active['name'] ?? '');
+        prefs.setString('user_photo', active['photo_path']?.toString() ?? '');
+      });
     }
   }
 
   Future<void> _fetchUnreadNotificationsCount() async {
-    if (widget.userRole.toUpperCase() != 'PARENT') return;
+    if (_isFetchingNotifications) return;
+    _isFetchingNotifications = true;
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token') ?? '';
+      if (token.isEmpty) return;
       final baseUrl = widget.leaveService.baseUrl;
-      final uri = Uri.parse('$baseUrl/api/student/notifications');
-      
+
+      final isSchoolStaff = widget.userRole.toUpperCase() == 'TEACHER' || 
+                            widget.userRole.toUpperCase() == 'SCHOOL_ADMIN' || 
+                            widget.userRole.toUpperCase() == 'PRINCIPAL';
+
+      final path = isSchoolStaff 
+          ? '/api/school/notifications' 
+          : '/api/student/notifications';
+
+      final uri = Uri.parse('$baseUrl$path');
+
       final headers = {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
-        if (_activeStudentId != null) 'X-Student-Id': _activeStudentId.toString(),
+        if (!isSchoolStaff && _activeStudentId != null) 'X-Student-Id': _activeStudentId.toString(),
       };
-      
+
       final response = await http.get(uri, headers: headers);
       if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body)['data'] ?? [];
+        final decodedBody = json.decode(response.body);
+        final List<dynamic> data = isSchoolStaff 
+            ? (decodedBody['notifications'] ?? decodedBody['data'] ?? [])
+            : (decodedBody['data'] ?? []);
+
         int count = data.where((n) => n['is_read'] == 0 || n['is_read'] == false || n['is_read'] == '0').length;
         if (mounted) {
           setState(() {
             _unreadNotificationCount = count;
           });
         }
+
+        // Show push notification toast banner for the latest unread notification
+        if (data.isNotEmpty) {
+          final latestNotif = data.first;
+          final int latestId = latestNotif['id'] is int 
+              ? latestNotif['id'] 
+              : int.parse(latestNotif['id'].toString());
+          final isUnread = latestNotif['is_read'] == 0 || latestNotif['is_read'] == false || latestNotif['is_read'] == '0';
+
+          final lastNotifiedId = prefs.getInt('last_notified_id_${widget.userRole}') ?? 0;
+          if (isUnread && latestId > lastNotifiedId) {
+            await prefs.setInt('last_notified_id_${widget.userRole}', latestId);
+            await NotificationHelper.showNotification(latestNotif);
+          }
+        }
       }
     } catch (e) {
       // Ignore
+    } finally {
+      _isFetchingNotifications = false;
     }
+  }
+
+  void _showPushNotificationToast(dynamic notif) {
+    final title = notif['title'] ?? 'New Notification';
+    final message = notif['message'] ?? '';
+
+    late OverlayEntry overlayEntry;
+    overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: MediaQuery.of(context).padding.top + 10,
+        left: 16,
+        right: 16,
+        child: Material(
+          color: Colors.transparent,
+          child: GestureDetector(
+            onTap: () {
+              overlayEntry.remove();
+
+              // Handle deep linking on click
+              final titleLower = title.toString().toLowerCase();
+              final msgLower = message.toString().toLowerCase();
+
+              if (titleLower.contains('leave') || msgLower.contains('leave')) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => LeaveListScreen(
+                      leaveService: widget.leaveService,
+                      userRole: widget.userRole,
+                      selectedStudentId: _activeStudentId,
+                    ),
+                  ),
+                ).then((_) => _loadSessionInfo());
+              } else if (titleLower.contains('timetable') || msgLower.contains('timetable')) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => TimetableScreen(
+                      baseUrl: widget.leaveService.baseUrl,
+                      token: widget.leaveService.token,
+                      userRole: widget.userRole,
+                      selectedStudentId: _activeStudentId,
+                    ),
+                  ),
+                );
+              } else {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => NotificationCenterScreen(
+                      baseUrl: widget.leaveService.baseUrl,
+                      token: widget.leaveService.token,
+                      studentId: _activeStudentId,
+                    ),
+                  ),
+                ).then((_) => _loadSessionInfo());
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.indigo.shade100, width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.12),
+                    blurRadius: 16,
+                    offset: const Offset(0, 8),
+                  )
+                ],
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: Colors.indigo.shade50,
+                    radius: 20,
+                    child: Icon(
+                      title.toString().toLowerCase().contains('leave')
+                          ? Icons.edit_document
+                          : Icons.notifications_active_rounded,
+                      color: Colors.indigo,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.black87),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          message,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 12, color: Colors.black54),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 18, color: Colors.grey),
+                    onPressed: () {
+                      overlayEntry.remove();
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    Overlay.of(context).insert(overlayEntry);
+
+    // Auto remove after 5 seconds
+    Future.delayed(const Duration(seconds: 5), () {
+      if (overlayEntry.mounted) {
+        overlayEntry.remove();
+      }
+    });
   }
 
   String _getGreeting() {
@@ -377,7 +630,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _showChangePasswordDialog() {
     final _formKey = GlobalKey<FormState>();
+    final _currentPasswordController = TextEditingController();
     final _newPasswordController = TextEditingController();
+    final _confirmPasswordController = TextEditingController();
     bool _isUpdating = false;
     String _errorText = '';
 
@@ -394,37 +649,81 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               content: Form(
                 key: _formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    TextFormField(
-                      controller: _newPasswordController,
-                      obscureText: true,
-                      decoration: const InputDecoration(
-                        labelText: 'New Password',
-                        hintText: 'Enter at least 6 characters',
-                        prefixIcon: Icon(Icons.lock_outline_rounded),
-                        border: OutlineInputBorder(),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      TextFormField(
+                        controller: _currentPasswordController,
+                        obscureText: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Current Password',
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Current password is required';
+                          }
+                          return null;
+                        },
                       ),
-                      validator: (val) {
-                        if (val == null || val.trim().isEmpty) {
-                          return 'Password cannot be empty';
-                        }
-                        if (val.trim().length < 6) {
-                          return 'Password must be at least 6 characters';
-                        }
-                        return null;
-                      },
-                    ),
-                    if (_errorText.isNotEmpty) ...[
                       const SizedBox(height: 12),
-                      Text(
-                        _errorText,
-                        style: const TextStyle(color: Colors.red, fontSize: 12, fontWeight: FontWeight.bold),
+                      TextFormField(
+                        controller: _newPasswordController,
+                        obscureText: true,
+                        decoration: const InputDecoration(
+                          labelText: 'New Password',
+                          hintText: 'Min 6 chars, 1 uppercase, 1 digit',
+                          hintStyle: TextStyle(fontSize: 11),
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'New password is required';
+                          }
+                          if (value.length < 6) {
+                            return 'At least 6 characters required';
+                          }
+                          bool hasUppercase = value.contains(RegExp(r'[A-Z]'));
+                          bool hasDigits = value.contains(RegExp(r'[0-9]'));
+                          bool hasAlpha = value.contains(RegExp(r'[a-zA-Z]'));
+                          if (!hasUppercase || !hasDigits || !hasAlpha) {
+                            return 'Must contain 1 uppercase, 1 digit & 1 letter';
+                          }
+                          return null;
+                        },
                       ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _confirmPasswordController,
+                        obscureText: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Confirm Password',
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Confirm password is required';
+                          }
+                          if (value != _newPasswordController.text) {
+                            return 'Passwords do not match';
+                          }
+                          return null;
+                        },
+                      ),
+                      if (_errorText.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          _errorText,
+                          style: const TextStyle(color: Colors.red, fontSize: 12),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
               actions: [
@@ -436,34 +735,37 @@ class _HomeScreenState extends State<HomeScreen> {
                   onPressed: _isUpdating
                       ? null
                       : () async {
-                          if (!_formKey.currentState!.validate()) return;
-                          
-                          setDialogState(() {
-                            _isUpdating = true;
-                            _errorText = '';
-                          });
-
-                          try {
-                            final prefs = await SharedPreferences.getInstance();
-                            final token = prefs.getString('auth_token') ?? '';
-                            final authService = AuthService(baseUrl: 'http://10.227.152.71:8000');
-                            await authService.changePassword(token, _newPasswordController.text.trim());
-                            
-                            if (context.mounted) {
-                              Navigator.pop(context); // close password dialog
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Password changed successfully.'),
-                                  behavior: SnackBarBehavior.floating,
-                                  backgroundColor: Colors.green,
-                                ),
-                              );
-                            }
-                          } catch (e) {
+                          if (_formKey.currentState!.validate()) {
                             setDialogState(() {
-                              _isUpdating = false;
-                              _errorText = e.toString().replaceAll('Exception:', '').trim();
+                              _isUpdating = true;
+                              _errorText = '';
                             });
+
+                            try {
+                              final prefs = await SharedPreferences.getInstance();
+                              final token = prefs.getString('auth_token') ?? '';
+                              final authService = AuthService(baseUrl: 'http://10.227.152.71:8000');
+                              await authService.changePassword(
+                                token,
+                                _currentPasswordController.text,
+                                _newPasswordController.text,
+                              );
+
+                              if (context.mounted) {
+                                Navigator.pop(context);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Password updated successfully!'),
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              setDialogState(() {
+                                _isUpdating = false;
+                                _errorText = e.toString().replaceAll('Exception:', '').trim();
+                              });
+                            }
                           }
                         },
                   style: ElevatedButton.styleFrom(
@@ -472,11 +774,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   child: _isUpdating
                       ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(Colors.white)),
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
                         )
-                      : const Text('Save'),
+                      : const Text('Update'),
                 ),
               ],
             );
@@ -685,7 +990,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _onFeatureTap(LauncherFeature feature) async {
     if (feature.isAvailable) {
-      if (feature.name == 'Leave') {
+      if (feature.name == 'Leaves') {
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -696,6 +1001,17 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ).then((_) => _loadSessionInfo()); // reload details in case anything changed
+      } else if (feature.name == 'Settings') {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SettingsScreen(
+              leaveService: widget.leaveService,
+              userRole: widget.userRole,
+              selectedStudentId: _activeStudentId,
+            ),
+          ),
+        ).then((_) => _loadSessionInfo());
       } else if (feature.name == 'Attendance') {
         final attService = AttendanceService(
           baseUrl: widget.leaveService.baseUrl,
@@ -746,6 +1062,33 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ).then((_) => _fetchUnreadNotificationsCount());
+      } else if (feature.name == 'Timetable') {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => TimetableScreen(
+              baseUrl: widget.leaveService.baseUrl,
+              token: widget.leaveService.token,
+              userRole: widget.userRole,
+              selectedStudentId: _activeStudentId,
+            ),
+          ),
+        );
+      } else if (feature.name == 'Exams') {
+        final examService = ExamService(
+          baseUrl: widget.leaveService.baseUrl,
+          token: widget.leaveService.token,
+        );
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ExamListScreen(
+              examService: examService,
+              userRole: widget.userRole,
+              selectedStudentId: _activeStudentId,
+            ),
+          ),
+        );
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -780,16 +1123,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            _getGreeting(),
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _userName,
+                            _schoolName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.w900,
@@ -837,7 +1173,30 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(width: 8),
                     ],
                     GestureDetector(
-                      onTap: _showProfilePopup,
+                      onTap: () {
+                        String photoUrl = '';
+                        if (widget.userRole.toUpperCase() == 'PARENT') {
+                          final active = _children.firstWhere(
+                            (c) => c['id'] == _activeStudentId,
+                            orElse: () => null,
+                          );
+                          if (active != null) {
+                            photoUrl = active['photo_path'] ?? '';
+                          }
+                        } else {
+                          photoUrl = _userPhoto;
+                        }
+
+                        if (photoUrl.isNotEmpty) {
+                          final fullUrl = photoUrl.startsWith('http') ? photoUrl : 'http://10.227.152.71:8000' + photoUrl;
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => FullScreenImageScreen(imageUrl: fullUrl),
+                            ),
+                          );
+                        }
+                      },
                       child: Hero(
                         tag: 'user_profile_icon',
                         child: CircleAvatar(

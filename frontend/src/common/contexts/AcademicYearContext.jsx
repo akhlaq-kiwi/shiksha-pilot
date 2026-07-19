@@ -55,7 +55,7 @@ export const AcademicYearProvider = ({ children }) => {
     const handleAuthChange = () => {
       const token = localStorage.getItem('shiksha_pilot_token');
       const role = localStorage.getItem('shiksha_pilot_role');
-      if (token && role === 'SCHOOL_ADMIN') {
+      if (token && (role === 'SCHOOL_ADMIN' || role === 'TEACHER')) {
         setLoading(true);
         loadYears();
       } else {

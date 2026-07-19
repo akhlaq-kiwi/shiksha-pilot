@@ -47,6 +47,11 @@ export default function SeatingPlanPage() {
   const [isRegenerateOpen, setIsRegenerateOpen] = useState(false);
   const [regenerateLoading, setRegenerateLoading] = useState(false);
 
+  // Publish Admit Cards States
+  const [showPublishAdmitModal, setShowPublishAdmitModal] = useState(false);
+  const [submittingPublishAdmit, setSubmittingPublishAdmit] = useState(false);
+  const [examClassStatuses, setExamClassStatuses] = useState([]);
+
   // Alerts
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -74,7 +79,12 @@ export default function SeatingPlanPage() {
           const examIdStr = String(passedExamId);
           setSelectedExamId(examIdStr);
 
-          const planDetails = await schoolService.getSeatingPlan(examIdStr);
+          const [planDetails, statuses] = await Promise.all([
+            schoolService.getSeatingPlan(examIdStr),
+            schoolService.getExamClassStatuses(examIdStr)
+          ]);
+          setExamClassStatuses(statuses || []);
+
           if (planDetails && planDetails.plan) {
             setGeneratedPlan(planDetails);
             // Pre-populate configs
@@ -383,6 +393,39 @@ export default function SeatingPlanPage() {
     const styleNode = document.getElementById('dynamic-print-style');
     if (styleNode) {
       document.head.removeChild(styleNode);
+    }
+  };
+
+  const handlePublishAdmitClick = () => {
+    setError('');
+    setSuccess('');
+    if (!generatedPlan || !selectedClassIds || selectedClassIds.length === 0) {
+      setError('Generate the seating plan before publishing admit cards.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    setShowPublishAdmitModal(true);
+  };
+
+  const confirmPublishAdmitCards = async () => {
+    setSubmittingPublishAdmit(true);
+    setError('');
+    setSuccess('');
+    try {
+      await Promise.all(selectedClassIds.map(classId => 
+        schoolService.publishExamAdmitCards(selectedExamId, classId)
+      ));
+      setSuccess('Admit Cards Published Successfully.');
+      setShowPublishAdmitModal(false);
+
+      // Reload class statuses
+      const statuses = await schoolService.getExamClassStatuses(selectedExamId);
+      setExamClassStatuses(statuses || []);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to publish admit cards.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } finally {
+      setSubmittingPublishAdmit(false);
     }
   };
 
@@ -757,6 +800,21 @@ export default function SeatingPlanPage() {
                 >
                   <RefreshCw className="h-4 w-4" /> Regenerate Plan
                 </Button>
+                {(() => {
+                  const allAdmitCardsPublished = selectedClassIds.length > 0 && selectedClassIds.every(classId => 
+                    examClassStatuses.find(c => c.id === classId)?.admit_card_published === 1
+                  );
+                  return (
+                    <Button 
+                      variant={allAdmitCardsPublished ? "secondary" : "default"}
+                      className="flex items-center gap-1.5 font-bold"
+                      onClick={handlePublishAdmitClick}
+                      disabled={allAdmitCardsPublished}
+                    >
+                      <Check className="h-4 w-4" /> {allAdmitCardsPublished ? 'Admit Cards Published' : 'Publish Admit Cards'}
+                    </Button>
+                  );
+                })()}
                 <Button 
                   variant="outline"
                   className="flex items-center gap-1.5 font-bold"
@@ -978,6 +1036,39 @@ export default function SeatingPlanPage() {
           </p>
           <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed font-semibold text-text-primary mt-1">
             Are you sure you want to continue?
+          </p>
+        </div>
+      </Dialog>
+
+      {/* PUBLISH ADMIT CARDS DIALOG */}
+      <Dialog
+        isOpen={showPublishAdmitModal}
+        onClose={() => !submittingPublishAdmit && setShowPublishAdmitModal(false)}
+        title="Publish Admit Cards"
+        className="max-w-md animate-in fade-in zoom-in-95 duration-200"
+        footer={
+          <div className="flex justify-end gap-3 w-full">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowPublishAdmitModal(false)}
+              disabled={submittingPublishAdmit}
+              className="font-bold"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={confirmPublishAdmitCards}
+              disabled={submittingPublishAdmit}
+              className="font-black bg-green-600 hover:bg-green-700 text-white"
+            >
+              {submittingPublishAdmit ? 'Publishing...' : 'Publish'}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed font-medium">
+            You are about to publish the admit cards. Once published, students will be able to access the admit cards in the mobile application. Do you want to continue?
           </p>
         </div>
       </Dialog>

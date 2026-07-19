@@ -783,4 +783,169 @@ class StudentService extends BaseService
 
         return ['success' => true];
     }
+
+    public function getExamsList(array $user): array
+    {
+        $student = $this->resolveStudent($user);
+        $classId = (int) $student['class_id'];
+        $schoolId = (int) ($user['school_id'] ?? 0);
+        $pdo = $this->repo->getPdo();
+
+        $stmt = $pdo->prepare("
+            SELECT DISTINCT e.id, e.name, e.start_date, e.end_date,
+                   COALESCE(ecs.scheme_published, 0) AS scheme_published,
+                   COALESCE(ecs.admit_card_published, 0) AS admit_card_published,
+                   COALESCE(ecs.status, 'Draft') AS result_status
+            FROM examinations e
+            JOIN examination_papers ep ON e.id = ep.exam_id
+            LEFT JOIN examination_class_status ecs ON e.id = ecs.exam_id AND ecs.class_id = :class_id_1
+            WHERE ep.class_id = :class_id_2 AND e.school_id = :school_id
+            ORDER BY e.start_date DESC
+        ");
+        $stmt->execute([
+            ':class_id_1' => $classId,
+            ':class_id_2' => $classId,
+            ':school_id' => $schoolId
+        ]);
+        $exams = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        $today = date('Y-m-d');
+        foreach ($exams as &$e) {
+            $e['id'] = (int)$e['id'];
+            $e['scheme_published'] = (int)$e['scheme_published'];
+            $e['admit_card_published'] = (int)$e['admit_card_published'];
+            $e['result_published'] = $e['result_status'] === 'Published' ? 1 : 0;
+            
+            if ($e['start_date'] > $today) {
+                $e['status'] = 'Upcoming';
+            } elseif ($e['start_date'] <= $today && $e['end_date'] >= $today) {
+                $e['status'] = 'Current';
+            } else {
+                $e['status'] = 'Completed';
+            }
+        }
+
+        return $exams;
+    }
+
+    public function getExamDetails(array $user, int $examId): array
+    {
+        $student = $this->resolveStudent($user);
+        $studentId = (int) $student['id'];
+        $classId = (int) $student['class_id'];
+        $schoolId = (int) ($user['school_id'] ?? 0);
+        $pdo = $this->repo->getPdo();
+
+        // 1. Fetch exam publish status for this class
+        $stmtStatus = $pdo->prepare("
+            SELECT COALESCE(scheme_published, 0) AS scheme_published,
+                   COALESCE(admit_card_published, 0) AS admit_card_published,
+                   COALESCE(status, 'Draft') AS result_status
+            FROM examination_class_status
+            WHERE exam_id = :exam_id AND class_id = :class_id
+            LIMIT 1
+        ");
+        $stmtStatus->execute([':exam_id' => $examId, ':class_id' => $classId]);
+        $statusInfo = $stmtStatus->fetch(PDO::FETCH_ASSOC);
+
+        $schemePublished = $statusInfo ? (int)$statusInfo['scheme_published'] : 0;
+        $admitCardPublished = $statusInfo ? (int)$statusInfo['admit_card_published'] : 0;
+        $resultPublished = ($statusInfo && $statusInfo['result_status'] === 'Published') ? 1 : 0;
+
+        // Fetch Exam basic info
+        $stmtExam = $pdo->prepare("SELECT name, start_date, end_date FROM examinations WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtExam->execute([':id' => $examId, ':sid' => $schoolId]);
+        $exam = $stmtExam->fetch(PDO::FETCH_ASSOC);
+        if (!$exam) {
+            throw new NotFoundException('Examination not found.');
+        }
+
+        $response = [
+            'exam_name' => $exam['name'],
+            'start_date' => $exam['start_date'],
+            'end_date' => $exam['end_date'],
+            'scheme_published' => $schemePublished,
+            'admit_card_published' => $admitCardPublished,
+            'result_published' => $resultPublished,
+            'scheme' => null,
+            'admit_card' => null,
+            'result' => null
+        ];
+
+        // 2. Fetch scheme if published
+        if ($schemePublished) {
+            $stmtScheme = $pdo->prepare("
+                SELECT ep.id, ep.exam_date, ep.start_time, ep.end_time, ep.max_marks, ep.passing_marks, ep.room, s.name AS subject_name
+                FROM examination_papers ep
+                JOIN subjects s ON ep.subject_id = s.id
+                WHERE ep.exam_id = :exam_id AND ep.class_id = :class_id
+                ORDER BY ep.exam_date ASC, ep.start_time ASC
+            ");
+            $stmtScheme->execute([':exam_id' => $examId, ':class_id' => $classId]);
+            $response['scheme'] = $stmtScheme->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        }
+
+        // 3. Fetch admit card if published
+        if ($admitCardPublished) {
+            $stmtAdmit = $pdo->prepare("
+                SELECT esa.seat_number, esa.room
+                FROM examination_seating_allocations esa
+                JOIN examination_seating_plans esp ON esa.seating_plan_id = esp.id
+                WHERE esp.exam_id = :exam_id AND esa.student_id = :student_id
+                LIMIT 1
+            ");
+            $stmtAdmit->execute([':exam_id' => $examId, ':student_id' => $studentId]);
+            $admit = $stmtAdmit->fetch(PDO::FETCH_ASSOC);
+            if ($admit) {
+                $response['admit_card'] = [
+                    'seat_number' => $admit['seat_number'],
+                    'room' => $admit['room'] ?: 'As scheduled'
+                ];
+            }
+        }
+
+        // 4. Fetch result if published
+        if ($resultPublished) {
+            $stmtResult = $pdo->prepare("
+                SELECT em.marks_obtained, em.is_absent, em.remarks, ep.max_marks, ep.passing_marks, s.name AS subject_name
+                FROM examination_marks em
+                JOIN examination_papers ep ON em.paper_id = ep.id
+                JOIN subjects s ON ep.subject_id = s.id
+                WHERE ep.exam_id = :exam_id AND em.student_id = :student_id
+            ");
+            $stmtResult->execute([':exam_id' => $examId, ':student_id' => $studentId]);
+            $marks = $stmtResult->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            
+            if (!empty($marks)) {
+                $totalMax = 0;
+                $totalObtained = 0;
+                $allPassed = true;
+                
+                foreach ($marks as &$m) {
+                    $m['max_marks'] = (float)$m['max_marks'];
+                    $m['passing_marks'] = (float)$m['passing_marks'];
+                    $m['marks_obtained'] = $m['marks_obtained'] !== null ? (float)$m['marks_obtained'] : null;
+                    
+                    if (!$m['is_absent'] && $m['marks_obtained'] !== null) {
+                        $totalObtained += $m['marks_obtained'];
+                        if ($m['marks_obtained'] < $m['passing_marks']) {
+                            $allPassed = false;
+                        }
+                    } else {
+                        $allPassed = false;
+                    }
+                    $totalMax += $m['max_marks'];
+                }
+                
+                $response['result'] = [
+                    'papers' => $marks,
+                    'total_max_marks' => $totalMax,
+                    'total_marks_obtained' => $totalObtained,
+                    'status' => $allPassed ? 'Pass' : 'Fail'
+                ];
+            }
+        }
+
+        return $response;
+    }
 }

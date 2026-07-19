@@ -4,7 +4,7 @@ import {
   Plus, ArrowLeft, Calendar, Clock, BookOpen, UserCheck, 
   Settings, Award, Printer, Trash, FileText, CheckCircle, 
   XCircle, Save, AlertCircle, Edit3, Trash2, LayoutDashboard, ChevronRight, Download, X,
-  Users
+  Users, Check
 } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
@@ -607,6 +607,10 @@ export default function ExamsPage() {
   const [deletePaperTarget, setDeletePaperTarget] = useState(null);
   const [editingPaper, setEditingPaper] = useState(null);
 
+  // Publish Scheme States
+  const [showPublishSchemeModal, setShowPublishSchemeModal] = useState(false);
+  const [submittingPublishScheme, setSubmittingPublishScheme] = useState(false);
+
   // Instructions States
   const [instructions, setInstructions] = useState([]);
   const [isInstructionsOpen, setIsInstructionsOpen] = useState(false);
@@ -1088,6 +1092,20 @@ export default function ExamsPage() {
       return;
     }
 
+    // Duplicate subject check
+    const isDuplicateSubject = timetablePapers.some(p => {
+      // If editing, allow the same subject id as the one being edited
+      if (editingPaper && parseInt(p.subject_id) === parseInt(editingPaper.subject_id)) {
+        return false;
+      }
+      return parseInt(p.subject_id) === parseInt(newPaper.subject_id);
+    });
+
+    if (isDuplicateSubject) {
+      setError('This subject is already scheduled for this exam.');
+      return;
+    }
+
     // Overlap checks locally using pure string comparison
     const overlaps = timetablePapers.some(p => {
       if (editingPaper && parseInt(p.subject_id) === parseInt(editingPaper.subject_id)) {
@@ -1562,6 +1580,37 @@ export default function ExamsPage() {
     }
   };
 
+  const handlePublishSchemeClick = () => {
+    setError('');
+    setSuccess('');
+    if (!allSubjectsScheduled) {
+      setError('Please complete the examination timetable before publishing.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    setShowPublishSchemeModal(true);
+  };
+
+  const confirmPublishScheme = async () => {
+    setSubmittingPublishScheme(true);
+    setError('');
+    setSuccess('');
+    try {
+      await schoolService.publishExamScheme(selectedExam.id, parseInt(selectedClassId));
+      setSuccess('Examination Scheme Published Successfully.');
+      setShowPublishSchemeModal(false);
+      
+      // Reload class statuses
+      const statuses = await schoolService.getExamClassStatuses(selectedExam.id);
+      setExamClassStatuses(statuses || []);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to publish examination scheme.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } finally {
+      setSubmittingPublishScheme(false);
+    }
+  };
+
   const handleOpenSingleReportCard = (card) => {
     setSelectedReportCard(card);
     setIsReportCardOpen(true);
@@ -1796,16 +1845,9 @@ export default function ExamsPage() {
     return true;
   });
 
-  const filteredClassSubjects = subjects.filter(s => {
-    if (s.class_id !== parseInt(selectedClassId)) return false;
-    const alreadyScheduled = timetablePapers.some(p => parseInt(p.subject_id) === s.id);
-    if (editingPaper && parseInt(editingPaper.subject_id) === s.id) {
-      return true;
-    }
-    return !alreadyScheduled;
-  });
+  const filteredClassSubjects = subjects;
 
-  const classSubjects = subjects.filter(s => s.class_id === parseInt(selectedClassId));
+  const classSubjects = subjects;
   const totalSubjectsCount = classSubjects.length;
   const scheduledCount = timetablePapers.length;
   const pendingSubjectsCount = Math.max(0, totalSubjectsCount - scheduledCount);
@@ -2335,7 +2377,7 @@ export default function ExamsPage() {
           <div className="space-y-6">
             {/* 1. Add Paper block */}
             {(examClassStatuses.find(c => c.id === parseInt(selectedClassId))?.status || 'Draft') === 'Draft' && !isReadOnly ? (
-              <Card>
+              <Card className="relative z-10">
                 <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-row justify-between items-center space-y-0">
                   <CardTitle className="text-sm font-bold text-text-primary">
                     {editingPaper ? 'Edit Paper' : 'Add Paper'}
@@ -2395,9 +2437,14 @@ export default function ExamsPage() {
                           disabled={filteredClassSubjects.length === 0}
                         >
                           <option value="">Select subject...</option>
-                          {filteredClassSubjects.map(s => (
-                            <option key={s.id} value={s.id}>{s.name}</option>
-                          ))}
+                          {filteredClassSubjects.map(s => {
+                            const isCreated = timetablePapers.some(p => parseInt(p.subject_id) === s.id && (!editingPaper || parseInt(editingPaper.subject_id) !== s.id));
+                            return (
+                              <option key={s.id} value={s.id}>
+                                {s.name}{isCreated ? ' (Created)' : ''}
+                              </option>
+                            );
+                          })}
                         </Select>
                       </div>
 
@@ -2482,25 +2529,41 @@ export default function ExamsPage() {
             <Card>
               <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-row justify-between items-center space-y-0">
                 <CardTitle className="text-sm font-bold text-text-primary">Exam Papers</CardTitle>
-                {allSubjectsScheduled && (
-                  <div className="flex items-center gap-2">
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      className="flex items-center gap-2 text-xs font-bold py-1.5 px-3 border-border hover:bg-zinc-100 dark:hover:bg-zinc-900 cursor-pointer"
-                      onClick={handleOpenInstructionsPopup}
-                    >
-                      <BookOpen className="h-4 w-4" /> Instructions
-                    </Button>
-                    <Button 
-                      type="button"
-                      className="flex items-center gap-2 text-xs font-bold py-1.5 px-3 cursor-pointer"
-                      onClick={handleDownloadSchemeClick}
-                    >
-                      <Download className="h-4 w-4" /> Download Scheme
-                    </Button>
-                  </div>
-                )}
+                {allSubjectsScheduled && (() => {
+                  const isSchemePublished = examClassStatuses.find(c => c.id === parseInt(selectedClassId))?.scheme_published === 1;
+                  return (
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        className="flex items-center gap-2 text-xs font-bold py-1.5 px-3 border-border hover:bg-zinc-100 dark:hover:bg-zinc-900 cursor-pointer"
+                        onClick={handleOpenInstructionsPopup}
+                      >
+                        <BookOpen className="h-4 w-4" /> Instructions
+                      </Button>
+                      <Button 
+                        type="button" 
+                        variant={isSchemePublished ? "secondary" : "default"}
+                        className="flex items-center gap-2 text-xs font-bold py-1.5 px-3 cursor-pointer"
+                        onClick={handlePublishSchemeClick}
+                        disabled={isSchemePublished || isReadOnly}
+                      >
+                        {isSchemePublished ? (
+                          <><Check className="h-4 w-4 text-green-600" /> Scheme Published</>
+                        ) : (
+                          <><Check className="h-4 w-4" /> Publish Scheme</>
+                        )}
+                      </Button>
+                      <Button 
+                        type="button"
+                        className="flex items-center gap-2 text-xs font-bold py-1.5 px-3 cursor-pointer"
+                        onClick={handleDownloadSchemeClick}
+                      >
+                        <Download className="h-4 w-4" /> Download Scheme
+                      </Button>
+                    </div>
+                  );
+                })()}
               </CardHeader>
               <Table>
                 <TableHeader>
@@ -2907,6 +2970,25 @@ export default function ExamsPage() {
           </Card>
         </div>
       )}
+
+      {/* PUBLISH SCHEME DIALOG */}
+      <Dialog isOpen={showPublishSchemeModal} onClose={() => setShowPublishSchemeModal(false)}
+        title="Publish Examination Scheme"
+        footer={<>
+          <Button variant="secondary" onClick={() => setShowPublishSchemeModal(false)}>Cancel</Button>
+          <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={confirmPublishScheme} disabled={submittingPublishScheme}>
+            {submittingPublishScheme ? 'Publishing...' : 'Publish'}
+          </Button>
+        </>}>
+        <div className="space-y-3 p-1">
+          <div className="mx-auto w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-green-600">
+            <CheckCircle className="h-6 w-6" />
+          </div>
+          <p className="text-xs text-center text-text-secondary leading-relaxed">
+            You are about to publish the examination scheme. Once published, students and class teachers will be able to access the examination scheme in the mobile application. Do you want to continue?
+          </p>
+        </div>
+      </Dialog>
 
       {/* CREATE EXAM DIALOG */}
       <Dialog isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)}

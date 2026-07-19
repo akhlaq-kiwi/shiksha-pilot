@@ -37,6 +37,29 @@ const StudentAvatar = ({ src, name, updatedAt }) => {
   );
 };
 
+const CLASS_ORDER = ['Nursery', 'LKG', 'UKG', 'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5', 'Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10', 'Class 11', 'Class 12'];
+
+const getClassIndex = (className) => {
+  if (!className) return -1;
+  const cleanName = className.trim();
+  const index = CLASS_ORDER.findIndex(name => name.toLowerCase() === cleanName.toLowerCase());
+  if (index !== -1) return index;
+
+  // Fallback: extract numeric value
+  const match = cleanName.match(/\d+/);
+  if (match) {
+    const num = parseInt(match[0], 10);
+    return 2 + num;
+  }
+  return -1;
+};
+
+const getEligibleClasses = (studentClassName, schoolClasses) => {
+  const studentIdx = getClassIndex(studentClassName);
+  if (studentIdx === -1) return [];
+  return schoolClasses.filter(c => getClassIndex(c.name) > studentIdx);
+};
+
 export default function ClassesPage() {
   const [searchParams] = useSearchParams();
   const location = useLocation();
@@ -81,6 +104,13 @@ export default function ClassesPage() {
   const [isCredentialsOpen, setIsCredentialsOpen] = useState(false);
   const [credentialsTarget, setCredentialsTarget] = useState(null);
 
+  // Advance Student states
+  const [isAdvanceDialogOpen, setIsAdvanceDialogOpen] = useState(false);
+  const [advanceTargetStudent, setAdvanceTargetStudent] = useState(null);
+  const [selectedAdvanceClassId, setSelectedAdvanceClassId] = useState('');
+  const [advancing, setAdvancing] = useState(false);
+  const [advanceError, setAdvanceError] = useState('');
+
   const loadData = async () => {
     setLoading(true);
     setError('');
@@ -96,6 +126,24 @@ export default function ClassesPage() {
       setError('Failed to fetch class and student data.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAdvanceStudent = async () => {
+    if (!selectedAdvanceClassId || !advanceTargetStudent) return;
+    setAdvancing(true);
+    setAdvanceError('');
+    try {
+      await schoolService.advanceStudent(advanceTargetStudent.id, selectedAdvanceClassId);
+      setIsAdvanceDialogOpen(false);
+      setAdvanceTargetStudent(null);
+      setSelectedAdvanceClassId('');
+      await loadData();
+    } catch (err) {
+      console.error(err);
+      setAdvanceError(err.message || 'Failed to advance student.');
+    } finally {
+      setAdvancing(false);
     }
   };
 
@@ -421,6 +469,23 @@ export default function ClassesPage() {
                       }}>
                         Credentials
                       </DropdownItem>
+                      {!isReadOnly && getEligibleClasses(s.class_name, classes).length > 0 && (
+                        s.status !== 'ACTIVE' ? (
+                          <DropdownItem disabled className="opacity-50 cursor-not-allowed hover:bg-transparent text-text-muted flex flex-col items-start gap-0.5">
+                            <span className="block text-left text-text-muted">Advance Student</span>
+                            <span className="block text-[8px] text-red-500 font-bold whitespace-normal text-left">Only active students can be advanced.</span>
+                          </DropdownItem>
+                        ) : (
+                          <DropdownItem onClick={() => {
+                            setAdvanceTargetStudent(s);
+                            setSelectedAdvanceClassId('');
+                            setAdvanceError('');
+                            setIsAdvanceDialogOpen(true);
+                          }}>
+                            Advance Student
+                          </DropdownItem>
+                        )
+                      )}
                     </DropdownMenu>
                   </div>
 
@@ -443,6 +508,122 @@ export default function ClassesPage() {
             </div>
           )}
         </div>
+
+        {isAdvanceDialogOpen && advanceTargetStudent && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 animate-in fade-in duration-200" onClick={() => {
+            setIsAdvanceDialogOpen(false);
+            setAdvanceTargetStudent(null);
+            setSelectedAdvanceClassId('');
+            setAdvanceError('');
+          }}>
+            <div className="bg-surface border border-border rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+              
+              {/* Modal Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-zinc-50 dark:bg-zinc-900/50">
+                <h3 className="font-extrabold text-text-primary text-base tracking-tight font-display">
+                  Advance Student
+                </h3>
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    setIsAdvanceDialogOpen(false);
+                    setAdvanceTargetStudent(null);
+                    setSelectedAdvanceClassId('');
+                    setAdvanceError('');
+                  }} 
+                  className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+                >
+                  <X className="h-4 w-4 text-text-secondary" />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6 space-y-4">
+                {advanceError && (
+                  <div className="p-3 bg-red-500/10 text-red-600 border border-red-500/20 rounded-xl text-xs font-semibold">
+                    {advanceError}
+                  </div>
+                )}
+
+                {/* Student info box */}
+                <div className="bg-zinc-50 dark:bg-zinc-900/50 border border-border rounded-xl p-4 text-xs space-y-2">
+                  <p className="flex justify-between">
+                    <span className="text-text-muted font-medium">Student Name:</span>
+                    <strong className="text-text-primary uppercase">{advanceTargetStudent.name}</strong>
+                  </p>
+                  <p className="flex justify-between">
+                    <span className="text-text-muted font-medium">SR Number:</span>
+                    <span className="font-bold font-mono text-text-primary">{advanceTargetStudent.sr_no || advanceTargetStudent.id}</span>
+                  </p>
+                  <p className="flex justify-between">
+                    <span className="text-text-muted font-medium">Current Class:</span>
+                    <span className="font-bold text-text-primary">
+                      {advanceTargetStudent.class_name} {advanceTargetStudent.section ? `- ${advanceTargetStudent.section}` : ''}
+                    </span>
+                  </p>
+                  <p className="flex justify-between">
+                    <span className="text-text-muted font-medium">Academic Year:</span>
+                    <span className="font-bold text-text-primary">{advanceTargetStudent.academic_year_name || '2025–2026'}</span>
+                  </p>
+                </div>
+
+                {/* Selection dropdown */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-text-muted uppercase tracking-wider block">
+                    Advance To <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={selectedAdvanceClassId}
+                    onChange={(e) => setSelectedAdvanceClassId(e.target.value)}
+                    className="w-full rounded-xl border border-border bg-surface text-text-primary px-3 py-2 text-xs font-bold focus:border-primary focus:ring-primary outline-none"
+                    required
+                  >
+                    <option value="">Select Class</option>
+                    {getEligibleClasses(advanceTargetStudent.class_name, classes).map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} {c.section ? `- ${c.section}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Warning box */}
+                <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 text-amber-600 rounded-xl text-xs leading-relaxed space-y-1.5">
+                  <p className="font-bold">Important Notice:</p>
+                  <ul className="list-disc pl-4 space-y-1">
+                    <li>This action will move the student to the selected class immediately.</li>
+                    <li>All academic records and history will be preserved.</li>
+                    <li>Please verify carefully before continuing.</li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="px-6 py-4 border-t border-border bg-surface flex justify-end gap-3">
+                <Button 
+                  variant="secondary" 
+                  onClick={() => {
+                    setIsAdvanceDialogOpen(false);
+                    setAdvanceTargetStudent(null);
+                    setSelectedAdvanceClassId('');
+                    setAdvanceError('');
+                  }}
+                  disabled={advancing}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  className="font-bold" 
+                  onClick={handleAdvanceStudent} 
+                  disabled={advancing || !selectedAdvanceClassId}
+                >
+                  {advancing ? 'Advancing...' : 'Advance Student'}
+                </Button>
+              </div>
+
+            </div>
+          </div>
+        )}
 
         <CredentialsDialog
           isOpen={isCredentialsOpen}
@@ -574,6 +755,122 @@ export default function ClassesPage() {
                 </Button>
               </div>
             </form>
+
+          </div>
+        </div>
+      )}
+
+      {isAdvanceDialogOpen && advanceTargetStudent && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 animate-in fade-in duration-200" onClick={() => {
+          setIsAdvanceDialogOpen(false);
+          setAdvanceTargetStudent(null);
+          setSelectedAdvanceClassId('');
+          setAdvanceError('');
+        }}>
+          <div className="bg-surface border border-border rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-zinc-50 dark:bg-zinc-900/50">
+              <h3 className="font-extrabold text-text-primary text-base tracking-tight font-display">
+                Advance Student
+              </h3>
+              <button 
+                type="button" 
+                onClick={() => {
+                  setIsAdvanceDialogOpen(false);
+                  setAdvanceTargetStudent(null);
+                  setSelectedAdvanceClassId('');
+                  setAdvanceError('');
+                }} 
+                className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+              >
+                <X className="h-4 w-4 text-text-secondary" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4">
+              {advanceError && (
+                <div className="p-3 bg-red-500/10 text-red-600 border border-red-500/20 rounded-xl text-xs font-semibold">
+                  {advanceError}
+                </div>
+              )}
+
+              {/* Student info box */}
+              <div className="bg-zinc-50 dark:bg-zinc-900/50 border border-border rounded-xl p-4 text-xs space-y-2">
+                <p className="flex justify-between">
+                  <span className="text-text-muted font-medium">Student Name:</span>
+                  <strong className="text-text-primary uppercase">{advanceTargetStudent.name}</strong>
+                </p>
+                <p className="flex justify-between">
+                  <span className="text-text-muted font-medium">SR Number:</span>
+                  <span className="font-bold font-mono text-text-primary">{advanceTargetStudent.sr_no || advanceTargetStudent.id}</span>
+                </p>
+                <p className="flex justify-between">
+                  <span className="text-text-muted font-medium">Current Class:</span>
+                  <span className="font-bold text-text-primary">
+                    {advanceTargetStudent.class_name} {advanceTargetStudent.section ? `- ${advanceTargetStudent.section}` : ''}
+                  </span>
+                </p>
+                <p className="flex justify-between">
+                  <span className="text-text-muted font-medium">Academic Year:</span>
+                  <span className="font-bold text-text-primary">{advanceTargetStudent.academic_year_name || '2025–2026'}</span>
+                </p>
+              </div>
+
+              {/* Selection dropdown */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-text-muted uppercase tracking-wider block">
+                  Advance To <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={selectedAdvanceClassId}
+                  onChange={(e) => setSelectedAdvanceClassId(e.target.value)}
+                  className="w-full rounded-xl border border-border bg-surface text-text-primary px-3 py-2 text-xs font-bold focus:border-primary focus:ring-primary outline-none"
+                  required
+                >
+                  <option value="">Select Class</option>
+                  {getEligibleClasses(advanceTargetStudent.class_name, classes).map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} {c.section ? `- ${c.section}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Warning box */}
+              <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 text-amber-600 rounded-xl text-xs leading-relaxed space-y-1.5">
+                <p className="font-bold">Important Notice:</p>
+                <ul className="list-disc pl-4 space-y-1">
+                  <li>This action will move the student to the selected class immediately.</li>
+                  <li>All academic records and history will be preserved.</li>
+                  <li>Please verify carefully before continuing.</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-border bg-surface flex justify-end gap-3">
+              <Button 
+                variant="secondary" 
+                onClick={() => {
+                  setIsAdvanceDialogOpen(false);
+                  setAdvanceTargetStudent(null);
+                  setSelectedAdvanceClassId('');
+                  setAdvanceError('');
+                }}
+                disabled={advancing}
+              >
+                Cancel
+              </Button>
+              <Button 
+                className="font-bold" 
+                onClick={handleAdvanceStudent} 
+                disabled={advancing || !selectedAdvanceClassId}
+              >
+                {advancing ? 'Advancing...' : 'Advance Student'}
+              </Button>
+            </div>
 
           </div>
         </div>
