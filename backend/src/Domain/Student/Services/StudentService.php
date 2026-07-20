@@ -604,6 +604,7 @@ class StudentService extends BaseService
             $additionalFees[] = [
                 'id' => (int)$row['id'],
                 'description' => $row['fee_name'] === 'Transport Fees' ? 'Transport Fee' : $row['fee_name'],
+                'custom_description' => $row['description'] ?? '',
                 'amount' => $amt,
                 'payment_date' => $row['payment_date'],
                 'due_date' => $dueDate,
@@ -845,6 +846,72 @@ class StudentService extends BaseService
         return $exams;
     }
 
+    public function getStudentOutstandingDue(array $student, int $schoolId): float
+    {
+        $studentId = (int)$student['id'];
+        $classId = (int)$student['class_id'];
+        $pdo = $this->repo->getPdo();
+
+        // 1. Fetch class base monthly fee configurations
+        $stmtBase = $pdo->prepare("SELECT amount FROM class_fee_configurations WHERE class_id = :class_id AND school_id = :school_id LIMIT 1");
+        $stmtBase->execute([':class_id' => $classId, ':school_id' => $schoolId]);
+        $fallbackAmount = (float)$stmtBase->fetchColumn();
+
+        // 2. Fetch specific student monthly fee configurations
+        $stmtMonths = $pdo->prepare("SELECT fee_month, amount FROM student_monthly_fee_configurations WHERE student_id = :student_id AND school_id = :school_id");
+        $stmtMonths->execute([':student_id' => $studentId, ':school_id' => $schoolId]);
+        $monthlyFeesAmountMap = $stmtMonths->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
+
+        // 3. Fetch paid records from fee_payments
+        $stmtPay = $pdo->prepare("SELECT * FROM fee_payments WHERE school_id = :sid AND student_id = :stid");
+        $stmtPay->execute([':sid' => $schoolId, ':stid' => $studentId]);
+        $payments = $stmtPay->fetchAll();
+        $paymentsMap = [];
+        foreach ($payments as $p) {
+            $paymentsMap[$p['fee_month']] = $p;
+        }
+
+        // Generate months structure
+        $allAcademicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+        $currentMonthName = date('F');
+        $currentMonthIdx = array_search($currentMonthName, $allAcademicMonths, true);
+        if ($currentMonthIdx === false) {
+            $currentMonthIdx = 11;
+        }
+
+        $monthlyDue = 0.0;
+        foreach ($allAcademicMonths as $month) {
+            $monthAmount = isset($monthlyFeesAmountMap[$month]) ? (float)$monthlyFeesAmountMap[$month] : $fallbackAmount;
+            $monthIdx = array_search($month, $allAcademicMonths, true);
+            $isFuture = $monthIdx > $currentMonthIdx;
+
+            if (!isset($paymentsMap[$month])) {
+                if (!$isFuture) {
+                    $monthlyDue += $monthAmount;
+                }
+            }
+        }
+
+        // 4. Fetch additional fee payments
+        $stmtAdd = $pdo->prepare("
+            SELECT afp.amount, afp.status
+            FROM additional_fee_payments afp
+            WHERE afp.school_id = :sid AND afp.student_id = :stid
+        ");
+        $stmtAdd->execute([':sid' => $schoolId, ':stid' => $studentId]);
+        $additionalPayments = $stmtAdd->fetchAll(PDO::FETCH_ASSOC);
+
+        $additionalDue = 0.0;
+        foreach ($additionalPayments as $row) {
+            $isPaid = strtolower($row['status']) === 'paid';
+            if (!$isPaid) {
+                $additionalDue += (float)$row['amount'];
+            }
+        }
+
+        return $monthlyDue + $additionalDue;
+    }
+
     public function getExamDetails(array $user, int $examId): array
     {
         $student = $this->resolveStudent($user);
@@ -877,6 +944,33 @@ class StudentService extends BaseService
             throw new NotFoundException('Examination not found.');
         }
 
+        // Check if there is an active finance setting for due restriction
+        $academicYearId = (int)$student['academic_year_id'];
+        $stmtSetting = $pdo->prepare("
+            SELECT enable_due_restriction, max_allowed_due, restrict_admit_card, restrict_exam_result FROM school_finance_settings 
+            WHERE school_id = :sid AND academic_year_id = :ayid LIMIT 1
+        ");
+        $stmtSetting->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+        $settings = $stmtSetting->fetch(PDO::FETCH_ASSOC);
+
+        $admitCardRestricted = false;
+        $resultRestricted = false;
+        $outstandingDue = 0.0;
+        $maxAllowedDue = 0.0;
+
+        if ($settings && (int)$settings['enable_due_restriction'] === 1) {
+            $outstandingDue = $this->getStudentOutstandingDue($student, $schoolId);
+            $maxAllowedDue = (float)$settings['max_allowed_due'];
+            if ($outstandingDue > $maxAllowedDue) {
+                if ((int)$settings['restrict_admit_card'] === 1) {
+                    $admitCardRestricted = true;
+                }
+                if ((int)$settings['restrict_exam_result'] === 1) {
+                    $resultRestricted = true;
+                }
+            }
+        }
+
         $response = [
             'exam_name' => $exam['name'],
             'start_date' => $exam['start_date'],
@@ -886,10 +980,15 @@ class StudentService extends BaseService
             'result_published' => $resultPublished,
             'scheme' => null,
             'admit_card' => null,
-            'result' => null
+            'result' => null,
+            'is_restricted' => ($admitCardRestricted || $resultRestricted),
+            'admit_card_restricted' => $admitCardRestricted,
+            'result_restricted' => $resultRestricted,
+            'max_allowed_due' => $maxAllowedDue,
+            'outstanding_due' => $outstandingDue
         ];
 
-        // 2. Fetch scheme if published
+        // 2. Fetch scheme if published (always visible)
         if ($schemePublished) {
             $stmtScheme = $pdo->prepare("
                 SELECT ep.id, ep.exam_date, ep.start_time, ep.end_time, ep.max_marks, ep.passing_marks, ep.room, s.name AS subject_name
@@ -902,8 +1001,8 @@ class StudentService extends BaseService
             $response['scheme'] = $stmtScheme->fetchAll(PDO::FETCH_ASSOC) ?: [];
         }
 
-        // 3. Fetch admit card if published
-        if ($admitCardPublished) {
+        // 3. Fetch admit card if published and NOT restricted
+        if ($admitCardPublished && !$admitCardRestricted) {
             $stmtAdmit = $pdo->prepare("
                 SELECT esa.seat_number, esa.room_name, esa.bench_number, esa.seat_position,
                        s.name AS school_name, ay.name AS academic_year, c.name AS class_name,
@@ -934,8 +1033,8 @@ class StudentService extends BaseService
             }
         }
 
-        // 4. Fetch result if published
-        if ($resultPublished) {
+        // 4. Fetch result if published and NOT restricted
+        if ($resultPublished && !$resultRestricted) {
             $stmtResult = $pdo->prepare("
                 SELECT em.marks_obtained, em.is_absent, em.remarks, ep.max_marks, ep.passing_marks, s.name AS subject_name
                 FROM examination_marks em

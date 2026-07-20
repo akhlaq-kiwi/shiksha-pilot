@@ -2403,6 +2403,17 @@ class SchoolAdminService extends BaseService
                 $studentsRepeatedCount = 0;
                 $studentsGraduatedCount = 0;
 
+                // Fetch Late Payment Penalty config for source year if any
+                $stmtLppCfg = $pdo->prepare("
+                    SELECT * FROM late_payment_penalty_configs 
+                    WHERE school_id = :sid AND academic_year_id = :ayid AND status = 'Active' LIMIT 1
+                ");
+                $lppConfig = null;
+                if ($prevYearId !== false) {
+                    $stmtLppCfg->execute([':sid' => $schoolId, ':ayid' => $prevYearId]);
+                    $lppConfig = $stmtLppCfg->fetch(PDO::FETCH_ASSOC);
+                }
+
                 // 6. Promote / Repeat / Graduate students
                 $studentMigrations = $body['student_migrations'] ?? [];
 
@@ -2598,6 +2609,115 @@ class SchoolAdminService extends BaseService
                                 ':amount' => $outstanding
                             ]);
                             
+                            // Apply Late Payment Penalty if configured
+                            if ($lppConfig && isset($lppConfig['percentage']) && (float)$lppConfig['percentage'] > 0) {
+                                $percentage = (float)$lppConfig['percentage'];
+                                $penaltyAmount = round($outstanding * $percentage / 100, 2);
+                                if ($penaltyAmount > 0) {
+                                    // Duplicate protection
+                                    $stmtCheckLppPay = $pdo->prepare("
+                                        SELECT COUNT(*) FROM additional_fee_payments afp
+                                        JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+                                        WHERE afp.student_id = :stid 
+                                          AND afp.school_id = :sid 
+                                          AND aft.academic_year_id = :target_ayid 
+                                          AND aft.name = 'Late Payment Penalty'
+                                    ");
+                                    $stmtCheckLppPay->execute([
+                                        ':stid' => $newStudentId,
+                                        ':sid' => $schoolId,
+                                        ':target_ayid' => $newYearId
+                                    ]);
+                                    $existsLpp = (int)$stmtCheckLppPay->fetchColumn();
+
+                                    if ($existsLpp === 0) {
+                                        // Find or create 'Late Payment Penalty' fee type in target academic year
+                                        $stmtLppType = $pdo->prepare("
+                                            SELECT id FROM additional_fee_types 
+                                            WHERE school_id = :sid AND academic_year_id = :ayid AND name = 'Late Payment Penalty' LIMIT 1
+                                        ");
+                                        $stmtLppType->execute([':sid' => $schoolId, ':ayid' => $newYearId]);
+                                        $lppTypeId = $stmtLppType->fetchColumn();
+                                        
+                                        if ($lppTypeId === false) {
+                                            $stmtInsLppType = $pdo->prepare("
+                                                INSERT INTO additional_fee_types (school_id, name, amount, academic_year_id, due_date, category)
+                                                VALUES (:sid, 'Late Payment Penalty', 0.0, :ayid, :due_date, 'System Generated')
+                                            ");
+                                            $stmtInsLppType->execute([
+                                                ':sid' => $schoolId,
+                                                ':ayid' => $newYearId,
+                                                ':due_date' => date('Y-m-d')
+                                            ]);
+                                            $lppTypeId = (int)$pdo->lastInsertId();
+                                        } else {
+                                            $lppTypeId = (int)$lppTypeId;
+                                        }
+
+                                        $lppDescription = "Late Payment Penalty For AY (" . $prevYear['name'] . ")";
+
+                                        // Create penalty fee payment record
+                                        $stmtInsLppPay = $pdo->prepare("
+                                            INSERT INTO additional_fee_payments (school_id, student_id, fee_type_id, amount, status, description, created_by_name, penalty_type)
+                                            VALUES (:sid, :student_id, :fee_type_id, :amount, 'Pending', :desc, 'System Migration', 'AUTO_MIGRATION')
+                                        ");
+                                        $stmtInsLppPay->execute([
+                                            ':sid' => $schoolId,
+                                            ':student_id' => $newStudentId,
+                                            ':fee_type_id' => $lppTypeId,
+                                            ':amount' => $penaltyAmount,
+                                            ':desc' => $lppDescription
+                                        ]);
+
+                                        // Log late payment penalty history
+                                        $stmtInsLppHist = $pdo->prepare("
+                                            INSERT INTO late_payment_penalty_history (
+                                                school_id, academic_year_id, student_id, student_name, admission_no,
+                                                class_name, section_name, outstanding_due, penalty_percentage, penalty_amount,
+                                                description, applied_by, applied_by_name
+                                            ) VALUES (
+                                                :sid, :ayid, :stid, :sname, :adm,
+                                                :class, :section, :due, :pct, :amount,
+                                                :desc, :uid, 'System Migration'
+                                            )
+                                        ");
+                                        $stmtInsLppHist->execute([
+                                            ':sid' => $schoolId,
+                                            ':ayid' => $prevYearId,
+                                            ':stid' => $newStudentId,
+                                            ':sname' => $studentName,
+                                            ':adm' => $oldStu['admission_no'] ?? '',
+                                            ':class' => $stuInfo['name'] ?? '',
+                                            ':section' => $stuInfo['section'] ?? '',
+                                            ':due' => $outstanding,
+                                            ':pct' => $percentage,
+                                            ':amount' => $penaltyAmount,
+                                            ':desc' => $lppDescription,
+                                            ':uid' => $user['id'] ?? 1
+                                        ]);
+
+                                        // Create dashboard notifications
+                                        $stmtNotif = $pdo->prepare("
+                                            INSERT INTO dashboard_notifications (school_id, user_role, message, path, is_read, academic_year_id)
+                                            VALUES (:sid, :role, :msg, '/student/fees', 0, :ayid)
+                                        ");
+                                        $notifMsg = "A late payment penalty of INR " . $penaltyAmount . " has been applied for previous year dues.";
+                                        $stmtNotif->execute([
+                                            ':sid' => $schoolId,
+                                            ':role' => 'STUDENT',
+                                            ':msg' => $notifMsg,
+                                            ':ayid' => $newYearId
+                                        ]);
+                                        $stmtNotif->execute([
+                                            ':sid' => $schoolId,
+                                            ':role' => 'PARENT',
+                                            ':msg' => $notifMsg,
+                                            ':ayid' => $newYearId
+                                        ]);
+                                    }
+                                }
+                            }
+
                             // Log the audit trail
                             $logAction = "Migrated prev year dues: student ID {$newStudentId} (old ID {$studentId}), INR {$outstanding}, from AY {$prevYearId} to {$newYearId}";
                             
@@ -12055,6 +12175,341 @@ Only approve the settlement after reviewing all financial records.
                 ':msg' => $plainText
             ]);
         }
+    }
+
+    public function getLatePaymentPenaltyStats(array $user): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->studentRepo->getPdo();
+        $activeYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+
+        if (!$activeYear) {
+            return [
+                'current_academic_session' => 'N/A',
+                'total_students' => 0,
+                'students_having_due' => 0,
+                'total_outstanding_due' => 0.00,
+                'last_applied_date' => null,
+                'last_applied_by' => null,
+            ];
+        }
+
+        // Get total students in current active session (ACTIVE or Inactive)
+        $stmtTotal = $pdo->prepare("
+            SELECT COUNT(*) FROM students 
+            WHERE school_id = :sid AND academic_year_id = :ayid AND status IN ('ACTIVE', 'Inactive')
+        ");
+        $stmtTotal->execute([':sid' => $schoolId, ':ayid' => $activeYear['id']]);
+        $totalStudents = (int)$stmtTotal->fetchColumn();
+
+        // Get all students to calculate dues
+        $stmtStudents = $pdo->prepare("
+            SELECT id FROM students 
+            WHERE school_id = :sid AND academic_year_id = :ayid AND status IN ('ACTIVE', 'Inactive')
+        ");
+        $stmtStudents->execute([':sid' => $schoolId, ':ayid' => $activeYear['id']]);
+        $students = $stmtStudents->fetchAll(PDO::FETCH_COLUMN);
+
+        $studentsHavingDue = 0;
+        $totalOutstandingDue = 0.0;
+
+        foreach ($students as $studentId) {
+            $due = $this->getStudentCurrentOutstandingBalance($pdo, (int)$studentId, $schoolId, (int)$activeYear['id']);
+            if ($due > 0) {
+                $studentsHavingDue++;
+                $totalOutstandingDue += $due;
+            }
+        }
+
+        // Get last completed application
+        $stmtLast = $pdo->prepare("
+            SELECT a.created_at, u.name AS applied_by_name 
+            FROM late_payment_penalty_applications a 
+            JOIN users u ON a.created_by = u.id 
+            WHERE a.school_id = :sid AND a.academic_year_id = :ayid AND a.status = 'Completed' 
+            ORDER BY a.id DESC LIMIT 1
+        ");
+        $stmtLast->execute([':sid' => $schoolId, ':ayid' => $activeYear['id']]);
+        $lastRun = $stmtLast->fetch(PDO::FETCH_ASSOC);
+
+        // Get active processing application if any
+        $stmtProcId = $pdo->prepare("
+            SELECT id FROM late_payment_penalty_applications 
+            WHERE school_id = :sid AND academic_year_id = :ayid AND status = 'Processing' 
+            LIMIT 1
+        ");
+        $stmtProcId->execute([':sid' => $schoolId, ':ayid' => $activeYear['id']]);
+        $activeProcessingId = $stmtProcId->fetchColumn();
+
+        return [
+            'current_academic_session' => $activeYear['name'],
+            'total_students' => $totalStudents,
+            'students_having_due' => $studentsHavingDue,
+            'total_outstanding_due' => round($totalOutstandingDue, 2),
+            'last_applied_date' => $lastRun ? $lastRun['created_at'] : null,
+            'last_applied_by' => $lastRun ? $lastRun['applied_by_name'] : null,
+            'active_processing_id' => $activeProcessingId !== false ? (int)$activeProcessingId : null,
+        ];
+    }
+
+    public function getLatePaymentPenaltyConfig(array $user): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->studentRepo->getPdo();
+        $activeYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+
+        if (!$activeYear) {
+            return [
+                'percentage' => '',
+                'description' => '',
+                'status' => 'Inactive'
+            ];
+        }
+
+        $stmt = $pdo->prepare("
+            SELECT * FROM late_payment_penalty_configs 
+            WHERE school_id = :sid AND academic_year_id = :ayid LIMIT 1
+        ");
+        $stmt->execute([':sid' => $schoolId, ':ayid' => $activeYear['id']]);
+        $config = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$config) {
+            return [
+                'percentage' => '',
+                'description' => '',
+                'status' => 'Inactive'
+            ];
+        }
+
+        return [
+            'percentage' => (float)$config['percentage'],
+            'description' => $config['description'] ?? '',
+            'status' => $config['status']
+        ];
+    }
+
+    public function saveLatePaymentPenaltyConfig(array $user, array $body): array
+    {
+        $percentage = isset($body['percentage']) ? (float)$body['percentage'] : 0.0;
+        $description = isset($body['description']) ? trim((string)$body['description']) : '';
+        $status = isset($body['status']) ? trim((string)$body['status']) : 'Active';
+
+        if ($percentage <= 0 || $percentage > 100) {
+            throw new ValidationException(['percentage' => 'Percentage must be between 0.01 and 100.']);
+        }
+
+        if ($status !== 'Active' && $status !== 'Inactive') {
+            $status = 'Active';
+        }
+
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->studentRepo->getPdo();
+        $activeYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+
+        if (!$activeYear) {
+            throw new ValidationException(['academic_year' => 'Active academic session not found.']);
+        }
+
+        $stmt = $pdo->prepare("
+            INSERT INTO late_payment_penalty_configs (school_id, academic_year_id, percentage, description, status)
+            VALUES (:sid, :ayid, :pct, :desc, :status)
+            ON DUPLICATE KEY UPDATE percentage = VALUES(percentage), description = VALUES(description), status = VALUES(status)
+        ");
+        $stmt->execute([
+            ':sid' => $schoolId,
+            ':ayid' => $activeYear['id'],
+            ':pct' => $percentage,
+            ':desc' => $description,
+            ':status' => $status
+        ]);
+
+        return [
+            'percentage' => $percentage,
+            'description' => $description,
+            'status' => $status
+        ];
+    }
+
+    public function checkLatePaymentPenaltyConfig(array $user): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->studentRepo->getPdo();
+        $activeYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+
+        if (!$activeYear) {
+            return ['configured' => false];
+        }
+
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*) FROM late_payment_penalty_configs 
+            WHERE school_id = :sid AND academic_year_id = :ayid AND status = 'Active'
+        ");
+        $stmt->execute([':sid' => $schoolId, ':ayid' => $activeYear['id']]);
+        $count = (int)$stmt->fetchColumn();
+
+        return ['configured' => $count > 0];
+    }
+
+    public function getLatePaymentPenaltyHistory(array $user, array $filters = []): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->studentRepo->getPdo();
+
+        $where = 'h.school_id = :sid';
+        $bindings = [':sid' => $schoolId];
+
+        if (!empty($filters['academic_year_id'])) {
+            $where .= ' AND h.academic_year_id = :academic_year_id';
+            $bindings[':academic_year_id'] = $filters['academic_year_id'];
+        }
+        if (!empty($filters['class_name'])) {
+            $where .= ' AND h.class_name = :class_name';
+            $bindings[':class_name'] = $filters['class_name'];
+        }
+        if (!empty($filters['section_name'])) {
+            $where .= ' AND h.section_name = :section_name';
+            $bindings[':section_name'] = $filters['section_name'];
+        }
+        if (!empty($filters['student_name'])) {
+            $where .= ' AND h.student_name LIKE :student_name';
+            $bindings[':student_name'] = '%' . $filters['student_name'] . '%';
+        }
+        if (!empty($filters['admission_no'])) {
+            $where .= ' AND h.admission_no LIKE :admission_no';
+            $bindings[':admission_no'] = '%' . $filters['admission_no'] . '%';
+        }
+        if (!empty($filters['date'])) {
+            $where .= ' AND DATE(h.created_at) = :date';
+            $bindings[':date'] = $filters['date'];
+        }
+        if (!empty($filters['applied_by_name'])) {
+            $where .= ' AND h.applied_by_name LIKE :applied_by_name';
+            $bindings[':applied_by_name'] = '%' . $filters['applied_by_name'] . '%';
+        }
+
+        $sql = "
+            SELECT h.*, ay.name AS academic_year_name 
+            FROM late_payment_penalty_history h
+            LEFT JOIN academic_years ay ON h.academic_year_id = ay.id
+            WHERE {$where}
+            ORDER BY h.id DESC
+        ";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($bindings);
+        $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return array_map(function($h) {
+            $h['id'] = (int)$h['id'];
+            $h['student_id'] = (int)$h['student_id'];
+            $h['outstanding_due'] = (float)$h['outstanding_due'];
+            $h['penalty_percentage'] = (float)$h['penalty_percentage'];
+            $h['penalty_amount'] = (float)$h['penalty_amount'];
+            return $h;
+        }, $history);
+    }
+
+    public function deleteLatePaymentPenaltyConfig(array $user): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->studentRepo->getPdo();
+        $activeYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+
+        if (!$activeYear) {
+            throw new ValidationException(['academic_year' => 'Active academic session not found.']);
+        }
+
+        $stmt = $pdo->prepare("
+            DELETE FROM late_payment_penalty_configs 
+            WHERE school_id = :sid AND academic_year_id = :ayid
+        ");
+        $stmt->execute([':sid' => $schoolId, ':ayid' => $activeYear['id']]);
+
+        return ['deleted' => true];
+    }
+
+    public function getFinanceSettings(array $user): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->studentRepo->getPdo();
+        $activeYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+
+        if (!$activeYear) {
+            return [
+                'enable_due_restriction' => 0,
+                'max_allowed_due' => 0.00,
+                'restrict_admit_card' => 1,
+                'restrict_exam_result' => 1
+            ];
+        }
+
+        $stmt = $pdo->prepare("
+            SELECT * FROM school_finance_settings 
+            WHERE school_id = :sid AND academic_year_id = :ayid LIMIT 1
+        ");
+        $stmt->execute([':sid' => $schoolId, ':ayid' => $activeYear['id']]);
+        $settings = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$settings) {
+            return [
+                'enable_due_restriction' => 0,
+                'max_allowed_due' => 0.00,
+                'restrict_admit_card' => 1,
+                'restrict_exam_result' => 1
+            ];
+        }
+
+        return [
+            'enable_due_restriction' => (int)$settings['enable_due_restriction'],
+            'max_allowed_due' => (float)$settings['max_allowed_due'],
+            'restrict_admit_card' => (int)$settings['restrict_admit_card'],
+            'restrict_exam_result' => (int)$settings['restrict_exam_result']
+        ];
+    }
+
+    public function saveFinanceSettings(array $user, array $body): array
+    {
+        $enableRestriction = isset($body['enable_due_restriction']) ? (int)$body['enable_due_restriction'] : 0;
+        $maxAllowedDue = isset($body['max_allowed_due']) ? (float)$body['max_allowed_due'] : 0.00;
+        $restrictAdmitCard = isset($body['restrict_admit_card']) ? (int)$body['restrict_admit_card'] : 0;
+        $restrictExamResult = isset($body['restrict_exam_result']) ? (int)$body['restrict_exam_result'] : 0;
+
+        if ($maxAllowedDue < 0) {
+            throw new ValidationException(['max_allowed_due' => 'Maximum allowed due amount cannot be negative.']);
+        }
+
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->studentRepo->getPdo();
+        $activeYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+
+        if (!$activeYear) {
+            throw new ValidationException(['academic_year' => 'Active academic session not found.']);
+        }
+
+        $stmt = $pdo->prepare("
+            INSERT INTO school_finance_settings (school_id, academic_year_id, enable_due_restriction, max_allowed_due, restrict_admit_card, restrict_exam_result)
+            VALUES (:sid, :ayid, :enable, :max_due, :restrict_ac, :restrict_er)
+            ON DUPLICATE KEY UPDATE 
+                enable_due_restriction = VALUES(enable_due_restriction), 
+                max_allowed_due = VALUES(max_allowed_due),
+                restrict_admit_card = VALUES(restrict_admit_card),
+                restrict_exam_result = VALUES(restrict_exam_result)
+        ");
+        $stmt->execute([
+            ':sid' => $schoolId,
+            ':ayid' => $activeYear['id'],
+            ':enable' => $enableRestriction,
+            ':max_due' => $maxAllowedDue,
+            ':restrict_ac' => $restrictAdmitCard,
+            ':restrict_er' => $restrictExamResult
+        ]);
+
+        return [
+            'enable_due_restriction' => $enableRestriction,
+            'max_allowed_due' => $maxAllowedDue,
+            'restrict_admit_card' => $restrictAdmitCard,
+            'restrict_exam_result' => $restrictExamResult
+        ];
     }
 }
 

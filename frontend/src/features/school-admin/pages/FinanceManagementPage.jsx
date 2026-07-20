@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { createPortal } from 'react-dom';
-import { Landmark, Plus, Search, Calendar, Clock, Eye, Edit, Trash2, MoreVertical, X, AlertTriangle, User, ChevronDown, RefreshCw } from 'lucide-react';
+import { Landmark, Plus, Search, Calendar, Clock, Eye, Edit, Trash2, MoreVertical, X, AlertTriangle, User, ChevronDown, RefreshCw, Percent, Clipboard, CheckCircle, HelpCircle, FileSpreadsheet, FileText, FileDown, AlertCircle, Info } from 'lucide-react';
+import html2pdf from 'html2pdf.js';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
 import { Button } from '../../../common/ui/button';
 import { Input } from '../../../common/ui/input';
@@ -39,7 +41,55 @@ const getLocalDateString = () => {
 const ACADEMIC_MONTHS = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
 
 export default function FinanceManagementPage() {
-  const [activeTab, setActiveTab] = useState('expenses'); // 'expenses', 'additional-fee', 'transport-fee'
+  const location = useLocation();
+  const initialTab = location.state?.tab || new URLSearchParams(location.search).get('tab') || 'expenses';
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  useEffect(() => {
+    const tab = location.state?.tab || new URLSearchParams(location.search).get('tab');
+    if (tab && ['expenses', 'additional-fee', 'transport-fee', 'late-payment-penalty'].includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, [location]);
+
+  // Late Payment Penalty states
+  const [lppStats, setLppStats] = useState({
+    current_academic_session: 'N/A',
+    total_students: 0,
+    students_having_due: 0,
+    total_outstanding_due: 0.00,
+    last_applied_date: null,
+    last_applied_by: null,
+    active_processing_id: null
+  });
+  const [lppStatsLoading, setLppStatsLoading] = useState(false);
+  const [lppPercentage, setLppPercentage] = useState('');
+  const [lppDescription, setLppDescription] = useState('Late Payment Penalty after Academic Year Migration');
+  const [lppStatus, setLppStatus] = useState('Active');
+  const [lppApplying, setLppApplying] = useState(false);
+  const [isLppConfigSaved, setIsLppConfigSaved] = useState(false);
+  const [lppHistory, setLppHistory] = useState([]);
+  const [lppHistoryFilters, setLppHistoryFilters] = useState({
+    academic_year_id: '',
+    class_name: '',
+    section_name: '',
+    student_name: '',
+    admission_no: '',
+    date: '',
+    applied_by_name: ''
+  });
+  const [lppHistoryLoading, setLppHistoryLoading] = useState(false);
+  const [lppSubView, setLppSubView] = useState('apply'); // 'apply' or 'history'
+  
+  // Finance Settings states
+  const [financeSettingsLoading, setFinanceSettingsLoading] = useState(false);
+  const [enableDueRestriction, setEnableDueRestriction] = useState(false);
+  const [maxAllowedDue, setMaxAllowedDue] = useState('0');
+  const [restrictAdmitCard, setRestrictAdmitCard] = useState(true);
+  const [restrictExamResult, setRestrictExamResult] = useState(true);
+  const [savingFinanceSettings, setSavingFinanceSettings] = useState(false);
+  const [isLppRemoveConfirmOpen, setIsLppRemoveConfirmOpen] = useState(false);
+
   const [classes, setClasses] = useState([]);
   const [academicYears, setAcademicYears] = useState([]);
   const [expenses, setExpenses] = useState([]);
@@ -178,6 +228,280 @@ export default function FinanceManagementPage() {
       console.error(err);
     }
   };
+
+  const lppPollInterval = useRef(null);
+
+  const loadLppStats = async () => {
+    setLppStatsLoading(true);
+    try {
+      const stats = await schoolService.getLatePaymentPenaltyStats();
+      setLppStats(stats || {});
+      return stats;
+    } catch (err) {
+      console.error(err);
+      setError('Failed to fetch Late Payment Penalty statistics.');
+      return null;
+    } finally {
+      setLppStatsLoading(false);
+    }
+  };
+
+  const loadLppConfig = async (sessionYear) => {
+    try {
+      const config = await schoolService.getLatePaymentPenaltyConfig();
+      const currentSess = sessionYear || lppStats.current_academic_session || currentYear?.name || '';
+      const defaultDesc = currentSess ? `Late Payment Penalty ${currentSess}` : 'Late Payment Penalty';
+      if (config && config.percentage) {
+        setLppPercentage(config.percentage ? String(config.percentage) : '');
+        setLppDescription(config.description ? config.description : defaultDesc);
+        setLppStatus(config.status || 'Active');
+        setIsLppConfigSaved(true);
+      } else {
+        setLppDescription(defaultDesc);
+        setIsLppConfigSaved(false);
+      }
+    } catch (err) {
+      console.error(err);
+      setError('Failed to fetch Late Payment Penalty configuration.');
+    }
+  };
+
+  const handleSaveAllFinanceConfig = async () => {
+    if (!lppPercentage) {
+      setError('Penalty percentage is required.');
+      return;
+    }
+    const pct = parseFloat(lppPercentage);
+    if (isNaN(pct) || pct <= 0 || pct > 100) {
+      setError('Penalty percentage must be between 0.01 and 100.');
+      return;
+    }
+    const limit = parseFloat(maxAllowedDue);
+    if (isNaN(limit) || limit < 0) {
+      setError('Maximum allowed due amount must be a positive number.');
+      return;
+    }
+    setError('');
+    setSuccess('');
+    setLppApplying(true);
+    try {
+      await Promise.all([
+        schoolService.saveLatePaymentPenaltyConfig({
+          percentage: pct,
+          description: lppDescription,
+          status: lppStatus
+        }),
+        schoolService.saveFinanceSettings({
+          enable_due_restriction: enableDueRestriction ? 1 : 0,
+          max_allowed_due: limit,
+          restrict_admit_card: restrictAdmitCard ? 1 : 0,
+          restrict_exam_result: restrictExamResult ? 1 : 0
+        })
+      ]);
+      setSuccess('Configurations saved successfully.');
+      setIsLppConfigSaved(true);
+      loadLppConfig();
+      loadFinanceSettings();
+    } catch (err) {
+      console.error(err);
+      setError(err?.response?.data?.message || err?.message || 'Failed to save configurations.');
+    } finally {
+      setLppApplying(false);
+    }
+  };
+
+  const loadLppHistory = async () => {
+    setLppHistoryLoading(true);
+    try {
+      const history = await schoolService.getLatePaymentPenaltyHistory(lppHistoryFilters);
+      setLppHistory(history || []);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to fetch penalty history.');
+    } finally {
+      setLppHistoryLoading(false);
+    }
+  };
+
+  const handleLppReset = () => {
+    setLppPercentage('');
+    const currentSess = lppStats.current_academic_session || currentYear?.name || '';
+    setLppDescription(currentSess ? `Late Payment Penalty ${currentSess}` : 'Late Payment Penalty');
+    setLppStatus('Active');
+    setError('');
+    setSuccess('');
+  };
+
+  const handleRemoveLppConfig = async () => {
+    setError('');
+    setSuccess('');
+    setLppApplying(true);
+    try {
+      await schoolService.deleteLatePaymentPenaltyConfig();
+      setSuccess('Late Payment Penalty configuration removed successfully.');
+      setIsLppConfigSaved(false);
+      handleLppReset();
+      setLppPercentage('');
+    } catch (err) {
+      console.error(err);
+      setError(err?.response?.data?.message || err?.message || 'Failed to remove configuration.');
+    } finally {
+      setLppApplying(false);
+      setIsLppRemoveConfirmOpen(false);
+    }
+  };
+
+  const loadFinanceSettings = async () => {
+    setFinanceSettingsLoading(true);
+    try {
+      const res = await schoolService.getFinanceSettings();
+      if (res) {
+        setEnableDueRestriction(res.enable_due_restriction === 1);
+        setMaxAllowedDue(res.max_allowed_due ? String(res.max_allowed_due) : '0');
+        setRestrictAdmitCard(res.restrict_admit_card === 1);
+        setRestrictExamResult(res.restrict_exam_result === 1);
+      }
+    } catch (err) {
+      console.error(err);
+      setError('Failed to fetch finance settings.');
+    } finally {
+      setFinanceSettingsLoading(false);
+    }
+  };
+
+  const exportLppHistoryCSV = () => {
+    const headers = ['Student', 'Admission Number', 'Class', 'Due Amount', 'Penalty Percentage', 'Penalty Amount', 'Description', 'Status', 'Created Date'];
+    const rows = lppHistory.map(row => [
+      row.student_name || '',
+      row.admission_no || '',
+      `${row.class_name || ''}${row.section_name ? ' - ' + row.section_name : ''}`,
+      row.outstanding_due || 0,
+      row.penalty_percentage || 0,
+      row.penalty_amount || 0,
+      row.description || '',
+      row.status || 'Success',
+      row.created_at || ''
+    ]);
+    
+    const csvContent = [headers.join(','), ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Late_Payment_Penalty_Report_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+  };
+
+  const exportLppHistoryExcel = () => {
+    let xml = '<?xml version="1.0"?>\n';
+    xml += '<?mso-application progid="Excel.Sheet"?>\n';
+    xml += '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"\n';
+    xml += ' xmlns:o="urn:schemas-microsoft-com:office:office"\n';
+    xml += ' xmlns:x="urn:schemas-microsoft-com:office:excel"\n';
+    xml += ' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"\n';
+    xml += ' xmlns:html="http://www.w3.org/TR/REC-html40">\n';
+    xml += ' <Styles>\n';
+    xml += '  <Style ss:Id="Header">\n';
+    xml += '   <Font ss:FontName="Calibri" ss:Size="11" ss:Color="#FFFFFF" ss:Bold="1"/>\n';
+    xml += '   <Interior ss:Color="#365F91" ss:Pattern="Solid"/>\n';
+    xml += '  </Style>\n';
+    xml += ' </Styles>\n';
+    xml += ' <Worksheet ss:Name="Penalty History">\n';
+    xml += '  <Table>\n';
+    xml += '   <Row>\n';
+    const headers = ['Student', 'Admission Number', 'Class', 'Due Amount', 'Penalty Percentage', 'Penalty Amount', 'Description', 'Status', 'Created Date'];
+    headers.forEach(h => {
+      xml += `    <Cell ss:StyleID="Header"><Data ss:Type="String">${h}</Data></Cell>\n`;
+    });
+    xml += '   </Row>\n';
+    lppHistory.forEach(row => {
+      xml += '   <Row>\n';
+      xml += `    <Cell><Data ss:Type="String">${row.student_name || ''}</Data></Cell>\n`;
+      xml += `    <Cell><Data ss:Type="String">${row.admission_no || ''}</Data></Cell>\n`;
+      xml += `    <Cell><Data ss:Type="String">${row.class_name || ''}${row.section_name ? ' - ' + row.section_name : ''}</Data></Cell>\n`;
+      xml += `    <Cell><Data ss:Type="Number">${row.outstanding_due || 0}</Data></Cell>\n`;
+      xml += `    <Cell><Data ss:Type="Number">${row.penalty_percentage || 0}</Data></Cell>\n`;
+      xml += `    <Cell><Data ss:Type="Number">${row.penalty_amount || 0}</Data></Cell>\n`;
+      xml += `    <Cell><Data ss:Type="String">${row.description || ''}</Data></Cell>\n`;
+      xml += `    <Cell><Data ss:Type="String">${row.status || 'Success'}</Data></Cell>\n`;
+      xml += `    <Cell><Data ss:Type="String">${row.created_at || ''}</Data></Cell>\n`;
+      xml += '   </Row>\n';
+    });
+    xml += '  </Table>\n';
+    xml += ' </Worksheet>\n';
+    xml += '</Workbook>\n';
+    
+    const blob = new Blob([xml], { type: 'application/vnd.ms-excel' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Late_Payment_Penalty_Report_${new Date().toISOString().slice(0,10)}.xls`;
+    a.click();
+  };
+
+  const exportLppHistoryPDF = () => {
+    const reportHtml = `
+      <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+        <h2 style="margin-bottom: 5px; font-weight: bold;">Late Payment Penalty Audit History</h2>
+        <p style="font-size: 12px; color: #666; margin-bottom: 20px;">Academic Session: ${lppStats.current_academic_session} &bull; Generated on: ${new Date().toLocaleString()}</p>
+        <table style="width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px;">
+          <thead>
+            <tr style="background-color: #365F91; color: white; text-align: left;">
+              <th style="padding: 8px; border: 1px solid #ddd;">Student</th>
+              <th style="padding: 8px; border: 1px solid #ddd;">Admission No</th>
+              <th style="padding: 8px; border: 1px solid #ddd;">Class</th>
+              <th style="padding: 8px; border: 1px solid #ddd;">Due Amount</th>
+              <th style="padding: 8px; border: 1px solid #ddd;">Penalty %</th>
+              <th style="padding: 8px; border: 1px solid #ddd;">Penalty Amount</th>
+              <th style="padding: 8px; border: 1px solid #ddd;">Description</th>
+              <th style="padding: 8px; border: 1px solid #ddd;">Applied By</th>
+              <th style="padding: 8px; border: 1px solid #ddd;">Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${lppHistory.map(row => `
+              <tr>
+                <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">${row.student_name || ''}</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">${row.admission_no || ''}</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">${row.class_name || ''}${row.section_name ? ' - ' + row.section_name : ''}</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">₹${(row.outstanding_due || 0).toFixed(2)}</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">${row.penalty_percentage || 0}%</td>
+                <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; color: #1e3a8a;">₹${(row.penalty_amount || 0).toFixed(2)}</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">${row.description || ''}</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">${row.applied_by_name || ''}</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">${row.created_at ? row.created_at.slice(0, 10) : ''}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = reportHtml;
+    
+    const opt = {
+      margin:       10,
+      filename:     `Late_Payment_Penalty_Report_${new Date().toISOString().slice(0,10)}.pdf`,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true },
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
+    };
+    
+    html2pdf().from(tempDiv).set(opt).save();
+  };
+
+  useEffect(() => {
+    if (activeTab === 'late-payment-penalty') {
+      loadLppStats().then(stats => {
+        loadLppConfig(stats?.current_academic_session);
+      });
+      loadFinanceSettings();
+      if (lppSubView === 'history') {
+        loadLppHistory();
+      }
+    }
+  }, [activeTab, lppSubView]);
 
   const { isReadOnly, currentYear } = useAcademicYear();
 
@@ -727,6 +1051,16 @@ export default function FinanceManagementPage() {
           >
             🚌 Transport Fees
           </button>
+          <button 
+            onClick={() => { setActiveTab('late-payment-penalty'); setError(''); setSuccess(''); }}
+            className={`pb-3 text-xs font-extrabold uppercase tracking-wider border-b-2 px-4 transition-all ${
+              activeTab === 'late-payment-penalty' 
+                ? 'border-primary text-primary' 
+                : 'border-transparent text-text-muted hover:text-text-primary'
+            }`}
+          >
+            ⏱️ Late Payment Penalty
+          </button>
         </div>
       </div>
 
@@ -1137,6 +1471,367 @@ export default function FinanceManagementPage() {
           </div>
         </div>
       )}
+
+      {/* Tab 4: Late Payment Penalty View */}
+      {!loading && activeTab === 'late-payment-penalty' && (
+        <div className="flex-1 flex flex-col min-h-0 space-y-4 animate-in fade-in duration-200">
+          
+          {/* Sub Tab Navigation */}
+          <div className="flex border-b border-border mb-2 bg-surface p-2 rounded-xl border">
+            <button 
+              onClick={() => setLppSubView('apply')}
+              className={`pb-2 pt-2 text-[11px] font-black uppercase tracking-wider border-b-2 px-6 transition-all ${
+                lppSubView === 'apply' 
+                  ? 'border-primary text-primary' 
+                  : 'border-transparent text-text-muted hover:text-text-primary'
+              }`}
+            >
+              ⚙️ Configure Penalty
+            </button>
+            <button 
+              onClick={() => setLppSubView('history')}
+              className={`pb-2 pt-2 text-[11px] font-black uppercase tracking-wider border-b-2 px-6 transition-all ${
+                lppSubView === 'history' 
+                  ? 'border-primary text-primary' 
+                  : 'border-transparent text-text-muted hover:text-text-primary'
+              }`}
+            >
+              📚 Audit History Log
+            </button>
+          </div>
+
+          {lppSubView === 'apply' ? (
+            <div className="space-y-4 overflow-y-auto pr-1">
+              
+              {/* Dashboard Statistics */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card className="bg-surface border border-border shadow-3xs p-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] text-text-secondary uppercase font-bold">Academic Session</span>
+                    <Calendar className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="text-base font-black text-text-primary mt-2">{lppStats.current_academic_session}</div>
+                </Card>
+                <Card className="bg-surface border border-border shadow-3xs p-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] text-text-secondary uppercase font-bold">Total Students</span>
+                    <User className="h-4 w-4 text-indigo-500" />
+                  </div>
+                  <div className="text-base font-black text-text-primary mt-2">{lppStats.total_students}</div>
+                </Card>
+                <Card className="bg-surface border border-border shadow-3xs p-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] text-text-secondary uppercase font-bold">Students with Due</span>
+                    <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  </div>
+                  <div className="text-base font-black text-amber-600 mt-2">{lppStats.students_having_due}</div>
+                </Card>
+                <Card className="bg-surface border border-border shadow-3xs p-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] text-text-secondary uppercase font-bold">Total Outstanding</span>
+                    <Landmark className="h-4 w-4 text-emerald-500" />
+                  </div>
+                  <div className="text-base font-black text-emerald-600 mt-2">{formatCurrency(lppStats.total_outstanding_due)}</div>
+                </Card>
+              </div>
+
+              {lppStats.last_applied_date && (
+                <div className="text-[10px] text-text-secondary bg-surface border p-3 rounded-xl flex items-center gap-1.5 shadow-3xs">
+                  <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+                  <span>Late Payment Penalty was last successfully applied for this session on <strong>{formatDateFull(lppStats.last_applied_date)}</strong> by <strong>{lppStats.last_applied_by}</strong>.</span>
+                </div>
+              )}
+
+              {/* Configuration Settings Input Form */}
+              <Card className="bg-surface border border-border p-5 rounded-2xl shadow-2xs space-y-4">
+                <h3 className="text-sm font-black text-text-primary uppercase tracking-tight">Late Payment Penalty For AY ({lppStats.current_academic_session})</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-text-secondary uppercase flex items-center gap-1">
+                      Penalty Percentage (%) *
+                      <Percent className="h-3 w-3 text-text-muted" />
+                    </label>
+                    <Input 
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      max="100"
+                      placeholder="e.g. 5.50"
+                      value={lppPercentage}
+                      onChange={e => setLppPercentage(e.target.value)}
+                      className="text-xs font-semibold"
+                      required
+                      disabled={lppApplying}
+                    />
+                  </div>
+                  
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-text-secondary uppercase">Custom Description</label>
+                    <Input 
+                      placeholder={lppStats.current_academic_session ? `Late Payment Penalty ${lppStats.current_academic_session}` : "Late Payment Penalty 2026-2027"}
+                      value={lppDescription}
+                      onChange={e => setLppDescription(e.target.value)}
+                      className="text-xs font-semibold"
+                      disabled={lppApplying}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-text-secondary uppercase">Target Academic Session</label>
+                    <Input 
+                      value={lppStats.current_academic_session}
+                      className="text-xs font-semibold bg-hover/10"
+                      disabled
+                    />
+                  </div>
+                </div>
+              </Card>
+
+              {/* Warning/Info Box */}
+              <div className="p-4 bg-amber-500/10 border border-amber-500/20 text-amber-600 rounded-2xl text-xs flex gap-3">
+                <AlertTriangle className="h-5 w-5 flex-shrink-0 text-amber-500" />
+                <div className="space-y-1">
+                  <p className="font-extrabold uppercase tracking-wider">Late Payment Penalty Information</p>
+                  <p className="leading-relaxed">If you configure a Late Payment Penalty, it will be added automatically after the Academic Year Migration is completed. Only students who have pending dues will receive the penalty. Students who have no pending dues will not be affected. You can change or remove this configuration anytime before migration.</p>
+                </div>
+              </div>
+
+              {/* Student Document Restriction Configuration Form */}
+              <Card className="bg-surface border border-border p-5 rounded-2xl shadow-2xs space-y-4">
+                <div className="space-y-1">
+                  <h3 className="text-sm font-black text-text-primary uppercase tracking-tight">Student Document Restriction</h3>
+                  <p className="text-xs text-text-secondary font-medium">Control access to student documents based on outstanding fee amount.</p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 bg-hover/10 rounded-xl border border-border max-w-2xl">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-text-primary uppercase cursor-pointer" htmlFor="enable-due-restriction-toggle">
+                        Enable Due Amount Restriction
+                      </label>
+                      <p className="text-[10px] text-text-secondary leading-relaxed">Toggle to block access to selected student documents when dues exceed the allowed limit.</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        id="enable-due-restriction-toggle"
+                        type="checkbox" 
+                        checked={enableDueRestriction}
+                        onChange={e => setEnableDueRestriction(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-border rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                  </div>
+
+                  {enableDueRestriction && (
+                    <div className="space-y-4 max-w-2xl animate-in slide-in-from-top-2 duration-150">
+                      <div className="space-y-1.5 max-w-md">
+                        <label className="text-xs font-bold text-text-secondary uppercase">Maximum Allowed Due Amount (₹) *</label>
+                        <Input 
+                          type="number"
+                          min="0"
+                          step="1"
+                          placeholder="e.g. 1000"
+                          value={maxAllowedDue}
+                          onChange={e => setMaxAllowedDue(e.target.value)}
+                          className="text-xs font-semibold"
+                          required
+                        />
+                        <p className="text-[10px] text-text-muted">Students whose outstanding dues are greater than this amount will not be able to access the selected documents.</p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-text-secondary uppercase block">Restriction Applies To</label>
+                        <div className="flex flex-wrap gap-6 items-center">
+                          <label className="flex items-center gap-2 text-xs font-semibold text-text-primary cursor-pointer">
+                            <input 
+                              type="checkbox"
+                              checked={restrictAdmitCard}
+                              onChange={e => setRestrictAdmitCard(e.target.checked)}
+                              className="rounded border-border text-primary focus:ring-primary h-3.5 w-3.5 cursor-pointer"
+                            />
+                            Admit Card
+                          </label>
+                          <label className="flex items-center gap-2 text-xs font-semibold text-text-primary cursor-pointer">
+                            <input 
+                              type="checkbox"
+                              checked={restrictExamResult}
+                              onChange={e => setRestrictExamResult(e.target.checked)}
+                              className="rounded border-border text-primary focus:ring-primary h-3.5 w-3.5 cursor-pointer"
+                            />
+                            Exam Result
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Informational Message box */}
+                  <div className="p-4 bg-amber-500/10 border border-amber-500/20 text-amber-600 rounded-2xl text-xs flex gap-3 max-w-2xl">
+                    <Info className="h-5 w-5 flex-shrink-0 text-amber-500 mt-0.5" />
+                    <div className="space-y-1">
+                      <p className="font-extrabold uppercase tracking-wider">How this works</p>
+                      <p className="leading-relaxed">If a student's outstanding fee is greater than the amount you enter above, they will not be able to view their Admit Card or Exam Result in the mobile application.</p>
+                      <p className="leading-relaxed font-semibold">Once the pending amount is paid and comes within the allowed limit, access will be restored automatically.</p>
+                      <p className="leading-relaxed text-amber-500 font-medium">This restriction does not apply to the Scheme section.</p>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Action Buttons Panel */}
+              <div className="flex gap-4">
+                {!isLppConfigSaved ? (
+                  <Button 
+                    onClick={handleSaveAllFinanceConfig} 
+                    disabled={isReadOnly || lppApplying || !lppPercentage}
+                    className="font-bold uppercase tracking-wider text-xs px-6 py-2.5 bg-primary hover:bg-primary/95 text-white shadow-2xs"
+                  >
+                    {lppApplying ? 'Saving...' : 'Save Configuration'}
+                  </Button>
+                ) : (
+                  <Button 
+                    onClick={() => setIsLppRemoveConfirmOpen(true)}
+                    disabled={isReadOnly || lppApplying}
+                    className="font-bold uppercase tracking-wider text-xs px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white shadow-2xs"
+                  >
+                    Remove Configuration
+                  </Button>
+                )}
+                <Button 
+                  onClick={handleLppReset}
+                  variant="secondary"
+                  className="font-bold uppercase tracking-wider text-xs px-6 py-2.5 ml-auto"
+                >
+                  Reset Form
+                </Button>
+              </div>
+            </div>
+          ) : (
+            /* Audit History Log Sub View */
+            <div className="flex-1 flex flex-col min-h-0 space-y-4 animate-in fade-in duration-200">
+              
+              {/* History Search Filters */}
+              <div className="flex-shrink-0 bg-surface border border-border p-5 rounded-2xl shadow-2xs space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+                  <div>
+                    <Input 
+                      placeholder="Search by Student Name..."
+                      value={lppHistoryFilters.student_name}
+                      onChange={e => handleLppHistoryFilterChange('student_name', e.target.value)}
+                      className="text-xs"
+                    />
+                  </div>
+                  <div>
+                    <Input 
+                      placeholder="Admission Number..."
+                      value={lppHistoryFilters.admission_no}
+                      onChange={e => handleLppHistoryFilterChange('admission_no', e.target.value)}
+                      className="text-xs"
+                    />
+                  </div>
+                  <div>
+                    <Select
+                      value={lppHistoryFilters.class_name}
+                      onChange={e => handleLppHistoryFilterChange('class_name', e.target.value)}
+                      className="text-xs cursor-pointer"
+                    >
+                      <option value="">All Classes</option>
+                      {classes.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                    </Select>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button onClick={loadLppHistory} className="flex-1 font-bold uppercase tracking-wider text-xs">
+                      <Search className="h-4 w-4 mr-1.5" /> Search
+                    </Button>
+                    <Button 
+                      onClick={() => {
+                        setLppHistoryFilters({
+                          academic_year_id: '',
+                          class_name: '',
+                          section_name: '',
+                          student_name: '',
+                          admission_no: '',
+                          date: '',
+                          applied_by_name: ''
+                        });
+                        loadLppHistory();
+                      }} 
+                      variant="secondary"
+                      className="font-bold uppercase tracking-wider text-xs"
+                    >
+                      Reset
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* History Log Toolbar */}
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Audit Records: {lppHistory.length} entries found</span>
+                <div className="flex items-center gap-2">
+                  <Button onClick={() => exportLppHistoryCSV()} variant="secondary" className="text-xs flex items-center gap-1.5 py-1">
+                    <FileDown className="h-3.5 w-3.5" /> CSV
+                  </Button>
+                  <Button onClick={() => exportLppHistoryExcel()} variant="secondary" className="text-xs flex items-center gap-1.5 py-1">
+                    <FileSpreadsheet className="h-3.5 w-3.5" /> Excel
+                  </Button>
+                  <Button onClick={() => exportLppHistoryPDF()} variant="secondary" className="text-xs flex items-center gap-1.5 py-1">
+                    <FileText className="h-3.5 w-3.5" /> PDF Report
+                  </Button>
+                </div>
+              </div>
+
+              {/* History Table */}
+              <div className="flex-1 min-h-0 overflow-y-auto border border-border rounded-2xl bg-surface shadow-2xs relative">
+                {lppHistoryLoading ? (
+                  <div className="flex justify-center items-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  </div>
+                ) : lppHistory.length === 0 ? (
+                  <div className="p-12 text-center text-text-muted text-xs font-bold">
+                    No history log entries found matching criteria.
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader className="sticky top-0 bg-surface z-10 border-b border-border shadow-3xs">
+                      <TableRow>
+                        <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Student Name</TableHead>
+                        <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Admission No</TableHead>
+                        <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Class</TableHead>
+                        <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Outstanding Due</TableHead>
+                        <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Penalty %</TableHead>
+                        <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Penalty Amount</TableHead>
+                        <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Description</TableHead>
+                        <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Applied By</TableHead>
+                        <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Applied Date</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {lppHistory.map(row => (
+                        <TableRow key={row.id} className="hover:bg-hover/30 transition-colors">
+                          <TableCell className="text-xs font-bold text-text-primary">{row.student_name}</TableCell>
+                          <TableCell className="text-xs text-text-secondary">{row.admission_no || '—'}</TableCell>
+                          <TableCell className="text-xs text-text-secondary">
+                            {row.class_name ? `${row.class_name}${row.section_name ? ` - ${row.section_name}` : ''}` : '—'}
+                          </TableCell>
+                          <TableCell className="text-xs font-semibold font-sans text-text-primary">{formatCurrency(row.outstanding_due)}</TableCell>
+                          <TableCell className="text-xs text-text-secondary font-sans font-bold">{row.penalty_percentage}%</TableCell>
+                          <TableCell className="text-xs font-black font-sans text-primary">{formatCurrency(row.penalty_amount)}</TableCell>
+                          <TableCell className="text-xs text-text-secondary">{row.description}</TableCell>
+                          <TableCell className="text-xs text-text-secondary font-semibold">{row.applied_by_name}</TableCell>
+                          <TableCell className="text-xs text-text-secondary">{formatDateFull(row.created_at)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
 
       {/* Record/Edit Expense Dialog */}
       <Dialog 
@@ -1716,6 +2411,30 @@ export default function FinanceManagementPage() {
           );
         })()
       )}
+
+      {/* Late Payment Penalty Remove Configuration Confirmation Dialog */}
+      <Dialog
+        isOpen={isLppRemoveConfirmOpen}
+        onClose={() => setIsLppRemoveConfirmOpen(false)}
+        title="Remove Penalty Configuration?"
+        description="This will remove the Late Payment Penalty configuration. No penalty will be applied during Academic Year Migration unless you configure it again."
+        footer={<>
+          <Button variant="secondary" onClick={() => setIsLppRemoveConfirmOpen(false)}>Cancel</Button>
+          <Button onClick={handleRemoveLppConfig} className="bg-red-600 hover:bg-red-700 text-white font-bold">Remove Configuration</Button>
+        </>}
+      >
+        <div className="space-y-4">
+          <div className="flex gap-3 p-4 bg-amber-500/10 border border-amber-500/20 text-amber-600 rounded-xl text-xs">
+            <AlertTriangle className="h-5 w-5 flex-shrink-0 text-amber-500" />
+            <div>
+              <p className="font-extrabold uppercase tracking-wider">Confirm Removal</p>
+              <p className="mt-1 leading-relaxed">
+                Are you sure you want to completely remove this configuration? Academic Year Migration will skip generating any late payment penalty once this is done.
+              </p>
+            </div>
+          </div>
+        </div>
+      </Dialog>
 
     </div>
   );

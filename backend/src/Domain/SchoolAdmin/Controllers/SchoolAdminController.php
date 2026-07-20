@@ -1737,4 +1737,71 @@ class SchoolAdminController extends BaseController
         $data = $this->service->deleteAnnouncement($user, $id);
         return $this->success($response, $data, 'Announcement deleted successfully');
     }
+
+    public function getLatePaymentPenaltyStats(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'SUPER_ADMIN']);
+        $data = $this->service->getLatePaymentPenaltyStats($user);
+        return $this->success($response, $data);
+    }
+
+    public function getLatePaymentPenaltyConfig(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'SUPER_ADMIN']);
+        $data = $this->service->getLatePaymentPenaltyConfig($user);
+        return $this->success($response, $data);
+    }
+
+    public function saveLatePaymentPenaltyConfig(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'SUPER_ADMIN']);
+        $body = RequestParser::body($request);
+        $data = $this->service->saveLatePaymentPenaltyConfig($user, $body);
+        return $this->success($response, $data, 'Late payment penalty configuration saved successfully.');
+    }
+
+    public function deleteLatePaymentPenaltyConfig(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'SUPER_ADMIN']);
+        $data = $this->service->deleteLatePaymentPenaltyConfig($user);
+        return $this->success($response, $data, 'Late payment penalty configuration removed successfully.');
+    }
+
+    public function checkLatePaymentPenaltyConfig(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'SUPER_ADMIN']);
+        $data = $this->service->checkLatePaymentPenaltyConfig($user);
+        return $this->success($response, $data);
+    }
+
+    public function getFinanceSettings(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'SUPER_ADMIN']);
+        $data = $this->service->getFinanceSettings($user);
+        return $this->success($response, $data);
+    }
+
+    public function saveFinanceSettings(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'SUPER_ADMIN']);
+        $body = RequestParser::body($request);
+        $data = $this->service->saveFinanceSettings($user, $body);
+        return $this->success($response, $data, 'School finance settings saved successfully.');
+    }
+
+    public function getLatePaymentPenaltyHistory(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'SUPER_ADMIN']);
+        $filters = $request->getQueryParams();
+        $data = $this->service->getLatePaymentPenaltyHistory($user, $filters);
+        return $this->success($response, $data);
+    }
 }

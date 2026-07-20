@@ -507,6 +507,30 @@ export const schoolService = {
   },
   deleteAnnouncement(id) {
     return apiClient.delete(`/api/school/announcements/${id}`);
+  },
+  getLatePaymentPenaltyStats() {
+    return apiClient.get('/api/school/late-payment-penalty/stats');
+  },
+  getLatePaymentPenaltyConfig() {
+    return apiClient.get('/api/school/late-payment-penalty/config');
+  },
+  saveLatePaymentPenaltyConfig(data) {
+    return apiClient.post('/api/school/late-payment-penalty/config', data);
+  },
+  checkLatePaymentPenaltyConfig() {
+    return apiClient.get('/api/school/late-payment-penalty/config/check');
+  },
+  deleteLatePaymentPenaltyConfig() {
+    return apiClient.delete('/api/school/late-payment-penalty/config');
+  },
+  getFinanceSettings() {
+    return apiClient.get('/api/school/finance-settings');
+  },
+  saveFinanceSettings(data) {
+    return apiClient.post('/api/school/finance-settings', data);
+  },
+  getLatePaymentPenaltyHistory(params = {}) {
+    return apiClient.get(buildUrl('/api/school/late-payment-penalty/history', params));
   }
 };
 

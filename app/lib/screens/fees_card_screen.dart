@@ -541,6 +541,17 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       ),
+                                      if (item['custom_description'] != null && item['custom_description'].toString().isNotEmpty)
+                                        Padding(
+                                          padding: const EdgeInsets.only(top: 2, bottom: 2),
+                                          child: Text(
+                                            item['custom_description'],
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey.shade500,
+                                            ),
+                                          ),
+                                        ),
                                       const SizedBox(height: 4),
                                       Text(
                                         isPaid

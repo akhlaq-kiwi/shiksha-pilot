@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
-import { Plus, CheckCircle2, ChevronRight, UserCog, Users, ShieldAlert, Award, FileSpreadsheet, ArrowLeft, RefreshCw, Check, Lock, Save, Trash2, Loader2 } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Plus, CheckCircle2, ChevronRight, UserCog, Users, ShieldAlert, Award, FileSpreadsheet, ArrowLeft, RefreshCw, Check, Lock, Save, Trash2, Loader2, AlertTriangle, X } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
@@ -13,7 +13,10 @@ import { schoolAdminService } from '../../../common/services/schoolAdminService'
 
 export default function AuditsSettingsPage({ onYearsUpdated }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const [academicYears, setAcademicYears] = useState([]);
+  const [showLppAlert, setShowLppAlert] = useState(false);
+  const [pendingDraftYear, setPendingDraftYear] = useState(null);
   const [loading, setLoading] = useState(true);
 
   // --- User Role & Class Assignment States ---
@@ -814,13 +817,24 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
     }
   };
 
-  const handleMigrateClick = (year) => {
+  const handleMigrateClick = async (year) => {
     const draftYear = academicYears.find(y => y.status === 'Draft');
     if (!draftYear) {
       setShowNoDraftModal(true);
       return;
     }
-    startActivation(draftYear);
+    try {
+      const res = await schoolService.checkLatePaymentPenaltyConfig();
+      if (res && res.configured) {
+        startActivation(draftYear);
+      } else {
+        setPendingDraftYear(draftYear);
+        setShowLppAlert(true);
+      }
+    } catch (err) {
+      console.error(err);
+      startActivation(draftYear);
+    }
   };
 
   const handleAutoCreateDraft = async () => {
@@ -2066,6 +2080,67 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
           </p>
         </div>
       </Dialog>
+
+      {/* Late Payment Penalty Not Configured Alert Dialog */}
+      {showLppAlert && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-surface border border-border rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col p-6 space-y-4 relative">
+            
+            {/* Close Icon Button */}
+            <button 
+              onClick={() => {
+                setShowLppAlert(false);
+                setPendingDraftYear(null);
+              }}
+              className="absolute top-4 right-4 text-text-muted hover:text-text-primary p-1.5 rounded-full hover:bg-hover transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            <div className="flex flex-col items-center text-center space-y-3 pt-2">
+              <div className="p-3 bg-amber-500/10 rounded-full border border-amber-500/20 text-amber-500">
+                <AlertTriangle className="h-8 w-8" />
+              </div>
+              <h3 className="font-black text-text-primary text-base tracking-tight uppercase">
+                Late Payment Penalty Not Configured
+              </h3>
+              <p className="text-xs text-text-secondary leading-relaxed max-w-sm">
+                You have not configured a Late Payment Penalty for this Academic Year. 
+                Students with outstanding dues will be migrated without any Late Payment Penalty being applied.
+              </p>
+              <p className="text-xs text-text-muted leading-relaxed max-w-sm">
+                If you wish to charge a penalty on pending dues, configure it before proceeding with Academic Year Migration. 
+                You may continue the migration without configuring a penalty if your school does not wish to charge one.
+              </p>
+            </div>
+
+            <div className="flex gap-3 justify-center pt-4 border-t border-border">
+              <Button 
+                onClick={() => {
+                  setShowLppAlert(false);
+                  navigate('/school-admin/finance-management?tab=late-payment-penalty');
+                }}
+                className="font-bold bg-primary hover:bg-primary/95 text-white px-5 py-2 text-xs uppercase tracking-wider"
+              >
+                Configure Penalty
+              </Button>
+              <Button 
+                variant="secondary" 
+                onClick={() => {
+                  setShowLppAlert(false);
+                  if (pendingDraftYear) {
+                    startActivation(pendingDraftYear);
+                  }
+                }}
+                className="font-bold text-xs uppercase tracking-wider"
+              >
+                Continue Without Penalty
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

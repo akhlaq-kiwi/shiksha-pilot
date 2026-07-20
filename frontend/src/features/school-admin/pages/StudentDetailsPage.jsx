@@ -1462,7 +1462,8 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                               {data.additional_fee_payments.map(af => (
                                 <TableRow key={af.id}>
                                   <TableCell className="font-extrabold text-text-primary text-xs uppercase tracking-wider">
-                                    {af.fee_name}
+                                    <div>{af.fee_name}</div>
+                                    {af.description && <div className="text-[10px] text-text-muted normal-case mt-0.5 font-semibold">{af.description}</div>}
                                   </TableCell>
                                   <TableCell className="text-xs text-text-primary font-bold">
                                     ₹{parseFloat(af.amount || 0).toLocaleString()}

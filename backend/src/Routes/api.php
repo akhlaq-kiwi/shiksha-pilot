@@ -81,6 +81,18 @@ return function (App $app) {
     $app->post('/api/school/additional-fees/payments/{id}/pay', [SchoolAdminController::class, 'collectAdditionalFeePayment']);
     $app->post('/api/school/additional-fees/payments/{id}/revert', [SchoolAdminController::class, 'revertAdditionalFeePayment']);
 
+    // Late Payment Penalty Management
+    $app->get('/api/school/late-payment-penalty/stats', [SchoolAdminController::class, 'getLatePaymentPenaltyStats']);
+    $app->get('/api/school/late-payment-penalty/config', [SchoolAdminController::class, 'getLatePaymentPenaltyConfig']);
+    $app->post('/api/school/late-payment-penalty/config', [SchoolAdminController::class, 'saveLatePaymentPenaltyConfig']);
+    $app->delete('/api/school/late-payment-penalty/config', [SchoolAdminController::class, 'deleteLatePaymentPenaltyConfig']);
+    $app->get('/api/school/late-payment-penalty/config/check', [SchoolAdminController::class, 'checkLatePaymentPenaltyConfig']);
+    $app->get('/api/school/late-payment-penalty/history', [SchoolAdminController::class, 'getLatePaymentPenaltyHistory']);
+
+    // School Finance Settings Management
+    $app->get('/api/school/finance-settings', [SchoolAdminController::class, 'getFinanceSettings']);
+    $app->post('/api/school/finance-settings', [SchoolAdminController::class, 'saveFinanceSettings']);
+
     // Transport Fees Management
     $app->get('/api/school/transport-fees', [SchoolAdminController::class, 'getTransportFees']);
     $app->post('/api/school/transport-fees', [SchoolAdminController::class, 'assignTransportFee']);

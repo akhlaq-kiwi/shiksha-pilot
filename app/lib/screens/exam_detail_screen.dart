@@ -7,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/services.dart';
+import 'package:school_hub/screens/due_restriction_screen.dart';
 
 class ExamDetailScreen extends StatefulWidget {
   final ExamService examService;
@@ -1356,6 +1357,10 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
     final bool schemePub = _details['scheme_published'] == 1;
     final bool admitPub = _details['admit_card_published'] == 1;
     final bool resultPub = _details['result_published'] == 1;
+    
+    final bool admitCardRestricted = _details['admit_card_restricted'] == true;
+    final bool resultRestricted = _details['result_restricted'] == true;
+    final double outstandingDue = double.tryParse(_details['outstanding_due']?.toString() ?? '0') ?? 0.0;
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
@@ -1416,7 +1421,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // 1. Exam Scheme Card
+                    // 1. Exam Scheme Card (Always accessible)
                     _buildFeatureCard(
                       title: 'Exam Scheme',
                       subtitle: schemePub ? 'View examination timetable scheme' : 'Not Published Yet',
@@ -1432,7 +1437,23 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                         subtitle: admitPub ? 'View room & seat allocations' : 'Not Published Yet',
                         icon: Icons.badge_rounded,
                         isPublished: admitPub,
-                        onTap: _showAdmitCardModal,
+                        onTap: admitCardRestricted
+                            ? () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => DueRestrictionScreen(
+                                      title: 'Admit Card Temporarily Unavailable',
+                                      message: 'Your admit card is temporarily unavailable because your outstanding fee amount is higher than the limit set by the school. Please clear the pending dues or contact the school office to access your admit card.',
+                                      outstandingDue: outstandingDue,
+                                      baseUrl: widget.examService.baseUrl,
+                                      token: widget.examService.token,
+                                      studentId: widget.studentId,
+                                    ),
+                                  ),
+                                );
+                              }
+                            : _showAdmitCardModal,
                       ),
 
                     // 3. Result Card
@@ -1443,7 +1464,23 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                           : 'Not Published Yet',
                       icon: Icons.workspace_premium_rounded,
                       isPublished: widget.userRole == 'TEACHER' ? true : resultPub,
-                      onTap: _showResultModal,
+                      onTap: (widget.userRole != 'TEACHER' && resultRestricted)
+                          ? () {
+                              Navigator.push(
+                                context,
+                                  MaterialPageRoute(
+                                    builder: (context) => DueRestrictionScreen(
+                                      title: 'Exam Result Temporarily Unavailable',
+                                      message: 'Your exam result is temporarily unavailable because your outstanding fee amount is higher than the limit set by the school. Please clear the pending dues or contact the school office for assistance.',
+                                      outstandingDue: outstandingDue,
+                                      baseUrl: widget.examService.baseUrl,
+                                      token: widget.examService.token,
+                                      studentId: widget.studentId,
+                                    ),
+                                  ),
+                                );
+                              }
+                          : _showResultModal,
                     ),
                   ],
                 ),
