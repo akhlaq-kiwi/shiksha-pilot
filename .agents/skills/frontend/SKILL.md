@@ -56,6 +56,11 @@ The application should maintain:
 * Consistent color tokens
 * Consistent interaction patterns
 * Consistent accessibility standards
+* Predefined Class Selection: Button text must be `+ Add Class`. Class creation uses a `<select>` dropdown populated from `PREDEFINED_CLASSES`. Custom class names cannot be typed manually.
+* Minimal Dashboard Cards: Class cards on `ClassesPage.jsx` must remain clean and minimal, displaying only Class Name and category badge. Section lists and student count text are strictly omitted from cards.
+* Section Type & Checkbox Selection: Manual text input is removed. Teachers select Section Type (`Alphabet Sections` / `Color Sections`) and multi-select 2 to 4 checkboxes (`A, B, C, D` / `Red, Blue, Green, Yellow`).
+* Deletion Safety Dialogs: Classes/sections with `studentCount > 0` must show warning dialog blocking deletion. Classes/sections with `studentCount = 0` display standard red confirmation dialog.
+
 
 Every feature should look like it belongs to the same application.
 
@@ -526,3 +531,27 @@ useEffect(() => {
     - **10-13 Subjects**: Automatically shrinks font size (`text-[10px]`), margins, and row padding (`p-1.5`) so everything fits on a single page.
     - **>= 14 Subjects**: Hides the Instructions block completely, shrinks row padding to `p-1`, and font size to `text-[9px]`.
 - **School Profile Name**: Dynamic school name is retrieved using `schoolProfile.name` (matching the SQL `schools` table schema) and printed at the header of the scheme document.
+
+---
+
+## Annual Fee & Admission Fee UI Standards
+
+1. **Annual Fee Placement**:
+   - Inside Finance Management (Additional Fees Tab), render `+ Annual Fee` beside `+ Additional Fee` button with identical button dimensions, height, border radius, spacing (`gap-2.5`), hover animations, and responsive flex behavior.
+
+2. **Annual Fee Dialog & Confirmation Step**:
+   - Provide radio selector for `○ Entire School` vs `○ Class Wise`.
+   - Always display the prominent information notice:
+     "Annual Fee will not be applied to students who were admitted during the current academic year. Only students who were already enrolled before the beginning of the current academic session are eligible."
+   - Prior to creation, show confirmation modal explicitly restating the eligibility exclusion policy.
+
+3. **Admission Fee Form Field**:
+   - Optional currency input in `StudentEnrollmentForm`, positioned adjacent to `Admission Date`.
+
+4. **Annual Fee Button Consistency**:
+   - The `+ Annual Fee` button must inherit the default button variant and exact utility classes (`className="w-full sm:w-auto font-bold uppercase tracking-wider text-xs flex items-center justify-center gap-1.5 shadow-2xs"`) as `+ Additional Fee` to ensure uniform visual style and eliminate class conflicts.
+
+5. **First Academic Year Student Category Field**:
+   - Render mandatory `Student Category` (`Existing Student` vs `New Admission`) dropdown only during the school's first academic year inside the system. Hide automatically from the 2nd academic year onward.
+
+

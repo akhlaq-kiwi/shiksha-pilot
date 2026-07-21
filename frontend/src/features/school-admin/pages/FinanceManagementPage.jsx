@@ -176,6 +176,77 @@ export default function FinanceManagementPage() {
   // Delete Additional Fee Confirmation
   const [deletingFeeTypeId, setDeletingFeeTypeId] = useState(null);
 
+  // Annual Fee Form & Confirmation Dialog State
+  const [isAnnualFeeModalOpen, setIsAnnualFeeModalOpen] = useState(false);
+  const [annualFeeApplyType, setAnnualFeeApplyType] = useState('school'); // 'school' | 'classes'
+  const [annualFeeAmount, setAnnualFeeAmount] = useState('');
+  const [annualFeeClassAmountsMap, setAnnualFeeClassAmountsMap] = useState({});
+  const [annualFeeSubmitting, setAnnualFeeSubmitting] = useState(false);
+  const [annualFeeFormErrors, setAnnualFeeFormErrors] = useState({});
+  const [isAnnualFeeConfirmOpen, setIsAnnualFeeConfirmOpen] = useState(false);
+
+  const handleAnnualFeeModalOpen = () => {
+    setAnnualFeeApplyType('school');
+    setAnnualFeeAmount('');
+    setAnnualFeeClassAmountsMap({});
+    setAnnualFeeFormErrors({});
+    setIsAnnualFeeConfirmOpen(false);
+    setIsAnnualFeeModalOpen(true);
+  };
+
+  const handleAnnualFeeInitialSubmit = (e) => {
+    if (e) e.preventDefault();
+    const errors = {};
+    if (annualFeeApplyType === 'school') {
+      if (!annualFeeAmount || parseFloat(annualFeeAmount) <= 0) {
+        errors.amount = 'Annual Fee amount must be greater than 0.';
+      } else if (parseFloat(annualFeeAmount) > 10000000) {
+        errors.amount = 'Annual Fee amount exceeds system maximum.';
+      }
+    } else {
+      const enteredAmounts = Object.values(annualFeeClassAmountsMap).filter(v => v !== '' && parseFloat(v) > 0);
+      if (enteredAmounts.length === 0) {
+        errors.classes = 'At least one class fee amount must be entered.';
+      }
+      Object.entries(annualFeeClassAmountsMap).forEach(([cid, val]) => {
+        if (val !== '' && parseFloat(val) < 0) {
+          errors[`class_${cid}`] = 'Amount cannot be negative.';
+        }
+      });
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setAnnualFeeFormErrors(errors);
+      return;
+    }
+
+    setAnnualFeeFormErrors({});
+    setIsAnnualFeeConfirmOpen(true);
+  };
+
+  const handleSaveAnnualFee = async () => {
+    setError('');
+    setSuccess('');
+    setAnnualFeeSubmitting(true);
+    try {
+      await schoolService.createAnnualFee({
+        apply_type: annualFeeApplyType,
+        amount: annualFeeAmount,
+        class_amounts: annualFeeClassAmountsMap
+      });
+      setSuccess('Annual Fee created successfully.');
+      setIsAnnualFeeConfirmOpen(false);
+      setIsAnnualFeeModalOpen(false);
+      await loadData();
+    } catch (err) {
+      console.error(err);
+      setError(err?.response?.data?.message || err?.message || 'Failed to create annual fee.');
+      setIsAnnualFeeConfirmOpen(false);
+    } finally {
+      setAnnualFeeSubmitting(false);
+    }
+  };
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -1247,12 +1318,18 @@ export default function FinanceManagementPage() {
               </div>
 
               {!isReadOnly && (
-                <div className="flex justify-end">
+                <div className="flex flex-col sm:flex-row items-center justify-end gap-2.5 w-full sm:w-auto">
                   <Button 
-                    className="w-full md:w-auto font-bold uppercase tracking-wider text-xs flex items-center justify-center gap-1.5 shadow-2xs"
+                    className="w-full sm:w-auto font-bold uppercase tracking-wider text-xs flex items-center justify-center gap-1.5 shadow-2xs"
                     onClick={handleApplyFeeModalOpen}
                   >
                     <Plus className="h-4 w-4" /> Additional Fee
+                  </Button>
+                  <Button 
+                    className="w-full sm:w-auto font-bold uppercase tracking-wider text-xs flex items-center justify-center gap-1.5 shadow-2xs"
+                    onClick={handleAnnualFeeModalOpen}
+                  >
+                    <Plus className="h-4 w-4" /> Annual Fee
                   </Button>
                 </div>
               )}
@@ -2433,6 +2510,165 @@ export default function FinanceManagementPage() {
               </p>
             </div>
           </div>
+        </div>
+      </Dialog>
+
+      {/* Annual Fee Configuration Dialog Popup */}
+      <Dialog
+        isOpen={isAnnualFeeModalOpen}
+        onClose={() => setIsAnnualFeeModalOpen(false)}
+        title="Create Annual Fee"
+        description="Configure annual fee allocation for eligible students across the school or class-wise."
+        footer={
+          <div className="flex justify-end gap-2.5">
+            <Button variant="outline" type="button" onClick={() => setIsAnnualFeeModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              type="button" 
+              onClick={handleAnnualFeeInitialSubmit}
+              disabled={annualFeeSubmitting}
+            >
+              Create Fee
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          {/* Information Message Box */}
+          <div className="p-3.5 bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 rounded-xl space-y-1 text-xs">
+            <div className="flex items-center gap-2 text-blue-800 dark:text-blue-300 font-bold">
+              <Info className="h-4 w-4 shrink-0" />
+              <span>Important</span>
+            </div>
+            <p className="text-blue-700 dark:text-blue-400 text-xs leading-relaxed pl-6">
+              Annual Fee will <strong>not</strong> be applied to students who were admitted during the current academic year.
+            </p>
+            <p className="text-blue-700 dark:text-blue-400 text-xs leading-relaxed pl-6">
+              Only students who were already enrolled before the beginning of the current academic session are eligible.
+            </p>
+          </div>
+
+          {/* Apply To Radio Selection */}
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black text-text-secondary uppercase tracking-wider">Apply To</label>
+            <div className="flex items-center gap-6 pt-1">
+              <label className="flex items-center gap-2 text-xs font-semibold text-text-primary cursor-pointer">
+                <input
+                  type="radio"
+                  name="annualFeeApplyType"
+                  value="school"
+                  checked={annualFeeApplyType === 'school'}
+                  onChange={() => setAnnualFeeApplyType('school')}
+                  className="accent-primary h-4 w-4"
+                />
+                Entire School
+              </label>
+              <label className="flex items-center gap-2 text-xs font-semibold text-text-primary cursor-pointer">
+                <input
+                  type="radio"
+                  name="annualFeeApplyType"
+                  value="classes"
+                  checked={annualFeeApplyType === 'classes'}
+                  onChange={() => setAnnualFeeApplyType('classes')}
+                  className="accent-primary h-4 w-4"
+                />
+                Class Wise
+              </label>
+            </div>
+          </div>
+
+          {/* If Entire School Selected */}
+          {annualFeeApplyType === 'school' ? (
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-text-secondary uppercase tracking-wider">Annual Fee Amount *</label>
+              <div className="relative">
+                <span className="absolute left-3 top-2.5 text-xs font-bold text-text-muted">₹</span>
+                <Input
+                  type="number"
+                  placeholder="1000"
+                  value={annualFeeAmount}
+                  onChange={e => setAnnualFeeAmount(e.target.value)}
+                  min="0"
+                  step="any"
+                  className="pl-7 text-xs"
+                />
+              </div>
+              {annualFeeFormErrors.amount && (
+                <p className="text-[10px] text-red-500 font-bold mt-1">{annualFeeFormErrors.amount}</p>
+              )}
+            </div>
+          ) : (
+            /* If Class Wise Selected */
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-black text-text-secondary uppercase tracking-wider">Class-Wise Fee Allocation *</label>
+                {annualFeeFormErrors.classes && (
+                  <p className="text-[10px] text-red-500 font-bold">{annualFeeFormErrors.classes}</p>
+                )}
+              </div>
+              <div className="max-h-56 overflow-y-auto border border-border rounded-xl">
+                <Table className="text-xs">
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="font-bold text-[10px] uppercase">Class</TableHead>
+                      <TableHead className="font-bold text-[10px] uppercase text-right">Annual Fee (₹)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {classes.map(cls => (
+                      <TableRow key={cls.id}>
+                        <TableCell className="font-medium">
+                          {cls.name} {cls.section ? `- ${cls.section}` : ''}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Input
+                            type="number"
+                            placeholder="0"
+                            value={annualFeeClassAmountsMap[cls.id] || ''}
+                            onChange={e => setAnnualFeeClassAmountsMap({
+                              ...annualFeeClassAmountsMap,
+                              [cls.id]: e.target.value
+                            })}
+                            min="0"
+                            step="any"
+                            className="h-8 w-28 ml-auto text-right text-xs"
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+        </div>
+      </Dialog>
+
+      {/* Confirmation Dialog Before Creation */}
+      <Dialog
+        isOpen={isAnnualFeeConfirmOpen}
+        onClose={() => setIsAnnualFeeConfirmOpen(false)}
+        title="Create Annual Fee"
+        description="Please confirm annual fee creation for eligible students."
+        footer={
+          <div className="flex justify-end gap-2.5">
+            <Button variant="outline" onClick={() => setIsAnnualFeeConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSaveAnnualFee} 
+              disabled={annualFeeSubmitting}
+            >
+              {annualFeeSubmitting ? 'Creating...' : 'Create Fee'}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-3 text-xs leading-relaxed text-text-secondary">
+          <p>This annual fee will be applied only to eligible students.</p>
+          <p>Students admitted during the current academic session will automatically be excluded.</p>
+          <p className="font-bold text-text-primary">Do you want to continue?</p>
         </div>
       </Dialog>
 

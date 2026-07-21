@@ -4,6 +4,7 @@ import { Input } from '../../../common/ui/input';
 import { Card, CardContent } from '../../../common/ui/card';
 import { schoolService } from '../../../common/services/schoolService';
 import { ArrowLeft, Upload, Check, AlertCircle, Calendar } from 'lucide-react';
+import { getClassIndex } from '../../../common/constants/predefinedClasses';
 
 const INDIAN_STATES_AND_CITIES = {
   "Andhra Pradesh": [
@@ -260,6 +261,8 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
     // Academic Info
     academic_year_id: '',
     admission_date: '',
+    admission_fee: '',
+    student_category: '',
     class_id: '',
     class_name: '',
     roll_no: '',
@@ -332,6 +335,8 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
               permanent_address_line_1: studentData.permanent_address_line || '',
               permanent_address_line_2: '',
               exit_date: studentData.exit_date || '',
+              admission_fee: studentData.admission_fee !== null && studentData.admission_fee !== undefined ? String(studentData.admission_fee) : '',
+              student_category: studentData.student_category || '',
               class_name: studentData.class_name || '',
               parent_occupation: studentData.father_occupation || ''
             });
@@ -687,6 +692,13 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
       if (!formData.admission_date) {
         errs.admission_date = 'Admission Date is required';
       }
+      if (formData.admission_fee !== '' && formData.admission_fee !== null && parseFloat(formData.admission_fee) < 0) {
+        errs.admission_fee = 'Admission Fee cannot be negative.';
+      }
+      const isFirstYearSession = (academicYears || []).length <= 1 || (formData.academic_year_id && String(formData.academic_year_id) === String(academicYears[0]?.id));
+      if (isFirstYearSession && !studentId && !formData.student_category) {
+        errs.student_category = 'Student Category is required.';
+      }
       if (!selectedClassName) {
         errs.class_name = 'Class is required';
       }
@@ -875,12 +887,20 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
     );
   }
 
-  // Extract unique class names in their creation order
+  // Extract unique class names sorted in standard academic order
   const uniqueClassNames = [];
   classesList.forEach(c => {
     if (!uniqueClassNames.includes(c.name)) {
       uniqueClassNames.push(c.name);
     }
+  });
+  uniqueClassNames.sort((a, b) => {
+    const idxA = getClassIndex(a);
+    const idxB = getClassIndex(b);
+    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+    if (idxA !== -1) return -1;
+    if (idxB !== -1) return 1;
+    return a.localeCompare(b);
   });
 
   return (
@@ -931,7 +951,7 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                 <div>
                   <h3 className="text-sm font-bold text-text-primary uppercase tracking-wide border-b border-border pb-2 mb-4">Basic Details</h3>
                   
-                  {/* Row 1 */}
+                  {/* Unified 4-Column Grid for Basic Details */}
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-text-secondary uppercase">Student Name <span className="text-red-500">*</span></label>
@@ -952,10 +972,7 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                       <label className="text-xs font-bold text-text-secondary uppercase">Parent Occupation</label>
                       <Input name="parent_occupation" value={formData.parent_occupation} onChange={handleTextChange} placeholder="e.g. Government Employee" />
                     </div>
-                  </div>
 
-                  {/* Row 2 */}
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-text-secondary uppercase">Gender <span className="text-red-500">*</span></label>
                       <select 
@@ -1003,6 +1020,43 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                       {errors.admission_date && <p className="text-[10px] text-red-500 font-semibold">{errors.admission_date}</p>}
                     </div>
                     <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-text-secondary uppercase">Admission Fee</label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2 text-xs font-bold text-text-muted">₹</span>
+                        <Input
+                          type="number"
+                          name="admission_fee"
+                          placeholder="0.00"
+                          value={formData.admission_fee}
+                          onChange={handleTextChange}
+                          min="0"
+                          step="any"
+                          className="pl-7 text-text-primary text-sm"
+                        />
+                      </div>
+                      {errors.admission_fee && <p className="text-[10px] text-red-500 font-semibold">{errors.admission_fee}</p>}
+                    </div>
+
+                    {(((academicYears || []).length <= 1 || (formData.academic_year_id && String(formData.academic_year_id) === String(academicYears[0]?.id))) || formData.student_category) && (
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-text-secondary uppercase">
+                          Student Category <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          name="student_category"
+                          value={formData.student_category}
+                          onChange={handleTextChange}
+                          required
+                          className="flex h-9 w-full rounded-md border border-zinc-200 bg-surface px-3 py-1.5 text-sm text-text-primary shadow-xs transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-950 dark:border-zinc-800 dark:focus:ring-zinc-300"
+                        >
+                          <option value="">Select...</option>
+                          <option value="Existing Student">Existing Student</option>
+                          <option value="New Admission">New Admission</option>
+                        </select>
+                        {errors.student_category && <p className="text-[10px] text-red-500 font-semibold">{errors.student_category}</p>}
+                      </div>
+                    )}
+                    <div className="space-y-1.5">
                       <label className="text-xs font-bold text-text-secondary uppercase">Blood Group</label>
                       <select 
                         name="blood_group" 
@@ -1017,10 +1071,7 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                         <option value="AB+">AB+</option><option value="AB-">AB-</option>
                       </select>
                     </div>
-                  </div>
 
-                  {/* Row 3 */}
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-text-secondary uppercase">Category</label>
                       <select 
@@ -1050,10 +1101,7 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                       <Input name="student_mobile" value={formData.student_mobile} onChange={handleNumericChange} placeholder="Contact number" required />
                       {errors.student_mobile && <p className="text-[10px] text-red-500 font-semibold">{errors.student_mobile}</p>}
                     </div>
-                  </div>
 
-                  {/* Row 4 */}
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-text-secondary uppercase">Student Email</label>
                       <Input type="email" name="student_email" value={formData.student_email} onChange={handleTextChange} placeholder="student@domain.com" />
@@ -1086,7 +1134,9 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                         >
                           <option value="">Select Section...</option>
                           {availableSections.map(sec => (
-                            <option key={sec} value={sec}>Section {sec}</option>
+                            <option key={sec} value={sec}>
+                              {sec.length === 1 ? `Section ${sec}` : sec}
+                            </option>
                           ))}
                         </select>
                         {errors.section_name && <p className="text-[10px] text-red-500 font-semibold">{errors.section_name}</p>}

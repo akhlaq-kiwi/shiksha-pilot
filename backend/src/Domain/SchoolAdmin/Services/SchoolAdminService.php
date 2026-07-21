@@ -938,7 +938,18 @@ class SchoolAdminService extends BaseService
         // System defaults for status based on exit date
         $exitDate = !empty($data['exit_date']) ? $data['exit_date'] : null;
         $status = $exitDate !== null ? 'Inactive' : 'ACTIVE';
-        $admissionDate = date('Y-m-d');
+        $admissionDate = !empty($data['admission_date']) ? $data['admission_date'] : date('Y-m-d');
+
+        $admissionFee = isset($data['admission_fee']) && $data['admission_fee'] !== '' ? (float)$data['admission_fee'] : null;
+        if ($admissionFee !== null && $admissionFee < 0) {
+            throw new ValidationException(['admission_fee' => 'Admission Fee cannot be negative.']);
+        }
+
+        $isFirstAY = $this->isFirstAcademicYear($schoolId, $academicYearId);
+        $studentCategory = !empty($data['student_category']) ? trim($data['student_category']) : null;
+        if ($isFirstAY && (empty($studentCategory) || !in_array($studentCategory, ['Existing Student', 'New Admission'], true))) {
+            throw new ValidationException(['student_category' => 'Student Category (Existing Student or New Admission) is required.']);
+        }
 
         $id = $this->studentRepo->create([
             'school_id'    => $schoolId,
@@ -965,6 +976,8 @@ class SchoolAdminService extends BaseService
             'student_email' => $data['student_email'] ?? null,
             'academic_year_id' => $academicYearId > 0 ? $academicYearId : null,
             'admission_date' => $admissionDate,
+            'admission_fee' => $admissionFee,
+            'student_category' => $studentCategory,
             'roll_no' => $rollNo,
             'house' => null,
             
@@ -1017,6 +1030,11 @@ class SchoolAdminService extends BaseService
         $student = $this->studentRepo->findDetailById($schoolId, $id);
         if ($student === null) {
             throw new NotFoundException('Student not found after creation');
+        }
+
+        if ($admissionFee !== null && $admissionFee > 0) {
+            $this->syncAdmissionFeePayment($pdo, $schoolId, $id, $academicYearId, $admissionFee);
+            $this->sendStudentNotification($pdo, $schoolId, $id, "Admission Fee Added", "Your admission fee has been added to your fee account. Please check your Fees section.");
         }
 
         $this->log('Student created', ['id' => $id, 'school_id' => $schoolId]);
@@ -1239,9 +1257,87 @@ class SchoolAdminService extends BaseService
             'report_card_path' => $data['report_card_path'] ?? $student['report_card_path'],
             'additional_docs_path' => $data['additional_docs_path'] ?? $student['additional_docs_path'],
             'exit_date' => $exitDate,
+            'admission_fee' => array_key_exists('admission_fee', $data) ? ($data['admission_fee'] !== null && $data['admission_fee'] !== '' ? (float)$data['admission_fee'] : null) : ($student['admission_fee'] ?? null),
         ]);
 
+        if (array_key_exists('admission_fee', $data)) {
+            $admFee = $data['admission_fee'] !== null && $data['admission_fee'] !== '' ? (float)$data['admission_fee'] : null;
+            if ($admFee !== null && $admFee < 0) {
+                throw new ValidationException(['admission_fee' => 'Admission Fee cannot be negative.']);
+            }
+            $this->syncAdmissionFeePayment($pdo, $schoolId, $id, $academicYearId, $admFee);
+        }
+
         return $this->studentRepo->findDetailById($schoolId, $id);
+    }
+
+    private function syncAdmissionFeePayment(PDO $pdo, int $schoolId, int $studentId, ?int $academicYearId, ?float $admissionFee): void
+    {
+        if ($academicYearId === null || $academicYearId <= 0) {
+            $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+            $academicYearId = $workingYear ? (int)$workingYear['id'] : null;
+        }
+        if ($academicYearId === null) {
+            return;
+        }
+
+        // Find or create 'Admission Fee' type in additional_fee_types
+        $stmtType = $pdo->prepare("
+            SELECT id FROM additional_fee_types 
+            WHERE school_id = :sid AND academic_year_id = :ayid AND name = 'Admission Fee' LIMIT 1
+        ");
+        $stmtType->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+        $typeId = $stmtType->fetchColumn();
+
+        if ($typeId === false) {
+            if ($admissionFee === null || $admissionFee <= 0) {
+                return;
+            }
+            $stmtInsType = $pdo->prepare("
+                INSERT INTO additional_fee_types (school_id, name, amount, academic_year_id, category)
+                VALUES (:sid, 'Admission Fee', 0.0, :ayid, 'Admission Fee')
+            ");
+            $stmtInsType->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+            $typeId = (int)$pdo->lastInsertId();
+        } else {
+            $typeId = (int)$typeId;
+        }
+
+        // Check for existing payment record for this student and fee type
+        $stmtPay = $pdo->prepare("
+            SELECT id, amount, status FROM additional_fee_payments
+            WHERE school_id = :sid AND student_id = :stid AND fee_type_id = :tid LIMIT 1
+        ");
+        $stmtPay->execute([':sid' => $schoolId, ':stid' => $studentId, ':tid' => $typeId]);
+        $existingPay = $stmtPay->fetch(PDO::FETCH_ASSOC);
+
+        if ($admissionFee !== null && $admissionFee > 0) {
+            if ($existingPay) {
+                if ($existingPay['status'] === 'Pending') {
+                    $stmtUpd = $pdo->prepare("
+                        UPDATE additional_fee_payments SET amount = :amt WHERE id = :pid
+                    ");
+                    $stmtUpd->execute([':amt' => $admissionFee, ':pid' => $existingPay['id']]);
+                }
+            } else {
+                $stmtInsPay = $pdo->prepare("
+                    INSERT INTO additional_fee_payments (school_id, student_id, fee_type_id, amount, status)
+                    VALUES (:sid, :stid, :tid, :amt, 'Pending')
+                ");
+                $stmtInsPay->execute([
+                    ':sid' => $schoolId,
+                    ':stid' => $studentId,
+                    ':tid' => $typeId,
+                    ':amt' => $admissionFee
+                ]);
+            }
+        } else {
+            // Remove pending payment entry if admission fee is set to blank/null/0
+            if ($existingPay && $existingPay['status'] === 'Pending') {
+                $stmtDel = $pdo->prepare("DELETE FROM additional_fee_payments WHERE id = :pid");
+                $stmtDel->execute([':pid' => $existingPay['id']]);
+            }
+        }
     }
 
     public function advanceStudent(array $user, int $id, int $targetClassId): array
@@ -1905,34 +2001,82 @@ class SchoolAdminService extends BaseService
     public function createClass(array $user, array $data): array
     {
         if (empty($data['name'])) {
-            throw new ValidationException(['name' => 'Class name is required']);
+            throw new ValidationException(['name' => 'Please select a class.']);
         }
 
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->classRepo->getPdo();
 
-        // Parse optional sections
+        // Parse sections
         $sections = [];
         if (!empty($data['sections'])) {
             if (is_array($data['sections'])) {
-                $sections = $data['sections'];
+                $sections = array_map('trim', $data['sections']);
             } else {
                 $sections = array_filter(array_map('trim', explode(',', (string)$data['sections'])));
             }
-            $sections = array_unique($sections);
+            $sections = array_values(array_unique($sections));
         }
 
-        if (!empty($sections) && count($sections) === 1) {
-            throw new ValidationException(['sections' => 'At least 2 sections are required, or leave blank for no sections.']);
-        }
+        if (!empty($sections)) {
+            if (count($sections) > 4) {
+                throw new ValidationException(['sections' => 'Maximum 4 sections allowed.']);
+            }
 
-        if (empty($sections)) {
+            // Validate section types (Alphabet vs Color)
+            $alphabetAllowed = ['A', 'B', 'C', 'D'];
+            $colorAllowed    = ['Red', 'Blue', 'Green', 'Yellow'];
+            
+            $isAlphabet = true;
+            $isColor    = true;
+            foreach ($sections as $sec) {
+                $secUpper = strtoupper($sec);
+                $secTitle = ucfirst(strtolower($sec));
+                if (!in_array($secUpper, $alphabetAllowed, true)) {
+                    $isAlphabet = false;
+                }
+                if (!in_array($secTitle, $colorAllowed, true)) {
+                    $isColor = false;
+                }
+            }
+
+            if (!$isAlphabet && !$isColor) {
+                throw new ValidationException(['sections' => 'Section names must belong to either Alphabet (A, B, C, D) or Color (Red, Blue, Green, Yellow) sections.']);
+            }
+
+            if ($isAlphabet) {
+                $sections = array_map('strtoupper', $sections);
+            } else {
+                $sections = array_map(fn($s) => ucfirst(strtolower($s)), $sections);
+            }
+        } else {
             $sections = [null];
         }
 
         // Get currently active or draft academic year
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
         $academicYearId = $workingYear ? (int)$workingYear['id'] : null;
+
+        // Check if the entire class with all sections already exists
+        $existingClasses = $this->classRepo->findBySchool($schoolId);
+        $existingClassNames = array_map(fn($c) => strtolower($c['name']), $existingClasses);
+        if (in_array(strtolower(trim((string)$data['name'])), $existingClassNames, true)) {
+            // Check if all requested sections already exist
+            $existingForThisClass = array_filter($existingClasses, fn($c) => strtolower($c['name']) === strtolower(trim((string)$data['name'])));
+            $existingSecs = array_map(fn($c) => strtolower($c['section'] ?? ''), $existingForThisClass);
+            
+            $allExist = true;
+            foreach ($sections as $sec) {
+                $secLower = strtolower(trim((string)($sec ?? '')));
+                if (!in_array($secLower, $existingSecs, true)) {
+                    $allExist = false;
+                    break;
+                }
+            }
+            if ($allExist) {
+                throw new ValidationException(['name' => 'This class has already been added.']);
+            }
+        }
 
         $lastInsertedClass = null;
         foreach ($sections as $sec) {
@@ -5019,19 +5163,67 @@ class SchoolAdminService extends BaseService
         $newSections = [];
         if (!empty($data['sections'])) {
             if (is_array($data['sections'])) {
-                $newSections = $data['sections'];
+                $newSections = array_map('trim', $data['sections']);
             } else {
                 $newSections = array_filter(array_map('trim', explode(',', (string)$data['sections'])));
             }
-            $newSections = array_unique($newSections);
+            $newSections = array_values(array_unique($newSections));
         }
 
-        if (!empty($newSections) && count($newSections) === 1) {
-            throw new ValidationException(['sections' => 'At least 2 sections are required, or leave blank to remove all sections.']);
-        }
+        if (!empty($newSections)) {
+            if (count($newSections) > 4) {
+                throw new ValidationException(['sections' => 'Maximum 4 sections allowed.']);
+            }
 
-        if (empty($newSections)) {
+            // Validate section types (Alphabet vs Color)
+            $alphabetAllowed = ['A', 'B', 'C', 'D'];
+            $colorAllowed    = ['Red', 'Blue', 'Green', 'Yellow'];
+            
+            $isAlphabet = true;
+            $isColor    = true;
+            foreach ($newSections as $sec) {
+                $secUpper = strtoupper($sec);
+                $secTitle = ucfirst(strtolower($sec));
+                if (!in_array($secUpper, $alphabetAllowed, true)) {
+                    $isAlphabet = false;
+                }
+                if (!in_array($secTitle, $colorAllowed, true)) {
+                    $isColor = false;
+                }
+            }
+
+            if (!$isAlphabet && !$isColor) {
+                throw new ValidationException(['sections' => 'Section names must belong to either Alphabet (A, B, C, D) or Color (Red, Blue, Green, Yellow) sections.']);
+            }
+
+            if ($isAlphabet) {
+                $newSections = array_map('strtoupper', $newSections);
+            } else {
+                $newSections = array_map(fn($s) => ucfirst(strtolower($s)), $newSections);
+            }
+        } else {
             $newSections = [null];
+        }
+
+        // Check Section Type Lock if students are already assigned
+        $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM students WHERE school_id = :sid AND class_name = :cname");
+        $stmtCount->execute([':sid' => $schoolId, ':cname' => $oldName]);
+        $assignedStudentCount = (int)$stmtCount->fetchColumn();
+
+        if ($assignedStudentCount > 0) {
+            $stmtOldSec = $pdo->prepare("SELECT section FROM classes WHERE school_id = :sid AND name = :name AND section IS NOT NULL");
+            $stmtOldSec->execute([':sid' => $schoolId, ':name' => $oldName]);
+            $oldSecList = array_filter(array_map('trim', $stmtOldSec->fetchAll(PDO::FETCH_COLUMN)));
+
+            if (!empty($oldSecList)) {
+                $oldFirst = $oldSecList[0];
+                $oldIsColor = in_array(ucfirst(strtolower($oldFirst)), $colorAllowed, true);
+                $oldIsAlphabet = in_array(strtoupper($oldFirst), $alphabetAllowed, true);
+
+                if (($oldIsAlphabet && $isColor) || ($oldIsColor && $isAlphabet)) {
+                    throw new ValidationException(['section_type' => 'Section type cannot be changed because students are already assigned to this class.']);
+                }
+            }
         }
 
         // Get currently active or draft academic year
@@ -5174,6 +5366,85 @@ class SchoolAdminService extends BaseService
         }
 
         return $lastClass;
+    }
+
+    public function deleteClass(array $user, array $data): array
+    {
+        if (empty($data['name'])) {
+            throw new ValidationException(['name' => 'Class name is required for deletion.']);
+        }
+
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->classRepo->getPdo();
+        $className = trim((string)$data['name']);
+
+        // Find all class IDs for this class name in this school
+        $stmtFind = $pdo->prepare("SELECT id FROM classes WHERE school_id = :sid AND name = :name");
+        $stmtFind->execute([':sid' => $schoolId, ':name' => $className]);
+        $classIds = $stmtFind->fetchAll(PDO::FETCH_COLUMN);
+
+        if (empty($classIds)) {
+            throw new NotFoundException('Class not found.');
+        }
+
+        $inClause = implode(',', array_map('intval', $classIds));
+
+        // Check if students are enrolled in this class across any section
+        $stmtCount = $pdo->prepare("
+            SELECT COUNT(*) FROM students 
+            WHERE school_id = :sid AND (class_name = :cname OR class_id IN ({$inClause}))
+        ");
+        $stmtCount->execute([':sid' => $schoolId, ':cname' => $className]);
+        $studentCount = (int)$stmtCount->fetchColumn();
+
+        if ($studentCount > 0) {
+            throw new ValidationException([
+                'students' => 'This class cannot be deleted because students are currently enrolled. Please transfer or remove all students before deleting this class.'
+            ]);
+        }
+
+        // Safe deletion
+        $stmtDelete = $pdo->prepare("DELETE FROM classes WHERE school_id = :sid AND name = :name");
+        $stmtDelete->execute([':sid' => $schoolId, ':name' => $className]);
+
+        $this->log('Class deleted', ['name' => $className, 'school_id' => $schoolId]);
+
+        return ['success' => true, 'message' => "Class {$className} deleted successfully."];
+    }
+
+    public function deleteSection(array $user, array $data): array
+    {
+        $classId = isset($data['class_id']) ? (int)$data['class_id'] : 0;
+        if ($classId <= 0) {
+            throw new ValidationException(['class_id' => 'Valid class ID is required for section deletion.']);
+        }
+
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->classRepo->getPdo();
+
+        $classRow = $this->classRepo->findById($classId);
+        if (!$classRow || (int)$classRow['school_id'] !== $schoolId) {
+            throw new NotFoundException('Class section not found.');
+        }
+
+        // Check student count for this specific class section
+        $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM students WHERE school_id = :sid AND class_id = :cid");
+        $stmtCount->execute([':sid' => $schoolId, ':cid' => $classId]);
+        $studentCount = (int)$stmtCount->fetchColumn();
+
+        if ($studentCount > 0) {
+            throw new ValidationException([
+                'students' => 'This section cannot be deleted because students belong to this section. Please reassign or remove all students before deleting this section.'
+            ]);
+        }
+
+        // Safe deletion of section
+        $stmtDelete = $pdo->prepare("DELETE FROM classes WHERE id = :id AND school_id = :sid");
+        $stmtDelete->execute([':id' => $classId, ':sid' => $schoolId]);
+
+        $this->log('Class section deleted', ['id' => $classId, 'school_id' => $schoolId]);
+
+        return ['success' => true, 'message' => 'Section deleted successfully.'];
     }
 
     public function deleteFeePayment(array $user, int $id): bool
@@ -7482,6 +7753,237 @@ Only approve the settlement after reviewing all financial records.
 
             return [
                 'name' => $name,
+                'academic_year_id' => $academicYearId,
+                'assigned_count' => count($studentsToApply)
+            ];
+        } catch (\Exception $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+    }
+
+    public function createAnnualFee(array $user, array $data): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->staffRepo->getPdo();
+        $this->requireWritableAcademicYear($pdo, $schoolId);
+
+        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+        if (!$workingYear) {
+            throw new ValidationException(['academic_year' => 'No academic year found. Please create an Academic Year first.']);
+        }
+        $academicYearId = (int)$workingYear['id'];
+        $sessionStartDate = $workingYear['start_date'];
+
+        $applyType = $data['apply_type'] ?? 'school'; // 'school' or 'classes'
+        $studentsToApply = []; // Array of ['student_id' => int, 'class_id' => int, 'amount' => float]
+
+        if ($applyType === 'school') {
+            $amount = isset($data['amount']) ? (float)$data['amount'] : 0.0;
+            if ($amount <= 0) {
+                throw new ValidationException(['amount' => 'Annual Fee amount must be greater than 0.']);
+            }
+            if ($amount > 10000000) {
+                throw new ValidationException(['amount' => 'Annual Fee amount exceeds system maximum.']);
+            }
+
+            // Query active students in current academic year
+            // ELIGIBILITY RULE: Annual Fee applies only to Existing Students (or auto-tracked prior session enrollments). New Admissions are excluded.
+            $stmtStudents = $pdo->prepare("
+                SELECT id, class_id FROM students 
+                WHERE school_id = :sid 
+                  AND status = 'ACTIVE' 
+                  AND academic_year_id = :ayid
+                  AND (
+                    student_category = 'Existing Student'
+                    OR (
+                      (student_category IS NULL OR student_category = '')
+                      AND (
+                        admission_date IS NULL 
+                        OR admission_date < :start_date 
+                        OR EXISTS (
+                          SELECT 1 FROM students prev 
+                          WHERE prev.school_id = :prev_sid 
+                            AND prev.academic_year_id < :prev_ayid 
+                            AND (prev.sr_no = students.sr_no OR (prev.student_email IS NOT NULL AND prev.student_email = students.student_email))
+                        )
+                      )
+                    )
+                  )
+                  AND (student_category IS NULL OR student_category != 'New Admission')
+            ");
+            $stmtStudents->execute([
+                ':sid' => $schoolId,
+                ':prev_sid' => $schoolId,
+                ':ayid' => $academicYearId,
+                ':prev_ayid' => $academicYearId,
+                ':start_date' => $sessionStartDate
+            ]);
+            $studentRows = $stmtStudents->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($studentRows as $s) {
+                $studentsToApply[] = [
+                    'student_id' => (int)$s['id'],
+                    'class_id'   => (int)$s['class_id'],
+                    'amount'     => $amount
+                ];
+            }
+        } else {
+            // Selected classes with custom amounts
+            if (empty($data['class_amounts']) || !is_array($data['class_amounts'])) {
+                throw new ValidationException(['classes' => 'At least one class configuration is required when Class Wise is selected.']);
+            }
+
+            foreach ($data['class_amounts'] as $classId => $amt) {
+                $classAmt = (float)$amt;
+                if ($classAmt <= 0) {
+                    continue; // Only configured classes receive fee
+                }
+                if ($classAmt > 10000000) {
+                    throw new ValidationException(['amount' => 'Class fee amount exceeds system maximum.']);
+                }
+
+                // Query active eligible students in this class
+                $stmtStudents = $pdo->prepare("
+                    SELECT id, class_id FROM students 
+                    WHERE school_id = :sid 
+                      AND class_id = :cid 
+                      AND status = 'ACTIVE' 
+                      AND academic_year_id = :ayid
+                      AND (
+                        student_category = 'Existing Student'
+                        OR (
+                          (student_category IS NULL OR student_category = '')
+                          AND (
+                            admission_date IS NULL 
+                            OR admission_date < :start_date 
+                            OR EXISTS (
+                              SELECT 1 FROM students prev 
+                              WHERE prev.school_id = :prev_sid 
+                                AND prev.academic_year_id < :prev_ayid 
+                                AND (prev.sr_no = students.sr_no OR (prev.student_email IS NOT NULL AND prev.student_email = students.student_email))
+                            )
+                          )
+                        )
+                      )
+                      AND (student_category IS NULL OR student_category != 'New Admission')
+                ");
+                $stmtStudents->execute([
+                    ':sid' => $schoolId,
+                    ':prev_sid' => $schoolId,
+                    ':cid' => (int)$classId,
+                    ':ayid' => $academicYearId,
+                    ':prev_ayid' => $academicYearId,
+                    ':start_date' => $sessionStartDate
+                ]);
+                $studentRows = $stmtStudents->fetchAll(PDO::FETCH_ASSOC);
+
+                foreach ($studentRows as $s) {
+                    $studentsToApply[] = [
+                        'student_id' => (int)$s['id'],
+                        'class_id'   => (int)$s['class_id'],
+                        'amount'     => $classAmt
+                    ];
+                }
+            }
+        }
+
+        if (empty($studentsToApply)) {
+            throw new ValidationException(['students' => 'No eligible students found. Annual Fee is only applicable to Existing Students. All currently enrolled students are marked as New Admission.']);
+        }
+
+        // Duplicate Check Rule: check if Annual Fee is already applied in current academic year for any target student
+        $stmtDup = $pdo->prepare("
+            SELECT COUNT(*) FROM additional_fee_payments afp
+            JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+            WHERE afp.student_id = :student_id 
+              AND aft.name = 'Annual Fee' 
+              AND aft.academic_year_id = :ayid
+        ");
+
+        foreach ($studentsToApply as $s) {
+            $stmtDup->execute([
+                ':student_id' => $s['student_id'],
+                ':ayid' => $academicYearId
+            ]);
+            if ((int)$stmtDup->fetchColumn() > 0) {
+                throw new ValidationException(['duplicate' => 'Annual fee has already been applied to eligible students in the current session.']);
+            }
+        }
+
+        $pdo->beginTransaction();
+        try {
+            $classFeeTypeIds = []; // class_id => fee_type_id
+            
+            if ($applyType === 'school') {
+                $stmtType = $pdo->prepare("
+                    INSERT INTO additional_fee_types (school_id, name, amount, academic_year_id, category)
+                    VALUES (:sid, 'Annual Fee', :amount, :ayid, 'Annual Fee')
+                ");
+                $stmtType->execute([
+                    ':sid' => $schoolId,
+                    ':amount' => $amount,
+                    ':ayid' => $academicYearId
+                ]);
+                $masterTypeId = (int)$pdo->lastInsertId();
+                
+                foreach ($studentsToApply as $s) {
+                    $classFeeTypeIds[$s['class_id']] = $masterTypeId;
+                }
+            } else {
+                $stmtType = $pdo->prepare("
+                    INSERT INTO additional_fee_types (school_id, name, amount, academic_year_id, category)
+                    VALUES (:sid, 'Annual Fee', :amount, :ayid, 'Annual Fee')
+                ");
+                
+                foreach ($data['class_amounts'] as $classId => $amt) {
+                    $classAmt = (float)$amt;
+                    if ($classAmt <= 0) continue;
+
+                    $stmtType->execute([
+                        ':sid' => $schoolId,
+                        ':amount' => $classAmt,
+                        ':ayid' => $academicYearId
+                    ]);
+                    $classFeeTypeIds[$classId] = (int)$pdo->lastInsertId();
+                }
+            }
+
+            $stmtInsertPay = $pdo->prepare("
+                INSERT INTO additional_fee_payments (school_id, student_id, fee_type_id, amount, status)
+                VALUES (:sid, :student_id, :type_id, :amount, 'Pending')
+            ");
+
+            foreach ($studentsToApply as $s) {
+                $stmtInsertPay->execute([
+                    ':sid' => $schoolId,
+                    ':student_id' => $s['student_id'],
+                    ':type_id' => $classFeeTypeIds[$s['class_id']],
+                    ':amount' => $s['amount']
+                ]);
+            }
+
+            $pdo->commit();
+
+            // Send notifications ONLY to eligible students who received the fee
+            foreach ($studentsToApply as $s) {
+                $this->sendStudentNotification(
+                    $pdo, 
+                    $schoolId, 
+                    $s['student_id'], 
+                    "Annual Fee Added", 
+                    "An annual fee has been added to your fee account. Please check your Fees section for details."
+                );
+            }
+
+            $this->log('Annual Fee Created', [
+                'school_id' => $schoolId,
+                'academic_year_id' => $academicYearId,
+                'eligible_students_count' => count($studentsToApply)
+            ]);
+
+            return [
+                'name' => 'Annual Fee',
                 'academic_year_id' => $academicYearId,
                 'assigned_count' => count($studentsToApply)
             ];

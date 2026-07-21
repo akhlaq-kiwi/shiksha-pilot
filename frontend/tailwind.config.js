@@ -10,6 +10,7 @@ export default {
       colors: {
         background: "var(--bg-app)",
         surface: "var(--bg-surface)",
+        sidebar: "var(--bg-sidebar)",
         border: "var(--border-color)",
         primary: {
           DEFAULT: "var(--color-primary)",

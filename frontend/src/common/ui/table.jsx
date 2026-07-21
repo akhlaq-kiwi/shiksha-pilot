@@ -14,7 +14,7 @@ export const Table = React.forwardRef(({ className, ...props }, ref) => (
 Table.displayName = 'Table';
 
 export const TableHeader = React.forwardRef(({ className, ...props }, ref) => (
-  <thead ref={ref} className={twMerge('bg-secondary/45 border-b border-border', className)} {...props} />
+  <thead ref={ref} className={twMerge('bg-[#EFEEEB] dark:bg-slate-800/60 border-b border-border', className)} {...props} />
 ));
 TableHeader.displayName = 'TableHeader';
 
@@ -30,7 +30,7 @@ TableBody.displayName = 'TableBody';
 export const TableFooter = React.forwardRef(({ className, ...props }, ref) => (
   <tfoot
     ref={ref}
-    className={twMerge('bg-secondary/5 font-semibold text-text-primary', className)}
+    className={twMerge('bg-[#EFEEEB]/50 dark:bg-slate-800/40 font-semibold text-text-primary', className)}
     {...props}
   />
 ));
@@ -40,7 +40,7 @@ export const TableRow = React.forwardRef(({ className, ...props }, ref) => (
   <tr
     ref={ref}
     className={twMerge(
-      'border-b border-border/40 transition-colors hover:bg-secondary/25 data-[state=selected]:bg-secondary/60',
+      'border-b border-border/40 transition-colors hover:bg-[#F4F3F1]/80 dark:hover:bg-slate-800/30 data-[state=selected]:bg-secondary/60',
       className
     )}
     {...props}

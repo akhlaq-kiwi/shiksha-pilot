@@ -1053,6 +1053,28 @@ class SchoolAdminController extends BaseController
         return $this->success($response, $class, 'Class updated');
     }
 
+    public function deleteClass(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body   = RequestParser::body($request);
+        $result = $this->service->deleteClass($user, $body);
+
+        return $this->success($response, $result, 'Class deleted');
+    }
+
+    public function deleteSection(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body   = RequestParser::body($request);
+        $result = $this->service->deleteSection($user, $body);
+
+        return $this->success($response, $result, 'Section deleted');
+    }
+
     public function deleteFeePayment(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
@@ -1350,6 +1372,17 @@ class SchoolAdminController extends BaseController
         $data = $this->service->createAdditionalFeeType($user, $body);
 
         return $this->success($response, $data, 'Additional fee type created and assigned', 201);
+    }
+
+    public function createAnnualFee(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body = RequestParser::body($request);
+        $data = $this->service->createAnnualFee($user, $body);
+
+        return $this->success($response, $data, 'Annual Fee created successfully.', 201);
     }
 
     public function updateAdditionalFeeType(Request $request, Response $response, array $args): Response

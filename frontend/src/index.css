@@ -2,31 +2,34 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Premium Slate & Obsidian Theme variables */
+/* LeadKeep Layered SaaS Palette (Paper-on-Stone Warm Neutrals) */
 :root {
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-display: 'Outfit', var(--font-sans);
 
-  /* Light Theme Variables (Premium Crisp Slate) */
-  --bg-app: #f8fafc;        /* slate-50 */
-  --bg-surface: #ffffff;
-  --bg-card: #ffffff;
-  --border-color: #e2e8f0;   /* slate-200 */
-  --border-glow: rgba(15, 23, 42, 0.02);
+  /* Layered Structural Surfaces & Palette Tokens */
+  --bg-app: #FAF9F6;        /* Soft Stone main page background (eliminates pure white) */
+  --bg-sidebar: #F4F3F1;    /* Ivory Tint for sidebar & navigation */
+  --bg-surface: #ffffff;    /* Pure White ONLY for inner card surfaces ("paper-on-stone") */
+  --bg-card: #ffffff;       /* Pure White inner card background */
+  --border-color: #EBEAE8;   /* Subtle Warm Gray border for cards */
+  --border-sidebar: #E5E5E1; /* Soft Gray border for sidebar */
+  --border-divider: #E5E5E1; /* Soft Stone global dividers */
+  --border-glow: rgba(17, 24, 39, 0.02);
 
-  --color-primary: #0f172a;  /* slate-900 */
-  --color-primary-hover: #1e293b;
-  --color-primary-rgb: 15, 23, 42;
-  --color-secondary: #f1f5f9; /* slate-100 */
-  --color-accent: #0f766e;    /* teal-700 */
+  --color-primary: #111827;  /* Deep Charcoal active menu items & primary buttons */
+  --color-primary-hover: #1f2937;
+  --color-primary-rgb: 17, 24, 39;
+  --color-secondary: #EFEEEB; /* Neutral Wash for headers & secondary elements */
+  --color-accent: #0f172a;    /* Onyx Navy */
 
-  --text-primary: #0f172a;   /* slate-900 */
-  --text-secondary: #475569; /* slate-600 */
-  --text-muted: #94a3b8;     /* slate-400 */
+  --text-primary: #0F172A;   /* Onyx Navy headings & page titles */
+  --text-secondary: #4b5563; /* Neutral charcoal body text */
+  --text-muted: #9ca3af;     /* Soft neutral gray placeholder & muted text */
   
-  --shadow-sm: 0 1px 2px 0 rgba(15, 23, 42, 0.03);
-  --shadow-md: 0 4px 12px -1px rgba(15, 23, 42, 0.05), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
-  --shadow-lg: 0 12px 24px -4px rgba(15, 23, 42, 0.06), 0 4px 12px -2px rgba(15, 23, 42, 0.04);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.02), 0 1px 2px -1px rgba(0, 0, 0, 0.02);
+  --shadow-md: 0 4px 12px -1px rgba(0, 0, 0, 0.03), 0 2px 4px -2px rgba(0, 0, 0, 0.02);
+  --shadow-lg: 0 12px 24px -4px rgba(0, 0, 0, 0.04), 0 4px 12px -2px rgba(0, 0, 0, 0.02);
   
   --radius-sm: 8px;
   --radius-md: 12px;
@@ -36,23 +39,26 @@
   --transition-normal: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Dark Mode Variables Override (Obsidian Space) */
+/* Dark Mode Variables Override */
 .dark {
-  --bg-app: #090d16;        /* deep black-slate space */
-  --bg-surface: #0f172a;    /* slate-900 */
-  --bg-card: #0f172a;
-  --border-color: #1e293b;   /* slate-800 */
+  --bg-app: #0f172a;        /* Deep navy obsidian space */
+  --bg-sidebar: #090d16;
+  --bg-surface: #1e293b;    /* Slate-800 surface */
+  --bg-card: #1e293b;
+  --border-color: #334155;   /* Slate-700 border */
+  --border-sidebar: #1e293b;
+  --border-divider: #334155;
   --border-glow: rgba(248, 250, 252, 0.02);
 
-  --color-primary: #f8fafc;  /* slate-50 */
+  --color-primary: #f8fafc;  /* Crisp light primary */
   --color-primary-hover: #e2e8f0;
   --color-primary-rgb: 248, 250, 252;
-  --color-secondary: #1e293b; /* slate-800 */
-  --color-accent: #2dd4bf;    /* teal-400 */
+  --color-secondary: #334155;
+  --color-accent: #f8fafc;
 
-  --text-primary: #f8fafc;   /* slate-50 */
-  --text-secondary: #94a3b8; /* slate-400 */
-  --text-muted: #64748b;     /* slate-500 */
+  --text-primary: #f8fafc;   /* White text */
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
   
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 12px -1px rgba(0, 0, 0, 0.4);

@@ -11,12 +11,12 @@ export const Button = React.forwardRef(({
   const baseStyles = 'inline-flex items-center justify-center rounded-lg text-xs font-semibold uppercase tracking-wider transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.97] duration-150 ease-in-out';
   
   const variants = {
-    default: 'bg-primary text-surface hover:bg-primary/95 dark:bg-primary dark:text-background dark:hover:bg-primary/90 shadow-xs hover:-translate-y-[1px] hover:shadow-sm',
-    secondary: 'bg-secondary text-text-primary hover:bg-secondary/85 dark:bg-secondary dark:text-text-primary dark:hover:bg-secondary/90',
-    outline: 'border border-border bg-transparent text-text-primary hover:bg-secondary hover:text-text-primary',
+    default: 'bg-primary text-white hover:bg-primary/90 dark:bg-primary dark:text-background dark:hover:bg-primary/90 shadow-xs hover:-translate-y-[1px]',
+    secondary: 'bg-surface text-text-primary border border-border hover:bg-secondary/80 dark:bg-surface dark:text-text-primary dark:hover:bg-secondary/90 shadow-2xs',
+    outline: 'border border-border bg-surface text-text-primary hover:bg-secondary hover:text-text-primary',
     ghost: 'text-text-secondary hover:bg-secondary hover:text-text-primary',
     destructive: 'bg-red-600 text-white hover:bg-red-700 dark:bg-red-700 dark:text-white dark:hover:bg-red-800 shadow-xs hover:-translate-y-[1px]',
-    accent: 'bg-accent text-white hover:bg-accent/90 shadow-xs hover:-translate-y-[1px]',
+    accent: 'bg-primary text-white hover:bg-primary/90 shadow-xs hover:-translate-y-[1px]',
   };
 
   const sizes = {

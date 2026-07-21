@@ -36,6 +36,11 @@ class ClassRepository extends BaseRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function findBySchoolId(int $schoolId, ?int $academicYearId = null): array
+    {
+        return $this->findBySchool($schoolId, $academicYearId);
+    }
+
     public function countBySchool(int $schoolId): int
     {
         $stmt = $this->pdo->prepare(

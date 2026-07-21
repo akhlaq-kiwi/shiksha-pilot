@@ -75,6 +75,7 @@ return function (App $app) {
     $app->delete('/api/school/expenses/{id}', [SchoolAdminController::class, 'deleteSchoolExpense']);
     $app->get('/api/school/additional-fees/types', [SchoolAdminController::class, 'getAdditionalFeeTypes']);
     $app->post('/api/school/additional-fees/types', [SchoolAdminController::class, 'createAdditionalFeeType']);
+    $app->post('/api/school/annual-fees', [SchoolAdminController::class, 'createAnnualFee']);
     $app->put('/api/school/additional-fees/types/{id}', [SchoolAdminController::class, 'updateAdditionalFeeType']);
     $app->delete('/api/school/additional-fees/types/{id}', [SchoolAdminController::class, 'deleteAdditionalFeeType']);
     $app->get('/api/school/additional-fees/payments', [SchoolAdminController::class, 'getAdditionalFeePayments']);
@@ -102,6 +103,8 @@ return function (App $app) {
     $app->get('/api/school/classes', [SchoolAdminController::class, 'getClasses']);
     $app->post('/api/school/classes', [SchoolAdminController::class, 'createClass']);
     $app->put('/api/school/classes', [SchoolAdminController::class, 'updateClass']);
+    $app->delete('/api/school/classes', [SchoolAdminController::class, 'deleteClass']);
+    $app->delete('/api/school/classes/sections', [SchoolAdminController::class, 'deleteSection']);
     $app->get('/api/school/classes/{class_id}/next-roll-no', [SchoolAdminController::class, 'getNextRollNo']);
     $app->get('/api/school/academic-years', [SchoolAdminController::class, 'getAcademicYears']);
     $app->post('/api/school/academic-years', [SchoolAdminController::class, 'createAcademicYear']);

@@ -71,6 +71,14 @@ export const schoolService = {
     return apiClient.post('/api/school/classes', classData);
   },
 
+  deleteClass(className) {
+    return apiClient.delete('/api/school/classes', { data: { name: className } });
+  },
+
+  deleteSection(classId) {
+    return apiClient.delete('/api/school/classes/sections', { data: { class_id: classId } });
+  },
+
   getExams() {
     return apiClient.get('/api/school/exams');
   },
@@ -355,6 +363,10 @@ export const schoolService = {
 
   createAdditionalFeeType(data) {
     return apiClient.post('/api/school/additional-fees/types', data);
+  },
+
+  createAnnualFee(data) {
+    return apiClient.post('/api/school/annual-fees', data);
   },
 
   updateAdditionalFeeType(id, data) {

@@ -54,9 +54,14 @@ Prefer collaborating services over deep inheritance trees.
 
 Business rules belong to the domain layer.
 
-### 5. Framework Independence
+### 6. Standardized Predefined Class Architecture
+* All school classes must be bound to standardized academic levels (`Play Group` through `Class 12`).
+* Custom manual class creation by teachers is strictly disallowed.
+* Section creation supports `Alphabet Sections` (`A, B, C, D`) and `Color Sections` (`Red, Blue, Green, Yellow`).
+* Minimum 2 sections and maximum 4 sections are enforced. Section type mixing is prohibited.
+* Section type is locked and cannot be changed once students are assigned (`studentCount > 0`).
+* Deletion of any class or section with `studentCount > 0` is strictly prohibited; explicit validation exception must be thrown instructing transfer/removal.
 
-Business logic should remain independent of Slim Framework.
 
 ### 6. Graphify First
 
@@ -1241,3 +1246,30 @@ For publishing global announcements and managing mobile notice boards with push 
    * Instead of using heavy, version-sensitive external HTML rendering packages, utilize a lightweight regex-based custom parser in Dart to split HTML strings into formatted `TextSpan` elements. This provides 100% native rendering speeds and removes dependency overheads.
 5. **Read/Unread State Synchronicity**:
    * Maintain a link table (e.g. `announcement_reads`) to track read status per user. Mark a notice as read automatically as soon as the user opens the notice detail screen, updating state indicators instantly.
+
+---
+
+# Annual Fee & Admission Fee Engineering Standards
+
+For managing dedicated Annual Fees and optional Admission Fees in financial modules, follow these business rules and architecture patterns:
+
+1. **Annual Fee Eligibility Rule**:
+   * Annual Fee must **NOT** be charged to students admitted during the current academic session (`admission_date >= academic_year.start_date`).
+   * Include only eligible students where `admission_date < academic_year.start_date` (or `admission_date` is `NULL` for legacy pre-enrolled students).
+   * Excluded students must receive **NO** entry in `additional_fee_payments` (no 0 amount, no hidden record, no placeholder) and **NO** notification.
+   * Send notification (`Title: Annual Fee Added`) only to eligible students who were assigned the fee.
+
+2. **Admission Fee Auto-Generation & Synchronization**:
+   * Admission Fee in student enrollment is optional. If provided (`admission_fee > 0`), automatically generate an `additional_fee_payments` record with status `'Pending'`.
+   * On student edits, if `admission_fee` is modified:
+     * If updated to a new amount: update existing pending payment record amount.
+     * If set to blank or 0: delete existing pending payment record.
+     * Paid payment history, receipts, and audit logs must remain preserved.
+
+3. **First Academic Year Student Category Classification**:
+   * During the school's **first Academic Year** inside the portal, `Student Category` (`Existing Student` vs `New Admission`) is mandatory upon student creation.
+   * From the second Academic Year onward, `Student Category` dropdown disappears completely from enrollment form, and students are classified automatically based on historical academic records.
+   * Annual Fee applies ONLY to `Existing Student` records (or auto-classified historical enrollments). All `New Admission` students are excluded.
+   * If no eligible students exist during Annual Fee creation, return descriptive validation error: `"No eligible students found. Annual Fee is only applicable to Existing Students. All currently enrolled students are marked as New Admission."`
+
+

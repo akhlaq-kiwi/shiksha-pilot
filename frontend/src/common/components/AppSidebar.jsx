@@ -2,7 +2,7 @@ import React from 'react';
 
 const AppSidebar = ({ navItems = [], currentPage, onNavigate }) => {
   return (
-    <aside className="hidden md:flex flex-col w-56 lg:w-64 flex-shrink-0 border-r border-border bg-surface min-h-full">
+    <aside className="hidden md:flex flex-col w-56 lg:w-64 flex-shrink-0 border-r border-[#E5E5E1] dark:border-border bg-sidebar min-h-full">
       <nav className="flex flex-col gap-1 p-3 pt-4">
         {navItems.map((item) => {
           const Icon = item.icon;

@@ -744,7 +744,7 @@ export default function TimetablePage() {
               onClick={handleToggleSelectionMode}
               className={`font-extrabold flex items-center gap-2 border border-border shadow-2xs transition-all ${
                 isSelectionMode 
-                  ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-800' 
+                  ? 'bg-primary/10 text-text-primary border-primary/20 hover:bg-primary/20' 
                   : 'hover:bg-zinc-50'
               }`}
             >
@@ -768,8 +768,8 @@ export default function TimetablePage() {
             {!isTimetableConfigured && (
               <Card className="flex-1 max-w-md w-full shadow-lg border border-border bg-surface p-8 rounded-3xl flex flex-col justify-between text-center">
                 <div>
-                  <div className="mx-auto w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center mb-4">
-                    <Calendar className="h-6 w-6 text-blue-500" />
+                  <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                    <Calendar className="h-6 w-6 text-text-primary" />
                   </div>
                   <h3 className="text-xl font-black text-text-primary tracking-tight font-display">Timetable setup has not been completed yet.</h3>
                   <p className="text-xs text-text-secondary mt-3 leading-relaxed">
@@ -788,8 +788,8 @@ export default function TimetablePage() {
             {!hasSchoolSubjects && (
               <Card className="flex-1 max-w-md w-full shadow-lg border border-border bg-surface p-8 rounded-3xl flex flex-col justify-between text-center">
                 <div>
-                  <div className="mx-auto w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center mb-4">
-                    <Users className="h-6 w-6 text-blue-500" />
+                  <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                    <Users className="h-6 w-6 text-text-primary" />
                   </div>
                   <h3 className="text-xl font-black text-text-primary tracking-tight font-display">No subjects have been created yet.</h3>
                   <p className="text-xs text-text-secondary mt-3 leading-relaxed">
@@ -908,11 +908,11 @@ export default function TimetablePage() {
                     isSelectionMode ? 'cursor-pointer select-none' : ''
                   } ${
                     isToday 
-                      ? 'border-blue-500/80 dark:border-blue-600/80 ring-2 ring-blue-500/10 shadow-md shadow-blue-500/5' 
+                      ? 'border-primary/80 ring-2 ring-primary/10 shadow-md' 
                       : 'border-border'
                   } ${
                     isSelectionMode && selectedDays.includes(dayName)
-                      ? 'ring-2 ring-blue-500 border-blue-500 dark:border-blue-500 bg-blue-50/20 dark:bg-blue-950/20'
+                      ? 'ring-2 ring-primary border-primary bg-primary/5'
                       : ''
                   }`}
                 >
@@ -928,7 +928,7 @@ export default function TimetablePage() {
                             }}
                             className={`w-5 h-5 rounded-full flex items-center justify-center border transition-all ${
                               selectedDays.includes(dayName)
-                                ? 'bg-blue-600 border-blue-600 text-white'
+                                ? 'bg-primary border-primary text-white'
                                 : 'border-zinc-300 dark:border-zinc-700 bg-surface text-transparent'
                             }`}
                           >
@@ -936,7 +936,7 @@ export default function TimetablePage() {
                           </button>
                         )}
                         <div>
-                          <h3 className="text-xl font-black text-blue-500 dark:text-blue-400 tracking-tight font-display">{dayName}</h3>
+                          <h3 className="text-xl font-black text-text-primary tracking-tight font-display">{dayName}</h3>
                           <p className="text-[10px] text-text-muted font-bold mt-0.5">
                             {formatLocalDate(dateStr)}
                           </p>
@@ -1133,7 +1133,7 @@ export default function TimetablePage() {
                           <Button
                             onClick={() => handleAddPeriod(dayName)}
                             disabled={actionLoading === 'add-' + dayName}
-                            className="w-full h-9 bg-blue-600 hover:bg-blue-700 text-white font-extrabold rounded-lg shadow-md transition-all flex items-center justify-center gap-1.5"
+                            className="w-full h-9 bg-primary hover:bg-primary/95 text-white font-extrabold rounded-lg shadow-sm transition-all flex items-center justify-center gap-1.5"
                           >
                             <Plus className="h-4 w-4" /> Add Period
                           </Button>
@@ -1143,7 +1143,7 @@ export default function TimetablePage() {
                       <Button
                         onClick={() => handlePublishDay(dayName, dateStr)}
                         disabled={actionLoading === 'publish-' + dayName || isPublished || periodsList.length === 0}
-                        className="w-full h-9 bg-blue-600 hover:bg-blue-700 text-white font-extrabold rounded-lg shadow-md transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full h-9 bg-primary hover:bg-primary/95 text-white font-extrabold rounded-lg shadow-sm transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Publish
                       </Button>

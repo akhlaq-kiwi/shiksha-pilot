@@ -541,7 +541,7 @@ export default function SchoolAdminPortal() {
     <div className="flex flex-col md:flex-row w-full min-h-[calc(100vh-56px)] bg-background">
 
       {/* Sidebar */}
-      <aside className="w-full md:w-[240px] flex-shrink-0 flex flex-col justify-between border-r border-border pl-6 pr-4 py-6 bg-surface md:sticky md:top-14 md:h-[calc(100vh-56px)]">
+      <aside className="w-full md:w-[240px] flex-shrink-0 flex flex-col justify-between border-r border-[#E5E5E1] dark:border-border pl-6 pr-4 py-6 bg-sidebar md:sticky md:top-14 md:h-[calc(100vh-56px)]">
         <div className="overflow-y-auto scrollbar-none flex-1 min-h-0">
           <nav className="flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 scrollbar-none">
             {visibleNavItems.map(navBtn)}
