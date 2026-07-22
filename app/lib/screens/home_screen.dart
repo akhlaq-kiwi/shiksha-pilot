@@ -21,6 +21,7 @@ import 'package:workmanager/workmanager.dart';
 import 'package:school_hub/main.dart';
 import 'package:school_hub/services/exam_service.dart';
 import 'package:school_hub/screens/exam_list_screen.dart';
+import 'package:school_hub/screens/word_builder_game_screen.dart';
 
 class LauncherFeature {
   final String name;
@@ -177,6 +178,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       icon: Icons.monetization_on_rounded,
       color: Colors.green.shade700,
       allowedRoles: ['SCHOOL_ADMIN', 'PRINCIPAL'],
+    ),
+    LauncherFeature(
+      name: 'Word Builder',
+      icon: Icons.extension_rounded,
+      color: Colors.indigo,
+      allowedRoles: ['PARENT'],
+      isAvailable: true,
     ),
   ];
 
@@ -1089,6 +1097,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
         );
+      } else if (feature.name == 'Word Builder') {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => WordBuilderGameScreen(
+              baseUrl: widget.leaveService.baseUrl,
+              token: widget.leaveService.token,
+              studentId: _activeStudentId,
+              studentClass: _activeStudentName.isNotEmpty ? _activeStudentName : 'Grade 9-A',
+            ),
+          ),
+        ).then((_) => _fetchUnreadNotificationsCount());
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(

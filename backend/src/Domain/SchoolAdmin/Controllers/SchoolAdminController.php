@@ -1064,6 +1064,17 @@ class SchoolAdminController extends BaseController
         return $this->success($response, $result, 'Class deleted');
     }
 
+    public function transferStudents(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body   = RequestParser::body($request);
+        $result = $this->service->transferStudents($user, $body);
+
+        return $this->success($response, $result, 'Students transferred successfully');
+    }
+
     public function deleteSection(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);

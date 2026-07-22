@@ -265,6 +265,10 @@ export const schoolService = {
     return apiClient.put('/api/school/classes', classData);
   },
 
+  transferStudents(payload) {
+    return apiClient.post('/api/school/classes/transfer-students', payload);
+  },
+
   revertFeePayment(id) {
     return apiClient.delete(`/api/school/fee-payments/${id}`);
   },

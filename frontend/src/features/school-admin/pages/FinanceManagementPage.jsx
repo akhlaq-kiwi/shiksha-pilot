@@ -708,7 +708,11 @@ export default function FinanceManagementPage() {
       setTimeout(() => setSuccess(''), 4000);
     } catch (err) {
       console.error(err);
-      setError(err.message || 'Failed to save transport fee.');
+      if (err.fields) {
+        setTransportFormErrors(err.fields);
+      } else {
+        setError(err.message || 'Failed to save transport fee.');
+      }
     } finally {
       setTransportSubmitting(false);
     }

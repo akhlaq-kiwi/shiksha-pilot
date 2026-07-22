@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  FileText, Eye, Edit, Trash2, AlertCircle, Bold, Italic, Underline, Check, Megaphone, Plus
+  FileText, Eye, Edit, Trash2, AlertCircle, Bold, Italic, Underline, Check, Megaphone, Plus, MoreVertical
 } from 'lucide-react';
 import { schoolService } from '../../../common/services/schoolService';
 import { Card, CardContent } from '../../../common/ui/card';
@@ -27,7 +27,7 @@ export default function AnnouncementsPage() {
   const [editingId, setEditingId] = useState(null);
 
   // Filter State
-  const [audienceFilter, setAudienceFilter] = useState('Teachers'); // Default to 'Teachers'
+  const [audienceFilter, setAudienceFilter] = useState('Both'); // Default to 'Both'
 
   // Modal / Confirm States
   const [showFormModal, setShowFormModal] = useState(false);
@@ -55,7 +55,7 @@ export default function AnnouncementsPage() {
       const sorted = (data || []).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
       setAnnouncements(sorted);
     } catch (err) {
-      toast.show('error', 'Error', err.message || 'Failed to load announcements.');
+      toast({ type: 'error', title: 'Error', message: err.message || 'Failed to load announcements.' });
     } finally {
       setLoading(false);
     }
@@ -176,15 +176,15 @@ export default function AnnouncementsPage() {
     const cleanDescText = editorRef.current ? editorRef.current.textContent.trim() : '';
 
     if (!cleanSub) {
-      toast.show('error', 'Validation Error', 'Subject is mandatory.');
+      toast({ type: 'error', title: 'Validation Error', message: 'Subject is mandatory.' });
       return;
     }
     if (cleanSub.length > 100) {
-      toast.show('error', 'Validation Error', 'Subject cannot exceed 100 characters.');
+      toast({ type: 'error', title: 'Validation Error', message: 'Subject cannot exceed 100 characters.' });
       return;
     }
     if (!cleanDescText && !description.trim()) {
-      toast.show('error', 'Validation Error', 'Description is mandatory.');
+      toast({ type: 'error', title: 'Validation Error', message: 'Description is mandatory.' });
       return;
     }
 
@@ -211,13 +211,13 @@ export default function AnnouncementsPage() {
 
       if (editingId) {
         await schoolService.updateAnnouncement(editingId, payload);
-        toast.show('success', 'Updated', 'Announcement updated successfully.');
+        toast({ type: 'success', title: 'Updated', message: 'Announcement updated successfully.' });
       } else {
         await schoolService.createAnnouncement(payload);
         if (statusToSave === 'Published') {
-          toast.show('success', 'Published', 'Announcement published successfully and notifications sent.');
+          toast({ type: 'success', title: 'Published', message: 'Announcement published successfully and notifications sent.' });
         } else {
-          toast.show('success', 'Saved as Draft', 'Announcement saved as draft.');
+          toast({ type: 'success', title: 'Saved as Draft', message: 'Announcement saved as draft.' });
         }
       }
 
@@ -235,7 +235,7 @@ export default function AnnouncementsPage() {
       // Refresh listing state instantly
       await loadAnnouncements();
     } catch (err) {
-      toast.show('error', 'Error', err.message || 'Failed to save announcement.');
+      toast({ type: 'error', title: 'Error', message: err.message || 'Failed to save announcement.' });
     } finally {
       setSubmitting(false);
     }
@@ -270,7 +270,7 @@ export default function AnnouncementsPage() {
         status: 'Draft'
       };
       await schoolService.updateAnnouncement(selectedAnn.id, payload);
-      toast.show('success', 'Moved to Draft', 'Announcement moved to draft successfully.');
+      toast({ type: 'success', title: 'Moved to Draft', message: 'Announcement moved to draft successfully.' });
       
       // Reset confirm popup state
       setShowConfirmMoveToDraft(false);
@@ -279,7 +279,7 @@ export default function AnnouncementsPage() {
       // Refresh list immediately
       await loadAnnouncements();
     } catch (err) {
-      toast.show('error', 'Error', err.message || 'Failed to move announcement to draft.');
+      toast({ type: 'error', title: 'Error', message: err.message || 'Failed to move announcement to draft.' });
     } finally {
       setSubmitting(false);
     }
@@ -298,7 +298,7 @@ export default function AnnouncementsPage() {
     setSubmitting(true);
     try {
       await schoolService.deleteAnnouncement(selectedAnn.id);
-      toast.show('success', 'Deleted', 'Announcement deleted successfully.');
+      toast({ type: 'success', title: 'Deleted', message: 'Announcement deleted successfully.' });
       
       // Reset confirmation
       setShowConfirmDelete(false);
@@ -307,7 +307,7 @@ export default function AnnouncementsPage() {
       // Refresh listing state instantly
       await loadAnnouncements();
     } catch (err) {
-      toast.show('error', 'Error', err.message || 'Failed to delete announcement.');
+      toast({ type: 'error', title: 'Error', message: err.message || 'Failed to delete announcement.' });
     } finally {
       setSubmitting(false);
     }

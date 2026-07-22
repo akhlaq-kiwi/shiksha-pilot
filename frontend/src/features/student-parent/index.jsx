@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, BookOpen, ClipboardList, CalendarCheck,
-  CreditCard, Library, Users, FileText
+  CreditCard, Library, Users, FileText, Sparkles
 } from 'lucide-react';
 import { Select } from '../../common/ui/select';
 import { Button } from '../../common/ui/button';
@@ -17,6 +17,7 @@ import ResourcesPage from './pages/ResourcesPage';
 import ParentPage from './pages/ParentPage';
 import ParentLeavePage from './pages/ParentLeavePage';
 import SettingsPage from './pages/SettingsPage';
+import WordBuilderGame from './pages/WordBuilderGame';
 
 // ─── Mock Data ─────────────────────────────────────────────────────────────────
 
@@ -161,6 +162,7 @@ function AppSidebar({ currentPage, onNavigate, isParent, user, selectedChild, on
     { id: 'leaves', icon: FileText, label: 'Leaves' },
     { id: 'fees', icon: CreditCard, label: 'Fees' },
     { id: 'resources', icon: Library, label: 'Resources' },
+    ...(!isParent ? [{ id: 'game', icon: Sparkles, label: 'Word Builder' }] : []),
     ...(isParent ? [{ id: 'parent', icon: Users, label: 'My Children' }] : []),
   ];
 
@@ -258,6 +260,7 @@ export default function StudentParentPortal() {
     if (path.endsWith('/resources')) return 'resources';
     if (path.endsWith('/parent')) return 'parent';
     if (path.endsWith('/settings')) return 'settings';
+    if (path.endsWith('/game')) return 'game';
     return 'dashboard';
   }, [location.pathname]);
 
@@ -329,6 +332,9 @@ export default function StudentParentPortal() {
         )}
         {currentPage === 'settings' && (
           <SettingsPage />
+        )}
+        {currentPage === 'game' && !isParent && (
+          <WordBuilderGame />
         )}
         {currentPage === 'parent' && isParent && (
           <ParentPage

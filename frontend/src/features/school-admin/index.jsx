@@ -17,6 +17,7 @@ import AttendancePage from './pages/AttendancePage';
 import AttendanceLeaderboardPage from './pages/AttendanceLeaderboardPage';
 import ExamsPage from './pages/ExamsPage';
 import SeatingPlanPage from './pages/SeatingPlanPage';
+import QuestionPaperDesignerPage from './pages/QuestionPaperDesignerPage';
 import FinancePage from './pages/FinancePage';
 import ReportsPage from './pages/ReportsPage';
 import FinancialReportsPage from './pages/FinancialReportsPage';
@@ -608,6 +609,7 @@ export default function SchoolAdminPortal() {
             <Route path="attendance/leaderboard" element={<AttendanceLeaderboardPage />} />
             <Route path="exams" element={<ExamsPage />} />
             <Route path="exams/seating-plan" element={<SeatingPlanPage />} />
+            <Route path="exams/question-paper-designer" element={<QuestionPaperDesignerPage />} />
             <Route path="finance" element={<FinancePage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="audits-settings" element={<AuditsSettingsPage onYearsUpdated={() => refreshYears()} />} />

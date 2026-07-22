@@ -932,7 +932,8 @@ class SchoolAdminService extends BaseService
         }
 
         // Full name
-        $name = trim($data['first_name'] . ' ' . ($data['middle_name'] ?? '') . ' ' . $data['last_name']);
+        $lastNameVal = ($data['last_name'] ?? '') === '.' ? '' : ($data['last_name'] ?? '');
+        $name = trim($data['first_name'] . ' ' . ($data['middle_name'] ?? '') . ' ' . $lastNameVal);
         $name = (string)preg_replace('/\s+/', ' ', $name);
 
         // System defaults for status based on exit date
@@ -1179,7 +1180,8 @@ class SchoolAdminService extends BaseService
         }
 
         // Full name
-        $name = trim($data['first_name'] . ' ' . ($data['middle_name'] ?? '') . ' ' . $data['last_name']);
+        $lastNameVal = ($data['last_name'] ?? '') === '.' ? '' : ($data['last_name'] ?? '');
+        $name = trim($data['first_name'] . ' ' . ($data['middle_name'] ?? '') . ' ' . $lastNameVal);
         $name = (string)preg_replace('/\s+/', ' ', $name);
 
         // Status based on Exit Date
@@ -1653,8 +1655,32 @@ class SchoolAdminService extends BaseService
                     ':payment_date' => $p['payment_date']
                 ]);
                 $p['is_locked'] = ((int)$stmtCheckReport->fetchColumn() > 0) ? 1 : 0;
+
+                // Attach dynamic proration details for already paid months
+                $prorDetails = $this->getSalaryProrationDetails((float)$member['salary'], $member['joining_date'] ?? null, $p['payment_month'], $workingYear);
+                $p['proration_details'] = $prorDetails['is_prorated'] ? $prorDetails : null;
             }
             $member['salary_payments'] = $payments;
+
+            // Calculate Joining Month Proration for pending preview
+            $member['joining_month_proration'] = null;
+            if ($member['joining_date']) {
+                try {
+                    $joiningMonthName = date('F', strtotime($member['joining_date']));
+                    $pror = $this->getSalaryProrationDetails((float)$member['salary'], $member['joining_date'], $joiningMonthName, $workingYear);
+                    if ($pror['is_prorated']) {
+                        $member['joining_month_proration'] = [
+                            'month' => $joiningMonthName,
+                            'prorated_days' => $pror['prorated_days'],
+                            'total_days' => $pror['total_days'],
+                            'payable_salary' => $pror['payable_salary'],
+                            'monthly_salary' => (float)$member['salary']
+                        ];
+                    }
+                } catch (\Exception $e) {
+                    // ignore
+                }
+            }
         }
 
         // Calculate Previous Year Pending Salaries for Migrated Teachers
@@ -4663,7 +4689,12 @@ class SchoolAdminService extends BaseService
                 fp.id,
                 'monthly' AS type,
                 fp.receipt_no,
-                s.name AS student_name,
+                CASE 
+                  WHEN s.last_name = '.' OR s.last_name IS NULL OR TRIM(s.last_name) = '' THEN 
+                    TRIM(CONCAT(s.first_name, ' ', COALESCE(s.middle_name, '')))
+                  ELSE 
+                    TRIM(CONCAT(s.first_name, ' ', COALESCE(s.middle_name, ''), ' ', s.last_name))
+                END AS student_name,
                 s.roll_no AS student_roll_no,
                 c.name AS class_name,
                 CONCAT('Monthly Fee (', fp.fee_month, ')') AS fee_name,
@@ -4692,7 +4723,12 @@ class SchoolAdminService extends BaseService
                 afp.id,
                 'additional' AS type,
                 afp.receipt_no,
-                s.name AS student_name,
+                CASE 
+                  WHEN s.last_name = '.' OR s.last_name IS NULL OR TRIM(s.last_name) = '' THEN 
+                    TRIM(CONCAT(s.first_name, ' ', COALESCE(s.middle_name, '')))
+                  ELSE 
+                    TRIM(CONCAT(s.first_name, ' ', COALESCE(s.middle_name, ''), ' ', s.last_name))
+                END AS student_name,
                 s.roll_no AS student_roll_no,
                 c.name AS class_name,
                 aft.name AS fee_name,
@@ -5160,6 +5196,9 @@ class SchoolAdminService extends BaseService
         $newName = trim((string)$data['name']);
 
         // Parse sections
+        $alphabetAllowed = ['A', 'B', 'C', 'D'];
+        $colorAllowed    = ['Red', 'Blue', 'Green', 'Yellow'];
+
         $newSections = [];
         if (!empty($data['sections'])) {
             if (is_array($data['sections'])) {
@@ -5175,10 +5214,6 @@ class SchoolAdminService extends BaseService
                 throw new ValidationException(['sections' => 'Maximum 4 sections allowed.']);
             }
 
-            // Validate section types (Alphabet vs Color)
-            $alphabetAllowed = ['A', 'B', 'C', 'D'];
-            $colorAllowed    = ['Red', 'Blue', 'Green', 'Yellow'];
-            
             $isAlphabet = true;
             $isColor    = true;
             foreach ($newSections as $sec) {
@@ -5206,7 +5241,12 @@ class SchoolAdminService extends BaseService
         }
 
         // Check Section Type Lock if students are already assigned
-        $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM students WHERE school_id = :sid AND class_name = :cname");
+        $stmtCount = $pdo->prepare("
+            SELECT COUNT(*) 
+            FROM students s
+            JOIN classes c ON s.class_id = c.id
+            WHERE s.school_id = :sid AND c.name = :cname
+        ");
         $stmtCount->execute([':sid' => $schoolId, ':cname' => $oldName]);
         $assignedStudentCount = (int)$stmtCount->fetchColumn();
 
@@ -5309,12 +5349,13 @@ class SchoolAdminService extends BaseService
                     }
                     
                     // Find the class ID matching $targetSec in the updated classes list
-                    $stmtFindTarget = $pdo->prepare("SELECT id FROM classes WHERE school_id = :sid AND name = :name AND academic_year_id = :ayid AND (section = :sec OR (section IS NULL AND :sec = '')) LIMIT 1");
+                    $stmtFindTarget = $pdo->prepare("SELECT id FROM classes WHERE school_id = :sid AND name = :name AND academic_year_id = :ayid AND (section = :sec1 OR (section IS NULL AND :sec2 = '')) LIMIT 1");
                     $stmtFindTarget->execute([
                         ':sid' => $schoolId,
                         ':name' => $newName,
                         ':ayid' => $academicYearId,
-                        ':sec' => $targetSec === '' ? null : $targetSec
+                        ':sec1' => $targetSec === '' ? null : $targetSec,
+                        ':sec2' => $targetSec === '' ? null : $targetSec
                     ]);
                     $targetClassId = (int)$stmtFindTarget->fetchColumn();
                 }
@@ -5324,7 +5365,7 @@ class SchoolAdminService extends BaseService
                 }
 
                 if (!empty($targetClassId)) {
-                    $tablesToMigrate = ['students', 'subjects', 'attendance', 'exams', 'fee_structures'];
+                    $tablesToMigrate = ['students', 'subjects', 'attendance', 'academic_achievement_snapshots'];
                     foreach ($tablesToMigrate as $tbl) {
                         $stmtMigrate = $pdo->prepare("UPDATE {$tbl} SET class_id = :target_id WHERE class_id = :old_id");
                         $stmtMigrate->execute([
@@ -5392,9 +5433,9 @@ class SchoolAdminService extends BaseService
         // Check if students are enrolled in this class across any section
         $stmtCount = $pdo->prepare("
             SELECT COUNT(*) FROM students 
-            WHERE school_id = :sid AND (class_name = :cname OR class_id IN ({$inClause}))
+            WHERE school_id = :sid AND class_id IN ({$inClause}) AND status = 'ACTIVE'
         ");
-        $stmtCount->execute([':sid' => $schoolId, ':cname' => $className]);
+        $stmtCount->execute([':sid' => $schoolId]);
         $studentCount = (int)$stmtCount->fetchColumn();
 
         if ($studentCount > 0) {
@@ -5403,13 +5444,141 @@ class SchoolAdminService extends BaseService
             ]);
         }
 
-        // Safe deletion
-        $stmtDelete = $pdo->prepare("DELETE FROM classes WHERE school_id = :sid AND name = :name");
-        $stmtDelete->execute([':sid' => $schoolId, ':name' => $className]);
+        // Safe deletion inside transaction to handle foreign key dependencies
+        $pdo->beginTransaction();
+        try {
+            $stmtDelSubjects = $pdo->prepare("DELETE FROM subjects WHERE class_id IN ({$inClause})");
+            $stmtDelSubjects->execute();
+
+            $stmtDelAttendance = $pdo->prepare("DELETE FROM attendance WHERE class_id IN ({$inClause})");
+            $stmtDelAttendance->execute();
+
+            $stmtDelSnapshots = $pdo->prepare("DELETE FROM academic_achievement_snapshots WHERE class_id IN ({$inClause})");
+            $stmtDelSnapshots->execute();
+
+            $stmtDelete = $pdo->prepare("DELETE FROM classes WHERE school_id = :sid AND name = :name");
+            $stmtDelete->execute([':sid' => $schoolId, ':name' => $className]);
+
+            $pdo->commit();
+        } catch (\Exception $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
 
         $this->log('Class deleted', ['name' => $className, 'school_id' => $schoolId]);
 
         return ['success' => true, 'message' => "Class {$className} deleted successfully."];
+    }
+
+    public function transferStudents(array $user, array $data): array
+    {
+        if (empty($data['class_name'])) {
+            throw new ValidationException(['class_name' => 'Class name is required.']);
+        }
+        if (empty($data['destination_section'])) {
+            throw new ValidationException(['destination_section' => 'Destination section is required.']);
+        }
+        if (empty($data['student_ids']) || !is_array($data['student_ids'])) {
+            throw new ValidationException(['student_ids' => 'At least one student must be selected.']);
+        }
+
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->classRepo->getPdo();
+        $this->requireWritableAcademicYear($pdo, $schoolId);
+
+        $className = trim((string)$data['class_name']);
+        $destSection = trim((string)$data['destination_section']);
+        $studentIds = array_map('intval', $data['student_ids']);
+
+        // Get currently active academic year
+        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+        $academicYearId = $workingYear ? (int)$workingYear['id'] : null;
+
+        // Find destination class_id
+        $stmtDest = $pdo->prepare("
+            SELECT id FROM classes 
+            WHERE school_id = :sid 
+              AND academic_year_id = :ayid 
+              AND name = :name 
+              AND (section = :sec1 OR (section IS NULL AND :sec2 = ''))
+            LIMIT 1
+        ");
+        $stmtDest->execute([
+            ':sid' => $schoolId,
+            ':ayid' => $academicYearId,
+            ':name' => $className,
+            ':sec1' => $destSection === '' ? null : $destSection,
+            ':sec2' => $destSection === '' ? null : $destSection
+        ]);
+        $destClassId = $stmtDest->fetchColumn();
+
+        if ($destClassId === false) {
+            throw new ValidationException(['destination_section' => 'Destination section class not found.']);
+        }
+        $destClassId = (int)$destClassId;
+
+        // Transfer each student
+        $pdo->beginTransaction();
+        try {
+            // Find max roll number in destination
+            $stmtMaxRoll = $pdo->prepare("
+                SELECT MAX(CAST(roll_no AS UNSIGNED)) 
+                FROM students 
+                WHERE class_id = :class_id AND status = 'ACTIVE'
+            ");
+            $stmtMaxRoll->execute([':class_id' => $destClassId]);
+            $maxRoll = (int)$stmtMaxRoll->fetchColumn();
+            $nextRoll = $maxRoll + 1;
+
+            // Update students class_id and roll_no
+            $stmtUpdateStudent = $pdo->prepare("
+                UPDATE students 
+                SET class_id = :dest_id, roll_no = :roll_no
+                WHERE id = :student_id AND school_id = :sid
+            ");
+
+            // Update attendance
+            $stmtUpdateAttendance = $pdo->prepare("
+                UPDATE attendance 
+                SET class_id = :dest_id 
+                WHERE student_id = :student_id AND school_id = :sid
+            ");
+
+            // Update snapshots if any
+            $stmtUpdateSnapshot = $pdo->prepare("
+                UPDATE academic_achievement_snapshots 
+                SET class_id = :dest_id 
+                WHERE student_id = :student_id AND school_id = :sid
+            ");
+
+            foreach ($studentIds as $stuId) {
+                $stmtUpdateStudent->execute([
+                    ':dest_id' => $destClassId,
+                    ':roll_no' => (string)$nextRoll,
+                    ':student_id' => $stuId,
+                    ':sid' => $schoolId
+                ]);
+                $stmtUpdateAttendance->execute([
+                    ':dest_id' => $destClassId,
+                    ':student_id' => $stuId,
+                    ':sid' => $schoolId
+                ]);
+                $stmtUpdateSnapshot->execute([
+                    ':dest_id' => $destClassId,
+                    ':student_id' => $stuId,
+                    ':sid' => $schoolId
+                ]);
+                $nextRoll++;
+            }
+
+            $pdo->commit();
+            $this->log("Transferred students to section {$destSection}", ['student_ids' => $studentIds, 'destination_class_id' => $destClassId]);
+        } catch (\Exception $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+
+        return ['success' => true];
     }
 
     public function deleteSection(array $user, array $data): array
@@ -5793,8 +5962,8 @@ class SchoolAdminService extends BaseService
         // Query active staff members and their payout status for the given month
         $stmt = $pdo->prepare("
             SELECT s.id AS staff_id, s.name, s.role, s.department, COALESCE(s.salary, 0.0) AS salary, 
-                   s.photo_path, s.updated_at,
-                   sp.id AS payment_id, sp.payment_date,
+                   s.joining_date, s.photo_path, s.updated_at,
+                   sp.id AS payment_id, sp.payment_date, sp.amount_paid,
                    CASE WHEN sp.id IS NOT NULL THEN 'Paid' ELSE 'Pending' END AS payment_status
             FROM staff s
             LEFT JOIN staff_payments sp ON s.id = sp.staff_id AND sp.payment_month = :month AND sp.academic_year_id = :ayid
@@ -5809,11 +5978,37 @@ class SchoolAdminService extends BaseService
 
         $results = [];
         foreach ($rows as $row) {
+            $joiningDateStr = $row['joining_date'] ?? null;
+            
+            // Filter: Skip teacher if the target month is before their joining month
+            if ($joiningDateStr && $workingYear) {
+                try {
+                    $joiningDate = new \DateTime($joiningDateStr);
+                    $targetMonthStr = $this->getTargetMonthDateStr($workingYear, $month);
+                    $targetMonthDate = new \DateTime($targetMonthStr);
+
+                    $joiningYearMonth = $joiningDate->format('Y-m');
+                    $targetYearMonth = $targetMonthDate->format('Y-m');
+
+                    if ($targetYearMonth < $joiningYearMonth) {
+                        // Skip teacher for this month as they haven't joined yet
+                        continue;
+                    }
+                } catch (\Exception $e) {
+                    // ignore
+                }
+            }
+
+            $prorDetails = $this->getSalaryProrationDetails((float)$row['salary'], $joiningDateStr, $month, $workingYear);
+            $payableSalary = ($row['payment_id'] !== null) ? (float)$row['amount_paid'] : (float)$prorDetails['payable_salary'];
+
             $results[] = [
                 'id' => (int)$row['staff_id'],
                 'name' => $row['name'],
                 'designation' => trim(($row['role'] ?? '') . ' ' . ($row['department'] ?? '')),
                 'salary' => (float)$row['salary'],
+                'payable_salary' => $payableSalary,
+                'proration_details' => $prorDetails['is_prorated'] ? $prorDetails : null,
                 'status' => $row['payment_status'],
                 'date' => $row['payment_date'] ? $row['payment_date'] : '—',
                 'payment_id' => $row['payment_id'] ? (int)$row['payment_id'] : null,
@@ -5912,7 +6107,28 @@ class SchoolAdminService extends BaseService
             }
         }
 
-        $salary = (float)($staff['salary'] ?? 0.0);
+        // Enforce: Prevent disbursement for months before the joining date
+        if ($staff['joining_date']) {
+            try {
+                $joiningDate = new \DateTime($staff['joining_date']);
+                $targetMonthStr = $this->getTargetMonthDateStr($workingYear, $month);
+                $targetMonthDate = new \DateTime($targetMonthStr);
+
+                $joiningYearMonth = $joiningDate->format('Y-m');
+                $targetYearMonth = $targetMonthDate->format('Y-m');
+
+                if ($targetYearMonth < $joiningYearMonth) {
+                    throw new ValidationException(['month' => 'Salary disbursement is not allowed for months before the joining date.']);
+                }
+            } catch (\Exception $e) {
+                if ($e instanceof ValidationException) {
+                    throw $e;
+                }
+            }
+        }
+
+        $prorDetails = $this->getSalaryProrationDetails((float)($staff['salary'] ?? 0.0), $staff['joining_date'] ?? null, $month, $workingYear);
+        $salary = (float)$prorDetails['payable_salary'];
         $paymentDate = date('Y-m-d');
 
         // Insert staff payment
@@ -8502,6 +8718,17 @@ Only approve the settlement after reviewing all financial records.
             throw new ValidationException(['id' => 'Transport fee config not found.']);
         }
 
+        // Block update if student has already deposited transport fees
+        $stmtCheckPaid = $pdo->prepare("
+            SELECT COUNT(*) FROM additional_fee_payments afp
+            JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+            WHERE afp.student_id = :student_id AND aft.name = 'Transport Fees' AND afp.school_id = :sid AND afp.status != 'Pending'
+        ");
+        $stmtCheckPaid->execute([':student_id' => (int)$config['student_id'], ':sid' => $schoolId]);
+        if ((int)$stmtCheckPaid->fetchColumn() > 0) {
+            throw new ValidationException(['monthly_fee' => 'Transport fee cannot be edited because fees have already been deposited.']);
+        }
+
         $monthlyFee = isset($data['monthly_fee']) ? (float)$data['monthly_fee'] : (float)$config['monthly_fee'];
         $startDateStr = $data['start_date'] ?? $config['start_date'];
         $status = $data['status'] ?? $config['status'];
@@ -8606,7 +8833,7 @@ Only approve the settlement after reviewing all financial records.
         return ['success' => true];
     }
 
-    private function calculateTransportCharge(string $startDateStr, float $monthlyFee, string $targetMonthStr): float
+    public function calculateProratedAmount(string $startDateStr, float $monthlyAmount, string $targetMonthStr, bool $useActualDays): float
     {
         $startDate = new \DateTime($startDateStr);
         $targetMonthDate = new \DateTime($targetMonthStr);
@@ -8621,18 +8848,104 @@ Only approve the settlement after reviewing all financial records.
         if ($targetYearMonth === $startYearMonth) {
             $startDay = (int)$startDate->format('d');
             if ($startDay === 1) {
-                return $monthlyFee;
+                return $monthlyAmount;
             }
             $totalDays = (int)$startDate->format('t');
             $remainingDays = $totalDays - $startDay + 1;
             if ($remainingDays < 0) {
                 $remainingDays = 0;
             }
-            $dailyFee = round($monthlyFee / $totalDays, 2);
-            return round($dailyFee * $remainingDays, 2);
+            $divisor = $useActualDays ? (float)$totalDays : 30.0;
+            $dailyRate = $monthlyAmount / $divisor;
+            return $dailyRate * $remainingDays;
         }
 
-        return $monthlyFee;
+        return $monthlyAmount;
+    }
+
+    private function getTargetMonthDateStr(array $workingYear, string $monthName): string
+    {
+        $ayStart = new \DateTime($workingYear['start_date']);
+        $ayStartYear = (int)$ayStart->format('Y');
+
+        $monthsOrder = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+        $monthIndex = array_search($monthName, $monthsOrder, true);
+        if ($monthIndex === false) {
+            $monthIndex = 0;
+        }
+
+        // January, February, March are in the next calendar year of the academic year
+        if ($monthIndex >= 9) {
+            $year = $ayStartYear + 1;
+        } else {
+            $year = $ayStartYear;
+        }
+
+        $monthMap = [
+            'January' => '01', 'February' => '02', 'March' => '03',
+            'April' => '04', 'May' => '05', 'June' => '06',
+            'July' => '07', 'August' => '08', 'September' => '09',
+            'October' => '10', 'November' => '11', 'December' => '12'
+        ];
+        $monthNum = $monthMap[$monthName] ?? '01';
+
+        return "{$year}-{$monthNum}-01";
+    }
+
+    public function getSalaryProrationDetails(float $monthlySalary, ?string $joiningDateStr, string $paymentMonthName, array $workingYear): array
+    {
+        $res = [
+            'is_prorated' => false,
+            'payable_salary' => $monthlySalary,
+            'joining_date' => $joiningDateStr,
+            'prorated_days' => 0,
+            'total_days' => 0,
+            'monthly_salary' => $monthlySalary,
+            'label' => ''
+        ];
+
+        if (!$joiningDateStr) {
+            return $res;
+        }
+
+        try {
+            $joiningDate = new \DateTime($joiningDateStr);
+            $targetMonthStr = $this->getTargetMonthDateStr($workingYear, $paymentMonthName);
+            $targetMonthDate = new \DateTime($targetMonthStr);
+
+            $joiningYearMonth = $joiningDate->format('Y-m');
+            $targetYearMonth = $targetMonthDate->format('Y-m');
+
+            if ($targetYearMonth === $joiningYearMonth) {
+                $startDay = (int)$joiningDate->format('d');
+                if ($startDay > 1) {
+                    $totalDays = (int)$joiningDate->format('t');
+                    $remainingDays = $totalDays - $startDay + 1;
+                    if ($remainingDays < 0) {
+                        $remainingDays = 0;
+                    }
+                    
+                    $proratedAmt = $this->calculateProratedAmount($joiningDateStr, $monthlySalary, $targetMonthStr, true);
+
+                    $res['is_prorated'] = true;
+                    $res['payable_salary'] = round($proratedAmt, 2);
+                    $res['prorated_days'] = $remainingDays;
+                    $res['total_days'] = $totalDays;
+                    $res['label'] = 'Prorated Salary';
+                }
+            } elseif ($targetYearMonth < $joiningYearMonth) {
+                $res['payable_salary'] = 0.0;
+            }
+        } catch (\Exception $e) {
+            // ignore
+        }
+
+        return $res;
+    }
+
+    private function calculateTransportCharge(string $startDateStr, float $monthlyFee, string $targetMonthStr): float
+    {
+        return round($this->calculateProratedAmount($startDateStr, $monthlyFee, $targetMonthStr, false));
     }
 
     public function syncTransportFees(int $schoolId, int $academicYearId, ?PDO $externalPdo = null): void
@@ -8728,6 +9041,24 @@ Only approve the settlement after reviewing all financial records.
                                 ':sid' => $schoolId,
                                 ':msg' => $msg
                             ]);
+                        }
+                    } else {
+                        // Payment exists - check if it is Pending and needs update
+                        $stmtGetPay = $pdo->prepare("SELECT id, status, amount FROM additional_fee_payments WHERE id = :id LIMIT 1");
+                        $stmtGetPay->execute([':id' => $existingPaymentId]);
+                        $payRow = $stmtGetPay->fetch(PDO::FETCH_ASSOC);
+                        
+                        if ($payRow && $payRow['status'] === 'Pending') {
+                            $newAmount = $this->calculateTransportCharge($startDateStr, $monthlyFee, $monthDateStr);
+                            if ($newAmount <= 0) {
+                                // Delete if no longer applicable
+                                $stmtDel = $pdo->prepare("DELETE FROM additional_fee_payments WHERE id = :id");
+                                $stmtDel->execute([':id' => $existingPaymentId]);
+                            } elseif (round((float)$payRow['amount']) !== round((float)$newAmount)) {
+                                // Update if amount changed
+                                $stmtUpPay = $pdo->prepare("UPDATE additional_fee_payments SET amount = :amount WHERE id = :id");
+                                $stmtUpPay->execute([':amount' => $newAmount, ':id' => $existingPaymentId]);
+                            }
                         }
                     }
                 }

@@ -104,6 +104,7 @@ return function (App $app) {
     $app->post('/api/school/classes', [SchoolAdminController::class, 'createClass']);
     $app->put('/api/school/classes', [SchoolAdminController::class, 'updateClass']);
     $app->delete('/api/school/classes', [SchoolAdminController::class, 'deleteClass']);
+    $app->post('/api/school/classes/transfer-students', [SchoolAdminController::class, 'transferStudents']);
     $app->delete('/api/school/classes/sections', [SchoolAdminController::class, 'deleteSection']);
     $app->get('/api/school/classes/{class_id}/next-roll-no', [SchoolAdminController::class, 'getNextRollNo']);
     $app->get('/api/school/academic-years', [SchoolAdminController::class, 'getAcademicYears']);
@@ -266,6 +267,11 @@ return function (App $app) {
     $app->get('/api/student/notifications', [StudentController::class, 'getNotifications']);
     $app->post('/api/student/notifications/read-all', [StudentController::class, 'markAllNotificationsRead']);
     $app->post('/api/student/notifications/{id}/read', [StudentController::class, 'markNotificationRead']);
+
+    // Word Builder Game endpoints
+    $app->get('/api/student/game/word-builder/progress', [StudentController::class, 'getGameProgress']);
+    $app->post('/api/student/game/word-builder/progress', [StudentController::class, 'syncGameProgress']);
+    $app->post('/api/student/game/word-builder/claim-daily', [StudentController::class, 'claimDailyLogin']);
 
     // Mobile Notices Domain
     $app->get('/api/student/announcements', [StudentController::class, 'getActiveNotices']);

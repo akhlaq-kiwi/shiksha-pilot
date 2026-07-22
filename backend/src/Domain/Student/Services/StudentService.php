@@ -1204,5 +1204,195 @@ class StudentService extends BaseService
                 $temp->modify('+1 month');
             }
         }
+        $temp->modify('+1 month');
+    }
+
+    public function getGameProgress(array $user): array
+    {
+        $student = $this->resolveStudent($user);
+        $studentId = (int)$student['id'];
+        $schoolId = (int)$student['school_id'];
+        $studentWithClass = $this->repo->findWithClass($studentId) ?? $student;
+        $className = $studentWithClass['class_name'] ?? '';
+
+        $pdo = $this->repo->getPdo();
+
+        // 1. Get or create game progress
+        $stmt = $pdo->prepare("SELECT * FROM student_game_progress WHERE student_id = :student_id AND game_key = 'word-builder' LIMIT 1");
+        $stmt->execute([':student_id' => $studentId]);
+        $progress = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$progress) {
+            $stmtInsert = $pdo->prepare("
+                INSERT INTO student_game_progress 
+                (student_id, school_id, game_key, coins, score, current_level, current_streak, highest_streak, correct_answers, wrong_answers, total_play_time)
+                VALUES 
+                (:student_id, :school_id, 'word-builder', 0, 0, 1, 0, 0, 0, 0, 0)
+            ");
+            $stmtInsert->execute([
+                ':student_id' => $studentId,
+                ':school_id' => $schoolId
+            ]);
+            $stmt->execute([':student_id' => $studentId]);
+            $progress = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
+
+        // 2. Get learned words
+        $stmtWords = $pdo->prepare("SELECT word FROM student_learned_words WHERE student_id = :student_id AND game_key = 'word-builder'");
+        $stmtWords->execute([':student_id' => $studentId]);
+        $words = $stmtWords->fetchAll(PDO::FETCH_COLUMN) ?: [];
+
+        return [
+            'progress' => [
+                'coins' => (int)$progress['coins'],
+                'score' => (int)$progress['score'],
+                'current_level' => (int)$progress['current_level'],
+                'current_streak' => (int)$progress['current_streak'],
+                'highest_streak' => (int)$progress['highest_streak'],
+                'correct_answers' => (int)$progress['correct_answers'],
+                'wrong_answers' => (int)$progress['wrong_answers'],
+                'total_play_time' => (int)$progress['total_play_time'],
+                'last_login_reward_date' => $progress['last_login_reward_date']
+            ],
+            'learned_words' => $words,
+            'student_class' => $className
+        ];
+    }
+
+    public function syncGameProgress(array $user, array $data): array
+    {
+        $student = $this->resolveStudent($user);
+        $studentId = (int)$student['id'];
+        $schoolId = (int)$student['school_id'];
+        $pdo = $this->repo->getPdo();
+
+        // Check if progress already exists
+        $stmt = $pdo->prepare("SELECT id FROM student_game_progress WHERE student_id = :student_id AND game_key = 'word-builder' LIMIT 1");
+        $stmt->execute([':student_id' => $studentId]);
+        $exists = $stmt->fetchColumn();
+
+        if ($exists) {
+            $stmtUpdate = $pdo->prepare("
+                UPDATE student_game_progress 
+                SET coins = :coins,
+                    score = :score,
+                    current_level = :current_level,
+                    current_streak = :current_streak,
+                    highest_streak = :highest_streak,
+                    correct_answers = :correct_answers,
+                    wrong_answers = :wrong_answers,
+                    total_play_time = :total_play_time
+                WHERE student_id = :student_id AND game_key = 'word-builder'
+            ");
+            $stmtUpdate->execute([
+                ':coins' => (int)($data['coins'] ?? 0),
+                ':score' => (int)($data['score'] ?? 0),
+                ':current_level' => (int)($data['current_level'] ?? 1),
+                ':current_streak' => (int)($data['current_streak'] ?? 0),
+                ':highest_streak' => (int)($data['highest_streak'] ?? 0),
+                ':correct_answers' => (int)($data['correct_answers'] ?? 0),
+                ':wrong_answers' => (int)($data['wrong_answers'] ?? 0),
+                ':total_play_time' => (int)($data['total_play_time'] ?? 0),
+                ':student_id' => $studentId
+            ]);
+        } else {
+            $stmtInsert = $pdo->prepare("
+                INSERT INTO student_game_progress 
+                (student_id, school_id, game_key, coins, score, current_level, current_streak, highest_streak, correct_answers, wrong_answers, total_play_time)
+                VALUES 
+                (:student_id, :school_id, 'word-builder', :coins, :score, :current_level, :current_streak, :highest_streak, :correct_answers, :wrong_answers, :total_play_time)
+            ");
+            $stmtInsert->execute([
+                ':student_id' => $studentId,
+                ':school_id' => $schoolId,
+                ':coins' => (int)($data['coins'] ?? 0),
+                ':score' => (int)($data['score'] ?? 0),
+                ':current_level' => (int)($data['current_level'] ?? 1),
+                ':current_streak' => (int)($data['current_streak'] ?? 0),
+                ':highest_streak' => (int)($data['highest_streak'] ?? 0),
+                ':correct_answers' => (int)($data['correct_answers'] ?? 0),
+                ':wrong_answers' => (int)($data['wrong_answers'] ?? 0),
+                ':total_play_time' => (int)($data['total_play_time'] ?? 0)
+            ]);
+        }
+
+        // Save new learned words
+        if (isset($data['new_words']) && is_array($data['new_words'])) {
+            $stmtWord = $pdo->prepare("
+                INSERT IGNORE INTO student_learned_words 
+                (student_id, school_id, game_key, word) 
+                VALUES 
+                (:student_id, :school_id, 'word-builder', :word)
+            ");
+            foreach ($data['new_words'] as $w) {
+                if (is_string($w) && !empty(trim($w))) {
+                    $stmtWord->execute([
+                        ':student_id' => $studentId,
+                        ':school_id' => $schoolId,
+                        ':word' => trim($w)
+                    ]);
+                }
+            }
+        }
+
+        return $this->getGameProgress($user);
+    }
+
+    public function claimDailyLogin(array $user): array
+    {
+        $student = $this->resolveStudent($user);
+        $studentId = (int)$student['id'];
+        $schoolId = (int)$student['school_id'];
+        $pdo = $this->repo->getPdo();
+
+        $today = date('Y-m-d');
+
+        // Check if progress already exists
+        $stmt = $pdo->prepare("SELECT * FROM student_game_progress WHERE student_id = :student_id AND game_key = 'word-builder' LIMIT 1");
+        $stmt->execute([':student_id' => $studentId]);
+        $progress = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($progress) {
+            if ($progress['last_login_reward_date'] === $today) {
+                return [
+                    'success' => false,
+                    'message' => 'Daily login reward already claimed today.',
+                    'progress' => [
+                        'coins' => (int)$progress['coins'],
+                        'last_login_reward_date' => $progress['last_login_reward_date']
+                    ]
+                ];
+            }
+
+            $newCoins = (int)$progress['coins'] + 20;
+            $stmtUpdate = $pdo->prepare("
+                UPDATE student_game_progress 
+                SET coins = :coins, last_login_reward_date = :today
+                WHERE student_id = :student_id AND game_key = 'word-builder'
+            ");
+            $stmtUpdate->execute([
+                ':coins' => $newCoins,
+                ':today' => $today,
+                ':student_id' => $studentId
+            ]);
+        } else {
+            $stmtInsert = $pdo->prepare("
+                INSERT INTO student_game_progress 
+                (student_id, school_id, game_key, coins, score, current_level, current_streak, highest_streak, correct_answers, wrong_answers, total_play_time, last_login_reward_date)
+                VALUES 
+                (:student_id, :school_id, 'word-builder', 20, 0, 1, 0, 0, 0, 0, 0, :today)
+            ");
+            $stmtInsert->execute([
+                ':student_id' => $studentId,
+                ':school_id' => $schoolId,
+                ':today' => $today
+            ]);
+        }
+
+        return [
+            'success' => true,
+            'message' => 'Daily login reward claimed successfully! +20 Coins.',
+            'data' => $this->getGameProgress($user)
+        ];
     }
 }

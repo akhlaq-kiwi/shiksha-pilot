@@ -157,6 +157,38 @@ const getLocalDateStr = () => {
   return `${year}-${month}-${day}`;
 };
 
+const getVisibleMonths = (joiningDateStr, workingYearStartStr) => {
+  const allMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+  
+  if (!joiningDateStr) return allMonths;
+  if (!workingYearStartStr) return allMonths;
+
+  try {
+    const joiningDate = new Date(joiningDateStr);
+    const workingYearStart = new Date(workingYearStartStr);
+
+    const joiningYear = joiningDate.getFullYear();
+    const joiningMonth = joiningDate.getMonth();
+    
+    const startYear = workingYearStart.getFullYear();
+    const startMonth = workingYearStart.getMonth();
+
+    const diffMonths = (joiningYear - startYear) * 12 + (joiningMonth - startMonth);
+
+    if (diffMonths <= 0) {
+      return allMonths;
+    }
+
+    if (diffMonths >= 12) {
+      return [];
+    }
+
+    return allMonths.slice(diffMonths);
+  } catch (e) {
+    return allMonths;
+  }
+};
+
 export default function StaffPage() {
   const [searchParams] = useSearchParams();
   const [view, setView] = useState('list'); // 'list', 'details'
@@ -1059,11 +1091,23 @@ export default function StaffPage() {
                   </div>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                    {['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'].map(month => {
+                    {getVisibleMonths(t.joining_date, (academicYears.find(y => y.is_current) || academicYears.find(y => y.status === 'Draft'))?.start_date).map(month => {
                       const payment = (t.salary_payments || []).find(p => p.payment_month === month);
                       const isPaid = !!payment;
                       const isLocked = payment ? !!payment.is_locked : false;
-                      const salaryAmount = t.salary || 0.0;
+                      
+                      let salaryAmount = t.salary || 0.0;
+                      let isProrated = false;
+                      if (isPaid) {
+                        salaryAmount = payment.amount_paid;
+                        isProrated = !!payment.proration_details;
+                      } else {
+                        const isJoiningMonth = t.joining_month_proration && t.joining_month_proration.month === month;
+                        if (isJoiningMonth) {
+                          salaryAmount = t.joining_month_proration.payable_salary;
+                          isProrated = true;
+                        }
+                      }
 
                       return (
                         <div 
@@ -1081,10 +1125,10 @@ export default function StaffPage() {
                               <p className="text-[10px] text-text-secondary font-bold uppercase mt-0.5">
                                 {isPaid ? (
                                   <span className="inline-flex items-center gap-1 text-green-600">
-                                    <CheckCircle className="h-3 w-3" /> Paid
+                                    <CheckCircle className="h-3 w-3" /> Paid {isProrated && '(Prorated)'}
                                   </span>
                                 ) : (
-                                  <span className="text-amber-500">Pending</span>
+                                  <span className="text-amber-500">Pending {isProrated && '(Prorated)'}</span>
                                 )}
                               </p>
                             </div>
@@ -1879,7 +1923,14 @@ export default function StaffPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-zinc-500">Amount:</span>
-                <span className="text-green-600 font-extrabold">₹{parseFloat(teacherDetails?.salary || 0).toLocaleString('en-IN')}</span>
+                <span className="text-green-600 font-extrabold">
+                  ₹{(() => {
+                    const isJoiningMonth = teacherDetails?.joining_month_proration && teacherDetails?.joining_month_proration.month === disburseMonth;
+                    const amount = isJoiningMonth ? teacherDetails.joining_month_proration.payable_salary : (teacherDetails?.salary || 0);
+                    return parseFloat(amount).toLocaleString('en-IN');
+                  })()}
+                  {teacherDetails?.joining_month_proration && teacherDetails?.joining_month_proration.month === disburseMonth && ' (Prorated)'}
+                </span>
               </div>
             </div>
             <p className="text-xs text-zinc-500 leading-normal">This action will record the salary payment.</p>
@@ -2091,10 +2142,31 @@ export default function StaffPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      <tr className="border-b border-zinc-100 text-zinc-800 font-medium">
-                        <td className="p-3">Basic Monthly Salary (Disbursed)</td>
-                        <td className="p-3 text-right font-semibold">₹{parseFloat(selectedSlipPayment.amount_paid).toLocaleString('en-IN')}</td>
-                      </tr>
+                      {selectedSlipPayment.proration_details ? (
+                        <>
+                          <tr className="border-b border-zinc-100 text-zinc-800 font-medium">
+                            <td className="p-3">Monthly Salary</td>
+                            <td className="p-3 text-right font-semibold">₹{parseFloat(selectedSlipPayment.proration_details.monthly_salary).toLocaleString('en-IN')}</td>
+                          </tr>
+                          <tr className="border-b border-zinc-100 text-zinc-800 font-medium">
+                            <td className="p-3">Joining Date</td>
+                            <td className="p-3 text-right font-semibold">{formatDate(selectedSlipPayment.proration_details.joining_date)}</td>
+                          </tr>
+                          <tr className="border-b border-zinc-100 text-zinc-800 font-medium">
+                            <td className="p-3">Prorated Days</td>
+                            <td className="p-3 text-right font-semibold">{selectedSlipPayment.proration_details.prorated_days} / {selectedSlipPayment.proration_details.total_days}</td>
+                          </tr>
+                          <tr className="border-b border-zinc-100 text-zinc-800 font-medium bg-amber-50/50">
+                            <td className="p-3 font-bold text-amber-800">Prorated Salary (Payable Amount)</td>
+                            <td className="p-3 text-right font-extrabold text-amber-800">₹{parseFloat(selectedSlipPayment.amount_paid).toLocaleString('en-IN')}</td>
+                          </tr>
+                        </>
+                      ) : (
+                        <tr className="border-b border-zinc-100 text-zinc-800 font-medium">
+                          <td className="p-3">Basic Monthly Salary (Disbursed)</td>
+                          <td className="p-3 text-right font-semibold">₹{parseFloat(selectedSlipPayment.amount_paid).toLocaleString('en-IN')}</td>
+                        </tr>
+                      )}
                       <tr className="bg-zinc-50 font-bold text-zinc-950 border-t-2 border-zinc-200 text-sm">
                         <td className="p-3">Net Disbursed Amount</td>
                         <td className="p-3 text-right text-green-700 font-extrabold">₹{parseFloat(selectedSlipPayment.amount_paid).toLocaleString('en-IN')}</td>

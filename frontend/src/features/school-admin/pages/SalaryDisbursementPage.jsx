@@ -86,10 +86,10 @@ export default function SalaryDisbursementPage() {
   };
 
   // Calculations based on fetched teacher listing
-  const totalSalary = teachersList.reduce((sum, t) => sum + parseFloat(t.salary || 0), 0);
+  const totalSalary = teachersList.reduce((sum, t) => sum + parseFloat(t.payable_salary || 0), 0);
   const disbursedSalary = teachersList
     .filter(t => t.status === 'Paid')
-    .reduce((sum, t) => sum + parseFloat(t.salary || 0), 0);
+    .reduce((sum, t) => sum + parseFloat(t.payable_salary || 0), 0);
   const pendingSalary = totalSalary - disbursedSalary;
 
   // Filtered teachers list
@@ -225,9 +225,16 @@ export default function SalaryDisbursementPage() {
                 <div className="flex items-center gap-8 text-right">
                   <div>
                     <p className="text-xs font-bold text-text-muted uppercase">Salary Amount</p>
-                    <p className="text-sm font-bold text-text-primary mt-0.5">
-                      ₹{parseFloat(teacher.salary || 0).toLocaleString('en-IN')}
-                    </p>
+                    <div className="flex items-center justify-end gap-1.5 mt-0.5">
+                      {teacher.proration_details && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                          Prorated
+                        </span>
+                      )}
+                      <p className="text-sm font-bold text-text-primary">
+                        ₹{parseFloat(teacher.payable_salary || 0).toLocaleString('en-IN')}
+                      </p>
+                    </div>
                   </div>
 
                   <div className="hidden sm:block">

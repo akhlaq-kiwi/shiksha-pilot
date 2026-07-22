@@ -292,71 +292,76 @@ class _NoticeScreenState extends State<NoticeScreen> {
                                       );
                                     },
                                     child: Padding(
-                                      padding: const EdgeInsets.all(16),
-                                      child: Row(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                // Subject Header row
-                                                Row(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    if (!isRead) ...[
-                                                      Container(
-                                                        margin: const EdgeInsets.only(top: 6, right: 8),
-                                                        width: 8,
-                                                        height: 8,
-                                                        decoration: const BoxDecoration(
-                                                          color: Colors.blue,
-                                                          shape: BoxShape.circle,
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                      child: SizedBox(
+                                        height: 85,
+                                        child: Row(
+                                          crossAxisAlignment: CrossAxisAlignment.center,
+                                          children: [
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                children: [
+                                                  // Subject Header row
+                                                  Row(
+                                                    crossAxisAlignment: CrossAxisAlignment.center,
+                                                    children: [
+                                                      if (!isRead) ...[
+                                                        Container(
+                                                          margin: const EdgeInsets.only(right: 8),
+                                                          width: 8,
+                                                          height: 8,
+                                                          decoration: const BoxDecoration(
+                                                            color: Colors.blue,
+                                                            shape: BoxShape.circle,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                      Expanded(
+                                                        child: Text(
+                                                          subject,
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow.ellipsis,
+                                                          style: TextStyle(
+                                                            fontSize: 14,
+                                                            fontWeight: isRead ? FontWeight.bold : FontWeight.w900,
+                                                            color: isRead ? Colors.black87 : Colors.indigo.shade900,
+                                                          ),
                                                         ),
                                                       ),
                                                     ],
-                                                    Expanded(
-                                                      child: Text(
-                                                        subject,
-                                                        style: TextStyle(
-                                                          fontSize: 15,
-                                                          fontWeight: isRead ? FontWeight.bold : FontWeight.w900,
-                                                          color: isRead ? Colors.black87 : Colors.indigo.shade900,
-                                                        ),
-                                                      ),
+                                                  ),
+                                                  // Short snippet text
+                                                  Text(
+                                                    _stripHtml(description),
+                                                    maxLines: 2,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: Colors.grey.shade600,
+                                                      height: 1.3,
                                                     ),
-                                                  ],
-                                                ),
-                                                const SizedBox(height: 8),
-                                                // Short snippet text
-                                                Text(
-                                                  _stripHtml(description),
-                                                  maxLines: 3,
-                                                  overflow: TextOverflow.ellipsis,
-                                                  style: TextStyle(
-                                                    fontSize: 13,
-                                                    color: Colors.grey.shade600,
-                                                    height: 1.4,
                                                   ),
-                                                ),
-                                                const SizedBox(height: 12),
-                                                // Date Footer
-                                                Text(
-                                                  _formatDate(dateStr),
-                                                  style: TextStyle(
-                                                    fontSize: 11,
-                                                    color: Colors.grey.shade500,
-                                                    fontWeight: FontWeight.w600,
+                                                  // Date Footer
+                                                  Text(
+                                                    _formatDate(dateStr),
+                                                    style: TextStyle(
+                                                      fontSize: 10,
+                                                      color: Colors.grey.shade500,
+                                                      fontWeight: FontWeight.w600,
+                                                    ),
                                                   ),
-                                                ),
-                                              ],
+                                                ],
+                                              ),
                                             ),
-                                          ),
-                                          Icon(
-                                            Icons.chevron_right_rounded,
-                                            color: Colors.grey.shade400,
-                                          )
-                                        ],
+                                            const SizedBox(width: 8),
+                                            Icon(
+                                              Icons.chevron_right_rounded,
+                                              color: Colors.grey.shade400,
+                                            )
+                                          ],
+                                        ),
                                       ),
                                     ),
                                   ),

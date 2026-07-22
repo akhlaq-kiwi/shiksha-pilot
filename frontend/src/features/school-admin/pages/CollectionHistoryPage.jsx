@@ -355,6 +355,13 @@ export default function CollectionHistoryPage() {
     return date.toLocaleDateString('en-GB', options);
   };
 
+  // Clean student name by removing fallback dots
+  const cleanStudentName = (name) => {
+    if (!name) return '';
+    const trimmed = name.trim();
+    return trimmed.endsWith('.') ? trimmed.replace(/\s*\.$/, '') : name;
+  };
+
   // Time formatter e.g., "10:35 AM"
   const formatTime = (timeStr) => {
     if (!timeStr) return '—';
@@ -535,7 +542,7 @@ export default function CollectionHistoryPage() {
 
                         {/* Name & Class */}
                         <TableCell className="text-xs whitespace-nowrap">
-                          <div className="font-extrabold text-text-primary uppercase tracking-wider">{t.student_name}</div>
+                          <div className="font-extrabold text-text-primary uppercase tracking-wider">{cleanStudentName(t.student_name)}</div>
                           <div className="text-[10px] text-text-secondary mt-0.5">{t.class_name}</div>
                         </TableCell>
 
@@ -602,7 +609,7 @@ export default function CollectionHistoryPage() {
                     <div className="text-xs space-y-1.5 bg-zinc-50/50 dark:bg-zinc-900/20 p-3 rounded-xl border border-border/80">
                       <div className="flex justify-between">
                         <span className="text-text-muted">Name & Class:</span>
-                        <span className="font-extrabold text-text-primary uppercase">{t.student_name} ({t.class_name})</span>
+                        <span className="font-extrabold text-text-primary uppercase">{cleanStudentName(t.student_name)} ({t.class_name})</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-text-muted">Fee Description:</span>

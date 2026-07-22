@@ -107,150 +107,6 @@ const getDynamicScalingStyles = (numSubjects, numInstructions) => {
   };
 };
 
-const getReportCardScalingStyles = (numSubjects) => {
-  let tableFontSize = 'text-xs';
-  let tablePadding = 'p-2';
-  
-  let headerLogoHeight = 'h-16 w-16';
-  let headerTitleSize = 'text-2xl';
-  let headerSubtitleSize = 'text-[10px]';
-  let headerPadding = 'pb-5';
-  
-  let metadataPadding = 'py-6';
-  let metadataGapY = 'gap-y-3';
-  
-  let tableMargin = 'py-6';
-  
-  let summaryPadding = 'p-4';
-  let summaryGap = 'gap-6';
-  let summarySpaceY = 'space-y-2';
-  
-  let verdictPadding = 'py-6';
-  let verdictBoxPadding = 'p-4';
-  let verdictMinHeight = 'min-h-[60px]';
-  
-  let signaturePadding = 'pt-8';
-  let signatureSpacer = 'h-8';
-
-  if (numSubjects <= 5) {
-    tableFontSize = 'text-sm';
-    tablePadding = 'p-3.5';
-    
-    headerLogoHeight = 'h-16 w-16';
-    headerTitleSize = 'text-2xl';
-    headerSubtitleSize = 'text-xs';
-    headerPadding = 'pb-6';
-    
-    metadataPadding = 'py-8';
-    metadataGapY = 'gap-y-4';
-    
-    tableMargin = 'py-8';
-    
-    summaryPadding = 'p-5';
-    summaryGap = 'gap-8';
-    summarySpaceY = 'space-y-3';
-    
-    verdictPadding = 'py-8';
-    verdictBoxPadding = 'p-5';
-    verdictMinHeight = 'min-h-[75px]';
-    
-    signaturePadding = 'pt-10';
-    signatureSpacer = 'h-10';
-  } else if (numSubjects >= 6 && numSubjects <= 9) {
-    tableFontSize = 'text-xs';
-    tablePadding = 'p-2';
-    
-    headerLogoHeight = 'h-14 w-14';
-    headerTitleSize = 'text-xl';
-    headerSubtitleSize = 'text-[10px]';
-    headerPadding = 'pb-4';
-    
-    metadataPadding = 'py-4';
-    metadataGapY = 'gap-y-2';
-    
-    tableMargin = 'py-4';
-    
-    summaryPadding = 'p-3.5';
-    summaryGap = 'gap-6';
-    summarySpaceY = 'space-y-1.5';
-    
-    verdictPadding = 'py-4';
-    verdictBoxPadding = 'p-3.5';
-    verdictMinHeight = 'min-h-[50px]';
-    
-    signaturePadding = 'pt-6';
-    signatureSpacer = 'h-8';
-  } else if (numSubjects >= 10 && numSubjects <= 12) {
-    tableFontSize = 'text-[11px]';
-    tablePadding = 'p-1.5';
-    
-    headerLogoHeight = 'h-12 w-12';
-    headerTitleSize = 'text-lg';
-    headerSubtitleSize = 'text-[9px]';
-    headerPadding = 'pb-2';
-    
-    metadataPadding = 'py-2';
-    metadataGapY = 'gap-y-1.5';
-    
-    tableMargin = 'py-2';
-    
-    summaryPadding = 'p-2.5';
-    summaryGap = 'gap-4';
-    summarySpaceY = 'space-y-1';
-    
-    verdictPadding = 'py-2';
-    verdictBoxPadding = 'p-2.5';
-    verdictMinHeight = 'min-h-[40px]';
-    
-    signaturePadding = 'pt-4';
-    signatureSpacer = 'h-6';
-  } else {
-    tableFontSize = 'text-[10px]';
-    tablePadding = 'p-1';
-    
-    headerLogoHeight = 'h-10 w-10';
-    headerTitleSize = 'text-base';
-    headerSubtitleSize = 'text-[8px]';
-    headerPadding = 'pb-1';
-    
-    metadataPadding = 'py-1.5';
-    metadataGapY = 'gap-y-1';
-    
-    tableMargin = 'py-1.5';
-    
-    summaryPadding = 'p-2';
-    summaryGap = 'gap-3';
-    summarySpaceY = 'space-y-0.5';
-    
-    verdictPadding = 'py-1.5';
-    verdictBoxPadding = 'p-2';
-    verdictMinHeight = 'min-h-[30px]';
-    
-    signaturePadding = 'pt-3';
-    signatureSpacer = 'h-4';
-  }
-
-  return {
-    tableFontSize,
-    tablePadding,
-    headerLogoHeight,
-    headerTitleSize,
-    headerSubtitleSize,
-    headerPadding,
-    metadataPadding,
-    metadataGapY,
-    tableMargin,
-    summaryPadding,
-    summaryGap,
-    summarySpaceY,
-    verdictPadding,
-    verdictBoxPadding,
-    verdictMinHeight,
-    signaturePadding,
-    signatureSpacer,
-  };
-};
-
 const suggestNextExamDate = (exam, papers, holidays) => {
   if (!exam) return '';
   const todayStr = new Date().toISOString().split('T')[0];
@@ -1744,124 +1600,6 @@ export default function ExamsPage() {
     }
   };
 
-  const triggerDownloadReportCardPdf = (cardData) => {
-    const reportCardData = cardData || selectedReportCard;
-    if (!reportCardData) return;
-
-    setSelectedReportCard(reportCardData);
-    setIsReportCardOpen(true);
-
-    setTimeout(() => {
-      const element = document.getElementById('printable-report-card');
-      if (!element) return;
-
-      const opt = {
-        margin: 8,
-        filename: `Report_Card_${reportCardData.student_name.replace(/\s+/g, '_')}_${reportCardData.class_name.replace(/\s+/g, '_')}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['css', 'avoid-all'] }
-      };
-
-      html2pdf().from(element).set(opt).save().then(() => {
-        schoolAdminService.logClientAudit({
-          module: 'Examinations',
-          action: 'Report Card Downloaded',
-          description: `Report card PDF downloaded for ${reportCardData.student_name} (${reportCardData.class_name})`
-        }).catch(console.error);
-      });
-    }, 450);
-  };
-
-  const triggerPrintReportCard = (cardData) => {
-    const reportCardData = cardData || selectedReportCard;
-    if (!reportCardData) return;
-
-    // Log the print action
-    schoolAdminService.logClientAudit({
-      module: 'Examinations',
-      action: 'Report Card Printed',
-      description: `Report card printed for ${reportCardData.student_name} (${reportCardData.class_name})`
-    }).catch(console.error);
-
-    const printElement = document.getElementById('printable-report-card');
-    if (!printElement) return;
-
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
-    document.body.appendChild(iframe);
-
-    const doc = iframe.contentWindow.document;
-    doc.open();
-    doc.write('<html><head><title>Print Report Card</title>');
-    
-    Array.from(document.querySelectorAll('link[rel="stylesheet"], style')).forEach(el => {
-      doc.write(el.outerHTML);
-    });
-
-    doc.write(`
-      <style>
-        @page {
-          size: portrait !important;
-          margin: 8mm !important;
-        }
-        html, body {
-          background-color: white !important;
-          color: black !important;
-          padding: 0 !important;
-          margin: 0 !important;
-          height: auto !important;
-          min-height: 0 !important;
-          -webkit-print-color-adjust: exact !important;
-          print-color-adjust: exact !important;
-        }
-        #printable-report-card-container {
-          padding: 0 !important;
-          margin: 0 !important;
-          width: 100% !important;
-          height: auto !important;
-        }
-        #printable-report-card {
-          width: 194mm !important;
-          max-width: 194mm !important;
-          height: 265mm !important;
-          max-height: 265mm !important;
-          box-sizing: border-box !important;
-          padding: 8mm !important;
-          margin-top: 0 !important;
-          margin-bottom: 0 !important;
-          margin-left: auto !important;
-          margin-right: auto !important;
-          overflow: hidden !important;
-          position: relative !important;
-          box-shadow: none !important;
-          border: 4px double #000 !important;
-        }
-      </style>
-    </head>
-    <body class="bg-white text-black">
-      <div id="printable-report-card-container">
-        ${printElement.outerHTML}
-      </div>
-    </body>
-    </html>
-    `);
-    doc.close();
-
-    iframe.contentWindow.focus();
-    setTimeout(() => {
-      iframe.contentWindow.document.title = `Report_Card_${reportCardData.student_name.replace(/\s+/g, '_')}`;
-      iframe.contentWindow.print();
-      document.body.removeChild(iframe);
-    }, 500);
-  };
-
   if (loading && activeView === 'dashboard') {
     return (
       <div className="flex items-center justify-center min-h-[400px] w-full">
@@ -2392,6 +2130,34 @@ export default function ExamsPage() {
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* CARD 6: Question Paper Designer */}
+                <Card className="hover:border-primary/20 transition-all shadow-xs flex flex-col justify-between">
+                  <CardContent className="p-6 space-y-4 flex-1 flex flex-col justify-between">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-primary">
+                        <FileText className="h-5 w-5" />
+                        <h4 className="text-base font-bold text-text-primary">Question Paper Designer</h4>
+                      </div>
+                      <p className="text-xs text-text-secondary leading-relaxed">
+                        Create professional examination question papers with formatting tools, diagrams, tables, images, equations, and automatic PDF generation.
+                      </p>
+                    </div>
+                    <div className="pt-2">
+                      <Button 
+                        className="w-full flex items-center justify-center gap-2 text-xs font-bold" 
+                        onClick={() => navigate('/school-admin/exams/question-paper-designer', { 
+                          state: { 
+                            examId: selectedExam?.id,
+                            classId: currentClass?.id
+                          } 
+                        })}
+                      >
+                        <FileText className="h-4 w-4" /> OPEN QUESTION PAPER DESIGNER
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             </div>
             );
@@ -2832,18 +2598,9 @@ export default function ExamsPage() {
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
-                      <DropdownMenu trigger={
-                        <Button variant="outline" className="h-7 px-2 text-xs flex items-center gap-1 text-primary border-primary/20 bg-primary/5 hover:bg-primary/10 ml-auto">
-                          <FileText className="h-3.5 w-3.5" /> View
-                        </Button>
-                      }>
-                        <DropdownItem onClick={() => handleOpenSingleReportCard(card)}>
-                          Print Report Card
-                        </DropdownItem>
-                        <DropdownItem onClick={() => triggerDownloadReportCardPdf(card)}>
-                          Download PDF
-                        </DropdownItem>
-                      </DropdownMenu>
+                      <Button variant="outline" className="h-7 px-2 text-xs flex items-center gap-1 text-primary border-primary/20 bg-primary/5 hover:bg-primary/10 ml-auto font-bold" onClick={() => handleOpenSingleReportCard(card)}>
+                        <FileText className="h-3.5 w-3.5" /> View Card
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -3394,170 +3151,142 @@ export default function ExamsPage() {
       {/* DETAILED REPORT CARD DIALOG MODAL (A4 PRINTABLE) */}
       <Dialog isOpen={isReportCardOpen} onClose={() => setIsReportCardOpen(false)} size="lg">
         {selectedReportCard && (
-          (() => {
-            const scaling = getReportCardScalingStyles(selectedReportCard.subjects.length);
-            
-            return (
-              <div id="printable-report-card-container" className="space-y-6">
-                {isReportCardOpen && (
-                  <style dangerouslySetInnerHTML={{__html: `
-                    @media print {
-                      @page {
-                        size: portrait !important;
-                        margin: 8mm !important;
-                      }
-                      body {
-                        background-color: white !important;
-                        color: black !important;
-                        padding: 0 !important;
-                        margin: 0 !important;
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
-                      }
-                      .no-print-scroll {
-                        overflow: visible !important;
-                        padding: 0 !important;
-                        background: transparent !important;
-                        display: block !important;
-                      }
-                      #printable-report-card {
-                        width: 194mm !important;
-                        max-width: 194mm !important;
-                        height: 265mm !important;
-                        max-height: 265mm !important;
-                        box-sizing: border-box !important;
-                        padding: 8mm !important;
-                        margin: 0 auto !important;
-                        overflow: hidden !important;
-                        position: relative !important;
-                        border: 4px double #000 !important;
-                      }
-                    }
-                  `}} />
-                )}
-                {/* Action Bar (Not printed) */}
-                <div className="flex justify-between items-center bg-zinc-50 border-b border-border p-4 -m-6 mb-6 no-print">
-                  <span className="text-xs font-bold text-text-secondary">Progress Report Card Preview</span>
-                  <div className="flex items-center gap-2">
-                    <Button type="button" onClick={() => triggerDownloadReportCardPdf(selectedReportCard)} className="flex items-center gap-2 font-bold py-1.5 px-3">
-                      <Download className="h-4 w-4" /> Download PDF
-                    </Button>
-                    <Button type="button" variant="outline" onClick={() => triggerPrintReportCard(selectedReportCard)} className="flex items-center gap-2 font-bold py-1.5 px-3 border-border hover:bg-zinc-100 dark:hover:bg-zinc-900">
-                      <Printer className="h-4 w-4" /> Print Report Card
-                    </Button>
-                  </div>
-                </div>
-
-                {/* A4 Report Card document */}
-                <div className="w-full overflow-x-auto py-2 bg-zinc-100 dark:bg-zinc-800 rounded-lg flex justify-start lg:justify-center p-2 no-print-scroll">
-                  <div id="printable-report-card" className="border-4 border-double border-zinc-400 p-6 bg-white text-zinc-900 rounded-sm font-sans relative w-full max-w-[194mm]" style={{ width: '194mm', boxSizing: 'border-box', height: '272mm' }}>
-                    
-                    {/* Report Card Header */}
-                    <div className={`text-center border-b-2 border-zinc-800 ${scaling.headerPadding}`}>
-                      <div className="flex justify-center mb-2">
-                        {selectedReportCard.school_logo ? (
-                          <img src={selectedReportCard.school_logo} alt="Logo" className={`${scaling.headerLogoHeight} object-contain`} />
-                        ) : (
-                          <div className={`rounded-full bg-zinc-100 border border-zinc-300 flex items-center justify-center font-bold text-zinc-600 uppercase ${scaling.headerLogoHeight} text-lg`}>
-                            {selectedReportCard.school_name.charAt(0)}
-                          </div>
-                        )}
-                      </div>
-                      <h2 className={`${scaling.headerTitleSize} font-black uppercase tracking-tight text-zinc-900 font-display`}>{selectedReportCard.school_name}</h2>
-                      <h4 className={`${scaling.headerSubtitleSize} font-bold tracking-widest text-zinc-500 uppercase mt-1`}>
-                        {selectedReportCard.exam_name} ACADEMIC PERFORMANCE
-                      </h4>
-                      <p className="text-xs font-mono text-zinc-600 mt-1">Academic Year: {selectedReportCard.academic_year_name}</p>
-                    </div>
-
-                    {/* Student Metadata grid */}
-                    <div className={`grid grid-cols-3 ${scaling.metadataGapY} gap-x-4 ${scaling.metadataPadding} text-xs border-b border-zinc-300 font-semibold leading-relaxed px-2`}>
-                      <div className="whitespace-nowrap overflow-visible">Student Name: <span className="font-bold text-zinc-900">{selectedReportCard.student_name}</span></div>
-                      <div className="whitespace-nowrap overflow-visible text-center">Class: <span className="font-bold text-zinc-900">{selectedReportCard.class_name} {selectedReportCard.class_section ? `(${selectedReportCard.class_section})` : ''}</span></div>
-                      <div className="whitespace-nowrap overflow-visible text-right">SR No: <span className="font-mono text-zinc-700">{selectedReportCard.admission_no || 'N/A'}</span></div>
-                      
-                      <div className="whitespace-nowrap overflow-visible">Father Name: <span className="text-zinc-700">{selectedReportCard.father_name || 'N/A'}</span></div>
-                      <div className="whitespace-nowrap overflow-visible text-center">Mother Name: <span className="text-zinc-700">{selectedReportCard.mother_name || 'N/A'}</span></div>
-                      <div className="whitespace-nowrap overflow-visible text-right">Roll No: <span className="font-mono text-zinc-700">{selectedReportCard.roll_no}</span></div>
-                    </div>
-
-                    {/* Marks Table */}
-                    <div className={scaling.tableMargin}>
-                      <table className="w-full text-left text-xs border border-zinc-400 border-collapse table-layout-fixed">
-                        <thead>
-                          <tr className="bg-zinc-100 border-b border-zinc-400">
-                            <th className={`p-2 border-r border-zinc-400 font-bold uppercase whitespace-nowrap ${scaling.tableFontSize} ${scaling.tablePadding}`}>Subject</th>
-                            <th className={`p-2 border-r border-zinc-400 font-bold uppercase text-center w-32 whitespace-nowrap ${scaling.tableFontSize} ${scaling.tablePadding}`}>Obtained Marks</th>
-                            <th className={`p-2 border-r border-zinc-400 font-bold uppercase text-center w-28 whitespace-nowrap ${scaling.tableFontSize} ${scaling.tablePadding}`}>Max Marks</th>
-                            <th className={`p-2 border-r border-zinc-400 font-bold uppercase text-center w-28 whitespace-nowrap ${scaling.tableFontSize} ${scaling.tablePadding}`}>Passing Marks</th>
-                            <th className={`p-2 border-r border-zinc-400 font-bold uppercase text-center w-20 whitespace-nowrap ${scaling.tableFontSize} ${scaling.tablePadding}`}>Grade</th>
-                            <th className={`p-2 font-bold uppercase text-center w-24 whitespace-nowrap ${scaling.tableFontSize} ${scaling.tablePadding}`}>Result</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {selectedReportCard.subjects.map((s, idx) => (
-                            <tr key={idx} className="border-b border-zinc-300">
-                              <td className={`p-2 border-r border-zinc-400 font-semibold ${scaling.tableFontSize} ${scaling.tablePadding}`}>{s.subject_name}</td>
-                              <td className={`p-2 border-r border-zinc-400 text-center font-mono font-bold ${scaling.tableFontSize} ${scaling.tablePadding}`}>{s.marks_obtained}</td>
-                              <td className={`p-2 border-r border-zinc-400 text-center font-mono ${scaling.tableFontSize} ${scaling.tablePadding}`}>{s.max_marks}</td>
-                              <td className={`p-2 border-r border-zinc-400 text-center font-mono ${scaling.tableFontSize} ${scaling.tablePadding}`}>{s.passing_marks}</td>
-                              <td className={`p-2 border-r border-zinc-400 text-center font-bold ${scaling.tableFontSize} ${scaling.tablePadding}`}>{s.grade}</td>
-                              <td className={`p-2 text-center whitespace-nowrap ${scaling.tableFontSize} ${scaling.tablePadding}`}>
-                                <span className={`font-bold uppercase ${s.result === 'PASS' ? 'text-green-700' : 'text-red-700'}`}>
-                                  {s.result}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {/* Results Summary grid */}
-                    <div className={`grid grid-cols-3 ${scaling.summaryGap} ${scaling.summaryPadding} bg-zinc-50 border border-zinc-300 rounded-sm text-xs font-semibold mx-2`}>
-                      <div>Class Rank: <span className="font-bold text-zinc-900">{selectedReportCard.class_rank.split(' ')[0]}</span></div>
-                      <div className="text-center">Percentage: <span className="font-mono font-bold text-primary">{selectedReportCard.percentage}%</span></div>
-                      <div className="text-right">Grand Total: <span className="font-mono font-bold text-zinc-900">{selectedReportCard.total_obtained} / {selectedReportCard.total_max}</span></div>
-                      
-                      <div>Overall Grade: <span className="font-bold text-primary">{selectedReportCard.grade}</span></div>
-                      <div className="text-center">Attendance Rate: <span className="font-mono text-zinc-700">{selectedReportCard.attendance.attendance_rate}%</span></div>
-                      <div></div>
-                    </div>
-
-                    {/* Remarks/Status display */}
-                    <div className={`${scaling.verdictPadding} px-2`}>
-                      <div className="flex flex-col">
-                        <h4 className="text-xs font-bold uppercase text-zinc-800 mb-2">Final Verdict & Teacher Remarks</h4>
-                        <div className={`border border-zinc-300 ${scaling.verdictBoxPadding} ${scaling.verdictMinHeight} text-xs leading-relaxed font-bold text-green-700`}>
-                          {selectedReportCard.result === 'PASS' 
-                            ? (selectedReportCard.report_card_remark || schoolProfile?.report_card_remark || 'No report card remark has been configured.') 
-                            : 'The student requires additional academic assistance in one or more subjects to meet the passing standards.'
-                          }
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Signatures block */}
-                    <div className="absolute bottom-6 left-8 right-8 flex justify-between text-xs font-bold">
-                      <div className="text-center w-36">
-                        <div className="h-6"></div>
-                        <div className="border-t border-zinc-800 pt-1 text-zinc-700">Class Teacher</div>
-                      </div>
-                      <div className="text-center w-36">
-                        <div className="h-6"></div>
-                        <div className="border-t border-zinc-800 pt-1 text-zinc-700">Principal Signature</div>
-                      </div>
-                    </div>
-
-                  </div>
-                </div>
+          <div id="printable-report-card-container" className="space-y-6">
+            {isReportCardOpen && (
+              <style dangerouslySetInnerHTML={{__html: `
+                @media print {
+                  @page {
+                    size: portrait !important;
+                    margin: 8mm !important;
+                  }
+                  body {
+                    background-color: white !important;
+                    color: black !important;
+                    padding: 0 !important;
+                    margin: 0 !important;
+                  }
+                }
+              `}} />
+            )}
+            {/* Action Bar (Not printed) */}
+            <div className="flex justify-between items-center bg-zinc-50 border-b border-border p-4 -m-6 mb-6 no-print">
+              <span className="text-xs font-bold text-text-secondary">Progress Report Card Preview</span>
+              <div className="flex items-center gap-2">
+                <Button type="button" onClick={() => window.print()} className="flex items-center gap-2 font-bold py-1.5 px-3">
+                  <Printer className="h-4 w-4" /> Print Report Card
+                </Button>
               </div>
-            );
-          })()
+            </div>
+
+            {/* A4 Report Card document */}
+            <div className="w-full overflow-x-auto py-2 bg-zinc-100 dark:bg-zinc-800 rounded-lg flex justify-start lg:justify-center p-2">
+              <div id="printable-report-card" className="border-4 border-double border-zinc-400 p-8 bg-white text-zinc-900 rounded-sm font-sans relative w-[194mm] max-w-full" style={{ boxSizing: 'border-box' }}>
+                
+                {/* Report Card Header */}
+                <div className="text-center border-b-2 border-zinc-800 pb-6">
+                  <div className="flex justify-center mb-2">
+                    {selectedReportCard.school_logo ? (
+                      <img src={selectedReportCard.school_logo} alt="Logo" className="h-16 w-16 object-contain" />
+                    ) : (
+                      <div className="rounded-full bg-zinc-100 border border-zinc-300 flex items-center justify-center font-bold text-zinc-600 uppercase h-16 w-16 text-lg">
+                        {selectedReportCard.school_name.charAt(0)}
+                      </div>
+                    )}
+                  </div>
+                  <h2 className="text-2xl font-black uppercase tracking-tight text-zinc-900 font-display">{selectedReportCard.school_name}</h2>
+                  <h4 className="text-xs font-bold tracking-widest text-zinc-500 uppercase mt-1">
+                    {selectedReportCard.exam_name} ACADEMIC PERFORMANCE
+                  </h4>
+                  <p className="text-xs font-mono text-zinc-600 mt-1">Academic Year: {selectedReportCard.academic_year_name}</p>
+                </div>
+
+                {/* Student Metadata grid */}
+                <div className="grid grid-cols-3 gap-y-4 gap-x-4 py-8 text-xs border-b border-zinc-300 font-semibold leading-relaxed px-2">
+                  <div>Student: <span className="font-bold text-zinc-900">{selectedReportCard.student_name}</span></div>
+                  <div className="text-center">Class: <span className="font-bold text-zinc-900">{selectedReportCard.class_name} {selectedReportCard.class_section ? `(${selectedReportCard.class_section})` : ''}</span></div>
+                  <div className="text-right">SR No: <span className="font-mono text-zinc-700">{selectedReportCard.admission_no || 'N/A'}</span></div>
+                  
+                  <div>Father: <span className="text-zinc-700">{selectedReportCard.father_name || 'N/A'}</span></div>
+                  <div className="text-center">Mother: <span className="text-zinc-700">{selectedReportCard.mother_name || 'N/A'}</span></div>
+                  <div className="text-right">Roll No: <span className="font-mono text-zinc-700">{selectedReportCard.roll_no}</span></div>
+                </div>
+
+                {/* Marks Table */}
+                <div className="py-8">
+                  <table className="w-full text-left text-xs border border-zinc-400 border-collapse table-layout-fixed">
+                    <thead>
+                      <tr className="bg-zinc-100 border-b border-zinc-400">
+                        <th className="p-2 border-r border-zinc-400 font-bold uppercase whitespace-nowrap text-xs">Subject</th>
+                        <th className="p-2 border-r border-zinc-400 font-bold uppercase text-center w-32 whitespace-nowrap text-xs">Obtained Marks</th>
+                        <th className="p-2 border-r border-zinc-400 font-bold uppercase text-center w-28 whitespace-nowrap text-xs">Max Marks</th>
+                        <th className="p-2 border-r border-zinc-400 font-bold uppercase text-center w-28 whitespace-nowrap text-xs">Passing Marks</th>
+                        <th className="p-2 border-r border-zinc-400 font-bold uppercase text-center w-20 whitespace-nowrap text-xs">Grade</th>
+                        <th className="p-2 font-bold uppercase text-center w-24 whitespace-nowrap text-xs">Result</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedReportCard.subjects.map((s, idx) => (
+                        <tr key={idx} className="border-b border-zinc-300">
+                          <td className="p-2 border-r border-zinc-400 font-semibold text-xs">{s.subject_name}</td>
+                          <td className="p-2 border-r border-zinc-400 text-center font-mono font-bold text-xs">{s.marks_obtained}</td>
+                          <td className="p-2 border-r border-zinc-400 text-center font-mono text-xs">{s.max_marks}</td>
+                          <td className="p-2 border-r border-zinc-400 text-center font-mono text-xs">{s.passing_marks}</td>
+                          <td className="p-2 border-r border-zinc-400 text-center font-bold text-xs">{s.grade}</td>
+                          <td className="p-2 text-center whitespace-nowrap text-xs">
+                            <span className={`font-bold uppercase ${s.result === 'PASS' ? 'text-green-700' : 'text-red-700'}`}>
+                              {s.result}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Results Summary grid */}
+                <div className="grid grid-cols-3 gap-6 p-5 bg-zinc-50 border border-zinc-300 rounded-sm text-xs font-semibold mx-2">
+                  <div>Class Rank: <span className="font-bold text-zinc-900">{selectedReportCard.class_rank}</span></div>
+                  <div className="text-center">Section Rank: <span className="font-bold text-zinc-900">{selectedReportCard.section_rank}</span></div>
+                  <div className="text-right">Grand Total: <span className="font-mono font-bold text-zinc-900">{selectedReportCard.total_obtained} / {selectedReportCard.total_max}</span></div>
+                  
+                  <div>Percentage: <span className="font-mono font-bold text-primary">{selectedReportCard.percentage}%</span></div>
+                  <div className="text-center">Overall Grade: <span className="font-bold text-primary">{selectedReportCard.grade}</span></div>
+                  <div className="text-right">Attendance: <span className="font-mono text-zinc-700">{selectedReportCard.attendance.present_days} / {selectedReportCard.attendance.working_days} Days ({selectedReportCard.attendance.attendance_rate}%)</span></div>
+                </div>
+
+                {/* Remarks/Status display */}
+                <div className="py-8 px-2">
+                  <div className="flex flex-col">
+                    <h4 className="text-xs font-bold uppercase text-zinc-800 mb-2">Final Verdict & Teacher Remarks</h4>
+                    <div className="border border-zinc-300 p-5 min-h-[75px] text-xs leading-relaxed text-zinc-700 italic">
+                      {selectedReportCard.result === 'PASS' 
+                        ? (selectedReportCard.report_card_remark || schoolProfile?.report_card_remark || 'No report card remark has been configured.') 
+                        : 'The student requires additional academic assistance in one or more subjects to meet the passing standards.'
+                      }
+                    </div>
+                  </div>
+                </div>
+
+                {/* Dashed divider */}
+                <div className="border-t border-dashed border-zinc-300 my-8"></div>
+
+                {/* Signatures block */}
+                <div className="flex justify-between text-xs font-bold pt-8">
+                  <div className="text-center w-36">
+                    <div className="h-6"></div>
+                    <div className="border-t border-zinc-800 pt-1 text-zinc-700">Class Teacher</div>
+                  </div>
+                  <div className="text-center w-36">
+                    <div className="h-6"></div>
+                    <div className="border-t border-zinc-800 pt-1 text-zinc-700">Principal Signature</div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
         )}
       </Dialog>
-
-
 
       {/* Add Report Card Remark Dialog */}
       <Dialog

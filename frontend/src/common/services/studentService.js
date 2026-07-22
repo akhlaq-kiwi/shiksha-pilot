@@ -77,4 +77,15 @@ export const studentService = {
   async getPublishedReportCards() {
     return apiClient.get('/api/student/exams-new/report-cards');
   },
+
+  // Word Builder Game
+  async getGameProgress() {
+    return apiClient.get('/api/student/game/word-builder/progress');
+  },
+  async syncGameProgress(data) {
+    return apiClient.post('/api/student/game/word-builder/progress', data);
+  },
+  async claimDailyLogin() {
+    return apiClient.post('/api/student/game/word-builder/claim-daily');
+  },
 };

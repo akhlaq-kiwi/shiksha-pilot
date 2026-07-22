@@ -5,4 +5,4 @@
 - `[x]` Redesign frontend `AnnouncementsPage` layout, modal, live preview, list table, badges, actions, validations
 - `[x]` Implement mobile unread dot color and date format update in `notice_screen.dart`
 - `[x]` Implement mobile notification click navigation in `notification_center_screen.dart`
-- `[ ]` Run build checks & verify execution
+- `[x]` Run build checks & verify execution

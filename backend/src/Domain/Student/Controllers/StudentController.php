@@ -211,4 +211,29 @@ class StudentController extends BaseController
         $data = $this->service->getExamDetails($user, $examId);
         return $this->success($response, $data);
     }
+
+    public function getGameProgress(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, self::ALLOWED_ROLES);
+        $data = $this->service->getGameProgress($user);
+        return $this->success($response, $data);
+    }
+
+    public function syncGameProgress(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, self::ALLOWED_ROLES);
+        $body = (array) $request->getParsedBody();
+        $data = $this->service->syncGameProgress($user, $body);
+        return $this->success($response, $data);
+    }
+
+    public function claimDailyLogin(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, self::ALLOWED_ROLES);
+        $data = $this->service->claimDailyLogin($user);
+        return $this->success($response, $data);
+    }
 }

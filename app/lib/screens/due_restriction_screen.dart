@@ -96,7 +96,7 @@ class DueRestrictionScreen extends StatelessWidget {
                       '₹${outstandingDue.toStringAsFixed(0).replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (Match m) => "${m[1]},")}',
                       style: const TextStyle(
                         fontSize: 32,
-                        fontWeight: FontWeight.black,
+                        fontWeight: FontWeight.w900,
                         color: Colors.redAccent,
                       ),
                     ),

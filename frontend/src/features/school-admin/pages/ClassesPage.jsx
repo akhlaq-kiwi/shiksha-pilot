@@ -113,6 +113,19 @@ export default function ClassesPage() {
   const [advancing, setAdvancing] = useState(false);
   const [advanceError, setAdvanceError] = useState('');
 
+  // Class Section Enhancement States
+  const [originalSections, setOriginalSections] = useState([]);
+  const [showMergeConfirm, setShowMergeConfirm] = useState(false);
+  const [sectionCreationMessage, setSectionCreationMessage] = useState('');
+
+  // Transfer Students States
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [transferSourceSec, setTransferSourceSec] = useState('');
+  const [transferDestSec, setTransferDestSec] = useState('');
+  const [selectedTransferStudents, setSelectedTransferStudents] = useState([]);
+  const [transferSubmitting, setTransferSubmitting] = useState(false);
+  const [transferError, setTransferError] = useState('');
+
   const loadData = async () => {
     setLoading(true);
     setError('');
@@ -170,6 +183,7 @@ export default function ClassesPage() {
     const sType = detectSectionType(gc.sections);
     setSectionTypeInput(sType);
     setSelectedSections(gc.sections || []);
+    setOriginalSections(gc.sections || []);
     setEditingStudentCount(gc.studentCount || 0);
 
     setClassFormError('');
@@ -185,6 +199,7 @@ export default function ClassesPage() {
     setClassNameInput('');
     setSectionTypeInput('');
     setSelectedSections([]);
+    setOriginalSections([]);
     setEditingStudentCount(0);
     setClassFormError('');
     setSectionTypeError('');
@@ -192,7 +207,7 @@ export default function ClassesPage() {
   };
 
   const handleSectionTypeChange = (newType) => {
-    if (isEditing && editingStudentCount > 0 && newType !== sectionTypeInput) {
+    if (isEditing && editingStudentCount > 0 && sectionTypeInput !== '' && newType !== sectionTypeInput) {
       setSectionTypeError('Section type cannot be changed because students are already assigned to this class.');
       return;
     }
@@ -231,8 +246,53 @@ export default function ClassesPage() {
     }
   };
 
+  const executeSaveClass = async (sectionsPayload) => {
+    setSavingClass(true);
+    try {
+      const isTransition = isEditing && originalSections.length === 0 && sectionsPayload.length > 0 && editingStudentCount > 0;
+
+      if (isEditing) {
+        await schoolService.updateClass({
+          oldName: editOldClassName,
+          name: classNameInput.trim(),
+          sections: sectionsPayload
+        });
+      } else {
+        await schoolService.createClass({
+          name: classNameInput.trim(),
+          sections: sectionsPayload
+        });
+      }
+
+      handleCloseClassForm();
+      await loadData();
+
+      if (isTransition) {
+        const firstSec = sectionsPayload[0];
+        setSectionCreationMessage(
+          `Sections have been created successfully. All existing students have been assigned to Section ${firstSec}. You can redistribute students anytime using Student Transfer.`
+        );
+      }
+    } catch (err) {
+      console.error(err);
+      const errRes = err.data || err.response?.data;
+      if (errRes?.errors?.name) {
+        setClassFormError(errRes.errors.name);
+      } else if (errRes?.errors?.sections) {
+        setSectionsFieldError(errRes.errors.sections);
+      } else if (errRes?.errors?.section_type) {
+        setSectionTypeError(errRes.errors.section_type);
+      } else {
+        setClassFormError(err.message || 'Failed to save class.');
+      }
+    } finally {
+      setSavingClass(false);
+      setShowMergeConfirm(false);
+    }
+  };
+
   const handleCreateClass = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     let hasError = false;
 
     if (!classNameInput.trim()) {
@@ -252,37 +312,13 @@ export default function ClassesPage() {
 
     if (hasError) return;
 
-    setSavingClass(true);
-    try {
-      if (isEditing) {
-        await schoolService.updateClass({
-          oldName: editOldClassName,
-          name: classNameInput.trim(),
-          sections: selectedSections
-        });
-      } else {
-        await schoolService.createClass({
-          name: classNameInput.trim(),
-          sections: selectedSections
-        });
-      }
-      handleCloseClassForm();
-      await loadData();
-    } catch (err) {
-      console.error(err);
-      const errRes = err.data || err.response?.data;
-      if (errRes?.errors?.name) {
-        setClassFormError(errRes.errors.name);
-      } else if (errRes?.errors?.sections) {
-        setSectionsFieldError(errRes.errors.sections);
-      } else if (errRes?.errors?.section_type) {
-        setSectionTypeError(errRes.errors.section_type);
-      } else {
-        setClassFormError(err.message || 'Failed to save class.');
-      }
-    } finally {
-      setSavingClass(false);
+    if (isEditing && originalSections.length > 0 && selectedSections.length === 0) {
+      // Show confirmation dialog before merging all sections back to none
+      setShowMergeConfirm(true);
+      return;
     }
+
+    await executeSaveClass(selectedSections);
   };
 
   // Delete Class & Warning Modal States
@@ -343,7 +379,7 @@ export default function ClassesPage() {
     // Populate student counts by grouping matching class names
     Object.keys(groups).forEach(name => {
       groups[name].sections.sort();
-      groups[name].studentCount = students.filter(s => s.class_name === name).length;
+      groups[name].studentCount = students.filter(s => s.class_name === name && s.status === 'ACTIVE').length;
     });
 
     return Object.values(groups).sort((a, b) => {
@@ -501,9 +537,26 @@ export default function ClassesPage() {
               <h2 className="text-2xl font-black text-text-primary tracking-tight font-display">{selectedClassName} ({rosterStudents.length})</h2>
             </div>
             {!isReadOnly && (
-              <Button className="flex items-center gap-2 font-bold" onClick={() => { setView('enroll'); setSelectedStudentId(null); }}>
-                <Plus className="h-4 w-4" /> Enroll Student
-              </Button>
+              <div className="flex items-center gap-2">
+                {rosterSections.length > 0 && (
+                  <Button 
+                    variant="secondary" 
+                    className="flex items-center gap-2 font-bold" 
+                    onClick={() => {
+                      setTransferSourceSec('');
+                      setTransferDestSec('');
+                      setSelectedTransferStudents([]);
+                      setTransferError('');
+                      setIsTransferModalOpen(true);
+                    }}
+                  >
+                    Transfer Students
+                  </Button>
+                )}
+                <Button className="flex items-center gap-2 font-bold" onClick={() => { setView('enroll'); setSelectedStudentId(null); }}>
+                  <Plus className="h-4 w-4" /> Enroll Student
+                </Button>
+              </div>
             )}
           </div>
 
@@ -740,6 +793,147 @@ export default function ClassesPage() {
           role="PARENT"
           target={credentialsTarget}
         />
+
+        {/* Transfer Students Modal */}
+        {isTransferModalOpen && (
+          <Dialog
+            isOpen={isTransferModalOpen}
+            title={`Transfer Students — ${selectedClassName}`}
+            onClose={() => setIsTransferModalOpen(false)}
+          >
+            <div className="space-y-4 text-xs font-semibold text-text-secondary max-w-md">
+              {transferError && (
+                <div className="p-3 bg-red-500/10 text-red-600 border border-red-500/20 rounded-xl text-xs font-semibold">
+                  {transferError}
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-text-muted uppercase tracking-wider block">Source Section *</label>
+                  <select
+                    value={transferSourceSec}
+                    onChange={(e) => {
+                      setTransferSourceSec(e.target.value);
+                      setSelectedTransferStudents([]);
+                    }}
+                    className="w-full rounded-xl border border-border bg-surface text-text-primary px-3 py-2 text-xs font-bold outline-none"
+                  >
+                    <option value="">Select Source...</option>
+                    {(classes.filter(c => c.name === selectedClassName && c.section).map(c => c.section).sort()).map(sec => (
+                      <option key={sec} value={sec}>Section {sec}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-text-muted uppercase tracking-wider block">Destination Section *</label>
+                  <select
+                    value={transferDestSec}
+                    onChange={(e) => setTransferDestSec(e.target.value)}
+                    className="w-full rounded-xl border border-border bg-surface text-text-primary px-3 py-2 text-xs font-bold outline-none"
+                  >
+                    <option value="">Select Destination...</option>
+                    {(classes.filter(c => c.name === selectedClassName && c.section).map(c => c.section).sort()).filter(sec => sec !== transferSourceSec).map(sec => (
+                      <option key={sec} value={sec}>Section {sec}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {transferSourceSec && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between border-b border-border pb-1.5">
+                    <span className="text-[10px] font-black text-text-muted uppercase tracking-wider">Select Students</span>
+                    {students.filter(s => s.class_name === selectedClassName && s.section === transferSourceSec && s.status === 'ACTIVE').length > 0 && (
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={selectedTransferStudents.length === students.filter(s => s.class_name === selectedClassName && s.section === transferSourceSec && s.status === 'ACTIVE').length}
+                          onChange={() => {
+                            const srcStus = students.filter(s => s.class_name === selectedClassName && s.section === transferSourceSec && s.status === 'ACTIVE');
+                            if (selectedTransferStudents.length === srcStus.length) {
+                              setSelectedTransferStudents([]);
+                            } else {
+                              setSelectedTransferStudents(srcStus.map(s => s.id));
+                            }
+                          }}
+                          className="rounded border-zinc-300 text-primary focus:ring-primary h-3.5 w-3.5"
+                        />
+                        <span className="text-[10px] text-text-muted">Select All</span>
+                      </label>
+                    )}
+                  </div>
+
+                  <div className="max-h-48 overflow-y-auto border border-border rounded-xl p-2.5 space-y-2 bg-zinc-50/50 dark:bg-zinc-900/10">
+                    {students.filter(s => s.class_name === selectedClassName && s.section === transferSourceSec && s.status === 'ACTIVE').length === 0 ? (
+                      <p className="text-center text-text-muted py-4">No active students in Section {transferSourceSec}</p>
+                    ) : (
+                      students.filter(s => s.class_name === selectedClassName && s.section === transferSourceSec && s.status === 'ACTIVE').map(s => {
+                        const isChecked = selectedTransferStudents.includes(s.id);
+                        return (
+                          <label
+                            key={s.id}
+                            className={`flex items-center gap-3 p-2 rounded-lg border cursor-pointer select-none transition-all ${isChecked ? 'border-primary bg-primary/10 text-primary font-bold shadow-xs' : 'border-transparent hover:bg-hover'}`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {
+                                if (isChecked) {
+                                  setSelectedTransferStudents(prev => prev.filter(id => id !== s.id));
+                                } else {
+                                  setSelectedTransferStudents(prev => [...prev, s.id]);
+                                }
+                              }}
+                              className="rounded border-zinc-300 text-primary focus:ring-primary h-3.5 w-3.5"
+                            />
+                            <span>{s.name} (Roll: {s.roll_no || s.roll || '-'})</span>
+                          </label>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-2 justify-end pt-2">
+                <Button
+                  variant="secondary"
+                  onClick={() => setIsTransferModalOpen(false)}
+                  disabled={transferSubmitting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={async () => {
+                    const srcStus = students.filter(s => s.class_name === selectedClassName && s.section === transferSourceSec && s.status === 'ACTIVE');
+                    if (!transferSourceSec || !transferDestSec || selectedTransferStudents.length === 0) return;
+                    setTransferSubmitting(true);
+                    setTransferError('');
+                    try {
+                      await schoolService.transferStudents({
+                        class_name: selectedClassName,
+                        destination_section: transferDestSec,
+                        student_ids: selectedTransferStudents
+                      });
+                      setIsTransferModalOpen(false);
+                      await loadData();
+                    } catch (err) {
+                      console.error(err);
+                      setTransferError(err.message || 'Failed to transfer students.');
+                    } finally {
+                      setTransferSubmitting(false);
+                    }
+                  }}
+                  disabled={transferSubmitting || !transferSourceSec || !transferDestSec || selectedTransferStudents.length === 0}
+                >
+                  {transferSubmitting ? 'Transferring...' : 'Transfer'}
+                </Button>
+              </div>
+            </div>
+          </Dialog>
+        )}
       </>
     );
   }
@@ -867,14 +1061,14 @@ export default function ClassesPage() {
                 <select
                   value={sectionTypeInput}
                   onChange={e => handleSectionTypeChange(e.target.value)}
-                  disabled={isEditing && editingStudentCount > 0}
-                  className={`flex h-9 w-full rounded-md border bg-surface px-3 py-1.5 text-sm text-text-primary shadow-xs transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-950 dark:border-zinc-800 ${isEditing && editingStudentCount > 0 ? 'bg-zinc-100 dark:bg-zinc-800 cursor-not-allowed' : ''}`}
+                  disabled={isEditing && editingStudentCount > 0 && sectionTypeInput !== ''}
+                  className={`flex h-9 w-full rounded-md border bg-surface px-3 py-1.5 text-sm text-text-primary shadow-xs transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-950 dark:border-zinc-800 ${isEditing && editingStudentCount > 0 && sectionTypeInput !== '' ? 'bg-zinc-100 dark:bg-zinc-800 cursor-not-allowed' : ''}`}
                 >
                   <option value="">No Sections (Optional)</option>
                   <option value={SECTION_TYPES.ALPHABET}>Alphabet Sections (A, B, C, D)</option>
                   <option value={SECTION_TYPES.COLOR}>Color Sections (Red, Blue, Green, Yellow)</option>
                 </select>
-                {isEditing && editingStudentCount > 0 && (
+                {isEditing && editingStudentCount > 0 && sectionTypeInput !== '' && (
                   <p className="text-[10px] text-amber-600 font-bold mt-1">
                     Section type cannot be changed because students are already assigned to this class.
                   </p>
@@ -1168,6 +1362,51 @@ export default function ClassesPage() {
         target={credentialsTarget}
       />
 
+      {/* Merge Sections Confirmation Modal */}
+      {showMergeConfirm && (
+        <Dialog
+          isOpen={showMergeConfirm}
+          title="Remove All Sections"
+          onClose={() => setShowMergeConfirm(false)}
+        >
+          <div className="space-y-4 max-w-sm text-xs font-semibold text-text-secondary">
+            <p className="leading-relaxed">
+              All students will be merged into one class without sections.
+            </p>
+            <p className="text-text-muted font-medium">
+              Do you want to continue?
+            </p>
+            <div className="flex gap-2 justify-end pt-2">
+              <Button variant="secondary" onClick={() => setShowMergeConfirm(false)}>
+                Cancel
+              </Button>
+              <Button onClick={() => executeSaveClass(selectedSections)} className="font-bold">
+                Continue
+              </Button>
+            </div>
+          </div>
+        </Dialog>
+      )}
+
+      {/* Section Creation Success Modal */}
+      {sectionCreationMessage && (
+        <Dialog
+          isOpen={!!sectionCreationMessage}
+          title="Sections Created Successfully"
+          onClose={() => setSectionCreationMessage('')}
+        >
+          <div className="space-y-4 max-w-sm text-xs font-semibold text-text-secondary leading-relaxed">
+            <p>Sections have been created successfully.</p>
+            <p>All existing students have been assigned to Section {selectedSections[0] || 'A'}.</p>
+            <p className="text-text-muted font-medium">You can redistribute students anytime using Student Transfer.</p>
+            <div className="flex justify-end pt-2">
+              <Button onClick={() => setSectionCreationMessage('')}>Understood</Button>
+            </div>
+          </div>
+        </Dialog>
+      )}
+
+      {/* Transfer Students Modal moved to roster view block */}
     </div>
   );
 }
