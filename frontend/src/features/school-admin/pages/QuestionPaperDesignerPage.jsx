@@ -309,11 +309,14 @@ export default function QuestionPaperDesignerPage() {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [dragPosStart, setDragPosStart] = useState({ x: 0, y: 0 });
   const [activeFloatingId, setActiveFloatingId] = useState(null);
+  const [selectedFontSize, setSelectedFontSize] = useState('13px');
+  const [isSizeDropdownOpen, setIsSizeDropdownOpen] = useState(false);
 
-  // Floating Images resize drag state
   const [resizingId, setResizingId] = useState(null);
   const [resizeStartX, setResizeStartX] = useState(0);
+  const [resizeStartY, setResizeStartY] = useState(0);
   const [resizeStartWidth, setResizeStartWidth] = useState(0);
+  const [resizeStartHeight, setResizeStartHeight] = useState(0);
 
   // Refs for synchronous upload handling (prevents React state race condition)
   const activeQuestionIdRef = useRef(null);
@@ -917,14 +920,49 @@ export default function QuestionPaperDesignerPage() {
     recordHistory(nextQuestions);
   };
 
+  const getSpawningY = (qId) => {
+    if (!qId) return 230;
+    const previewEl = document.getElementById(`preview-q-${qId}`);
+    const paperEl = document.getElementById("printable-question-paper-doc");
+    if (previewEl && paperEl) {
+      const previewRect = previewEl.getBoundingClientRect();
+      const paperRect = paperEl.getBoundingClientRect();
+      const relativeY = (previewRect.top - paperRect.top) / (zoomFactor || 1);
+      return Math.max(50, Math.round(relativeY + 15));
+    }
+    return 230;
+  };
+
   // Insert Box, Circle or Underline answer indicator at selection or end
   const insertAnswerSpace = (qId, type) => {
+    let width = 28;
+    let height = 28;
+    if (type === 'line') {
+      width = 140;
+      height = 2;
+    } else if (type === 'rectangle') {
+      width = 160;
+      height = 90;
+    } else if (type === 'square') {
+      width = 80;
+      height = 80;
+    } else if (type === 'circle') {
+      width = 40;
+      height = 40;
+    } else if (type === 'box') {
+      width = 40;
+      height = 40;
+    }
+
+    const spawningY = getSpawningY(qId);
+
     const newSpace = {
       id: 'fl-space-' + Date.now(),
-      type: type === 'box' ? 'box' : type === 'circle' ? 'circle' : 'line',
+      type: type,
       x: 180,
-      y: 230,
-      width: type === 'line' ? 140 : 28,
+      y: spawningY,
+      width: width,
+      height: height,
       rotate: 0
     };
     setFloatingImages(prev => {
@@ -1048,7 +1086,8 @@ export default function QuestionPaperDesignerPage() {
     fileInputRef.current.click();
   };
 
-  const triggerFloatingImageUpload = () => {
+  const triggerFloatingImageUpload = (qId) => {
+    activeQuestionIdRef.current = qId;
     isFloatingUploadRef.current = true;
     fileInputRef.current.click();
   };
@@ -1062,11 +1101,12 @@ export default function QuestionPaperDesignerPage() {
       const base64 = event.target.result;
       
       if (isFloatingUploadRef.current) {
+        const spawningY = getSpawningY(activeQuestionIdRef.current);
         const newFloating = {
           id: 'fl-' + Date.now(),
           src: base64,
           x: 150,
-          y: 200,
+          y: spawningY,
           width: 140,
           rotate: 0
         };
@@ -1167,7 +1207,6 @@ export default function QuestionPaperDesignerPage() {
 
   // Floating Images Drag handlers
   const handleImageMouseDown = (e, imgId, currentX, currentY) => {
-    e.preventDefault();
     // Blur any active inputs or contenteditables to focus body and enable arrow key events
     if (document.activeElement && typeof document.activeElement.blur === 'function') {
       document.activeElement.blur();
@@ -1215,6 +1254,21 @@ export default function QuestionPaperDesignerPage() {
     };
   }, [draggingId, dragStart, dragPosStart, floatingImages]);
 
+  // Centralized helper to prevent text selection during drag/resize
+  useEffect(() => {
+    if (draggingId || resizingId) {
+      document.body.style.userSelect = 'none';
+      document.body.style.webkitUserSelect = 'none';
+    } else {
+      document.body.style.userSelect = '';
+      document.body.style.webkitUserSelect = '';
+    }
+    return () => {
+      document.body.style.userSelect = '';
+      document.body.style.webkitUserSelect = '';
+    };
+  }, [draggingId, resizingId]);
+
   const resizeFloatingImage = (id, delta) => {
     setFloatingImages(prev => {
       const next = prev.map(item => {
@@ -1258,20 +1312,43 @@ export default function QuestionPaperDesignerPage() {
     });
   };
 
-  const handleResizeMouseDown = (e, imgId, currentWidth) => {
+  const handleResizeMouseDown = (e, imgId, currentWidth, currentHeight) => {
     e.stopPropagation();
     e.preventDefault();
     setResizingId(imgId);
     setResizeStartX(e.clientX);
+    setResizeStartY(e.clientY);
     setResizeStartWidth(currentWidth);
+    setResizeStartHeight(currentHeight || currentWidth);
   };
 
   useEffect(() => {
     const handleMouseMove = (e) => {
       if (!resizingId) return;
+      const targetEl = floatingImages.find(item => item.id === resizingId);
+      if (!targetEl) return;
+
       const dx = e.clientX - resizeStartX;
-      const newWidth = Math.max(30, Math.min(600, resizeStartWidth + dx));
-      setFloatingImages(prev => prev.map(item => item.id === resizingId ? { ...item, width: newWidth } : item));
+      const dy = e.clientY - resizeStartY;
+      const newWidth = Math.max(15, Math.min(700, resizeStartWidth + dx));
+      const newHeight = Math.max(15, Math.min(800, resizeStartHeight + dy));
+
+      // Lock aspect ratio for circle, box, and square
+      const isRatioLocked = ['circle', 'box', 'square'].includes(targetEl.type);
+      const isDrawing = targetEl.type === 'drawing';
+
+      let finalHeight = newHeight;
+      if (isRatioLocked) {
+        finalHeight = newWidth;
+      } else if (isDrawing) {
+        finalHeight = Math.round(newWidth * 0.6); // Lock 5:3 ratio for drawings
+      }
+
+      setFloatingImages(prev => prev.map(item => 
+        item.id === resizingId 
+          ? { ...item, width: newWidth, height: finalHeight } 
+          : item
+      ));
     };
 
     const handleMouseUp = () => {
@@ -1291,7 +1368,7 @@ export default function QuestionPaperDesignerPage() {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [resizingId, resizeStartX, resizeStartWidth, floatingImages]);
+  }, [resizingId, resizeStartX, resizeStartY, resizeStartWidth, resizeStartHeight, floatingImages]);
 
 
 
@@ -1370,12 +1447,14 @@ export default function QuestionPaperDesignerPage() {
 
   const insertTable = () => {
     const rowsArr = Array.from({ length: tableRows }, () => Array.from({ length: tableCols }, () => 'Cell'));
+    const spawningY = getSpawningY(activeQuestionIdRef.current);
     const newTable = {
       id: 'fl-table-' + Date.now(),
       type: 'table',
       x: 100,
-      y: 185,
+      y: spawningY,
       width: 420,
+      height: 120,
       rotate: 0,
       tableData: rowsArr
     };
@@ -1643,11 +1722,12 @@ export default function QuestionPaperDesignerPage() {
         return next;
       });
     } else {
+      const spawningY = getSpawningY(activeQuestionIdRef.current);
       const newDrawing = {
         id: 'fl-draw-' + Date.now(),
         type: 'drawing',
         x: 100,
-        y: 185,
+        y: spawningY,
         width: 360,
         rotate: 0,
         drawingData: shapes
@@ -1815,10 +1895,130 @@ export default function QuestionPaperDesignerPage() {
     URL.revokeObjectURL(url);
   };
 
-  // Word formatting helper triggers
   const applyTextFormat = (cmd, val = null) => {
     document.execCommand(cmd, false, val);
   };
+
+  const syncActiveEditorContent = () => {
+    const activeEl = document.activeElement;
+    if (activeEl && activeEl.getAttribute('contenteditable') === 'true') {
+      const qId = activeEl.getAttribute('data-q-id');
+      if (qId) {
+        updateQuestionText(qId, activeEl.innerHTML);
+      }
+    }
+  };
+
+  const applyFontSizeToSelection = (size) => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+
+    const range = selection.getRangeAt(0);
+    
+    if (selection.toString() === '') {
+      // Insertion at cursor position
+      const span = document.createElement('span');
+      span.style.fontSize = size;
+      span.appendChild(document.createTextNode('\u200B')); // zero-width space
+      
+      range.insertNode(span);
+      
+      // Place cursor inside the span after the zero-width space
+      selection.removeAllRanges();
+      const newRange = document.createRange();
+      newRange.setStart(span.firstChild, 1);
+      newRange.setEnd(span.firstChild, 1);
+      selection.addRange(newRange);
+    } else {
+      // Wrap selected text
+      const span = document.createElement('span');
+      span.style.fontSize = size;
+      
+      const fragment = range.extractContents();
+      span.appendChild(fragment);
+      range.insertNode(span);
+      
+      selection.removeAllRanges();
+      const newRange = document.createRange();
+      newRange.selectNodeContents(span);
+      selection.addRange(newRange);
+    }
+    
+    setSelectedFontSize(size);
+    syncActiveEditorContent();
+  };
+
+  const adjustSelectedTextSize = (action) => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+
+    const range = selection.getRangeAt(0);
+    
+    // Find parent element to check if it's already a font-size span
+    let parentSpan = range.commonAncestorContainer;
+    if (parentSpan.nodeType === Node.TEXT_NODE) {
+      parentSpan = parentSpan.parentNode;
+    }
+    
+    let currentSize = 13; // default size in pixels
+    if (parentSpan && parentSpan.tagName === 'SPAN' && parentSpan.style.fontSize) {
+      currentSize = parseInt(parentSpan.style.fontSize) || 13;
+    }
+
+    const newSize = action === 'increase' ? currentSize + 1 : Math.max(8, currentSize - 1);
+    const sizeStr = `${newSize}px`;
+    
+    if (selection.toString() === '') {
+      // Insertion at cursor position
+      const span = document.createElement('span');
+      span.style.fontSize = sizeStr;
+      span.appendChild(document.createTextNode('\u200B')); // zero-width space
+      
+      range.insertNode(span);
+      
+      // Place cursor inside the span
+      selection.removeAllRanges();
+      const newRange = document.createRange();
+      newRange.setStart(span.firstChild, 1);
+      newRange.setEnd(span.firstChild, 1);
+      selection.addRange(newRange);
+    } else {
+      // Wrap selected text
+      const span = document.createElement('span');
+      span.style.fontSize = sizeStr;
+      
+      const fragment = range.extractContents();
+      span.appendChild(fragment);
+      range.insertNode(span);
+      
+      selection.removeAllRanges();
+      const newRange = document.createRange();
+      newRange.selectNodeContents(span);
+      selection.addRange(newRange);
+    }
+    
+    setSelectedFontSize(sizeStr);
+    syncActiveEditorContent();
+  };
+
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) return;
+      try {
+        let node = selection.getRangeAt(0).commonAncestorContainer;
+        if (node.nodeType === Node.TEXT_NODE) {
+          node = node.parentNode;
+        }
+        if (node && node.tagName === 'SPAN' && node.style.fontSize) {
+          setSelectedFontSize(node.style.fontSize);
+        }
+      } catch (e) {}
+    };
+
+    document.addEventListener('selectionchange', handleSelectionChange);
+    return () => document.removeEventListener('selectionchange', handleSelectionChange);
+  }, []);
 
   const activeClassName = (classes.find(c => String(c.id) === String(selectedClassId))?.name) || 'Class';
   const activeSubjectName = (subjects.find(s => String(s.id) === String(selectedSubjectId))?.name) || 'Subject';
@@ -1996,62 +2196,7 @@ export default function QuestionPaperDesignerPage() {
             </CardContent>
           </Card>
 
-          {/* CARD 2: EDITOR FORMATTING TOOLBAR */}
           <Card className="sticky top-32 z-30 shadow-md">
-            <CardContent className="p-3 flex flex-wrap items-center gap-1 bg-zinc-50 dark:bg-zinc-900 border-b border-border rounded-t-lg">
-              {/* Text formatting tags */}
-              <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0" title="Bold (Ctrl+B)" onClick={() => applyTextFormat('bold')}><Bold className="h-4 w-4" /></Button>
-              <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0" title="Italic (Ctrl+I)" onClick={() => applyTextFormat('italic')}><Italic className="h-4 w-4" /></Button>
-              <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0" title="Underline (Ctrl+U)" onClick={() => applyTextFormat('underline')}><Underline className="h-4 w-4" /></Button>
-              <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0" title="Strikethrough" onClick={() => applyTextFormat('strikeThrough')}><Strikethrough className="h-4 w-4" /></Button>
-              
-              <div className="h-6 w-px bg-border mx-1" />
-
-              {/* Alignments */}
-              <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0" title="Align Left" onClick={() => applyTextFormat('justifyLeft')}><AlignLeft className="h-4 w-4" /></Button>
-              <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0" title="Align Center" onClick={() => applyTextFormat('justifyCenter')}><AlignCenter className="h-4 w-4" /></Button>
-              <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0" title="Align Right" onClick={() => applyTextFormat('justifyRight')}><AlignRight className="h-4 w-4" /></Button>
-              <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0" title="Justify" onClick={() => applyTextFormat('justifyFull')}><AlignJustify className="h-4 w-4" /></Button>
-
-              <div className="h-6 w-px bg-border mx-1" />
-
-              {/* Lists */}
-              <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0" title="Bullet List" onClick={() => applyTextFormat('insertUnorderedList')}><List className="h-4 w-4" /></Button>
-              <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0" title="Numbered List" onClick={() => applyTextFormat('insertOrderedList')}><ListOrdered className="h-4 w-4" /></Button>
-              
-              <div className="h-6 w-px bg-border mx-1" />
-
-              {/* Superscript/Subscript */}
-              <Button type="button" variant="ghost" size="sm" className="h-8 px-1 text-xs font-bold" title="Superscript" onClick={() => applyTextFormat('superscript')}>x²</Button>
-              <Button type="button" variant="ghost" size="sm" className="h-8 px-1 text-xs font-bold" title="Subscript" onClick={() => applyTextFormat('subscript')}>x₂</Button>
-
-              <div className="h-6 w-px bg-border mx-1" />
-
-              {/* Font Color */}
-              <input 
-                type="color" 
-                title="Text Color" 
-                className="w-6 h-6 p-0 border-0 cursor-pointer rounded-sm"
-                onChange={(e) => applyTextFormat('foreColor', e.target.value)} 
-              />
-              {/* Highlight Background Color */}
-              <input 
-                type="color" 
-                title="Highlight Color" 
-                defaultValue="#ffff00"
-                className="w-6 h-6 p-0 border-0 cursor-pointer rounded-sm"
-                onChange={(e) => applyTextFormat('hiliteColor', e.target.value)} 
-              />
-
-              <div className="h-6 w-px bg-border mx-1" />
-
-              {/* Clear format */}
-              <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs font-bold text-red-500" title="Clear Formatting" onClick={() => applyTextFormat('removeFormat')}>Clear</Button>
-
-              {/* Undo/Redo */}
-              <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0" title="Undo (Ctrl+Z)" onClick={handleUndo}><Undo className="h-4 w-4" /></Button>
-              <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0" title="Redo (Ctrl+Y)" onClick={handleRedo}><Redo className="h-4 w-4" /></Button>
-            </CardContent>
 
             <CardContent className="p-3 flex flex-wrap gap-2 items-center bg-white dark:bg-zinc-950">
               <span className="text-[10px] font-black text-text-muted uppercase">Quick Blocks:</span>
@@ -2069,157 +2214,13 @@ export default function QuestionPaperDesignerPage() {
             </CardContent>
           </Card>
 
-          {/* ACTIVE FLOATING ELEMENT SETTINGS SIDEBAR CARD */}
-          {activeFloatingId && (() => {
-            const el = floatingImages.find(item => item.id === activeFloatingId);
-            if (!el) return null;
-            return (
-              <Card className="border-2 border-primary/45 shadow-md bg-primary/5 mb-4 animate-in fade-in duration-200">
-                <CardContent className="p-4 space-y-3 font-sans">
-                  <div className="flex justify-between items-center pb-2 border-b border-border/50">
-                    <span className="text-xs font-black uppercase text-primary flex items-center gap-1.5">
-                      <Settings className="h-4 w-4" /> Editing {el.type}
-                    </span>
-                    <Button 
-                      type="button" 
-                      variant="ghost" 
-                      size="sm" 
-                      className="h-5 px-1.5 text-[10px] font-bold text-text-muted hover:text-text-primary"
-                      onClick={() => setActiveFloatingId(null)}
-                    >
-                      Done
-                    </Button>
-                  </div>
 
-                  {/* Table Cell Editor */}
-                  {el.type === 'table' && el.tableData && (
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-[10px] font-black text-text-secondary uppercase">Table Cells</span>
-                        <div className="flex gap-1.5">
-                          <Button 
-                            type="button" 
-                            variant="ghost" 
-                            size="sm" 
-                            className="h-5 text-[9px] font-bold text-primary" 
-                            onClick={() => handleAddTableDimension(el.id, 'row')}
-                          >
-                            + Row
-                          </Button>
-                          <Button 
-                            type="button" 
-                            variant="ghost" 
-                            size="sm" 
-                            className="h-5 text-[9px] font-bold text-primary" 
-                            onClick={() => handleAddTableDimension(el.id, 'col')}
-                          >
-                            + Column
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="max-h-[160px] overflow-auto border border-border rounded bg-background p-2">
-                        <table className="border-collapse w-full text-xs">
-                          <tbody>
-                            {el.tableData.map((row, rIdx) => (
-                              <tr key={rIdx}>
-                                {row.map((cell, cIdx) => (
-                                  <td key={cIdx} className="border border-border p-0.5">
-                                    <input 
-                                      type="text"
-                                      value={cell}
-                                      onChange={(e) => updateFloatingTableCell(el.id, rIdx, cIdx, e.target.value)}
-                                      className="w-full bg-transparent border-0 outline-none text-center font-mono p-1 text-[11px]"
-                                    />
-                                  </td>
-                                ))}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
 
-                  {/* Drawing Editor */}
-                  {el.type === 'drawing' && (
-                    <div className="flex gap-2">
-                      <Button 
-                        type="button" 
-                        size="sm" 
-                        className="flex-1 text-xs font-bold text-primary border-primary/20 bg-primary/5 hover:bg-primary/10" 
-                        onClick={() => handleOpenDrawingDialogForFloating(el.id)}
-                      >
-                        Open Drawing Tool
-                      </Button>
-                    </div>
-                  )}
-
-                  {/* Rotation, size sliders, alignment and delete controls */}
-                  <div className="flex flex-col gap-2 pt-2 border-t border-border/40 text-xs">
-                    <div className="flex justify-between items-center gap-2">
-                      <span className="text-[10px] font-bold text-text-muted">Adjust Size:</span>
-                      <input 
-                        type="range"
-                        min={el.type === 'box' || el.type === 'circle' ? "10" : "30"}
-                        max="600"
-                        value={el.width}
-                        onChange={(e) => resizeFloatingImage(el.id, parseInt(e.target.value) - el.width)}
-                        className="w-40 h-1 bg-zinc-200 rounded"
-                      />
-                    </div>
-                    <div className="flex gap-2 justify-end items-center pt-1">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-[10px] font-bold"
-                        onClick={() => rotateFloatingImage(el.id)}
-                      >
-                        Rotate 90°
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-[10px] font-bold text-red-600 hover:bg-red-50 border-red-200"
-                        onClick={() => deleteFloatingImage(el.id)}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })()}
-
-          {/* QUESTIONS LIST WRAPPER */}
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-base font-bold text-text-primary flex items-center gap-1.5">
                 Questions List ({questions.length})
               </h3>
-              
-              {/* Dynamic Marks Counter & Live Validation */}
-              <div className="flex items-center gap-2 text-xs">
-                {parseFloat(maxMarks) > 0 && (
-                  <>
-                    {totalMarks === parseFloat(maxMarks) ? (
-                      <span className="px-2.5 py-1 bg-green-100 text-green-800 border border-green-200 font-bold rounded-full">
-                        Perfect: {totalMarks} / {maxMarks} Marks
-                      </span>
-                    ) : totalMarks > parseFloat(maxMarks) ? (
-                      <span className="px-2.5 py-1 bg-red-100 text-red-800 border border-red-200 font-bold rounded-full animate-pulse">
-                        Exceeded: {totalMarks} / {maxMarks} Marks (Reduce {totalMarks - parseFloat(maxMarks)})
-                      </span>
-                    ) : (
-                      <span className="px-2.5 py-1 bg-amber-100 text-amber-800 border border-amber-200 font-bold rounded-full">
-                        Pending: {totalMarks} / {maxMarks} Marks (Remaining: {parseFloat(maxMarks) - totalMarks})
-                      </span>
-                    )}
-                  </>
-                )}
-              </div>
             </div>
 
             {questions.length === 0 ? (
@@ -2370,23 +2371,25 @@ export default function QuestionPaperDesignerPage() {
                         </div>
                       ) : (
                         <>
-                          {/* Question Text Editor (ContentEditable) */}
                           <div className="space-y-1">
                             <div className="flex justify-between items-center flex-wrap gap-2">
                               <label className="text-[10px] font-black text-text-secondary uppercase">Question Text</label>
                               <div className="flex gap-1.5 items-center flex-wrap">
-                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold" onClick={() => triggerFloatingImageUpload()}>+ Image</Button>
-                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold" onClick={() => { setActiveFloatingId(null); setIsTableOpen(true); }}>+ Table</Button>
+                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold" onClick={() => triggerFloatingImageUpload(q.id)}>+ Image</Button>
+                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold" onClick={() => { activeQuestionIdRef.current = q.id; setActiveFloatingId(null); setIsTableOpen(true); }}>+ Table</Button>
                                 <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold" onClick={() => handleOpenEquationDialog(q.id)}>+ Math</Button>
-                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold" onClick={() => { setActiveFloatingId(null); setShapes([]); setIsDrawingOpen(true); }}>+ Drawing</Button>
+                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold" onClick={() => { activeQuestionIdRef.current = q.id; setActiveFloatingId(null); setShapes([]); setIsDrawingOpen(true); }}>+ Drawing</Button>
                                 <div className="h-4 w-px bg-border mx-1" />
-                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold text-primary hover:bg-primary/5" title="Insert answer box for students to fill in" onClick={() => insertAnswerSpace(null, 'box')}>+ Answer Box [ ]</Button>
-                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold text-primary hover:bg-primary/5" title="Insert answer circle for students to circle" onClick={() => insertAnswerSpace(null, 'circle')}>+ Circle ( )</Button>
-                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold text-primary hover:bg-primary/5" title="Insert write-in line space" onClick={() => insertAnswerSpace(null, 'line')}>+ Line ___</Button>
+                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold text-primary hover:bg-primary/5" title="Insert answer box for students to fill in" onClick={() => insertAnswerSpace(q.id, 'box')}>+ Answer Box [ ]</Button>
+                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold text-primary hover:bg-primary/5" title="Insert answer circle for students to circle" onClick={() => insertAnswerSpace(q.id, 'circle')}>+ Circle ( )</Button>
+                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold text-primary hover:bg-primary/5" title="Insert write-in line space" onClick={() => insertAnswerSpace(q.id, 'line')}>+ Line ___</Button>
+                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold text-primary hover:bg-primary/5" title="Insert square shape" onClick={() => insertAnswerSpace(q.id, 'square')}>+ Square</Button>
+                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold text-primary hover:bg-primary/5" title="Insert rectangle shape" onClick={() => insertAnswerSpace(q.id, 'rectangle')}>+ Rectangle</Button>
                               </div>
                             </div>
                             <div 
                               contentEditable
+                              data-q-id={q.id}
                               dangerouslySetInnerHTML={{ __html: q.text }}
                               onBlur={(e) => {
                                 updateQuestionText(q.id, e.target.innerHTML);
@@ -2818,6 +2821,7 @@ export default function QuestionPaperDesignerPage() {
                       return (
                         <div 
                           key={q.id} 
+                          id={`preview-q-${q.id}`}
                           className={`w-full py-1 my-2 font-extrabold text-sm uppercase tracking-wide border-black ${alignClass} ${borderClass} q-block q-block-section`}
                         >
                           {q.text}
@@ -2830,6 +2834,7 @@ export default function QuestionPaperDesignerPage() {
                       return (
                         <div 
                           key={q.id} 
+                          id={`preview-q-${q.id}`}
                           className={`w-full py-0.5 my-1 font-bold text-xs uppercase tracking-wide border-black ${alignClass} q-block q-block-heading`}
                         >
                           {q.text}
@@ -2841,6 +2846,7 @@ export default function QuestionPaperDesignerPage() {
                       return (
                         <div 
                           key={q.id} 
+                          id={`preview-q-${q.id}`}
                           className="w-full text-xs italic font-semibold font-sans my-1 pl-6 text-zinc-700 q-block leading-relaxed"
                         >
                           {q.text}
@@ -2849,7 +2855,7 @@ export default function QuestionPaperDesignerPage() {
                     }
 
                     return (
-                      <div key={q.id} className="space-y-1.5 q-block">
+                      <div key={q.id} id={`preview-q-${q.id}`} className="space-y-1.5 q-block">
                         <div className="flex justify-between items-start leading-relaxed">
                           <div className="flex-1 flex gap-2">
                             {!isSubParts && <span className="font-extrabold text-sm font-sans">Q {qNum}.</span>}
@@ -2998,11 +3004,14 @@ export default function QuestionPaperDesignerPage() {
                   style={{ 
                     left: `${img.x}px`, 
                     top: `${img.y}px`, 
-                    width: `${img.width}px`, 
+                    width: `${img.width}px`,
+                    height: img.height ? `${img.height}px` : (['circle', 'box', 'square'].includes(img.type) ? `${img.width}px` : img.type === 'drawing' ? `${img.width * 0.6}px` : 'auto'),
                     transform: `rotate(${img.rotate || 0}deg)`,
                     transformOrigin: 'center center',
                     zIndex: 49
                   }}
+                  onDragStart={(e) => e.preventDefault()}
+                  onClick={(e) => e.stopPropagation()}
                   onMouseDown={(e) => {
                     e.stopPropagation();
                     e.currentTarget.focus();
@@ -3010,6 +3019,10 @@ export default function QuestionPaperDesignerPage() {
                     setActiveFloatingId(img.id);
                   }}
                   onKeyDown={(e) => {
+                    // Ignore keydowns if typing in an input
+                    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                      return;
+                    }
                     const keys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Delete', 'Backspace'];
                     if (!keys.includes(e.key)) return;
                     
@@ -3050,8 +3063,13 @@ export default function QuestionPaperDesignerPage() {
                         {img.tableData?.map((row, rIdx) => (
                           <tr key={rIdx}>
                             {row.map((cell, cIdx) => (
-                              <td key={cIdx} className="border border-black p-1 text-center font-sans whitespace-normal break-all">
-                                {cell}
+                              <td key={cIdx} className="border border-black p-0.5 text-center font-sans">
+                                <input 
+                                  type="text"
+                                  value={cell}
+                                  onChange={(e) => updateFloatingTableCell(img.id, rIdx, cIdx, e.target.value)}
+                                  className="w-full text-center border-0 outline-none bg-transparent font-sans text-xs focus:ring-0 p-1 print:p-1.5"
+                                />
                               </td>
                             ))}
                           </tr>
@@ -3092,6 +3110,10 @@ export default function QuestionPaperDesignerPage() {
                     <div className="w-full h-full border border-black bg-white/20 rounded-sm min-h-[24px]"></div>
                   ) : img.type === 'circle' ? (
                     <div className="w-full h-full border border-black rounded-full bg-white/20 min-h-[24px]"></div>
+                  ) : img.type === 'square' ? (
+                    <div className="w-full h-full border border-black bg-white/10 rounded-sm"></div>
+                  ) : img.type === 'rectangle' ? (
+                    <div className="w-full h-full border border-black bg-white/10 rounded-sm"></div>
                   ) : img.type === 'line' ? (
                     <div className="w-full h-0 border-b border-black"></div>
                   ) : (
@@ -3106,14 +3128,48 @@ export default function QuestionPaperDesignerPage() {
                   {img.type !== 'line' && (
                     <div 
                       className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-primary border-2 border-white cursor-se-resize rounded-full translate-x-1/2 translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity z-50 print:hidden shadow-md active:scale-125"
-                      onMouseDown={(e) => handleResizeMouseDown(e, img.id, img.width)}
+                      onMouseDown={(e) => {
+                        const currentHeight = img.height || (['circle', 'box', 'square'].includes(img.type) ? img.width : img.type === 'drawing' ? img.width * 0.6 : 100);
+                        handleResizeMouseDown(e, img.id, img.width, currentHeight);
+                      }}
                       title="Drag corner to resize"
                     />
                   )}
                   {/* Actions toolbar on hover */}
                   <div className="absolute -top-7 left-0 right-0 hidden group-hover:flex justify-between items-center bg-white dark:bg-zinc-900 shadow-md border border-border px-1.5 py-0.5 rounded text-[10px] gap-1.5 z-50 print:hidden font-sans">
                     <span className="font-bold text-text-muted">{img.width}px</span>
-                    <div className="flex gap-1">
+                    <div className="flex gap-1 items-center">
+                      {img.type === 'table' && (
+                        <>
+                          <button 
+                            type="button" 
+                            className="px-1 py-0.5 text-[9px] bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 rounded font-bold text-primary"
+                            onClick={(e) => { e.stopPropagation(); handleAddTableDimension(img.id, 'row'); }}
+                            title="Add Row"
+                          >
+                            +Row
+                          </button>
+                          <button 
+                            type="button" 
+                            className="px-1 py-0.5 text-[9px] bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 rounded font-bold text-primary"
+                            onClick={(e) => { e.stopPropagation(); handleAddTableDimension(img.id, 'col'); }}
+                            title="Add Column"
+                          >
+                            +Col
+                          </button>
+                        </>
+                      )}
+                      {img.type === 'drawing' && (
+                        <button 
+                          type="button" 
+                          className="px-1.5 py-0.5 text-[9px] bg-primary text-white hover:bg-primary/95 rounded font-bold"
+                          onClick={(e) => { e.stopPropagation(); handleOpenDrawingDialogForFloating(img.id); }}
+                          title="Edit Drawing"
+                        >
+                          Edit Shapes
+                        </button>
+                      )}
+                      <div className="h-3 w-px bg-zinc-200 dark:bg-zinc-700 mx-0.5" />
                       <button 
                         type="button" 
                         className="px-1 py-0.5 text-[9px] bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 rounded font-bold text-text-primary"
