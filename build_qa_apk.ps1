@@ -1,7 +1,7 @@
 # PowerShell script to build QA APK for Shiksha Pilot School Hub Flutter app
 $ErrorActionPreference = "Stop"
 
-$workspaceRoot = "c:\Users\bilal\Documents\BN School"
+$workspaceRoot = $PSScriptRoot
 $appDir = Join-Path $workspaceRoot "app"
 $buildsDir = Join-Path $workspaceRoot ".builds"
 
