@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
 import { Button } from './button';
 
-export const Dialog = ({ isOpen, onClose, title, description, children, footer, className = '' }) => {
+export const Dialog = ({ isOpen, onClose, title, description, children, footer, className = '', containerClassName = '' }) => {
   useEffect(() => {
     const handleEscape = (e) => {
       if (e.key === 'Escape') onClose();
@@ -20,7 +20,7 @@ export const Dialog = ({ isOpen, onClose, title, description, children, footer, 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${containerClassName}`}>
       {/* Backdrop */}
       <div 
         className="fixed inset-0 bg-black/50 backdrop-blur-xs transition-opacity duration-200"

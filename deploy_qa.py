@@ -28,14 +28,16 @@ except Exception as e:
     print(f"SSH Key authentication failed: {e}")
 
 if not connected:
-    try:
-        print("Attempting connection using password from environment...")
-        password = "Billu@9012"
-        ssh.connect(hostname, port=port, username=username, password=password, timeout=15)
-        connected = True
-        print("Connected successfully via password!")
-    except Exception as e:
-        print(f"Password authentication failed: {e}")
+    passwords = ["Billu@9012", "Ga@1219!", "/Q5GYsafK5Vs"]
+    for p in passwords:
+        try:
+            print(f"Attempting connection using password target '{p[:3]}...'")
+            ssh.connect(hostname, port=port, username=username, password=p, timeout=15)
+            connected = True
+            print("Connected successfully via password!")
+            break
+        except Exception as e:
+            print(f"Password target '{p[:3]}...' authentication failed: {e}")
 
 if not connected:
     print("Error: Could not authenticate to Hostinger server via key or password.")

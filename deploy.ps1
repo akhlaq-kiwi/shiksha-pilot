@@ -7,6 +7,10 @@ $SSH_HOST = "92.249.46.170"
 $SSH_PORT = "65002"
 $REMOTE_PATH = "/home/u554613359/domains/qa.shikshapilot.com/public_html"
 
+$phpDir = "$PSScriptRoot\.bin\php"
+$nodeDir = "$PSScriptRoot\.bin\node"
+$env:PATH = "$phpDir;$nodeDir;" + $env:PATH
+
 $SMTP_HOST = "smtp.gmail.com"
 $SMTP_PORT = "587"
 $SMTP_USER = "bilalnashi6@gmail.com"
@@ -28,7 +32,9 @@ Write-Host "Building frontend..." -ForegroundColor Yellow
 Copy-Item "frontend/.qa.env" "frontend/.env.qa" -Force
 Push-Location frontend
 npm install
+$env:NODE_OPTIONS = "--max-old-space-size=1536"
 npm run build -- --mode qa
+Remove-Item env:NODE_OPTIONS -ErrorAction SilentlyContinue
 Pop-Location
 Remove-Item "frontend/.env.qa" -Force
 
@@ -106,5 +112,8 @@ Remove-Item $TEMP_DIR -Recurse -Force
 # 5. Run Python deployment script to upload and extract
 Write-Host "Uploading and deploying using deploy_qa.py..." -ForegroundColor Yellow
 python deploy_qa.py
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Error: Python deployment script (deploy_qa.py) failed with exit code $LASTEXITCODE"
+}
 
 Write-Host "QA deployment completed successfully!" -ForegroundColor Green

@@ -5,7 +5,7 @@ import {
   Settings, CheckCircle, AlertCircle, Edit, ChevronUp, ChevronDown, 
   Bold, Italic, Underline, Strikethrough, AlignLeft, AlignCenter, AlignRight, AlignJustify,
   List, ListOrdered, Undo, Redo, Image, Table as TableIcon, Heading, HelpCircle, Eye, 
-  Type, Scissors, FileText, LayoutTemplate, RotateCw, Grid,
+  Type, Scissors, FileText, FolderOpen, LayoutTemplate, RotateCw, Grid,
   Maximize2, ArrowRight, CornerRightDown, PlusCircle, Sparkles, RefreshCw, FileSpreadsheet,
   Square, Circle, MoveRight, HelpCircle as HelpIcon, Minus, Type as TextIcon,
   Palette, Info
@@ -181,6 +181,77 @@ const PAPER_TEMPLATES = {
   }
 };
 
+const MATH_TEMPLATES = [
+  {
+    label: 'Fraction (a/b)',
+    icon: 'a/b',
+    html: '<span class="inline-flex flex-col items-center justify-center align-middle mx-1" style="font-size:0.9em; line-height:1;"><span class="border-b border-black pb-0.5 min-w-[15px] text-center" style="outline:none;">x</span><span class="pt-0.5 min-w-[15px] text-center" style="outline:none;">y</span></span>'
+  },
+  {
+    label: 'Square Root (√x)',
+    icon: '√x',
+    html: '<span class="inline-block align-middle mx-1" style="font-family:sans-serif;">&radic;<span class="border-t border-black px-0.5">x</span></span>'
+  },
+  {
+    label: 'Cube Root (³√x)',
+    icon: '³√x',
+    html: '<span class="inline-block align-middle mx-1" style="font-family:sans-serif;"><sup style="font-size:0.6em; margin-right:-4px; vertical-align:super;">3</sup>&radic;<span class="border-t border-black px-0.5">x</span></span>'
+  },
+  {
+    label: 'Integral (∫)',
+    icon: '∫',
+    html: '<span class="inline-flex items-center align-middle mx-1"><span class="flex flex-col text-[0.65em] leading-none text-right pr-0.5 justify-between h-[1.8em]"><span>b</span><span>a</span></span><span class="text-xl font-serif leading-none">&int;</span><span class="pl-1">f(x)dx</span></span>'
+  },
+  {
+    label: 'Summation (Σ)',
+    icon: 'Σ',
+    html: '<span class="inline-flex flex-col items-center align-middle mx-1 text-center leading-none"><span class="text-[0.6em]">n</span><span class="text-lg font-serif">&Sigma;</span><span class="text-[0.6em]">i=1</span></span><span class="pl-1 align-middle inline-block">x</span>'
+  },
+  {
+    label: 'Limit (lim)',
+    icon: 'lim',
+    html: '<span class="inline-flex flex-col items-center align-middle mx-1 text-center leading-none"><span class="text-[0.85em] font-bold">lim</span><span class="text-[0.6em]">x &rarr; 0</span></span><span class="pl-1 align-middle inline-block">f(x)</span>'
+  },
+  {
+    label: 'Matrix (2x2)',
+    icon: '[ ]',
+    html: '<span class="inline-flex items-center align-middle mx-1"><span class="text-xl font-light pr-1">[</span><span class="grid grid-cols-2 gap-1.5 text-center text-xs"><span>a</span><span>b</span><span>c</span><span>d</span></span><span class="text-xl font-light pl-1">]</span></span>'
+  }
+];
+
+const GREEK_SYMBOLS = [
+  { label: 'alpha', char: 'α', html: '<span class="inline-block font-serif mx-0.5">&alpha;</span>' },
+  { label: 'beta', char: 'β', html: '<span class="inline-block font-serif mx-0.5">&beta;</span>' },
+  { label: 'gamma', char: 'γ', html: '<span class="inline-block font-serif mx-0.5">&gamma;</span>' },
+  { label: 'delta', char: 'δ', html: '<span class="inline-block font-serif mx-0.5">&delta;</span>' },
+  { label: 'theta', char: 'θ', html: '<span class="inline-block font-serif mx-0.5">&theta;</span>' },
+  { label: 'pi', char: 'π', html: '<span class="inline-block font-serif mx-0.5">&pi;</span>' },
+  { label: 'sigma', char: 'σ', html: '<span class="inline-block font-serif mx-0.5">&sigma;</span>' },
+  { label: 'omega', char: 'ω', html: '<span class="inline-block font-serif mx-0.5">&omega;</span>' },
+  { label: 'lambda', char: 'λ', html: '<span class="inline-block font-serif mx-0.5">&lambda;</span>' },
+  { label: 'mu', char: 'μ', html: '<span class="inline-block font-serif mx-0.5">&mu;</span>' }
+];
+
+const MATH_OPERATORS = [
+  { char: '+', html: ' + ' },
+  { char: '-', html: ' - ' },
+  { char: '×', html: ' &times; ' },
+  { char: '÷', html: ' &divide; ' },
+  { char: '±', html: ' &plusmn; ' },
+  { char: '=', html: ' = ' },
+  { char: '≠', html: ' &ne; ' },
+  { char: '≈', html: ' &asymp; ' },
+  { char: '≤', html: ' &le; ' },
+  { char: '≥', html: ' &ge; ' },
+  { char: '∞', html: ' &infin; ' },
+  { char: '∵', html: ' &#8757; ' },
+  { char: '∴', html: ' &there4; ' },
+  { char: 'Δ', html: ' &#916; ' },
+  { char: '°', html: ' &deg; ' },
+  { char: '^', html: '<sup>2</sup>' },
+  { char: 'sub', html: '<sub>2</sub>' }
+];
+
 export default function QuestionPaperDesignerPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -230,6 +301,23 @@ export default function QuestionPaperDesignerPage() {
   // Questions List
   const [questions, setQuestions] = useState([]);
   const [activeQuestionId, setActiveQuestionId] = useState(null);
+  const [activeSubQuestionId, setActiveSubQuestionId] = useState(null);
+  
+  // Floating Images state
+  const [floatingImages, setFloatingImages] = useState([]);
+  const [draggingId, setDraggingId] = useState(null);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [dragPosStart, setDragPosStart] = useState({ x: 0, y: 0 });
+
+  // Floating Images resize drag state
+  const [resizingId, setResizingId] = useState(null);
+  const [resizeStartX, setResizeStartX] = useState(0);
+  const [resizeStartWidth, setResizeStartWidth] = useState(0);
+
+  // Refs for synchronous upload handling (prevents React state race condition)
+  const activeQuestionIdRef = useRef(null);
+  const activeSubQuestionIdRef = useRef(null);
+  const isFloatingUploadRef = useRef(false);
 
   // Modals & Popups Toggle
   const [isDrawingOpen, setIsDrawingOpen] = useState(false);
@@ -245,12 +333,37 @@ export default function QuestionPaperDesignerPage() {
 
   // Version History State
   const [revisions, setRevisions] = useState([]);
+  const [currentPaperId, setCurrentPaperId] = useState(null);
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+  const [savedPapersList, setSavedPapersList] = useState([]);
+  const [librarySelectedClass, setLibrarySelectedClass] = useState(null);
+
+  // Custom Confirmation Dialog State
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null
+  });
+
+  const triggerConfirm = (title, message, onConfirm) => {
+    setConfirmDialog({
+      isOpen: true,
+      title,
+      message,
+      onConfirm: () => {
+        onConfirm();
+        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+      }
+    });
+  };
 
   // Equation Editor State
   const [equationType, setEquationType] = useState('fraction');
   const [eqPartA, setEqPartA] = useState('');
   const [eqPartB, setEqPartB] = useState('');
   const [eqPartC, setEqPartC] = useState('');
+  const [modalHtml, setModalHtml] = useState('');
 
   // Table Inserter State
   const [tableRows, setTableRows] = useState(3);
@@ -413,6 +526,7 @@ export default function QuestionPaperDesignerPage() {
   const saveDraftSilently = () => {
     if (!selectedClassId) return;
     const paperState = {
+      id: currentPaperId,
       selectedClassId,
       selectedSubjectId,
       paperTitle,
@@ -423,9 +537,27 @@ export default function QuestionPaperDesignerPage() {
       instructions,
       academicYearName,
       questions,
+      floatingImages,
       lastSaved: new Date().toISOString()
     };
     localStorage.setItem('qpd_current_draft', JSON.stringify(paperState));
+    
+    // Auto-save should also update the saved paper in library if it already has an ID!
+    if (currentPaperId) {
+      const savedPapers = JSON.parse(localStorage.getItem('qpd_saved_papers') || '[]');
+      const existingIndex = savedPapers.findIndex(p => p.id === currentPaperId);
+      if (existingIndex > -1) {
+        const classObj = classes.find(c => String(c.id) === String(selectedClassId));
+        const subjectObj = subjects.find(s => String(s.id) === String(selectedSubjectId));
+        paperState.className = classObj ? classObj.name : 'Unknown Class';
+        paperState.subjectName = subjectObj ? subjectObj.name : 'Unknown Subject';
+        
+        const updatedPapers = [...savedPapers];
+        updatedPapers[existingIndex] = paperState;
+        localStorage.setItem('qpd_saved_papers', JSON.stringify(updatedPapers));
+        setSavedPapersList(updatedPapers);
+      }
+    }
   };
 
   const saveDraft = () => {
@@ -433,9 +565,25 @@ export default function QuestionPaperDesignerPage() {
       setError('Please select a class before saving draft.');
       return;
     }
+    
+    // Find class name and subject name
+    const classObj = classes.find(c => String(c.id) === String(selectedClassId));
+    const subjectObj = subjects.find(s => String(s.id) === String(selectedSubjectId));
+    const className = classObj ? classObj.name : 'Unknown Class';
+    const subjectName = subjectObj ? subjectObj.name : 'Unknown Subject';
+
+    let paperId = currentPaperId;
+    if (!paperId) {
+      paperId = 'paper-' + Date.now();
+      setCurrentPaperId(paperId);
+    }
+
     const paperState = {
+      id: paperId,
       selectedClassId,
       selectedSubjectId,
+      className,
+      subjectName,
       paperTitle,
       examName,
       duration,
@@ -444,14 +592,29 @@ export default function QuestionPaperDesignerPage() {
       instructions,
       academicYearName,
       questions,
+      floatingImages,
       lastSaved: new Date().toISOString()
     };
     
     // Save draft
     localStorage.setItem('qpd_current_draft', JSON.stringify(paperState));
 
-    // Save to revisions list
-    const currentRevisions = JSON.parse(localStorage.getItem('qpd_revisions') || '[]');
+    // Save to saved papers library
+    const savedPapers = JSON.parse(localStorage.getItem('qpd_saved_papers') || '[]');
+    const existingIndex = savedPapers.findIndex(p => p.id === paperId);
+    let updatedPapers;
+    if (existingIndex > -1) {
+      updatedPapers = [...savedPapers];
+      updatedPapers[existingIndex] = paperState;
+    } else {
+      updatedPapers = [paperState, ...savedPapers];
+    }
+    localStorage.setItem('qpd_saved_papers', JSON.stringify(updatedPapers));
+    setSavedPapersList(updatedPapers);
+
+    // Save to paper-specific revisions list
+    const revisionKey = `qpd_revisions_${paperId}`;
+    const currentRevisions = JSON.parse(localStorage.getItem(revisionKey) || '[]');
     const newRevision = {
       id: 'rev-' + Date.now(),
       timestamp: new Date().toLocaleTimeString() + ' ' + new Date().toLocaleDateString(),
@@ -459,11 +622,11 @@ export default function QuestionPaperDesignerPage() {
       questionCount: questions.length,
       paperState
     };
-    const updatedRevisions = [newRevision, ...currentRevisions].slice(0, 15); // keep max 15 revisions
-    localStorage.setItem('qpd_revisions', JSON.stringify(updatedRevisions));
+    const updatedRevisions = [newRevision, ...currentRevisions].slice(0, 15);
+    localStorage.setItem(revisionKey, JSON.stringify(updatedRevisions));
     setRevisions(updatedRevisions);
 
-    setSuccess('Draft and version history updated successfully!');
+    setSuccess('Paper saved successfully to your library!');
     setTimeout(() => setSuccess(''), 3000);
   };
 
@@ -473,6 +636,7 @@ export default function QuestionPaperDesignerPage() {
     if (saved) {
       try {
         const state = JSON.parse(saved);
+        if (state.id) setCurrentPaperId(state.id);
         if (state.selectedClassId) setSelectedClassId(state.selectedClassId);
         if (state.selectedSubjectId) setSelectedSubjectId(state.selectedSubjectId);
         if (state.paperTitle) setPaperTitle(state.paperTitle);
@@ -487,19 +651,133 @@ export default function QuestionPaperDesignerPage() {
           setHistory([JSON.parse(JSON.stringify(state.questions))]);
           setHistoryIndex(0);
         }
+        if (state.floatingImages) {
+          setFloatingImages(state.floatingImages);
+        } else {
+          setFloatingImages([]);
+        }
+        if (state.id) {
+          const revisionKey = `qpd_revisions_${state.id}`;
+          const savedRevisions = JSON.parse(localStorage.getItem(revisionKey) || '[]');
+          setRevisions(savedRevisions);
+        }
       } catch (err) {
         console.error('Failed to parse draft state', err);
       }
+    } else {
+      const savedRevisions = JSON.parse(localStorage.getItem('qpd_revisions') || '[]');
+      setRevisions(savedRevisions);
     }
 
-    // Load revisions list
-    const savedRevisions = JSON.parse(localStorage.getItem('qpd_revisions') || '[]');
-    setRevisions(savedRevisions);
+    // Load saved papers library
+    const savedList = JSON.parse(localStorage.getItem('qpd_saved_papers') || '[]');
+    setSavedPapersList(savedList);
   }, []);
+
+  const handleNewPaper = () => {
+    const startNew = () => {
+      setCurrentPaperId(null);
+      setSelectedClassId('');
+      setSelectedSubjectId('');
+      setPaperTitle('Terminal Assessment');
+      setExamName('');
+      setDuration('3 Hours');
+      setMaxMarks('100');
+      setPassingMarks('33');
+      setInstructions('1. All questions are compulsory.\n2. Write your answers neatly.\n3. Diagrams should be drawn using a pencil.');
+      setQuestions([]);
+      setFloatingImages([]);
+      setHistory([]);
+      setHistoryIndex(-1);
+      localStorage.removeItem('qpd_current_draft');
+      setSuccess('Started a new paper template.');
+      setTimeout(() => setSuccess(''), 3000);
+    };
+
+    if (questions.length > 0) {
+      triggerConfirm(
+        'Start New Paper',
+        'Starting a new paper will clear the current editor. Make sure you have saved your work. Do you want to continue?',
+        startNew
+      );
+    } else {
+      startNew();
+    }
+  };
+
+  const handleLoadSavedPaper = (paper) => {
+    const loadPaper = () => {
+      setCurrentPaperId(paper.id);
+      if (paper.selectedClassId) setSelectedClassId(paper.selectedClassId);
+      if (paper.selectedSubjectId) setSelectedSubjectId(paper.selectedSubjectId);
+      if (paper.paperTitle) setPaperTitle(paper.paperTitle);
+      if (paper.examName) setExamName(paper.examName);
+      if (paper.duration) setDuration(paper.duration);
+      if (paper.maxMarks) setMaxMarks(paper.maxMarks);
+      if (paper.passingMarks) setPassingMarks(paper.passingMarks);
+      if (paper.instructions) setInstructions(paper.instructions);
+      if (paper.academicYearName) setAcademicYearName(paper.academicYearName);
+      if (paper.questions) {
+        setQuestions(paper.questions);
+        setHistory([JSON.parse(JSON.stringify(paper.questions))]);
+        setHistoryIndex(0);
+      }
+      if (paper.floatingImages) {
+        setFloatingImages(paper.floatingImages);
+      } else {
+        setFloatingImages([]);
+      }
+      localStorage.setItem('qpd_current_draft', JSON.stringify(paper));
+      const revisionKey = `qpd_revisions_${paper.id}`;
+      const savedRevisions = JSON.parse(localStorage.getItem(revisionKey) || '[]');
+      setRevisions(savedRevisions);
+      setIsLibraryOpen(false);
+      setSuccess(`Loaded paper: ${paper.paperTitle || 'Untitled'}`);
+      setTimeout(() => setSuccess(''), 3000);
+    };
+
+    if (questions.length > 0) {
+      triggerConfirm(
+        'Load Saved Paper',
+        'Loading this paper will overwrite the current editor. Do you want to continue?',
+        loadPaper
+      );
+    } else {
+      loadPaper();
+    }
+  };
+
+  const handleDeleteSavedPaper = (id) => {
+    triggerConfirm(
+      'Delete Saved Paper',
+      'Are you sure you want to delete this paper from your library?',
+      () => {
+        const savedPapers = JSON.parse(localStorage.getItem('qpd_saved_papers') || '[]');
+        const updated = savedPapers.filter(p => p.id !== id);
+        localStorage.setItem('qpd_saved_papers', JSON.stringify(updated));
+        setSavedPapersList(updated);
+        localStorage.removeItem(`qpd_revisions_${id}`);
+        if (currentPaperId === id) {
+          setCurrentPaperId(null);
+        }
+        
+        // Return to class list if no papers left in currently selected class
+        const clsNameOfDeleted = savedPapers.find(p => p.id === id)?.className || 'Unassigned Class';
+        const remainingInClass = updated.filter(p => (p.className || 'Unassigned Class') === clsNameOfDeleted);
+        if (remainingInClass.length === 0) {
+          setLibrarySelectedClass(null);
+        }
+
+        setSuccess('Paper deleted from library.');
+        setTimeout(() => setSuccess(''), 3000);
+      }
+    );
+  };
 
   // Restore previous revision
   const handleRestoreRevision = (rev) => {
     const state = rev.paperState;
+    if (state.id) setCurrentPaperId(state.id);
     if (state.selectedClassId) setSelectedClassId(state.selectedClassId);
     if (state.selectedSubjectId) setSelectedSubjectId(state.selectedSubjectId);
     if (state.paperTitle) setPaperTitle(state.paperTitle);
@@ -579,7 +857,7 @@ export default function QuestionPaperDesignerPage() {
     else if (type === 'fill_blanks') defaultText = 'The capital of France is _______.';
     else if (type === 'matching') defaultText = '';
     else if (type === 'sub_parts') {
-      defaultText = 'Answer the following sub-questions:';
+      defaultText = '';
     }
     else if (type === 'section') {
       const existingSectionsCount = questions.filter(q => q.type === 'section').length;
@@ -640,48 +918,21 @@ export default function QuestionPaperDesignerPage() {
 
   // Insert Box, Circle or Underline answer indicator at selection or end
   const insertAnswerSpace = (qId, type) => {
-    let space = '';
-    if (type === 'box') space = ' [ ] ';
-    else if (type === 'circle') space = ' ( ) ';
-    else if (type === 'line') space = ' _______ ';
-
-    // Try to insert at contentEditable cursor position
-    const selection = window.getSelection();
-    if (selection && selection.rangeCount > 0) {
-      const range = selection.getRangeAt(0);
-      let container = range.commonAncestorContainer;
-      while (container && container.nodeType !== Node.ELEMENT_NODE) {
-        container = container.parentNode;
-      }
-      if (container && container.hasAttribute('contenteditable')) {
-        range.deleteContents();
-        const textNode = document.createTextNode(space);
-        range.insertNode(textNode);
-        range.setStartAfter(textNode);
-        range.setEndAfter(textNode);
-        selection.removeAllRanges();
-        selection.addRange(range);
-        
-        const content = container.innerHTML;
-        const nextQuestions = questions.map(q => q.id === qId ? { ...q, text: content } : q);
-        setQuestions(nextQuestions);
-        recordHistory(nextQuestions);
-        return;
-      }
-    }
-
-    // Fallback: append
-    const nextQuestions = questions.map(q => {
-      if (q.id === qId) {
-        return {
-          ...q,
-          text: q.text + space
-        };
-      }
-      return q;
+    const newSpace = {
+      id: 'fl-space-' + Date.now(),
+      type: type === 'box' ? 'box' : type === 'circle' ? 'circle' : 'line',
+      x: 180,
+      y: 230,
+      width: type === 'line' ? 140 : 28,
+      rotate: 0
+    };
+    setFloatingImages(prev => {
+      const next = [...prev, newSpace];
+      const paperState = JSON.parse(localStorage.getItem('qpd_current_draft') || '{}');
+      paperState.floatingImages = next;
+      localStorage.setItem('qpd_current_draft', JSON.stringify(paperState));
+      return next;
     });
-    setQuestions(nextQuestions);
-    recordHistory(nextQuestions);
   };
 
   // Sub-question management
@@ -789,8 +1040,15 @@ export default function QuestionPaperDesignerPage() {
   };
 
   // Image upload handler
-  const triggerImageUpload = (qId) => {
-    setActiveQuestionId(qId);
+  const triggerImageUpload = (qId, sqId = null) => {
+    isFloatingUploadRef.current = false;
+    activeQuestionIdRef.current = qId;
+    activeSubQuestionIdRef.current = sqId;
+    fileInputRef.current.click();
+  };
+
+  const triggerFloatingImageUpload = () => {
+    isFloatingUploadRef.current = true;
     fileInputRef.current.click();
   };
 
@@ -801,22 +1059,64 @@ export default function QuestionPaperDesignerPage() {
     const reader = new FileReader();
     reader.onload = (event) => {
       const base64 = event.target.result;
-      const nextQuestions = questions.map(q => {
-        if (q.id === activeQuestionId) {
-          return {
-            ...q,
-            image: {
-              src: base64,
-              width: 50, // default percentage width
-              rotate: 0,
-              align: 'center'
+      
+      if (isFloatingUploadRef.current) {
+        const newFloating = {
+          id: 'fl-' + Date.now(),
+          src: base64,
+          x: 150,
+          y: 200,
+          width: 140,
+          rotate: 0
+        };
+        setFloatingImages(prev => {
+          const next = [...prev, newFloating];
+          // Update draft and history with new floating images
+          const paperState = JSON.parse(localStorage.getItem('qpd_current_draft') || '{}');
+          paperState.floatingImages = next;
+          localStorage.setItem('qpd_current_draft', JSON.stringify(paperState));
+          return next;
+        });
+      } else {
+        const qId = activeQuestionIdRef.current;
+        const sqId = activeSubQuestionIdRef.current;
+        const nextQuestions = questions.map(q => {
+          if (q.id === qId) {
+            if (sqId) {
+              return {
+                ...q,
+                subQuestions: q.subQuestions.map(sq => {
+                  if (sq.id === sqId) {
+                    return {
+                      ...sq,
+                      image: {
+                        src: base64,
+                        width: 50,
+                        rotate: 0,
+                        align: 'left'
+                      }
+                    };
+                  }
+                  return sq;
+                })
+              };
+            } else {
+              return {
+                ...q,
+                image: {
+                  src: base64,
+                  width: 50, // default percentage width
+                  rotate: 0,
+                  align: 'center'
+                }
+              };
             }
-          };
-        }
-        return q;
-      });
-      setQuestions(nextQuestions);
-      recordHistory(nextQuestions);
+          }
+          return q;
+        });
+        setQuestions(nextQuestions);
+        recordHistory(nextQuestions);
+      }
     };
     reader.readAsDataURL(file);
     e.target.value = ''; // reset file input
@@ -834,6 +1134,264 @@ export default function QuestionPaperDesignerPage() {
     });
     setQuestions(nextQuestions);
     recordHistory(nextQuestions);
+  };
+
+  const updateSubQuestionImage = (qId, sqId, field, val) => {
+    const nextQuestions = questions.map(q => {
+      if (q.id === qId) {
+        return {
+          ...q,
+          subQuestions: q.subQuestions.map(sq => {
+            if (sq.id === sqId) {
+              if (field === 'remove') {
+                return { ...sq, image: null };
+              }
+              return {
+                ...sq,
+                image: {
+                  ...sq.image,
+                  [field]: val
+                }
+              };
+            }
+            return sq;
+          })
+        };
+      }
+      return q;
+    });
+    setQuestions(nextQuestions);
+    recordHistory(nextQuestions);
+  };
+
+  // Floating Images Drag handlers
+  const handleImageMouseDown = (e, imgId, currentX, currentY) => {
+    e.preventDefault();
+    setDraggingId(imgId);
+    setDragStart({ x: e.clientX, y: e.clientY });
+    setDragPosStart({ x: currentX, y: currentY });
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!draggingId) return;
+      const dx = e.clientX - dragStart.x;
+      const dy = e.clientY - dragStart.y;
+      
+      let newX = dragPosStart.x + dx;
+      let newY = dragPosStart.y + dy;
+      
+      const img = floatingImages.find(i => i.id === draggingId);
+      if (img) {
+        newX = Math.max(0, Math.min(720 - (img.width || 100), newX));
+        newY = Math.max(0, newY);
+      }
+
+      setFloatingImages(prev => prev.map(item => item.id === draggingId ? { ...item, x: newX, y: newY } : item));
+    };
+
+    const handleMouseUp = () => {
+      if (draggingId) {
+        setDraggingId(null);
+        // Persist position update silently
+        const paperState = JSON.parse(localStorage.getItem('qpd_current_draft') || '{}');
+        paperState.floatingImages = floatingImages;
+        localStorage.setItem('qpd_current_draft', JSON.stringify(paperState));
+      }
+    };
+
+    if (draggingId) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [draggingId, dragStart, dragPosStart, floatingImages]);
+
+  const resizeFloatingImage = (id, delta) => {
+    setFloatingImages(prev => {
+      const next = prev.map(item => {
+        if (item.id === id) {
+          const newWidth = Math.max(30, Math.min(600, item.width + delta));
+          return { ...item, width: newWidth };
+        }
+        return item;
+      });
+      const paperState = JSON.parse(localStorage.getItem('qpd_current_draft') || '{}');
+      paperState.floatingImages = next;
+      localStorage.setItem('qpd_current_draft', JSON.stringify(paperState));
+      return next;
+    });
+  };
+
+  const rotateFloatingImage = (id) => {
+    setFloatingImages(prev => {
+      const next = prev.map(item => {
+        if (item.id === id) {
+          return { ...item, rotate: (item.rotate + 90) % 360 };
+        }
+        return item;
+      });
+      const paperState = JSON.parse(localStorage.getItem('qpd_current_draft') || '{}');
+      paperState.floatingImages = next;
+      localStorage.setItem('qpd_current_draft', JSON.stringify(paperState));
+      return next;
+    });
+  };
+
+  const deleteFloatingImage = (id) => {
+    setFloatingImages(prev => {
+      const next = prev.filter(item => item.id !== id);
+      const paperState = JSON.parse(localStorage.getItem('qpd_current_draft') || '{}');
+      paperState.floatingImages = next;
+      localStorage.setItem('qpd_current_draft', JSON.stringify(paperState));
+      return next;
+    });
+  };
+
+  const handleResizeMouseDown = (e, imgId, currentWidth) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setResizingId(imgId);
+    setResizeStartX(e.clientX);
+    setResizeStartWidth(currentWidth);
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!resizingId) return;
+      const dx = e.clientX - resizeStartX;
+      const newWidth = Math.max(30, Math.min(600, resizeStartWidth + dx));
+      setFloatingImages(prev => prev.map(item => item.id === resizingId ? { ...item, width: newWidth } : item));
+    };
+
+    const handleMouseUp = () => {
+      if (resizingId) {
+        setResizingId(null);
+        const paperState = JSON.parse(localStorage.getItem('qpd_current_draft') || '{}');
+        paperState.floatingImages = floatingImages;
+        localStorage.setItem('qpd_current_draft', JSON.stringify(paperState));
+      }
+    };
+
+    if (resizingId) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [resizingId, resizeStartX, resizeStartWidth, floatingImages]);
+
+  const [activeFloatingId, setActiveFloatingId] = useState(null);
+
+  // Keyboard Nudging and Deletion Listener for Active Floating Element
+  useEffect(() => {
+    const handleNudge = (e) => {
+      if (!activeFloatingId) return;
+
+      const keys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Delete', 'Backspace'];
+      if (!keys.includes(e.key)) return;
+
+      // Ensure user is not currently typing in a text field
+      if (document.activeElement && (
+        document.activeElement.tagName === 'INPUT' || 
+        document.activeElement.tagName === 'TEXTAREA' || 
+        document.activeElement.isContentEditable
+      )) {
+        return;
+      }
+
+      e.preventDefault();
+      const nudgeAmount = e.shiftKey ? 5 : 1;
+
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        deleteFloatingImage(activeFloatingId);
+        setActiveFloatingId(null);
+        return;
+      }
+
+      setFloatingImages(prev => {
+        const next = prev.map(img => {
+          if (img.id === activeFloatingId) {
+            let newX = img.x;
+            let newY = img.y;
+            
+            if (e.key === 'ArrowLeft') newX = Math.max(0, img.x - nudgeAmount);
+            if (e.key === 'ArrowRight') newX = Math.min(720 - (img.width || 100), img.x + nudgeAmount);
+            if (e.key === 'ArrowUp') newY = Math.max(0, img.y - nudgeAmount);
+            if (e.key === 'ArrowDown') newY = img.y + nudgeAmount;
+
+            return { ...img, x: newX, y: newY };
+          }
+          return img;
+        });
+        const paperState = JSON.parse(localStorage.getItem('qpd_current_draft') || '{}');
+        paperState.floatingImages = next;
+        localStorage.setItem('qpd_current_draft', JSON.stringify(paperState));
+        return next;
+      });
+    };
+
+    window.addEventListener('keydown', handleNudge);
+    return () => window.removeEventListener('keydown', handleNudge);
+  }, [activeFloatingId, floatingImages]);
+
+  const handleAddTableDimension = (tableId, type) => {
+    setFloatingImages(prev => {
+      const next = prev.map(item => {
+        if (item.id === tableId && item.type === 'table' && item.tableData) {
+          if (type === 'row') {
+            const colsCount = item.tableData[0]?.length || 3;
+            const newRow = Array.from({ length: colsCount }, () => 'Cell');
+            return { ...item, tableData: [...item.tableData, newRow] };
+          } else {
+            return {
+              ...item,
+              tableData: item.tableData.map(row => [...row, 'Cell'])
+            };
+          }
+        }
+        return item;
+      });
+      const paperState = JSON.parse(localStorage.getItem('qpd_current_draft') || '{}');
+      paperState.floatingImages = next;
+      localStorage.setItem('qpd_current_draft', JSON.stringify(paperState));
+      return next;
+    });
+  };
+
+  const updateFloatingTableCell = (tableId, r, c, val) => {
+    setFloatingImages(prev => {
+      const next = prev.map(item => {
+        if (item.id === tableId && item.type === 'table' && item.tableData) {
+          const nextData = item.tableData.map((row, rIdx) => {
+            if (rIdx === r) {
+              return row.map((cell, cIdx) => cIdx === c ? val : cell);
+            }
+            return row;
+          });
+          return { ...item, tableData: nextData };
+        }
+        return item;
+      });
+      const paperState = JSON.parse(localStorage.getItem('qpd_current_draft') || '{}');
+      paperState.floatingImages = next;
+      localStorage.setItem('qpd_current_draft', JSON.stringify(paperState));
+      return next;
+    });
+  };
+
+  const handleOpenDrawingDialogForFloating = (id) => {
+    const el = floatingImages.find(item => item.id === id);
+    if (el && el.type === 'drawing') {
+      setActiveFloatingId(id);
+      setShapes(el.drawingData || []);
+      setIsDrawingOpen(true);
+    }
   };
 
   const removeQuestionImage = (qId) => {
@@ -857,24 +1415,22 @@ export default function QuestionPaperDesignerPage() {
 
   const insertTable = () => {
     const rowsArr = Array.from({ length: tableRows }, () => Array.from({ length: tableCols }, () => 'Cell'));
-    const nextQuestions = questions.map(q => {
-      if (q.id === activeQuestionId) {
-        return {
-          ...q,
-          table: {
-            rows: tableRows,
-            cols: tableCols,
-            data: rowsArr,
-            borderStyle: 'solid',
-            cellBg: '#ffffff',
-            align: 'left'
-          }
-        };
-      }
-      return q;
+    const newTable = {
+      id: 'fl-table-' + Date.now(),
+      type: 'table',
+      x: 100,
+      y: 185,
+      width: 420,
+      rotate: 0,
+      tableData: rowsArr
+    };
+    setFloatingImages(prev => {
+      const next = [...prev, newTable];
+      const paperState = JSON.parse(localStorage.getItem('qpd_current_draft') || '{}');
+      paperState.floatingImages = next;
+      localStorage.setItem('qpd_current_draft', JSON.stringify(paperState));
+      return next;
     });
-    setQuestions(nextQuestions);
-    recordHistory(nextQuestions);
     setIsTableOpen(false);
   };
 
@@ -911,46 +1467,97 @@ export default function QuestionPaperDesignerPage() {
   // Math equations editor support
   const handleOpenEquationDialog = (qId) => {
     setActiveQuestionId(qId);
-    setEquationType('fraction');
-    setEqPartA('');
-    setEqPartB('');
-    setEqPartC('');
+    const activeQ = questions.find(q => q.id === qId);
+    setModalHtml(activeQ?.text || '');
     setIsEquationOpen(true);
   };
 
-  const insertEquation = () => {
-    let htmlMarkup = '';
-    if (equationType === 'fraction') {
-      htmlMarkup = `<span class="inline-flex flex-col items-center justify-center align-middle mx-1" style="font-size:0.9em; line-height:1;"><span class="border-b border-black pb-0.5">${eqPartA}</span><span class="pt-0.5">${eqPartB}</span></span>`;
-    } else if (equationType === 'sqrt') {
-      htmlMarkup = `<span class="inline-block align-middle mx-1" style="font-family:sans-serif;">&radic;<span class="border-t border-black px-0.5" style="margin-top:-2px;">${eqPartA}</span></span>`;
-    } else if (equationType === 'cube_root') {
-      htmlMarkup = `<span class="inline-block align-middle mx-1" style="font-family:sans-serif;"><sup style="font-size:0.6em; margin-right:-4px; vertical-align:super;">3</sup>&radic;<span class="border-t border-black px-0.5" style="margin-top:-2px;">${eqPartA}</span></span>`;
-    } else if (equationType === 'integral') {
-      htmlMarkup = `<span class="inline-flex items-center align-middle mx-1"><span class="flex flex-col text-[0.65em] leading-none text-right pr-0.5 justify-between h-[1.8em]"><span>${eqPartA}</span><span>${eqPartB}</span></span><span class="text-xl font-serif leading-none">&int;</span><span class="pl-1">${eqPartC}</span></span>`;
-    } else if (equationType === 'limit') {
-      htmlMarkup = `<span class="inline-flex flex-col items-center align-middle mx-1 text-center leading-none"><span class="text-[0.85em] font-bold">lim</span><span class="text-[0.6em]">${eqPartA} &rarr; ${eqPartB}</span></span><span class="pl-1 align-middle inline-block">${eqPartC}</span>`;
-    } else if (equationType === 'matrix') {
-      htmlMarkup = `<span class="inline-flex items-center align-middle mx-1"><span class="text-xl font-light pr-1">[</span><span class="grid grid-cols-2 gap-1.5 text-center text-xs"><span>${eqPartA || '0'}</span><span>${eqPartB || '0'}</span><span>${eqPartC || '0'}</span><span>0</span></span><span class="text-xl font-light pl-1">]</span></span>`;
-    } else if (equationType === 'sigma') {
-      htmlMarkup = `<span class="inline-flex flex-col items-center align-middle mx-1 text-center leading-none"><span class="text-[0.6em]">${eqPartA}</span><span class="text-lg font-serif">&Sigma;</span><span class="text-[0.6em]">${eqPartB}</span></span><span class="pl-1 align-middle inline-block">${eqPartC}</span>`;
-    } else if (equationType === 'greek') {
-      htmlMarkup = `<span class="inline-block font-serif mx-0.5">${eqPartA}</span>`;
+  const insertSymbolHTML = (htmlMarkup) => {
+    const editor = document.getElementById('math-modal-editor');
+    if (editor) {
+      editor.focus();
+    }
+    
+    // Insert HTML at current cursor position
+    const sel = window.getSelection();
+    if (sel.getRangeAt && sel.rangeCount) {
+      const range = sel.getRangeAt(0);
+      range.deleteContents();
+      
+      const el = document.createElement("div");
+      el.innerHTML = htmlMarkup;
+      const frag = document.createDocumentFragment();
+      let node, lastNode;
+      while ((node = el.firstChild)) {
+        lastNode = frag.appendChild(node);
+      }
+      range.insertNode(frag);
+      
+      if (lastNode) {
+        const nextRange = range.cloneRange();
+        nextRange.setStartAfter(lastNode);
+        nextRange.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(nextRange);
+      }
+    } else {
+      if (editor) editor.innerHTML += htmlMarkup;
     }
 
-    const nextQuestions = questions.map(q => {
-      if (q.id === activeQuestionId) {
-        return {
-          ...q,
-          text: q.text + ' ' + htmlMarkup
-        };
-      }
-      return q;
-    });
+    // Sync state in real time so preview updates immediately
+    if (editor && activeQuestionId) {
+      const updatedText = editor.innerHTML;
+      setQuestions(prev => prev.map(q => q.id === activeQuestionId ? { ...q, text: updatedText } : q));
+    }
+  };
 
-    setQuestions(nextQuestions);
-    recordHistory(nextQuestions);
-    setIsEquationOpen(false);
+  const handleModalEditorInput = (e) => {
+    if (activeQuestionId) {
+      const newText = e.target.innerHTML;
+      setQuestions(prev => prev.map(q => q.id === activeQuestionId ? { ...q, text: newText } : q));
+    }
+  };
+
+  const handleModalEditorBlur = (e) => {
+    if (activeQuestionId) {
+      const newText = e.target.innerHTML;
+      setQuestions(prev => prev.map(q => q.id === activeQuestionId ? { ...q, text: newText } : q));
+      recordHistory(questions);
+    }
+  };
+
+  const handleEditorKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      const sel = window.getSelection();
+      if (sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0);
+        let node = range.startContainer;
+        
+        // Traverse up to find if cursor is inside SUP or SUB
+        let supOrSub = null;
+        while (node && node !== e.currentTarget) {
+          if (node.nodeName === 'SUP' || node.nodeName === 'SUB') {
+            supOrSub = node;
+            break;
+          }
+          node = node.parentNode;
+        }
+
+        if (supOrSub) {
+          e.preventDefault();
+          // Insert a regular non-breaking space after the superscript/subscript block
+          const spaceNode = document.createTextNode('\u00A0');
+          supOrSub.parentNode.insertBefore(spaceNode, supOrSub.nextSibling);
+          
+          // Position cursor in the new space node
+          const newRange = document.createRange();
+          newRange.setStart(spaceNode, 1);
+          newRange.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(newRange);
+        }
+      }
+    }
   };
 
   // Drawing Canvas vector tools
@@ -1072,17 +1679,32 @@ export default function QuestionPaperDesignerPage() {
   };
 
   const saveDrawing = () => {
-    const nextQuestions = questions.map(q => {
-      if (q.id === activeQuestionId) {
-        return {
-          ...q,
-          drawing: shapes
-        };
-      }
-      return q;
-    });
-    setQuestions(nextQuestions);
-    recordHistory(nextQuestions);
+    if (activeFloatingId) {
+      setFloatingImages(prev => {
+        const next = prev.map(item => item.id === activeFloatingId ? { ...item, drawingData: shapes } : item);
+        const paperState = JSON.parse(localStorage.getItem('qpd_current_draft') || '{}');
+        paperState.floatingImages = next;
+        localStorage.setItem('qpd_current_draft', JSON.stringify(paperState));
+        return next;
+      });
+    } else {
+      const newDrawing = {
+        id: 'fl-draw-' + Date.now(),
+        type: 'drawing',
+        x: 100,
+        y: 185,
+        width: 360,
+        rotate: 0,
+        drawingData: shapes
+      };
+      setFloatingImages(prev => {
+        const next = [...prev, newDrawing];
+        const paperState = JSON.parse(localStorage.getItem('qpd_current_draft') || '{}');
+        paperState.floatingImages = next;
+        localStorage.setItem('qpd_current_draft', JSON.stringify(paperState));
+        return next;
+      });
+    }
     setIsDrawingOpen(false);
   };
 
@@ -1245,6 +1867,7 @@ export default function QuestionPaperDesignerPage() {
 
   const activeClassName = (classes.find(c => String(c.id) === String(selectedClassId))?.name) || 'Class';
   const activeSubjectName = (subjects.find(s => String(s.id) === String(selectedSubjectId))?.name) || 'Subject';
+  const activeExamName = (exams.find(e => String(e.id) === String(examName))?.name) || 'N/A';
 
   return (
     <div className="min-h-screen bg-background text-text-primary pb-10">
@@ -1270,21 +1893,30 @@ export default function QuestionPaperDesignerPage() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+        <div className="flex flex-nowrap items-center gap-2 justify-end overflow-x-auto">
           <Button 
             type="button"
             variant="outline" 
             size="sm"
-            className="flex items-center gap-1.5 font-bold text-xs"
-            onClick={() => setIsTemplateOpen(true)}
+            className="flex items-center gap-1.5 font-bold text-xs text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100 whitespace-nowrap"
+            onClick={handleNewPaper}
           >
-            <LayoutTemplate className="h-4 w-4" /> Load Template
+            <Plus className="h-4 w-4" /> New Paper
           </Button>
           <Button 
             type="button"
             variant="outline" 
             size="sm"
-            className="flex items-center gap-1.5 font-bold text-xs text-green-600 border-green-200 bg-green-50 hover:bg-green-100"
+            className="flex items-center gap-1.5 font-bold text-xs text-amber-600 border-amber-200 bg-amber-50 hover:bg-amber-100 whitespace-nowrap"
+            onClick={() => { setLibrarySelectedClass(null); setIsLibraryOpen(true); }}
+          >
+            <FolderOpen className="h-4 w-4" /> Saved Papers ({savedPapersList.length})
+          </Button>
+          <Button 
+            type="button"
+            variant="outline" 
+            size="sm"
+            className="flex items-center gap-1.5 font-bold text-xs text-green-600 border-green-200 bg-green-50 hover:bg-green-100 whitespace-nowrap"
             onClick={saveDraft}
           >
             <Save className="h-4 w-4" /> Save Draft
@@ -1293,7 +1925,7 @@ export default function QuestionPaperDesignerPage() {
             type="button"
             variant="default" 
             size="sm"
-            className="flex items-center gap-1.5 font-bold text-xs bg-primary text-white"
+            className="flex items-center gap-1.5 font-bold text-xs bg-primary text-white whitespace-nowrap"
             onClick={handlePrint}
           >
             <Printer className="h-4 w-4" /> Print
@@ -1361,42 +1993,7 @@ export default function QuestionPaperDesignerPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Paper Title */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-text-secondary uppercase">Paper Title</label>
-                  <Input 
-                    placeholder="Half Yearly Examination" 
-                    value={paperTitle} 
-                    onChange={(e) => setPaperTitle(e.target.value)} 
-                  />
-                </div>
 
-                {/* Exam Name Dropdown */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-text-secondary uppercase">Exam Name</label>
-                  <select 
-                    value={examName}
-                    onChange={(e) => setExamName(e.target.value)}
-                    className="w-full h-10 px-3 border border-border bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  >
-                    <option value="">-- Select Exam --</option>
-                    {exams.map(e => (
-                      <option key={e.id} value={e.id}>{e.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Academic Year (auto-selected) */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-text-secondary uppercase">Academic Year</label>
-                  <Input 
-                    value={academicYearName} 
-                    onChange={(e) => setAcademicYearName(e.target.value)}
-                    placeholder="2026-2027" 
-                  />
-                </div>
-              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Duration */}
@@ -1420,15 +2017,12 @@ export default function QuestionPaperDesignerPage() {
                   />
                 </div>
 
-                {/* Passing Marks */}
+                {/* Exam Name (Read-Only) */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-text-secondary uppercase">Passing Marks</label>
-                  <Input 
-                    type="number"
-                    placeholder="33" 
-                    value={passingMarks} 
-                    onChange={(e) => setPassingMarks(e.target.value)} 
-                  />
+                  <label className="text-xs font-bold text-text-secondary uppercase">Exam Name</label>
+                  <div className="h-10 px-3 border border-border bg-zinc-50 dark:bg-zinc-900 rounded-md text-sm flex items-center text-text-muted font-medium select-none">
+                    {activeExamName}
+                  </div>
                 </div>
               </div>
 
@@ -1520,6 +2114,130 @@ export default function QuestionPaperDesignerPage() {
             </CardContent>
           </Card>
 
+          {/* ACTIVE FLOATING ELEMENT SETTINGS SIDEBAR CARD */}
+          {activeFloatingId && (() => {
+            const el = floatingImages.find(item => item.id === activeFloatingId);
+            if (!el) return null;
+            return (
+              <Card className="border-2 border-primary/45 shadow-md bg-primary/5 mb-4 animate-in fade-in duration-200">
+                <CardContent className="p-4 space-y-3 font-sans">
+                  <div className="flex justify-between items-center pb-2 border-b border-border/50">
+                    <span className="text-xs font-black uppercase text-primary flex items-center gap-1.5">
+                      <Settings className="h-4 w-4" /> Editing {el.type}
+                    </span>
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-5 px-1.5 text-[10px] font-bold text-text-muted hover:text-text-primary"
+                      onClick={() => setActiveFloatingId(null)}
+                    >
+                      Done
+                    </Button>
+                  </div>
+
+                  {/* Table Cell Editor */}
+                  {el.type === 'table' && el.tableData && (
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-black text-text-secondary uppercase">Table Cells</span>
+                        <div className="flex gap-1.5">
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-5 text-[9px] font-bold text-primary" 
+                            onClick={() => handleAddTableDimension(el.id, 'row')}
+                          >
+                            + Row
+                          </Button>
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-5 text-[9px] font-bold text-primary" 
+                            onClick={() => handleAddTableDimension(el.id, 'col')}
+                          >
+                            + Column
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="max-h-[160px] overflow-auto border border-border rounded bg-background p-2">
+                        <table className="border-collapse w-full text-xs">
+                          <tbody>
+                            {el.tableData.map((row, rIdx) => (
+                              <tr key={rIdx}>
+                                {row.map((cell, cIdx) => (
+                                  <td key={cIdx} className="border border-border p-0.5">
+                                    <input 
+                                      type="text"
+                                      value={cell}
+                                      onChange={(e) => updateFloatingTableCell(el.id, rIdx, cIdx, e.target.value)}
+                                      className="w-full bg-transparent border-0 outline-none text-center font-mono p-1 text-[11px]"
+                                    />
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Drawing Editor */}
+                  {el.type === 'drawing' && (
+                    <div className="flex gap-2">
+                      <Button 
+                        type="button" 
+                        size="sm" 
+                        className="flex-1 text-xs font-bold text-primary border-primary/20 bg-primary/5 hover:bg-primary/10" 
+                        onClick={() => handleOpenDrawingDialogForFloating(el.id)}
+                      >
+                        Open Drawing Tool
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Rotation, size sliders, alignment and delete controls */}
+                  <div className="flex flex-col gap-2 pt-2 border-t border-border/40 text-xs">
+                    <div className="flex justify-between items-center gap-2">
+                      <span className="text-[10px] font-bold text-text-muted">Adjust Size:</span>
+                      <input 
+                        type="range"
+                        min={el.type === 'box' || el.type === 'circle' ? "10" : "30"}
+                        max="600"
+                        value={el.width}
+                        onChange={(e) => resizeFloatingImage(el.id, parseInt(e.target.value) - el.width)}
+                        className="w-40 h-1 bg-zinc-200 rounded"
+                      />
+                    </div>
+                    <div className="flex gap-2 justify-end items-center pt-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-[10px] font-bold"
+                        onClick={() => rotateFloatingImage(el.id)}
+                      >
+                        Rotate 90°
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-[10px] font-bold text-red-600 hover:bg-red-50 border-red-200"
+                        onClick={() => deleteFloatingImage(el.id)}
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })()}
+
           {/* QUESTIONS LIST WRAPPER */}
           <div className="space-y-4">
             <div className="flex justify-between items-center">
@@ -1562,9 +2280,10 @@ export default function QuestionPaperDesignerPage() {
                 let questionCounter = 0;
                 return questions.map((q, index) => {
                   const isStructural = q.type === 'section' || q.type === 'heading' || q.type === 'instruction';
+                  const isSubParts = q.type === 'sub_parts';
                   if (q.type === 'section' || q.type === 'heading') {
                     questionCounter = 0;
-                  } else if (!isStructural) {
+                  } else if (!isStructural && !isSubParts) {
                     questionCounter++;
                   }
                   const qNumber = questionCounter;
@@ -1578,9 +2297,9 @@ export default function QuestionPaperDesignerPage() {
                     >
                       <CardHeader className="py-2.5 px-4 border-b border-border bg-zinc-50/30 flex flex-row justify-between items-center space-y-0">
                         <div className="flex items-center gap-2">
-                          {isStructural ? (
+                          {isStructural || isSubParts ? (
                             <span className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase">
-                              {q.type === 'section' ? 'Section' : q.type === 'heading' ? 'Heading' : 'Instruction'}
+                              {q.type === 'section' ? 'Section' : q.type === 'heading' ? 'Heading' : q.type === 'instruction' ? 'Instruction' : 'Sub-Parts'}
                             </span>
                           ) : (
                             <span className="bg-primary/10 text-primary px-2.5 py-0.5 rounded-full text-xs font-black">
@@ -1701,14 +2420,14 @@ export default function QuestionPaperDesignerPage() {
                             <div className="flex justify-between items-center flex-wrap gap-2">
                               <label className="text-[10px] font-black text-text-secondary uppercase">Question Text</label>
                               <div className="flex gap-1.5 items-center flex-wrap">
-                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold" onClick={() => triggerImageUpload(q.id)}>+ Image</Button>
-                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold" onClick={() => handleOpenTableDialog(q.id)}>+ Table</Button>
+                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold" onClick={() => triggerFloatingImageUpload()}>+ Image</Button>
+                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold" onClick={() => { setActiveFloatingId(null); setIsTableOpen(true); }}>+ Table</Button>
                                 <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold" onClick={() => handleOpenEquationDialog(q.id)}>+ Math</Button>
-                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold" onClick={() => handleOpenDrawingDialog(q.id)}>+ Drawing</Button>
+                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold" onClick={() => { setActiveFloatingId(null); setShapes([]); setIsDrawingOpen(true); }}>+ Drawing</Button>
                                 <div className="h-4 w-px bg-border mx-1" />
-                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold text-primary hover:bg-primary/5" title="Insert answer box for students to fill in" onClick={() => insertAnswerSpace(q.id, 'box')}>+ Answer Box [ ]</Button>
-                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold text-primary hover:bg-primary/5" title="Insert answer circle for students to circle" onClick={() => insertAnswerSpace(q.id, 'circle')}>+ Circle ( )</Button>
-                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold text-primary hover:bg-primary/5" title="Insert write-in line space" onClick={() => insertAnswerSpace(q.id, 'line')}>+ Line ___</Button>
+                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold text-primary hover:bg-primary/5" title="Insert answer box for students to fill in" onClick={() => insertAnswerSpace(null, 'box')}>+ Answer Box [ ]</Button>
+                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold text-primary hover:bg-primary/5" title="Insert answer circle for students to circle" onClick={() => insertAnswerSpace(null, 'circle')}>+ Circle ( )</Button>
+                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold text-primary hover:bg-primary/5" title="Insert write-in line space" onClick={() => insertAnswerSpace(null, 'line')}>+ Line ___</Button>
                               </div>
                             </div>
                             <div 
@@ -1718,6 +2437,7 @@ export default function QuestionPaperDesignerPage() {
                                 updateQuestionText(q.id, e.target.innerHTML);
                                 recordHistory(questions);
                               }}
+                              onKeyDown={handleEditorKeyDown}
                               className="border border-border rounded-md p-3 min-h-[70px] bg-background text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-primary leading-relaxed"
                               placeholder="Type question content..."
                             />
@@ -1966,10 +2686,10 @@ export default function QuestionPaperDesignerPage() {
                               <div className="space-y-3 pl-4 border-l-2 border-primary/20">
                                 {q.subQuestions.map((sq, sqIdx) => (
                                   <div key={sq.id} className="flex gap-2 items-start bg-zinc-50 dark:bg-zinc-900/50 p-2.5 rounded-lg border border-border">
-                                    <span className="text-xs font-bold text-primary mt-2">
+                                    <span className="text-xs font-bold text-primary mt-2 flex-shrink-0">
                                       {String.fromCharCode(97 + sqIdx)})
                                     </span>
-                                    <div className="flex-1 space-y-1.5">
+                                    <div className="flex-1 space-y-1.5 min-w-0">
                                       <textarea 
                                         rows={1}
                                         value={sq.text} 
@@ -2040,13 +2760,15 @@ export default function QuestionPaperDesignerPage() {
           <div ref={wrapperRef} className="border border-border shadow-xl rounded-xl bg-white text-black p-2 md:p-4 max-h-[85vh] overflow-y-auto w-full select-text leading-normal no-print-scroll font-serif text-[13px]">
             <div 
               id="printable-question-paper-doc" 
-              className="p-14 space-y-2 bg-white min-h-[1012px] shadow-sm"
+              className="p-14 space-y-2 bg-white min-h-[1012px] shadow-sm relative"
+              onClick={() => setActiveFloatingId(null)}
               style={{
                 width: '720px',
                 zoom: zoomFactor,
                 transformOrigin: 'top center',
                 margin: '0 auto',
-                boxSizing: 'border-box'
+                boxSizing: 'border-box',
+                position: 'relative'
               }}
             >
               <style>{`
@@ -2071,6 +2793,7 @@ export default function QuestionPaperDesignerPage() {
                 <div className="flex justify-between text-xs font-bold pt-1 font-sans">
                   <div>Class: {activeClassName}</div>
                   <div>Subject: {activeSubjectName}</div>
+                  <div>Max Marks: {totalMarks}</div>
                   <div>Time: {duration}</div>
                 </div>
               </div>
@@ -2096,9 +2819,10 @@ export default function QuestionPaperDesignerPage() {
                   let questionCounter = 0;
                   return questions.map((q, idx) => {
                     const isStructural = q.type === 'section' || q.type === 'heading' || q.type === 'instruction';
+                    const isSubParts = q.type === 'sub_parts';
                     if (q.type === 'section' || q.type === 'heading') {
                       questionCounter = 0;
-                    } else if (!isStructural) {
+                    } else if (!isStructural && !isSubParts) {
                       questionCounter++;
                     }
                     const qNum = questionCounter;
@@ -2123,6 +2847,8 @@ export default function QuestionPaperDesignerPage() {
                           return `<span class="inline-block border-b border-black mx-1" style="width: ${widthPercent}%">&nbsp;</span>`;
                         }
                       });
+                      // Convert newlines to HTML break tags
+                      formatted = formatted.replace(/\n/g, '<br />');
                       return formatted;
                     };
 
@@ -2171,12 +2897,14 @@ export default function QuestionPaperDesignerPage() {
                       <div key={q.id} className="space-y-1.5 q-block">
                         <div className="flex justify-between items-start leading-relaxed">
                           <div className="flex-1 flex gap-2">
-                            <span className="font-extrabold text-sm font-sans">Q {qNum}.</span>
+                            {!isSubParts && <span className="font-extrabold text-sm font-sans">Q {qNum}.</span>}
                             <div className="flex-1">
-                              <span 
-                                dangerouslySetInnerHTML={{ __html: formatPreviewText(q.text) }} 
-                                className="font-serif leading-relaxed text-sm block animate-fade-in"
-                              />
+                              {q.text && (
+                                <span 
+                                  dangerouslySetInnerHTML={{ __html: formatPreviewText(q.text) }} 
+                                  className="font-serif leading-relaxed text-sm block animate-fade-in"
+                                />
+                              )}
                             </div>
                           </div>
                           {(q.type === 'sub_parts' || !q.subQuestions || q.subQuestions.length === 0) && (
@@ -2304,10 +3032,133 @@ export default function QuestionPaperDesignerPage() {
                 })()}
               </div>
 
-              {/* FOOTER SECTION: PAGE NUMBER / PRINT DETAILS */}
-              <div className="pt-4 mt-6 flex justify-end items-center text-[10px] font-sans text-text-secondary font-bold">
-                <span>Page 1 of 1</span>
-              </div>
+              {/* Floating draggable images on the paper */}
+              {floatingImages.map((img) => (
+                <div 
+                  key={img.id}
+                  className={`absolute group border border-dashed hover:border-primary/50 transition-all ${
+                    activeFloatingId === img.id ? 'border-primary ring-2 ring-primary/30 ring-offset-1 rounded-sm' : 'border-transparent'
+                  }`}
+                  style={{ 
+                    left: `${img.x}px`, 
+                    top: `${img.y}px`, 
+                    width: `${img.width}px`, 
+                    transform: `rotate(${img.rotate || 0}deg)`,
+                    transformOrigin: 'center center',
+                    zIndex: 49
+                  }}
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    handleImageMouseDown(e, img.id, img.x, img.y);
+                    setActiveFloatingId(img.id);
+                  }}
+                >
+                  {img.type === 'table' ? (
+                    <table className="border-collapse border border-black w-full h-full text-xs font-serif bg-white" style={{ minHeight: '100%' }}>
+                      <tbody>
+                        {img.tableData?.map((row, rIdx) => (
+                          <tr key={rIdx}>
+                            {row.map((cell, cIdx) => (
+                              <td key={cIdx} className="border border-black p-1 text-center font-sans whitespace-normal break-all">
+                                {cell}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : img.type === 'drawing' ? (
+                    <div className="w-full h-full border border-black/10 bg-white/50 rounded-sm">
+                      <svg className="w-full h-full" viewBox="0 0 500 300" style={{ pointerEvents: 'none' }}>
+                        {img.drawingData?.map((s) => (
+                          <g key={s.id} transform={`rotate(${s.rotate || 0} ${s.x + (s.w || 0)/2} ${s.y + (s.h || 0)/2})`}>
+                            {s.type === 'rect' && (
+                              <rect x={s.x} y={s.y} width={s.w} height={s.h} stroke={s.stroke} fill={s.fill} strokeWidth={s.strokeWidth} />
+                            )}
+                            {s.type === 'circle' && (
+                              <ellipse cx={s.x + s.w/2} cy={s.y + s.h/2} rx={s.w/2} ry={s.h/2} stroke={s.stroke} fill={s.fill} strokeWidth={s.strokeWidth} />
+                            )}
+                            {s.type === 'line' && (
+                              <line x1={s.x} y1={s.y} x2={s.x2} y2={s.y2} stroke={s.stroke} strokeWidth={s.strokeWidth} />
+                            )}
+                            {s.type === 'arrow' && (
+                              <g>
+                                <line x1={s.x} y1={s.y} x2={s.x2} y2={s.y2} stroke={s.stroke} strokeWidth={s.strokeWidth} />
+                                <polygon points={`${s.x2},${s.y2} ${s.x2-10},${s.y2-6} ${s.x2-10},${s.y2+6}`} fill={s.stroke} />
+                              </g>
+                            )}
+                            {s.type === 'blank' && (
+                              <line x1={s.x} y1={s.y} x2={s.x2} y2={s.y2} stroke={s.stroke} strokeWidth={s.strokeWidth} strokeDasharray="5,5" />
+                            )}
+                            {s.type === 'text' && (
+                              <text x={s.x} y={s.y + 12} fill={s.stroke} fontSize={s.fontSize || 14} fontFamily="sans-serif" fontWeight="bold">{s.text}</text>
+                            )}
+                          </g>
+                        ))}
+                      </svg>
+                    </div>
+                  ) : img.type === 'box' ? (
+                    <div className="w-full h-full border border-black bg-white/20 rounded-sm min-h-[24px]"></div>
+                  ) : img.type === 'circle' ? (
+                    <div className="w-full h-full border border-black rounded-full bg-white/20 min-h-[24px]"></div>
+                  ) : img.type === 'line' ? (
+                    <div className="w-full h-0 border-b border-black"></div>
+                  ) : (
+                    <img 
+                      src={img.src} 
+                      alt="Floating attachment" 
+                      className="w-full h-auto select-none cursor-move" 
+                      draggable={false}
+                    />
+                  )}
+                  {/* Drag-to-resize handle in the bottom-right corner */}
+                  {img.type !== 'line' && (
+                    <div 
+                      className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-primary border-2 border-white cursor-se-resize rounded-full translate-x-1/2 translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity z-50 print:hidden shadow-md active:scale-125"
+                      onMouseDown={(e) => handleResizeMouseDown(e, img.id, img.width)}
+                      title="Drag corner to resize"
+                    />
+                  )}
+                  {/* Actions toolbar on hover */}
+                  <div className="absolute -top-7 left-0 right-0 hidden group-hover:flex justify-between items-center bg-white dark:bg-zinc-900 shadow-md border border-border px-1.5 py-0.5 rounded text-[10px] gap-1.5 z-50 print:hidden font-sans">
+                    <span className="font-bold text-text-muted">{img.width}px</span>
+                    <div className="flex gap-1">
+                      <button 
+                        type="button" 
+                        className="px-1 py-0.5 text-[9px] bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 rounded font-bold text-text-primary"
+                        onClick={(e) => { e.stopPropagation(); resizeFloatingImage(img.id, -20); }}
+                        title="Shrink"
+                      >
+                        A-
+                      </button>
+                      <button 
+                        type="button" 
+                        className="px-1 py-0.5 text-[9px] bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 rounded font-bold text-text-primary"
+                        onClick={(e) => { e.stopPropagation(); resizeFloatingImage(img.id, 20); }}
+                        title="Grow"
+                      >
+                        A+
+                      </button>
+                      <button 
+                        type="button" 
+                        className="px-1 py-0.5 text-[9px] bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 rounded font-bold text-text-primary"
+                        onClick={(e) => { e.stopPropagation(); rotateFloatingImage(img.id); }}
+                        title="Rotate"
+                      >
+                        ↻
+                      </button>
+                      <button 
+                        type="button" 
+                        className="px-1 py-0.5 text-[9px] bg-red-50 hover:bg-red-100 text-red-600 rounded font-bold"
+                        onClick={(e) => { e.stopPropagation(); deleteFloatingImage(img.id); }}
+                        title="Delete"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
 
             </div>
           </div>
@@ -2316,7 +3167,7 @@ export default function QuestionPaperDesignerPage() {
       </div>
 
       {/* MODAL 1: LOAD TEMPLATE */}
-      <Dialog open={isTemplateOpen} onClose={() => setIsTemplateOpen(false)}>
+      <Dialog isOpen={isTemplateOpen} onClose={() => setIsTemplateOpen(false)}>
         <div className="p-6 space-y-4 max-w-md bg-card rounded-lg border border-border shadow-xl">
           <h2 className="text-base font-black flex items-center gap-2"><LayoutTemplate className="h-5 w-5 text-primary" /> Load Examination Template</h2>
           <p className="text-xs text-text-secondary">Loading a template will overwrite current settings and questions. Select a predefined paper standard below:</p>
@@ -2342,7 +3193,7 @@ export default function QuestionPaperDesignerPage() {
       </Dialog>
 
       {/* MODAL 2: VERSION HISTORY */}
-      <Dialog open={isHistoryOpen} onClose={() => setIsHistoryOpen(false)}>
+      <Dialog isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)}>
         <div className="p-6 space-y-4 max-w-md bg-card rounded-lg border border-border shadow-xl">
           <h2 className="text-base font-black flex items-center gap-2"><RefreshCw className="h-5 w-5 text-primary" /> Version History / Revisions</h2>
           <p className="text-xs text-text-secondary">Select a previous auto-saved version to restore the editor state:</p>
@@ -2372,149 +3223,104 @@ export default function QuestionPaperDesignerPage() {
       </Dialog>
 
       {/* MODAL 3: EQUATION EDITOR */}
-      <Dialog open={isEquationOpen} onClose={() => setIsEquationOpen(false)}>
-        <div className="p-6 space-y-4 max-w-md bg-card rounded-lg border border-border shadow-xl">
-          <h2 className="text-base font-black flex items-center gap-2"><PlusCircle className="h-5 w-5 text-primary" /> Mathematical Equation Editor</h2>
-          
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-text-secondary uppercase">Equation Type</label>
-              <select 
-                value={equationType}
-                onChange={(e) => { setEquationType(e.target.value); setEqPartA(''); setEqPartB(''); setEqPartC(''); }}
-                className="w-full h-9 px-2 border border-border bg-background rounded text-xs focus:outline-none"
-              >
-                <option value="fraction">Fraction (a/b)</option>
-                <option value="sqrt">Square Root (√x)</option>
-                <option value="cube_root">Cube Root (³√x)</option>
-                <option value="integral">Integral (∫)</option>
-                <option value="limit">Limits (lim)</option>
-                <option value="sigma">Summation (Σ)</option>
-                <option value="matrix">Matrix (2x2)</option>
-                <option value="greek">Greek Symbol (α, β, θ)</option>
-              </select>
+      <Dialog isOpen={isEquationOpen} onClose={() => setIsEquationOpen(false)} containerClassName="md:justify-start md:pl-20">
+        <div className="p-6 space-y-4 max-w-2xl w-full bg-card rounded-lg border border-border shadow-xl">
+          <h2 className="text-base font-black flex items-center gap-2 text-text-primary">
+            <PlusCircle className="h-5 w-5 text-primary" /> Visual Math Question Editor
+          </h2>
+          <p className="text-xs text-text-secondary leading-normal">
+            Type your question text below. Click the math buttons to insert formulas/symbols directly at the cursor.
+          </p>
+
+          <div 
+            key={activeQuestionId}
+            id="math-modal-editor"
+            contentEditable
+            dangerouslySetInnerHTML={{ __html: modalHtml }}
+            onInput={handleModalEditorInput}
+            onBlur={handleModalEditorBlur}
+            onKeyDown={handleEditorKeyDown}
+            className="border border-border rounded-lg p-4 min-h-[140px] max-h-[220px] bg-background text-base text-text-primary focus:outline-none focus:ring-2 focus:ring-primary leading-relaxed font-sans overflow-y-auto"
+            placeholder="Type question content and click math buttons to insert formulas..."
+          />
+
+          {/* CALCULATOR TOOLBAR */}
+          <div className="space-y-4 pt-2 border-t border-border/50">
+            {/* Templates */}
+            <div>
+              <span className="text-[10px] font-black text-text-secondary uppercase tracking-wider block mb-1.5">Equation Templates</span>
+              <div className="flex flex-wrap gap-1.5">
+                {MATH_TEMPLATES.map((item) => (
+                  <Button
+                    key={item.label}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 font-bold text-xs bg-zinc-50 border-zinc-200 hover:bg-zinc-100 flex items-center gap-1 text-text-primary"
+                    onClick={() => insertSymbolHTML(item.html)}
+                  >
+                    {item.icon}
+                  </Button>
+                ))}
+              </div>
             </div>
 
-            {/* Fraction input */}
-            {equationType === 'fraction' && (
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="space-y-1">
-                  <span className="font-bold">Numerator</span>
-                  <Input value={eqPartA} onChange={(e) => setEqPartA(e.target.value)} placeholder="e.g. x" className="h-8" />
-                </div>
-                <div className="space-y-1">
-                  <span className="font-bold">Denominator</span>
-                  <Input value={eqPartB} onChange={(e) => setEqPartB(e.target.value)} placeholder="e.g. y" className="h-8" />
-                </div>
+            {/* Greek Letters */}
+            <div>
+              <span className="text-[10px] font-black text-text-secondary uppercase tracking-wider block mb-1.5">Greek Symbols</span>
+              <div className="flex flex-wrap gap-1.5">
+                {GREEK_SYMBOLS.map((item) => (
+                  <Button
+                    key={item.label}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-10 font-bold text-sm bg-zinc-50 border-zinc-200 hover:bg-zinc-100 text-text-primary font-serif flex items-center justify-center"
+                    onClick={() => insertSymbolHTML(item.html)}
+                    title={item.label}
+                  >
+                    {item.char}
+                  </Button>
+                ))}
               </div>
-            )}
+            </div>
 
-            {/* Root input */}
-            {(equationType === 'sqrt' || equationType === 'cube_root') && (
-              <div className="space-y-1 text-xs">
-                <span className="font-bold">Radicand Expression</span>
-                <Input value={eqPartA} onChange={(e) => setEqPartA(e.target.value)} placeholder="e.g. x + 5" className="h-8" />
+            {/* Mathematical Operators */}
+            <div>
+              <span className="text-[10px] font-black text-text-secondary uppercase tracking-wider block mb-1.5">Mathematical Operators & Accents</span>
+              <div className="flex flex-wrap gap-1.5">
+                {MATH_OPERATORS.map((item, idx) => (
+                  <Button
+                    key={idx}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-10 font-bold text-xs bg-zinc-50 border-zinc-200 hover:bg-zinc-100 text-text-primary flex items-center justify-center"
+                    onClick={() => insertSymbolHTML(item.html)}
+                  >
+                    {item.char === '^' ? 'x²' : item.char === 'sub' ? 'x₂' : item.char}
+                  </Button>
+                ))}
               </div>
-            )}
-
-            {/* Integral input */}
-            {equationType === 'integral' && (
-              <div className="grid grid-cols-3 gap-2 text-xs">
-                <div className="space-y-1">
-                  <span className="font-bold">Upper Limit</span>
-                  <Input value={eqPartA} onChange={(e) => setEqPartA(e.target.value)} placeholder="b" className="h-8" />
-                </div>
-                <div className="space-y-1">
-                  <span className="font-bold">Lower Limit</span>
-                  <Input value={eqPartB} onChange={(e) => setEqPartB(e.target.value)} placeholder="a" className="h-8" />
-                </div>
-                <div className="space-y-1">
-                  <span className="font-bold">Expression</span>
-                  <Input value={eqPartC} onChange={(e) => setEqPartC(e.target.value)} placeholder="f(x)dx" className="h-8" />
-                </div>
-              </div>
-            )}
-
-            {/* Limit Input */}
-            {equationType === 'limit' && (
-              <div className="grid grid-cols-3 gap-2 text-xs">
-                <div className="space-y-1">
-                  <span className="font-bold">Variable</span>
-                  <Input value={eqPartA} onChange={(e) => setEqPartA(e.target.value)} placeholder="x" className="h-8" />
-                </div>
-                <div className="space-y-1">
-                  <span className="font-bold">Approaches</span>
-                  <Input value={eqPartB} onChange={(e) => setEqPartB(e.target.value)} placeholder="0" className="h-8" />
-                </div>
-                <div className="space-y-1">
-                  <span className="font-bold">Expression</span>
-                  <Input value={eqPartC} onChange={(e) => setEqPartC(e.target.value)} placeholder="sin(x)/x" className="h-8" />
-                </div>
-              </div>
-            )}
-
-            {/* Matrix Input */}
-            {equationType === 'matrix' && (
-              <div className="grid grid-cols-4 gap-1.5 text-xs text-center font-mono">
-                <Input value={eqPartA} onChange={(e) => setEqPartA(e.target.value)} placeholder="a1" className="h-8 text-center" />
-                <Input value={eqPartB} onChange={(e) => setEqPartB(e.target.value)} placeholder="a2" className="h-8 text-center" />
-                <Input value={eqPartC} onChange={(e) => setEqPartC(e.target.value)} placeholder="b1" className="h-8 text-center" />
-                <Input placeholder="b2" className="h-8 text-center" disabled />
-              </div>
-            )}
-
-            {/* Summation input */}
-            {equationType === 'sigma' && (
-              <div className="grid grid-cols-3 gap-2 text-xs">
-                <div className="space-y-1">
-                  <span className="font-bold">Upper Limit</span>
-                  <Input value={eqPartA} onChange={(e) => setEqPartA(e.target.value)} placeholder="n" className="h-8" />
-                </div>
-                <div className="space-y-1">
-                  <span className="font-bold">Lower Limit</span>
-                  <Input value={eqPartB} onChange={(e) => setEqPartB(e.target.value)} placeholder="i=1" className="h-8" />
-                </div>
-                <div className="space-y-1">
-                  <span className="font-bold">Expression</span>
-                  <Input value={eqPartC} onChange={(e) => setEqPartC(e.target.value)} placeholder="i²" className="h-8" />
-                </div>
-              </div>
-            )}
-
-            {/* Greek select */}
-            {equationType === 'greek' && (
-              <div className="space-y-1 text-xs">
-                <span className="font-bold">Select Symbol</span>
-                <select 
-                  value={eqPartA} 
-                  onChange={(e) => setEqPartA(e.target.value)}
-                  className="w-full h-8 px-2 border border-border bg-background rounded"
-                >
-                  <option value="">-- Choose --</option>
-                  <option value="&alpha;">&alpha; (Alpha)</option>
-                  <option value="&beta;">&beta; (Beta)</option>
-                  <option value="&gamma;">&gamma; (Gamma)</option>
-                  <option value="&delta;">&delta; (Delta)</option>
-                  <option value="&theta;">&theta; (Theta)</option>
-                  <option value="&pi;">&pi; (Pi)</option>
-                  <option value="&sigma;">&sigma; (Sigma)</option>
-                  <option value="&omega;">&omega; (Omega)</option>
-                  <option value="&mu;">&mu; (Mu)</option>
-                  <option value="&lambda;">&lambda; (Lambda)</option>
-                </select>
-              </div>
-            )}
+            </div>
           </div>
 
-          <div className="flex justify-end gap-2 pt-2 border-t border-border">
-            <Button type="button" variant="outline" size="sm" onClick={() => setIsEquationOpen(false)}>Cancel</Button>
-            <Button type="button" variant="default" size="sm" onClick={insertEquation} className="bg-primary text-white">Insert Formula</Button>
+          <div className="flex justify-end gap-2 pt-3 border-t border-border">
+            <Button 
+              type="button" 
+              variant="default" 
+              size="sm" 
+              onClick={() => setIsEquationOpen(false)} 
+              className="bg-primary text-white font-bold"
+            >
+              Done & Close
+            </Button>
           </div>
         </div>
       </Dialog>
 
       {/* MODAL 4: TABLE DIALOG */}
-      <Dialog open={isTableOpen} onClose={() => setIsTableOpen(false)}>
+      <Dialog isOpen={isTableOpen} onClose={() => setIsTableOpen(false)}>
         <div className="p-6 space-y-4 max-w-sm bg-card rounded-lg border border-border shadow-xl">
           <h2 className="text-base font-black flex items-center gap-2"><Grid className="h-5 w-5 text-primary" /> Insert Custom Table</h2>
           <div className="grid grid-cols-2 gap-4 text-xs font-bold">
@@ -2535,7 +3341,7 @@ export default function QuestionPaperDesignerPage() {
       </Dialog>
 
       {/* MODAL 5: VECTOR DRAWING DIALOG */}
-      <Dialog open={isDrawingOpen} onClose={() => setIsDrawingOpen(false)}>
+      <Dialog isOpen={isDrawingOpen} onClose={() => setIsDrawingOpen(false)}>
         <div className="p-6 space-y-4 max-w-4xl w-full bg-card rounded-xl border border-border shadow-2xl">
           <div className="flex justify-between items-center pb-2 border-b border-border">
             <h2 className="text-base font-black flex items-center gap-2">
@@ -2753,7 +3559,7 @@ export default function QuestionPaperDesignerPage() {
       </Dialog>
 
       {/* MODAL 6: FIND / STATS */}
-      <Dialog open={isSearchOpen} onClose={() => setIsSearchOpen(false)}>
+      <Dialog isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)}>
         <div className="p-6 space-y-4 max-w-sm bg-card rounded-lg border border-border shadow-xl">
           <h2 className="text-base font-black flex items-center gap-2"><Search className="h-5 w-5 text-primary" /> Document Statistics & Search</h2>
           
@@ -2782,6 +3588,141 @@ export default function QuestionPaperDesignerPage() {
           <div className="flex justify-end gap-2 pt-2 border-t border-border">
             <Button type="button" variant="outline" size="sm" onClick={() => setIsSearchOpen(false)}>Close</Button>
             <Button type="button" variant="default" size="sm" onClick={handleSearchReplace} className="bg-primary text-white" disabled={!searchQuery}>Replace All</Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* MODAL 7: SAVED PAPERS LIBRARY */}
+      <Dialog isOpen={isLibraryOpen} onClose={() => setIsLibraryOpen(false)}>
+        <div className="p-6 space-y-4 max-w-lg bg-card rounded-lg border border-border shadow-xl w-full">
+          <h2 className="text-base font-black flex items-center gap-2">
+            <FileText className="h-5 w-5 text-primary" /> Saved Papers Library
+          </h2>
+          <p className="text-xs text-text-secondary">
+            {librarySelectedClass ? `Viewing saved papers for ${librarySelectedClass}:` : 'Select a class below to view its saved question papers:'}
+          </p>
+          
+          <div className="max-h-[350px] overflow-y-auto space-y-2 pr-1 pt-1">
+            {savedPapersList.length === 0 ? (
+              <div className="text-center text-xs text-text-muted py-8 font-medium">
+                No saved papers found in your library.
+              </div>
+            ) : !librarySelectedClass ? (
+              /* Class Cards Grid View */
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                {[...new Set(savedPapersList.map(p => p.className || 'Unassigned Class'))].map((clsName) => {
+                  const classPapers = savedPapersList.filter(p => (p.className || 'Unassigned Class') === clsName);
+                  return (
+                    <Button
+                      key={clsName}
+                      type="button"
+                      variant="outline"
+                      className="justify-start font-bold text-xs p-4 h-auto text-left flex items-center gap-3 bg-zinc-50 border-zinc-200 hover:bg-zinc-100/50 rounded-xl transition-all"
+                      onClick={() => setLibrarySelectedClass(clsName)}
+                    >
+                      <FolderOpen className="h-5 w-5 text-primary shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <span className="font-black text-sm text-text-primary block truncate">{clsName}</span>
+                        <span className="text-[10px] text-text-muted font-bold block">{classPapers.length} {classPapers.length === 1 ? 'Paper' : 'Papers'}</span>
+                      </div>
+                    </Button>
+                  );
+                })}
+              </div>
+            ) : (
+              /* Papers List View for Selected Class */
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 pb-1 border-b border-border">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-2 font-bold text-xs flex items-center gap-1 hover:bg-zinc-100"
+                    onClick={() => setLibrarySelectedClass(null)}
+                  >
+                    <ArrowLeft className="h-4 w-4" /> Back to Classes
+                  </Button>
+                </div>
+
+                <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                  {savedPapersList
+                    .filter(p => (p.className || 'Unassigned Class') === librarySelectedClass)
+                    .map((paper) => (
+                      <div key={paper.id} className="flex justify-between items-center p-3 bg-zinc-50 dark:bg-zinc-900 rounded border border-border text-xs hover:bg-zinc-100/50 transition-all">
+                        <div className="space-y-1 pr-4">
+                          <div className="font-bold text-text-primary text-sm">
+                            {paper.paperTitle || 'Untitled Paper'}
+                          </div>
+                          <div className="flex flex-wrap gap-2 text-[10px] text-text-muted font-bold">
+                            <span className="bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded font-extrabold uppercase">
+                              Subject: {paper.subjectName || 'N/A'}
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-text-muted">
+                            Last Saved: {new Date(paper.lastSaved).toLocaleString()} • {paper.questions?.length || 0} Questions
+                          </div>
+                        </div>
+                        <div className="flex gap-1.5 shrink-0">
+                          <Button 
+                            type="button" 
+                            size="sm" 
+                            variant="ghost" 
+                            className="h-8 text-xs font-bold text-primary hover:bg-blue-50"
+                            onClick={() => handleLoadSavedPaper(paper)}
+                          >
+                            Load
+                          </Button>
+                          <Button 
+                            type="button" 
+                            size="sm" 
+                            variant="ghost" 
+                            className="h-8 text-xs font-bold text-red-600 hover:bg-red-50"
+                            onClick={() => handleDeleteSavedPaper(paper.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end pt-2 border-t border-border">
+            <Button type="button" variant="outline" size="sm" onClick={() => setIsLibraryOpen(false)}>Close</Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* CUSTOM CONFIRMATION DIALOG */}
+      <Dialog isOpen={confirmDialog.isOpen} onClose={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}>
+        <div className="p-6 space-y-4 max-w-sm bg-card rounded-lg border border-border shadow-xl w-full">
+          <h2 className="text-base font-black flex items-center gap-2 text-text-primary">
+            <Info className="h-5 w-5 text-amber-500" /> {confirmDialog.title}
+          </h2>
+          <p className="text-xs text-text-secondary leading-relaxed">
+            {confirmDialog.message}
+          </p>
+          
+          <div className="flex justify-end gap-2 pt-2 border-t border-border">
+            <Button 
+              type="button" 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+            >
+              Cancel
+            </Button>
+            <Button 
+              type="button" 
+              variant="default" 
+              size="sm" 
+              className="bg-primary text-white font-bold" 
+              onClick={confirmDialog.onConfirm}
+            >
+              Confirm
+            </Button>
           </div>
         </div>
       </Dialog>
