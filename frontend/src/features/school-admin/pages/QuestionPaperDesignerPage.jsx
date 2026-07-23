@@ -1293,57 +1293,7 @@ export default function QuestionPaperDesignerPage() {
     };
   }, [resizingId, resizeStartX, resizeStartWidth, floatingImages]);
 
-  // Keyboard Nudging and Deletion Listener for Active Floating Element
-  useEffect(() => {
-    const handleNudge = (e) => {
-      if (!activeFloatingId) return;
 
-      const keys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Delete', 'Backspace'];
-      if (!keys.includes(e.key)) return;
-
-      // Ensure user is not currently typing in a text field
-      if (document.activeElement && (
-        document.activeElement.tagName === 'INPUT' || 
-        document.activeElement.tagName === 'TEXTAREA' || 
-        document.activeElement.isContentEditable
-      )) {
-        return;
-      }
-
-      e.preventDefault();
-      const nudgeAmount = e.shiftKey ? 5 : 1;
-
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        deleteFloatingImage(activeFloatingId);
-        setActiveFloatingId(null);
-        return;
-      }
-
-      setFloatingImages(prev => {
-        const next = prev.map(img => {
-          if (img.id === activeFloatingId) {
-            let newX = img.x;
-            let newY = img.y;
-            
-            if (e.key === 'ArrowLeft') newX = Math.max(0, img.x - nudgeAmount);
-            if (e.key === 'ArrowRight') newX = Math.min(720 - (img.width || 100), img.x + nudgeAmount);
-            if (e.key === 'ArrowUp') newY = Math.max(0, img.y - nudgeAmount);
-            if (e.key === 'ArrowDown') newY = img.y + nudgeAmount;
-
-            return { ...img, x: newX, y: newY };
-          }
-          return img;
-        });
-        const paperState = JSON.parse(localStorage.getItem('qpd_current_draft') || '{}');
-        paperState.floatingImages = next;
-        localStorage.setItem('qpd_current_draft', JSON.stringify(paperState));
-        return next;
-      });
-    };
-
-    window.addEventListener('keydown', handleNudge);
-    return () => window.removeEventListener('keydown', handleNudge);
-  }, [activeFloatingId, floatingImages]);
 
   const handleAddTableDimension = (tableId, type) => {
     setFloatingImages(prev => {
@@ -3041,7 +2991,8 @@ export default function QuestionPaperDesignerPage() {
               {floatingImages.map((img) => (
                 <div 
                   key={img.id}
-                  className={`absolute group border border-dashed hover:border-primary/50 transition-all ${
+                  tabIndex={0}
+                  className={`absolute group border border-dashed hover:border-primary/50 transition-all focus:outline-none ${
                     activeFloatingId === img.id ? 'border-primary ring-2 ring-primary/30 ring-offset-1 rounded-sm' : 'border-transparent'
                   }`}
                   style={{ 
@@ -3054,8 +3005,43 @@ export default function QuestionPaperDesignerPage() {
                   }}
                   onMouseDown={(e) => {
                     e.stopPropagation();
+                    e.currentTarget.focus();
                     handleImageMouseDown(e, img.id, img.x, img.y);
                     setActiveFloatingId(img.id);
+                  }}
+                  onKeyDown={(e) => {
+                    const keys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Delete', 'Backspace'];
+                    if (!keys.includes(e.key)) return;
+                    
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    const nudgeAmount = e.shiftKey ? 5 : 1;
+                    
+                    if (e.key === 'Delete' || e.key === 'Backspace') {
+                      deleteFloatingImage(img.id);
+                      setActiveFloatingId(null);
+                      return;
+                    }
+                    
+                    setFloatingImages(prev => {
+                      const next = prev.map(item => {
+                        if (item.id === img.id) {
+                          let newX = item.x;
+                          let newY = item.y;
+                          if (e.key === 'ArrowLeft') newX = Math.max(0, item.x - nudgeAmount);
+                          if (e.key === 'ArrowRight') newX = Math.min(720 - (item.width || 100), item.x + nudgeAmount);
+                          if (e.key === 'ArrowUp') newY = Math.max(0, item.y - nudgeAmount);
+                          if (e.key === 'ArrowDown') newY = item.y + nudgeAmount;
+                          return { ...item, x: newX, y: newY };
+                        }
+                        return item;
+                      });
+                      const paperState = JSON.parse(localStorage.getItem('qpd_current_draft') || '{}');
+                      paperState.floatingImages = next;
+                      localStorage.setItem('qpd_current_draft', JSON.stringify(paperState));
+                      return next;
+                    });
                   }}
                 >
                   {img.type === 'table' ? (
