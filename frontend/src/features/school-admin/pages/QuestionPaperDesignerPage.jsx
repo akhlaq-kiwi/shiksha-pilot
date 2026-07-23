@@ -308,6 +308,7 @@ export default function QuestionPaperDesignerPage() {
   const [draggingId, setDraggingId] = useState(null);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [dragPosStart, setDragPosStart] = useState({ x: 0, y: 0 });
+  const [activeFloatingId, setActiveFloatingId] = useState(null);
 
   // Floating Images resize drag state
   const [resizingId, setResizingId] = useState(null);
@@ -1167,6 +1168,10 @@ export default function QuestionPaperDesignerPage() {
   // Floating Images Drag handlers
   const handleImageMouseDown = (e, imgId, currentX, currentY) => {
     e.preventDefault();
+    // Blur any active inputs or contenteditables to focus body and enable arrow key events
+    if (document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur();
+    }
     setDraggingId(imgId);
     setDragStart({ x: e.clientX, y: e.clientY });
     setDragPosStart({ x: currentX, y: currentY });
@@ -1242,6 +1247,8 @@ export default function QuestionPaperDesignerPage() {
   };
 
   const deleteFloatingImage = (id) => {
+    // Also clear selection if the deleted element was active
+    setActiveFloatingId(prev => prev === id ? null : prev);
     setFloatingImages(prev => {
       const next = prev.filter(item => item.id !== id);
       const paperState = JSON.parse(localStorage.getItem('qpd_current_draft') || '{}');
@@ -1285,8 +1292,6 @@ export default function QuestionPaperDesignerPage() {
       window.removeEventListener('mouseup', handleMouseUp);
     };
   }, [resizingId, resizeStartX, resizeStartWidth, floatingImages]);
-
-  const [activeFloatingId, setActiveFloatingId] = useState(null);
 
   // Keyboard Nudging and Deletion Listener for Active Floating Element
   useEffect(() => {
