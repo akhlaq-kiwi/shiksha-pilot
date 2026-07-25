@@ -525,7 +525,7 @@ export default function DashboardPage({ onNavigate }) {
           subtitle="Live monthly staff salary disbursements"
           icon={CreditCard}
           data={SALARY_DATA}
-          colorTheme="indigo"
+          colorTheme="emerald"
           onPointClick={(item) => onNavigate('salary-disbursement?month=' + encodeURIComponent(item.label))}
         />
       </div>
