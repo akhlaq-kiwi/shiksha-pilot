@@ -3,6 +3,21 @@ frontend/node_modules/
 .bin/
 frontend/dist/
 backend/vendor/
+
+# Flutter & Mobile App Builds
+app/build/
+app/.dart_tool/
+app/.pub/
+app/.pub-cache/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+app/android/.gradle/
+app/android/app/build/
+app/android/app/release/
+app/android/app/debug/
+app/ios/Pods/
+app/ios/.symlinks/
+
 *.log
 .DS_Store
 .idea/
