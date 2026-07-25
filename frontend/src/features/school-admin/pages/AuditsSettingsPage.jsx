@@ -296,6 +296,17 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
   const [periodError, setPeriodError] = useState('');
   const [initialTotalPeriods, setInitialTotalPeriods] = useState(null);
   const [showConfirmConfig, setShowConfirmConfig] = useState(false);
+  const [savedSettings, setSavedSettings] = useState(null);
+
+  const isChanged = !!(
+    savedSettings && (
+      schoolStartTime !== savedSettings.schoolStartTime ||
+      parseInt(periodDuration || 0, 10) !== parseInt(savedSettings.periodDuration || 0, 10) ||
+      parseInt(intervalDuration || 0, 10) !== parseInt(savedSettings.intervalDuration || 0, 10) ||
+      parseInt(intervalAfterPeriod || 0, 10) !== parseInt(savedSettings.intervalAfterPeriod || 0, 10) ||
+      parseInt(totalPeriods || 0, 10) !== parseInt(savedSettings.totalPeriods || 0, 10)
+    )
+  );
 
 
 
@@ -329,19 +340,28 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
       const todayStr = getLocalDateStr();
       const settings = await schoolAdminService.getTimetableSettings();
       if (settings) {
-        setSchoolStartTime(settings.school_start_time.substring(0, 5));
+        const parsedStart = settings.school_start_time.substring(0, 5);
+        setSchoolStartTime(parsedStart);
         setPeriodDuration(settings.period_duration);
         setIntervalDuration(settings.interval_duration);
         setIntervalAfterPeriod(settings.interval_after_period);
         setTotalPeriods(settings.total_periods);
         setInitialTotalPeriods(settings.total_periods);
         setShowPreview(true);
+        setSavedSettings({
+          schoolStartTime: parsedStart,
+          periodDuration: settings.period_duration,
+          intervalDuration: settings.interval_duration,
+          intervalAfterPeriod: settings.interval_after_period,
+          totalPeriods: settings.total_periods
+        });
 
         const data = await schoolAdminService.getPeriodConfigurations({ date: todayStr });
         setPeriods(data || []);
       } else {
         setShowPreview(false);
         setPeriods([]);
+        setSavedSettings(null);
       }
     } catch (err) {
       console.error('Failed to load period configurations', err);
@@ -1259,7 +1279,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
 
               <Button
                 onClick={handleSavePeriods}
-                disabled={isReadOnly || periodLoading}
+                disabled={isReadOnly || periodLoading || !isChanged}
                 className="font-bold h-10 px-6 bg-primary hover:bg-primary/95 text-white rounded-lg flex items-center gap-1.5 shadow-sm"
               >
                 {periodLoading ? 'Saving...' : 'Save Configuration'}
@@ -1984,7 +2004,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
           </Button>
           <Button 
             onClick={() => executeSavePeriods(true)} 
-            className="font-bold bg-blue-600 hover:bg-blue-700 text-white"
+            className="font-bold bg-primary hover:bg-primary/95 text-white"
           >
             Update Configuration
           </Button>

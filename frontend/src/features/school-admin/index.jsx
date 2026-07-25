@@ -171,6 +171,8 @@ function SubscriptionExpiredScreen({ profile }) {
     fetchPlans();
   }, []);
 
+  const hasNoPlan = !profile?.active_plan || profile?.active_plan === 'None' || profile?.active_plan === '';
+
   return (
     <div className="flex flex-col items-center justify-center min-h-[calc(100vh-140px)] w-full px-4 py-12 bg-zinc-50/50 dark:bg-zinc-950/20">
       <div className="max-w-4xl w-full text-center space-y-8 animate-in fade-in duration-300">
@@ -178,12 +180,16 @@ function SubscriptionExpiredScreen({ profile }) {
           <div className="mx-auto w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-2">
             <AlertTriangle className="h-8 w-8 text-red-500" />
           </div>
-          <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">Subscription Expired</h2>
+          <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">
+            {hasNoPlan ? 'Subscription Required' : 'Subscription Expired'}
+          </h2>
           <p className="text-sm text-text-secondary leading-relaxed font-medium">
-            Your subscription has expired.
+            {hasNoPlan 
+              ? 'No subscription plan has been assigned to your school yet.' 
+              : 'Your subscription has expired.'}
           </p>
           <p className="text-sm text-text-secondary leading-relaxed font-medium mt-1">
-            Please purchase a new subscription plan to continue using <span className="font-extrabold text-text-primary">ShikshaPilot</span>
+            Please purchase a subscription plan to continue using <span className="font-extrabold text-text-primary">ShikshaPilot</span>
           </p>
         </div>
 

@@ -107,6 +107,90 @@ export default function ReportsPage() {
           ))}
         </CardContent>
       </Card>
+
+
+    </div>
+  );
+}
+
+function VocabularyAnalyticsReport({ analytics }) {
+  if (!analytics) return <p className="text-xs text-text-muted font-bold py-4">No vocabulary analytics data loaded.</p>;
+
+  const { total_words_played, dau, mau, category_performance, grade_performance } = analytics;
+
+  return (
+    <div className="space-y-6">
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-[#FAF9F6] dark:bg-zinc-900 border border-border p-5 rounded-xl shadow-2xs">
+          <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Total Vocabulary Words Played</p>
+          <p className="text-3xl font-black text-text-primary mt-1.5 tabular-nums">{total_words_played.toLocaleString()}</p>
+        </div>
+        <div className="bg-[#FAF9F6] dark:bg-zinc-900 border border-border p-5 rounded-xl shadow-2xs">
+          <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Daily Active Players (DAU)</p>
+          <p className="text-3xl font-black text-emerald-600 mt-1.5 tabular-nums">{dau}</p>
+        </div>
+        <div className="bg-[#FAF9F6] dark:bg-zinc-900 border border-border p-5 rounded-xl shadow-2xs">
+          <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Monthly Active Players (MAU)</p>
+          <p className="text-3xl font-black text-blue-600 mt-1.5 tabular-nums">{mau}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Grade performance */}
+        <Card className="border border-border bg-white rounded-2xl shadow-2xs">
+          <CardHeader className="py-3.5 border-b border-border bg-[#FAF9F6] dark:bg-zinc-900/50">
+            <CardTitle className="text-xs font-black text-text-primary uppercase tracking-wider">Accuracy by Grade Level</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 space-y-3.5">
+            {grade_performance.map((gp, idx) => {
+              const total = parseInt(gp.correct) + parseInt(gp.wrong);
+              const rate = total > 0 ? Math.round((parseInt(gp.correct) / total) * 100) : 0;
+              return (
+                <div key={idx} className="space-y-1 text-xs">
+                  <div className="flex justify-between font-semibold">
+                    <span className="text-text-primary">{gp.academic_level}</span>
+                    <span className="text-text-secondary font-black">{rate}%</span>
+                  </div>
+                  <div className="h-2 bg-zinc-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-primary rounded-full" style={{ width: `${rate}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+            {grade_performance.length === 0 && (
+              <p className="text-xs text-text-muted italic">No grade session history yet.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Category performance */}
+        <Card className="border border-border bg-white rounded-2xl shadow-2xs">
+          <CardHeader className="py-3.5 border-b border-border bg-[#FAF9F6] dark:bg-zinc-900/50">
+            <CardTitle className="text-xs font-black text-text-primary uppercase tracking-wider">Accuracy by Word Category</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 space-y-3.5">
+            {category_performance.map((cp, idx) => {
+              const total = parseInt(cp.correct) + parseInt(cp.wrong);
+              const rate = total > 0 ? Math.round((parseInt(cp.correct) / total) * 100) : 0;
+              return (
+                <div key={idx} className="space-y-1 text-xs">
+                  <div className="flex justify-between font-semibold">
+                    <span className="text-text-primary">{cp.category}</span>
+                    <span className="text-text-secondary font-black">{rate}%</span>
+                  </div>
+                  <div className="h-2 bg-zinc-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-[#3B82F6] rounded-full" style={{ width: `${rate}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+            {category_performance.length === 0 && (
+              <p className="text-xs text-text-muted italic">No category session history yet.</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

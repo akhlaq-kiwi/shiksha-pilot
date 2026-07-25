@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../screens/leave_list_screen.dart';
 import '../screens/timetable_screen.dart';
 import '../screens/notification_center_screen.dart';
+import '../screens/fees_card_screen.dart';
 import '../services/leave_service.dart';
 import '../main.dart';
 
@@ -34,30 +35,49 @@ class NotificationHelper {
               final token = prefs.getString('auth_token') ?? '';
               final userRole = prefs.getString('user_role') ?? '';
               final studentId = prefs.getInt('selected_student_id');
-              final baseUrl = prefs.getString('base_url') ?? 'http://10.227.152.71:8000';
+              final baseUrl = prefs.getString('base_url') ?? 'http://10.55.253.71:8000';
               if (token.isEmpty || userRole.isEmpty) return;
 
               final leaveService = LeaveService(baseUrl: baseUrl, token: token);
               
+              // Parse studentId from link if present for deep linking
+              int? notifStudentId;
+              try {
+                final cleanLink = link.startsWith('http') ? link : 'http://localhost$link';
+                final uri = Uri.parse(cleanLink);
+                final idStr = uri.queryParameters['student_id'] ?? uri.queryParameters['studentId'];
+                if (idStr != null) {
+                  notifStudentId = int.tryParse(idStr);
+                }
+              } catch (e) {
+                debugPrint('Failed to parse student_id from notification link: $e');
+              }
+
               Widget targetScreen;
-              if (link.contains('leaves') || title.contains('leave') || message.contains('leave')) {
+              if (link.contains('fees') || title.contains('fee') || message.contains('fee')) {
+                targetScreen = FeesCardScreen(
+                  baseUrl: baseUrl,
+                  token: token,
+                  studentId: notifStudentId ?? studentId,
+                );
+              } else if (link.contains('leaves') || title.contains('leave') || message.contains('leave')) {
                 targetScreen = LeaveListScreen(
                   leaveService: leaveService,
                   userRole: userRole,
-                  selectedStudentId: studentId,
+                  selectedStudentId: notifStudentId ?? studentId,
                 );
               } else if (link.contains('timetable') || title.contains('timetable') || message.contains('timetable')) {
                 targetScreen = TimetableScreen(
                   baseUrl: leaveService.baseUrl,
                   token: leaveService.token,
                   userRole: userRole,
-                  selectedStudentId: studentId,
+                  selectedStudentId: notifStudentId ?? studentId,
                 );
               } else {
                 targetScreen = NotificationCenterScreen(
                   baseUrl: leaveService.baseUrl,
                   token: leaveService.token,
-                  studentId: studentId,
+                  studentId: notifStudentId ?? studentId,
                 );
               }
 

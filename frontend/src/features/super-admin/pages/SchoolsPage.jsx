@@ -45,7 +45,7 @@ const getRemainingDaysText = (expiryDateStr) => {
 };
 
 const calculateDaysLeftText = (expiryDateStr) => {
-  if (!expiryDateStr) return 'Expired';
+  if (!expiryDateStr) return 'No Active Plan';
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const datePart = expiryDateStr.split(' ')[0];
@@ -337,14 +337,35 @@ function CredentialsDialog({ school, onClose }) {
   );
 }
 
-function SubscriptionDetailsDialog({ school, onClose }) {
+function SubscriptionDetailsDialog({ school, onClose, onUpgradeClick }) {
   const formatDate = (dateStr) => {
     if (!dateStr) return '—';
     const opt = { year: 'numeric', month: 'short', day: 'numeric' };
     return new Date(dateStr).toLocaleDateString('en-IN', opt);
   };
 
-  const remainingText = getRemainingDaysText(school.subscription_expiry);
+  const getRemainingOrExpiredDays = (expiryDateStr) => {
+    if (!expiryDateStr) return { remaining: 0, expired: 0, status: 'No Plan', text: 'No Active Plan' };
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const datePart = expiryDateStr.split(' ')[0];
+    const expiry = new Date(datePart.replace(/-/g, '/'));
+    expiry.setHours(0, 0, 0, 0);
+    
+    const diffTime = expiry.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays > 0) {
+      return { remaining: diffDays, expired: 0, status: 'Active', text: 'Active' };
+    } else if (diffDays < 0) {
+      const absDays = Math.abs(diffDays);
+      return { remaining: 0, expired: absDays, status: 'Expired', text: 'Expired' };
+    } else {
+      return { remaining: 0, expired: 0, status: 'Active', text: 'Expires Today' };
+    }
+  };
+
+  const info = getRemainingOrExpiredDays(school.subscription_expiry);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
@@ -363,12 +384,12 @@ function SubscriptionDetailsDialog({ school, onClose }) {
         <div className="space-y-4 text-xs font-semibold text-text-secondary">
           <div className="flex justify-between border-b border-border/40 pb-2">
             <span>Current Plan:</span>
-            <span className="text-text-primary font-bold">{school.active_plan} Plan</span>
+            <span className="text-text-primary font-bold">{school.active_plan || 'None'}</span>
           </div>
           <div className="flex justify-between border-b border-border/40 pb-2">
-            <span>Duration:</span>
-            <span className="text-text-primary font-bold">
-              {school.subscription_duration_value} {school.subscription_duration_unit === 'month' ? 'Month' : 'Year'}{school.subscription_duration_value > 1 ? 's' : ''}
+            <span>Plan Status:</span>
+            <span className={`font-black uppercase ${info.status === 'Expired' ? 'text-red-500' : 'text-green-600'}`}>
+              {info.text}
             </span>
           </div>
           <div className="flex justify-between border-b border-border/40 pb-2">
@@ -379,16 +400,44 @@ function SubscriptionDetailsDialog({ school, onClose }) {
             <span>Expiry Date:</span>
             <span className="text-text-primary font-bold">{formatDate(school.subscription_expiry)}</span>
           </div>
-          <div className="flex justify-between pt-2">
-            <span>Status:</span>
-            <span className={`font-black uppercase ${remainingText.includes('Expired') ? 'text-red-500' : 'text-green-600'}`}>
-              {remainingText}
+          <div className="flex justify-between border-b border-border/40 pb-2">
+            <span>Total Duration:</span>
+            <span className="text-text-primary font-bold">
+              {school.subscription_duration_value ? `${school.subscription_duration_value} ${school.subscription_duration_unit === 'month' ? 'Month' : 'Year'}${school.subscription_duration_value > 1 ? 's' : ''}` : '—'}
+            </span>
+          </div>
+          {info.status === 'Active' && info.remaining > 0 && (
+            <div className="flex justify-between border-b border-border/40 pb-2">
+              <span>Days Remaining:</span>
+              <span className="text-emerald-600 font-bold">{info.remaining} Day{info.remaining !== 1 ? 's' : ''}</span>
+            </div>
+          )}
+          {info.status === 'Expired' && info.expired > 0 && (
+            <div className="flex justify-between border-b border-border/40 pb-2">
+              <span>Days Expired:</span>
+              <span className="text-red-500 font-bold">{info.expired} Day{info.expired !== 1 ? 's' : ''}</span>
+            </div>
+          )}
+          <div className="flex justify-between border-b border-border/40 pb-2">
+            <span>Maximum Students:</span>
+            <span className="text-text-primary font-bold">
+              {school.subscription_student_limit ? Number(school.subscription_student_limit).toLocaleString() : 'Unlimited'}
+            </span>
+          </div>
+          <div className="flex justify-between border-b border-border/40 pb-2">
+            <span>Maximum Teachers:</span>
+            <span className="text-text-primary font-bold">Unlimited</span>
+          </div>
+          <div className="flex flex-col gap-1 pb-1">
+            <span>Available Features:</span>
+            <span className="text-text-muted font-normal leading-relaxed text-[11px] bg-zinc-50 dark:bg-zinc-900/50 p-2.5 rounded-lg border border-border/60">
+              {school.subscription_features || 'Standard school administration features, student lists, attendance, timetable tracking, fee modules, exams, and announcements.'}
             </span>
           </div>
         </div>
 
         <div className="mt-6">
-          <Button onClick={onClose} className="w-full">Close</Button>
+          <Button onClick={onUpgradeClick} className="w-full">Upgrade Plan</Button>
         </div>
       </div>
     </div>
@@ -400,6 +449,8 @@ function PlanSelectionDialog({ school, onClose, onAssigned }) {
   const [selectedPlanId, setSelectedPlanId] = useState('');
   const [loading, setLoading] = useState(true);
   const [assigning, setAssigning] = useState(false);
+  const [upgradePreview, setUpgradePreview] = useState(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
   const toast = useToast();
 
   React.useEffect(() => {
@@ -409,28 +460,44 @@ function PlanSelectionDialog({ school, onClose, onAssigned }) {
         const activePlans = (data || []).filter(p => p.is_active === 1);
         setPlans(activePlans);
         if (activePlans.length > 0) {
-          setSelectedPlanId(activePlans[0].id);
+          const currentPlan = school.active_plan;
+          const initialPlan = activePlans.find(p => p.name !== currentPlan) || activePlans[0];
+          setSelectedPlanId(initialPlan.id);
         }
       } catch {}
       setLoading(false);
     }
     loadPlans();
-  }, []);
+  }, [school]);
 
-  const handleAssign = async () => {
+  const handleUpgradeClick = async () => {
     const selected = plans.find(p => String(p.id) === String(selectedPlanId));
     if (!selected) return;
-    
+
+    if (school.active_plan && school.active_plan !== 'Trial') {
+      setLoadingPreview(true);
+      try {
+        const preview = await platformService.getUpgradePreview(school.id, selectedPlanId);
+        setUpgradePreview(preview);
+      } catch (err) {
+        toast.error(err.message || 'Failed to fetch upgrade preview.');
+      } finally {
+        setLoadingPreview(false);
+      }
+    } else {
+      await executeUpgrade();
+    }
+  };
+
+  const executeUpgrade = async () => {
     setAssigning(true);
     try {
-      const updated = await platformService.updateSchool(school.id, {
-        plan: selected.name
-      });
-      toast.success(`Assigned ${selected.name} plan to ${school.name}.`, 'Plan Assigned');
+      const updated = await platformService.upgradeSchool(school.id, selectedPlanId);
+      toast.success(`Subscription upgraded successfully to ${updated.plan || 'new plan'}.`, 'Upgrade Successful');
       onAssigned(updated);
       onClose();
     } catch (err) {
-      toast.error(err.message || 'Failed to assign plan.');
+      toast.error(err.message || 'Failed to upgrade subscription plan.');
     } finally {
       setAssigning(false);
     }
@@ -439,67 +506,130 @@ function PlanSelectionDialog({ school, onClose, onAssigned }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-surface border border-border rounded-2xl shadow-2xl w-full max-w-lg p-6 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
-        <div className="flex items-center justify-between mb-5 border-b border-border/60 pb-3">
-          <div>
-            <h3 className="text-base font-bold text-text-primary">Upgrade Plan</h3>
-            <p className="text-xs text-text-muted mt-0.5">Select a subscription plan for {school.name}</p>
+      
+      {upgradePreview ? (
+        <div className="relative bg-surface border border-border rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95 duration-200">
+          <div className="flex items-center justify-between mb-5 border-b border-border/60 pb-3">
+            <div>
+              <h3 className="text-base font-bold text-text-primary">Upgrade Subscription</h3>
+              <p className="text-xs text-text-muted mt-0.5">{school.name}</p>
+            </div>
+            <button onClick={() => setUpgradePreview(null)} className="p-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-text-muted">
+              <X className="h-4 w-4" />
+            </button>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-text-muted">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
 
-        {loading ? (
-          <div className="py-12 text-center text-xs text-text-muted">Loading available plans…</div>
-        ) : plans.length === 0 ? (
-          <div className="py-12 text-center text-xs text-text-muted flex flex-col items-center gap-2">
-            <HelpCircle className="h-8 w-8 text-text-muted" />
-            <span>No plans configured yet. Create a plan in "Manage Plans" first.</span>
-          </div>
-        ) : (
-          <div className="space-y-4 overflow-y-auto pr-1 flex-1 py-1">
-            <div className="grid grid-cols-1 gap-3">
-              {plans.map(p => (
-                <div
-                  key={p.id}
-                  onClick={() => setSelectedPlanId(p.id)}
-                  className={`p-4 border rounded-xl cursor-pointer transition-all flex flex-col justify-between hover:border-primary/50 relative ${String(selectedPlanId) === String(p.id) ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border bg-surface'}`}
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="font-extrabold text-sm text-text-primary flex items-center gap-1.5">
-                        {p.name}
-                        {String(selectedPlanId) === String(p.id) && <Sparkles className="h-3.5 w-3.5 text-primary" />}
-                      </h4>
-                      <p className="text-xs text-text-muted mt-1 leading-relaxed">{p.description || 'Standard plan benefits'}</p>
-                    </div>
-                    <div className="text-right">
-                      <span className="font-black text-sm text-text-primary">
-                        {p.price > 0 ? `₹${Number(p.price).toLocaleString()}` : 'Free'}
-                      </span>
-                      <p className="text-[10px] text-text-secondary font-bold uppercase mt-0.5">
-                        {p.duration_value} {p.duration_unit === 'month' ? 'Month' : 'Year'}{p.duration_value > 1 ? 's' : ''}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-3 flex items-center justify-between text-[10px] text-text-secondary font-bold border-t border-border/40 pt-2.5">
-                    <span>Student Limit: {p.student_limit ? Number(p.student_limit).toLocaleString() : 'Unlimited'}</span>
-                    <span className="text-primary uppercase tracking-wider font-extrabold">{String(selectedPlanId) === String(p.id) ? 'Selected' : 'Click to select'}</span>
-                  </div>
-                </div>
-              ))}
+          <div className="space-y-4 text-xs font-semibold text-text-secondary border-b border-border/40 pb-4">
+            <div className="flex justify-between">
+              <span>Current Plan:</span>
+              <span className="text-text-primary font-bold">{upgradePreview.current_plan}</span>
             </div>
-            
-            <div className="flex gap-3 pt-4 border-t border-border/60">
-              <Button variant="outline" className="flex-1" onClick={onClose} disabled={assigning}>Cancel</Button>
-              <Button className="flex-1" onClick={handleAssign} disabled={assigning || !selectedPlanId}>
-                {assigning ? 'Assigning…' : 'Assign Plan'}
-              </Button>
+            <div className="flex justify-between">
+              <span>New Plan:</span>
+              <span className="text-primary font-extrabold">{upgradePreview.new_plan}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Current Plan Remaining:</span>
+              <span className="text-text-primary font-bold">{upgradePreview.remaining_days} Day{upgradePreview.remaining_days !== 1 ? 's' : ''}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Unused Subscription Credit:</span>
+              <span className="text-emerald-600 font-extrabold">₹{Number(upgradePreview.unused_credit).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>New Plan Price:</span>
+              <span className="text-text-primary font-bold">₹{Number(upgradePreview.new_plan_price).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+            <div className="flex justify-between border-t border-dashed border-border pt-3">
+              <span className="text-sm font-black text-text-primary">Final Amount Payable:</span>
+              <span className="text-base font-black text-primary">₹{Number(upgradePreview.final_amount_payable).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
           </div>
-        )}
-      </div>
+
+          <div className="my-4 bg-zinc-50 dark:bg-zinc-900/50 p-3 rounded-lg border border-border/50 text-[11px] text-text-muted font-normal leading-relaxed">
+            The unused value of the current subscription has been adjusted automatically. Do you want to continue with this upgrade?
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <Button variant="outline" className="flex-1" onClick={() => setUpgradePreview(null)} disabled={assigning}>
+              Cancel
+            </Button>
+            <Button className="flex-1" onClick={executeUpgrade} disabled={assigning}>
+              {assigning ? 'Upgrading…' : 'Confirm Upgrade'}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="relative bg-surface border border-border rounded-2xl shadow-2xl w-full max-w-lg p-6 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+          <div className="flex items-center justify-between mb-5 border-b border-border/60 pb-3">
+            <div>
+              <h3 className="text-base font-bold text-text-primary">Upgrade Plan</h3>
+              <p className="text-xs text-text-muted mt-0.5">Select a subscription plan for {school.name}</p>
+            </div>
+            <button onClick={onClose} className="p-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-text-muted">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          {loading || loadingPreview ? (
+            <div className="py-12 text-center text-xs text-text-muted">
+              {loadingPreview ? 'Fetching credit calculations…' : 'Loading available plans…'}
+            </div>
+          ) : plans.length === 0 ? (
+            <div className="py-12 text-center text-xs text-text-muted flex flex-col items-center gap-2">
+              <HelpCircle className="h-8 w-8 text-text-muted" />
+              <span>No plans configured yet. Create a plan in "Manage Plans" first.</span>
+            </div>
+          ) : (
+            <div className="space-y-4 overflow-y-auto pr-1 flex-1 py-1">
+              <div className="grid grid-cols-1 gap-3">
+                {plans.map(p => {
+                  const isCurrent = school.active_plan === p.name;
+                  return (
+                    <div
+                      key={p.id}
+                      onClick={() => !isCurrent && setSelectedPlanId(p.id)}
+                      className={`p-4 border rounded-xl cursor-pointer transition-all flex flex-col justify-between hover:border-primary/50 relative ${isCurrent ? 'border-zinc-200 bg-zinc-50/50 dark:border-zinc-800 dark:bg-zinc-900/10 cursor-not-allowed opacity-60' : String(selectedPlanId) === String(p.id) ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border bg-surface'}`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="font-extrabold text-sm text-text-primary flex items-center gap-1.5">
+                            {p.name}
+                            {isCurrent && <span className="text-[9px] font-black uppercase bg-zinc-200 text-zinc-700 px-1.5 py-0.5 rounded-md">Current</span>}
+                            {String(selectedPlanId) === String(p.id) && !isCurrent && <Sparkles className="h-3.5 w-3.5 text-primary" />}
+                          </h4>
+                          <p className="text-xs text-text-muted mt-1 leading-relaxed">{p.description || 'Standard plan benefits'}</p>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-black text-sm text-text-primary">
+                            {p.price > 0 ? `₹${Number(p.price).toLocaleString()}` : 'Free'}
+                          </span>
+                          <p className="text-[10px] text-text-secondary font-bold uppercase mt-0.5">
+                            {p.duration_value} {p.duration_unit === 'month' ? 'Month' : 'Year'}{p.duration_value > 1 ? 's' : ''}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-3 flex items-center justify-between text-[10px] text-text-secondary font-bold border-t border-border/40 pt-2.5">
+                        <span>Student Limit: {p.student_limit ? Number(p.student_limit).toLocaleString() : 'Unlimited'}</span>
+                        <span className="text-primary uppercase tracking-wider font-extrabold">
+                          {isCurrent ? '' : String(selectedPlanId) === String(p.id) ? 'Selected' : 'Click to select'}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              
+              <div className="flex gap-3 pt-4 border-t border-border/60">
+                <Button variant="outline" className="flex-1" onClick={onClose} disabled={assigning}>Cancel</Button>
+                <Button className="flex-1" onClick={handleUpgradeClick} disabled={assigning || !selectedPlanId}>
+                  {assigning ? 'Upgrading…' : 'Upgrade Plan'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -699,7 +829,9 @@ export default function SchoolsPage({ schools, onCreateSchool, onToggleStatus, o
                   {(() => {
                     const daysText = calculateDaysLeftText(school.subscription_expiry);
                     let style = 'bg-rose-500/10 text-rose-600 border border-rose-500/20';
-                    if (daysText !== 'Expired') {
+                    if (daysText === 'No Active Plan') {
+                      style = 'bg-zinc-500/10 text-zinc-600 border border-zinc-500/20';
+                    } else if (daysText !== 'Expired') {
                       const days = parseInt(daysText, 10);
                       if (days <= 7) {
                         style = 'bg-amber-500/10 text-amber-600 border border-amber-500/20';
@@ -708,7 +840,14 @@ export default function SchoolsPage({ schools, onCreateSchool, onToggleStatus, o
                       }
                     }
                     return (
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${style}`}>
+                      <span 
+                        onClick={() => {
+                          if (school.active_plan) {
+                            setSelectedSubSchool(school);
+                          }
+                        }}
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${style} ${school.active_plan ? 'cursor-pointer hover:opacity-80 transition-all' : ''}`}
+                      >
                         {daysText}
                       </span>
                     );
@@ -735,7 +874,7 @@ export default function SchoolsPage({ schools, onCreateSchool, onToggleStatus, o
                       className="h-7 text-[10px] font-black uppercase tracking-wider py-1 px-3 rounded-lg"
                       onClick={() => setUpgradeSchool(school)}
                     >
-                      Upgrade Plan
+                      {school.active_plan ? 'Upgrade Plan' : 'Assign Plan'}
                     </Button>
                   );
                 })()}
@@ -757,6 +896,10 @@ export default function SchoolsPage({ schools, onCreateSchool, onToggleStatus, o
         <SubscriptionDetailsDialog
           school={selectedSubSchool}
           onClose={() => setSelectedSubSchool(null)}
+          onUpgradeClick={() => {
+            setUpgradeSchool(selectedSubSchool);
+            setSelectedSubSchool(null);
+          }}
         />
       )}
 

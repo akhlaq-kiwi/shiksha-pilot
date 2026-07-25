@@ -11,6 +11,7 @@ use App\Domain\SchoolAdmin\Controllers\SchoolAdminController;
 use App\Domain\Teacher\Controllers\TeacherController;
 use App\Domain\Student\Controllers\StudentController;
 use App\Domain\SchoolAdmin\Controllers\LeaveRequestController;
+use App\Domain\Student\Controllers\VocabularyController;
 
 return function (App $app) {
     // Auth Domain
@@ -27,6 +28,8 @@ return function (App $app) {
     $app->get('/api/platform/schools/{id}/credentials', [PlatformController::class, 'getSchoolCredentials']);
     $app->put('/api/platform/schools/{id}/credentials', [PlatformController::class, 'updateSchoolCredentials']);
     $app->delete('/api/platform/schools/{id}', [PlatformController::class, 'deleteSchool']);
+    $app->get('/api/platform/schools/{id}/upgrade-preview', [PlatformController::class, 'previewUpgrade']);
+    $app->post('/api/platform/schools/{id}/upgrade', [PlatformController::class, 'upgradePlan']);
     $app->get('/api/platform/plans', [PlatformController::class, 'getPlans']);
     $app->post('/api/platform/plans', [PlatformController::class, 'createPlan']);
     $app->put('/api/platform/plans/{id}', [PlatformController::class, 'updatePlan']);
@@ -49,6 +52,7 @@ return function (App $app) {
     $app->get('/api/school/students', [SchoolAdminController::class, 'getStudents']);
     $app->get('/api/school/students/check-sr-no', [SchoolAdminController::class, 'checkSrNo']);
     $app->get('/api/school/students/{id}', [SchoolAdminController::class, 'getStudentById']);
+    $app->get('/api/school/students/{student_id}/fees/receipt', [SchoolAdminController::class, 'getFeeReceipt']);
     $app->post('/api/school/students', [SchoolAdminController::class, 'createStudent']);
     $app->put('/api/school/students/{id}', [SchoolAdminController::class, 'updateStudent']);
     $app->post('/api/school/students/{id}/advance', [SchoolAdminController::class, 'advanceStudent']);
@@ -269,9 +273,22 @@ return function (App $app) {
     $app->post('/api/student/notifications/{id}/read', [StudentController::class, 'markNotificationRead']);
 
     // Word Builder Game endpoints
-    $app->get('/api/student/game/word-builder/progress', [StudentController::class, 'getGameProgress']);
-    $app->post('/api/student/game/word-builder/progress', [StudentController::class, 'syncGameProgress']);
+    $app->get('/api/student/game/word-builder/progress', [VocabularyController::class, 'getGameProgress']);
+    $app->post('/api/student/game/word-builder/progress', [VocabularyController::class, 'syncGameProgress']);
     $app->post('/api/student/game/word-builder/claim-daily', [StudentController::class, 'claimDailyLogin']);
+
+    // Gamification & Challenges
+    $app->get('/api/student/vocabulary/challenge/daily', [VocabularyController::class, 'getDailyChallenge']);
+    $app->post('/api/student/vocabulary/challenge/daily', [VocabularyController::class, 'submitDailyChallenge']);
+    $app->get('/api/student/vocabulary/challenge/weekly', [VocabularyController::class, 'getWeeklyChallenge']);
+    $app->post('/api/student/vocabulary/challenge/weekly', [VocabularyController::class, 'submitWeeklyChallenge']);
+    $app->get('/api/student/vocabulary/leaderboard', [VocabularyController::class, 'getLeaderboard']);
+    $app->get('/api/student/vocabulary/achievements', [VocabularyController::class, 'getAchievements']);
+
+    // Dashboard Analytics Reports
+    $app->get('/api/parent/vocabulary/report', [VocabularyController::class, 'getParentReport']);
+    $app->get('/api/teacher/vocabulary/report', [VocabularyController::class, 'getTeacherReport']);
+    $app->get('/api/school/vocabulary/analytics', [VocabularyController::class, 'getSchoolAnalytics']);
 
     // Mobile Notices Domain
     $app->get('/api/student/announcements', [StudentController::class, 'getActiveNotices']);

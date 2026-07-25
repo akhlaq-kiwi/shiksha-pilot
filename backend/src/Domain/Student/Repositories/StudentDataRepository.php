@@ -22,7 +22,7 @@ class StudentDataRepository extends BaseRepository
     public function findWithClass(int $studentId): ?array
     {
         $sql = "
-            SELECT s.*, c.name AS class_name, c.section, c.grade_level
+            SELECT s.*, c.name AS class_name, c.section
             FROM students s
             LEFT JOIN classes c ON s.class_id = c.id
             WHERE s.id = :id

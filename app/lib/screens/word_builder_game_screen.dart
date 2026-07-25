@@ -117,13 +117,32 @@ class _WordBuilderGameScreenState extends State<WordBuilderGameScreen> with Sing
           _difficulty = getDifficultyByClass(res['student_class'] as String?);
         }
 
-        _loadWordsForLevel();
+        final activeList = res['active_words'] as List<dynamic>?;
+        if (activeList != null && activeList.isNotEmpty) {
+          _wordsList = activeList.map((item) {
+            final map = item as Map<String, dynamic>;
+            return WordEntry(
+              id: map['id'] is int ? map['id'] as int : int.tryParse(map['id']?.toString() ?? ''),
+              word: map['word']?.toString() ?? '',
+              hint: map['english_meaning']?.toString() ?? '',
+              meaning: map['english_meaning']?.toString() ?? '',
+              hindiMeaning: map['hindi_meaning']?.toString() ?? '',
+              sentence: map['english_sentence']?.toString() ?? '',
+              hindiSentence: map['hindi_sentence']?.toString() ?? '',
+              category: map['category']?.toString() ?? '',
+            );
+          }).toList();
+          _currentWordIdx = 0;
+          _setupWord();
+        } else {
+          _loadWordsForLevel();
+        }
         _loading = false;
       });
       _saveLocalProgress();
     } catch (e) {
       debugPrint('API Load failed, loading from local cache: $e');
-      // Load offline cached details
+      int savedIdx = 0;
       final localDataStr = prefs.getString('wb_game_progress_${widget.studentId ?? 0}');
       if (localDataStr != null) {
         final Map<String, dynamic> data = json.decode(localDataStr);
@@ -138,13 +157,14 @@ class _WordBuilderGameScreenState extends State<WordBuilderGameScreen> with Sing
           _totalPlayTime = data['totalPlayTime'] ?? 0;
           _lastClaimedDate = data['lastClaimedDate'];
           _learnedWords = List<String>.from(data['learnedWords'] ?? []);
+          savedIdx = data['currentWordIdx'] ?? 0;
 
           final today = DateTime.now().toIso8601String().split('T')[0];
           _dailyClaimedToday = _lastClaimedDate == today;
         });
       }
       setState(() {
-        _loadWordsForLevel();
+        _loadWordsForLevel(initialIndex: savedIdx);
         _loading = false;
       });
     }
@@ -164,12 +184,13 @@ class _WordBuilderGameScreenState extends State<WordBuilderGameScreen> with Sing
       'totalPlayTime': _totalPlayTime,
       'learnedWords': _learnedWords,
       'lastClaimedDate': _lastClaimedDate,
+      'currentWordIdx': _currentWordIdx,
     };
     await prefs.setString('wb_game_progress_${widget.studentId ?? 0}', json.encode(data));
   }
 
   // Push local state metrics back to database
-  Future<void> _triggerSync() async {
+  Future<void> _triggerSync({int? lastWordId, bool? lastIsCorrect}) async {
     setState(() {
       _syncing = true;
     });
@@ -187,6 +208,13 @@ class _WordBuilderGameScreenState extends State<WordBuilderGameScreen> with Sing
         'wrong_answers': _wrongAnswers,
         'total_play_time': _totalPlayTime,
         'new_words': _learnedWords,
+        if (lastWordId != null && lastIsCorrect != null)
+          'played_words': [
+            {
+              'word_id': lastWordId,
+              'is_correct': lastIsCorrect,
+            }
+          ]
       };
       await _gameService.syncGameProgress(syncData, widget.studentId);
     } catch (e) {
@@ -201,7 +229,7 @@ class _WordBuilderGameScreenState extends State<WordBuilderGameScreen> with Sing
   }
 
   // Populate words bank list based on current active level
-  void _loadWordsForLevel() {
+  void _loadWordsForLevel({int initialIndex = 0}) {
     final allWords = predefinedWords[_difficulty] ?? predefinedWords['primary-easy']!;
     final items = <WordEntry>[];
     const wordsPerLevel = 10;
@@ -213,7 +241,7 @@ class _WordBuilderGameScreenState extends State<WordBuilderGameScreen> with Sing
     }
 
     _wordsList = items;
-    _currentWordIdx = 0;
+    _currentWordIdx = initialIndex;
     _setupWord();
   }
 
@@ -286,6 +314,23 @@ class _WordBuilderGameScreenState extends State<WordBuilderGameScreen> with Sing
         _selectedLetters.add(idx);
       }
     });
+
+    final currentWord = _wordsList[_currentWordIdx];
+    if (_selectedLetters.length == currentWord.word.length) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _handleVerifyAnswer();
+        }
+      });
+    }
+  }
+
+  // Clear all filled letter boxes
+  void _handleReset() {
+    if (_showResult) return;
+    setState(() {
+      _selectedLetters.clear();
+    });
   }
 
   // Confirm word spelling correctness
@@ -298,8 +343,11 @@ class _WordBuilderGameScreenState extends State<WordBuilderGameScreen> with Sing
       return;
     }
 
-    if (spelling == currentWord.word) {
+    final isMatch = spelling == currentWord.word || _isAcceptedAnagram(spelling, currentWord.word);
+
+    if (isMatch) {
       // CORRECT SPELLED
+      final isAnagram = spelling != currentWord.word;
       setState(() {
         _isCorrect = true;
         _showResult = true;
@@ -313,6 +361,8 @@ class _WordBuilderGameScreenState extends State<WordBuilderGameScreen> with Sing
         if (_currentStreak > 0 && _currentStreak % 10 == 0) {
           reward += 50; //perfect streak bonus
           _showCustomSnackBar('Perfect 10 Streak Bonus! +50 Coins 🎉', isError: false);
+        } else if (isAnagram) {
+          _showCustomSnackBar('Alternative word "$spelling" accepted! +$reward Coins', isError: false);
         }
         _coins += reward;
         _score += 20;
@@ -321,7 +371,7 @@ class _WordBuilderGameScreenState extends State<WordBuilderGameScreen> with Sing
           _learnedWords.add(currentWord.word);
         }
       });
-      _triggerSync();
+      _triggerSync(lastWordId: currentWord.id, lastIsCorrect: true);
     } else {
       // WRONG ANSWER
       setState(() {
@@ -334,7 +384,7 @@ class _WordBuilderGameScreenState extends State<WordBuilderGameScreen> with Sing
           _currentStreak = 0;
           _coins += 2; // Console reward
           _showCustomSnackBar('Answer revealed! Read definition below to learn.');
-          _triggerSync();
+          _triggerSync(lastWordId: currentWord.id, lastIsCorrect: false);
         } else {
           _showCustomSnackBar('Wrong spelling! $_lives attempts left.', isError: true);
         }
@@ -342,33 +392,33 @@ class _WordBuilderGameScreenState extends State<WordBuilderGameScreen> with Sing
     }
   }
 
-  // Deduct 5 coins and unlock meaning
+  // Deduct 2 coins and unlock meaning
   void _handleUseHint() {
     if (_showHint) return;
-    if (_coins < 5) {
-      _showCustomSnackBar('Not enough coins! Hint costs 5 coins.', isError: true);
+    if (_coins < 2) {
+      _showCustomSnackBar('Not enough coins! Hint costs 2 coins.', isError: true);
       return;
     }
 
     setState(() {
-      _coins -= 5;
+      _coins -= 2;
       _showHint = true;
     });
-    _showCustomSnackBar('Hint unlocked! (-5 coins)', isError: false);
+    _showCustomSnackBar('Hint unlocked! (-2 coins)', isError: false);
     _triggerSync();
   }
 
-  // Deduct 10 coins and jump to next word
+  // Deduct 2 coins and jump to next word
   void _handleSkipWord() {
-    if (_coins < 10) {
-      _showCustomSnackBar('Not enough coins! Skip costs 10 coins.', isError: true);
+    if (_coins < 2) {
+      _showCustomSnackBar('Not enough coins! Skip costs 2 coins.', isError: true);
       return;
     }
 
     setState(() {
-      _coins -= 10;
+      _coins -= 2;
     });
-    _showCustomSnackBar('Word skipped! (-10 coins)', isError: false);
+    _showCustomSnackBar('Word skipped! (-2 coins)', isError: false);
     _handleNextWord();
   }
 
@@ -379,6 +429,7 @@ class _WordBuilderGameScreenState extends State<WordBuilderGameScreen> with Sing
         _currentWordIdx++;
         _setupWord();
       });
+      _saveLocalProgress();
     } else {
       // LEVEL COMPLETED!
       setState(() {
@@ -646,7 +697,7 @@ class _WordBuilderGameScreenState extends State<WordBuilderGameScreen> with Sing
                             const Icon(Icons.help_outline, size: 16, color: Colors.amber),
                             const SizedBox(width: 6),
                             Text(
-                              'Unlock Hint (Costs 5 🪙)',
+                              'Unlock Hint (Costs 2 🪙)',
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
@@ -821,22 +872,23 @@ class _WordBuilderGameScreenState extends State<WordBuilderGameScreen> with Sing
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     icon: const Icon(Icons.skip_next, size: 18, color: Colors.grey),
-                    label: const Text('SKIP (10 🪙)', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, fontSize: 12)),
+                    label: const Text('SKIP (2 🪙)', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, fontSize: 12)),
                     onPressed: _handleSkipWord,
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: ElevatedButton(
+                  child: ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.indigo,
+                      backgroundColor: Colors.orange.shade800,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       elevation: 1,
                     ),
-                    child: const Text('VERIFY', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
-                    onPressed: _handleVerifyAnswer,
+                    icon: const Icon(Icons.refresh, size: 18),
+                    label: const Text('RESET', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
+                    onPressed: _handleReset,
                   ),
                 ),
               ],
@@ -1066,5 +1118,49 @@ class _WordBuilderGameScreenState extends State<WordBuilderGameScreen> with Sing
         ),
       ),
     );
+  }
+
+  bool _isAcceptedAnagram(String spelling, String target) {
+    var s = spelling.toUpperCase();
+    var t = target.toUpperCase();
+    
+    if (s == t) return true;
+    
+    // Strip trailing 'S' characters to resolve seeder plural/spelling variants
+    while (s.endsWith('S') && t.endsWith('S')) {
+      s = s.substring(0, s.length - 1);
+      t = t.substring(0, t.length - 1);
+    }
+    
+    if (s == t) return true;
+    
+    final List<Set<String>> groups = [
+      {'GARDEN', 'DANGER'},
+      {'CAT', 'ACT'},
+      {'DOG', 'GOD'},
+      {'CAR', 'ARC'},
+      {'STAR', 'RATS', 'ARTS', 'TARS'},
+      {'RULE', 'LURE'},
+      {'BOARD', 'BROAD'},
+      {'FLOW', 'WOLF'},
+      {'EAT', 'TEA', 'ATE'},
+      {'MEAT', 'TEAM', 'MATE', 'TAME'},
+      {'LAMP', 'PALM'},
+      {'POST', 'STOP', 'SPOT', 'TOPS'},
+      {'BAKE', 'BEAK'},
+      {'LATE', 'TALE'},
+      {'EAST', 'SEAT'},
+      {'LEAF', 'FLEA'},
+      {'PEAR', 'REAP'},
+      {'RACE', 'CARE'},
+      {'SNAKE', 'SNEAK'},
+    ];
+
+    for (final group in groups) {
+      if (group.contains(t) && group.contains(s)) {
+        return true;
+      }
+    }
+    return false;
   }
 }

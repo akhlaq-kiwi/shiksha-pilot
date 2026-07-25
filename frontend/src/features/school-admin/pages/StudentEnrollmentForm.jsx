@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Dialog } from '../../../common/ui/dialog';
 import { Button } from '../../../common/ui/button';
 import { Input } from '../../../common/ui/input';
 import { Card, CardContent } from '../../../common/ui/card';
@@ -222,6 +224,8 @@ function SearchableSelect({ label, placeholder, value, onChange, options, disabl
 }
 
 export default function StudentEnrollmentForm({ studentId, currentClassName, currentClassId, onCancel, onSuccess }) {
+  const navigate = useNavigate();
+  const [showLimitReached, setShowLimitReached] = useState(null);
   const [academicYears, setAcademicYears] = useState([]);
   const [classesList, setClassesList] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -865,7 +869,9 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
       onSuccess();
     } catch (err) {
       console.error(err);
-      if (err.message && err.message.includes('{')) {
+      if (err.data && err.data.subscription_limit_reached) {
+        setShowLimitReached({ limit: err.data.limit });
+      } else if (err.message && err.message.includes('{')) {
         try {
           setErrors(JSON.parse(err.message));
         } catch {
@@ -1437,6 +1443,25 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
             )}
           </div>
         </div>
+      {showLimitReached && (
+        <Dialog
+          isOpen={!!showLimitReached}
+          title="Student Limit Reached"
+          onClose={() => setShowLimitReached(null)}
+        >
+          <div className="space-y-4 max-w-sm text-xs font-semibold text-text-secondary leading-relaxed">
+            <p>
+              Your current subscription plan allows a maximum of <strong>{showLimitReached.limit} students</strong>.
+            </p>
+            <p>You have already reached this limit.</p>
+            <p className="text-text-muted font-medium">Please upgrade your subscription plan to continue enrolling new students.</p>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="secondary" onClick={() => setShowLimitReached(null)}>Cancel</Button>
+              <Button onClick={() => { setShowLimitReached(null); navigate('/school-admin/profile/subscription'); }}>View Plans</Button>
+            </div>
+          </div>
+        </Dialog>
+      )}
       </form>
     </div>
   );

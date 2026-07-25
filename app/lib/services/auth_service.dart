@@ -21,6 +21,14 @@ class AuthService {
     if (response.statusCode == 200) {
       return resData['data']; // Contains 'token' and 'user' map
     } else {
+      if (resData['data'] != null && resData['data'] is Map) {
+        final errors = resData['data'] as Map<String, dynamic>;
+        if (errors.containsKey('phone')) {
+          throw Exception(errors['phone']);
+        } else if (errors.containsKey('password')) {
+          throw Exception(errors['password']);
+        }
+      }
       throw Exception(resData['message'] ?? 'Login failed. Please check credentials.');
     }
   }

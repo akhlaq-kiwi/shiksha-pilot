@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Send, CheckCircle2 } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../common/ui/card';
@@ -215,6 +215,8 @@ export default function ParentPage({ children, isParent, selectedChild, onSelect
         </Card>
       </div>
 
+
+
       {/* Leave Request Dialog */}
       <Dialog
         isOpen={leaveDialogOpen}
@@ -287,6 +289,100 @@ export default function ParentPage({ children, isParent, selectedChild, onSelect
           </form>
         )}
       </Dialog>
+    </div>
+  );
+}
+
+function ParentVocabReport({ studentId }) {
+  const [report, setReport] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchReport = async () => {
+      setLoading(true);
+      try {
+        const numericId = typeof studentId === 'string' && studentId.startsWith('c') ? studentId.substring(1) : studentId;
+        const res = await studentService.getParentVocabularyReport(numericId);
+        if (res?.success) {
+          setReport(res.data);
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (studentId) {
+      fetchReport();
+    }
+  }, [studentId]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 py-4 text-xs font-bold text-text-muted uppercase tracking-wider">
+        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+        Loading Child Vocabulary report...
+      </div>
+    );
+  }
+
+  if (!report) {
+    return <div className="text-xs text-text-muted py-4 font-bold">No vocabulary metrics found for this student.</div>;
+  }
+
+  const { stats, category_performance } = report;
+
+  return (
+    <div className="space-y-6">
+      {/* Overview stats cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-[#FAF9F6] dark:bg-zinc-900 border border-border p-4 rounded-xl text-center shadow-2xs">
+          <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">XP Score</p>
+          <p className="text-2xl font-black text-text-primary mt-1 tabular-nums">{stats.score}</p>
+        </div>
+        <div className="bg-[#FAF9F6] dark:bg-zinc-900 border border-border p-4 rounded-xl text-center shadow-2xs">
+          <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Words Learned</p>
+          <p className="text-2xl font-black text-emerald-600 mt-1 tabular-nums">{stats.total_words_learned}</p>
+        </div>
+        <div className="bg-[#FAF9F6] dark:bg-zinc-900 border border-border p-4 rounded-xl text-center shadow-2xs">
+          <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Words Mastered</p>
+          <p className="text-2xl font-black text-blue-600 mt-1 tabular-nums">{stats.total_words_mastered}</p>
+        </div>
+        <div className="bg-[#FAF9F6] dark:bg-zinc-900 border border-border p-4 rounded-xl text-center shadow-2xs">
+          <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Avg Accuracy</p>
+          <p className="text-2xl font-black text-purple-600 mt-1 tabular-nums">{stats.accuracy_percent}%</p>
+        </div>
+      </div>
+
+      {/* Categories Breakdown */}
+      <div className="space-y-3">
+        <h4 className="text-xs font-black text-text-primary uppercase tracking-wider">Category Strength & Weakness Analysis</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {category_performance.map(cat => {
+            const total = parseInt(cat.correct) + parseInt(cat.wrong);
+            const rate = total > 0 ? Math.round((parseInt(cat.correct) / total) * 100) : 0;
+            return (
+              <div key={cat.category} className="p-4 bg-[#FAF9F6] dark:bg-zinc-900 border border-border rounded-xl shadow-2xs space-y-2">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-bold text-text-primary">{cat.category}</span>
+                  <span className={`font-black uppercase text-[10px] ${rate >= 75 ? 'text-emerald-600' : rate >= 50 ? 'text-amber-600' : 'text-red-500'}`}>{rate}% Accuracy</span>
+                </div>
+                <div className="h-2 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full ${rate >= 75 ? 'bg-emerald-500' : rate >= 50 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${rate}%` }} />
+                </div>
+                <p className="text-[9px] text-text-muted font-bold uppercase tracking-wider">
+                  {cat.correct} Correct · {cat.wrong} Incorrect
+                </p>
+              </div>
+            );
+          })}
+          {category_performance.length === 0 && (
+            <div className="col-span-2 bg-[#FAF9F6] border border-dashed border-border rounded-xl p-6 text-center text-xs text-text-muted font-bold">
+              Your child has not started playing Word Builder yet. Start gameplay to see statistics!
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../..
 import { SectionHeader, StatCard, StatusBadge, PriorityDot } from '../shared';
 
 export default function DashboardPage({ schedule, tasks, upcomingExams, classes }) {
+  const [selectedClassId, setSelectedClassId] = useState(classes[0]?.id || 0);
   const [schoolName, setSchoolName] = useState(() => {
     try {
       const cached = localStorage.getItem('cached_school_profile');
@@ -113,6 +114,131 @@ export default function DashboardPage({ schedule, tasks, upcomingExams, classes 
             </CardContent>
           </Card>
         </div>
+      </div>
+
+
+    </div>
+  );
+}
+
+function TeacherVocabReport({ classId }) {
+  const [report, setReport] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchReport = async () => {
+      setLoading(true);
+      try {
+        const res = await studentService.getTeacherVocabularyReport(classId);
+        if (res?.success) {
+          setReport(res.data);
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (classId) {
+      fetchReport();
+    }
+  }, [classId]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 py-4 text-xs font-bold text-text-muted uppercase tracking-wider">
+        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+        Loading Class Vocabulary analytics...
+      </div>
+    );
+  }
+
+  if (!report) {
+    return <div className="text-xs text-text-muted py-4 font-bold">No class metrics found.</div>;
+  }
+
+  const { summary, weak_categories, difficult_words, active_students } = report;
+
+  return (
+    <div className="space-y-6">
+      {/* Metrics grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-[#FAF9F6] border border-border p-4 rounded-xl text-center shadow-2xs">
+          <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Avg Accuracy</p>
+          <p className="text-2xl font-black text-purple-600 mt-1 tabular-nums">{summary.average_accuracy}%</p>
+        </div>
+        <div className="bg-[#FAF9F6] border border-border p-4 rounded-xl text-center shadow-2xs">
+          <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Avg Stage Unlocked</p>
+          <p className="text-2xl font-black text-text-primary mt-1 tabular-nums">{summary.average_stage}</p>
+        </div>
+        <div className="bg-[#FAF9F6] border border-border p-4 rounded-xl text-center shadow-2xs">
+          <p className="text-[10px] font-black text-text-muted uppercase tracking-wider font-sans">Words Learned</p>
+          <p className="text-2xl font-black text-emerald-600 mt-1 tabular-nums">{summary.total_words_learned}</p>
+        </div>
+        <div className="bg-[#FAF9F6] border border-border p-4 rounded-xl text-center shadow-2xs">
+          <p className="text-[10px] font-black text-text-muted uppercase tracking-wider font-sans">Words Mastered</p>
+          <p className="text-2xl font-black text-blue-600 mt-1 tabular-nums">{summary.total_words_mastered}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Active students */}
+        <Card className="border border-border shadow-2xs bg-white rounded-2xl">
+          <CardHeader className="py-3 px-4 border-b border-border">
+            <CardTitle className="text-xs font-black text-text-primary uppercase tracking-wider">Most Active Students</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 space-y-2">
+            {active_students.map((student, idx) => (
+              <div key={idx} className="flex justify-between items-center text-xs font-semibold">
+                <span className="text-text-primary">{student.first_name} {student.last_name}</span>
+                <span className="text-text-secondary font-black tabular-nums">{student.score} XP</span>
+              </div>
+            ))}
+            {active_students.length === 0 && (
+              <p className="text-[10px] text-text-muted italic">No student sessions recorded yet.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Difficult words */}
+        <Card className="border border-border shadow-2xs bg-white rounded-2xl">
+          <CardHeader className="py-3 px-4 border-b border-border">
+            <CardTitle className="text-xs font-black text-text-primary uppercase tracking-wider">Difficult Words</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 space-y-2">
+            {difficult_words.map((w, idx) => (
+              <div key={idx} className="flex justify-between items-center text-xs font-semibold">
+                <span className="text-text-primary uppercase font-mono">{w.word}</span>
+                <span className="text-red-500 font-black tabular-nums">{w.total_wrongs} Mistakes</span>
+              </div>
+            ))}
+            {difficult_words.length === 0 && (
+              <p className="text-[10px] text-text-muted italic">No word failure counts recorded yet.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Weak categories */}
+        <Card className="border border-border shadow-2xs bg-white rounded-2xl">
+          <CardHeader className="py-3 px-4 border-b border-border">
+            <CardTitle className="text-xs font-black text-text-primary uppercase tracking-wider">Weak Categories</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 space-y-2">
+            {weak_categories.map((c, idx) => {
+              const total = parseInt(c.correct) + parseInt(c.wrong);
+              const rate = total > 0 ? Math.round((parseInt(c.correct) / total) * 100) : 0;
+              return (
+                <div key={idx} className="flex justify-between items-center text-xs font-semibold">
+                  <span className="text-text-primary">{c.category}</span>
+                  <span className="text-red-500 font-black">{rate}% Accuracy</span>
+                </div>
+              );
+            })}
+            {weak_categories.length === 0 && (
+              <p className="text-[10px] text-text-muted italic">No category counters recorded yet.</p>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

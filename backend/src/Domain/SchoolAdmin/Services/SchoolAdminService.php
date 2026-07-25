@@ -524,22 +524,61 @@ class SchoolAdminService extends BaseService
                 $feeMap[$m] = ['amount' => 0.0, 'transactions' => 0];
             }
             
+            // Query 1: Regular monthly fee payments for this academic year
             $stmtFeeChart = $pdo->prepare("
-                SELECT fp.fee_month, SUM(fp.amount_paid) AS total_collected, COUNT(fp.id) AS transaction_count
+                SELECT fp.fee_month, fp.payment_date, SUM(fp.amount_paid) AS total_collected, COUNT(fp.id) AS transaction_count
                 FROM fee_payments fp
-                JOIN students s ON fp.student_id = s.id
-                WHERE fp.school_id = :school_id AND s.academic_year_id = :academic_year_id AND fp.status = 'PAID'
-                GROUP BY fp.fee_month
+                WHERE fp.school_id = :school_id 
+                  AND fp.academic_year_id = :academic_year_id 
+                  AND fp.status = 'PAID'
+                GROUP BY fp.fee_month, fp.payment_date
             ");
             $stmtFeeChart->execute([':school_id' => $schoolId, ':academic_year_id' => $activeYear['id']]);
             while ($row = $stmtFeeChart->fetch(\PDO::FETCH_ASSOC)) {
-                $m = $row['fee_month'];
+                $m = trim($row['fee_month'] ?? '');
+                $amt = (float)$row['total_collected'];
+                $cnt = (int)$row['transaction_count'];
+
                 if (isset($feeMap[$m])) {
-                    $feeMap[$m]['amount'] = (float)$row['total_collected'];
-                    $feeMap[$m]['transactions'] = (int)$row['transaction_count'];
+                    $feeMap[$m]['amount'] += $amt;
+                    $feeMap[$m]['transactions'] += $cnt;
+                } else if (!empty($row['payment_date'])) {
+                    $mName = date('F', strtotime($row['payment_date']));
+                    if (isset($feeMap[$mName])) {
+                        $feeMap[$mName]['amount'] += $amt;
+                        $feeMap[$mName]['transactions'] += $cnt;
+                    }
                 }
             }
-            
+
+            // Query 2: Additional fee payments for this academic year
+            $stmtAddFeeChart = $pdo->prepare("
+                SELECT afp.fee_month, afp.payment_date, SUM(afp.amount) AS total_collected, COUNT(afp.id) AS transaction_count
+                FROM additional_fee_payments afp
+                JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+                WHERE afp.school_id = :school_id 
+                  AND aft.academic_year_id = :academic_year_id 
+                  AND afp.status = 'Paid'
+                GROUP BY afp.fee_month, afp.payment_date
+            ");
+            $stmtAddFeeChart->execute([':school_id' => $schoolId, ':academic_year_id' => $activeYear['id']]);
+            while ($row = $stmtAddFeeChart->fetch(\PDO::FETCH_ASSOC)) {
+                $m = trim($row['fee_month'] ?? '');
+                $amt = (float)$row['total_collected'];
+                $cnt = (int)$row['transaction_count'];
+
+                if (isset($feeMap[$m])) {
+                    $feeMap[$m]['amount'] += $amt;
+                    $feeMap[$m]['transactions'] += $cnt;
+                } else if (!empty($row['payment_date'])) {
+                    $mName = date('F', strtotime($row['payment_date']));
+                    if (isset($feeMap[$mName])) {
+                        $feeMap[$mName]['amount'] += $amt;
+                        $feeMap[$mName]['transactions'] += $cnt;
+                    }
+                }
+            }
+
             foreach ($academicMonths as $m) {
                 $short = substr($m, 0, 3);
                 $feeCollectionChart[] = [
@@ -592,6 +631,14 @@ class SchoolAdminService extends BaseService
             }
         }
 
+        $schoolRow = $pdo->query("SELECT plan FROM schools WHERE id = " . (int)$schoolId)->fetch(PDO::FETCH_ASSOC);
+        $planName = $schoolRow['plan'] ?? 'Premium';
+
+        $stmtPlan = $pdo->prepare("SELECT student_limit FROM plans WHERE name = :name LIMIT 1");
+        $stmtPlan->execute([':name' => $planName]);
+        $plan = $stmtPlan->fetch(PDO::FETCH_ASSOC);
+        $studentLimit = $plan ? ($plan['student_limit'] !== null ? (int)$plan['student_limit'] : null) : null;
+
         $ayid = $activeYear ? (int)$activeYear['id'] : null;
 
         return [
@@ -602,6 +649,8 @@ class SchoolAdminService extends BaseService
             'total_collected' => $this->feeRepo->getTotalCollectedBySchool($schoolId, $ayid),
             'fee_collection_chart' => $feeCollectionChart,
             'salary_disbursement_chart' => $salaryDisbursementChart,
+            'subscription_plan' => $planName,
+            'subscription_student_limit' => $studentLimit,
         ];
     }
 
@@ -762,6 +811,163 @@ class SchoolAdminService extends BaseService
         ];
     }
 
+    public function getFeeReceipt(array $user, int $studentId, int $paymentId, bool $isAdditional): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->studentRepo->getPdo();
+
+        if ($isAdditional) {
+            $stmt = $pdo->prepare("
+                SELECT afp.*, s.first_name, s.last_name, s.roll_no, s.sr_no, c.name AS class_name, c.section, sch.name AS school_name, sch.logo_path, aft.name AS fee_name, ay.name AS academic_year_name
+                FROM additional_fee_payments afp
+                JOIN students s ON afp.student_id = s.id
+                LEFT JOIN classes c ON s.class_id = c.id
+                JOIN schools sch ON afp.school_id = sch.id
+                JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+                LEFT JOIN academic_years ay ON s.academic_year_id = ay.id
+                WHERE afp.id = :id AND afp.student_id = :student_id AND afp.school_id = :sid
+                LIMIT 1
+            ");
+            $stmt->execute([':id' => $paymentId, ':student_id' => $studentId, ':sid' => $schoolId]);
+            $payment = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$payment) {
+                throw new NotFoundException('Additional fee payment record not found');
+            }
+            $title = "Exam Fees";
+            if (!empty($payment['fee_name'])) {
+                $title = $payment['fee_name'];
+            }
+            $rupee = mb_chr(0x20B9, 'UTF-8');
+            $billingItemLabel = "Description: ";
+            $feeMonthDisplay = $title;
+            $receiptNo = "AFP-" . str_pad((string)$payment['id'], 5, '0', STR_PAD_LEFT);
+            $monthTitle = $title;
+            $totalAmountPaid = (float)$payment['amount'];
+            $amountPaidFormatted = $rupee . " " . number_format((float)$totalAmountPaid, 0);
+        } else {
+            $stmt = $pdo->prepare("
+                SELECT fp.*, s.first_name, s.last_name, s.roll_no, s.sr_no, c.name AS class_name, c.section, sch.name AS school_name, sch.logo_path, ay.name AS academic_year_name
+                FROM fee_payments fp
+                JOIN students s ON fp.student_id = s.id
+                LEFT JOIN classes c ON s.class_id = c.id
+                JOIN schools sch ON fp.school_id = sch.id
+                LEFT JOIN academic_years ay ON s.academic_year_id = ay.id
+                WHERE fp.id = :id AND fp.student_id = :student_id AND fp.school_id = :sid
+                LIMIT 1
+            ");
+            $stmt->execute([':id' => $paymentId, ':student_id' => $studentId, ':sid' => $schoolId]);
+            $payment = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$payment) {
+                throw new NotFoundException('Fee payment record not found');
+            }
+            $receiptNo = $payment['receipt_no'];
+            $monthTitle = $payment['fee_month'];
+
+            $stmtGrp = $pdo->prepare("SELECT fee_month, amount_paid FROM fee_payments WHERE receipt_no = :receipt_no AND school_id = :sid");
+            $stmtGrp->execute([':receipt_no' => $receiptNo, ':sid' => $schoolId]);
+            $groupPayments = $stmtGrp->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            
+            $academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+            usort($groupPayments, function($a, $b) use ($academicMonths) {
+                $idxA = array_search($a['fee_month'], $academicMonths, true);
+                $idxB = array_search($b['fee_month'], $academicMonths, true);
+                return $idxA - $idxB;
+            });
+            
+            $rupee = "Rs";
+            $monthsList = array_column($groupPayments, 'fee_month');
+            $indices = [];
+            foreach ($monthsList as $m) {
+                $idx = array_search($m, $academicMonths, true);
+                if ($idx !== false) {
+                    $indices[] = $idx;
+                }
+            }
+            $isConsecutive = false;
+            if (count($indices) > 1) {
+                $isConsecutive = true;
+                for ($i = 1; $i < count($indices); $i++) {
+                    if ($indices[$i] !== $indices[$i - 1] + 1) {
+                        $isConsecutive = false;
+                        break;
+                    }
+                }
+            }
+            if ($isConsecutive) {
+                $feeMonthDisplay = reset($monthsList) . " To " . end($monthsList);
+            } else {
+                $feeMonthDisplay = implode(', ', $monthsList);
+            }
+            $totalAmountPaid = array_sum(array_column($groupPayments, 'amount_paid'));
+            $amountPaidFormatted = "Rs " . number_format((float)$totalAmountPaid, 0);
+            $billingItemLabel = count($groupPayments) > 1 ? "Billing Months: " : "Billing Month: ";
+        }
+
+        // Format payment date
+        $months = [
+            '01' => 'Jan', '02' => 'Feb', '03' => 'Mar', '04' => 'Apr',
+            '05' => 'May', '06' => 'Jun', '07' => 'Jul', '08' => 'Aug',
+            '09' => 'Sep', '10' => 'Oct', '11' => 'Nov', '12' => 'Dec'
+        ];
+        $paymentDateFormatted = '—';
+        if (!empty($payment['payment_date'])) {
+            $parts = explode('-', $payment['payment_date']);
+            if (count($parts) === 3) {
+                $mWord = $months[$parts[1]] ?? '';
+                $paymentDateFormatted = "{$parts[2]} {$mWord} {$parts[0]}";
+            }
+        }
+
+        $studentName = trim($payment['first_name'] . ' ' . ($payment['last_name'] !== '.' ? $payment['last_name'] : ''));
+        $classDisplay = $payment['class_name'] . (!empty($payment['section']) ? ' - ' . $payment['section'] : '');
+
+        $paymentMethod = !empty($payment['payment_method']) ? $payment['payment_method'] : 'Cash';
+        $m = strtolower($paymentMethod);
+        if ($m === 'cash') {
+            $paymentMode = 'Cash';
+        } elseif ($m === 'cheque') {
+            $paymentMode = 'Cheque';
+        } else {
+            $paymentMode = 'Online';
+        }
+
+        $rollNo = $payment['roll_no'] ?? '—';
+        $srNo = $payment['sr_no'] ?? '—';
+        $rollSrDisplay = "{$rollNo} / {$srNo}";
+
+        $rawAcademicYear = !empty($payment['academic_year_name']) ? $payment['academic_year_name'] : '2026-2027';
+        $academicYear = str_replace(['–', '—'], '-', $rawAcademicYear);
+
+        $lines = [
+            "FEE PAYMENT RECEIPT",
+            "Logo Path: " . ($payment['logo_path'] ?? ''),
+            "---",
+            "Mode of Payment: " . $paymentMode,
+            "Student Name: " . strtoupper($studentName),
+            "Class & Section: " . $classDisplay,
+            "Roll Number / SR No: " . $rollSrDisplay,
+            "Ref No: " . $receiptNo,
+            "Academic Year: " . $academicYear,
+            "Payment Date: " . $paymentDateFormatted,
+            "---",
+            $billingItemLabel . $feeMonthDisplay,
+            "Total Amount: " . $amountPaidFormatted,
+            "---",
+            "Status: PAID",
+            "---",
+            "This is an automated system generated receipt. Thank you for your payment."
+        ];
+
+        $pdf = new \App\Shared\Pdf\SimplePdf();
+        $pdfData = $pdf->render(strtoupper($payment['school_name']), $lines);
+        $filename = str_replace(' ', '_', $monthTitle) . "_Fee_Receipt.pdf";
+
+        return [
+            'data' => $pdfData,
+            'filename' => $filename
+        ];
+    }
+
     public function checkSrNoExists(array $user, string $srNo, ?int $excludeId = null): bool
     {
         $schoolId = $this->getSchoolId($user);
@@ -813,6 +1019,30 @@ class SchoolAdminService extends BaseService
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->studentRepo->getPdo();
         $this->requireWritableAcademicYear($pdo, $schoolId);
+
+        // Verify subscription student limit
+        $school = $pdo->query("SELECT plan FROM schools WHERE id = " . (int)$schoolId)->fetch(PDO::FETCH_ASSOC);
+        $planName = $school['plan'] ?? 'Premium';
+
+        $stmtPlan = $pdo->prepare("SELECT student_limit FROM plans WHERE name = :name LIMIT 1");
+        $stmtPlan->execute([':name' => $planName]);
+        $plan = $stmtPlan->fetch(PDO::FETCH_ASSOC);
+
+        if ($plan && $plan['student_limit'] !== null && (int)$plan['student_limit'] > 0) {
+            $limit = (int)$plan['student_limit'];
+            
+            $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM students WHERE school_id = :school_id AND status = 'ACTIVE'");
+            $stmtCount->execute([':school_id' => $schoolId]);
+            $currentCount = (int)$stmtCount->fetchColumn();
+
+            if ($currentCount >= $limit) {
+                throw new ValidationException([
+                    'subscription_limit_reached' => true,
+                    'limit' => $limit,
+                    'message' => "Your current subscription plan allows a maximum of {$limit} students. You have already reached this limit."
+                ], 'Student limit reached.');
+            }
+        }
         
         // 1. Validations
         $errors = [];
@@ -4340,6 +4570,70 @@ class SchoolAdminService extends BaseService
             $row = $stmtLatest->fetch(\PDO::FETCH_ASSOC);
         }
         
+        if ($row === false) {
+            $today = date('Y-m-d');
+            $defaultStartTime = '08:00';
+            $defaultPeriodDuration = 40;
+            $defaultIntervalDuration = 20;
+            $defaultIntervalAfter = 4;
+            $defaultTotalPeriods = 8;
+
+            $pdo->beginTransaction();
+            try {
+                // Insert default settings record
+                $stmtInsSetting = $pdo->prepare("
+                    INSERT INTO school_timetable_settings (school_id, school_start_time, period_duration, interval_duration, interval_after_period, total_periods, start_date)
+                    VALUES (:sid, :start_time, :period_dur, :interval_dur, :interval_after, :total_p, :start_date)
+                ");
+                $stmtInsSetting->execute([
+                    ':sid' => $schoolId,
+                    ':start_time' => $defaultStartTime,
+                    ':period_dur' => $defaultPeriodDuration,
+                    ':interval_dur' => $defaultIntervalDuration,
+                    ':interval_after' => $defaultIntervalAfter,
+                    ':total_p' => $defaultTotalPeriods,
+                    ':start_date' => $today
+                ]);
+
+                // Calculate and insert period timings
+                $startTime = strtotime($defaultStartTime);
+                $currentTime = $startTime;
+
+                $stmtInsPeriod = $pdo->prepare("
+                    INSERT INTO period_configurations (school_id, period_number, start_time, end_time, start_date)
+                    VALUES (:sid, :pnum, :start_time, :end_time, :start_date)
+                ");
+
+                for ($i = 1; $i <= $defaultTotalPeriods; $i++) {
+                    $pStart = date('H:i:s', $currentTime);
+                    $currentTime += $defaultPeriodDuration * 60;
+                    $pEnd = date('H:i:s', $currentTime);
+
+                    $stmtInsPeriod->execute([
+                        ':sid' => $schoolId,
+                        ':pnum' => $i,
+                        ':start_time' => $pStart,
+                        ':end_time' => $pEnd,
+                        ':start_date' => $today
+                    ]);
+
+                    // Apply interval break after specified period number
+                    if ($i === $defaultIntervalAfter && $defaultIntervalDuration > 0) {
+                        $currentTime += $defaultIntervalDuration * 60;
+                    }
+                }
+
+                $pdo->commit();
+            } catch (\Exception $e) {
+                $pdo->rollBack();
+                throw $e;
+            }
+
+            // Re-fetch the setting we just saved
+            $stmt->execute([':sid' => $schoolId]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        }
+        
         return $row !== false ? $row : null;
     }
 
@@ -5695,6 +5989,15 @@ class SchoolAdminService extends BaseService
                 }
             }
         }
+
+        // 5. Send Reverted Push Notification immediately
+        $this->sendStudentNotification(
+            $pdo, 
+            $schoolId, 
+            $studentId, 
+            "Fee Payment Reverted", 
+            "A previously recorded fee payment has been reverted by your school. Please review your updated fee status."
+        );
 
         // 4. Perform deletion
         if (!empty($receiptNo)) {
@@ -8364,7 +8667,7 @@ Only approve the settlement after reviewing all financial records.
 
         // 2. Writable year check & Outstanding migration lock check
         $stmtGetInfo = $pdo->prepare("
-            SELECT s.academic_year_id AS student_ay_id, s.status AS student_status, aft.academic_year_id AS fee_ay_id
+            SELECT s.id AS student_id, s.academic_year_id AS student_ay_id, s.status AS student_status, aft.academic_year_id AS fee_ay_id, aft.name AS fee_name
             FROM additional_fee_payments afp
             JOIN students s ON s.id = afp.student_id
             JOIN additional_fee_types aft ON aft.id = afp.fee_type_id
@@ -8397,6 +8700,18 @@ Only approve the settlement after reviewing all financial records.
             ':id' => $id,
             ':sid' => $schoolId
         ]);
+
+        if ($info) {
+            $studentId = (int)$info['student_id'];
+            $feeName = $info['fee_name'] ?? 'Additional Fee';
+            $this->sendStudentNotification(
+                $pdo, 
+                $schoolId, 
+                $studentId, 
+                "Fee Payment Reverted", 
+                "Your {$feeName} payment has been reverted by the school."
+            );
+        }
 
         return ['success' => true];
     }
@@ -12426,27 +12741,73 @@ Only approve the settlement after reviewing all financial records.
 
     private function sendStudentNotification(PDO $pdo, int $schoolId, int $studentId, string $title, string $message): void
     {
-        // Find student user ID
-        $stmtUser = $pdo->prepare("
-            SELECT id FROM users 
-            WHERE school_id = :sid AND role = 'STUDENT' 
-              AND email = (SELECT email FROM students WHERE id = :stid LIMIT 1)
-            LIMIT 1
-        ");
-        $stmtUser->execute([':sid' => $schoolId, ':stid' => $studentId]);
-        $userId = $stmtUser->fetchColumn();
-        
-        if ($userId) {
-            $stmtInsert = $pdo->prepare("
-                INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, is_read)
-                VALUES (:school_id, 'STUDENT', :user_id, :title, :message, 0)
+        // 1. Get student and parent information
+        $stmtInfo = $pdo->prepare("SELECT email, parent_phone, father_phone, guardian_phone, student_mobile FROM students WHERE id = :stid LIMIT 1");
+        $stmtInfo->execute([':stid' => $studentId]);
+        $studentInfo = $stmtInfo->fetch(PDO::FETCH_ASSOC);
+
+        if (!$studentInfo) {
+            return;
+        }
+
+        $studentEmail = $studentInfo['email'];
+        $phones = array_filter([
+            $studentInfo['parent_phone'] ?? null,
+            $studentInfo['father_phone'] ?? null,
+            $studentInfo['guardian_phone'] ?? null,
+            $studentInfo['student_mobile'] ?? null
+        ]);
+
+        // 2. Notify Student User account
+        if (!empty($studentEmail)) {
+            $stmtStudentUser = $pdo->prepare("
+                SELECT id FROM users 
+                WHERE school_id = :sid AND role = 'STUDENT' AND email = :email LIMIT 1
             ");
-            $stmtInsert->execute([
-                ':school_id' => $schoolId,
-                ':user_id' => $userId,
-                ':title' => $title,
-                ':message' => $message
-            ]);
+            $stmtStudentUser->execute([':sid' => $schoolId, ':email' => $studentEmail]);
+            $studentUserId = $stmtStudentUser->fetchColumn();
+
+            if ($studentUserId) {
+                $stmtInsert = $pdo->prepare("
+                    INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, is_read)
+                    VALUES (:school_id, 'STUDENT', :user_id, :title, :message, :link, 0)
+                ");
+                $stmtInsert->execute([
+                    ':school_id' => $schoolId,
+                    ':user_id' => $studentUserId,
+                    ':title' => $title,
+                    ':message' => $message,
+                    ':link' => "/student/fees?student_id=" . $studentId
+                ]);
+            }
+        }
+
+        // 3. Notify Parent User account
+        if (!empty($phones)) {
+            $placeholders = implode(',', array_fill(0, count($phones), '?'));
+            $stmtParentUser = $pdo->prepare("
+                SELECT id FROM users 
+                WHERE school_id = ? AND role = 'PARENT' AND phone IN ($placeholders)
+            ");
+            $params = array_merge([$schoolId], array_values($phones));
+            $stmtParentUser->execute($params);
+            $parentUserIds = $stmtParentUser->fetchAll(PDO::FETCH_COLUMN) ?: [];
+
+            if (!empty($parentUserIds)) {
+                $stmtInsert = $pdo->prepare("
+                    INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, is_read)
+                    VALUES (:school_id, 'PARENT', :user_id, :title, :message, :link, 0)
+                ");
+                foreach ($parentUserIds as $parentUserId) {
+                    $stmtInsert->execute([
+                        ':school_id' => $schoolId,
+                        ':user_id' => $parentUserId,
+                        ':title' => $title,
+                        ':message' => $message,
+                        ':link' => "/parent/fees?student_id=" . $studentId
+                    ]);
+                }
+            }
         }
     }
 

@@ -13,7 +13,7 @@ class AuditLogRepository extends BaseRepository
     /**
      * Insert an audit log entry and return the new row ID.
      */
-    public function log(string $action, ?string $targetSchool, string $actor, string $ip, ?string $actorRole = null): int
+    public function log(string $action, ?string $targetSchool, string $actor, string $ip, ?string $actorRole = null, ?string $description = null): int
     {
         return $this->create([
             'action'        => $action,
@@ -21,6 +21,7 @@ class AuditLogRepository extends BaseRepository
             'user'          => $actor,
             'user_role'     => $actorRole,
             'ip_address'    => $ip,
+            'description'   => $description,
         ]);
     }
 

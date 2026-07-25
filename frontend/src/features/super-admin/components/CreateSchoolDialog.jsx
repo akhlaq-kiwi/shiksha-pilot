@@ -12,14 +12,12 @@ const generatePassword = () => {
 };
 
 const EMPTY = {
-  name: '', plan: '',
+  name: '',
   contact_phone: '', contact_email: '', admin_phone: '', admin_password: '',
 };
 
 export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating, validationErrors = {} }) {
   const [form, setForm] = useState({ ...EMPTY, admin_password: generatePassword() });
-  const [plans, setPlans] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [localErrors, setLocalErrors] = useState({});
 
   useEffect(() => {
@@ -28,24 +26,8 @@ export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating
 
   useEffect(() => {
     if (isOpen) {
-      setLoading(true);
       setLocalErrors({});
-      platformService.getPlans()
-        .then(data => {
-          const activePlans = (data || []).filter(p => p.is_active === 1 || p.is_active === '1' || p.is_active === true);
-          setPlans(activePlans);
-          if (activePlans.length > 0) {
-            setForm({ ...EMPTY, plan: activePlans[0].name, admin_password: generatePassword() });
-          } else {
-            setForm({ ...EMPTY, plan: '', admin_password: generatePassword() });
-          }
-        })
-        .catch(err => {
-          console.error(err);
-        })
-        .finally(() => {
-          setLoading(false);
-        });
+      setForm({ ...EMPTY, admin_password: generatePassword() });
     }
   }, [isOpen]);
 
@@ -93,39 +75,17 @@ export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={creating || plans.length === 0}>
+          <Button onClick={handleSubmit} disabled={creating}>
             {creating ? 'Creating...' : 'Create School'}
           </Button>
         </>
       }
     >
       <form onSubmit={handleSubmit} className="space-y-4">
-        {plans.length === 0 && !loading && (
-          <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-lg text-xs font-bold leading-normal">
-            Please create and activate at least one subscription plan before adding a school.
-          </div>
-        )}
-
         {/* School details */}
         <div className="space-y-1.5">
           <label className="text-xs font-bold text-text-secondary uppercase">School Name</label>
           <Input placeholder="e.g. Cambridge Academy" value={form.name} onChange={set('name')} required />
-        </div>
-
-        {/* Plan selector */}
-        <div className="space-y-1.5">
-          <label className="text-xs font-bold text-text-secondary uppercase">Pricing Plan</label>
-          <Select value={form.plan} onChange={set('plan')} disabled={plans.length === 0}>
-            {plans.length === 0 ? (
-              <option value="">No active subscription plans available.</option>
-            ) : (
-              plans.map(p => (
-                <option key={p.id} value={p.name}>
-                  {p.name} — {p.price > 0 ? `₹${Number(p.price).toLocaleString()}` : 'Free'}
-                </option>
-              ))
-            )}
-          </Select>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

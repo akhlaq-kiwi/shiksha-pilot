@@ -88,4 +88,36 @@ export const studentService = {
   async claimDailyLogin() {
     return apiClient.post('/api/student/game/word-builder/claim-daily');
   },
+
+  // Gamification & Challenges
+  async getDailyChallenge() {
+    return apiClient.get('/api/student/vocabulary/challenge/daily');
+  },
+  async submitDailyChallenge(data) {
+    return apiClient.post('/api/student/vocabulary/challenge/daily', data);
+  },
+  async getWeeklyChallenge() {
+    return apiClient.get('/api/student/vocabulary/challenge/weekly');
+  },
+  async submitWeeklyChallenge(data) {
+    return apiClient.post('/api/student/vocabulary/challenge/weekly', data);
+  },
+  async getVocabularyLeaderboard() {
+    return apiClient.get('/api/student/vocabulary/leaderboard');
+  },
+  async getVocabularyAchievements() {
+    return apiClient.get('/api/student/vocabulary/achievements');
+  },
+
+  // Dashboard Reports
+  async getParentVocabularyReport(studentId = null) {
+    const url = studentId ? `/api/parent/vocabulary/report?student_id=${studentId}` : '/api/parent/vocabulary/report';
+    return apiClient.get(url);
+  },
+  async getTeacherVocabularyReport(classId) {
+    return apiClient.get(`/api/teacher/vocabulary/report?class_id=${classId}`);
+  },
+  async getSchoolVocabularyAnalytics() {
+    return apiClient.get('/api/school/vocabulary/analytics');
+  },
 };

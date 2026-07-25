@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../common/ui/card';
-import { PREDEFINED_WORDS, getDifficultyByClass } from '../../../common/constants/predefinedWords';
+import { getDifficultyByClass } from '../../../common/constants/predefinedWords';
 import { studentService } from '../../../common/services/studentService';
 import { useToast } from '../../../common/components/Toast';
 
@@ -106,9 +106,29 @@ export default function WordBuilderGame() {
   const [isCorrect, setIsCorrect] = useState(false);
   const [showHint, setShowHint] = useState(false);
   const [dailyClaimedToday, setDailyClaimedToday] = useState(false);
+  const [imageError, setImageError] = useState(false);
   
-  // Daily challenge state
-  const [isDailyChallenge, setIsDailyChallenge] = useState(false);
+  useEffect(() => {
+    setImageError(false);
+  }, [currentWordIdx, wordsList]);
+
+  const [unlockedHints, setUnlockedHints] = useState({
+    firstLetter: false,
+    meaning: false,
+    sentence: false,
+    image: false
+  });
+  const [bufferedPlayedWords, setBufferedPlayedWords] = useState([]);
+  
+  const isPrePrimary = ['Play Group', 'Nursery', 'LKG', 'UKG'].includes(studentClass);
+  
+  // Challenge & Gamification states
+  const [gameMode, setGameMode] = useState('normal'); // 'normal' | 'daily' | 'weekly'
+  const [leaderboardData, setLeaderboardData] = useState(null);
+  const [leaderboardSubTab, setLeaderboardSubTab] = useState('school'); // 'school' | 'class' | 'section'
+  const [achievementsData, setAchievementsData] = useState([]);
+  const [challengesData, setChallengesData] = useState({ daily: null, weekly: null });
+  const [loadingChallenge, setLoadingChallenge] = useState(false);
   
   // Playtime accumulator ref
   const timerRef = useRef(null);
@@ -161,6 +181,97 @@ export default function WordBuilderGame() {
     }
   }, [coins, score, currentLevel, currentStreak, highestStreak, correctAnswers, wrongAnswers, totalPlayTime, learnedWords, lastClaimedDate]);
 
+  // Fetch data dynamically on tab shifts
+  useEffect(() => {
+    if (activeTab === 'leaderboard') {
+      fetchLeaderboard();
+    } else if (activeTab === 'achievements') {
+      fetchAchievements();
+    } else if (activeTab === 'challenges') {
+      fetchChallengesStatus();
+    }
+  }, [activeTab]);
+
+  const fetchLeaderboard = async () => {
+    if (!navigator.onLine) return;
+    try {
+      const res = await studentService.getVocabularyLeaderboard();
+      if (res?.success) {
+        setLeaderboardData(res.data);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const fetchAchievements = async () => {
+    if (!navigator.onLine) return;
+    try {
+      const res = await studentService.getVocabularyAchievements();
+      if (res?.success) {
+        setAchievementsData(res.data);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const fetchChallengesStatus = async () => {
+    if (!navigator.onLine) return;
+    try {
+      const [dailyRes, weeklyRes] = await Promise.all([
+        studentService.getDailyChallenge(),
+        studentService.getWeeklyChallenge()
+      ]);
+      setChallengesData({
+        daily: dailyRes?.data || null,
+        weekly: weeklyRes?.data || null
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const startChallenge = async (type) => {
+    setLoadingChallenge(true);
+    setGameMode(type);
+    try {
+      const res = type === 'daily' 
+        ? await studentService.getDailyChallenge()
+        : await studentService.getWeeklyChallenge();
+        
+      if (res?.success && res.data?.words) {
+        setWordsList(res.data.words);
+        setCurrentWordIdx(0);
+        setActiveTab('game');
+        setupWord(res.data.words[0].word);
+        toast.info(`Started ${type === 'daily' ? 'Daily Challenge' : 'Weekly Review Test'}!`);
+      }
+    } catch (e) {
+      toast.error('Failed to load challenge.');
+    } finally {
+      setLoadingChallenge(false);
+    }
+  };
+
+  const handleChallengeCompleted = async () => {
+    try {
+      const res = gameMode === 'daily'
+        ? await studentService.submitDailyChallenge({})
+        : await studentService.submitWeeklyChallenge({});
+      if (res?.success) {
+        playTone('complete');
+        toast.success(res.message);
+        fetchChallengesStatus();
+        setGameMode('normal');
+        loadGameProgress();
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to submit challenge results.');
+    }
+  };
+
   const loadGameProgress = async () => {
     setLoading(true);
     try {
@@ -189,9 +300,9 @@ export default function WordBuilderGame() {
           
           setLearnedWords(apiData.learned_words || []);
           
-          // Seed gameplay list
-          const list = getWordsForLevel(diff, prog.current_level || 1);
-          setWordsList(list);
+          // Seed gameplay list from server active words
+          setWordsList(apiData.active_words || []);
+          localStorage.setItem('wb_cached_words', JSON.stringify(apiData.active_words || []));
           setLoading(false);
           return;
         }
@@ -200,7 +311,7 @@ export default function WordBuilderGame() {
       console.error('API load failed, falling back to LocalStorage', e);
     }
 
-    // 2. LocalStorage fallback
+    // 2. LocalStorage fallback (reads cached progress)
     const local = localStorage.getItem('wb_game_progress');
     const studentInfo = localStorage.getItem('wb_student_info');
     
@@ -226,26 +337,13 @@ export default function WordBuilderGame() {
       const today = new Date().toISOString().split('T')[0];
       setDailyClaimedToday(data.lastClaimedDate === today);
       
-      const diff = getDifficultyByClass(studentClass);
-      setWordsList(getWordsForLevel(diff, data.currentLevel || 1));
-    } else {
-      // First time initialization
-      const diff = getDifficultyByClass(studentClass);
-      setWordsList(getWordsForLevel(diff, 1));
+      // Fallback: use previously loaded wordsList from local cache if offline
+      const cachedList = localStorage.getItem('wb_cached_words');
+      if (cachedList) {
+        setWordsList(JSON.parse(cachedList));
+      }
     }
     setLoading(false);
-  };
-
-  const getWordsForLevel = (diff, level) => {
-    const allWords = PREDEFINED_WORDS[diff] || PREDEFINED_WORDS['primary-easy'];
-    // Rotate words if level exceeds word bank size
-    const items = [];
-    const count = 10;
-    for (let i = 0; i < count; i++) {
-      const index = ((level - 1) * count + i) % allWords.length;
-      items.push(allWords[index]);
-    }
-    return items;
   };
 
   const setupWord = (word) => {
@@ -255,10 +353,15 @@ export default function WordBuilderGame() {
     setShowHint(false);
     setLives(3);
     setSelectedLetters([]);
+    setUnlockedHints({
+      firstLetter: false,
+      meaning: false,
+      sentence: false,
+      image: false
+    });
     
     // Scramble letters
     const letters = word.split('');
-    // Fisher-Yates shuffle with fallback to ensure it is scrambled
     let shuffled = [...letters];
     let attempts = 0;
     while (attempts < 5) {
@@ -288,22 +391,40 @@ export default function WordBuilderGame() {
     localStorage.setItem('wb_game_progress', JSON.stringify(data));
   };
 
-  const triggerSync = async () => {
+  const triggerSync = async (nextLvl = currentLevel) => {
     if (!navigator.onLine) return;
     try {
       const syncData = {
         coins,
         score,
-        current_level: currentLevel,
+        current_level: nextLvl,
         current_streak: currentStreak,
         highest_streak: highestStreak,
         correct_answers: correctAnswers,
         wrong_answers: wrongAnswers,
         total_play_time: totalPlayTime,
-        new_words: learnedWords
+        played_words: bufferedPlayedWords
       };
-      await studentService.syncGameProgress(syncData);
-      console.log('Progress synced successfully.');
+      const res = await studentService.syncGameProgress(syncData);
+      if (res?.success && res?.data) {
+        const apiData = res.data;
+        setCoins(apiData.progress.coins || 0);
+        setScore(apiData.progress.score || 0);
+        setCurrentLevel(apiData.progress.current_level || nextLvl);
+        setCurrentStreak(apiData.progress.current_streak || 0);
+        setHighestStreak(apiData.progress.highest_streak || 0);
+        setCorrectAnswers(apiData.progress.correct_answers || 0);
+        setWrongAnswers(apiData.progress.wrong_answers || 0);
+        setTotalPlayTime(apiData.progress.total_play_time || 0);
+        setLearnedWords(apiData.learned_words || []);
+        
+        // Cache active words list locally for offline fallback
+        localStorage.setItem('wb_cached_words', JSON.stringify(apiData.active_words || []));
+        setWordsList(apiData.active_words || []);
+        setCurrentWordIdx(0);
+        setBufferedPlayedWords([]);
+        console.log('Progress synced and next level words loaded successfully.');
+      }
     } catch (e) {
       console.error('Progress sync failed', e);
     }
@@ -350,6 +471,19 @@ export default function WordBuilderGame() {
   };
 
   const handleTextToSpeech = (text) => {
+    const currentWord = wordsList[currentWordIdx];
+    if (currentWord?.audio_path) {
+      const audio = new Audio(currentWord.audio_path);
+      audio.play().catch(e => {
+        console.error('Custom audio playback failed, falling back to TTS', e);
+        playSpeechSynthesis(text);
+      });
+    } else {
+      playSpeechSynthesis(text);
+    }
+  };
+
+  const playSpeechSynthesis = (text) => {
     if ('speechSynthesis' in window) {
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'en-US';
@@ -368,6 +502,11 @@ export default function WordBuilderGame() {
       toast.warning('Spell the complete word first!');
       return;
     }
+
+    const totalHints = (unlockedHints.firstLetter ? 1 : 0) + 
+                       (unlockedHints.meaning ? 1 : 0) + 
+                       (unlockedHints.sentence ? 1 : 0) + 
+                       (unlockedHints.image ? 1 : 0);
 
     if (spelling === currentWord.word) {
       // CORRECT SPELLED
@@ -388,15 +527,17 @@ export default function WordBuilderGame() {
       }
       setCoins(prev => prev + coinReward);
       setScore(prev => prev + 20);
-      
-      // Add to vocabulary notebook if not already there
-      if (!learnedWords.includes(currentWord.word)) {
-        setLearnedWords(prev => [...prev, currentWord.word]);
-      }
+
+      // Buffer this word log
+      const playedWordLog = {
+        word_id: currentWord.id,
+        is_correct: true,
+        hints_used: totalHints
+      };
+      setBufferedPlayedWords(prev => [...prev, playedWordLog]);
       
       // Speak pronunciation automatically on success
       handleTextToSpeech(currentWord.word);
-      triggerSync();
     } else {
       // WRONG ANSWER
       playTone('wrong');
@@ -412,7 +553,14 @@ export default function WordBuilderGame() {
         setCurrentStreak(0); // reset streak
         setCoins(prev => prev + 2); // wrong answer reward after retries
         toast.info('Answer revealed! Let\'s read the meaning to learn.');
-        triggerSync();
+
+        // Buffer this word log as incorrect
+        const playedWordLog = {
+          word_id: currentWord.id,
+          is_correct: false,
+          hints_used: totalHints
+        };
+        setBufferedPlayedWords(prev => [...prev, playedWordLog]);
       } else {
         toast.error(`Wrong spelling! ${remainingLives} attempts left.`);
       }
@@ -420,14 +568,13 @@ export default function WordBuilderGame() {
   };
 
   const handleUseHint = () => {
-    if (showHint) return;
     if (coins < 5) {
       toast.warning('Not enough coins! Hints cost 5 coins.');
       return;
     }
     setCoins(prev => prev - 5);
-    setShowHint(true);
-    toast.success('Hint unlocked! (Cost: 5 coins)');
+    setUnlockedHints(prev => ({ ...prev, meaning: true }));
+    toast.success('Meaning hint unlocked! (Cost: 5 coins)');
   };
 
   const handleSkipWord = () => {
@@ -435,6 +582,13 @@ export default function WordBuilderGame() {
       toast.warning('Not enough coins! Skips cost 10 coins.');
       return;
     }
+    const currentWord = wordsList[currentWordIdx];
+    const playedWordLog = {
+      word_id: currentWord.id,
+      is_correct: false,
+      hints_used: 0
+    };
+    setBufferedPlayedWords(prev => [...prev, playedWordLog]);
     setCoins(prev => prev - 10);
     toast.info('Word skipped! (Cost: 10 coins)');
     handleNextWord();
@@ -444,17 +598,18 @@ export default function WordBuilderGame() {
     if (currentWordIdx < wordsList.length - 1) {
       setCurrentWordIdx(prev => prev + 1);
     } else {
-      // LEVEL COMPLETED!
-      playTone('complete');
-      toast.success(`🎉 Level ${currentLevel} Completed!`);
-      const nextLvl = currentLevel + 1;
-      setCurrentLevel(nextLvl);
-      
-      // Reload words list for next level
-      const list = getWordsForLevel(difficulty, nextLvl);
-      setWordsList(list);
-      setCurrentWordIdx(0);
-      triggerSync();
+      if (gameMode !== 'normal') {
+        handleChallengeCompleted();
+      } else {
+        // LEVEL COMPLETED!
+        playTone('complete');
+        toast.success(`🎉 Level ${currentLevel} Completed!`);
+        const nextLvl = currentLevel + 1;
+        setCurrentLevel(nextLvl);
+        
+        // Reset level word sequence
+        triggerSync(nextLvl);
+      }
     }
   };
 
@@ -521,8 +676,12 @@ export default function WordBuilderGame() {
             <div className="bg-white border border-[#EBEAE8] px-2 py-1.5 rounded-xl flex items-center gap-1 shadow-2xs">
               <Award className="h-3 w-3 text-indigo-500 flex-shrink-0" />
               <div className="min-w-0">
-                <span className="block text-[7px] text-text-muted font-bold uppercase tracking-wider leading-none">Lvl {currentLevel}</span>
-                <span className="text-[10px] font-black text-text-primary leading-none mt-0.5 block truncate">Word {currentWordIdx + 1}/10</span>
+                <span className="block text-[7px] text-text-muted font-bold uppercase tracking-wider leading-none">
+                  {gameMode === 'daily' ? 'Daily' : gameMode === 'weekly' ? 'Weekly' : `Lvl ${currentLevel}`}
+                </span>
+                <span className="text-[10px] font-black text-text-primary leading-none mt-0.5 block truncate">
+                  Word {currentWordIdx + 1}/{wordsList.length}
+                </span>
               </div>
             </div>
           </div>
@@ -581,24 +740,109 @@ export default function WordBuilderGame() {
                       ))}
                     </div>
                   </CardHeader>
-                  <CardContent className="p-6 text-center space-y-6">
+                  <CardContent className="p-6 text-center space-y-5">
                     
-                    {/* Clue/Hint Area */}
-                    <div className="bg-[#FAF9F6] border border-[#EBEAE8] rounded-2xl p-4 min-h-[90px] flex flex-col justify-center items-center">
-                      {showHint ? (
-                        <p className="text-xs font-semibold text-text-primary italic leading-relaxed">
-                          "{wordsList[currentWordIdx].hint}"
-                        </p>
-                      ) : (
-                        <div className="space-y-2">
-                          <p className="text-[9px] font-black text-text-muted uppercase tracking-wider">Need a Clue?</p>
-                          <Button 
-                            onClick={handleUseHint}
+                    {/* Visual Illustration Area */}
+                    {wordsList[currentWordIdx].image_path && (
+                      <div className="flex justify-center items-center py-1">
+                        <div className="relative w-28 h-28 rounded-2xl overflow-hidden border border-[#E5E5E1] bg-white flex items-center justify-center shadow-2xs">
+                          {imageError ? (
+                            <div className="flex flex-col items-center justify-center gap-1.5 p-2">
+                              <HelpCircle className="h-6 w-6 text-text-muted animate-pulse" />
+                              <span className="text-[8px] font-black text-text-muted uppercase tracking-wider text-center">Illustration Pending</span>
+                            </div>
+                          ) : (isPrePrimary || unlockedHints.image) ? (
+                            <img 
+                              src={wordsList[currentWordIdx].image_path} 
+                              alt={wordsList[currentWordIdx].word} 
+                              onError={() => setImageError(true)}
+                              className="w-24 h-24 object-contain transition-all duration-300"
+                            />
+                          ) : (
+                            <div className="flex flex-col items-center justify-center gap-1.5 p-2">
+                              <HelpCircle className="h-6 w-6 text-text-muted animate-pulse" />
+                              <span className="text-[8px] font-black text-text-muted uppercase tracking-wider text-center">Image Hint Locked</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Granular Hint Panel */}
+                    <div className="bg-[#FAF9F6] border border-[#EBEAE8] rounded-2xl p-4 space-y-2.5">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[8px] font-black text-text-muted uppercase tracking-wider">Available Hints</span>
+                        <span className="text-[8px] font-bold text-text-secondary">Coins: {coins} 🪙</span>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          disabled={unlockedHints.firstLetter || coins < 5}
+                          onClick={() => {
+                            setCoins(prev => prev - 5);
+                            setUnlockedHints(prev => ({ ...prev, firstLetter: true }));
+                            toast.success("First letter revealed!");
+                          }}
+                          variant="outline"
+                          className="h-8 text-[9px] font-bold flex items-center justify-center gap-1 border border-[#E5E5E1] rounded-lg shadow-3xs"
+                        >
+                          {unlockedHints.firstLetter ? `Starts with: ${wordsList[currentWordIdx].word.charAt(0)}` : "First Letter (5 🪙)"}
+                        </Button>
+
+                        <Button
+                          disabled={unlockedHints.meaning || coins < 5}
+                          onClick={() => {
+                            setCoins(prev => prev - 5);
+                            setUnlockedHints(prev => ({ ...prev, meaning: true }));
+                            toast.success("Meaning unlocked!");
+                          }}
+                          variant="outline"
+                          className="h-8 text-[9px] font-bold flex items-center justify-center gap-1 border border-[#E5E5E1] rounded-lg shadow-3xs"
+                        >
+                          {unlockedHints.meaning ? "Meaning Unlocked" : "Meaning (5 🪙)"}
+                        </Button>
+
+                        <Button
+                          disabled={unlockedHints.sentence || coins < 5}
+                          onClick={() => {
+                            setCoins(prev => prev - 5);
+                            setUnlockedHints(prev => ({ ...prev, sentence: true }));
+                            toast.success("Sentence unlocked!");
+                          }}
+                          variant="outline"
+                          className="h-8 text-[9px] font-bold flex items-center justify-center gap-1 border border-[#E5E5E1] rounded-lg shadow-3xs"
+                        >
+                          {unlockedHints.sentence ? "Sentence Unlocked" : "Sentence (5 🪙)"}
+                        </Button>
+
+                        {wordsList[currentWordIdx].image_path && (
+                          <Button
+                            disabled={isPrePrimary || unlockedHints.image || coins < 10}
+                            onClick={() => {
+                              setCoins(prev => prev - 10);
+                              setUnlockedHints(prev => ({ ...prev, image: true }));
+                              toast.success("Image revealed!");
+                            }}
                             variant="outline"
-                            className="h-8 px-4 text-[10px] font-extrabold flex items-center gap-1 border border-[#E5E5E1] rounded-lg shadow-2xs hover:bg-[#F4F3F1]"
+                            className="h-8 text-[9px] font-bold flex items-center justify-center gap-1 border border-[#E5E5E1] rounded-lg shadow-3xs"
                           >
-                            <HelpCircle className="h-3.5 w-3.5" /> Unlock Hint (5 🪙)
+                            {(isPrePrimary || unlockedHints.image) ? "Image Unlocked" : "Reveal Image (10 🪙)"}
                           </Button>
+                        )}
+                      </div>
+
+                      {(unlockedHints.meaning || unlockedHints.sentence) && (
+                        <div className="border-t border-dashed border-[#E5E5E1] pt-2.5 text-left space-y-1.5">
+                          {unlockedHints.meaning && (
+                            <p className="text-[10px] text-text-primary font-bold">
+                              💡 <span className="font-extrabold text-text-secondary">Meaning:</span> {wordsList[currentWordIdx].english_meaning} ({wordsList[currentWordIdx].hindi_meaning})
+                            </p>
+                          )}
+                          {unlockedHints.sentence && (
+                            <p className="text-[10px] text-text-primary font-bold leading-relaxed">
+                              📝 <span className="font-extrabold text-text-secondary">Sentence:</span> "{wordsList[currentWordIdx].english_sentence}"
+                            </p>
+                          )}
                         </div>
                       )}
                     </div>
@@ -682,7 +926,8 @@ export default function WordBuilderGame() {
                       <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center text-red-600">
                         <X className="h-5.5 w-5.5 stroke-[3]" />
                       </div>
-                    )}
+                    )
+                    }
                     <div>
                       <h4 className="text-sm font-black text-text-primary">
                         {isCorrect ? '🎉 Correct Answer!' : '😞 Nice Try!'}
@@ -708,16 +953,16 @@ export default function WordBuilderGame() {
                     <div className="space-y-2">
                       <div>
                         <span className="text-[8px] font-black text-text-muted uppercase tracking-wider block">English Meaning</span>
-                        <p className="text-xs text-text-primary font-bold">{wordsList[currentWordIdx].meaning}</p>
+                        <p className="text-xs text-text-primary font-bold">{wordsList[currentWordIdx].english_meaning}</p>
                       </div>
                       <div>
                         <span className="text-[8px] font-black text-text-muted uppercase tracking-wider block">Hindi Meaning</span>
-                        <p className="text-xs text-text-primary font-bold font-sans">{wordsList[currentWordIdx].hindiMeaning}</p>
+                        <p className="text-xs text-text-primary font-bold font-sans">{wordsList[currentWordIdx].hindi_meaning}</p>
                       </div>
                       <div className="pt-1.5 border-t border-dashed border-border">
                         <span className="text-[8px] font-black text-text-muted uppercase tracking-wider block">Example Sentence</span>
-                        <p className="text-xs text-text-primary font-bold">"{wordsList[currentWordIdx].sentence}"</p>
-                        <p className="text-[10px] text-text-muted font-semibold mt-1 font-sans">"{wordsList[currentWordIdx].hindiSentence}"</p>
+                        <p className="text-xs text-text-primary font-bold">"{wordsList[currentWordIdx].english_sentence}"</p>
+                        <p className="text-[10px] text-text-muted font-semibold mt-1 font-sans">"{wordsList[currentWordIdx].hindi_sentence}"</p>
                       </div>
                     </div>
                   </div>
@@ -749,32 +994,19 @@ export default function WordBuilderGame() {
                     <p className="text-[10px] text-text-secondary">Spell words correctly in gameplay mode to add them here.</p>
                   </div>
                 ) : (
-                  // Group words by their category
-                  learnedWords.map(wordStr => {
-                    // Find actual word details from PREDEFINED_WORDS
-                    let matchedWord = null;
-                    const diffKeys = Object.keys(PREDEFINED_WORDS);
-                    for (const key of diffKeys) {
-                      const found = PREDEFINED_WORDS[key].find(item => item.word === wordStr);
-                      if (found) {
-                        matchedWord = found;
-                        break;
-                      }
-                    }
-                    if (!matchedWord) return null;
-
+                  learnedWords.map(wordObj => {
                     return (
-                      <Card key={wordStr} className="border border-[#EBEAE8] rounded-2xl bg-white shadow-2xs">
+                      <Card key={wordObj.id} className="border border-[#EBEAE8] rounded-2xl bg-white shadow-2xs">
                         <CardContent className="p-4 space-y-3">
                           <div className="flex items-center justify-between border-b border-border/60 pb-2">
                             <div>
-                              <h4 className="text-sm font-black text-text-primary tracking-wide leading-none">{matchedWord.word}</h4>
+                              <h4 className="text-sm font-black text-text-primary tracking-wide leading-none">{wordObj.word}</h4>
                               <span className="text-[7px] font-black text-text-muted uppercase tracking-wider mt-1 block">
-                                {matchedWord.category}
+                                {wordObj.category}
                               </span>
                             </div>
                             <button
-                              onClick={() => handleTextToSpeech(matchedWord.word)}
+                              onClick={() => handleTextToSpeech(wordObj.word)}
                               className="w-7 h-7 rounded-full bg-primary/10 text-text-primary hover:bg-primary/20 flex items-center justify-center transition-colors"
                             >
                               <Volume2 className="h-3.5 w-3.5" />
@@ -782,11 +1014,11 @@ export default function WordBuilderGame() {
                           </div>
                           
                           <div className="space-y-1.5 text-[10px] text-text-secondary font-bold">
-                            <p><span className="text-text-muted text-[9px] uppercase block">Meaning</span> {matchedWord.meaning}</p>
-                            <p><span className="text-text-muted text-[9px] uppercase block font-sans">Hindi Meaning</span> {matchedWord.hindiMeaning}</p>
+                            <p><span className="text-text-muted text-[9px] uppercase block">Meaning</span> {wordObj.english_meaning}</p>
+                            <p><span className="text-text-muted text-[9px] uppercase block font-sans">Hindi Meaning</span> {wordObj.hindi_meaning}</p>
                             <div className="pt-1.5 border-t border-dashed border-border/80">
-                              <p><span className="text-text-muted text-[9px] uppercase block">Example</span> "{matchedWord.sentence}"</p>
-                              <p className="text-text-muted font-normal mt-0.5 font-sans">"{matchedWord.hindiSentence}"</p>
+                              <p><span className="text-text-muted text-[9px] uppercase block">Example</span> "{wordObj.english_sentence}"</p>
+                              <p className="text-text-muted font-normal mt-0.5 font-sans">"{wordObj.hindi_sentence}"</p>
                             </div>
                           </div>
                         </CardContent>
@@ -796,7 +1028,7 @@ export default function WordBuilderGame() {
                 )}
               </div>
             </div>
-          ) : (
+          ) : activeTab === 'stats' ? (
             // STATS & PROGRESS TRACKING MODE
             <div className="space-y-4">
               <div className="flex items-center gap-2">
@@ -873,14 +1105,204 @@ export default function WordBuilderGame() {
                 </CardContent>
               </Card>
             </div>
+          ) : activeTab === 'challenges' ? (
+            // CHALLENGES MODE VIEW
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                <h3 className="text-lg font-black text-text-primary tracking-tight font-display">Challenges</h3>
+              </div>
+              <p className="text-[10px] text-text-secondary leading-relaxed font-bold">
+                Solve unique challenges every day and week to earn trophies, coins, and extra XP!
+              </p>
+
+              {loadingChallenge ? (
+                <div className="flex flex-col items-center justify-center py-8 gap-2">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                  <span className="text-[9px] font-black text-text-muted uppercase tracking-wider">Starting challenge...</span>
+                </div>
+              ) : (
+                <div className="space-y-4 pt-2">
+                  {/* Daily Challenge Card */}
+                  <Card className="border border-[#EBEAE8] rounded-2xl bg-white shadow-2xs">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="text-sm font-black text-text-primary">Daily Word Theme</h4>
+                          <p className="text-[9px] text-text-muted mt-0.5">10 questions · Topic-specific vocabulary</p>
+                        </div>
+                        {challengesData.daily?.completed ? (
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 text-[8px] font-black uppercase">Completed</span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 text-[8px] font-black uppercase">Available</span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-4 text-[9px] font-black text-text-secondary uppercase">
+                        <div>XP: <span className="text-text-primary font-bold">+100</span></div>
+                        <div>Coins: <span className="text-text-primary font-bold">+50</span></div>
+                      </div>
+
+                      {!challengesData.daily?.completed && (
+                        <Button 
+                          onClick={() => startChallenge('daily')}
+                          className="w-full text-xs font-black uppercase tracking-wider py-2 justify-center bg-primary text-white"
+                        >
+                          Start Daily Challenge
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Weekly Challenge Card */}
+                  <Card className="border border-[#EBEAE8] rounded-2xl bg-white shadow-2xs">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="text-sm font-black text-text-primary">Weekly Review Test</h4>
+                          <p className="text-[9px] text-text-muted mt-0.5">20 questions · Spaced-repetition review</p>
+                        </div>
+                        {challengesData.weekly?.completed ? (
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 text-[8px] font-black uppercase">Completed</span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 text-[8px] font-black uppercase">Available</span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-4 text-[9px] font-black text-text-secondary uppercase">
+                        <div>XP: <span className="text-text-primary font-bold">+250</span></div>
+                        <div>Coins: <span className="text-text-primary font-bold">+100</span></div>
+                        <div>Badge: <span className="text-text-primary font-bold">Trophy</span></div>
+                      </div>
+
+                      {!challengesData.weekly?.completed && (
+                        <Button 
+                          onClick={() => startChallenge('weekly')}
+                          className="w-full text-xs font-black uppercase tracking-wider py-2 justify-center bg-zinc-900 text-white dark:bg-white dark:text-black"
+                        >
+                          Start Weekly Challenge
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+            </div>
+          ) : activeTab === 'leaderboard' ? (
+            // LEADERBOARD RATING VIEW
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Trophy className="h-5 w-5 text-primary" />
+                <h3 className="text-lg font-black text-text-primary tracking-tight font-display">Leaderboard</h3>
+              </div>
+
+              {/* Sub tabs selector */}
+              <div className="flex border border-[#EBEAE8] rounded-xl overflow-hidden text-[9px] font-black uppercase tracking-wider">
+                {['school', 'class', 'section'].map(tab => (
+                  <button
+                    key={tab}
+                    onClick={() => setLeaderboardSubTab(tab)}
+                    className={`flex-1 py-1.5 text-center transition-colors ${
+                      leaderboardSubTab === tab 
+                        ? 'bg-zinc-900 text-white dark:bg-white dark:text-black' 
+                        : 'bg-white text-text-secondary hover:bg-zinc-50'
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
+
+              <div className="space-y-2.5 pt-2">
+                {!leaderboardData ? (
+                  <div className="text-center py-8 text-xs text-text-muted font-bold">
+                    No leaderboard scores loaded.
+                  </div>
+                ) : (
+                  (leaderboardSubTab === 'school' ? leaderboardData.school_rankings :
+                   leaderboardSubTab === 'class' ? leaderboardData.class_rankings :
+                   leaderboardData.section_rankings).map((row, idx) => {
+                    const medals = ['🥇', '🥈', '🥉'];
+                    return (
+                      <div 
+                        key={row.id}
+                        className={`flex items-center justify-between p-3.5 bg-white border border-[#EBEAE8] rounded-2xl shadow-2xs transition-all ${
+                          row.id === studentService.getCurrentUser()?.student_id ? 'border-primary/60 bg-primary/5' : ''
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs font-black text-text-muted w-6 block">
+                            {idx < 3 ? medals[idx] : `#${idx + 1}`}
+                          </span>
+                          <div className="min-w-0">
+                            <span className="text-xs font-black text-text-primary block truncate">{row.name}</span>
+                            <span className="text-[7px] font-bold text-text-muted block mt-0.5 uppercase">
+                              {row.total_words_mastered} mastered
+                            </span>
+                          </div>
+                        </div>
+                        <span className="text-xs font-black text-text-primary tabular-nums">
+                          {row.score} XP
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          ) : (
+            // ACHIEVEMENTS / BADGES VIEW
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Award className="h-5 w-5 text-primary" />
+                <h3 className="text-lg font-black text-text-primary tracking-tight font-display">My Badges</h3>
+              </div>
+              <p className="text-[10px] text-text-secondary leading-relaxed font-bold">
+                Check your unlocked accolades and practice milestones below.
+              </p>
+
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                {achievementsData.length === 0 ? (
+                  <div className="col-span-2 text-center py-8 text-xs text-text-muted font-bold">
+                    Achievements are currently loading...
+                  </div>
+                ) : (
+                  achievementsData.map(badge => (
+                    <Card 
+                      key={badge.key} 
+                      className={`border border-[#EBEAE8] rounded-2xl transition-all ${
+                        badge.unlocked ? 'bg-white opacity-100 shadow-2xs' : 'bg-[#FAF9F6] opacity-60'
+                      }`}
+                    >
+                      <CardContent className="p-3 text-center flex flex-col items-center justify-between min-h-[145px] gap-2.5">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          badge.unlocked ? 'bg-primary/10 text-primary' : 'bg-zinc-200 text-zinc-400'
+                        }`}>
+                          <Award className="h-5.5 w-5.5" />
+                        </div>
+                        <div>
+                          <h4 className="text-[11px] font-black text-text-primary leading-tight">{badge.title}</h4>
+                          <p className="text-[8px] text-text-muted mt-1 leading-normal font-bold">{badge.desc}</p>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded-full text-[7px] font-black uppercase ${
+                          badge.unlocked ? 'bg-emerald-500/10 text-emerald-600' : 'bg-zinc-200 text-zinc-500'
+                        }`}>
+                          {badge.unlocked ? 'Unlocked' : 'Locked'}
+                        </span>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </div>
+            </div>
           )}
         </div>
 
         {/* Bottom Tab Menu Navigation */}
-        <div className="border-t border-[#E5E5E1] bg-white grid grid-cols-3 h-[60px] relative z-20 shadow-sm">
+        <div className="border-t border-[#E5E5E1] bg-white grid grid-cols-5 h-[60px] relative z-20 shadow-sm">
           <button 
-            onClick={() => setActiveTab('game')}
-            className={`flex flex-col items-center justify-center gap-1.5 text-[9px] font-black uppercase tracking-wider transition-colors ${
+            onClick={() => { setActiveTab('game'); setGameMode('normal'); }}
+            className={`flex flex-col items-center justify-center gap-1.5 text-[8px] font-black uppercase tracking-wider transition-colors ${
               activeTab === 'game' 
                 ? 'text-primary' 
                 : 'text-text-muted hover:text-text-primary'
@@ -892,7 +1314,7 @@ export default function WordBuilderGame() {
           
           <button 
             onClick={() => setActiveTab('notebook')}
-            className={`flex flex-col items-center justify-center gap-1.5 text-[9px] font-black uppercase tracking-wider transition-colors ${
+            className={`flex flex-col items-center justify-center gap-1.5 text-[8px] font-black uppercase tracking-wider transition-colors ${
               activeTab === 'notebook' 
                 ? 'text-primary' 
                 : 'text-text-muted hover:text-text-primary'
@@ -903,15 +1325,39 @@ export default function WordBuilderGame() {
           </button>
 
           <button 
-            onClick={() => setActiveTab('stats')}
-            className={`flex flex-col items-center justify-center gap-1.5 text-[9px] font-black uppercase tracking-wider transition-colors ${
-              activeTab === 'stats' 
+            onClick={() => setActiveTab('challenges')}
+            className={`flex flex-col items-center justify-center gap-1.5 text-[8px] font-black uppercase tracking-wider transition-colors ${
+              activeTab === 'challenges' 
                 ? 'text-primary' 
                 : 'text-text-muted hover:text-text-primary'
             }`}
           >
-            <Activity className="h-4.5 w-4.5" />
-            Stats
+            <Sparkles className="h-4.5 w-4.5" />
+            Challenges
+          </button>
+
+          <button 
+            onClick={() => setActiveTab('leaderboard')}
+            className={`flex flex-col items-center justify-center gap-1.5 text-[8px] font-black uppercase tracking-wider transition-colors ${
+              activeTab === 'leaderboard' 
+                ? 'text-primary' 
+                : 'text-text-muted hover:text-text-primary'
+            }`}
+          >
+            <Trophy className="h-4.5 w-4.5" />
+            Ranks
+          </button>
+
+          <button 
+            onClick={() => setActiveTab('achievements')}
+            className={`flex flex-col items-center justify-center gap-1.5 text-[8px] font-black uppercase tracking-wider transition-colors ${
+              activeTab === 'achievements' 
+                ? 'text-primary' 
+                : 'text-text-muted hover:text-text-primary'
+            }`}
+          >
+            <Award className="h-4.5 w-4.5" />
+            Badges
           </button>
         </div>
       </div>

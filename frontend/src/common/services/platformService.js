@@ -96,4 +96,12 @@ export const platformService = {
   async updateSchoolCredentials(id, data) {
     return apiClient.put(`/api/platform/schools/${id}/credentials`, data);
   },
+
+  async getUpgradePreview(id, planId) {
+    return apiClient.get(`/api/platform/schools/${id}/upgrade-preview?plan_id=${planId}`);
+  },
+
+  async upgradeSchool(id, planId) {
+    return apiClient.post(`/api/platform/schools/${id}/upgrade`, { plan_id: planId });
+  },
 };

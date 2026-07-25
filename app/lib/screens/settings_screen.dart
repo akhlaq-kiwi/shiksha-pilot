@@ -134,7 +134,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 final childPhoto = child['photo_path']?.toString() ?? '';
                 Widget leadingWidget;
                 if (childPhoto.isNotEmpty) {
-                  final fullUrl = childPhoto.startsWith('http') ? childPhoto : 'http://10.227.152.71:8000' + childPhoto;
+                  final fullUrl = childPhoto.startsWith('http') ? childPhoto : 'http://10.55.253.71:8000' + childPhoto;
                   leadingWidget = CircleAvatar(
                     backgroundImage: NetworkImage(fullUrl),
                     backgroundColor: Colors.indigo.shade50,
@@ -473,7 +473,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     String photoUrl = _userPhoto;
     Widget avatarWidget;
     if (photoUrl.isNotEmpty) {
-      final fullUrl = photoUrl.startsWith('http') ? photoUrl : 'http://10.227.152.71:8000' + photoUrl;
+      final fullUrl = photoUrl.startsWith('http') ? photoUrl : 'http://10.55.253.71:8000' + photoUrl;
       avatarWidget = CircleAvatar(
         radius: 46,
         backgroundImage: NetworkImage(fullUrl),
@@ -508,7 +508,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   GestureDetector(
                     onTap: () {
                       if (_userPhoto.isNotEmpty) {
-                        final fullUrl = _userPhoto.startsWith('http') ? _userPhoto : 'http://10.227.152.71:8000' + _userPhoto;
+                        final fullUrl = _userPhoto.startsWith('http') ? _userPhoto : 'http://10.55.253.71:8000' + _userPhoto;
                         Navigator.push(
                           context,
                           MaterialPageRoute(

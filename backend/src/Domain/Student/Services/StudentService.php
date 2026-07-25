@@ -39,7 +39,13 @@ class StudentService extends BaseService
         $schoolId = (int) ($user['school_id'] ?? 0);
 
         if ($user['role'] === 'STUDENT') {
-            $student = $this->repo->findByUserEmail((string) ($user['email'] ?? ''), $schoolId);
+            $email = $user['email'] ?? null;
+            if (empty($email) && isset($user['id'])) {
+                $stmt = $this->repo->getPdo()->prepare("SELECT email FROM users WHERE id = :id LIMIT 1");
+                $stmt->execute([':id' => $user['id']]);
+                $email = $stmt->fetchColumn() ?: '';
+            }
+            $student = $this->repo->findByUserEmail((string)$email, $schoolId);
         } else {
             // PARENT: match via phone stored on users.phone -> students.parent_phone
             // Allow selecting a specific child via X-Student-Id header or query parameter
@@ -635,12 +641,13 @@ class StudentService extends BaseService
 
         if ($isAdditional) {
             $stmt = $pdo->prepare("
-                SELECT afp.*, s.first_name, s.last_name, s.roll_no, c.name AS class_name, c.section, sch.name AS school_name, aft.name AS fee_name
+                SELECT afp.*, s.first_name, s.last_name, s.roll_no, s.sr_no, c.name AS class_name, c.section, sch.name AS school_name, sch.logo_path, aft.name AS fee_name, ay.name AS academic_year_name
                 FROM additional_fee_payments afp
                 JOIN students s ON afp.student_id = s.id
                 LEFT JOIN classes c ON s.class_id = c.id
                 JOIN schools sch ON afp.school_id = sch.id
                 JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+                LEFT JOIN academic_years ay ON s.academic_year_id = ay.id
                 WHERE afp.id = :id AND afp.student_id = :student_id AND afp.school_id = :sid
                 LIMIT 1
             ");
@@ -658,11 +665,12 @@ class StudentService extends BaseService
             $monthTitle = $title;
         } else {
             $stmt = $pdo->prepare("
-                SELECT fp.*, s.first_name, s.last_name, s.roll_no, c.name AS class_name, c.section, sch.name AS school_name
+                SELECT fp.*, s.first_name, s.last_name, s.roll_no, s.sr_no, c.name AS class_name, c.section, sch.name AS school_name, sch.logo_path, ay.name AS academic_year_name
                 FROM fee_payments fp
                 JOIN students s ON fp.student_id = s.id
                 LEFT JOIN classes c ON s.class_id = c.id
                 JOIN schools sch ON fp.school_id = sch.id
+                LEFT JOIN academic_years ay ON s.academic_year_id = ay.id
                 WHERE fp.id = :id AND fp.student_id = :student_id AND fp.school_id = :sid
                 LIMIT 1
             ");
@@ -678,9 +686,9 @@ class StudentService extends BaseService
 
         // Format payment date
         $months = [
-            '01' => 'January', '02' => 'February', '03' => 'March', '04' => 'April',
-            '05' => 'May', '06' => 'June', '07' => 'July', '08' => 'August',
-            '09' => 'September', '10' => 'October', '11' => 'November', '12' => 'December'
+            '01' => 'Jan', '02' => 'Feb', '03' => 'Mar', '04' => 'Apr',
+            '05' => 'May', '06' => 'Jun', '07' => 'Jul', '08' => 'Aug',
+            '09' => 'Sep', '10' => 'Oct', '11' => 'Nov', '12' => 'Dec'
         ];
         $paymentDateFormatted = '—';
         if (!empty($payment['payment_date'])) {
@@ -694,24 +702,92 @@ class StudentService extends BaseService
         $studentName = trim($payment['first_name'] . ' ' . ($payment['last_name'] !== '.' ? $payment['last_name'] : ''));
         $classDisplay = $payment['class_name'] . (!empty($payment['section']) ? ' - ' . $payment['section'] : '');
 
-        $pdf = new SimplePdf();
+        $paymentMethod = !empty($payment['payment_method']) ? $payment['payment_method'] : 'Cash';
+        $m = strtolower($paymentMethod);
+        if ($m === 'cash') {
+            $paymentMode = 'Cash';
+        } elseif ($m === 'cheque') {
+            $paymentMode = 'Cheque';
+        } else {
+            $paymentMode = 'Online';
+        }
+
+        $rollNo = $payment['roll_no'] ?? '—';
+        $srNo = $payment['sr_no'] ?? '—';
+        $rollSrDisplay = "{$rollNo} / {$srNo}";
+
+        $rawAcademicYear = !empty($payment['academic_year_name']) ? $payment['academic_year_name'] : '2026-2027';
+        $academicYear = str_replace(['–', '—'], '-', $rawAcademicYear);
+
+        $feeMonthDisplay = '';
+        if (!$isAdditional) {
+            $stmtGrp = $pdo->prepare("SELECT fee_month, amount_paid FROM fee_payments WHERE receipt_no = :receipt_no AND school_id = :sid");
+            $stmtGrp->execute([':receipt_no' => $receiptNo, ':sid' => $schoolId]);
+            $groupPayments = $stmtGrp->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            
+            $academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+            usort($groupPayments, function($a, $b) use ($academicMonths) {
+                $idxA = array_search($a['fee_month'], $academicMonths, true);
+                $idxB = array_search($b['fee_month'], $academicMonths, true);
+                return $idxA - $idxB;
+            });
+            
+            $rupee = "Rs";
+            $monthsList = array_column($groupPayments, 'fee_month');
+            $indices = [];
+            foreach ($monthsList as $m) {
+                $idx = array_search($m, $academicMonths, true);
+                if ($idx !== false) {
+                    $indices[] = $idx;
+                }
+            }
+            $isConsecutive = false;
+            if (count($indices) > 1) {
+                $isConsecutive = true;
+                for ($i = 1; $i < count($indices); $i++) {
+                    if ($indices[$i] !== $indices[$i - 1] + 1) {
+                        $isConsecutive = false;
+                        break;
+                    }
+                }
+            }
+            if ($isConsecutive) {
+                $feeMonthDisplay = reset($monthsList) . " To " . end($monthsList);
+            } else {
+                $feeMonthDisplay = implode(', ', $monthsList);
+            }
+            $totalAmountPaid = array_sum(array_column($groupPayments, 'amount_paid'));
+            $amountPaidFormatted = "Rs " . number_format((float)$totalAmountPaid, 0);
+            $billingItemLabel = count($groupPayments) > 1 ? "Billing Months: " : "Billing Month: ";
+        } else {
+            $feeMonthDisplay = $payment['fee_name'];
+            $totalAmountPaid = (float)$payment['amount'];
+            $amountPaidFormatted = "Rs " . number_format((float)$totalAmountPaid, 0);
+            $billingItemLabel = "Description: ";
+        }
+
         $lines = [
-            "School: " . $payment['school_name'],
+            "FEE PAYMENT RECEIPT",
+            "Logo Path: " . ($payment['logo_path'] ?? ''),
             "---",
-            "Receipt Number: " . $receiptNo,
-            "Student Name: " . $studentName,
-            "Class: " . $classDisplay,
-            "Roll Number: " . ($payment['roll_no'] ?? '—'),
-            $billingItem,
-            "Amount Paid: INR " . number_format((float)($payment['amount_paid'] ?? $payment['amount'] ?? 0.0), 2),
+            "Mode of Payment: " . $paymentMode,
+            "Student Name: " . strtoupper($studentName),
+            "Class & Section: " . $classDisplay,
+            "Roll Number / SR No: " . $rollSrDisplay,
+            "Ref No: " . $receiptNo,
+            "Academic Year: " . $academicYear,
             "Payment Date: " . $paymentDateFormatted,
+            "---",
+            $billingItemLabel . $feeMonthDisplay,
+            "Total Amount: " . $amountPaidFormatted,
             "---",
             "Status: PAID",
             "---",
-            "This is an automated system generated fee receipt."
+            "This is an automated system generated receipt. Thank you for your payment."
         ];
 
-        $pdfData = $pdf->render("FEE PAYMENT RECEIPT", $lines);
+        $pdf = new \App\Shared\Pdf\SimplePdf();
+        $pdfData = $pdf->render(strtoupper($payment['school_name']), $lines);
         $filename = str_replace(' ', '_', $monthTitle) . "_Fee_Receipt.pdf";
 
         return [
@@ -1204,7 +1280,6 @@ class StudentService extends BaseService
                 $temp->modify('+1 month');
             }
         }
-        $temp->modify('+1 month');
     }
 
     public function getGameProgress(array $user): array

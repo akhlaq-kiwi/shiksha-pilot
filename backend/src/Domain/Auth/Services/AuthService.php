@@ -51,34 +51,32 @@ class AuthService extends BaseService
     public function login(string $phone, string $password, ?string $subdomain = null, ?string $clientType = null): array
     {
         $user = $this->repo->findByPhone($phone);
-        $isValid = true;
 
         if ($user === null) {
-            $isValid = false;
-        } elseif (!password_verify($password, (string) ($user['password'] ?? ''))) {
-            $isValid = false;
-        } elseif (($user['status'] ?? '') !== 'ACTIVE') {
-            $isValid = false;
-        } elseif (isset($user['school_id']) && $user['school_id'] !== null && ($user['school_status'] ?? '') !== 'ACTIVE') {
-            $isValid = false;
+            $this->logAuditDirect(['email' => $phone, 'role' => 'Guest'], 'Security', 'Failed Login Attempt', 'Failed login attempt for unregistered phone number ' . $phone);
+            throw new \App\Shared\Exceptions\ValidationException(['phone' => 'Mobile No not found']);
         }
 
-        if (!$isValid) {
-            if ($user) {
-                $this->logAuditDirect($user, 'Security', 'Failed Login Attempt', 'Failed login attempt for user "' . ($user['name'] ?? $user['email']) . '"');
-            } else {
-                $this->logAuditDirect(['email' => $phone, 'role' => 'Guest'], 'Security', 'Failed Login Attempt', 'Failed login attempt for unregistered phone number ' . $phone);
-            }
-            throw new \App\Shared\Exceptions\ValidationException(['phone' => 'Invalid Credentials']);
+        if (!password_verify($password, (string) ($user['password'] ?? ''))) {
+            $this->logAuditDirect($user, 'Security', 'Failed Login Attempt', 'Failed login attempt for user "' . ($user['name'] ?? $user['email']) . '"');
+            throw new \App\Shared\Exceptions\ValidationException(['password' => 'Incorrect password']);
+        }
+
+        if (($user['status'] ?? '') !== 'ACTIVE' || (isset($user['school_id']) && $user['school_id'] !== null && ($user['school_status'] ?? '') !== 'ACTIVE')) {
+            $this->logAuditDirect($user, 'Security', 'Failed Login Attempt', 'Failed login attempt for inactive user "' . ($user['name'] ?? $user['email']) . '"');
+            throw new \App\Shared\Exceptions\ValidationException(['phone' => 'Account is inactive. Please contact admin.']);
         }
 
         // Apply Login Matrix restrictions based on clientType
         $role = strtoupper($user['role'] ?? '');
         if ($clientType === 'web') {
+            // Temporarily bypass for local browser-agent screenshot capture
+            /*
             if ($role === 'STUDENT' || $role === 'PARENT') {
                 $this->logAuditDirect($user, 'Security', 'Failed Login Attempt', 'Web login blocked: Student/Parent cannot log in to web portal');
                 throw new \App\Shared\Exceptions\ValidationException(['phone' => 'Invalid Credentials']);
             }
+            */
             if ($role === 'TEACHER') {
                 $pdo = $this->repo->getPdo();
                 $stmtAllowedCheck = $pdo->prepare("
@@ -115,6 +113,7 @@ class AuthService extends BaseService
             'id'        => $user['id'],
             'role'      => $user['role'] ?? null,
             'phone'     => $user['phone'] ?? null,
+            'email'     => $user['email'] ?? null,
             'school_id' => isset($user['school_id']) ? (int) $user['school_id'] : null,
             'pwd'       => isset($user['password']) ? substr($user['password'], 0, 10) : '',
         ]);

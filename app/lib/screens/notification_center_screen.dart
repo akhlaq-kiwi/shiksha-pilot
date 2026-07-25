@@ -8,6 +8,7 @@ import '../services/leave_service.dart';
 import 'exam_list_screen.dart';
 import 'exam_detail_screen.dart';
 import '../services/exam_service.dart';
+import 'fees_card_screen.dart';
 
 class NotificationCenterScreen extends StatefulWidget {
   final String baseUrl;
@@ -315,6 +316,20 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                     );
                                   }
                                 }
+                                return;
+                              }
+
+                              if (linkStr.contains('fees') || titleLower.contains('fee') || msgLower.contains('fee')) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => FeesCardScreen(
+                                      baseUrl: widget.baseUrl,
+                                      token: widget.token,
+                                      studentId: widget.studentId,
+                                    ),
+                                  ),
+                                );
                                 return;
                               }
 

@@ -21,7 +21,6 @@ import 'package:workmanager/workmanager.dart';
 import 'package:school_hub/main.dart';
 import 'package:school_hub/services/exam_service.dart';
 import 'package:school_hub/screens/exam_list_screen.dart';
-import 'package:school_hub/screens/word_builder_game_screen.dart';
 
 class LauncherFeature {
   final String name;
@@ -63,6 +62,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   String _userPhone = '';
   int? _activeStudentId;
   String _activeStudentName = '';
+  String _activeStudentClass = '';
   String _userPhoto = '';
   
   List<dynamic> _children = [];
@@ -79,14 +79,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       name: 'Attendance',
       icon: Icons.calendar_month_rounded,
       color: Colors.teal,
-      allowedRoles: ['PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL'],
+      allowedRoles: ['PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL', 'STUDENT'],
       isAvailable: true,
     ),
     LauncherFeature(
       name: 'Leaves',
       icon: Icons.edit_document,
       color: Colors.amber.shade800,
-      allowedRoles: ['PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL'],
+      allowedRoles: ['PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL', 'STUDENT'],
       isAvailable: true,
     ),
     LauncherFeature(
@@ -107,20 +107,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       name: 'Homework',
       icon: Icons.menu_book_rounded,
       color: Colors.indigo,
-      allowedRoles: ['PARENT', 'TEACHER'],
+      allowedRoles: ['PARENT', 'TEACHER', 'STUDENT'],
     ),
     LauncherFeature(
       name: 'Timetable',
       icon: Icons.schedule_rounded,
       color: Colors.blue,
-      allowedRoles: ['PARENT', 'TEACHER'],
+      allowedRoles: ['PARENT', 'TEACHER', 'STUDENT'],
       isAvailable: true,
     ),
     LauncherFeature(
       name: 'Exams',
       icon: Icons.assignment_turned_in_rounded,
       color: Colors.red,
-      allowedRoles: ['PARENT', 'TEACHER'],
+      allowedRoles: ['PARENT', 'TEACHER', 'STUDENT'],
       isAvailable: true,
     ),
     LauncherFeature(
@@ -133,32 +133,32 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       name: 'Notice',
       icon: Icons.campaign_rounded,
       color: Colors.orange.shade700,
-      allowedRoles: ['PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL'],
+      allowedRoles: ['PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL', 'STUDENT'],
       isAvailable: true,
     ),
     LauncherFeature(
       name: 'Transport',
       icon: Icons.directions_bus_rounded,
       color: Colors.blueGrey,
-      allowedRoles: ['PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL'],
+      allowedRoles: ['PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL', 'STUDENT'],
     ),
     LauncherFeature(
       name: 'Library',
       icon: Icons.local_library_rounded,
       color: Colors.brown,
-      allowedRoles: ['PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL'],
+      allowedRoles: ['PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL', 'STUDENT'],
     ),
     LauncherFeature(
       name: 'Messages',
       icon: Icons.chat_rounded,
       color: Colors.purple,
-      allowedRoles: ['PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL'],
+      allowedRoles: ['PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL', 'STUDENT'],
     ),
     LauncherFeature(
       name: 'Settings',
       icon: Icons.settings_rounded,
       color: Colors.grey.shade700,
-      allowedRoles: ['PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL'],
+      allowedRoles: ['PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL', 'STUDENT'],
       isAvailable: true,
     ),
     LauncherFeature(
@@ -180,10 +180,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       allowedRoles: ['SCHOOL_ADMIN', 'PRINCIPAL'],
     ),
     LauncherFeature(
-      name: 'Word Builder',
-      icon: Icons.extension_rounded,
-      color: Colors.indigo,
-      allowedRoles: ['PARENT'],
+      name: 'Achievements',
+      icon: Icons.emoji_events_rounded,
+      color: Colors.amber.shade700,
+      allowedRoles: ['PARENT', 'STUDENT'],
       isAvailable: true,
     ),
   ];
@@ -294,7 +294,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
     });
 
-    if (widget.userRole.toUpperCase() == 'PARENT') {
+    final roleUpper = widget.userRole.toUpperCase();
+    if (roleUpper == 'PARENT' || roleUpper == 'STUDENT') {
       final savedId = prefs.getInt('selected_student_id');
       if (savedId != null) {
         setState(() {
@@ -313,7 +314,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _syncProfileDetails(String token) async {
     try {
-      final authService = AuthService(baseUrl: 'http://10.227.152.71:8000');
+      final authService = AuthService(baseUrl: 'http://10.55.253.71:8000');
       final profile = await authService.fetchProfile(token);
       
       final latestPhoto = (profile['photo_path'] as String?) ?? (profile['staff_photo_path'] as String?) ?? '';
@@ -340,7 +341,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _fetchChildrenList() async {
-    if (widget.userRole.toUpperCase() != 'PARENT') return;
+    final roleUpper = widget.userRole.toUpperCase();
+    if (roleUpper != 'PARENT' && roleUpper != 'STUDENT') return;
     
     setState(() {
       _isLoadingChildren = true;
@@ -375,6 +377,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (active != null) {
       setState(() {
         _activeStudentName = active['name'] ?? '';
+        _activeStudentClass = active['class_name'] ?? '';
       });
       SharedPreferences.getInstance().then((prefs) {
         prefs.setString('user_name', active['name'] ?? '');
@@ -752,7 +755,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             try {
                               final prefs = await SharedPreferences.getInstance();
                               final token = prefs.getString('auth_token') ?? '';
-                              final authService = AuthService(baseUrl: 'http://10.227.152.71:8000');
+                              final authService = AuthService(baseUrl: 'http://10.55.253.71:8000');
                               await authService.changePassword(
                                 token,
                                 _currentPasswordController.text,
@@ -820,7 +823,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
         Widget avatarChild;
         if (photoUrl.isNotEmpty) {
-          final fullUrl = photoUrl.startsWith('http') ? photoUrl : 'http://10.227.152.71:8000' + photoUrl;
+          final fullUrl = photoUrl.startsWith('http') ? photoUrl : 'http://10.55.253.71:8000' + photoUrl;
           avatarChild = ClipOval(
             child: Image.network(
               fullUrl,
@@ -1097,18 +1100,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
         );
-      } else if (feature.name == 'Word Builder') {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => WordBuilderGameScreen(
-              baseUrl: widget.leaveService.baseUrl,
-              token: widget.leaveService.token,
-              studentId: _activeStudentId,
-              studentClass: _activeStudentName.isNotEmpty ? _activeStudentName : 'Grade 9-A',
+      } else if (feature.name == 'Achievements') {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text('Achievements', style: TextStyle(fontWeight: FontWeight.bold)),
+            content: const Text(
+              'This feature is currently under development. It will be available in a future update.',
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
           ),
-        ).then((_) => _fetchUnreadNotificationsCount());
+        );
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1208,7 +1216,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         }
 
                         if (photoUrl.isNotEmpty) {
-                          final fullUrl = photoUrl.startsWith('http') ? photoUrl : 'http://10.227.152.71:8000' + photoUrl;
+                          final fullUrl = photoUrl.startsWith('http') ? photoUrl : 'http://10.55.253.71:8000' + photoUrl;
                           Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -1238,7 +1246,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                               }
 
                               if (photoUrl.isNotEmpty) {
-                                final fullUrl = photoUrl.startsWith('http') ? photoUrl : 'http://10.227.152.71:8000' + photoUrl;
+                                final fullUrl = photoUrl.startsWith('http') ? photoUrl : 'http://10.55.253.71:8000' + photoUrl;
                                 return ClipOval(
                                   child: Image.network(
                                     fullUrl,

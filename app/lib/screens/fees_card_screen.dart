@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:school_hub/services/http_service.dart' as http;
-import 'package:file_picker/file_picker.dart';
 
 class FeesCardScreen extends StatefulWidget {
   final String baseUrl;
@@ -105,17 +107,41 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
         final cleanMonth = monthOrDesc.replaceAll(RegExp(r'\s+'), '_');
         final defaultFilename = '${cleanMonth}_Fee_Receipt.pdf';
         
-        final savedPath = await FilePicker.platform.saveFile(
-          fileName: defaultFilename,
-          bytes: response.bodyBytes,
-        );
+        String? savedPath;
+
+        if (Platform.isAndroid) {
+          const platform = MethodChannel('com.shikshapilot.schoolhub/battery');
+          try {
+            final savedUri = await platform.invokeMethod<String>(
+              'saveFileToDownloads',
+              {
+                'fileName': defaultFilename,
+                'bytes': response.bodyBytes,
+              },
+            );
+            savedPath = savedUri;
+          } catch (e) {
+            debugPrint('MethodChannel save failed: $e');
+            final appExternalDir = await getExternalStorageDirectory();
+            if (appExternalDir != null) {
+              final fallbackFile = File('${appExternalDir.path}/$defaultFilename');
+              await fallbackFile.writeAsBytes(response.bodyBytes);
+              savedPath = fallbackFile.path;
+            }
+          }
+        } else {
+          final appDocDir = await getApplicationDocumentsDirectory();
+          final file = File('${appDocDir.path}/$defaultFilename');
+          await file.writeAsBytes(response.bodyBytes);
+          savedPath = file.path;
+        }
 
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(savedPath != null ? 'Receipt saved successfully.' : 'Download cancelled.'),
+            content: Text(savedPath != null ? 'Receipt saved successfully.' : 'Download failed.'),
             behavior: SnackBarBehavior.floating,
-            backgroundColor: savedPath != null ? Colors.green : Colors.grey.shade700,
+            backgroundColor: savedPath != null ? Colors.green : Colors.red,
           ),
         );
       } else {
@@ -131,9 +157,11 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
         ),
       );
     } finally {
-      setState(() {
-        _isDownloading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isDownloading = false;
+        });
+      }
     }
   }
 

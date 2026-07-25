@@ -21,7 +21,7 @@ void callbackDispatcher() {
           final prefs = await SharedPreferences.getInstance();
           final token = prefs.getString('auth_token') ?? '';
           final userRole = prefs.getString('user_role') ?? '';
-          final baseUrl = prefs.getString('base_url') ?? 'http://10.227.152.71:8000';
+          final baseUrl = prefs.getString('base_url') ?? 'http://10.55.253.71:8000';
           if (token.isEmpty || userRole.isEmpty) return true;
 
           final isSchoolStaff = userRole.toUpperCase() == 'TEACHER' || 
@@ -130,7 +130,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
 
-  final String _baseUrl = 'http://10.227.152.71:8000';
+  final String _baseUrl = 'http://10.55.253.71:8000';
 
   @override
   void initState() {
@@ -167,7 +167,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     if (token != null && role != null) {
       final leaveService = LeaveService(baseUrl: _baseUrl, token: token);
       
-      if (role == 'PARENT') {
+      final roleUpper = role.toUpperCase();
+      if (roleUpper == 'PARENT' || roleUpper == 'STUDENT') {
         final savedStudentId = prefs.getInt('selected_student_id');
         if (savedStudentId != null) {
           if (mounted) {
@@ -314,7 +315,10 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   String _errorMessage = '';
 
-  final String _baseUrl = 'http://10.227.152.71:8000';
+  String? _phoneValidationError;
+  String? _passwordValidationError;
+
+  final String _baseUrl = 'http://10.55.253.71:8000';
 
   @override
   void dispose() {
@@ -354,7 +358,27 @@ class _LoginScreenState extends State<LoginScreen> {
 
       final leaveService = LeaveService(baseUrl: _baseUrl, token: token);
 
-      if (role == 'PARENT') {
+      if (role == 'STUDENT') {
+        final students = await leaveService.getChildren();
+        if (students.isEmpty) {
+          throw Exception('No student profile found for this user.');
+        }
+        final studentId = students[0]['id'] as int;
+        await prefs.setInt('selected_student_id', studentId);
+        
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => HomeScreen(
+                leaveService: leaveService,
+                userRole: role,
+                selectedStudentId: studentId,
+              ),
+            ),
+          );
+        }
+      } else if (role == 'PARENT') {
         final children = await leaveService.getChildren();
         if (children.isEmpty) {
           throw Exception('No students registered under this parent phone number.');
@@ -395,9 +419,36 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       }
     } catch (e) {
+      final errorMsg = e.toString().replaceAll('Exception:', '').trim();
+      
       setState(() {
-        _errorMessage = e.toString().replaceAll('Exception:', '').trim();
+        _phoneValidationError = null;
+        _passwordValidationError = null;
+        _errorMessage = '';
       });
+
+      if (errorMsg.toLowerCase().contains('mobile no not found')) {
+        setState(() {
+          _phoneValidationError = 'Mobile No not found';
+        });
+        _formKey.currentState!.validate();
+      } else if (errorMsg.toLowerCase().contains('incorrect password')) {
+        setState(() {
+          _passwordValidationError = 'Incorrect password';
+        });
+        _formKey.currentState!.validate();
+      } else if (errorMsg.toLowerCase().contains('validation failed') ||
+                 errorMsg.toLowerCase().contains('invalid credentials') ||
+                 errorMsg.toLowerCase().contains('invalid credential')) {
+        setState(() {
+          _phoneValidationError = 'Invalid credential';
+        });
+        _formKey.currentState!.validate();
+      } else {
+        setState(() {
+          _errorMessage = errorMsg;
+        });
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -567,6 +618,13 @@ class _LoginScreenState extends State<LoginScreen> {
                         TextFormField(
                           controller: _phoneController,
                           keyboardType: TextInputType.phone,
+                          onChanged: (val) {
+                            if (_phoneValidationError != null) {
+                              setState(() {
+                                _phoneValidationError = null;
+                              });
+                            }
+                          },
                           decoration: InputDecoration(
                             labelText: 'Mobile Number',
                             prefixIcon: const Icon(Icons.phone_android),
@@ -581,6 +639,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             if (!RegExp(r'^\d{10}$').hasMatch(value.trim())) {
                               return 'Mobile number must be exactly 10 digits';
                             }
+                            if (_phoneValidationError != null) {
+                              return _phoneValidationError;
+                            }
                             return null;
                           },
                         ),
@@ -590,6 +651,13 @@ class _LoginScreenState extends State<LoginScreen> {
                         TextFormField(
                           controller: _passwordController,
                           obscureText: _obscurePassword,
+                          onChanged: (val) {
+                            if (_passwordValidationError != null) {
+                              setState(() {
+                                _passwordValidationError = null;
+                              });
+                            }
+                          },
                           decoration: InputDecoration(
                             labelText: 'Password',
                             prefixIcon: const Icon(Icons.lock_outline),
@@ -612,6 +680,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           validator: (value) {
                             if (value == null || value.isEmpty) {
                               return 'Please enter password';
+                            }
+                            if (_passwordValidationError != null) {
+                              return _passwordValidationError;
                             }
                             return null;
                           },

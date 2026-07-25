@@ -1,4 +1,5 @@
 class WordEntry {
+  final int? id;
   final String word;
   final String hint;
   final String meaning;
@@ -8,6 +9,7 @@ class WordEntry {
   final String category;
 
   const WordEntry({
+    this.id,
     required this.word,
     required this.hint,
     required this.meaning,
@@ -18,6 +20,7 @@ class WordEntry {
   });
 
   Map<String, dynamic> toJson() => {
+    'id': id,
     'word': word,
     'hint': hint,
     'meaning': meaning,

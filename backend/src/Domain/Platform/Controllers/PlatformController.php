@@ -265,4 +265,30 @@ class PlatformController extends BaseController
 
         return $this->success($response, $credentials, 'Credentials updated successfully.');
     }
+
+    public function previewUpgrade(Request $request, Response $response, array $args): Response
+    {
+        $actor = $this->authenticate($request);
+        $this->requireRole($actor, ['SUPER_ADMIN']);
+
+        $id = (int) ($args['id'] ?? 0);
+        $queryParams = $request->getQueryParams();
+        $planId = isset($queryParams['plan_id']) ? (int)$queryParams['plan_id'] : 0;
+
+        $preview = $this->service->previewUpgrade($id, $planId, $actor);
+        return $this->success($response, $preview);
+    }
+
+    public function upgradePlan(Request $request, Response $response, array $args): Response
+    {
+        $actor = $this->authenticate($request);
+        $this->requireRole($actor, ['SUPER_ADMIN']);
+
+        $id = (int) ($args['id'] ?? 0);
+        $body = RequestParser::body($request);
+        $planId = isset($body['plan_id']) ? (int)$body['plan_id'] : 0;
+
+        $school = $this->service->upgradePlan($id, $planId, $actor);
+        return $this->success($response, $school, 'Subscription upgraded successfully.');
+    }
 }

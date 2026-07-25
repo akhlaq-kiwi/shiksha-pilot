@@ -63,6 +63,31 @@ export default function ClassesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
+  const [showLimitReached, setShowLimitReached] = useState(null);
+  const [checkingLimit, setCheckingLimit] = useState(false);
+
+  const handleEnrollStudentClick = async () => {
+    setCheckingLimit(true);
+    try {
+      const stats = await schoolService.getStats();
+      const activeCount = stats.students_count || 0;
+      const limit = stats.subscription_student_limit;
+
+      if (limit !== null && limit !== undefined && limit > 0 && activeCount >= limit) {
+        setShowLimitReached({ limit, plan: stats.subscription_plan });
+      } else {
+        setView('enroll');
+        setSelectedStudentId(null);
+      }
+    } catch (err) {
+      console.error(err);
+      setView('enroll');
+      setSelectedStudentId(null);
+    } finally {
+      setCheckingLimit(false);
+    }
+  };
+  
   // Selection states
   const [selectedClassName, setSelectedClassName] = useState('');
   const [selectedStudentId, setSelectedStudentId] = useState(null);
@@ -553,8 +578,12 @@ export default function ClassesPage() {
                     Transfer Students
                   </Button>
                 )}
-                <Button className="flex items-center gap-2 font-bold" onClick={() => { setView('enroll'); setSelectedStudentId(null); }}>
-                  <Plus className="h-4 w-4" /> Enroll Student
+                 <Button 
+                  className="flex items-center gap-2 font-bold" 
+                  onClick={handleEnrollStudentClick} 
+                  disabled={checkingLimit}
+                >
+                  <Plus className="h-4 w-4" /> {checkingLimit ? 'Checking Limit...' : 'Enroll Student'}
                 </Button>
               </div>
             )}
@@ -930,6 +959,26 @@ export default function ClassesPage() {
                 >
                   {transferSubmitting ? 'Transferring...' : 'Transfer'}
                 </Button>
+              </div>
+            </div>
+          </Dialog>
+        )}
+
+        {showLimitReached && (
+          <Dialog
+            isOpen={!!showLimitReached}
+            title="Student Limit Reached"
+            onClose={() => setShowLimitReached(null)}
+          >
+            <div className="space-y-4 max-w-sm text-xs font-semibold text-text-secondary leading-relaxed">
+              <p>
+                Your current subscription plan allows a maximum of <strong>{showLimitReached.limit} students</strong>.
+              </p>
+              <p>You have already reached this limit.</p>
+              <p className="text-text-muted font-medium">Please upgrade your subscription plan to continue enrolling new students.</p>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="secondary" onClick={() => setShowLimitReached(null)}>Cancel</Button>
+                <Button onClick={() => { setShowLimitReached(null); navigate('/school-admin/profile/subscription'); }}>View Plans</Button>
               </div>
             </div>
           </Dialog>
@@ -1401,6 +1450,26 @@ export default function ClassesPage() {
             <p className="text-text-muted font-medium">You can redistribute students anytime using Student Transfer.</p>
             <div className="flex justify-end pt-2">
               <Button onClick={() => setSectionCreationMessage('')}>Understood</Button>
+            </div>
+          </div>
+        </Dialog>
+      )}
+      {/* Student Limit Reached Dialog */}
+      {showLimitReached && (
+        <Dialog
+          isOpen={!!showLimitReached}
+          title="Student Limit Reached"
+          onClose={() => setShowLimitReached(null)}
+        >
+          <div className="space-y-4 max-w-sm text-xs font-semibold text-text-secondary leading-relaxed">
+            <p>
+              Your current subscription plan allows a maximum of <strong>{showLimitReached.limit} students</strong>.
+            </p>
+            <p>You have already reached this limit.</p>
+            <p className="text-text-muted font-medium">Please upgrade your subscription plan to continue enrolling new students.</p>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="secondary" onClick={() => setShowLimitReached(null)}>Cancel</Button>
+              <Button onClick={() => { setShowLimitReached(null); navigate('/school-admin/profile/subscription'); }}>View Plans</Button>
             </div>
           </div>
         </Dialog>

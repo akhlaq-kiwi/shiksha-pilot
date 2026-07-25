@@ -71,6 +71,25 @@ class SchoolAdminController extends BaseController
         return $this->success($response, $student);
     }
 
+    public function getFeeReceipt(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $studentId = (int)($args['student_id'] ?? 0);
+        $params = $request->getQueryParams();
+        $id = isset($params['id']) ? (int)$params['id'] : 0;
+        $isAdditional = isset($params['additional']) && (int)$params['additional'] === 1;
+
+        $receipt = $this->service->getFeeReceipt($user, $studentId, $id, $isAdditional);
+
+        $response->getBody()->write($receipt['data']);
+        return $response
+            ->withHeader('Content-Type', 'application/pdf')
+            ->withHeader('Content-Disposition', 'attachment; filename="' . $receipt['filename'] . '"')
+            ->withStatus(200);
+    }
+
     public function updateStudent(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);

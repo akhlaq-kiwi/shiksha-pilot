@@ -57,10 +57,11 @@ class PlatformService extends BaseService
 
         foreach ($schools as &$school) {
             $stmt = $pdo->prepare("
-                SELECT plan_name, start_date, expiry_date, duration_value, duration_unit 
-                FROM subscriptions 
-                WHERE school_id = :school_id AND status = 'PAID'
-                ORDER BY expiry_date DESC, id DESC
+                SELECT s.plan_name, s.start_date, s.expiry_date, s.duration_value, s.duration_unit, s.amount, s.features, p.student_limit 
+                FROM subscriptions s
+                LEFT JOIN plans p ON p.name COLLATE utf8mb4_unicode_ci = s.plan_name COLLATE utf8mb4_unicode_ci
+                WHERE s.school_id = :school_id AND s.status = 'PAID'
+                ORDER BY s.expiry_date DESC, s.id DESC
                 LIMIT 1
             ");
             $stmt->execute([':school_id' => $school['id']]);
@@ -72,12 +73,18 @@ class PlatformService extends BaseService
                 $school['subscription_start'] = $sub['start_date'];
                 $school['subscription_duration_value'] = $sub['duration_value'];
                 $school['subscription_duration_unit'] = $sub['duration_unit'];
+                $school['subscription_amount'] = (float)$sub['amount'];
+                $school['subscription_features'] = $sub['features'];
+                $school['subscription_student_limit'] = $sub['student_limit'] !== null ? (int)$sub['student_limit'] : null;
             } else {
                 $school['active_plan'] = null;
                 $school['subscription_expiry'] = null;
                 $school['subscription_start'] = null;
                 $school['subscription_duration_value'] = null;
                 $school['subscription_duration_unit'] = null;
+                $school['subscription_amount'] = 0.0;
+                $school['subscription_features'] = '';
+                $school['subscription_student_limit'] = null;
             }
         }
 
@@ -217,14 +224,16 @@ class PlatformService extends BaseService
         $schoolId = $this->schools->create([
             'name'          => $data['name'],
             'subdomain'     => $subdomain,
-            'plan'          => $data['plan'] ?? 'Premium',
+            'plan'          => !empty($data['plan']) ? $data['plan'] : '',
             'status'        => 'ACTIVE',
             'contact_phone' => $data['contact_phone'] ?? '',
             'contact_email' => $data['contact_email'],
         ]);
 
         $pdo = $this->schools->getPdo();
-        $this->addSubscriptionForSchool($pdo, $schoolId, $data['plan'] ?? 'Premium', 'new');
+        if (!empty($data['plan'])) {
+            $this->addSubscriptionForSchool($pdo, $schoolId, $data['plan'], 'new');
+        }
 
         // Create school admin user if credentials provided
         if (!empty($data['admin_phone'])) {
@@ -509,6 +518,277 @@ class PlatformService extends BaseService
         ");
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function previewUpgrade(int $schoolId, int $newPlanId, array $actor): array
+    {
+        $school = $this->schools->findById($schoolId);
+        if ($school === null) {
+            throw new NotFoundException('School tenant not found.');
+        }
+
+        $newPlan = $this->plans->findById($newPlanId);
+        if ($newPlan === null || (int)$newPlan['is_active'] !== 1) {
+            throw new NotFoundException('Selected subscription plan not found or inactive.');
+        }
+
+        $pdo = $this->schools->getPdo();
+        $today = date('Y-m-d');
+
+        // Fetch current active subscription
+        $stmtActive = $pdo->prepare("
+            SELECT * FROM subscriptions 
+            WHERE school_id = :school_id AND status = 'PAID' AND expiry_date >= :today
+            ORDER BY expiry_date DESC, id DESC
+            LIMIT 1
+        ");
+        $stmtActive->execute([':school_id' => $schoolId, ':today' => $today]);
+        $activeSub = $stmtActive->fetch(PDO::FETCH_ASSOC);
+
+        $currentPlanName = $school['plan'] ?? 'Trial';
+        $currentPlanPrice = 0.0;
+        $totalDays = 365;
+        $remainingDays = 0;
+        $unusedCredit = 0.0;
+
+        if ($activeSub) {
+            $currentPlanName = $activeSub['plan_name'];
+            $currentPlanPrice = (float)$activeSub['amount'];
+            
+            $startTs = strtotime($activeSub['start_date']);
+            $expiryTs = strtotime($activeSub['expiry_date']);
+            $todayTs = strtotime($today);
+
+            $totalDays = (int)ceil(max(1, ($expiryTs - $startTs) / 86400));
+            $remainingDays = (int)ceil(max(0, ($expiryTs - $todayTs) / 86400));
+
+            if ($remainingDays > 0 && $currentPlanPrice > 0) {
+                $dailyCost = $currentPlanPrice / $totalDays;
+                $unusedCredit = round($dailyCost * $remainingDays, 2);
+            }
+        }
+
+        if (strtolower($currentPlanName) === strtolower($newPlan['name'])) {
+            throw new \App\Shared\Exceptions\ValidationException([
+                'plan' => 'Cannot upgrade/downgrade to the same plan.'
+            ]);
+        }
+
+        $newPlanPrice = (float)$newPlan['price'];
+        $finalAmountPayable = max(0.0, $newPlanPrice - $unusedCredit);
+
+        return [
+            'school_id' => $schoolId,
+            'school_name' => $school['name'],
+            'current_plan' => $currentPlanName,
+            'new_plan' => $newPlan['name'],
+            'new_plan_id' => $newPlan['id'],
+            'remaining_days' => $remainingDays,
+            'unused_credit' => $unusedCredit,
+            'new_plan_price' => $newPlanPrice,
+            'final_amount_payable' => $finalAmountPayable,
+        ];
+    }
+
+    public function upgradePlan(int $schoolId, int $newPlanId, array $actor): array
+    {
+        $actorInfo = $this->actorInfo($actor);
+        $pdo = $this->schools->getPdo();
+
+        $pdo->beginTransaction();
+        try {
+            // Lock school record
+            $stmtLock = $pdo->prepare("SELECT * FROM schools WHERE id = :id FOR UPDATE");
+            $stmtLock->execute([':id' => $schoolId]);
+            $school = $stmtLock->fetch(PDO::FETCH_ASSOC);
+            if ($school === null) {
+                throw new NotFoundException('School tenant not found.');
+            }
+
+            // Lock current active subscriptions
+            $today = date('Y-m-d');
+            $stmtActive = $pdo->prepare("
+                SELECT * FROM subscriptions 
+                WHERE school_id = :school_id AND status = 'PAID' AND expiry_date >= :today
+                FOR UPDATE
+            ");
+            $stmtActive->execute([':school_id' => $schoolId, ':today' => $today]);
+            $activeSub = $stmtActive->fetch(PDO::FETCH_ASSOC);
+
+            // Fetch new plan details
+            $stmtPlan = $pdo->prepare("SELECT * FROM plans WHERE id = :id FOR UPDATE");
+            $stmtPlan->execute([':id' => $newPlanId]);
+            $newPlan = $stmtPlan->fetch(PDO::FETCH_ASSOC);
+            if ($newPlan === null || (int)$newPlan['is_active'] !== 1) {
+                throw new NotFoundException('Selected subscription plan not found or inactive.');
+            }
+
+            $currentPlanName = $school['plan'] ?? 'Trial';
+            $currentPlanPrice = 0.0;
+            $totalDays = 365;
+            $remainingDays = 0;
+            $unusedCredit = 0.0;
+            $prevExpiry = null;
+            $prevPrice = 0.0;
+
+            if ($activeSub) {
+                $currentPlanName = $activeSub['plan_name'];
+                $currentPlanPrice = (float)$activeSub['amount'];
+                $prevExpiry = $activeSub['expiry_date'];
+                $prevPrice = $currentPlanPrice;
+
+                $startTs = strtotime($activeSub['start_date']);
+                $expiryTs = strtotime($activeSub['expiry_date']);
+                $todayTs = strtotime($today);
+
+                $totalDays = (int)ceil(max(1, ($expiryTs - $startTs) / 86400));
+                $remainingDays = (int)ceil(max(0, ($expiryTs - $todayTs) / 86400));
+
+                if ($remainingDays > 0 && $currentPlanPrice > 0) {
+                    $dailyCost = $currentPlanPrice / $totalDays;
+                    $unusedCredit = round($dailyCost * $remainingDays, 2);
+                }
+            }
+
+            if (strtolower($currentPlanName) === strtolower($newPlan['name'])) {
+                throw new \App\Shared\Exceptions\ValidationException([
+                    'plan' => 'Cannot upgrade/downgrade to the same plan.'
+                ]);
+            }
+
+            $newPlanPrice = (float)$newPlan['price'];
+            $finalAmountPayable = max(0.0, $newPlanPrice - $unusedCredit);
+
+            // De-activate/expire old subscription if any
+            if ($activeSub) {
+                $stmtExpire = $pdo->prepare("
+                    UPDATE subscriptions 
+                    SET status = 'UPGRADED', expiry_date = :today 
+                    WHERE id = :id
+                ");
+                $stmtExpire->execute([':today' => $today, ':id' => $activeSub['id']]);
+            }
+
+            // Create new active subscription
+            $durationValue = (int)($newPlan['duration_value'] ?? 12);
+            $durationUnit = $newPlan['duration_unit'] ?? 'month';
+            $features = $newPlan['description'];
+
+            $startDate = date('Y-m-d');
+            if ($durationUnit === 'year') {
+                $expiryDate = date('Y-m-d', strtotime("+$durationValue years"));
+            } else {
+                $expiryDate = date('Y-m-d', strtotime("+$durationValue months"));
+            }
+
+            $invoiceNo = 'INV-UPG-' . time() . '-' . rand(100, 999);
+
+            $stmtIns = $pdo->prepare("
+                INSERT INTO subscriptions (school_id, invoice_no, amount, billing_cycle, status, plan_name, duration_value, duration_unit, start_date, expiry_date, type, features)
+                VALUES (:school_id, :invoice_no, :amount, :billing_cycle, 'PAID', :plan_name, :duration_value, :duration_unit, :start_date, :expiry_date, 'upgrade', :features)
+            ");
+            $stmtIns->execute([
+                ':school_id' => $schoolId,
+                ':invoice_no' => $invoiceNo,
+                ':amount' => $finalAmountPayable,
+                ':billing_cycle' => $durationValue . ' ' . ucfirst($durationUnit) . ($durationValue > 1 ? 's' : ''),
+                ':plan_name' => $newPlan['name'],
+                ':duration_value' => $durationValue,
+                ':duration_unit' => $durationUnit,
+                ':start_date' => $startDate,
+                ':expiry_date' => $expiryDate,
+                ':features' => $features
+            ]);
+
+            // Update school table plan
+            $stmtUpdateSchool = $pdo->prepare("
+                UPDATE schools 
+                SET plan = :new_plan_name, updated_at = NOW() 
+                WHERE id = :id
+            ");
+            $stmtUpdateSchool->execute([
+                ':new_plan_name' => $newPlan['name'],
+                ':id' => $schoolId
+            ]);
+
+            // Create Audit Log
+            $actionStr = sprintf(
+                "Upgraded subscription plan for %s: Previous Plan: %s, New Plan: %s, Previous Expiry: %s, New Expiry: %s, Previous Price: INR %s, New Price: INR %s, Remaining Credit Applied: INR %s, Final Amount Charged: INR %s, Upgrade Date: %s, Upgraded By: %s",
+                $school['name'],
+                $currentPlanName,
+                $newPlan['name'],
+                $prevExpiry ?? 'None',
+                $expiryDate,
+                number_format($prevPrice, 2),
+                number_format($newPlanPrice, 2),
+                number_format($unusedCredit, 2),
+                number_format($finalAmountPayable, 2),
+                date('Y-m-d H:i:s'),
+                $actorInfo['name']
+            );
+
+            $this->auditLogs->log(
+                "Upgrade plan",
+                $school['name'],
+                $actorInfo['name'],
+                (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'),
+                $actorInfo['role'],
+                $actionStr
+            );
+
+            // Send School Admin Notification
+            $stmtAdmins = $pdo->prepare("SELECT id FROM users WHERE school_id = :school_id AND role = 'SCHOOL_ADMIN'");
+            $stmtAdmins->execute([':school_id' => $schoolId]);
+            $adminIds = $stmtAdmins->fetchAll(PDO::FETCH_COLUMN) ?: [];
+
+            $notifTitle = "Subscription Upgraded Successfully";
+            $notifMsg = "Your school's subscription has been upgraded to **{$newPlan['name']}**. Your new subscription benefits are now active.";
+
+            $stmtNotif = $pdo->prepare("
+                INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, is_read)
+                VALUES (:school_id, 'SCHOOL_ADMIN', :user_id, :title, :message, '/school-admin/profile/subscription', 0)
+            ");
+            foreach ($adminIds as $adminId) {
+                $stmtNotif->execute([
+                    ':school_id' => $schoolId,
+                    ':user_id' => $adminId,
+                    ':title' => $notifTitle,
+                    ':message' => $notifMsg
+                ]);
+            }
+
+            $pdo->commit();
+        } catch (\Exception $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+
+        // Return updated school profile
+        $updatedSchool = $this->schools->findById($schoolId);
+        if ($updatedSchool) {
+            $stmt = $pdo->prepare("
+                SELECT s.plan_name, s.start_date, s.expiry_date, s.duration_value, s.duration_unit, s.amount, s.features, p.student_limit 
+                FROM subscriptions s
+                LEFT JOIN plans p ON p.name COLLATE utf8mb4_unicode_ci = s.plan_name COLLATE utf8mb4_unicode_ci
+                WHERE s.school_id = :school_id AND s.status = 'PAID'
+                ORDER BY s.expiry_date DESC, s.id DESC
+                LIMIT 1
+            ");
+            $stmt->execute([':school_id' => $schoolId]);
+            $sub = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($sub) {
+                $updatedSchool['active_plan'] = $sub['plan_name'];
+                $updatedSchool['subscription_expiry'] = $sub['expiry_date'];
+                $updatedSchool['subscription_start'] = $sub['start_date'];
+                $updatedSchool['subscription_duration_value'] = $sub['duration_value'];
+                $updatedSchool['subscription_duration_unit'] = $sub['duration_unit'];
+                $updatedSchool['subscription_amount'] = (float)$sub['amount'];
+                $updatedSchool['subscription_features'] = $sub['features'];
+                $updatedSchool['subscription_student_limit'] = $sub['student_limit'] !== null ? (int)$sub['student_limit'] : null;
+            }
+        }
+        return $updatedSchool ?: [];
     }
 
     // -------------------------------------------------------------------------

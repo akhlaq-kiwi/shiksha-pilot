@@ -137,6 +137,10 @@ try {
 
     echo "\nAll migrations completed successfully.\n";
 
+    // Run Vocabulary Seeder
+    require_once __DIR__ . '/vocabulary_seeder.php';
+    seedVocabulary($pdo);
+
 } catch (Exception $e) {
     echo "\nMigration failed: " . $e->getMessage() . "\n";
     exit(1);

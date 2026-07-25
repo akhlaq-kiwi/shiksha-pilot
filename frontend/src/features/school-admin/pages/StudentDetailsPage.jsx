@@ -5,6 +5,7 @@ import { Dialog } from '../../../common/ui/dialog';
 import { Card, CardContent } from '../../../common/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
 import { schoolService } from '../../../common/services/schoolService';
+import { apiClient } from '../../../common/services/apiClient';
 import html2pdf from 'html2pdf.js';
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 import { 
@@ -111,71 +112,47 @@ function DocumentViewerModal({ docName, docPath, onClose }) {
 }
 
 // Receipt Modal View Component
-function ReceiptModal({ receipt, student, schoolName, allPayments = [], onClose }) {
-  const handlePrint = () => {
-    const printContent = document.getElementById('receipt-print-area').innerHTML;
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
-    document.body.appendChild(iframe);
-    
-    const doc = iframe.contentWindow.document;
-    doc.open();
-    doc.write('<html><head><title>Print Receipt</title>');
-    // Copy stylesheets from parent to preserve styling in print
-    Array.from(document.querySelectorAll('link[rel="stylesheet"], style')).forEach(el => {
-      doc.write(el.outerHTML);
-    });
-    doc.write(`
-      <style>
-        @page {
-          size: auto;
-          margin: 0mm;
-        }
-        body {
-          background-color: white !important;
-          color: black !important;
-          padding: 40px !important;
-        }
-      </style>
-    </head>
-    <body class="bg-white text-black">
-      <div class="space-y-6">
-        ${printContent}
-      </div>
-    </body>
-    </html>
-    `);
-    doc.close();
-    
-    iframe.contentWindow.focus();
-    setTimeout(() => {
-      iframe.contentWindow.print();
-      setTimeout(() => {
-        document.body.removeChild(iframe);
-      }, 1000);
-    }, 500);
+function ReceiptModal({ receipt, student, schoolName, schoolLogoUrl, allPayments = [], onClose }) {
+  const handlePrint = async () => {
+    try {
+      const isAdditional = receipt.is_additional || (receipt.fee_name && receipt.fee_name !== 'Previous Year Dues' && !receipt.fee_month) ? 1 : 0;
+      const blob = await apiClient.get(`/api/school/students/${student.id}/fees/receipt?id=${receipt.id}&additional=${isAdditional}`);
+      const url = window.URL.createObjectURL(blob);
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      document.body.appendChild(iframe);
+      iframe.src = url;
+      iframe.onload = () => {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+        setTimeout(() => {
+          document.body.removeChild(iframe);
+          window.URL.revokeObjectURL(url);
+        }, 2000);
+      };
+    } catch (err) {
+      console.error('Failed to print receipt PDF:', err);
+    }
   };
 
   const handleDownload = () => {
     const element = document.getElementById('receipt-print-area');
+    if (!element) return;
     const cleanName = student.name.split(/\s+/).join('');
-    const cleanYear = (student.academic_year_name || student.academic_year || '2025-2026').replace(/[–]/g, '-');
-    const filename = `FeeReceipt_${cleanName}_${cleanYear}.pdf`;
-
+    const cleanYear = (student.academic_year_name || student.academic_year || '2025-2026').replace(/[–—]/g, '-');
     const opt = {
-      margin:       15,
-      filename:     filename,
-      image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true },
-      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      margin: 10,
+      filename: `FeeReceipt_${cleanName}_${cleanYear}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
-
-    html2pdf().set(opt).from(element).save();
+    html2pdf().from(element).set(opt).save();
   };
 
   const getModeOfPayment = (method) => {
@@ -235,7 +212,14 @@ function ReceiptModal({ receipt, student, schoolName, allPayments = [], onClose 
 
         {/* Printable area */}
         <div className="p-8 space-y-6" id="receipt-print-area">
-          <div className="text-center space-y-1">
+          <div className="text-center space-y-1 flex flex-col items-center justify-center">
+            {schoolLogoUrl && (
+              <img 
+                src={schoolLogoUrl} 
+                alt="School Logo" 
+                className="h-12 w-auto mb-2 object-contain" 
+              />
+            )}
             <h2 className="text-xl font-black tracking-tight text-text-primary font-display uppercase">{displaySchoolName}</h2>
             <p className="text-[10px] uppercase font-bold tracking-widest text-primary">Fee Payment Receipt</p>
           </div>
@@ -257,7 +241,21 @@ function ReceiptModal({ receipt, student, schoolName, allPayments = [], onClose 
                   {receipt.is_additional ? 'Description' : (sortedGroup.length > 1 ? 'Billing Months' : 'Billing Month')}
                 </p>
                 <p className="text-sm font-black text-text-primary mt-0.5 max-w-[200px] break-words">
-                  {receipt.is_additional ? receipt.fee_name : sortedGroup.map(p => p.fee_month).join(', ')}
+                  {receipt.is_additional ? receipt.fee_name : (() => {
+                    const academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+                    const months = sortedGroup.map(p => p.fee_month);
+                    const indices = months.map(m => academicMonths.indexOf(m)).filter(idx => idx !== -1);
+                    
+                    let isConsecutive = false;
+                    if (indices.length > 1) {
+                      isConsecutive = indices.every((val, i) => i === 0 || val === indices[i - 1] + 1);
+                    }
+
+                    if (isConsecutive) {
+                      return `${months[0]} To ${months[months.length - 1]}`;
+                    }
+                    return months.join(', ');
+                  })()}
                 </p>
               </div>
               <div className="text-right">
@@ -265,7 +263,7 @@ function ReceiptModal({ receipt, student, schoolName, allPayments = [], onClose 
                   {sortedGroup.length > 1 ? 'Total Amount' : 'Amount Paid'}
                 </p>
                 <p className="text-lg font-black text-primary mt-0.5">
-                  ₹{totalAmountPaid.toLocaleString()}
+                  Rs {totalAmountPaid.toLocaleString()}
                 </p>
               </div>
             </div>
@@ -378,6 +376,7 @@ function DepositModal({ student, availableMonths, paidMonths, classFeeConfig, on
         months: selectedMonths,
         payment_method: paymentMethod
       });
+      window.dispatchEvent(new Event('fee-payment-updated'));
       onSave();
     } catch (err) {
       console.error(err);
@@ -495,6 +494,7 @@ function AdditionalDepositModal({ student, unpaidFees, initialSelectedIds = [], 
     setError('');
     try {
       await Promise.all(selectedIds.map(id => schoolService.collectAdditionalFeePayment(id, { payment_method: paymentMethod })));
+      window.dispatchEvent(new Event('fee-payment-updated'));
       onSave();
     } catch (err) {
       console.error(err);
@@ -677,6 +677,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
   const { isReadOnly } = useAcademicYear();
 
   useEffect(() => {
+    window.scrollTo(0, 0);
     loadDetails();
     const handleYearSwitch = () => {
       loadDetails();
@@ -827,6 +828,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
       } else {
         await schoolService.revertAdditionalFeePayment(revertTarget.id);
       }
+      window.dispatchEvent(new Event('fee-payment-updated'));
       setRevertConfirmOpen(false);
       setRevertTarget(null);
       await loadDetails();
@@ -1611,6 +1613,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
           receipt={viewingReceipt} 
           student={student} 
           schoolName={schoolProfile?.name}
+          schoolLogoUrl={schoolProfile?.logo_path}
           allPayments={fee_summary.payments}
           onClose={() => setViewingReceipt(null)} 
         />

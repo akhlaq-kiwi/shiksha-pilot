@@ -458,18 +458,31 @@ class LeaveRequestService extends BaseService
         $pdo = $this->repo->getPdo();
 
         if ($user['role'] === 'STUDENT') {
-            $stmt = $pdo->prepare("SELECT * FROM students WHERE email = :email AND school_id = :sid");
+            $stmt = $pdo->prepare("
+                SELECT s.*, c.name as class_name FROM students s
+                LEFT JOIN classes c ON s.class_id = c.id
+                WHERE s.email = :email AND s.school_id = :sid
+            ");
             $stmt->execute([':email' => $user['email'] ?? '', ':sid' => $schoolId]);
             $students = $stmt->fetchAll(PDO::FETCH_ASSOC);
             if (empty($students) && !empty($user['phone'])) {
-                $stmt = $pdo->prepare("SELECT * FROM students WHERE student_mobile = :phone AND school_id = :sid");
+                $stmt = $pdo->prepare("
+                    SELECT s.*, c.name as class_name FROM students s
+                    LEFT JOIN classes c ON s.class_id = c.id
+                    WHERE s.student_mobile = :phone AND s.school_id = :sid
+                ");
                 $stmt->execute([':phone' => $user['phone'], ':sid' => $schoolId]);
                 $students = $stmt->fetchAll(PDO::FETCH_ASSOC);
             }
             return $students;
         } else {
             // PARENT: match via phone (fallback to father_phone, guardian_phone, or student_mobile)
-            $stmt = $pdo->prepare("SELECT * FROM students WHERE (parent_phone = :phone1 OR father_phone = :phone2 OR guardian_phone = :phone3 OR student_mobile = :phone4) AND school_id = :sid");
+            $stmt = $pdo->prepare("
+                SELECT s.*, c.name as class_name FROM students s
+                LEFT JOIN classes c ON s.class_id = c.id
+                WHERE (s.parent_phone = :phone1 OR s.father_phone = :phone2 OR s.guardian_phone = :phone3 OR s.student_mobile = :phone4) 
+                  AND s.school_id = :sid
+            ");
             $stmt->execute([
                 ':phone1' => $user['phone'] ?? '',
                 ':phone2' => $user['phone'] ?? '',

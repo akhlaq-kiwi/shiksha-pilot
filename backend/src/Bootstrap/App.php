@@ -48,6 +48,8 @@ use App\Domain\Teacher\Controllers\TeacherController;
 use App\Domain\Student\Repositories\StudentDataRepository;
 use App\Domain\Student\Services\StudentService;
 use App\Domain\Student\Controllers\StudentController;
+use App\Domain\Student\Services\VocabularyService;
+use App\Domain\Student\Controllers\VocabularyController;
 
 /**
  * Load a .env file if it exists, exporting each KEY=VALUE pair via putenv().
@@ -296,6 +298,19 @@ class App
                 return new StudentController(
                     $c->get(TokenService::class),
                     $c->get(StudentService::class),
+                );
+            },
+
+            VocabularyService::class => function ($c) {
+                return new VocabularyService(
+                    $c->get(StudentDataRepository::class),
+                );
+            },
+
+            VocabularyController::class => function ($c) {
+                return new VocabularyController(
+                    $c->get(TokenService::class),
+                    $c->get(VocabularyService::class),
                 );
             },
         ]);
