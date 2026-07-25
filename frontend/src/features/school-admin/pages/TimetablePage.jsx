@@ -1082,7 +1082,7 @@ export default function TimetablePage() {
                               className="w-full h-9 px-2.5 rounded-lg border border-border bg-surface text-xs font-bold focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs cursor-pointer"
                             >
                               <option value="">Select Subject</option>
-                              {subjects.filter(s => !periodsList.some(p => p.subject_id === s.id)).map(s => (
+                              {subjects.filter(s => !periodsList.some(p => String(p.subject_id) === String(s.id))).map(s => (
                                 <option key={s.id} value={s.id}>{s.name}</option>
                               ))}
                             </select>

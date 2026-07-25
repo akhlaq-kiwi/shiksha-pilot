@@ -4530,7 +4530,7 @@ class SchoolAdminService extends BaseService
         $stmt->execute([':sid' => $schoolId]);
         $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         
-        // Fallback: If empty, get the latest configurations created for this school
+        // Fallback 1: If empty, get the latest configurations created for this school
         if (empty($rows)) {
             $stmtLatest = $pdo->prepare("
                 SELECT * FROM period_configurations 
@@ -4541,6 +4541,48 @@ class SchoolAdminService extends BaseService
             ");
             $stmtLatest->execute([':sid1' => $schoolId, ':sid2' => $schoolId]);
             $rows = $stmtLatest->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        }
+
+        // Fallback 2: If STILL empty, generate default period_configurations from school_timetable_settings
+        if (empty($rows)) {
+            $settings = $this->getTimetableSettings($user);
+            if ($settings && !empty($settings['total_periods'])) {
+                $defaultStartTime = !empty($settings['school_start_time']) ? $settings['school_start_time'] : '08:00:00';
+                $defaultPeriodDuration = !empty($settings['period_duration']) ? (int)$settings['period_duration'] : 40;
+                $defaultIntervalDuration = isset($settings['interval_duration']) ? (int)$settings['interval_duration'] : 20;
+                $defaultIntervalAfter = !empty($settings['interval_after_period']) ? (int)$settings['interval_after_period'] : 4;
+                $defaultTotalPeriods = (int)$settings['total_periods'];
+                $today = !empty($settings['start_date']) ? $settings['start_date'] : date('Y-m-d');
+
+                $startTime = strtotime($defaultStartTime);
+                $currentTime = $startTime;
+
+                $stmtInsPeriod = $pdo->prepare("
+                    INSERT INTO period_configurations (school_id, period_number, start_time, end_time, start_date)
+                    VALUES (:sid, :pnum, :start_time, :end_time, :start_date)
+                ");
+
+                for ($i = 1; $i <= $defaultTotalPeriods; $i++) {
+                    $pStart = date('H:i:s', $currentTime);
+                    $currentTime += $defaultPeriodDuration * 60;
+                    $pEnd = date('H:i:s', $currentTime);
+
+                    $stmtInsPeriod->execute([
+                        ':sid' => $schoolId,
+                        ':pnum' => $i,
+                        ':start_time' => $pStart,
+                        ':end_time' => $pEnd,
+                        ':start_date' => $today
+                    ]);
+
+                    if ($i === $defaultIntervalAfter && $defaultIntervalDuration > 0) {
+                        $currentTime += $defaultIntervalDuration * 60;
+                    }
+                }
+
+                $stmt->execute([':sid' => $schoolId]);
+                $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            }
         }
 
         return $rows;
