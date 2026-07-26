@@ -3685,48 +3685,53 @@ class SchoolAdminService extends BaseService
         $search = !empty($params['search']) ? trim($params['search']) : null;
         $sort = !empty($params['sort']) ? trim($params['sort']) : 'newest';
 
-        $whereClause = " WHERE school_id = :sid AND academic_year_id = :ayid ";
+        $whereClause = " WHERE a.school_id = :sid AND a.academic_year_id = :ayid ";
         $queryParams = [':sid' => $schoolId, ':ayid' => $academicYearId];
 
         if ($category) {
             if ($category === 'attendance_champions') {
-                $whereClause .= " AND feature_type = 'attendance_leaderboard' ";
+                $whereClause .= " AND a.feature_type = 'attendance_leaderboard' ";
             } else if ($category === 'academic_excellence') {
-                $whereClause .= " AND feature_type = 'academic_excellence' ";
+                $whereClause .= " AND a.feature_type = 'academic_excellence' ";
             } else {
-                $whereClause .= " AND feature_type = :cat ";
+                $whereClause .= " AND a.feature_type = :cat ";
                 $queryParams[':cat'] = $category;
             }
         }
 
         if ($classId !== null) {
-            $whereClause .= " AND class_id = :cid ";
+            $whereClause .= " AND a.class_id = :cid ";
             $queryParams[':cid'] = $classId;
         }
 
         if ($level === 'school') {
-            $whereClause .= " AND class_id IS NULL ";
+            $whereClause .= " AND a.class_id IS NULL ";
         } else if ($level === 'class') {
-            $whereClause .= " AND class_id IS NOT NULL ";
+            $whereClause .= " AND a.class_id IS NOT NULL ";
         }
 
         if ($search) {
-            $whereClause .= " AND (student_name LIKE :srch OR roll_number LIKE :srch OR class_name LIKE :srch) ";
+            $whereClause .= " AND (a.student_name LIKE :srch OR a.roll_number LIKE :srch OR a.class_name LIKE :srch) ";
             $queryParams[':srch'] = '%' . $search . '%';
         }
 
         // Order clause
-        $orderBy = " ORDER BY created_at DESC, id DESC ";
+        $orderBy = " ORDER BY a.created_at DESC, a.id DESC ";
         if ($sort === 'rank') {
-            $orderBy = " ORDER BY `rank` ASC, achievement_score DESC ";
+            $orderBy = " ORDER BY a.`rank` ASC, a.achievement_score DESC ";
         } else if ($sort === 'class') {
-            $orderBy = " ORDER BY class_name ASC, `rank` ASC ";
+            $orderBy = " ORDER BY a.class_name ASC, a.`rank` ASC ";
         } else if ($sort === 'academic_year') {
-            $orderBy = " ORDER BY academic_year_id DESC, `rank` ASC ";
+            $orderBy = " ORDER BY a.academic_year_id DESC, a.`rank` ASC ";
         }
 
         // Execute achievements query
-        $stmtSelect = $pdo->prepare("SELECT * FROM academic_achievement_snapshots {$whereClause} {$orderBy}");
+        $stmtSelect = $pdo->prepare("
+            SELECT a.*, COALESCE(NULLIF(s.photo_path, ''), a.student_photo) AS student_photo 
+            FROM academic_achievement_snapshots a 
+            LEFT JOIN students s ON a.student_id = s.id 
+            {$whereClause} {$orderBy}
+        ");
         $stmtSelect->execute($queryParams);
         $rawAchievements = $stmtSelect->fetchAll(PDO::FETCH_ASSOC) ?: [];
 

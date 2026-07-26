@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:printing/printing.dart';
 import '../screens/leave_list_screen.dart';
 import '../screens/timetable_screen.dart';
 import '../screens/notification_center_screen.dart';
@@ -13,6 +15,9 @@ class NotificationHelper {
   static final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
+  static Uint8List? _lastDownloadedBytes;
+  static String? _lastDownloadedFileName;
+
   static Future<void> init() async {
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -22,11 +27,23 @@ class NotificationHelper {
 
     await _flutterLocalNotificationsPlugin.initialize(
       settings: initializationSettings,
-      onDidReceiveNotificationResponse: (NotificationResponse response) {
+      onDidReceiveNotificationResponse: (NotificationResponse response) async {
         final payload = response.payload;
         if (payload != null) {
           try {
             final notif = json.decode(payload);
+
+            // Handle file download notification click
+            if (notif['type'] == 'download_complete') {
+              if (_lastDownloadedBytes != null && _lastDownloadedFileName != null) {
+                await Printing.sharePdf(
+                  bytes: _lastDownloadedBytes!,
+                  filename: _lastDownloadedFileName!,
+                );
+              }
+              return;
+            }
+
             final title = (notif['title'] ?? '').toString().toLowerCase();
             final message = (notif['message'] ?? '').toString().toLowerCase();
             final link = (notif['link'] ?? '').toString().toLowerCase();
@@ -97,6 +114,46 @@ class NotificationHelper {
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>()
         ?.requestNotificationsPermission();
+  }
+
+  static Future<void> showDownloadNotification({
+    required String title,
+    required String fileName,
+    required List<int> bytes,
+  }) async {
+    _lastDownloadedBytes = Uint8List.fromList(bytes);
+    _lastDownloadedFileName = fileName;
+
+    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      'file_downloads_channel',
+      'File Downloads',
+      channelDescription: 'Notifications for downloaded files',
+      importance: Importance.max,
+      priority: Priority.high,
+      playSound: true,
+      enableVibration: true,
+      icon: 'ic_notification',
+      largeIcon: DrawableResourceAndroidBitmap('ic_launcher'),
+      color: Color(0xFF059669),
+      styleInformation: BigTextStyleInformation(''),
+    );
+
+    const NotificationDetails platformDetails = NotificationDetails(android: androidDetails);
+
+    final payload = json.encode({
+      'type': 'download_complete',
+      'fileName': fileName,
+    });
+
+    final int id = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+
+    await _flutterLocalNotificationsPlugin.show(
+      id: id,
+      title: '📥 $title',
+      body: 'Tap to open $fileName',
+      notificationDetails: platformDetails,
+      payload: payload,
+    );
   }
 
   static Future<void> showNotification(dynamic notif) async {

@@ -3,7 +3,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:printing/printing.dart';
 import 'package:school_hub/services/http_service.dart' as http;
+import 'package:school_hub/services/notification_helper.dart';
 
 class FeesCardScreen extends StatefulWidget {
   final String baseUrl;
@@ -136,12 +138,29 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
           savedPath = file.path;
         }
 
+        if (savedPath != null) {
+          try {
+            await NotificationHelper.showDownloadNotification(
+              title: 'Fee Receipt Downloaded',
+              fileName: defaultFilename,
+              bytes: response.bodyBytes,
+            );
+          } catch (_) {}
+        }
+
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(savedPath != null ? 'Receipt saved successfully.' : 'Download failed.'),
+            content: Text(savedPath != null ? 'Fee Receipt saved successfully.' : 'Download failed.'),
+            action: savedPath != null ? SnackBarAction(
+              label: 'OPEN',
+              textColor: Colors.amber.shade300,
+              onPressed: () async {
+                await Printing.sharePdf(bytes: response.bodyBytes, filename: defaultFilename);
+              },
+            ) : null,
             behavior: SnackBarBehavior.floating,
-            backgroundColor: savedPath != null ? Colors.green : Colors.red,
+            backgroundColor: savedPath != null ? const Color(0xFF059669) : Colors.red,
           ),
         );
       } else {

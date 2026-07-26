@@ -14,6 +14,24 @@ import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 import { useToast } from '../../../common/components/Toast';
 import html2pdf from 'html2pdf.js';
 
+const formatClassName = (rawClass) => {
+  if (!rawClass) return '';
+  const clean = String(rawClass).trim();
+  if (clean.toLowerCase().startsWith('class ')) {
+    return clean;
+  }
+  return `Class ${clean}`;
+};
+
+const formatClassScope = (rawClass) => {
+  if (!rawClass) return '';
+  const clean = String(rawClass).trim();
+  if (clean.toLowerCase().startsWith('class ')) {
+    return clean.toUpperCase();
+  }
+  return `CLASS ${clean}`.toUpperCase();
+};
+
 export default function AchievementsPage() {
   const toast = useToast();
   const { currentYear } = useAcademicYear();
@@ -533,72 +551,113 @@ export default function AchievementsPage() {
             </div>
 
             {/* Printable Certificate Box */}
-            <div className="overflow-x-auto p-2">
+            <div className="overflow-x-auto p-1 sm:p-2">
               <div
                 ref={certPrintRef}
-                className="bg-white text-zinc-900 pt-6 pb-8 px-8 border-[12px] border-double border-amber-500 rounded-3xl max-w-3xl mx-auto text-center space-y-5 shadow-lg min-w-[650px]"
+                className="bg-white text-zinc-900 p-3 sm:p-4 rounded-3xl border-4 border-amber-500 max-w-3xl mx-auto shadow-lg text-center font-sans"
               >
-                {/* School Header */}
-                <div className="border-b-2 border-zinc-200 pb-3">
-                  <p className="text-base font-black text-zinc-700 tracking-wide uppercase">
-                    {schoolProfile?.name || 'SHIKSHA PILOT ACADEMY'}
-                  </p>
-                  <h1 className="text-2xl font-black text-zinc-900 tracking-tight uppercase mt-1 font-display">
-                    {activeCertificate.category === 'academic_excellence' ? 'Certificate of Academic Excellence' : 'Certificate of Attendance Achievement'}
-                  </h1>
-                  <p className="text-xs text-zinc-500 font-bold mt-0.5">
-                    Academic Session: {currentYearObj?.name || '2026–2027'}
-                  </p>
-                </div>
-
-                {/* Presentation Text */}
-                <div className="space-y-2 py-2">
-                  <p className="text-sm font-medium italic text-zinc-600">
-                    This certificate is honorably presented to
-                  </p>
-                  <h2 className="text-3xl font-black text-amber-700 tracking-tight font-serif">
-                    {activeCertificate.student_name}
-                  </h2>
-                  <p className="text-xs text-zinc-600 font-bold">
-                    Class {activeCertificate.class_name} · Roll No. {activeCertificate.roll_number || '—'}
-                  </p>
-                </div>
-
-                {/* Rank & Score Box */}
-                <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 max-w-md mx-auto flex items-center justify-around">
-                  <div>
-                    <span className="text-2xl">
-                      {activeCertificate.rank === 1 ? '🥇' : activeCertificate.rank === 2 ? '🥈' : '🥉'}
-                    </span>
-                    <p className="text-xs font-black text-amber-700 uppercase">Rank #{activeCertificate.rank}</p>
+                <div className="border-2 border-amber-400 p-5 sm:p-8 rounded-2xl space-y-5 bg-white">
+                  
+                  {/* School & Certificate Title Header */}
+                  <div className="space-y-1">
+                    <p className="text-xs sm:text-sm font-bold text-zinc-700 uppercase tracking-wide">
+                      {schoolProfile?.name || 'Jamiya Sams Academy'}
+                    </p>
+                    <h1 className="text-lg sm:text-2xl font-black text-zinc-900 tracking-tight uppercase font-display">
+                      {activeCertificate.category === 'academic_excellence' 
+                        ? 'CERTIFICATE OF ACADEMIC EXCELLENCE' 
+                        : 'CERTIFICATE OF ATTENDANCE ACHIEVEMENT'}
+                    </h1>
+                    <p className="text-[11px] sm:text-xs text-zinc-500 font-bold">
+                      Academic Session: {currentYearObj?.name || '2026–2027'}
+                    </p>
+                    <div className="border-b border-zinc-200 w-full pt-2"></div>
                   </div>
-                  <div className="h-8 w-px bg-amber-300"></div>
-                  <div>
-                    <p className="text-2xl font-black text-emerald-600 font-sans">
+
+                  {/* Presentation & Scope Text */}
+                  <div className="space-y-1.5 py-1">
+                    <p className="text-xs sm:text-sm font-medium italic text-zinc-600">
+                      This certificate is honorably presented to the top {activeCertificate.category === 'academic_excellence' ? 'academic' : 'attendance'} achievers of
+                    </p>
+                    <h2 className="text-sm sm:text-base font-black text-zinc-900 uppercase tracking-wider font-display">
+                      {activeCertificate.level === 'school' ? 'SCHOOL OVERALL' : formatClassScope(activeCertificate.class_name)}
+                    </h2>
+                    <p className="text-[11px] sm:text-xs text-zinc-500 max-w-md mx-auto leading-relaxed">
+                      {activeCertificate.category === 'academic_excellence'
+                        ? 'For demonstrating outstanding academic performance, subject mastery, and intellectual excellence.'
+                        : 'For demonstrating exceptional commitment, consistency, and dedication to learning throughout the academic session.'}
+                    </p>
+                  </div>
+
+                  {/* Center Student Detail Box */}
+                  <div className="bg-[#FFFDF6] border-2 border-amber-400/90 rounded-2xl p-4 sm:p-5 w-60 sm:w-72 mx-auto shadow-2xs space-y-2 flex flex-col items-center justify-center">
+                    
+                    {/* Ribbon Medal / Rank Badge */}
+                    <div className="flex flex-col items-center gap-0.5">
+                      <span className="text-2xl sm:text-3xl">
+                        {activeCertificate.rank === 1 ? '🥇' : activeCertificate.rank === 2 ? '🥈' : '🥉'}
+                      </span>
+                      <span className="text-[11px] font-black text-amber-700 uppercase tracking-wider">
+                        Rank #{activeCertificate.rank}
+                      </span>
+                    </div>
+
+                    {/* Student Avatar (Photo or Initials) */}
+                    <div className="my-1">
+                      {activeCertificate.student_photo ? (
+                        <img
+                          src={activeCertificate.student_photo.startsWith('http') ? activeCertificate.student_photo : `${activeCertificate.student_photo.startsWith('/') ? '' : '/'}${activeCertificate.student_photo}`}
+                          alt={activeCertificate.student_name}
+                          className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-2 border-amber-400 shadow-sm"
+                        />
+                      ) : (
+                        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-zinc-200 border-2 border-zinc-300 text-zinc-800 font-black text-2xl sm:text-3xl flex items-center justify-center shadow-sm">
+                          {activeCertificate.student_name ? activeCertificate.student_name.substring(0, 2).toUpperCase() : 'ST'}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Student Name */}
+                    <h3 className="text-base sm:text-lg font-black text-zinc-900 tracking-tight leading-tight">
+                      {activeCertificate.student_name}
+                    </h3>
+
+                    {/* Roll No & Class */}
+                    <p className="text-[11px] text-zinc-500 font-semibold">
+                      {activeCertificate.roll_number ? `Roll No. ${activeCertificate.roll_number} · ` : ''}{formatClassName(activeCertificate.class_name)}
+                    </p>
+
+                    {/* Big Green Percentage */}
+                    <p className="text-xl sm:text-2xl font-black text-emerald-600 pt-1 font-sans">
                       {activeCertificate.achievement_score}%
                     </p>
-                    <p className="text-[10px] font-bold text-zinc-500 uppercase">
-                      {activeCertificate.category === 'academic_excellence' ? 'Final Score' : 'Attendance Rate'}
+
+                    {/* Sub detail (Days / Marks) */}
+                    <p className="text-[10px] sm:text-[11px] font-bold text-zinc-500">
+                      {activeCertificate.category === 'academic_excellence'
+                        ? (activeCertificate.metadata?.total_obtained 
+                            ? `Total: ${activeCertificate.metadata.total_obtained} / ${activeCertificate.metadata.total_max} Marks` 
+                            : 'Final Score')
+                        : (activeCertificate.metadata?.present_days 
+                            ? `Present: ${activeCertificate.metadata.present_days} / ${activeCertificate.metadata.total_working_days} Days` 
+                            : 'Attendance Rate')}
                     </p>
+
                   </div>
+
+                  {/* Bottom Signature Section */}
+                  <div className="flex justify-between items-end pt-6 border-t border-zinc-200 text-[11px] sm:text-xs font-bold text-zinc-700">
+                    <div className="text-left space-y-1">
+                      <div className="w-24 sm:w-36 border-b border-zinc-400"></div>
+                      <span>Teacher Sign</span>
+                    </div>
+                    <div className="text-right space-y-1">
+                      <div className="w-24 sm:w-36 border-b border-zinc-400 ml-auto"></div>
+                      <span>Principal Sign</span>
+                    </div>
+                  </div>
+
                 </div>
-
-                <p className="text-xs text-zinc-500 max-w-lg mx-auto leading-relaxed">
-                  For demonstrating outstanding performance, dedication, and excellence in {activeCertificate.category_label}.
-                </p>
-
-                {/* Signatures */}
-                <div className="flex justify-between items-end pt-6 border-t border-zinc-200 text-xs font-bold text-zinc-600">
-                  <div className="text-left">
-                    <div className="w-36 border-b border-zinc-400 mb-1"></div>
-                    <span>Class Teacher Sign</span>
-                  </div>
-                  <div className="text-right">
-                    <div className="w-36 border-b border-zinc-400 mb-1 ml-auto"></div>
-                    <span>Principal Sign</span>
-                  </div>
-                </div>
-
               </div>
             </div>
 
@@ -763,7 +822,7 @@ function AchievementCard({ item, onOpenCert, onOpenReport }) {
             {item.student_name}
           </h4>
           <p className="text-xs text-text-secondary font-bold truncate">
-            Class {item.class_name} {item.roll_number ? `· Roll No. ${item.roll_number}` : ''}
+            {formatClassName(item.class_name)} {item.roll_number ? `· Roll No. ${item.roll_number}` : ''}
           </p>
           <div className="flex items-center gap-2 pt-1">
             <span className="text-xs font-black text-emerald-600 font-sans">

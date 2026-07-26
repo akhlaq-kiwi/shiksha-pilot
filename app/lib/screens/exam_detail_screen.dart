@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:school_hub/services/exam_service.dart';
+import 'package:school_hub/services/notification_helper.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -636,7 +637,14 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
       }
 
       if (savedPath != null) {
-        _showToast('Downloaded successfully');
+        try {
+          await NotificationHelper.showDownloadNotification(
+            title: 'Admit Card Downloaded',
+            fileName: defaultFilename,
+            bytes: pdfBytes,
+          );
+        } catch (_) {}
+        _showToast('Admit Card downloaded successfully');
       } else {
         _showErrorToast('Failed to download Admit Card.');
       }
