@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Search, Edit, User, UserCog, Upload, AlertCircle, ArrowLeft, Check, Trash2, FileText, Download, Printer, MoreVertical, Lock, CheckCircle, AlertTriangle, CreditCard } from 'lucide-react';
+import { Plus, Search, Edit, User, UserCog, Upload, AlertCircle, ArrowLeft, Check, Trash2, FileText, Download, Printer, MoreVertical, Lock, CheckCircle, AlertTriangle, CreditCard, ChevronDown, ChevronUp, Eye } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
 import { Input } from '../../../common/ui/input';
@@ -128,6 +128,7 @@ const printStyles = `
     }
     #experience-letter-print-area, #experience-letter-print-area * {
       visibility: visible !important;
+      font-variant-numeric: lining-nums tabular-nums !important;
     }
     #experience-letter-print-area {
       position: absolute !important;
@@ -212,6 +213,10 @@ export default function StaffPage() {
   const [selectedDeptFilter, setSelectedDeptFilter] = useState('');
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
   const [isExpLetterOpen, setIsExpLetterOpen] = useState(false);
+  const [isExpOptionDialogOpen, setIsExpOptionDialogOpen] = useState(false);
+  const [expLetterMode, setExpLetterMode] = useState('auto'); // 'auto' | 'custom'
+  const [customJoiningDate, setCustomJoiningDate] = useState('');
+  const [docsOpen, setDocsOpen] = useState(false);
   
   // School profile metadata
   const [schoolProfile, setSchoolProfile] = useState(null);
@@ -219,6 +224,15 @@ export default function StaffPage() {
   // Full detailed state of selected teacher
   const [teacherDetails, setTeacherDetails] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+
+  const effectiveJoiningDate = (expLetterMode === 'custom' && customJoiningDate) 
+    ? customJoiningDate 
+    : (teacherDetails?.joining_date || '');
+
+  const isInactiveTeacher = Boolean(
+    (teacherDetails?.status && teacherDetails.status.toString().toUpperCase() !== 'ACTIVE') ||
+    (teacherDetails?.exit_date && teacherDetails.exit_date.toString().trim() !== '')
+  );
 
   const [academicYears, setAcademicYears] = useState([]);
   
@@ -972,9 +986,13 @@ export default function StaffPage() {
                 <h2 className="text-2xl font-black text-text-primary tracking-tight font-display">Teacher Profile</h2>
               </div>
               <div className="flex items-center gap-3">
-                {t.exit_date && (
+                {isInactiveTeacher && (
                   <Button 
-                    onClick={() => setIsExpLetterOpen(true)}
+                    onClick={() => {
+                      setExpLetterMode('auto');
+                      setCustomJoiningDate(t?.joining_date || '');
+                      setIsExpOptionDialogOpen(true);
+                    }}
                     className="flex items-center gap-2 font-black bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
                   >
                     <FileText className="h-4 w-4" /> Experience Letter
@@ -1080,6 +1098,60 @@ export default function StaffPage() {
                       )}
                     </div>
                   </div>
+                </Card>
+
+                {/* Collapsible Documents Card relocation (Matching Student Details) */}
+                <Card className="shadow-xs overflow-hidden border border-border">
+                  <button 
+                    onClick={() => setDocsOpen(prev => !prev)}
+                    className="w-full flex items-center justify-between px-6 py-4 bg-zinc-50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors focus:outline-none"
+                  >
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-primary" />
+                      <h4 className="text-xs font-bold text-text-primary uppercase tracking-wider">Documents</h4>
+                    </div>
+                    {docsOpen ? <ChevronUp className="h-4 w-4 text-text-muted" /> : <ChevronDown className="h-4 w-4 text-text-muted" />}
+                  </button>
+
+                  {docsOpen && (
+                    <div className="p-6 border-t border-border animate-in slide-in-from-top-2 duration-300">
+                      {(!t.documents || t.documents.length === 0) ? (
+                        <div className="p-4 bg-zinc-50 dark:bg-zinc-900/50 border border-dashed border-border rounded-xl text-center">
+                          <p className="text-xs text-text-muted font-medium">No joining documents uploaded for this teacher.</p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                          {t.documents.map((doc, idx) => {
+                            const rawPath = doc.file_path || doc.path || '';
+                            const fileUrl = rawPath ? (rawPath.startsWith('http') ? rawPath : `${window.location.origin.includes('localhost') ? 'http://localhost:8000' : ''}${rawPath.startsWith('/') ? '' : '/'}${rawPath}`) : '#';
+
+                            return (
+                              <div key={doc.id || idx} className="flex items-center justify-between p-3 border border-border rounded-xl bg-zinc-50/50 dark:bg-zinc-900/10">
+                                <div className="min-w-0 pr-2">
+                                  <p className="font-bold text-text-primary uppercase text-[10px] tracking-wider truncate">{doc.category || doc.file_name || 'Document'}</p>
+                                  <p className="text-[10px] text-text-muted truncate mt-0.5">{doc.file_name || 'File attachment'}</p>
+                                </div>
+                                {rawPath ? (
+                                  <a
+                                    href={fileUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="p-2 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-colors flex items-center gap-1 text-xs font-semibold shadow-2xs flex-shrink-0"
+                                    title="View / Download Document"
+                                  >
+                                    <Download className="h-3.5 w-3.5" />
+                                    <span>Download</span>
+                                  </a>
+                                ) : (
+                                  <span className="text-[10px] text-text-muted font-bold uppercase tracking-wider flex-shrink-0">Missing</span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </Card>
                    {/* Salary Card panel */}
                 <Card className="p-6 bg-surface border border-border rounded-2xl shadow-xs animate-in fade-in duration-200">
@@ -2200,6 +2272,107 @@ export default function StaffPage() {
         </Dialog>
       )}
 
+      {/* Experience Letter Options Dialog Modal */}
+      {isExpOptionDialogOpen && (
+        <Dialog
+          isOpen={isExpOptionDialogOpen}
+          onClose={() => setIsExpOptionDialogOpen(false)}
+          title="Generate Experience Letter"
+          description="Select whether to use the system portal joining date or specify a custom joining date."
+          className="max-w-md animate-in fade-in duration-200"
+          footer={
+            <div className="flex gap-2 justify-end w-full">
+              <Button variant="secondary" onClick={() => setIsExpOptionDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  setIsExpOptionDialogOpen(false);
+                  setIsExpLetterOpen(true);
+                }}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold flex items-center gap-1.5 shadow-2xs"
+              >
+                <FileText className="h-4 w-4" /> Preview Letter
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-4 text-sm mt-2">
+            {/* Option Selector */}
+            <div className="space-y-3">
+              <label
+                onClick={() => setExpLetterMode('auto')}
+                className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
+                  expLetterMode === 'auto'
+                    ? 'bg-indigo-50/70 border-indigo-300 dark:bg-indigo-950/40 dark:border-indigo-800'
+                    : 'bg-surface border-border hover:bg-zinc-50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="exp_mode"
+                  checked={expLetterMode === 'auto'}
+                  onChange={() => setExpLetterMode('auto')}
+                  className="mt-0.5 text-indigo-600 focus:ring-indigo-500"
+                />
+                <div>
+                  <p className="font-extrabold text-text-primary text-xs">Auto Generate (Portal Joining Date)</p>
+                  <p className="text-[11px] text-text-muted mt-0.5">
+                    Uses system record joining date: <span className="font-bold text-text-primary">{formatDate(teacherDetails?.joining_date)}</span>
+                  </p>
+                </div>
+              </label>
+
+              <label
+                onClick={() => setExpLetterMode('custom')}
+                className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
+                  expLetterMode === 'custom'
+                    ? 'bg-indigo-50/70 border-indigo-300 dark:bg-indigo-950/40 dark:border-indigo-800'
+                    : 'bg-surface border-border hover:bg-zinc-50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="exp_mode"
+                  checked={expLetterMode === 'custom'}
+                  onChange={() => setExpLetterMode('custom')}
+                  className="mt-0.5 text-indigo-600 focus:ring-indigo-500"
+                />
+                <div className="w-full">
+                  <p className="font-extrabold text-text-primary text-xs">Customize Joining Date</p>
+                  <p className="text-[11px] text-text-muted mt-0.5">
+                    Specify actual original joining date if teacher joined prior to portal setup.
+                  </p>
+
+                  {expLetterMode === 'custom' && (
+                    <div className="mt-3 space-y-1.5" onClick={(e) => e.stopPropagation()}>
+                      <label className="text-[10px] font-bold uppercase text-text-secondary">Original Joining Date</label>
+                      <Input
+                        type="date"
+                        value={customJoiningDate}
+                        onChange={(e) => setCustomJoiningDate(e.target.value)}
+                        className="h-9 text-xs"
+                      />
+                    </div>
+                  )}
+                </div>
+              </label>
+            </div>
+
+            {/* Calculated Experience Tenure Live Summary */}
+            <div className="p-3.5 bg-zinc-50 dark:bg-zinc-900 border border-border rounded-xl space-y-1">
+              <p className="text-[10px] font-extrabold uppercase text-text-muted tracking-wider">Calculated Experience Tenure</p>
+              <p className="text-sm font-extrabold text-indigo-600 dark:text-indigo-400">
+                {calculateExperience(effectiveJoiningDate, teacherDetails?.exit_date || new Date().toISOString().split('T')[0]) || '0 Days'}
+              </p>
+              <p className="text-[10px] text-text-muted italic">
+                From {formatDate(effectiveJoiningDate)} to {formatDate(teacherDetails?.exit_date || new Date().toISOString().split('T')[0])}
+              </p>
+            </div>
+          </div>
+        </Dialog>
+      )}
+
       {/* Experience Letter Preview Dialog Modal */}
       <Dialog 
         isOpen={isExpLetterOpen} 
@@ -2220,22 +2393,34 @@ export default function StaffPage() {
         {/* Isolated style injector for media print margins override */}
         <style dangerouslySetInnerHTML={{ __html: printStyles }} />
         
-        <div className="max-h-[60vh] overflow-y-auto p-4 bg-zinc-100 dark:bg-zinc-900 border border-border rounded-xl flex items-center justify-center">
+        <div className="max-h-[75vh] overflow-y-auto p-4 bg-zinc-100 dark:bg-zinc-900 border border-border rounded-xl">
           
           {/* Printable Container in A4 Ratio */}
           <div 
             id="experience-letter-print-area" 
-            className="w-full max-w-[210mm] h-[296mm] bg-white p-[15mm] text-zinc-950 font-serif shadow-lg rounded-sm border border-border flex flex-col justify-between select-text mx-auto"
+            className="w-full max-w-[210mm] min-h-[280mm] bg-white p-8 sm:p-12 text-zinc-950 font-serif [font-variant-numeric:lining-nums_tabular-nums] shadow-lg rounded-sm border border-border flex flex-col justify-between select-text mx-auto my-2"
           >
             {/* Header / School details */}
             <div className="space-y-4">
-              <div className="flex items-center justify-center border-b-2 border-zinc-950 pb-4">
-                <div className="flex items-center gap-4">
-                  {/* Default academic crest logo */}
-                  <div className="w-16 h-16 bg-zinc-950 text-white rounded-md flex items-center justify-center font-bold text-3xl font-display flex-shrink-0 shadow-2xs select-none">
-                    {schoolProfile?.name ? schoolProfile.name.charAt(0).toUpperCase() : 'S'}
+              <div className="border-b-2 border-zinc-950 pb-4">
+                <div className="relative flex items-center justify-center min-h-[64px]">
+                  {/* School logo positioned 5px from left, aligned parallel with school name */}
+                  <div className="absolute left-[5px] top-0 flex items-center justify-center">
+                    {schoolProfile?.logo_path ? (
+                      <img 
+                        src={schoolProfile.logo_path} 
+                        alt="School Logo" 
+                        className="h-16 w-auto max-w-[110px] object-contain flex-shrink-0" 
+                      />
+                    ) : (
+                      <div className="w-14 h-14 bg-zinc-950 text-white rounded-md flex items-center justify-center font-bold text-2xl font-display flex-shrink-0 shadow-2xs select-none">
+                        {schoolProfile?.name ? schoolProfile.name.charAt(0).toUpperCase() : 'S'}
+                      </div>
+                    )}
                   </div>
-                  <div>
+
+                  {/* Center aligned School Name & Subtitle */}
+                  <div className="text-center px-16">
                     <h1 className="text-2xl font-black font-display text-zinc-950 tracking-tight leading-none uppercase">{schoolProfile?.name || 'ABC Public School'}</h1>
                     <p className="text-[10px] font-sans font-extrabold text-zinc-500 mt-1 uppercase tracking-wider">Official Certificate of Service</p>
                   </div>
@@ -2255,13 +2440,13 @@ export default function StaffPage() {
               {/* Letter Body */}
               <div className="text-sm text-zinc-800 leading-relaxed space-y-6 pt-6 text-justify">
                 <p>
-                  This is to certify that <strong>Mr./Ms. {teacherDetails?.name}</strong>, son/daughter of <strong>Mr. {teacherDetails?.father_name || 'Mohammad Akram'}</strong>, was employed with <strong>{schoolProfile?.name || 'ABC Public School'}</strong> as a <strong>Teacher</strong> teaching the subject of <strong>{teacherDetails?.department || 'Mathematics'}</strong> from <strong>{formatDateFull(teacherDetails?.joining_date)}</strong> to <strong>{formatDateFull(teacherDetails?.exit_date)}</strong>.
+                  This is to certify that <strong>Mr./Ms. {teacherDetails?.name}</strong>, son/daughter of <strong>Mr. {teacherDetails?.father_name || '—'}</strong>, was employed with <strong>{schoolProfile?.name || 'ABC Public School'}</strong> as a <strong>Teacher</strong> teaching the subject of <strong>{teacherDetails?.department || 'General'}</strong> from <strong>{formatDateFull(effectiveJoiningDate)}</strong> to <strong>{formatDateFull(teacherDetails?.exit_date || new Date().toISOString().split('T')[0])}</strong>.
                 </p>
                 <p>
                   During his/her tenure of service, he/she carried out the assigned responsibilities sincerely, maintained professional conduct, demonstrated dedication toward students, and contributed positively to the academic environment of the school.
                 </p>
                 <p>
-                  His/Her total experience with our institution is calculated as <strong>{calculateExperience(teacherDetails?.joining_date, teacherDetails?.exit_date)}</strong>.
+                  His/Her total experience with our institution is calculated as <strong>{calculateExperience(effectiveJoiningDate, teacherDetails?.exit_date || new Date().toISOString().split('T')[0])}</strong>.
                 </p>
                 <p>
                   We highly appreciate his/her valuable services and contribution during the tenure and wish him/her success in all future endeavors.
