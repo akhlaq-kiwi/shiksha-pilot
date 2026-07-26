@@ -3,7 +3,7 @@ import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-
 import {
   LayoutDashboard, School, BookOpen, Users, UserCog, Clock,
   ClipboardCheck, FileText, DollarSign, BarChart2, Shield, Settings, RefreshCw, Landmark,
-  AlertCircle, AlertTriangle, Copy, Phone, Mail, ExternalLink, PhoneCall, Megaphone, ShieldAlert
+  AlertCircle, AlertTriangle, Copy, Phone, Mail, ExternalLink, PhoneCall, Megaphone, ShieldAlert, Trophy
 } from 'lucide-react';
 import { useToast } from '../../common/components/Toast';
 
@@ -29,6 +29,7 @@ import FeeFollowUpPage from './pages/FeeFollowUpPage';
 import LeaveRequestsPage from './pages/LeaveRequestsPage';
 import CollectionHistoryPage from './pages/CollectionHistoryPage';
 import AnnouncementsPage from './pages/AnnouncementsPage';
+import AchievementsPage from '../achievements/pages/AchievementsPage';
 
 import { schoolService } from '../../common/services/schoolService';
 import { apiClient } from '../../common/services/apiClient';
@@ -55,6 +56,7 @@ const NAV_ITEMS = [
   { path: '/school-admin/fee-follow-ups',     label: 'Fee Follow-up', icon: PhoneCall },
   { path: '/school-admin/announcements',      label: 'Announcements', icon: Megaphone },
   { path: '/school-admin/audits-settings',    label: 'Audits & Settings', icon: Settings },
+  { path: '/school-admin/achievements', label: 'Achievements', icon: Trophy },
   { path: '/school-admin/security',   label: 'Security', icon: Shield },
 ];
 
@@ -317,6 +319,7 @@ export default function SchoolAdminPortal() {
   // Sidebar dynamic navigation list filtering
   const visibleNavItems = NAV_ITEMS.filter(item => {
     if (role !== 'TEACHER') return true;
+    if (item.label === 'Achievements') return true;
     if (loadingPermissions || permissions === null) return false;
     return permissions.includes(item.label);
   });
@@ -329,6 +332,7 @@ export default function SchoolAdminPortal() {
 
   const hasAccess = (() => {
     if (role !== 'TEACHER') return true;
+    if (currentItem && currentItem.label === 'Achievements') return true;
     if (loadingPermissions) return true;
     if (!currentItem) return true; // Profile pages, change-password are open to all logged in users
     if (permissions === null) return true;
@@ -613,6 +617,7 @@ export default function SchoolAdminPortal() {
             <Route path="attendance" element={<AttendancePage />} />
             <Route path="leave-requests" element={<LeaveRequestsPage />} />
             <Route path="attendance/leaderboard" element={<AttendanceLeaderboardPage />} />
+            <Route path="achievements" element={<AchievementsPage />} />
             <Route path="exams" element={<ExamsPage />} />
             <Route path="exams/seating-plan" element={<SeatingPlanPage />} />
             <Route path="exams/question-paper-designer" element={<QuestionPaperDesignerPage />} />

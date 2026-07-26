@@ -17,6 +17,7 @@ import ResourcesPage from './pages/ResourcesPage';
 import ParentPage from './pages/ParentPage';
 import ParentLeavePage from './pages/ParentLeavePage';
 import SettingsPage from './pages/SettingsPage';
+import AchievementsPage from '../achievements/pages/AchievementsPage';
 
 // ─── Mock Data ─────────────────────────────────────────────────────────────────
 
@@ -161,7 +162,7 @@ function AppSidebar({ currentPage, onNavigate, isParent, user, selectedChild, on
     { id: 'leaves', icon: FileText, label: 'Leaves' },
     { id: 'fees', icon: CreditCard, label: 'Fees' },
     { id: 'resources', icon: Library, label: 'Resources' },
-    ...(!isParent ? [{ id: 'achievements', icon: Trophy, label: 'Achievements' }] : []),
+    { id: 'achievements', icon: Trophy, label: 'Achievements' },
     ...(isParent ? [{ id: 'parent', icon: Users, label: 'My Children' }] : []),
   ];
 
@@ -269,13 +270,7 @@ export default function StudentParentPortal() {
     setCurrentPage(getPageFromPath());
   }, [location.pathname, getPageFromPath]);
 
-  const [showAchievementsModal, setShowAchievementsModal] = useState(false);
-
   const handleNavigate = (id) => {
-    if (id === 'achievements') {
-      setShowAchievementsModal(true);
-      return;
-    }
     const base = role === 'PARENT' ? '/parent' : '/student';
     navigate(id === 'dashboard' ? base : `${base}/${id}`);
   };
@@ -335,6 +330,9 @@ export default function StudentParentPortal() {
         {currentPage === 'resources' && (
           <ResourcesPage materials={data.resources} />
         )}
+        {currentPage === 'achievements' && (
+          <AchievementsPage />
+        )}
         {currentPage === 'settings' && (
           <SettingsPage />
         )}
@@ -348,22 +346,6 @@ export default function StudentParentPortal() {
           />
         )}
       </div>
-
-      {showAchievementsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-surface rounded-2xl max-w-sm w-full p-6 border border-border shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-            <h3 className="text-lg font-bold text-text-primary mb-2">Achievements</h3>
-            <p className="text-sm text-text-muted mb-6">
-              This feature is currently under development. It will be available in a future update.
-            </p>
-            <div className="flex justify-end">
-              <Button onClick={() => setShowAchievementsModal(false)} variant="primary" size="sm">
-                OK
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

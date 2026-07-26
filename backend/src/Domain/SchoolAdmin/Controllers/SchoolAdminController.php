@@ -531,6 +531,22 @@ class SchoolAdminController extends BaseController
         return $this->success($response, $data);
     }
 
+    public function getAchievements(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $params = $request->getQueryParams();
+        $data = $this->service->getAchievements($user, $params);
+        return $this->success($response, $data);
+    }
+
+    public function getAchievementReportCard(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $achievementId = (int)$args['id'];
+        $data = $this->service->getAchievementReportCard($user, $achievementId);
+        return $this->success($response, $data);
+    }
+
     public function getExamClassStatuses(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);

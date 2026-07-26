@@ -3645,6 +3645,446 @@ class SchoolAdminService extends BaseService
         return $formatted;
     }
 
+    public function getAchievements(array $user, array $params = []): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->attendanceRepo->getPdo();
+
+        // 1. Resolve Academic Year
+        $academicYearId = !empty($params['academic_year_id']) ? (int)$params['academic_year_id'] : null;
+        if (!$academicYearId) {
+            $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+            $academicYearId = $workingYear ? (int)$workingYear['id'] : null;
+        }
+        if (!$academicYearId) {
+            $stmtLatestAY = $pdo->prepare("SELECT id FROM academic_years WHERE school_id = :sid ORDER BY id DESC LIMIT 1");
+            $stmtLatestAY->execute([':sid' => $schoolId]);
+            $academicYearId = (int)$stmtLatestAY->fetchColumn();
+        }
+
+        if (!$academicYearId) {
+            return [
+                'academic_year_id' => null,
+                'categories_summary' => [
+                    'attendance_champions' => ['count' => 0, 'label' => 'Attendance Champions', 'description' => 'Students with outstanding school attendance.'],
+                    'academic_excellence' => ['count' => 0, 'label' => 'Academic Excellence', 'description' => 'Top performers in the final examinations.']
+                ],
+                'achievements' => [],
+                'classes' => [],
+                'academic_years' => []
+            ];
+        }
+
+        // 2. Auto-generate snapshots if not present for this academic year
+        $this->autoGenerateAchievementsSnapshots($pdo, $schoolId, $academicYearId);
+
+        // 3. Build Filters
+        $category = !empty($params['category']) ? trim($params['category']) : null;
+        $classId = isset($params['class_id']) && $params['class_id'] !== '' && $params['class_id'] !== 'ALL' ? (int)$params['class_id'] : null;
+        $level = !empty($params['level']) ? trim($params['level']) : null; // 'school', 'class', 'all'
+        $search = !empty($params['search']) ? trim($params['search']) : null;
+        $sort = !empty($params['sort']) ? trim($params['sort']) : 'newest';
+
+        $whereClause = " WHERE school_id = :sid AND academic_year_id = :ayid ";
+        $queryParams = [':sid' => $schoolId, ':ayid' => $academicYearId];
+
+        if ($category) {
+            if ($category === 'attendance_champions') {
+                $whereClause .= " AND feature_type = 'attendance_leaderboard' ";
+            } else if ($category === 'academic_excellence') {
+                $whereClause .= " AND feature_type = 'academic_excellence' ";
+            } else {
+                $whereClause .= " AND feature_type = :cat ";
+                $queryParams[':cat'] = $category;
+            }
+        }
+
+        if ($classId !== null) {
+            $whereClause .= " AND class_id = :cid ";
+            $queryParams[':cid'] = $classId;
+        }
+
+        if ($level === 'school') {
+            $whereClause .= " AND class_id IS NULL ";
+        } else if ($level === 'class') {
+            $whereClause .= " AND class_id IS NOT NULL ";
+        }
+
+        if ($search) {
+            $whereClause .= " AND (student_name LIKE :srch OR roll_number LIKE :srch OR class_name LIKE :srch) ";
+            $queryParams[':srch'] = '%' . $search . '%';
+        }
+
+        // Order clause
+        $orderBy = " ORDER BY created_at DESC, id DESC ";
+        if ($sort === 'rank') {
+            $orderBy = " ORDER BY `rank` ASC, achievement_score DESC ";
+        } else if ($sort === 'class') {
+            $orderBy = " ORDER BY class_name ASC, `rank` ASC ";
+        } else if ($sort === 'academic_year') {
+            $orderBy = " ORDER BY academic_year_id DESC, `rank` ASC ";
+        }
+
+        // Execute achievements query
+        $stmtSelect = $pdo->prepare("SELECT * FROM academic_achievement_snapshots {$whereClause} {$orderBy}");
+        $stmtSelect->execute($queryParams);
+        $rawAchievements = $stmtSelect->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        $achievements = [];
+        foreach ($rawAchievements as $row) {
+            $meta = !empty($row['metadata']) ? json_decode($row['metadata'], true) : [];
+            $achievements[] = [
+                'id' => (int)$row['id'],
+                'school_id' => (int)$row['school_id'],
+                'academic_year_id' => (int)$row['academic_year_id'],
+                'feature_type' => $row['feature_type'],
+                'category' => $row['feature_type'] === 'attendance_leaderboard' ? 'attendance_champions' : $row['feature_type'],
+                'category_label' => $row['feature_type'] === 'attendance_leaderboard' ? 'Attendance Champions' : ($row['feature_type'] === 'academic_excellence' ? 'Academic Excellence' : ucwords(str_replace('_', ' ', $row['feature_type']))),
+                'class_id' => $row['class_id'] !== null ? (int)$row['class_id'] : null,
+                'student_id' => (int)$row['student_id'],
+                'student_name' => $row['student_name'],
+                'student_photo' => $row['student_photo'],
+                'class_name' => $row['class_name'],
+                'roll_number' => $row['roll_number'],
+                'achievement_score' => (float)$row['achievement_score'],
+                'rank' => (int)$row['rank'],
+                'level' => $row['class_id'] === null ? 'school' : 'class',
+                'metadata' => $meta,
+                'created_at' => $row['created_at']
+            ];
+        }
+
+        // Summary counts for this academic year
+        $stmtAttCnt = $pdo->prepare("SELECT COUNT(*) FROM academic_achievement_snapshots WHERE school_id = :sid AND academic_year_id = :ayid AND feature_type = 'attendance_leaderboard'");
+        $stmtAttCnt->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+        $attCount = (int)$stmtAttCnt->fetchColumn();
+
+        $stmtAcadCnt = $pdo->prepare("SELECT COUNT(*) FROM academic_achievement_snapshots WHERE school_id = :sid AND academic_year_id = :ayid AND feature_type = 'academic_excellence'");
+        $stmtAcadCnt->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+        $acadCount = (int)$stmtAcadCnt->fetchColumn();
+
+        // Fetch classes list for this academic year
+        $stmtClasses = $pdo->prepare("SELECT id, name, section FROM classes WHERE school_id = :sid AND academic_year_id = :ayid ORDER BY name ASC, section ASC");
+        $stmtClasses->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+        $classList = $stmtClasses->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        // Fetch academic years list
+        $stmtAYs = $pdo->prepare("SELECT id, name, status, is_current FROM academic_years WHERE school_id = :sid ORDER BY id DESC");
+        $stmtAYs->execute([':sid' => $schoolId]);
+        $ayList = $stmtAYs->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        return [
+            'academic_year_id' => $academicYearId,
+            'categories_summary' => [
+                'attendance_champions' => [
+                    'count' => $attCount,
+                    'label' => 'Attendance Champions',
+                    'description' => 'Students with outstanding school attendance.'
+                ],
+                'academic_excellence' => [
+                    'count' => $acadCount,
+                    'label' => 'Academic Excellence',
+                    'description' => 'Top performers in the final examinations.'
+                ]
+            ],
+            'achievements' => $achievements,
+            'classes' => $classList,
+            'academic_years' => $ayList
+        ];
+    }
+
+    private function autoGenerateAchievementsSnapshots(PDO $pdo, int $schoolId, int $academicYearId): void
+    {
+        // 1. Attendance Leaderboard Auto-Generation (if attendance exists)
+        $stmtAttCheck = $pdo->prepare("SELECT COUNT(*) FROM academic_achievement_snapshots WHERE school_id = :sid AND academic_year_id = :ayid AND feature_type = 'attendance_leaderboard'");
+        $stmtAttCheck->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+        if ((int)$stmtAttCheck->fetchColumn() === 0) {
+            $stmtCalc = $pdo->prepare("
+                SELECT 
+                    s.id AS student_id,
+                    s.name AS student_name,
+                    s.photo_path AS student_photo,
+                    s.roll_no AS roll_number,
+                    c.name AS class_name,
+                    c.id AS class_id,
+                    COUNT(a.id) AS total_working_days,
+                    SUM(CASE WHEN UPPER(a.status) IN ('PRESENT', 'LATE') THEN 1 ELSE 0 END) AS present_days
+                FROM students s
+                INNER JOIN classes c ON s.class_id = c.id
+                INNER JOIN attendance a ON s.id = a.student_id
+                WHERE c.academic_year_id = :ay_id AND c.school_id = :sid
+                GROUP BY s.id, c.id
+                HAVING total_working_days > 0
+            ");
+            $stmtCalc->execute([':ay_id' => $academicYearId, ':sid' => $schoolId]);
+            $studentsList = $stmtCalc->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+            if (!empty($studentsList)) {
+                $overallList = [];
+                foreach ($studentsList as $stu) {
+                    $total = (int)$stu['total_working_days'];
+                    $present = (int)$stu['present_days'];
+                    $pct = $total > 0 ? round(($present / $total) * 100, 2) : 0.00;
+                    $overallList[] = array_merge($stu, ['percentage' => $pct]);
+                }
+
+                usort($overallList, function ($a, $b) {
+                    if ($b['percentage'] != $a['percentage']) return $b['percentage'] <=> $a['percentage'];
+                    if ($b['present_days'] != $a['present_days']) return $b['present_days'] <=> $a['present_days'];
+                    return strcasecmp($a['student_name'], $b['student_name']);
+                });
+
+                $overallTop3 = array_slice($overallList, 0, 3);
+                $classGroups = [];
+                foreach ($overallList as $stu) {
+                    $classGroups[$stu['class_id']][] = $stu;
+                }
+
+                $classWiseTop3 = [];
+                foreach ($classGroups as $classId => $roster) {
+                    usort($roster, function ($a, $b) {
+                        if ($b['percentage'] != $a['percentage']) return $b['percentage'] <=> $a['percentage'];
+                        if ($b['present_days'] != $a['present_days']) return $b['present_days'] <=> $a['present_days'];
+                        return strcasecmp($a['student_name'], $b['student_name']);
+                    });
+                    $classWiseTop3[$classId] = array_slice($roster, 0, 3);
+                }
+
+                $stmtInsert = $pdo->prepare("
+                    INSERT INTO academic_achievement_snapshots (
+                        school_id, academic_year_id, feature_type, class_id, 
+                        student_id, student_name, student_photo, class_name, roll_number, 
+                        achievement_score, `rank`, metadata
+                    ) VALUES (
+                        :sid, :ay_id, 'attendance_leaderboard', :class_id,
+                        :stu_id, :stu_name, :stu_photo, :cls_name, :roll,
+                        :score, :rank, :meta
+                    )
+                ");
+
+                foreach ($overallTop3 as $idx => $row) {
+                    $rank = $idx + 1;
+                    $stmtInsert->execute([
+                        ':sid' => $schoolId,
+                        ':ay_id' => $academicYearId,
+                        ':class_id' => null,
+                        ':stu_id' => $row['student_id'],
+                        ':stu_name' => $row['student_name'],
+                        ':stu_photo' => $row['student_photo'],
+                        ':cls_name' => $row['class_name'],
+                        ':roll' => $row['roll_number'],
+                        ':score' => $row['percentage'],
+                        ':rank' => $rank,
+                        ':meta' => json_encode(['present_days' => $row['present_days'], 'total_working_days' => $row['total_working_days']])
+                    ]);
+                    $this->notifyAchievementGenerated($pdo, $schoolId, (int)$row['student_id'], $row['student_name'], 'School Attendance Champion!', "Congratulations! You have earned the School Attendance Champion Award (Rank #{$rank}).");
+                }
+
+                foreach ($classWiseTop3 as $classId => $roster) {
+                    foreach ($roster as $idx => $row) {
+                        $rank = $idx + 1;
+                        $stmtInsert->execute([
+                            ':sid' => $schoolId,
+                            ':ay_id' => $academicYearId,
+                            ':class_id' => $classId,
+                            ':stu_id' => $row['student_id'],
+                            ':stu_name' => $row['student_name'],
+                            ':stu_photo' => $row['student_photo'],
+                            ':cls_name' => $row['class_name'],
+                            ':roll' => $row['roll_number'],
+                            ':score' => $row['percentage'],
+                            ':rank' => $rank,
+                            ':meta' => json_encode(['present_days' => $row['present_days'], 'total_working_days' => $row['total_working_days']])
+                        ]);
+                        $this->notifyAchievementGenerated($pdo, $schoolId, (int)$row['student_id'], $row['student_name'], 'Attendance Champion Award!', "Congratulations! You secured Rank #{$rank} in Class {$row['class_name']} Attendance. View your certificate from the Achievements section.");
+                    }
+                }
+            }
+        }
+
+        // 2. Academic Excellence Auto-Generation (if exam marks exist)
+        $stmtAcadCheck = $pdo->prepare("SELECT COUNT(*) FROM academic_achievement_snapshots WHERE school_id = :sid AND academic_year_id = :ayid AND feature_type = 'academic_excellence'");
+        $stmtAcadCheck->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+        if ((int)$stmtAcadCheck->fetchColumn() === 0) {
+            // Find all classes in this academic year
+            $stmtClasses = $pdo->prepare("SELECT id, name FROM classes WHERE school_id = :sid AND academic_year_id = :ayid");
+            $stmtClasses->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+            $classes = $stmtClasses->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+            $stmtInsAcad = $pdo->prepare("
+                INSERT INTO academic_achievement_snapshots (
+                    school_id, academic_year_id, feature_type, class_id, 
+                    student_id, student_name, student_photo, class_name, roll_number, 
+                    achievement_score, `rank`, metadata
+                ) VALUES (
+                    :sid, :ay_id, 'academic_excellence', :class_id,
+                    :stu_id, :stu_name, :stu_photo, :cls_name, :roll,
+                    :score, :rank, :meta
+                )
+            ");
+
+            foreach ($classes as $cls) {
+                $classId = (int)$cls['id'];
+                $className = $cls['name'];
+
+                // Find latest exam for this class
+                $stmtExam = $pdo->prepare("
+                    SELECT e.id, e.name 
+                    FROM examinations e 
+                    JOIN examination_papers ep ON ep.exam_id = e.id 
+                    WHERE ep.class_id = :cid AND e.school_id = :sid 
+                    ORDER BY e.id DESC 
+                    LIMIT 1
+                ");
+                $stmtExam->execute([':cid' => $classId, ':sid' => $schoolId]);
+                $exam = $stmtExam->fetch(PDO::FETCH_ASSOC);
+
+                if ($exam) {
+                    $examId = (int)$exam['id'];
+                    $examName = $exam['name'];
+
+                    try {
+                        $dummyUser = ['id' => 1, 'role' => 'SCHOOL_ADMIN', 'school_id' => $schoolId];
+                        $reportCards = $this->getReportCards($dummyUser, $examId, $classId);
+
+                        if (!empty($reportCards) && is_array($reportCards)) {
+                            // Filter valid report cards and sort by percentage DESC
+                            usort($reportCards, function($a, $b) {
+                                return (float)($b['percentage'] ?? 0) <=> (float)($a['percentage'] ?? 0);
+                            });
+
+                            $top3 = array_slice($reportCards, 0, 3);
+                            foreach ($top3 as $idx => $rc) {
+                                $rank = $idx + 1;
+                                $stuId = (int)$rc['student_id'];
+                                $pct = (float)($rc['percentage'] ?? 0.0);
+
+                                // Fetch photo
+                                $stmtSt = $pdo->prepare("SELECT photo_path FROM students WHERE id = :sid LIMIT 1");
+                                $stmtSt->execute([':sid' => $stuId]);
+                                $photoPath = $stmtSt->fetchColumn() ?: null;
+
+                                $stmtInsAcad->execute([
+                                    ':sid' => $schoolId,
+                                    ':ay_id' => $academicYearId,
+                                    ':class_id' => $classId,
+                                    ':stu_id' => $stuId,
+                                    ':stu_name' => $rc['student_name'],
+                                    ':stu_photo' => $photoPath,
+                                    ':cls_name' => $className,
+                                    ':roll' => $rc['roll_no'] ?? '',
+                                    ':score' => $pct,
+                                    ':rank' => $rank,
+                                    ':meta' => json_encode([
+                                        'exam_id' => $examId,
+                                        'exam_name' => $examName,
+                                        'total_obtained' => $rc['total_obtained'] ?? 0,
+                                        'total_max' => $rc['total_max'] ?? 0,
+                                        'percentage' => $pct,
+                                        'result' => $rc['result'] ?? 'PASS'
+                                    ])
+                                ]);
+
+                                $this->notifyAchievementGenerated($pdo, $schoolId, $stuId, $rc['student_name'], 'Academic Excellence Topper!', "Congratulations! You secured Rank #{$rank} in Class {$className} Final Examination. Your achievement certificate is now available.");
+                            }
+                        }
+                    } catch (\Exception $ex) {
+                        // Ignore individual class calculation failures
+                    }
+                }
+            }
+        }
+    }
+
+    private function notifyAchievementGenerated(PDO $pdo, int $schoolId, int $studentId, string $studentName, string $title, string $message): void
+    {
+        try {
+            $stmtS = $pdo->prepare("SELECT parent_phone, student_mobile, phone FROM students WHERE id = :sid LIMIT 1");
+            $stmtS->execute([':sid' => $studentId]);
+            $stu = $stmtS->fetch(PDO::FETCH_ASSOC);
+
+            if ($stu) {
+                $stmtInsNotif = $pdo->prepare("
+                    INSERT INTO dashboard_notifications (school_id, user_role, title, message, link, is_read)
+                    VALUES (:sid, :role, :title, :msg, '/achievements', 0)
+                ");
+
+                // Notify student role
+                $stmtInsNotif->execute([
+                    ':sid' => $schoolId,
+                    ':role' => 'STUDENT',
+                    ':title' => $title,
+                    ':msg' => $message
+                ]);
+
+                // Notify parent role
+                $stmtInsNotif->execute([
+                    ':sid' => $schoolId,
+                    ':role' => 'PARENT',
+                    ':title' => $title,
+                    ':msg' => "Child: {$studentName} - " . $message
+                ]);
+            }
+        } catch (\Exception $e) {
+            // Ignore notification failures
+        }
+    }
+
+    public function getAchievementReportCard(array $user, int $achievementId): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->attendanceRepo->getPdo();
+
+        $stmt = $pdo->prepare("SELECT * FROM academic_achievement_snapshots WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmt->execute([':id' => $achievementId, ':sid' => $schoolId]);
+        $achievement = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$achievement) {
+            throw new NotFoundException('Achievement record not found.');
+        }
+
+        $targetStudentId = (int)$achievement['student_id'];
+        $role = strtoupper($user['role'] ?? '');
+
+        // Security / Authorization check
+        if (!in_array($role, ['SUPER_ADMIN', 'SUPERADMIN', 'SCHOOL_ADMIN', 'SCHOOLADMIN', 'TEACHER'])) {
+            $isAuthorized = false;
+
+            // Fetch student info
+            $stmtStu = $pdo->prepare("SELECT id, student_mobile, parent_phone, phone FROM students WHERE id = :sid LIMIT 1");
+            $stmtStu->execute([':sid' => $targetStudentId]);
+            $stu = $stmtStu->fetch(PDO::FETCH_ASSOC);
+
+            if ($stu) {
+                $userPhone = (string)($user['phone'] ?? '');
+
+                if ($role === 'STUDENT') {
+                    if ($userPhone !== '' && ($userPhone === (string)$stu['student_mobile'] || $userPhone === (string)$stu['phone'])) {
+                        $isAuthorized = true;
+                    }
+                } else if ($role === 'PARENT') {
+                    if ($userPhone !== '' && $userPhone === (string)$stu['parent_phone']) {
+                        $isAuthorized = true;
+                    }
+                }
+            }
+
+            if (!$isAuthorized) {
+                throw new ForbiddenException('Report card viewing is restricted to the student, parent, teachers, and school admin.');
+            }
+        }
+
+        $meta = !empty($achievement['metadata']) ? json_decode($achievement['metadata'], true) : [];
+        $examId = isset($meta['exam_id']) ? (int)$meta['exam_id'] : null;
+        $classId = (int)$achievement['class_id'];
+
+        if (!$examId || !$classId) {
+            throw new ValidationException(['report_card' => 'Report card is not available for this achievement.']);
+        }
+
+        return $this->getReportCards($user, $examId, $classId, $targetStudentId);
+    }
+
     public function markAttendance(array $user, array $data): array
     {
         $schoolId = $this->getSchoolId($user);
@@ -11770,31 +12210,48 @@ Only approve the settlement after reviewing all financial records.
             $benchSeats = $benchData['seats'];
             $seatCount = count($benchSeats);
 
-            uasort($activeClassQueues, function($a, $b) {
-                return count($b) <=> count($a);
-            });
+            $lastClassIdOnBench = null;
 
-            $selectedClasses = [];
-            $i = 0;
-            foreach ($activeClassQueues as $classId => $queue) {
-                if ($i >= $seatCount) {
+            for ($sIdx = 0; $sIdx < $seatCount; $sIdx++) {
+                if (empty($activeClassQueues)) {
                     break;
                 }
-                if (!empty($queue)) {
-                    $selectedClasses[] = $classId;
-                    $i++;
+
+                uasort($activeClassQueues, function($a, $b) {
+                    return count($b) <=> count($a);
+                });
+
+                $targetClassId = null;
+                foreach ($activeClassQueues as $cId => $q) {
+                    if (!empty($q)) {
+                        if ($cId !== $lastClassIdOnBench || count($activeClassQueues) === 1) {
+                            $targetClassId = $cId;
+                            break;
+                        }
+                    }
                 }
-            }
 
-            for ($sIdx = 0; $sIdx < count($selectedClasses); $sIdx++) {
-                $classId = $selectedClasses[$sIdx];
-                $student = array_shift($activeClassQueues[$classId]);
-
-                if (empty($activeClassQueues[$classId])) {
-                    unset($activeClassQueues[$classId]);
+                if ($targetClassId === null) {
+                    foreach ($activeClassQueues as $cId => $q) {
+                        if (!empty($q)) {
+                            $targetClassId = $cId;
+                            break;
+                        }
+                    }
                 }
 
+                if ($targetClassId === null) {
+                    break;
+                }
+
+                $student = array_shift($activeClassQueues[$targetClassId]);
+                if (empty($activeClassQueues[$targetClassId])) {
+                    unset($activeClassQueues[$targetClassId]);
+                }
+
+                $lastClassIdOnBench = $targetClassId;
                 $seat = $benchSeats[$sIdx];
+
                 $allocations[] = [
                     'student_id' => $student['id'],
                     'student_name' => $student['name'],
@@ -13156,7 +13613,7 @@ Only approve the settlement after reviewing all financial records.
             return [
                 'role' => $role,
                 'permissions' => [
-                    'Dashboard', 'Classes', 'Teachers', 'Attendance', 'Leave Requests', 
+                    'Dashboard', 'Classes', 'Teachers', 'Attendance', 'Achievements', 'Leave Requests', 
                     'Examinations', 'Fees Portal', 'Financial Reports', 'Finance Management', 
                     'Fee Follow-up', 'Timetable', 'Audits & Settings', 'Security'
                 ]
@@ -13170,7 +13627,7 @@ Only approve the settlement after reviewing all financial records.
             $phone = $stmtUser->fetchColumn();
 
             if (!$phone) {
-                return ['role' => $role, 'permissions' => []];
+                return ['role' => $role, 'permissions' => ['Achievements']];
             }
 
             // Get active year
@@ -13179,7 +13636,7 @@ Only approve the settlement after reviewing all financial records.
             $workingYearId = $stmtYear->fetchColumn();
 
             if (!$workingYearId) {
-                return ['role' => $role, 'permissions' => []];
+                return ['role' => $role, 'permissions' => ['Achievements']];
             }
 
             $stmtStaff = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND academic_year_id = :ayid AND phone = :phone LIMIT 1");
@@ -13187,7 +13644,7 @@ Only approve the settlement after reviewing all financial records.
             $staff = $stmtStaff->fetch();
 
             if (!$staff) {
-                return ['role' => $role, 'permissions' => []];
+                return ['role' => $role, 'permissions' => ['Achievements']];
             }
 
             $staffId = (int)$staff['id'];
@@ -13200,6 +13657,9 @@ Only approve the settlement after reviewing all financial records.
             ");
             $stmtPerms->execute([':sid' => $schoolId, ':tid' => $staffId]);
             $perms = $stmtPerms->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+            if (!in_array('Achievements', $perms)) {
+                $perms[] = 'Achievements';
+            }
 
             return [
                 'role' => $role,

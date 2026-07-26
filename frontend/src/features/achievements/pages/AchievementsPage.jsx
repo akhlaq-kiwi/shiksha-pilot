@@ -1,0 +1,827 @@
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  Trophy, Award, GraduationCap, Medal, Search, Filter, Calendar, Users,
+  Download, Printer, Eye, Lock, FileText, Sparkles, ChevronRight, ArrowLeft,
+  CheckCircle2, X, School, ShieldAlert
+} from 'lucide-react';
+import { Button } from '../../../common/ui/button';
+import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
+import { Input } from '../../../common/ui/input';
+import { Dialog } from '../../../common/ui/dialog';
+import { achievementsService } from '../../../common/services/achievementsService';
+import { schoolService } from '../../../common/services/schoolService';
+import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
+import { useToast } from '../../../common/components/Toast';
+import html2pdf from 'html2pdf.js';
+
+export default function AchievementsPage() {
+  const toast = useToast();
+  const { currentYear } = useAcademicYear();
+
+  // Navigation / View State
+  const [selectedCategory, setSelectedCategory] = useState(null); // null = Landing Page, 'attendance_champions' | 'academic_excellence'
+
+  // Data States
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [data, setData] = useState({
+    academic_year_id: null,
+    categories_summary: {
+      attendance_champions: { count: 0, label: 'Attendance Champions', description: 'Students with outstanding school attendance.' },
+      academic_excellence: { count: 0, label: 'Academic Excellence', description: 'Top performers in the final examinations.' }
+    },
+    achievements: [],
+    classes: [],
+    academic_years: []
+  });
+  const [schoolProfile, setSchoolProfile] = useState(null);
+
+  // Filter States
+  const [selectedYearId, setSelectedYearId] = useState('');
+  const [selectedClassId, setSelectedClassId] = useState('ALL');
+  const [selectedLevel, setSelectedLevel] = useState('all'); // 'all', 'school', 'class'
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('newest'); // 'newest', 'rank', 'class'
+
+  // Modals State
+  const [activeCertificate, setActiveCertificate] = useState(null);
+  const [activeReportCard, setActiveReportCard] = useState(null);
+  const [loadingReportCard, setLoadingReportCard] = useState(false);
+  const [reportCardError, setReportCardError] = useState('');
+
+  const certPrintRef = useRef(null);
+
+  // Load School Profile
+  useEffect(() => {
+    schoolService.getSchoolProfile()
+      .then(res => setSchoolProfile(res))
+      .catch(err => console.error("Failed to load school profile", err));
+  }, []);
+
+  // Load Achievements Data on Filter change
+  useEffect(() => {
+    loadAchievementsData();
+  }, [selectedCategory, selectedYearId, selectedClassId, selectedLevel, sortBy]);
+
+  const loadAchievementsData = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const params = {
+        academic_year_id: selectedYearId || undefined,
+        category: selectedCategory || undefined,
+        class_id: selectedClassId !== 'ALL' ? selectedClassId : undefined,
+        level: selectedLevel !== 'all' ? selectedLevel : undefined,
+        search: searchQuery || undefined,
+        sort: sortBy
+      };
+
+      const res = await achievementsService.getAchievements(params);
+      setData(res || {});
+      if (!selectedYearId && res.academic_year_id) {
+        setSelectedYearId(String(res.academic_year_id));
+      }
+    } catch (err) {
+      console.error("Failed to load achievements", err);
+      setError("Failed to load achievements. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    loadAchievementsData();
+  };
+
+  // Helper for Initials
+  const getInitials = (name) => {
+    if (!name) return 'ST';
+    const parts = name.trim().split(' ');
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return name.substring(0, 2).toUpperCase();
+  };
+
+  // Open Certificate Modal
+  const handleOpenCertificate = (item) => {
+    setActiveCertificate(item);
+  };
+
+  // Open Report Card Modal (with security/permission error handling)
+  const handleOpenReportCard = async (item) => {
+    setActiveReportCard(null);
+    setReportCardError('');
+    setLoadingReportCard(true);
+    try {
+      const res = await achievementsService.getAchievementReportCard(item.id);
+      setActiveReportCard(res);
+    } catch (err) {
+      console.error("Report card fetch error", err);
+      const msg = err.response?.data?.message || err.message || "Report card access restricted.";
+      toast.error(msg, "Access Restricted");
+      setReportCardError(msg);
+    } finally {
+      setLoadingReportCard(false);
+    }
+  };
+
+  // Certificate Download PDF
+  const handleDownloadCertPDF = () => {
+    if (!certPrintRef.current) return;
+    toast.info("Generating Certificate PDF for download...", "Exporting");
+    const opt = {
+      margin: 5,
+      filename: `Certificate_${activeCertificate?.student_name.replace(/\s+/g, '_')}_${activeCertificate?.rank}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+    };
+    html2pdf().from(certPrintRef.current).set(opt).save();
+  };
+
+  // Certificate Print
+  const handlePrintCert = () => {
+    if (!certPrintRef.current) return;
+    const content = certPrintRef.current.innerHTML;
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Certificate - ${activeCertificate?.student_name || 'Achievement'}</title>
+          <style>
+            @page { size: landscape; margin: 8mm; }
+            body { font-family: system-ui, sans-serif; margin: 0; padding: 20px; background: #fff; text-align: center; }
+            .cert-box { border: 12px double #eab308; padding: 30px; border-radius: 24px; max-width: 900px; margin: 0 auto; background: #fff; }
+            .cert-header { border-bottom: 2px solid #e5e7eb; pb-4; margin-bottom: 20px; }
+            .cert-title { font-size: 28px; font-weight: 900; text-transform: uppercase; color: #111827; letter-spacing: 1px; margin: 10px 0; }
+            .cert-school { font-size: 20px; font-weight: 800; color: #374151; margin: 0; }
+            .cert-body { margin: 25px 0; font-size: 16px; color: #4b5563; line-height: 1.6; }
+            .cert-name { font-size: 32px; font-weight: 900; color: #b45309; margin: 10px 0; font-family: Georgia, serif; }
+            .cert-rank { font-size: 24px; font-weight: 800; color: #d97706; margin: 10px 0; }
+            .cert-score { font-size: 22px; font-weight: 900; color: #059669; margin: 15px 0; }
+            .cert-footer { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 50px; pt-10; border-top: 1px solid #e5e7eb; }
+            .sign-line { border-top: 1px solid #9ca3af; width: 180px; text-align: center; padding-top: 6px; font-weight: bold; font-size: 12px; color: #374151; }
+          </style>
+        </head>
+        <body>
+          ${content}
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 500);
+  };
+
+  // Filtered List for active category
+  const filteredAchievements = (data.achievements || []).filter(item => {
+    if (selectedCategory && item.category !== selectedCategory && item.feature_type !== selectedCategory) {
+      if (selectedCategory === 'attendance_champions' && item.feature_type !== 'attendance_leaderboard') return false;
+      if (selectedCategory === 'academic_excellence' && item.feature_type !== 'academic_excellence') return false;
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const nameMatch = (item.student_name || '').toLowerCase().includes(q);
+      const rollMatch = (item.roll_number || '').toLowerCase().includes(q);
+      const classMatch = (item.class_name || '').toLowerCase().includes(q);
+      if (!nameMatch && !rollMatch && !classMatch) return false;
+    }
+    return true;
+  });
+
+  // Separate School Overall vs Class Level
+  const schoolOverallAchievements = filteredAchievements.filter(item => item.level === 'school' || item.class_id === null);
+  const classAchievements = filteredAchievements.filter(item => item.level !== 'school' && item.class_id !== null);
+
+  // Group class achievements by Class Name
+  const classGroups = classAchievements.reduce((acc, item) => {
+    const key = item.class_name || 'Other Class';
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(item);
+    return acc;
+  }, {});
+
+  const currentYearObj = (data.academic_years || []).find(y => String(y.id) === String(selectedYearId)) || currentYear;
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-300 pb-12">
+      {/* Page Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/80 pb-6">
+        <div>
+          <div className="flex items-center gap-3">
+            {selectedCategory && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setSelectedCategory(null)}
+                className="h-9 w-9 rounded-xl border border-border hover:bg-secondary/80"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            )}
+            <div>
+              <h2 className="text-3xl font-black text-text-primary tracking-tight font-display flex items-center gap-2.5">
+                <Trophy className="h-7 w-7 text-amber-500" />
+                {selectedCategory === 'attendance_champions'
+                  ? 'Attendance Champions'
+                  : selectedCategory === 'academic_excellence'
+                  ? 'Academic Excellence'
+                  : 'Hall of Fame & Achievements'}
+              </h2>
+              <p className="text-text-secondary text-sm mt-1">
+                {selectedCategory === 'attendance_champions'
+                  ? 'Recognizing students with outstanding school attendance and commitment.'
+                  : selectedCategory === 'academic_excellence'
+                  ? 'Honoring top academic performers in examination results.'
+                  : 'Celebrating excellence in attendance and academic performance.'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Global Academic Year Selector */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold text-text-muted uppercase tracking-wider">Academic Year:</span>
+          <select
+            value={selectedYearId}
+            onChange={(e) => setSelectedYearId(e.target.value)}
+            className="h-10 px-3 pr-8 rounded-xl border border-border bg-surface text-xs font-bold focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs cursor-pointer"
+          >
+            {(data.academic_years || []).map(y => (
+              <option key={y.id} value={y.id}>
+                {y.name} {y.is_current ? '(Current)' : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Error State */}
+      {error && (
+        <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-600 rounded-2xl text-xs font-bold flex items-center gap-3">
+          <ShieldAlert className="h-5 w-5 flex-shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 1. LANDING PAGE VIEW (When no specific category selected)                 */}
+      {/* ========================================================================= */}
+      {!selectedCategory && (
+        <div className="space-y-10 animate-in fade-in duration-300">
+          
+          {/* Category Cards Section */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            
+            {/* Card 1: Attendance Champions */}
+            <Card
+              onClick={() => setSelectedCategory('attendance_champions')}
+              className="group relative overflow-hidden border-2 border-border hover:border-amber-400/80 rounded-3xl p-8 transition-all duration-300 hover:shadow-xl cursor-pointer bg-gradient-to-br from-surface via-surface to-amber-500/5 dark:to-amber-500/10"
+            >
+              <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-all transform group-hover:scale-110">
+                <Award className="h-40 w-40 text-amber-500" />
+              </div>
+
+              <div className="relative space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="w-14 h-14 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center border border-amber-500/20 group-hover:scale-105 transition-transform">
+                    <Award className="h-7 w-7" />
+                  </div>
+                  <span className="px-3.5 py-1 rounded-full text-xs font-black bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                    {data.categories_summary.attendance_champions.count} Achievements
+                  </span>
+                </div>
+
+                <div>
+                  <h3 className="text-2xl font-black text-text-primary tracking-tight font-display group-hover:text-amber-600 transition-colors flex items-center gap-2">
+                    Attendance Champions
+                    <ChevronRight className="h-5 w-5 opacity-0 group-hover:opacity-100 transform -translate-x-2 group-hover:translate-x-0 transition-all text-amber-500" />
+                  </h3>
+                  <p className="text-xs text-text-secondary mt-2 leading-relaxed font-medium">
+                    Students with outstanding school attendance, discipline, and daily commitment to learning throughout the academic session.
+                  </p>
+                </div>
+
+                <div className="pt-4 border-t border-border/60 flex items-center justify-between text-xs font-bold text-amber-600 dark:text-amber-400">
+                  <span>Explore School & Class Champions</span>
+                  <span className="flex items-center gap-1 font-black">
+                    View Gallery <ChevronRight className="h-4 w-4" />
+                  </span>
+                </div>
+              </div>
+            </Card>
+
+            {/* Card 2: Academic Excellence */}
+            <Card
+              onClick={() => setSelectedCategory('academic_excellence')}
+              className="group relative overflow-hidden border-2 border-border hover:border-emerald-400/80 rounded-3xl p-8 transition-all duration-300 hover:shadow-xl cursor-pointer bg-gradient-to-br from-surface via-surface to-emerald-500/5 dark:to-emerald-500/10"
+            >
+              <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-all transform group-hover:scale-110">
+                <GraduationCap className="h-40 w-40 text-emerald-500" />
+              </div>
+
+              <div className="relative space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center border border-emerald-500/20 group-hover:scale-105 transition-transform">
+                    <GraduationCap className="h-7 w-7" />
+                  </div>
+                  <span className="px-3.5 py-1 rounded-full text-xs font-black bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                    {data.categories_summary.academic_excellence.count} Achievements
+                  </span>
+                </div>
+
+                <div>
+                  <h3 className="text-2xl font-black text-text-primary tracking-tight font-display group-hover:text-emerald-600 transition-colors flex items-center gap-2">
+                    Academic Excellence
+                    <ChevronRight className="h-5 w-5 opacity-0 group-hover:opacity-100 transform -translate-x-2 group-hover:translate-x-0 transition-all text-emerald-500" />
+                  </h3>
+                  <p className="text-xs text-text-secondary mt-2 leading-relaxed font-medium">
+                    Top academic performers in final examination results. Celebrates scholars with highest percentages and subject mastery.
+                  </p>
+                </div>
+
+                <div className="pt-4 border-t border-border/60 flex items-center justify-between text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                  <span>Explore Class Examination Toppers</span>
+                  <span className="flex items-center gap-1 font-black">
+                    View Gallery <ChevronRight className="h-4 w-4" />
+                  </span>
+                </div>
+              </div>
+            </Card>
+
+          </div>
+
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 2. CATEGORY DETAIL VIEW (When category is selected)                       */}
+      {/* ========================================================================= */}
+      {selectedCategory && (
+        <div className="space-y-8 animate-in fade-in duration-300">
+          
+          {/* Filters & Control Panel */}
+          <Card className="p-5 shadow-2xs border border-border space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              
+              {/* Filter 1: Class */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-text-secondary uppercase tracking-wider">Class Filter</label>
+                <select
+                  value={selectedClassId}
+                  onChange={e => setSelectedClassId(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-border bg-surface text-xs font-bold focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs cursor-pointer"
+                >
+                  <option value="ALL">All Classes</option>
+                  {(data.classes || []).map(c => (
+                    <option key={c.id} value={c.id}>{c.name} {c.section ? ` - ${c.section}` : ''}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Filter 2: Level Scope */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-text-secondary uppercase tracking-wider">Achievement Level</label>
+                <select
+                  value={selectedLevel}
+                  onChange={e => setSelectedLevel(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-border bg-surface text-xs font-bold focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs cursor-pointer"
+                >
+                  <option value="all">All Levels (School & Class)</option>
+                  <option value="school">School Overall Champions Only</option>
+                  <option value="class">Class Toppers Only</option>
+                </select>
+              </div>
+
+              {/* Filter 3: Sort By */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-text-secondary uppercase tracking-wider">Sort By</label>
+                <select
+                  value={sortBy}
+                  onChange={e => setSortBy(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-border bg-surface text-xs font-bold focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs cursor-pointer"
+                >
+                  <option value="newest">Newest First</option>
+                  <option value="rank">Highest Rank / Score First</option>
+                  <option value="class">Class Wise</option>
+                </select>
+              </div>
+
+              {/* Filter 4: Search Input */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-text-secondary uppercase tracking-wider">Search</label>
+                <form onSubmit={handleSearchSubmit} className="relative">
+                  <Input
+                    type="text"
+                    placeholder="Search by name, roll..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    className="h-10 pl-9 pr-3 text-xs font-bold rounded-xl"
+                  />
+                  <Search className="h-4 w-4 absolute left-3 top-3 text-text-muted" />
+                </form>
+              </div>
+
+            </div>
+          </Card>
+
+          {/* Loader */}
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[1, 2, 3, 4, 5, 6].map(i => (
+                <div key={i} className="h-72 bg-surface border border-border rounded-3xl animate-pulse"></div>
+              ))}
+            </div>
+          ) : filteredAchievements.length === 0 ? (
+            <Card className="p-16 text-center border-dashed border-2 border-border/80 rounded-3xl bg-zinc-50/50 dark:bg-zinc-950/20">
+              <Trophy className="h-12 w-12 text-text-muted/40 mx-auto mb-3" />
+              <h4 className="text-base font-black text-text-primary">No matching achievements found.</h4>
+              <p className="text-xs text-text-secondary mt-1">Try adjusting your class or level filters.</p>
+            </Card>
+          ) : (
+            <div className="space-y-10">
+              
+              {/* SECTION A: SCHOOL OVERALL CHAMPIONS (If available and level permits) */}
+              {schoolOverallAchievements.length > 0 && (selectedLevel === 'all' || selectedLevel === 'school') && (
+                <div className="space-y-5 border-b border-border/80 pb-8">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500">
+                      <Trophy className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-black text-text-primary tracking-tight font-display">
+                        School Overall Attendance Champions
+                      </h3>
+                      <p className="text-xs text-text-secondary font-bold">Top 3 achievers across the entire school</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {schoolOverallAchievements.map(item => (
+                      <AchievementCard
+                        key={item.id}
+                        item={item}
+                        onOpenCert={handleOpenCertificate}
+                        onOpenReport={handleOpenReportCard}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* SECTION B: CLASS WISE CHAMPIONS */}
+              {Object.keys(classGroups).length > 0 && (selectedLevel === 'all' || selectedLevel === 'class') && (
+                <div className="space-y-8">
+                  {Object.entries(classGroups).map(([className, items]) => (
+                    <div key={className} className="space-y-4">
+                      <div className="flex items-center gap-2 pb-2 border-b border-border">
+                        <span className="px-3 py-1 rounded-xl text-xs font-black bg-primary/10 text-primary uppercase tracking-wider">
+                          {className}
+                        </span>
+                        <span className="text-xs text-text-muted font-bold">Top Achievers</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {items.map(item => (
+                          <AchievementCard
+                            key={item.id}
+                            item={item}
+                            onOpenCert={handleOpenCertificate}
+                            onOpenReport={handleOpenReportCard}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+            </div>
+          )}
+
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* FULL-SCREEN CERTIFICATE PREVIEW MODAL                                    */}
+      {/* ========================================================================= */}
+      {activeCertificate && (
+        <Dialog
+          isOpen={!!activeCertificate}
+          onClose={() => setActiveCertificate(null)}
+          title="Achievement Certificate Preview"
+          maxWidth="max-w-4xl"
+        >
+          <div className="space-y-6">
+            
+            {/* Modal Actions */}
+            <div className="flex items-center justify-between pb-4 border-b border-border">
+              <span className="text-xs font-bold text-text-muted">
+                Official Achievement Certificate
+              </span>
+              <div className="flex items-center gap-3">
+                <Button variant="outline" size="sm" onClick={handleDownloadCertPDF} className="font-bold flex items-center gap-1.5 text-xs">
+                  <Download className="h-3.5 w-3.5" /> Download PDF
+                </Button>
+                <Button variant="outline" size="sm" onClick={handlePrintCert} className="font-bold flex items-center gap-1.5 text-xs">
+                  <Printer className="h-3.5 w-3.5" /> Print
+                </Button>
+              </div>
+            </div>
+
+            {/* Printable Certificate Box */}
+            <div className="overflow-x-auto p-2">
+              <div
+                ref={certPrintRef}
+                className="bg-white text-zinc-900 pt-6 pb-8 px-8 border-[12px] border-double border-amber-500 rounded-3xl max-w-3xl mx-auto text-center space-y-5 shadow-lg min-w-[650px]"
+              >
+                {/* School Header */}
+                <div className="border-b-2 border-zinc-200 pb-3">
+                  <p className="text-base font-black text-zinc-700 tracking-wide uppercase">
+                    {schoolProfile?.name || 'SHIKSHA PILOT ACADEMY'}
+                  </p>
+                  <h1 className="text-2xl font-black text-zinc-900 tracking-tight uppercase mt-1 font-display">
+                    {activeCertificate.category === 'academic_excellence' ? 'Certificate of Academic Excellence' : 'Certificate of Attendance Achievement'}
+                  </h1>
+                  <p className="text-xs text-zinc-500 font-bold mt-0.5">
+                    Academic Session: {currentYearObj?.name || '2026–2027'}
+                  </p>
+                </div>
+
+                {/* Presentation Text */}
+                <div className="space-y-2 py-2">
+                  <p className="text-sm font-medium italic text-zinc-600">
+                    This certificate is honorably presented to
+                  </p>
+                  <h2 className="text-3xl font-black text-amber-700 tracking-tight font-serif">
+                    {activeCertificate.student_name}
+                  </h2>
+                  <p className="text-xs text-zinc-600 font-bold">
+                    Class {activeCertificate.class_name} · Roll No. {activeCertificate.roll_number || '—'}
+                  </p>
+                </div>
+
+                {/* Rank & Score Box */}
+                <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 max-w-md mx-auto flex items-center justify-around">
+                  <div>
+                    <span className="text-2xl">
+                      {activeCertificate.rank === 1 ? '🥇' : activeCertificate.rank === 2 ? '🥈' : '🥉'}
+                    </span>
+                    <p className="text-xs font-black text-amber-700 uppercase">Rank #{activeCertificate.rank}</p>
+                  </div>
+                  <div className="h-8 w-px bg-amber-300"></div>
+                  <div>
+                    <p className="text-2xl font-black text-emerald-600 font-sans">
+                      {activeCertificate.achievement_score}%
+                    </p>
+                    <p className="text-[10px] font-bold text-zinc-500 uppercase">
+                      {activeCertificate.category === 'academic_excellence' ? 'Final Score' : 'Attendance Rate'}
+                    </p>
+                  </div>
+                </div>
+
+                <p className="text-xs text-zinc-500 max-w-lg mx-auto leading-relaxed">
+                  For demonstrating outstanding performance, dedication, and excellence in {activeCertificate.category_label}.
+                </p>
+
+                {/* Signatures */}
+                <div className="flex justify-between items-end pt-6 border-t border-zinc-200 text-xs font-bold text-zinc-600">
+                  <div className="text-left">
+                    <div className="w-36 border-b border-zinc-400 mb-1"></div>
+                    <span>Class Teacher Sign</span>
+                  </div>
+                  <div className="text-right">
+                    <div className="w-36 border-b border-zinc-400 mb-1 ml-auto"></div>
+                    <span>Principal Sign</span>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+        </Dialog>
+      )}
+
+      {/* ========================================================================= */}
+      {/* READ-ONLY REPORT CARD MODAL                                               */}
+      {/* ========================================================================= */}
+      {loadingReportCard ? (
+        <Dialog isOpen={loadingReportCard} onClose={() => setLoadingReportCard(false)} title="Loading Report Card...">
+          <div className="flex flex-col items-center justify-center py-12 gap-3">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <p className="text-xs font-bold text-text-muted">Fetching Student Final Report Card...</p>
+          </div>
+        </Dialog>
+      ) : activeReportCard && (
+        <Dialog
+          isOpen={!!activeReportCard}
+          onClose={() => setActiveReportCard(null)}
+          title="Student Final Report Card (Read-Only)"
+          maxWidth="max-w-4xl"
+        >
+          <div className="space-y-6">
+            
+            {/* Header info */}
+            <div className="bg-surface border border-border p-5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                  {activeReportCard.result || 'PASS'}
+                </span>
+                <h3 className="text-xl font-black text-text-primary">{activeReportCard.student_name}</h3>
+                <p className="text-xs text-text-secondary font-bold">
+                  Class: {activeReportCard.class_name} {activeReportCard.class_section ? `(${activeReportCard.class_section})` : ''} · Roll No. {activeReportCard.roll_no || '—'}
+                </p>
+              </div>
+
+              <div className="flex gap-4 border-t md:border-t-0 md:border-l border-border pt-3 md:pt-0 md:pl-6 text-right">
+                <div>
+                  <p className="text-[10px] font-bold text-text-muted uppercase">Overall Marks</p>
+                  <p className="text-lg font-black text-text-primary">{activeReportCard.total_obtained} / {activeReportCard.total_max}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-text-muted uppercase">Percentage</p>
+                  <p className="text-lg font-black text-emerald-600">{activeReportCard.percentage}%</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-text-muted uppercase">Grade</p>
+                  <p className="text-lg font-black text-amber-500">{activeReportCard.grade}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Subject Marks Table */}
+            <div className="border border-border rounded-2xl overflow-hidden shadow-2xs">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-secondary/40 border-b border-border text-text-secondary uppercase text-[10px] font-black">
+                  <tr>
+                    <th className="p-3">Subject</th>
+                    <th className="p-3">Paper Type</th>
+                    <th className="p-3 text-right">Max Marks</th>
+                    <th className="p-3 text-right">Pass Marks</th>
+                    <th className="p-3 text-right">Obtained</th>
+                    <th className="p-3 text-center">Grade</th>
+                    <th className="p-3 text-center">Result</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60 font-semibold">
+                  {(activeReportCard.subjects || []).map((sub, idx) => (
+                    <tr key={idx} className="hover:bg-secondary/20">
+                      <td className="p-3 font-bold text-text-primary">{sub.subject_name}</td>
+                      <td className="p-3 text-text-muted">{sub.paper_type || 'Written'}</td>
+                      <td className="p-3 text-right">{sub.max_marks}</td>
+                      <td className="p-3 text-right">{sub.passing_marks}</td>
+                      <td className="p-3 text-right font-black text-text-primary">{sub.marks_obtained}</td>
+                      <td className="p-3 text-center font-black">{sub.grade}</td>
+                      <td className="p-3 text-center">
+                        <span className={`px-2 py-0.5 rounded-md text-[9px] font-black ${
+                          sub.result === 'PASS' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-red-500/10 text-red-600'
+                        }`}>
+                          {sub.result}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Remark */}
+            {activeReportCard.report_card_remark && (
+              <div className="p-4 bg-zinc-50 dark:bg-zinc-950/40 border border-border rounded-xl space-y-1">
+                <p className="text-[10px] font-black text-text-muted uppercase">Teacher Remark</p>
+                <p className="text-xs text-text-primary font-medium italic">&quot;{activeReportCard.report_card_remark}&quot;</p>
+              </div>
+            )}
+
+            <div className="flex justify-end pt-2">
+              <Button onClick={() => setActiveReportCard(null)} variant="outline" size="sm" className="font-bold">
+                Close Report Card
+              </Button>
+            </div>
+
+          </div>
+        </Dialog>
+      )}
+
+    </div>
+  );
+}
+
+// ─── REUSABLE ACHIEVEMENT CARD COMPONENT ──────────────────────────────────────
+function AchievementCard({ item, onOpenCert, onOpenReport }) {
+  const isRank1 = item.rank === 1;
+  const isRank2 = item.rank === 2;
+  const isRank3 = item.rank === 3;
+
+  const medalBadge = isRank1 ? '🥇' : isRank2 ? '🥈' : '🥉';
+  const borderClass = isRank1
+    ? 'border-amber-400/90 ring-1 ring-amber-400/20 bg-amber-500/5'
+    : isRank2
+    ? 'border-zinc-400/90 ring-1 ring-zinc-400/20 bg-zinc-500/5'
+    : 'border-amber-700/90 ring-1 ring-amber-700/20 bg-amber-700/5';
+
+  const isAcademic = item.category === 'academic_excellence' || item.feature_type === 'academic_excellence';
+
+  return (
+    <Card className={`group relative border-2 rounded-3xl p-6 transition-all duration-300 hover:shadow-lg flex flex-col justify-between ${borderClass}`}>
+      
+      {/* Top Header Badge */}
+      <div className="flex items-center justify-between pb-4 border-b border-border/60">
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">{medalBadge}</span>
+          <span className="text-xs font-black uppercase tracking-wider text-text-primary">
+            Rank #{item.rank}
+          </span>
+        </div>
+        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-surface border border-border text-text-secondary">
+          {item.level === 'school' ? 'School Overall' : item.class_name}
+        </span>
+      </div>
+
+      {/* Student Info */}
+      <div className="py-5 flex items-center gap-4">
+        <div className="relative">
+          {item.student_photo ? (
+            <img
+              src={item.student_photo}
+              alt={item.student_name}
+              className="w-14 h-14 rounded-2xl object-cover border-2 border-border shadow-xs"
+            />
+          ) : (
+            <div className="w-14 h-14 rounded-2xl bg-primary/10 border-2 border-primary/20 text-primary font-black text-lg flex items-center justify-center shadow-xs">
+              {item.student_name ? item.student_name.substring(0, 2).toUpperCase() : 'ST'}
+            </div>
+          )}
+        </div>
+
+        <div className="min-w-0 flex-1 space-y-1">
+          <h4 className="text-base font-black text-text-primary truncate group-hover:text-primary transition-colors font-display">
+            {item.student_name}
+          </h4>
+          <p className="text-xs text-text-secondary font-bold truncate">
+            Class {item.class_name} {item.roll_number ? `· Roll No. ${item.roll_number}` : ''}
+          </p>
+          <div className="flex items-center gap-2 pt-1">
+            <span className="text-xs font-black text-emerald-600 font-sans">
+              {item.achievement_score}%
+            </span>
+            <span className="text-[10px] text-text-muted font-bold">
+              {isAcademic ? 'Exam Score' : 'Attendance Rate'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Certificate Thumbnail Box */}
+      <div
+        onClick={() => onOpenCert(item)}
+        className="p-3 bg-surface border border-border rounded-2xl hover:border-primary/50 transition-all cursor-pointer space-y-2 group/thumb"
+      >
+        <div className="flex items-center justify-between text-[10px] font-extrabold text-text-muted">
+          <span>Certificate Preview</span>
+          <Eye className="h-3.5 w-3.5 text-primary opacity-0 group-hover/thumb:opacity-100 transition-opacity" />
+        </div>
+        <div className="h-16 rounded-xl bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-amber-500/10 border border-amber-400/30 p-2 flex items-center justify-between">
+          <div className="space-y-0.5 text-left">
+            <p className="text-[9px] font-black text-amber-700 dark:text-amber-400 uppercase truncate max-w-[140px]">
+              {isAcademic ? 'Academic Excellence' : 'Attendance Champion'}
+            </p>
+            <p className="text-[8px] text-zinc-500 font-bold truncate max-w-[140px]">
+              {item.student_name}
+            </p>
+          </div>
+          <span className="text-lg">{medalBadge}</span>
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="pt-4 mt-2 border-t border-border/60 flex items-center gap-2">
+        <Button
+          onClick={() => onOpenCert(item)}
+          variant="outline"
+          size="sm"
+          className="flex-1 font-bold text-xs shadow-2xs border-border hover:bg-secondary/60"
+        >
+          View Certificate
+        </Button>
+
+        {/* Show View Report Card ONLY for Academic Excellence */}
+        {isAcademic && (
+          <Button
+            onClick={() => onOpenReport(item)}
+            variant="primary"
+            size="sm"
+            className="flex-1 font-bold text-xs shadow-2xs"
+          >
+            View Report Card
+          </Button>
+        )}
+      </div>
+
+    </Card>
+  );
+}

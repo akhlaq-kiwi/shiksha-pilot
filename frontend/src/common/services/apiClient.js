@@ -63,3 +63,5 @@ export const apiClient = {
   put: (endpoint, body, options = {}) => request(endpoint, { ...options, method: 'PUT', body }),
   delete: (endpoint, options = {}) => request(endpoint, { ...options, method: 'DELETE' }),
 };
+
+export default apiClient;

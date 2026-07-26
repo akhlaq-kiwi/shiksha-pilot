@@ -7,6 +7,7 @@ import {
   Award,
   FolderOpen,
   CheckSquare,
+  Trophy
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { teacherService } from '../../common/services/teacherService';
@@ -18,11 +19,13 @@ import ExaminationPage from './pages/ExaminationPage';
 import MaterialsPage   from './pages/MaterialsPage';
 import TeacherLeavePage from './pages/TeacherLeavePage';
 import SettingsPage from './pages/SettingsPage';
+import AchievementsPage from '../achievements/pages/AchievementsPage';
 
 const NAV_ITEMS = [
   { id: 'dashboard',   label: 'Dashboard',         icon: LayoutDashboard },
   { id: 'classes',     label: 'My Classes',         icon: BookOpen },
   { id: 'attendance',  label: 'Attendance',         icon: ClipboardCheck },
+  { id: 'achievements', label: 'Achievements',      icon: Trophy },
   { id: 'assignments', label: 'Assignments',        icon: FileText },
   { id: 'examination', label: 'Examination',        icon: Award },
   { id: 'materials',   label: 'Learning Materials', icon: FolderOpen },
@@ -35,6 +38,7 @@ export default function TeacherPortal() {
 
   const getPageFromPath = useCallback(() => {
     const path = location.pathname;
+    if (path.endsWith('/achievements')) return 'achievements';
     if (path.endsWith('/leaves')) return 'leaves';
     if (path.endsWith('/classes')) return 'classes';
     if (path.endsWith('/attendance')) return 'attendance';
@@ -140,6 +144,7 @@ export default function TeacherPortal() {
             {currentPage === 'dashboard'   && <DashboardPage   schedule={schedule} tasks={tasks} upcomingExams={upcomingExams} classes={classes} />}
             {currentPage === 'classes'     && <ClassesPage     classes={classes} allStudents={allStudents} />}
             {currentPage === 'attendance'  && <AttendancePage  classes={classes} allStudents={allStudents} />}
+            {currentPage === 'achievements' && <AchievementsPage />}
             {currentPage === 'assignments' && <AssignmentsPage classes={classes} assignments={assignments} />}
             {currentPage === 'examination' && <ExaminationPage classes={classes} exams={exams} allStudents={allStudents} />}
             {currentPage === 'materials'   && <MaterialsPage   classes={classes} materials={materials} />}

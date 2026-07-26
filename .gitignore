@@ -28,3 +28,4 @@ scratch/add_teachers_for_user.php
 .env
 .qa.env
 .builds/
+backend/public/uploads/*

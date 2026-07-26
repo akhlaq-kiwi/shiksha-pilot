@@ -21,6 +21,7 @@ import 'package:workmanager/workmanager.dart';
 import 'package:school_hub/main.dart';
 import 'package:school_hub/services/exam_service.dart';
 import 'package:school_hub/screens/exam_list_screen.dart';
+import 'package:school_hub/screens/achievements_screen.dart';
 
 class LauncherFeature {
   final String name;
@@ -183,7 +184,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       name: 'Achievements',
       icon: Icons.emoji_events_rounded,
       color: Colors.amber.shade700,
-      allowedRoles: ['PARENT', 'STUDENT'],
+      allowedRoles: ['PARENT', 'STUDENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL'],
       isAvailable: true,
     ),
   ];
@@ -1101,20 +1102,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
         );
       } else if (feature.name == 'Achievements') {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Text('Achievements', style: TextStyle(fontWeight: FontWeight.bold)),
-            content: const Text(
-              'This feature is currently under development. It will be available in a future update.',
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('auth_token') ?? widget.leaveService.token;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => AchievementsScreen(
+              baseUrl: widget.leaveService.baseUrl,
+              token: token,
+              userRole: widget.userRole,
+              studentId: _activeStudentId,
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('OK', style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ],
           ),
         );
       }

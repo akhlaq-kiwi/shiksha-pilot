@@ -165,7 +165,7 @@ export default function SeatingPlanPage() {
 
   // Calculate active students in currently selected classes
   const getStudentCountForClass = (classId) => {
-    return students.filter(s => s.class_id === classId && s.status === 'ACTIVE').length;
+    return students.filter(s => String(s.class_id) === String(classId) && s.status === 'ACTIVE').length;
   };
 
   const totalSelectedStudents = selectedClassIds.reduce(
@@ -492,11 +492,6 @@ export default function SeatingPlanPage() {
   };
 
   const getSlipGridClass = () => {
-    if (studentsPerBench === '2') {
-      return 'grid-cols-2 print-grid-2cols';
-    } else if (studentsPerBench === '3') {
-      return 'grid-cols-3 print-grid-3cols';
-    }
     return 'grid-cols-2 print-grid-2cols';
   };
 
@@ -732,7 +727,7 @@ export default function SeatingPlanPage() {
       ) : null}
 
       {/* INSTANT SEATING PREVIEW AREA - Displayed directly below form inside State A */}
-      {!generatedPlan && previewData && (
+      {currentView === 'config' && previewData && (
         <div className="max-w-5xl mx-auto mt-6 space-y-6 animate-in fade-in duration-300 no-print">
           <Card>
             <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">

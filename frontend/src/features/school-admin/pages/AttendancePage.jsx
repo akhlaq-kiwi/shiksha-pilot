@@ -436,7 +436,7 @@ export default function AttendancePage() {
           <Card className="border-dashed border-2 py-16 text-center text-text-muted max-w-lg mx-auto mt-6">
             <CardContent className="flex flex-col items-center justify-center gap-3">
               <Calendar className="h-10 w-10 text-text-muted mb-2 animate-bounce" />
-              <h3 className="text-lg font-black text-text-primary">📅 No Attendance Required</h3>
+              <h3 className="text-lg font-black text-text-primary">No Attendance Required</h3>
               <p className="text-sm text-text-secondary max-w-sm">
                 Attendance is not required for the selected date because it is a scheduled holiday or weekend.
               </p>

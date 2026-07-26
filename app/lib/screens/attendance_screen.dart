@@ -1007,7 +1007,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                               ),
                               const SizedBox(height: 24),
                               const Text(
-                                '📅 No Attendance Required',
+                                'No Attendance Required',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontSize: 18,
