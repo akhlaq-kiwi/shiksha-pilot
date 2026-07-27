@@ -13,8 +13,37 @@ import { schoolService } from '../../../common/services/schoolService';
 import html2pdf from 'html2pdf.js';
 
 // Receipt Modal View Component (Reused from StudentDetailsPage.jsx)
-function ReceiptModal({ receipt, student, schoolName, allPayments = [], onClose }) {
-  const handlePrint = () => {
+function ReceiptModal({ receipt, student, schoolName, schoolLogoUrl, allPayments = [], onClose }) {
+  const handlePrint = async () => {
+    try {
+      const studentId = student.student_id || student.id;
+      const isAdditional = receipt.is_additional || (receipt.fee_name && receipt.fee_name !== 'Previous Year Dues' && !receipt.fee_month) ? 1 : 0;
+      if (studentId) {
+        const blob = await apiClient.get(`/api/school/students/${studentId}/fees/receipt?id=${receipt.id}&additional=${isAdditional}`);
+        const url = window.URL.createObjectURL(blob);
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        document.body.appendChild(iframe);
+        iframe.src = url;
+        iframe.onload = () => {
+          iframe.contentWindow.focus();
+          iframe.contentWindow.print();
+          setTimeout(() => {
+            document.body.removeChild(iframe);
+            window.URL.revokeObjectURL(url);
+          }, 2000);
+        };
+        return;
+      }
+    } catch (err) {
+      console.error('Failed to print official receipt PDF, using DOM fallback:', err);
+    }
+
     const printContent = document.getElementById('receipt-print-area').innerHTML;
     const iframe = document.createElement('iframe');
     iframe.style.position = 'fixed';
@@ -28,7 +57,6 @@ function ReceiptModal({ receipt, student, schoolName, allPayments = [], onClose 
     const doc = iframe.contentWindow.document;
     doc.open();
     doc.write('<html><head><title>Print Receipt</title>');
-    // Copy stylesheets from parent to preserve styling in print
     Array.from(document.querySelectorAll('link[rel="stylesheet"], style')).forEach(el => {
       doc.write(el.outerHTML);
     });
@@ -47,7 +75,7 @@ function ReceiptModal({ receipt, student, schoolName, allPayments = [], onClose 
     </head>
     <body class="bg-white text-black">
       <div class="space-y-6">
-        \${printContent}
+        ${printContent}
       </div>
     </body>
     </html>
@@ -63,11 +91,32 @@ function ReceiptModal({ receipt, student, schoolName, allPayments = [], onClose 
     }, 500);
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
+    try {
+      const studentId = student.student_id || student.id;
+      const isAdditional = receipt.is_additional || (receipt.fee_name && receipt.fee_name !== 'Previous Year Dues' && !receipt.fee_month) ? 1 : 0;
+      if (studentId) {
+        const blob = await apiClient.get(`/api/school/students/${studentId}/fees/receipt?id=${receipt.id}&additional=${isAdditional}`);
+        const cleanName = (student.name || 'Student').split(/\s+/).join('');
+        const cleanYear = (student.academic_year_name || student.academic_year || '2027-2028').replace(/[–—]/g, '-');
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `FeeReceipt_${cleanName}_${cleanYear}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        return;
+      }
+    } catch (err) {
+      console.error('Failed to download official receipt PDF, using html2pdf fallback:', err);
+    }
+
     const element = document.getElementById('receipt-print-area');
-    const cleanName = student.name.split(/\s+/).join('');
-    const cleanYear = (student.academic_year_name || student.academic_year || '2025-2026').replace(/[–]/g, '-');
-    const filename = `FeeReceipt_\${cleanName}_\${cleanYear}.pdf`;
+    const cleanName = (student.name || 'Student').split(/\s+/).join('');
+    const cleanYear = (student.academic_year_name || student.academic_year || '2025-2026').replace(/[–—]/g, '-');
+    const filename = `FeeReceipt_${cleanName}_${cleanYear}.pdf`;
 
     const opt = {
       margin:       15,
@@ -85,7 +134,7 @@ function ReceiptModal({ receipt, student, schoolName, allPayments = [], onClose 
     const m = method.toLowerCase();
     if (m === 'cash') return 'Cash';
     if (m === 'cheque') return 'Cheque';
-    return 'Online'; // UPI, Card, Bank Transfer -> Online
+    return 'Online';
   };
 
   const formatDate = (dateStr) => {
@@ -119,7 +168,7 @@ function ReceiptModal({ receipt, student, schoolName, allPayments = [], onClose 
   if (match) {
     const startYear = parseInt(match[1], 10);
     const endYear = parseInt(match[2], 10);
-    previousYearName = `Academic Year \${startYear - 1}–\${endYear - 1}`;
+    previousYearName = `Academic Year ${startYear - 1}–${endYear - 1}`;
   } else {
     previousYearName = 'Previous Academic Year';
   }
@@ -137,7 +186,14 @@ function ReceiptModal({ receipt, student, schoolName, allPayments = [], onClose 
 
         {/* Printable area */}
         <div className="p-8 space-y-6" id="receipt-print-area">
-          <div className="text-center space-y-1">
+          <div className="text-center space-y-1 flex flex-col items-center justify-center">
+            {schoolLogoUrl && (
+              <img 
+                src={schoolLogoUrl} 
+                alt="School Logo" 
+                className="h-12 w-auto mb-2 object-contain" 
+              />
+            )}
             <h2 className="text-xl font-black tracking-tight text-text-primary font-display uppercase">{displaySchoolName}</h2>
             <p className="text-[10px] uppercase font-bold tracking-widest text-primary">Fee Payment Receipt</p>
           </div>
@@ -146,7 +202,7 @@ function ReceiptModal({ receipt, student, schoolName, allPayments = [], onClose 
             <div className="flex justify-between"><span className="text-text-muted">Mode of Payment:</span> <span className="font-extrabold text-text-primary">{getModeOfPayment(receipt.payment_method)}</span></div>
             <div className="flex justify-between"><span className="text-text-muted">Student Name:</span> <span className="font-extrabold text-text-primary uppercase">{student.name}</span></div>
             <div className="flex justify-between"><span className="text-text-muted">Class & Section:</span> <span className="font-bold text-text-primary">{student.class_name}</span></div>
-            <div className="flex justify-between"><span className="text-text-muted">Roll Number:</span> <span className="font-bold text-text-primary">{student.roll_no || '—'}</span></div>
+            <div className="flex justify-between"><span className="text-text-muted">Roll Number / SR No:</span> <span className="font-bold text-text-primary">{student.roll_no || '—'} / {student.sr_no || '—'}</span></div>
             <div className="flex justify-between"><span className="text-text-muted">Ref No:</span> <span className="font-mono font-bold text-text-primary">{receipt.receipt_no}</span></div>
             <div className="flex justify-between"><span className="text-text-muted">Academic Year:</span> <span className="font-bold text-text-primary">{student.academic_year_name || '2027–2028'}</span></div>
             <div className="flex justify-between"><span className="text-text-muted">Payment Date:</span> <span className="font-bold text-text-primary">{formatDate(receipt.payment_date)}</span></div>
@@ -156,7 +212,7 @@ function ReceiptModal({ receipt, student, schoolName, allPayments = [], onClose 
             <div className="bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-xl border border-border flex justify-between items-center">
               <div>
                 <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">
-                  {receipt.is_additional ? 'Description' : (sortedGroup.length > 1 ? 'Billing Months' : 'Billing Month')}
+                  {receipt.is_additional ? 'Description' : (sortedGroup.length > 1 ? 'Months' : 'Month')}
                 </p>
                 <p className="text-sm font-black text-text-primary mt-0.5 max-w-[200px] break-words">
                   {receipt.is_additional ? receipt.fee_name : sortedGroup.map(p => p.fee_month).join(', ')}

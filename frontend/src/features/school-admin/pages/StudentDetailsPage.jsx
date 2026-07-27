@@ -238,7 +238,7 @@ function ReceiptModal({ receipt, student, schoolName, schoolLogoUrl, allPayments
             <div className="bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-xl border border-border flex justify-between items-center">
               <div>
                 <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">
-                  {receipt.is_additional ? 'Description' : (sortedGroup.length > 1 ? 'Billing Months' : 'Billing Month')}
+                  {receipt.is_additional ? 'Description' : (sortedGroup.length > 1 ? 'Months' : 'Month')}
                 </p>
                 <p className="text-sm font-black text-text-primary mt-0.5 max-w-[200px] break-words">
                   {receipt.is_additional ? receipt.fee_name : (() => {

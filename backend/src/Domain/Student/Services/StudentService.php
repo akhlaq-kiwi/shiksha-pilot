@@ -758,7 +758,7 @@ class StudentService extends BaseService
             }
             $totalAmountPaid = array_sum(array_column($groupPayments, 'amount_paid'));
             $amountPaidFormatted = "Rs " . number_format((float)$totalAmountPaid, 0);
-            $billingItemLabel = count($groupPayments) > 1 ? "Billing Months: " : "Billing Month: ";
+            $billingItemLabel = count($groupPayments) > 1 ? "Months: " : "Month: ";
         } else {
             $feeMonthDisplay = $payment['fee_name'];
             $totalAmountPaid = (float)$payment['amount'];

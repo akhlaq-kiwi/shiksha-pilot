@@ -396,7 +396,7 @@ class SimplePdf
             $stream .= "1 0 0 1 145 450 Tm\n";
             $stream .= "(" . $this->escape($paymentDate) . ") Tj\n";
 
-            $descLabel = (count($rawMonths) > 1) ? "Billing Months:" : "Description:";
+            $descLabel = (count($rawMonths) > 1) ? "Months:" : (count($rawMonths) === 1 ? "Month:" : "Description:");
             $stream .= "/F2 9 Tf\n";
             $stream .= "1 0 0 1 310 450 Tm\n";
             $stream .= "(" . $this->escape($descLabel) . ") Tj\n";

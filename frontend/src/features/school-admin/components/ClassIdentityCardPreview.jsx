@@ -441,14 +441,14 @@ export default function ClassIdentityCardPreview({
                       ) : null}
                       <div className="min-w-0">
                         <h4
-                          className="text-xs font-black uppercase tracking-wider truncate font-display text-amber-300"
-                          style={{ lineHeight: '1.35' }}
+                          className="text-xs font-black uppercase tracking-wider font-display text-amber-300 pb-0.5 leading-normal"
+                          style={{ lineHeight: '1.25', paddingBottom: '2px' }}
                         >
                           {schoolName}
                         </h4>
                         <p
-                          className="text-[8.5px] font-extrabold uppercase tracking-widest text-emerald-100 opacity-90 mt-0.5"
-                          style={{ lineHeight: '1.3' }}
+                          className="text-[8.5px] font-extrabold uppercase tracking-widest text-emerald-100 opacity-90 leading-normal"
+                          style={{ lineHeight: '1.2' }}
                         >
                           Student Identity Card
                         </p>
@@ -476,8 +476,8 @@ export default function ClassIdentityCardPreview({
                           Student Name
                         </span>
                         <h3
-                          className="text-xs font-black text-zinc-900 truncate uppercase font-display"
-                          style={{ lineHeight: '1.35' }}
+                          className="text-xs font-black text-zinc-900 uppercase font-display pb-0.5 leading-normal"
+                          style={{ lineHeight: '1.25', paddingBottom: '2px' }}
                         >
                           {s.name}
                         </h3>
