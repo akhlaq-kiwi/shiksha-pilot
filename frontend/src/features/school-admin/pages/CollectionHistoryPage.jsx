@@ -332,13 +332,15 @@ export default function CollectionHistoryPage() {
         setSchoolProfile(profileRes);
       }
 
-      setTransactions(historyRes.data || []);
-      setStats({
-        total_collected: historyRes.total_collected || 0,
-        today_collection: historyRes.today_collection || 0,
-        this_month_collection: historyRes.this_month_collection || 0,
-        total_transactions: historyRes.total_transactions || 0
-      });
+      setTransactions(historyRes.transactions || []);
+      if (historyRes.stats) {
+        setStats({
+          total_collected: historyRes.stats.total_collected || 0,
+          today_collection: historyRes.stats.today_collection || 0,
+          this_month_collection: historyRes.stats.this_month_collection || 0,
+          total_transactions: historyRes.stats.total_transactions || 0
+        });
+      }
       setAvailableMonths(historyRes.available_months || []);
       setPagination(historyRes.pagination || { page: 1, limit: 10, total: 0, pages: 1 });
       setHasMore((historyRes.pagination?.page || 1) < (historyRes.pagination?.pages || 1));
@@ -370,10 +372,24 @@ export default function CollectionHistoryPage() {
 
       const historyRes = await schoolService.getCollectionHistory(params);
 
+      const txList = historyRes.transactions || [];
       if (isAppend) {
-        setTransactions(prev => [...prev, ...(historyRes.data || [])]);
+        setTransactions(prev => [...prev, ...txList]);
       } else {
-        setTransactions(historyRes.data || []);
+        setTransactions(txList);
+      }
+
+      if (historyRes.stats) {
+        setStats({
+          total_collected: historyRes.stats.total_collected || 0,
+          today_collection: historyRes.stats.today_collection || 0,
+          this_month_collection: historyRes.stats.this_month_collection || 0,
+          total_transactions: historyRes.stats.total_transactions || 0
+        });
+      }
+
+      if (historyRes.available_months) {
+        setAvailableMonths(historyRes.available_months);
       }
 
       setPagination(historyRes.pagination || { page: 1, limit: 10, total: 0, pages: 1 });
