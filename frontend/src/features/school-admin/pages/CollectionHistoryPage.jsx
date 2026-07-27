@@ -10,41 +10,11 @@ import { Button } from '../../../common/ui/button';
 import { Input } from '../../../common/ui/input';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../../common/ui/table';
 import { schoolService } from '../../../common/services/schoolService';
-import { apiClient } from '../../../common/services/apiClient';
 import html2pdf from 'html2pdf.js';
 
-// Receipt Modal View Component (Official Branded Fee Receipt Layout)
-function ReceiptModal({ receipt, student, schoolName, schoolLogoUrl, allPayments = [], onClose }) {
-  const handlePrint = async () => {
-    try {
-      const studentId = student.student_id || student.id;
-      const isAdditional = receipt.is_additional || (receipt.fee_name && receipt.fee_name !== 'Previous Year Dues' && !receipt.fee_month) ? 1 : 0;
-      if (studentId) {
-        const blob = await apiClient.get(`/api/school/students/${studentId}/fees/receipt?id=${receipt.id}&additional=${isAdditional}`);
-        const url = window.URL.createObjectURL(blob);
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'fixed';
-        iframe.style.right = '0';
-        iframe.style.bottom = '0';
-        iframe.style.width = '0';
-        iframe.style.height = '0';
-        iframe.style.border = '0';
-        document.body.appendChild(iframe);
-        iframe.src = url;
-        iframe.onload = () => {
-          iframe.contentWindow.focus();
-          iframe.contentWindow.print();
-          setTimeout(() => {
-            document.body.removeChild(iframe);
-            window.URL.revokeObjectURL(url);
-          }, 2000);
-        };
-        return;
-      }
-    } catch (err) {
-      console.error('Failed to print official receipt PDF, using DOM fallback:', err);
-    }
-
+// Receipt Modal View Component (Reused from StudentDetailsPage.jsx)
+function ReceiptModal({ receipt, student, schoolName, allPayments = [], onClose }) {
+  const handlePrint = () => {
     const printContent = document.getElementById('receipt-print-area').innerHTML;
     const iframe = document.createElement('iframe');
     iframe.style.position = 'fixed';
@@ -54,63 +24,53 @@ function ReceiptModal({ receipt, student, schoolName, schoolLogoUrl, allPayments
     iframe.style.height = '0';
     iframe.style.border = '0';
     document.body.appendChild(iframe);
-
+    
     const doc = iframe.contentWindow.document;
     doc.open();
+    doc.write('<html><head><title>Print Receipt</title>');
+    // Copy stylesheets from parent to preserve styling in print
+    Array.from(document.querySelectorAll('link[rel="stylesheet"], style')).forEach(el => {
+      doc.write(el.outerHTML);
+    });
     doc.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Fee Payment Receipt</title>
-          <style>
-            @page { size: A4 portrait; margin: 10mm; }
-            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #fff; color: #000; padding: 20px; }
-          </style>
-          <link rel="stylesheet" href="${window.location.origin}/assets/index.css" />
-        </head>
-        <body>
-          <div>${printContent}</div>
-        </body>
-      </html>
+      <style>
+        @page {
+          size: auto;
+          margin: 0mm;
+        }
+        body {
+          background-color: white !important;
+          color: black !important;
+          padding: 40px !important;
+        }
+      </style>
+    </head>
+    <body class="bg-white text-black">
+      <div class="space-y-6">
+        \${printContent}
+      </div>
+    </body>
+    </html>
     `);
     doc.close();
-
+    
     iframe.contentWindow.focus();
     setTimeout(() => {
       iframe.contentWindow.print();
-      setTimeout(() => { document.body.removeChild(iframe); }, 1000);
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+      }, 1000);
     }, 500);
   };
 
-  const handleDownload = async () => {
-    try {
-      const studentId = student.student_id || student.id;
-      const isAdditional = receipt.is_additional || (receipt.fee_name && receipt.fee_name !== 'Previous Year Dues' && !receipt.fee_month) ? 1 : 0;
-      if (studentId) {
-        const blob = await apiClient.get(`/api/school/students/${studentId}/fees/receipt?id=${receipt.id}&additional=${isAdditional}`);
-        const cleanName = (student.name || 'Student').split(/\s+/).join('');
-        const cleanYear = (student.academic_year_name || student.academic_year || '2027-2028').replace(/[–—]/g, '-');
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `FeeReceipt_${cleanName}_${cleanYear}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-        return;
-      }
-    } catch (err) {
-      console.error('Failed to download official receipt PDF, using html2pdf fallback:', err);
-    }
-
+  const handleDownload = () => {
     const element = document.getElementById('receipt-print-area');
-    const cleanName = (student.name || 'Student').split(/\s+/).join('');
-    const cleanYear = (student.academic_year_name || student.academic_year || '2027-2028').replace(/[–—]/g, '-');
-    const filename = `FeeReceipt_${cleanName}_${cleanYear}.pdf`;
+    const cleanName = student.name.split(/\s+/).join('');
+    const cleanYear = (student.academic_year_name || student.academic_year || '2025-2026').replace(/[–]/g, '-');
+    const filename = `FeeReceipt_\${cleanName}_\${cleanYear}.pdf`;
 
     const opt = {
-      margin:       10,
+      margin:       15,
       filename:     filename,
       image:        { type: 'jpeg', quality: 0.98 },
       html2canvas:  { scale: 2, useCORS: true },
@@ -125,7 +85,7 @@ function ReceiptModal({ receipt, student, schoolName, schoolLogoUrl, allPayments
     const m = method.toLowerCase();
     if (m === 'cash') return 'Cash';
     if (m === 'cheque') return 'Cheque';
-    return 'Online';
+    return 'Online'; // UPI, Card, Bank Transfer -> Online
   };
 
   const formatDate = (dateStr) => {
@@ -153,30 +113,20 @@ function ReceiptModal({ receipt, student, schoolName, schoolLogoUrl, allPayments
   const totalAmountPaid = sortedGroup.reduce((sum, p) => sum + parseFloat(p.amount_paid || 0), 0);
   const displaySchoolName = schoolName || 'SHIKSHA PILOT SCHOOL';
 
-  const currentYearName = student.academic_year_name || student.academic_year || '2026–2027';
-
-  let feeMonthDisplay = '';
-  if (receipt.is_additional) {
-    feeMonthDisplay = receipt.fee_name;
+  const currentYearName = student.academic_year_name || student.academic_year || '2027–2028';
+  let previousYearName = '';
+  const match = currentYearName.match(/(\d{4})[–-](\d{4})/);
+  if (match) {
+    const startYear = parseInt(match[1], 10);
+    const endYear = parseInt(match[2], 10);
+    previousYearName = `Academic Year \${startYear - 1}–\${endYear - 1}`;
   } else {
-    const months = sortedGroup.map(p => p.fee_month);
-    const indices = months.map(m => academicMonths.indexOf(m)).filter(idx => idx !== -1);
-    let isConsecutive = false;
-    if (indices.length > 1) {
-      isConsecutive = indices.every((val, i) => i === 0 || val === indices[i - 1] + 1);
-    }
-    if (isConsecutive) {
-      feeMonthDisplay = `${months[0]} To ${months[months.length - 1]}`;
-    } else {
-      feeMonthDisplay = months.join(', ');
-    }
+    previousYearName = 'Previous Academic Year';
   }
-
-  const monthLabel = receipt.is_additional ? 'Description:' : (sortedGroup.length > 1 ? 'Months:' : 'Month:');
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-      <div className="bg-surface border border-border rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-surface border border-border rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-zinc-50 dark:bg-zinc-900/50">
           <h3 className="font-extrabold text-text-primary text-base tracking-tight font-display">Fee Payment Receipt</h3>
@@ -185,94 +135,66 @@ function ReceiptModal({ receipt, student, schoolName, schoolLogoUrl, allPayments
           </button>
         </div>
 
-        {/* Printable Official Receipt Body (Matching Screenshot 1) */}
-        <div className="p-8 space-y-6 overflow-y-auto bg-white text-zinc-900" id="receipt-print-area">
-          {/* Header Branding */}
-          <div className="text-center space-y-1.5 flex flex-col items-center justify-center pb-2">
-            {schoolLogoUrl ? (
-              <img 
-                src={schoolLogoUrl} 
-                alt="School Logo" 
-                className="h-14 w-auto mb-1 object-contain" 
-              />
-            ) : (
-              <div className="w-12 h-12 rounded-full bg-amber-400 text-emerald-950 flex items-center justify-center font-black text-xl mb-1 shadow-xs border border-amber-500">
-                {(displaySchoolName || 'S')[0]}
+        {/* Printable area */}
+        <div className="p-8 space-y-6" id="receipt-print-area">
+          <div className="text-center space-y-1">
+            <h2 className="text-xl font-black tracking-tight text-text-primary font-display uppercase">{displaySchoolName}</h2>
+            <p className="text-[10px] uppercase font-bold tracking-widest text-primary">Fee Payment Receipt</p>
+          </div>
+
+          <div className="border-y border-dashed border-border py-4 space-y-2 text-xs">
+            <div className="flex justify-between"><span className="text-text-muted">Mode of Payment:</span> <span className="font-extrabold text-text-primary">{getModeOfPayment(receipt.payment_method)}</span></div>
+            <div className="flex justify-between"><span className="text-text-muted">Student Name:</span> <span className="font-extrabold text-text-primary uppercase">{student.name}</span></div>
+            <div className="flex justify-between"><span className="text-text-muted">Class & Section:</span> <span className="font-bold text-text-primary">{student.class_name}</span></div>
+            <div className="flex justify-between"><span className="text-text-muted">Roll Number:</span> <span className="font-bold text-text-primary">{student.roll_no || '—'}</span></div>
+            <div className="flex justify-between"><span className="text-text-muted">Ref No:</span> <span className="font-mono font-bold text-text-primary">{receipt.receipt_no}</span></div>
+            <div className="flex justify-between"><span className="text-text-muted">Academic Year:</span> <span className="font-bold text-text-primary">{student.academic_year_name || '2027–2028'}</span></div>
+            <div className="flex justify-between"><span className="text-text-muted">Payment Date:</span> <span className="font-bold text-text-primary">{formatDate(receipt.payment_date)}</span></div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-xl border border-border flex justify-between items-center">
+              <div>
+                <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">
+                  {receipt.is_additional ? 'Description' : (sortedGroup.length > 1 ? 'Billing Months' : 'Billing Month')}
+                </p>
+                <p className="text-sm font-black text-text-primary mt-0.5 max-w-[200px] break-words">
+                  {receipt.is_additional ? receipt.fee_name : sortedGroup.map(p => p.fee_month).join(', ')}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">
+                  {sortedGroup.length > 1 ? 'Total Amount' : 'Amount Paid'}
+                </p>
+                <p className="text-lg font-black text-primary mt-0.5">
+                  ₹{totalAmountPaid.toLocaleString()}
+                </p>
+              </div>
+            </div>
+            {receipt.fee_name === 'Previous Year Dues' && (
+              <div className="border border-border p-4 rounded-xl text-xs space-y-2 bg-zinc-50/50 dark:bg-zinc-900/10">
+                <div className="flex justify-between">
+                  <span className="text-text-muted font-semibold">Fee Type:</span>
+                  <span className="font-extrabold text-text-primary">Previous Year Dues</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-text-muted font-semibold">Collected For:</span>
+                  <span className="font-bold text-text-primary">{previousYearName || 'Previous Academic Year'} Outstanding</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-text-muted font-semibold">Collected In:</span>
+                  <span className="font-bold text-text-primary">{currentYearName || 'Current Academic Year'}</span>
+                </div>
               </div>
             )}
-            <h2 className="text-xl font-black tracking-tight text-slate-900 font-display uppercase">{displaySchoolName}</h2>
-            <p className="text-xs uppercase font-extrabold tracking-widest text-slate-700">FEE PAYMENT RECEIPT</p>
-            <div className="w-full border-t border-slate-300 pt-2 mt-2">
-              <p className="text-xs font-semibold text-slate-600">Academic Year: {currentYearName}</p>
-            </div>
           </div>
 
-          {/* STUDENT INFORMATION SECTION BOX */}
-          <div className="border border-slate-200 rounded-lg overflow-hidden">
-            <div className="bg-slate-50 px-4 py-2 border-b border-slate-200">
-              <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">STUDENT INFORMATION</h4>
-            </div>
-            <div className="p-4 grid grid-cols-2 gap-x-6 gap-y-3 text-xs">
-              <div>
-                <span className="text-slate-500 font-bold block mb-0.5">Student Name:</span>
-                <span className="font-extrabold text-slate-900 uppercase">{student.name}</span>
-              </div>
-              <div>
-                <span className="text-slate-500 font-bold block mb-0.5">Class & Section:</span>
-                <span className="font-extrabold text-slate-900">{student.class_name || 'Class 1'}</span>
-              </div>
-              <div>
-                <span className="text-slate-500 font-bold block mb-0.5">Roll Number:</span>
-                <span className="font-bold text-slate-800">{student.roll_no || '—'}</span>
-              </div>
-              <div>
-                <span className="text-slate-500 font-bold block mb-0.5">Admission No:</span>
-                <span className="font-bold text-slate-800">{student.sr_no || student.admission_no || '—'}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* PAYMENT DETAILS SECTION BOX */}
-          <div className="border border-slate-200 rounded-lg overflow-hidden">
-            <div className="bg-slate-50 px-4 py-2 border-b border-slate-200">
-              <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">PAYMENT DETAILS</h4>
-            </div>
-            <div className="p-4 grid grid-cols-2 gap-x-6 gap-y-3 text-xs">
-              <div>
-                <span className="text-slate-500 font-bold block mb-0.5">Mode of Payment:</span>
-                <span className="font-extrabold text-slate-900">{getModeOfPayment(receipt.payment_method)}</span>
-              </div>
-              <div>
-                <span className="text-slate-500 font-bold block mb-0.5">Reference Number:</span>
-                <span className="font-mono font-bold text-slate-900">{receipt.receipt_no}</span>
-              </div>
-              <div>
-                <span className="text-slate-500 font-bold block mb-0.5">Payment Date:</span>
-                <span className="font-bold text-slate-800">{formatDate(receipt.payment_date)}</span>
-              </div>
-              <div>
-                <span className="text-slate-500 font-bold block mb-0.5">{monthLabel}</span>
-                <span className="font-extrabold text-slate-900">{feeMonthDisplay}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* CENTERED TOTAL AMOUNT PAID BOX */}
-          <div className="flex justify-center py-2">
-            <div className="border-2 border-blue-200 bg-blue-50/50 rounded-xl p-5 text-center min-w-[240px]">
-              <span className="text-xs font-black text-blue-900 uppercase tracking-wider block mb-1">TOTAL AMOUNT PAID</span>
-              <span className="text-2xl font-black text-blue-950 font-display">Rs {totalAmountPaid.toLocaleString()}</span>
-            </div>
-          </div>
-
-          {/* FOOTER NOTICE */}
-          <div className="text-center text-[11px] text-slate-500 space-y-1 pt-2">
-            <p>This is a computer-generated fee receipt. No signature is required.</p>
-            <p className="font-semibold">Thank you for your payment.</p>
+          <div className="text-center text-[10px] text-text-muted leading-relaxed pt-2">
+            This is an automated system generated receipt.<br />Thank you for your payment.
           </div>
         </div>
 
-        {/* Modal Footer Actions */}
+        {/* Footer actions */}
         <div className="px-6 py-4 border-t border-border bg-zinc-50 dark:bg-zinc-900/50 flex justify-end gap-3">
           <Button variant="secondary" onClick={onClose}>Close</Button>
           <Button variant="outline" className="font-bold text-xs" onClick={handlePrint}>Print</Button>
@@ -300,383 +222,292 @@ export default function CollectionHistoryPage() {
     pages: 1
   });
   const [availableMonths, setAvailableMonths] = useState([]);
-  const [selectedMonth, setSelectedMonth] = useState('ALL');
-  const [selectedType, setSelectedType] = useState('ALL'); // ALL, monthly, additional
-  const [selectedMethod, setSelectedMethod] = useState('ALL'); // ALL, Cash, Cheque, Online
+  
+  const [selectedMonth, setSelectedMonth] = useState('All Months');
   const [searchQuery, setSearchQuery] = useState('');
-
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const [error, setError] = useState('');
+  const [schoolProfile, setSchoolProfile] = useState(null);
   
   const [viewingReceipt, setViewingReceipt] = useState(null);
-  const [schoolProfile, setSchoolProfile] = useState(null);
 
   const observerTarget = useRef(null);
 
+  // Debounce search query
   useEffect(() => {
-    fetchInitialData();
-  }, []);
-
-  const fetchInitialData = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const [historyRes, profileRes] = await Promise.all([
-        schoolService.getCollectionHistory({ page: 1, limit: 10 }),
-        schoolService.getSchoolProfile().catch(() => null)
-      ]);
-
-      if (profileRes) {
-        setSchoolProfile(profileRes);
-      }
-
-      setTransactions(historyRes.transactions || []);
-      if (historyRes.stats) {
-        setStats({
-          total_collected: historyRes.stats.total_collected || 0,
-          today_collection: historyRes.stats.today_collection || 0,
-          this_month_collection: historyRes.stats.this_month_collection || 0,
-          total_transactions: historyRes.stats.total_transactions || 0
-        });
-      }
-      setAvailableMonths(historyRes.available_months || []);
-      setPagination(historyRes.pagination || { page: 1, limit: 10, total: 0, pages: 1 });
-      setHasMore((historyRes.pagination?.page || 1) < (historyRes.pagination?.pages || 1));
-    } catch (err) {
-      console.error('Failed to fetch collection history:', err);
-      setError(err.message || 'Failed to load transaction history.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchFilteredData = async (page = 1, isAppend = false) => {
-    if (isAppend) {
-      setLoadingMore(true);
-    } else {
-      setLoading(true);
-    }
-    setError('');
-
-    try {
-      const params = {
-        page,
-        limit: 10,
-        month: selectedMonth !== 'ALL' ? selectedMonth : undefined,
-        type: selectedType !== 'ALL' ? selectedType : undefined,
-        payment_method: selectedMethod !== 'ALL' ? selectedMethod : undefined,
-        search: searchQuery.trim() || undefined
-      };
-
-      const historyRes = await schoolService.getCollectionHistory(params);
-
-      const txList = historyRes.transactions || [];
-      if (isAppend) {
-        setTransactions(prev => [...prev, ...txList]);
-      } else {
-        setTransactions(txList);
-      }
-
-      if (historyRes.stats) {
-        setStats({
-          total_collected: historyRes.stats.total_collected || 0,
-          today_collection: historyRes.stats.today_collection || 0,
-          this_month_collection: historyRes.stats.this_month_collection || 0,
-          total_transactions: historyRes.stats.total_transactions || 0
-        });
-      }
-
-      if (historyRes.available_months) {
-        setAvailableMonths(historyRes.available_months);
-      }
-
-      setPagination(historyRes.pagination || { page: 1, limit: 10, total: 0, pages: 1 });
-      setHasMore((historyRes.pagination?.page || 1) < (historyRes.pagination?.pages || 1));
-    } catch (err) {
-      console.error('Failed to filter transactions:', err);
-      setError(err.message || 'Failed to apply filters.');
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  };
-
-  // Trigger filter fetch when filter selections change
-  useEffect(() => {
-    fetchFilteredData(1, false);
-  }, [selectedMonth, selectedType, selectedMethod]);
-
-  // Debounced search
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchFilteredData(1, false);
-    }, 400);
-    return () => clearTimeout(timer);
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(handler);
   }, [searchQuery]);
 
-  // Intersection Observer for Infinite Scroll
+  const loadHistory = async (forcePage1 = false) => {
+    const isInitial = page === 1 || forcePage1;
+    if (isInitial) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
+    
+    try {
+      const response = await schoolService.getCollectionHistory({
+        month: selectedMonth,
+        search: debouncedSearch,
+        page: isInitial ? 1 : page,
+        limit: 10
+      });
+      
+      const newTx = response.transactions || [];
+      if (isInitial) {
+        setTransactions(newTx);
+      } else {
+        setTransactions(prev => {
+          // Avoid duplicate rows sharing the same Ref No if triggered multiple times
+          const existingIds = new Set(prev.map(item => `${item.type}-${item.id}`));
+          const filteredNewTx = newTx.filter(item => !existingIds.has(`${item.type}-${item.id}`));
+          return [...prev, ...filteredNewTx];
+        });
+      }
+      
+      setStats(response.stats || {
+        total_collected: 0,
+        today_collection: 0,
+        this_month_collection: 0,
+        total_transactions: 0
+      });
+      
+      const p = response.pagination || {
+        page: 1,
+        limit: 10,
+        total: 0,
+        pages: 1
+      };
+      setPagination(p);
+      
+      if (response.available_months && response.available_months.length > 0) {
+        setAvailableMonths(response.available_months);
+      }
+      
+      setHasMore(isInitial ? (newTx.length < p.total) : (page < p.pages));
+    } catch (err) {
+      console.error("Failed to load collection history:", err);
+    } finally {
+      if (isInitial) {
+        setLoading(false);
+      } else {
+        setLoadingMore(false);
+      }
+    }
+  };
+
+  // Load school profile for receipt branding
   useEffect(() => {
+    schoolService.getSchoolProfile()
+      .then(profile => setSchoolProfile(profile))
+      .catch(err => console.error("Failed to load school profile", err));
+  }, []);
+
+  // Filter or search changes: reset to page 1
+  useEffect(() => {
+    if (page !== 1) {
+      setPage(1);
+    } else {
+      loadHistory(true);
+    }
+  }, [selectedMonth, debouncedSearch]);
+
+  // Page index changes: fetch more records
+  useEffect(() => {
+    if (page > 1) {
+      loadHistory(false);
+    }
+  }, [page]);
+
+  // Set up intersection observer for infinite scroll
+  useEffect(() => {
+    if (!hasMore || loading || loadingMore) return;
+
     const observer = new IntersectionObserver(
       entries => {
-        if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
-          fetchFilteredData(pagination.page + 1, true);
+        if (entries[0].isIntersecting) {
+          setPage(prev => prev + 1);
         }
       },
-      { threshold: 0.5 }
+      { threshold: 0.1 }
     );
 
     if (observerTarget.current) {
       observer.observe(observerTarget.current);
     }
 
-    return () => {
-      if (observerTarget.current) {
-        observer.unobserve(observerTarget.current);
-      }
-    };
-  }, [observerTarget.current, hasMore, loadingMore, loading, pagination.page]);
+    return () => observer.disconnect();
+  }, [hasMore, loading, loadingMore]);
 
-  const handleDownloadSingleReceipt = async (t) => {
-    try {
-      const isAdditional = t.type === 'additional' ? 1 : 0;
-      const blob = await apiClient.get(`/api/school/students/${t.student_id}/fees/receipt?id=${t.id}&additional=${isAdditional}`);
-      const cleanName = (t.student_name || 'Student').split(/\s+/).join('');
-      const cleanYear = (t.academic_year_name || '2027-2028').replace(/[–—]/g, '-');
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `FeeReceipt_${cleanName}_${cleanYear}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('Failed to download PDF:', err);
-      setViewingReceipt(t);
-    }
-  };
-
-  const formatCurrency = (val) => {
-    return `₹${parseFloat(val || 0).toLocaleString('en-IN')}`;
-  };
-
+  // Date formatter e.g., "15 July 2027"
   const formatDate = (dateStr) => {
     if (!dateStr) return '—';
     const date = new Date(dateStr);
     if (isNaN(date.getTime())) return dateStr;
-    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const options = { day: 'numeric', month: 'long', year: 'numeric' };
+    return date.toLocaleDateString('en-GB', options);
   };
 
-  const getPaymentMethodBadge = (method) => {
-    const m = (method || 'cash').toLowerCase();
-    if (m === 'cash') {
-      return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-          <Banknote className="h-3 w-3" /> Cash
-        </span>
-      );
+  // Clean student name by removing fallback dots
+  const cleanStudentName = (name) => {
+    if (!name) return '';
+    const trimmed = name.trim();
+    return trimmed.endsWith('.') ? trimmed.replace(/\s*\.$/, '') : name;
+  };
+
+  // Time formatter e.g., "10:35 AM"
+  const formatTime = (timeStr) => {
+    if (!timeStr) return '—';
+    const date = new Date(timeStr);
+    if (isNaN(date.getTime())) {
+      // Fallback if it's already a time string or a relative date format
+      const match = timeStr.match(/\d{2}:\d{2}:\d{2}/);
+      if (match) {
+        const parts = match[0].split(':');
+        let hours = parseInt(parts[0], 10);
+        const minutes = parts[1];
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        hours = hours ? hours : 12; // 0 should be 12
+        return `${hours}:${minutes} ${ampm}`;
+      }
+      return timeStr;
     }
-    if (m === 'cheque') {
-      return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
-          <Landmark className="h-3 w-3" /> Cheque
-        </span>
-      );
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+
+  const getMethodIcon = (method) => {
+    const m = (method || '').toUpperCase();
+    if (m === 'UPI') return Smartphone;
+    if (m === 'CARD') return CreditCard;
+    if (m === 'BANK TRANSFER') return Landmark;
+    return Banknote;
+  };
+
+  const handleDownloadSingleReceipt = (receipt) => {
+    setViewingReceipt(receipt);
+  };
+
+  const getDynamicMonthCardTitle = () => {
+    if (selectedMonth === 'All Months') {
+      return 'ALL MONTHS';
     }
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300">
-        <Smartphone className="h-3 w-3" /> Online
-      </span>
-    );
+    const parts = selectedMonth.split(' ');
+    if (parts.length > 0) {
+      return `${parts[0].toUpperCase()} MONTH`;
+    }
+    return 'THIS MONTH';
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300 pb-12">
-      {/* Top Bar Navigation */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface border border-border p-5 rounded-2xl shadow-2xs">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="outline"
-            onClick={() => navigate('/school-admin/dashboard')}
-            className="font-bold text-xs gap-2 border-border hover:bg-zinc-100 dark:hover:bg-zinc-800"
+    <div className="space-y-6 animate-in fade-in duration-200">
+      
+      {/* Navigation and Title */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-1">
+          <button 
+            onClick={() => navigate('/school-admin')} 
+            className="flex items-center gap-1.5 text-xs font-bold text-text-secondary hover:text-text-primary transition-colors mb-2 uppercase tracking-wider"
           >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </Button>
-          <div>
-            <h2 className="text-2xl font-black text-text-primary tracking-tight font-display">
-              Collection History
-            </h2>
-            <p className="text-xs text-text-secondary font-medium mt-0.5">
-              Comprehensive audit trail of all fee collections across current and previous sessions
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => fetchFilteredData(1, false)}
-            disabled={loading}
-            className="font-bold text-xs gap-2"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
+            <ArrowLeft className="h-3.5 w-3.5" /> Back to Dashboard
+          </button>
+          <h1 className="text-2xl font-black text-text-primary tracking-tight font-display">Collection History</h1>
+          <p className="text-xs text-text-secondary">
+            View every fee collection transaction with complete payment history.
+          </p>
         </div>
       </div>
 
-      {/* KPI Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-5 bg-surface border-border shadow-2xs flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-text-muted uppercase tracking-wider">Total Collection</span>
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
-              <Receipt className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <h3 className="text-2xl font-black text-text-primary font-display">{formatCurrency(stats.total_collected)}</h3>
-            <p className="text-[10px] font-bold text-text-muted mt-1">Lifetime total across history</p>
-          </div>
-        </Card>
-
-        <Card className="p-5 bg-surface border-border shadow-2xs flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-text-muted uppercase tracking-wider">Today's Collection</span>
-            <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center">
-              <Calendar className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <h3 className="text-2xl font-black text-text-primary font-display">{formatCurrency(stats.today_collection)}</h3>
-            <p className="text-[10px] font-bold text-text-muted mt-1">Collected today</p>
-          </div>
-        </Card>
-
-        <Card className="p-5 bg-surface border-border shadow-2xs flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-text-muted uppercase tracking-wider">This Month</span>
-            <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center">
-              <Clock className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <h3 className="text-2xl font-black text-text-primary font-display">{formatCurrency(stats.this_month_collection)}</h3>
-            <p className="text-[10px] font-bold text-text-muted mt-1">Current month total</p>
-          </div>
-        </Card>
-
-        <Card className="p-5 bg-surface border-border shadow-2xs flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-text-muted uppercase tracking-wider">Total Transactions</span>
-            <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center">
-              <FileText className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <h3 className="text-2xl font-black text-text-primary font-display">{stats.total_transactions.toLocaleString('en-IN')}</h3>
-            <p className="text-[10px] font-bold text-text-muted mt-1">Processed transactions</p>
-          </div>
-        </Card>
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { label: 'Total Fee Collected', value: `₹${parseFloat(stats.total_collected).toLocaleString('en-IN')}`, icon: Banknote, color: 'text-primary bg-primary/5 border-primary/10' },
+          { label: "Today's Collection", value: `₹${parseFloat(stats.today_collection).toLocaleString('en-IN')}`, icon: CheckCircle2, color: 'text-emerald-600 bg-emerald-50 border-emerald-100 dark:bg-emerald-950/20 dark:border-emerald-500/20' },
+          { label: getDynamicMonthCardTitle(), value: `₹${parseFloat(stats.this_month_collection).toLocaleString('en-IN')}`, icon: Calendar, color: 'text-blue-600 bg-blue-50 border-blue-100 dark:bg-blue-950/20 dark:border-blue-500/20' },
+          { label: 'Total Transactions', value: stats.total_transactions.toString(), icon: FileText, color: 'text-purple-600 bg-purple-50 border-purple-100 dark:bg-purple-950/20 dark:border-purple-500/20' },
+        ].map((c, i) => {
+          const Icon = c.icon;
+          return (
+            <Card key={i} className="shadow-xs border border-border bg-surface">
+              <CardContent className="p-5 flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">{c.label}</p>
+                  <p className="text-xl font-black text-text-primary tracking-tight font-display">{c.value}</p>
+                </div>
+                <div className={`p-2.5 rounded-xl border ${c.color}`}>
+                  <Icon className="h-5 w-5" />
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
-      {/* Filter Control Bar */}
-      <Card className="p-5 bg-surface border-border shadow-2xs space-y-4">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          
-          {/* Search Box */}
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
-            <Input
-              placeholder="Search by student name, roll no, ref no..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="pl-10 text-xs font-medium"
-            />
-            {searchQuery && (
-              <button 
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* Filter Dropdowns */}
-          <div className="flex flex-wrap items-center gap-3">
-            
-            {/* Month Filter */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs font-bold text-text-muted uppercase">Month:</span>
-              <select
-                value={selectedMonth}
-                onChange={e => setSelectedMonth(e.target.value)}
-                className="h-9 text-xs font-bold bg-zinc-50 dark:bg-zinc-900 border border-border rounded-lg px-3 text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-              >
-                <option value="ALL">All Months</option>
-                {availableMonths.map(m => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Type Filter */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs font-bold text-text-muted uppercase">Type:</span>
-              <select
-                value={selectedType}
-                onChange={e => setSelectedType(e.target.value)}
-                className="h-9 text-xs font-bold bg-zinc-50 dark:bg-zinc-900 border border-border rounded-lg px-3 text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-              >
-                <option value="ALL">All Types</option>
-                <option value="monthly">Monthly Fee</option>
-                <option value="additional">Additional Fee</option>
-              </select>
-            </div>
-
-            {/* Payment Method Filter */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs font-bold text-text-muted uppercase">Method:</span>
-              <select
-                value={selectedMethod}
-                onChange={e => setSelectedMethod(e.target.value)}
-                className="h-9 text-xs font-bold bg-zinc-50 dark:bg-zinc-900 border border-border rounded-lg px-3 text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-              >
-                <option value="ALL">All Methods</option>
-                <option value="Cash">Cash</option>
-                <option value="Cheque">Cheque</option>
-                <option value="Online">Online / UPI</option>
-              </select>
-            </div>
-
-          </div>
+      {/* Filters and Search Control Box */}
+      <div className="bg-surface border border-border rounded-2xl p-5 shadow-xs flex flex-col md:flex-row gap-4 justify-between items-center">
+        
+        {/* Search */}
+        <div className="relative w-full md:w-80">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search student, receipt, class..."
+            className="pl-10 text-xs font-semibold py-2.5 h-10"
+          />
         </div>
-      </Card>
 
-      {/* Main Transactions List / Cards */}
-      <Card className="bg-surface border-border shadow-2xs overflow-hidden">
-        {error && (
-          <div className="p-4 bg-red-500/10 border-b border-red-500/20 text-red-600 dark:text-red-400 text-xs font-bold">
-            {error}
-          </div>
-        )}
+        {/* Month Selector dropdown */}
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <label className="text-xs font-bold text-text-secondary shrink-0 flex items-center gap-1.5 uppercase tracking-wider">
+            <Calendar className="h-3.5 w-3.5 text-text-muted" /> Filter Month:
+          </label>
+          <select
+            value={selectedMonth}
+            onChange={(e) => {
+              setSelectedMonth(e.target.value);
+              setPage(1);
+            }}
+            className="w-full md:w-56 rounded-xl border border-border bg-surface text-text-primary px-3 py-2 text-xs font-bold focus:border-primary focus:ring-primary outline-none h-10 cursor-pointer"
+          >
+            {availableMonths.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
 
-        {loading && transactions.length === 0 ? (
-          <div className="flex flex-col items-center justify-center p-16 space-y-3">
-            <RefreshCw className="h-8 w-8 text-primary animate-spin" />
-            <p className="text-xs font-bold text-text-muted uppercase tracking-wider">Loading Collection History...</p>
+      {/* Transaction History Log table */}
+      <Card className="shadow-xs border border-border bg-surface overflow-hidden">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-3">
+            <RefreshCw className="h-7 w-7 text-primary animate-spin" />
+            <p className="text-xs font-bold text-text-muted uppercase tracking-wider">Loading history...</p>
           </div>
         ) : transactions.length === 0 ? (
-          <div className="flex flex-col items-center justify-center p-16 text-center space-y-2">
-            <Receipt className="h-10 w-10 text-text-muted opacity-40 mb-1" />
-            <h4 className="text-base font-extrabold text-text-primary font-display">No Transactions Found</h4>
-            <p className="text-xs text-text-secondary max-w-sm">
-              No collection records match your selected search query or filters.
-            </p>
+          <div className="flex flex-col items-center justify-center py-16 px-4 text-center max-w-md mx-auto space-y-4">
+            <div className="p-4 rounded-full bg-zinc-50 border border-zinc-100 dark:bg-zinc-900/50 dark:border-zinc-800 text-text-muted">
+              <FileText className="h-8 w-8" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="font-extrabold text-text-primary text-base tracking-tight font-display">No Collection History Found</h3>
+              <p className="text-xs text-text-secondary leading-relaxed font-medium">
+                No fee collection transactions were recorded during the selected month.
+              </p>
+            </div>
           </div>
         ) : (
           <>
@@ -684,80 +515,67 @@ export default function CollectionHistoryPage() {
             <div className="hidden md:block overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-zinc-50/80 dark:bg-zinc-900/50">
-                    <TableHead className="font-extrabold text-xs">Date & Time</TableHead>
-                    <TableHead className="font-extrabold text-xs">Ref No.</TableHead>
-                    <TableHead className="font-extrabold text-xs">Student Details</TableHead>
-                    <TableHead className="font-extrabold text-xs">Fee Item / Month</TableHead>
-                    <TableHead className="font-extrabold text-xs">Method</TableHead>
-                    <TableHead className="font-extrabold text-xs text-right">Amount Paid</TableHead>
-                    <TableHead className="font-extrabold text-xs text-right">Action</TableHead>
+                  <TableRow className="bg-zinc-50/50 dark:bg-zinc-900/20">
+                    <TableHead className="font-bold text-xs whitespace-nowrap">Ref No.</TableHead>
+                    <TableHead className="font-bold text-xs whitespace-nowrap">Date & Time</TableHead>
+                    <TableHead className="font-bold text-xs whitespace-nowrap">Name & Class</TableHead>
+                    <TableHead className="font-bold text-xs whitespace-nowrap">Fee Description</TableHead>
+                    <TableHead className="font-bold text-xs text-left whitespace-nowrap">Amount (₹)</TableHead>
+                    <TableHead className="font-bold text-xs text-center whitespace-nowrap">(Prev → Credit → New)</TableHead>
+                    <TableHead className="font-bold text-xs text-right whitespace-nowrap">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {transactions.map((t) => {
                     return (
-                      <TableRow 
-                        key={t.id}
-                        className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/40 transition-colors"
-                      >
-                        <TableCell className="text-xs font-medium">
-                          <div className="flex flex-col">
-                            <span className="font-bold text-text-primary">{formatDate(t.payment_date)}</span>
-                            <span className="text-[10px] text-text-muted">{t.academic_year_name || 'Current Session'}</span>
+                      <TableRow key={`${t.type}-${t.id}`}>
+                        {/* Ref No. */}
+                        <TableCell className="font-mono text-xs font-bold text-text-primary py-4 whitespace-nowrap">
+                          {t.receipt_no}
+                        </TableCell>
+                        
+                        {/* Date and Time */}
+                        <TableCell className="text-xs whitespace-nowrap">
+                          <div className="font-bold text-text-primary">{formatDate(t.payment_date)}</div>
+                          <div className="text-[10px] text-text-muted font-mono">{formatTime(t.created_at)}</div>
+                        </TableCell>
+
+                        {/* Name & Class */}
+                        <TableCell className="text-xs whitespace-nowrap">
+                          <div className="font-extrabold text-text-primary uppercase tracking-wider">{cleanStudentName(t.student_name)}</div>
+                          <div className="text-[10px] text-text-secondary mt-0.5">{t.class_name}</div>
+                        </TableCell>
+
+                        {/* Fee Name */}
+                        <TableCell className="text-xs font-bold text-text-secondary whitespace-nowrap">
+                          {t.fee_name}
+                        </TableCell>
+
+                        {/* Amount */}
+                        <TableCell className="text-left font-mono font-black text-emerald-600 text-sm whitespace-nowrap">
+                          + ₹{t.amount.toLocaleString('en-IN')}
+                        </TableCell>
+
+                        {/* Balance flow (Bank Statements Style) */}
+                        <TableCell className="text-center text-xs py-3 whitespace-nowrap">
+                          <div className="flex items-center justify-center gap-1 text-sm font-semibold text-text-secondary bg-zinc-50 dark:bg-zinc-900/50 py-1.5 px-3 rounded-lg border border-border max-w-[340px] mx-auto">
+                            <span className="text-text-muted font-mono">₹{parseFloat(t.previous_total).toLocaleString('en-IN')}</span>
+                            <span className="text-text-muted">→</span>
+                            <span className="text-emerald-600 font-black font-mono">+₹{t.amount.toLocaleString('en-IN')}</span>
+                            <span className="text-text-muted">→</span>
+                            <span className="font-black text-text-primary font-mono">₹{parseFloat(t.updated_total).toLocaleString('en-IN')}</span>
                           </div>
                         </TableCell>
 
-                        <TableCell className="text-xs font-mono font-bold text-text-primary">
-                          {t.receipt_no || `REC-${t.id}`}
-                        </TableCell>
-
-                        <TableCell className="text-xs">
-                          <div className="flex flex-col">
-                            <span className="font-extrabold text-text-primary uppercase">{t.student_name}</span>
-                            <span className="text-[10px] text-text-secondary font-medium">
-                              {t.class_name} | Roll: {t.student_roll_no || '—'}
-                            </span>
-                          </div>
-                        </TableCell>
-
-                        <TableCell className="text-xs">
-                          <div className="flex flex-col">
-                            <span className="font-bold text-text-primary">
-                              {t.type === 'additional' ? (t.fee_name || 'Additional Fee') : (t.fee_month || 'Monthly Fee')}
-                            </span>
-                            <span className="text-[10px] text-text-muted capitalize">
-                              {t.type === 'additional' ? 'Additional Fee' : 'Tuition Fee'}
-                            </span>
-                          </div>
-                        </TableCell>
-
-                        <TableCell>
-                          {getPaymentMethodBadge(t.payment_method)}
-                        </TableCell>
-
-                        <TableCell className="text-right">
-                          <div className="flex flex-col items-end">
-                            <span className="text-sm font-black text-emerald-600 font-mono">
-                              +{formatCurrency(t.amount)}
-                            </span>
-                            {t.previous_total !== undefined && t.updated_total !== undefined && (
-                              <span className="text-[9.5px] text-text-muted font-mono">
-                                ₹{parseFloat(t.previous_total).toLocaleString('en-IN')} → ₹{parseFloat(t.updated_total).toLocaleString('en-IN')}
-                              </span>
-                            )}
-                          </div>
-                        </TableCell>
-
-                        <TableCell className="text-right">
-                          <Button
-                            variant="outline"
-                            size="xs"
-                            className="font-bold text-xs gap-1 hover:bg-primary hover:text-white transition-colors"
-                            onClick={() => setViewingReceipt(t)}
+                        {/* Action */}
+                        <TableCell className="text-right whitespace-nowrap">
+                          <Button 
+                            variant="secondary" 
+                            size="xs" 
+                            className="h-7 w-20 text-[10px] px-0 font-bold"
+                            onClick={() => handleDownloadSingleReceipt(t)}
                           >
-                            <FileText className="h-3.5 w-3.5" />
-                            View Receipt
+                            Receipt
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -767,50 +585,57 @@ export default function CollectionHistoryPage() {
               </Table>
             </div>
 
-            {/* Mobile Cards List View */}
-            <div className="md:hidden divide-y divide-border">
+            {/* Mobile Cards View */}
+            <div className="block md:hidden divide-y divide-border">
               {transactions.map((t) => {
                 return (
-                  <div key={t.id} className="p-4 space-y-3 bg-surface hover:bg-zinc-50/50 dark:hover:bg-zinc-900/30 transition-colors">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <span className="text-[10px] font-extrabold font-mono text-text-muted uppercase tracking-wider block">
-                          {t.receipt_no || `REC-${t.id}`}
-                        </span>
-                        <h4 className="text-sm font-black text-text-primary uppercase font-display mt-0.5">
-                          {t.student_name}
-                        </h4>
-                        <p className="text-xs text-text-secondary font-medium">
-                          {t.class_name} | Roll: {t.student_roll_no || '—'}
-                        </p>
+                  <div key={`${t.type}-${t.id}`} className="p-4 space-y-3.5 bg-surface">
+                    
+                    {/* Top Row - Ref No & Amount */}
+                    <div className="flex justify-between items-start">
+                      <div className="space-y-0.5">
+                        <span className="font-mono text-xs font-bold text-text-primary block">{t.receipt_no}</span>
+                        <span className="text-[10px] text-text-muted font-mono">{formatDate(t.payment_date)} • {formatTime(t.created_at)}</span>
                       </div>
-
-                      <div className="text-right shrink-0">
-                        <span className="text-base font-black text-emerald-600 font-mono block">
-                          +{formatCurrency(t.amount)}
+                      <div className="text-right">
+                        <span className="font-mono font-black text-emerald-600 text-sm block">+ ₹{t.amount.toLocaleString('en-IN')}</span>
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-600 border border-emerald-500/10 mt-1">
+                          Completed
                         </span>
-                        {getPaymentMethodBadge(t.payment_method)}
                       </div>
                     </div>
 
-                    <div className="pt-2 border-t border-dashed border-border/80 flex items-center justify-between text-xs">
-                      <div>
-                        <span className="font-bold text-text-primary block">
-                          {t.type === 'additional' ? (t.fee_name || 'Additional Fee') : (t.fee_month || 'Monthly Fee')}
-                        </span>
-                        <span className="text-[10px] text-text-muted">
-                          {formatDate(t.payment_date)}
-                        </span>
+                    {/* Middle Block - Student & Fee Info */}
+                    <div className="text-xs space-y-1.5 bg-zinc-50/50 dark:bg-zinc-900/20 p-3 rounded-xl border border-border/80">
+                      <div className="flex justify-between">
+                        <span className="text-text-muted">Name & Class:</span>
+                        <span className="font-extrabold text-text-primary uppercase">{cleanStudentName(t.student_name)} ({t.class_name})</span>
                       </div>
+                      <div className="flex justify-between">
+                        <span className="text-text-muted">Fee Description:</span>
+                        <span className="font-bold text-text-secondary">{t.fee_name}</span>
+                      </div>
+                    </div>
 
+                    {/* Bottom Row - Running balance and actions */}
+                    <div className="flex flex-col gap-2.5 sm:flex-row sm:justify-between sm:items-center pt-1">
+                      {/* Flow */}
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-text-secondary">
+                        <span className="text-text-muted font-mono">₹{parseFloat(t.previous_total).toLocaleString('en-IN')}</span>
+                        <span>→</span>
+                        <span className="text-emerald-600 font-black font-mono">+₹{t.amount.toLocaleString('en-IN')}</span>
+                        <span>→</span>
+                        <span className="font-black text-text-primary font-mono">₹{parseFloat(t.updated_total).toLocaleString('en-IN')}</span>
+                      </div>
+                      
+                      {/* Button */}
                       <Button 
                         variant="secondary" 
                         size="xs" 
-                        className="h-8 text-xs font-bold gap-1.5"
-                        onClick={() => setViewingReceipt(t)}
+                        className="h-7 w-full sm:w-24 text-[10px] font-bold"
+                        onClick={() => handleDownloadSingleReceipt(t)}
                       >
-                        <FileText className="h-3.5 w-3.5 text-primary" />
-                        View Receipt
+                        Download Receipt
                       </Button>
                     </div>
 
@@ -843,26 +668,22 @@ export default function CollectionHistoryPage() {
         )}
       </Card>
 
-      {/* Fee Payment Receipt Popup Modal */}
+      {/* Fee Payment Receipt Popup */}
       {viewingReceipt && (
         <ReceiptModal 
           receipt={{
             ...viewingReceipt,
-            id: viewingReceipt.id,
             is_additional: viewingReceipt.type === 'additional',
             amount_paid: viewingReceipt.amount
           }} 
           student={{
-            id: viewingReceipt.student_id,
-            student_id: viewingReceipt.student_id,
             name: viewingReceipt.student_name,
             class_name: viewingReceipt.class_name,
             roll_no: viewingReceipt.student_roll_no || '—',
-            sr_no: viewingReceipt.student_sr_no || '—',
+            sr_no: '—',
             academic_year_name: viewingReceipt.academic_year_name
           }} 
           schoolName={schoolProfile?.name}
-          schoolLogoUrl={schoolProfile?.logo_path}
           allPayments={transactions.map(t => ({
             ...t,
             is_additional: t.type === 'additional',

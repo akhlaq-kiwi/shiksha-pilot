@@ -5478,7 +5478,6 @@ class SchoolAdminService extends BaseService
         $stmtMonthly = $pdo->prepare("
             SELECT 
                 fp.id,
-                fp.student_id,
                 'monthly' AS type,
                 fp.receipt_no,
                 CASE 
@@ -5488,7 +5487,6 @@ class SchoolAdminService extends BaseService
                     TRIM(CONCAT(s.first_name, ' ', COALESCE(s.middle_name, ''), ' ', s.last_name))
                 END AS student_name,
                 s.roll_no AS student_roll_no,
-                s.sr_no AS student_sr_no,
                 c.name AS class_name,
                 CONCAT('Monthly Fee (', fp.fee_month, ')') AS fee_name,
                 fp.collected_by,
@@ -5503,9 +5501,9 @@ class SchoolAdminService extends BaseService
                 ay.status AS academic_year_status
             FROM fee_payments fp
             JOIN students s ON fp.student_id = s.id
-            LEFT JOIN classes c ON s.class_id = c.id
-            LEFT JOIN academic_years ay ON fp.academic_year_id = ay.id
-            WHERE fp.school_id = :school_id AND UPPER(fp.status) = 'PAID'
+            JOIN classes c ON s.class_id = c.id
+            JOIN academic_years ay ON fp.academic_year_id = ay.id
+            WHERE fp.school_id = :school_id AND fp.status = 'PAID' AND ay.status IN ('ACTIVE', 'Draft')
         ");
         $stmtMonthly->execute([':school_id' => $schoolId]);
         $monthly = $stmtMonthly->fetchAll(PDO::FETCH_ASSOC);
@@ -5514,7 +5512,6 @@ class SchoolAdminService extends BaseService
         $stmtAdditional = $pdo->prepare("
             SELECT 
                 afp.id,
-                afp.student_id,
                 'additional' AS type,
                 afp.receipt_no,
                 CASE 
@@ -5524,7 +5521,6 @@ class SchoolAdminService extends BaseService
                     TRIM(CONCAT(s.first_name, ' ', COALESCE(s.middle_name, ''), ' ', s.last_name))
                 END AS student_name,
                 s.roll_no AS student_roll_no,
-                s.sr_no AS student_sr_no,
                 c.name AS class_name,
                 aft.name AS fee_name,
                 afp.collected_by,
@@ -5539,10 +5535,10 @@ class SchoolAdminService extends BaseService
                 ay.status AS academic_year_status
             FROM additional_fee_payments afp
             JOIN students s ON afp.student_id = s.id
-            LEFT JOIN classes c ON s.class_id = c.id
-            LEFT JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
-            LEFT JOIN academic_years ay ON aft.academic_year_id = ay.id
-            WHERE afp.school_id = :school_id AND UPPER(afp.status) = 'PAID'
+            JOIN classes c ON c.id = s.class_id
+            JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+            JOIN academic_years ay ON aft.academic_year_id = ay.id
+            WHERE afp.school_id = :school_id AND afp.status = 'Paid' AND ay.status IN ('ACTIVE', 'Draft')
         ");
         $stmtAdditional->execute([':school_id' => $schoolId]);
         $additional = $stmtAdditional->fetchAll(PDO::FETCH_ASSOC);
@@ -5705,40 +5701,18 @@ class SchoolAdminService extends BaseService
 
         // Default month filter to "All Months" if not provided
         $selectedMonth = !empty($params['month']) ? trim($params['month']) : 'All Months';
-        $isAllMonths = empty($selectedMonth) || strcasecmp($selectedMonth, 'All Months') === 0 || strcasecmp($selectedMonth, 'ALL') === 0;
         
         // Apply filters
         $filtered = $withBalance;
-        if (!$isAllMonths) {
+        if ($selectedMonth && strcasecmp($selectedMonth, 'All Months') !== 0) {
             $filtered = array_filter($filtered, function($t) use ($selectedMonth) {
                 $timestamp = strtotime($t['payment_date']);
                 if ($timestamp === false) return false;
                 
-                $tMonthNameYear = date('F Y', $timestamp); // 'July 2026'
-                $tMonthNumYear = date('Y-m', $timestamp);  // '2026-07'
-                $tMonthNameOnly = date('F', $timestamp);   // 'July'
+                $tMonthNameYear = date('F Y', $timestamp); // 'July 2027'
+                $tMonthNumYear = date('Y-m', $timestamp);  // '2027-07'
                 
-                return (
-                    strcasecmp($tMonthNameYear, $selectedMonth) === 0 || 
-                    strcasecmp($tMonthNumYear, $selectedMonth) === 0 ||
-                    strcasecmp($tMonthNameOnly, $selectedMonth) === 0
-                );
-            });
-        }
-
-        // Apply Type Filter if provided
-        $selectedType = !empty($params['type']) ? trim($params['type']) : 'ALL';
-        if ($selectedType && strcasecmp($selectedType, 'ALL') !== 0) {
-            $filtered = array_filter($filtered, function($t) use ($selectedType) {
-                return strcasecmp($t['type'], $selectedType) === 0;
-            });
-        }
-
-        // Apply Payment Method Filter if provided
-        $selectedMethod = !empty($params['payment_method']) ? trim($params['payment_method']) : 'ALL';
-        if ($selectedMethod && strcasecmp($selectedMethod, 'ALL') !== 0) {
-            $filtered = array_filter($filtered, function($t) use ($selectedMethod) {
-                return strcasecmp($t['payment_method'], $selectedMethod) === 0;
+                return (strcasecmp($tMonthNameYear, $selectedMonth) === 0 || strcasecmp($tMonthNumYear, $selectedMonth) === 0);
             });
         }
 
@@ -5754,6 +5728,7 @@ class SchoolAdminService extends BaseService
             });
         }
 
+        // Calculate dynamic summary stats on the filtered set
         // Calculate dynamic summary stats
         $totalCollected = 0.0;
         $todayCollection = 0.0;
@@ -5762,7 +5737,7 @@ class SchoolAdminService extends BaseService
         $todayStr = date('Y-m-d');
         // Get month number of the selected month
         $selectedMonthNum = '';
-        if (!$isAllMonths) {
+        if ($selectedMonth && strcasecmp($selectedMonth, 'All Months') !== 0) {
             $selectedTime = strtotime($selectedMonth);
             if ($selectedTime !== false) {
                 $selectedMonthNum = date('Y-m', $selectedTime);

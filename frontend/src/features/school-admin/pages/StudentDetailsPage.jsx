@@ -199,28 +199,9 @@ function ReceiptModal({ receipt, student, schoolName, schoolLogoUrl, allPayments
     previousYearName = 'Previous Academic Year';
   }
 
-  let feeMonthDisplay = '';
-  if (receipt.is_additional) {
-    feeMonthDisplay = receipt.fee_name;
-  } else {
-    const months = sortedGroup.map(p => p.fee_month);
-    const indices = months.map(m => academicMonths.indexOf(m)).filter(idx => idx !== -1);
-    let isConsecutive = false;
-    if (indices.length > 1) {
-      isConsecutive = indices.every((val, i) => i === 0 || val === indices[i - 1] + 1);
-    }
-    if (isConsecutive) {
-      feeMonthDisplay = `${months[0]} To ${months[months.length - 1]}`;
-    } else {
-      feeMonthDisplay = months.join(', ');
-    }
-  }
-
-  const monthLabel = receipt.is_additional ? 'Description:' : (sortedGroup.length > 1 ? 'Months:' : 'Month:');
-
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-      <div className="bg-surface border border-border rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-surface border border-border rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-zinc-50 dark:bg-zinc-900/50">
           <h3 className="font-extrabold text-text-primary text-base tracking-tight font-display">Fee Payment Receipt</h3>
@@ -229,94 +210,87 @@ function ReceiptModal({ receipt, student, schoolName, schoolLogoUrl, allPayments
           </button>
         </div>
 
-        {/* Printable Official Receipt Body (Matching Screenshot 1) */}
-        <div className="p-8 space-y-6 overflow-y-auto bg-white text-zinc-900" id="receipt-print-area">
-          {/* Header Branding */}
-          <div className="text-center space-y-1.5 flex flex-col items-center justify-center pb-2">
-            {schoolLogoUrl ? (
+        {/* Printable area */}
+        <div className="p-8 space-y-6" id="receipt-print-area">
+          <div className="text-center space-y-1 flex flex-col items-center justify-center">
+            {schoolLogoUrl && (
               <img 
                 src={schoolLogoUrl} 
                 alt="School Logo" 
-                className="h-14 w-auto mb-1 object-contain" 
+                className="h-12 w-auto mb-2 object-contain" 
               />
-            ) : (
-              <div className="w-12 h-12 rounded-full bg-amber-400 text-emerald-950 flex items-center justify-center font-black text-xl mb-1 shadow-xs border border-amber-500">
-                {(displaySchoolName || 'S')[0]}
+            )}
+            <h2 className="text-xl font-black tracking-tight text-text-primary font-display uppercase">{displaySchoolName}</h2>
+            <p className="text-[10px] uppercase font-bold tracking-widest text-primary">Fee Payment Receipt</p>
+          </div>
+
+          <div className="border-y border-dashed border-border py-4 space-y-2 text-xs">
+            <div className="flex justify-between"><span className="text-text-muted">Mode of Payment:</span> <span className="font-extrabold text-text-primary">{getModeOfPayment(receipt.payment_method)}</span></div>
+            <div className="flex justify-between"><span className="text-text-muted">Student Name:</span> <span className="font-extrabold text-text-primary uppercase">{student.name}</span></div>
+            <div className="flex justify-between"><span className="text-text-muted">Class & Section:</span> <span className="font-bold text-text-primary">{student.class_name}</span></div>
+            <div className="flex justify-between"><span className="text-text-muted">Roll Number / SR No:</span> <span className="font-bold text-text-primary">{student.roll_no || '—'} / {student.sr_no || '—'}</span></div>
+            <div className="flex justify-between"><span className="text-text-muted">Ref No:</span> <span className="font-mono font-bold text-text-primary">{receipt.receipt_no}</span></div>
+            <div className="flex justify-between"><span className="text-text-muted">Academic Year:</span> <span className="font-bold text-text-primary">{student.academic_year_name || student.academic_year || '2025–2026'}</span></div>
+            <div className="flex justify-between"><span className="text-text-muted">Payment Date:</span> <span className="font-bold text-text-primary">{formatDate(receipt.payment_date)}</span></div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-xl border border-border flex justify-between items-center">
+              <div>
+                <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">
+                  {receipt.is_additional ? 'Description' : (sortedGroup.length > 1 ? 'Billing Months' : 'Billing Month')}
+                </p>
+                <p className="text-sm font-black text-text-primary mt-0.5 max-w-[200px] break-words">
+                  {receipt.is_additional ? receipt.fee_name : (() => {
+                    const academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+                    const months = sortedGroup.map(p => p.fee_month);
+                    const indices = months.map(m => academicMonths.indexOf(m)).filter(idx => idx !== -1);
+                    
+                    let isConsecutive = false;
+                    if (indices.length > 1) {
+                      isConsecutive = indices.every((val, i) => i === 0 || val === indices[i - 1] + 1);
+                    }
+
+                    if (isConsecutive) {
+                      return `${months[0]} To ${months[months.length - 1]}`;
+                    }
+                    return months.join(', ');
+                  })()}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">
+                  {sortedGroup.length > 1 ? 'Total Amount' : 'Amount Paid'}
+                </p>
+                <p className="text-lg font-black text-primary mt-0.5">
+                  Rs {totalAmountPaid.toLocaleString()}
+                </p>
+              </div>
+            </div>
+            {receipt.fee_name === 'Previous Year Dues' && (
+              <div className="border border-border p-4 rounded-xl text-xs space-y-2 bg-zinc-50/50 dark:bg-zinc-900/10">
+                <div className="flex justify-between">
+                  <span className="text-text-muted font-semibold">Fee Type:</span>
+                  <span className="font-extrabold text-text-primary">Previous Year Dues</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-text-muted font-semibold">Collected For:</span>
+                  <span className="font-bold text-text-primary">{previousYearName || 'Previous Academic Year'} Outstanding</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-text-muted font-semibold">Collected In:</span>
+                  <span className="font-bold text-text-primary">{currentYearName || 'Current Academic Year'}</span>
+                </div>
               </div>
             )}
-            <h2 className="text-xl font-black tracking-tight text-slate-900 font-display uppercase">{displaySchoolName}</h2>
-            <p className="text-xs uppercase font-extrabold tracking-widest text-slate-700">FEE PAYMENT RECEIPT</p>
-            <div className="w-full border-t border-slate-300 pt-2 mt-2">
-              <p className="text-xs font-semibold text-slate-600">Academic Year: {currentYearName}</p>
-            </div>
           </div>
 
-          {/* STUDENT INFORMATION SECTION BOX */}
-          <div className="border border-slate-200 rounded-lg overflow-hidden">
-            <div className="bg-slate-50 px-4 py-2 border-b border-slate-200">
-              <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">STUDENT INFORMATION</h4>
-            </div>
-            <div className="p-4 grid grid-cols-2 gap-x-6 gap-y-3 text-xs">
-              <div>
-                <span className="text-slate-500 font-bold block mb-0.5">Student Name:</span>
-                <span className="font-extrabold text-slate-900 uppercase">{student.name}</span>
-              </div>
-              <div>
-                <span className="text-slate-500 font-bold block mb-0.5">Class & Section:</span>
-                <span className="font-extrabold text-slate-900">{student.class_name || 'Class 1'}</span>
-              </div>
-              <div>
-                <span className="text-slate-500 font-bold block mb-0.5">Roll Number:</span>
-                <span className="font-bold text-slate-800">{student.roll_no || '—'}</span>
-              </div>
-              <div>
-                <span className="text-slate-500 font-bold block mb-0.5">Admission No:</span>
-                <span className="font-bold text-slate-800">{student.sr_no || student.admission_no || '—'}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* PAYMENT DETAILS SECTION BOX */}
-          <div className="border border-slate-200 rounded-lg overflow-hidden">
-            <div className="bg-slate-50 px-4 py-2 border-b border-slate-200">
-              <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">PAYMENT DETAILS</h4>
-            </div>
-            <div className="p-4 grid grid-cols-2 gap-x-6 gap-y-3 text-xs">
-              <div>
-                <span className="text-slate-500 font-bold block mb-0.5">Mode of Payment:</span>
-                <span className="font-extrabold text-slate-900">{getModeOfPayment(receipt.payment_method)}</span>
-              </div>
-              <div>
-                <span className="text-slate-500 font-bold block mb-0.5">Reference Number:</span>
-                <span className="font-mono font-bold text-slate-900">{receipt.receipt_no}</span>
-              </div>
-              <div>
-                <span className="text-slate-500 font-bold block mb-0.5">Payment Date:</span>
-                <span className="font-bold text-slate-800">{formatDate(receipt.payment_date)}</span>
-              </div>
-              <div>
-                <span className="text-slate-500 font-bold block mb-0.5">{monthLabel}</span>
-                <span className="font-extrabold text-slate-900">{feeMonthDisplay}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* CENTERED TOTAL AMOUNT PAID BOX */}
-          <div className="flex justify-center py-2">
-            <div className="border-2 border-blue-200 bg-blue-50/50 rounded-xl p-5 text-center min-w-[240px]">
-              <span className="text-xs font-black text-blue-900 uppercase tracking-wider block mb-1">TOTAL AMOUNT PAID</span>
-              <span className="text-2xl font-black text-blue-950 font-display">Rs {totalAmountPaid.toLocaleString()}</span>
-            </div>
-          </div>
-
-          {/* FOOTER NOTICE */}
-          <div className="text-center text-[11px] text-slate-500 space-y-1 pt-2">
-            <p>This is a computer-generated fee receipt. No signature is required.</p>
-            <p className="font-semibold">Thank you for your payment.</p>
+          <div className="text-center text-[10px] text-text-muted leading-relaxed pt-2">
+            This is an automated system generated receipt.<br />Thank you for your payment.
           </div>
         </div>
 
-        {/* Modal Footer Actions */}
+        {/* Footer actions */}
         <div className="px-6 py-4 border-t border-border bg-surface flex justify-end gap-3">
           <Button variant="secondary" onClick={onClose}>Close</Button>
           <Button className="flex items-center gap-1.5 font-bold" onClick={handleDownload}>
