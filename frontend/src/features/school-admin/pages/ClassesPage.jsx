@@ -11,6 +11,7 @@ import { DropdownMenu, DropdownItem } from '../../../common/ui/DropdownMenu';
 import StudentDetailsPage from './StudentDetailsPage';
 import { Dialog } from '../../../common/ui/dialog';
 import CredentialsDialog from '../../../common/components/CredentialsDialog';
+import ClassIdentityCardPreview from '../components/ClassIdentityCardPreview';
 import { 
   PREDEFINED_CLASSES, 
   PREDEFINED_CLASS_NAMES, 
@@ -60,8 +61,17 @@ export default function ClassesPage() {
   const [view, setView] = useState('list'); // 'list', 'roster', 'enroll', 'edit', 'details'
   const [classes, setClasses] = useState([]);
   const [students, setStudents] = useState([]);
+  const [schoolProfile, setSchoolProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  const { currentYear } = useAcademicYear();
+
+  useEffect(() => {
+    schoolService.getSchoolProfile().then(data => {
+      setSchoolProfile(data || null);
+    }).catch(console.error);
+  }, []);
   
   const [showLimitReached, setShowLimitReached] = useState(null);
   const [checkingLimit, setCheckingLimit] = useState(false);
@@ -500,6 +510,19 @@ export default function ClassesPage() {
           setView('edit');
           setSelectedStudentId(id);
         }} 
+      />
+    );
+  }
+
+  if (view === 'identity-cards') {
+    const classStudents = students.filter(s => s.class_name === selectedClassName && s.status === 'ACTIVE');
+    return (
+      <ClassIdentityCardPreview
+        className={selectedClassName}
+        students={classStudents}
+        schoolProfile={schoolProfile}
+        currentYear={currentYear}
+        onBack={() => setView('list')}
       />
     );
   }
@@ -1032,8 +1055,14 @@ export default function ClassesPage() {
               {!isReadOnly && (
                 <div className="absolute right-4 top-1/2 -translate-y-1/2 z-10" onClick={(e) => e.stopPropagation()}>
                   <DropdownMenu>
+                    <DropdownItem onClick={() => { setSelectedClassName(gc.name); setRosterSearch(''); setView('roster'); }}>
+                      View Students
+                    </DropdownItem>
                     <DropdownItem onClick={() => handleOpenEditClass(gc)}>
                       Manage Sections
+                    </DropdownItem>
+                    <DropdownItem onClick={() => { setSelectedClassName(gc.name); setView('identity-cards'); }}>
+                      Identity Cards
                     </DropdownItem>
                     <DropdownItem 
                       onClick={() => handleDeleteClassClick(gc)}

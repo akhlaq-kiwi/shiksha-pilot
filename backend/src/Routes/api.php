@@ -221,6 +221,8 @@ return function (App $app) {
     $app->post('/api/school/profile', [SchoolAdminController::class, 'updateSchoolProfile']);
     $app->post('/api/school/profile/logo', [SchoolAdminController::class, 'uploadSchoolLogo']);
     $app->delete('/api/school/profile/logo', [SchoolAdminController::class, 'removeSchoolLogo']);
+    $app->post('/api/school/profile/signature', [SchoolAdminController::class, 'uploadPrincipalSignature']);
+    $app->delete('/api/school/profile/signature', [SchoolAdminController::class, 'removePrincipalSignature']);
     $app->get('/api/school/plans', [SchoolAdminController::class, 'getActivePlans']);
     $app->get('/api/school/subscriptions', [SchoolAdminController::class, 'getSubscriptionHistory']);
 

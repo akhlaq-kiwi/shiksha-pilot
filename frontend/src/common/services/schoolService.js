@@ -261,6 +261,14 @@ export const schoolService = {
     return apiClient.delete('/api/school/profile/logo');
   },
 
+  uploadPrincipalSignature(formData) {
+    return apiClient.post('/api/school/profile/signature', formData);
+  },
+
+  removePrincipalSignature() {
+    return apiClient.delete('/api/school/profile/signature');
+  },
+
   updateClass(classData) {
     return apiClient.put('/api/school/classes', classData);
   },

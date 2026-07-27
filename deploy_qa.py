@@ -6,7 +6,8 @@ hostname = "92.249.46.170"
 port = 65002
 username = "u554613359"
 remote_path = "/home/u554613359/domains/qa.shikshapilot.com/public_html"
-local_tar = "c:/Users/bilal/Documents/BN School/.builds/deploy.tar.gz"
+script_dir = os.path.dirname(os.path.abspath(__file__))
+local_tar = os.path.join(script_dir, ".builds", "deploy.tar.gz")
 
 print("Initializing SSH client...")
 ssh = paramiko.SSHClient()
@@ -28,7 +29,7 @@ except Exception as e:
     print(f"SSH Key authentication failed: {e}")
 
 if not connected:
-    passwords = ["Billu@9012", "Ga@1219!", "/Q5GYsafK5Vs"]
+    passwords = ["Billu@9999", "Billu@9012", "Ga@1219!", "/Q5GYsafK5Vs"]
     for p in passwords:
         try:
             print(f"Attempting connection using password target '{p[:3]}...'")
@@ -53,7 +54,7 @@ print("Upload completed successfully!")
 
 # Execute remote extraction and migration commands
 print("Extracting package and running migrations on remote server...")
-extract_cmd = f"cd {remote_path} && rm -rf assets api index.html && tar -xzf deploy.tar.gz && rm deploy.tar.gz && composer install --no-dev --optimize-autoloader --working-dir={remote_path}/api && php api/src/Database/migrate.php"
+extract_cmd = f"cd {remote_path} && rm -rf assets api index.html .htaccess && tar -xzf deploy.tar.gz && rm deploy.tar.gz && composer install --no-dev --optimize-autoloader --working-dir={remote_path}/api && php api/src/Database/migrate.php"
 
 stdin, stdout, stderr = ssh.exec_command(extract_cmd)
 exit_status = stdout.channel.recv_exit_status()

@@ -524,57 +524,67 @@ class SchoolAdminService extends BaseService
                 $feeMap[$m] = ['amount' => 0.0, 'transactions' => 0];
             }
             
-            // Query 1: Regular monthly fee payments for this academic year
+            // Query 1: Regular monthly fee payments for this academic year (only confirmed PAID transactions)
             $stmtFeeChart = $pdo->prepare("
-                SELECT fp.fee_month, fp.payment_date, SUM(fp.amount_paid) AS total_collected, COUNT(fp.id) AS transaction_count
+                SELECT fp.fee_month, fp.payment_date, fp.amount_paid
                 FROM fee_payments fp
                 WHERE fp.school_id = :school_id 
                   AND fp.academic_year_id = :academic_year_id 
                   AND fp.status = 'PAID'
-                GROUP BY fp.fee_month, fp.payment_date
             ");
             $stmtFeeChart->execute([':school_id' => $schoolId, ':academic_year_id' => $activeYear['id']]);
             while ($row = $stmtFeeChart->fetch(\PDO::FETCH_ASSOC)) {
-                $m = trim($row['fee_month'] ?? '');
-                $amt = (float)$row['total_collected'];
-                $cnt = (int)$row['transaction_count'];
+                $rawMonths = trim($row['fee_month'] ?? '');
+                $amt = (float)($row['amount_paid'] ?? 0);
+                if ($amt <= 0) continue;
 
-                if (isset($feeMap[$m])) {
-                    $feeMap[$m]['amount'] += $amt;
-                    $feeMap[$m]['transactions'] += $cnt;
+                $monthsList = array_map('trim', explode(',', $rawMonths));
+                $validMonths = array_intersect($monthsList, $academicMonths);
+
+                if (!empty($validMonths)) {
+                    $portion = $amt / count($validMonths);
+                    foreach ($validMonths as $vMonth) {
+                        $feeMap[$vMonth]['amount'] += $portion;
+                        $feeMap[$vMonth]['transactions'] += 1;
+                    }
                 } else if (!empty($row['payment_date'])) {
                     $mName = date('F', strtotime($row['payment_date']));
                     if (isset($feeMap[$mName])) {
                         $feeMap[$mName]['amount'] += $amt;
-                        $feeMap[$mName]['transactions'] += $cnt;
+                        $feeMap[$mName]['transactions'] += 1;
                     }
                 }
             }
 
-            // Query 2: Additional fee payments for this academic year
+            // Query 2: Additional fee payments for this academic year (only confirmed Paid transactions)
             $stmtAddFeeChart = $pdo->prepare("
-                SELECT afp.fee_month, afp.payment_date, SUM(afp.amount) AS total_collected, COUNT(afp.id) AS transaction_count
+                SELECT afp.fee_month, afp.payment_date, afp.amount
                 FROM additional_fee_payments afp
                 JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
                 WHERE afp.school_id = :school_id 
                   AND aft.academic_year_id = :academic_year_id 
                   AND afp.status = 'Paid'
-                GROUP BY afp.fee_month, afp.payment_date
             ");
             $stmtAddFeeChart->execute([':school_id' => $schoolId, ':academic_year_id' => $activeYear['id']]);
             while ($row = $stmtAddFeeChart->fetch(\PDO::FETCH_ASSOC)) {
-                $m = trim($row['fee_month'] ?? '');
-                $amt = (float)$row['total_collected'];
-                $cnt = (int)$row['transaction_count'];
+                $rawMonths = trim($row['fee_month'] ?? '');
+                $amt = (float)($row['amount'] ?? 0);
+                if ($amt <= 0) continue;
 
-                if (isset($feeMap[$m])) {
-                    $feeMap[$m]['amount'] += $amt;
-                    $feeMap[$m]['transactions'] += $cnt;
+                $monthsList = array_map('trim', explode(',', $rawMonths));
+                $validMonths = array_intersect($monthsList, $academicMonths);
+
+                if (!empty($validMonths)) {
+                    $portion = $amt / count($validMonths);
+                    foreach ($validMonths as $vMonth) {
+                        $feeMap[$vMonth]['amount'] += $portion;
+                        $feeMap[$vMonth]['transactions'] += 1;
+                    }
                 } else if (!empty($row['payment_date'])) {
                     $mName = date('F', strtotime($row['payment_date']));
                     if (isset($feeMap[$mName])) {
                         $feeMap[$mName]['amount'] += $amt;
-                        $feeMap[$mName]['transactions'] += $cnt;
+                        $feeMap[$mName]['transactions'] += 1;
                     }
                 }
             }
@@ -584,7 +594,7 @@ class SchoolAdminService extends BaseService
                 $feeCollectionChart[] = [
                     'month' => $short,
                     'label' => $m,
-                    'amount' => $feeMap[$m]['amount'],
+                    'amount' => round($feeMap[$m]['amount'], 2),
                     'studentsPaid' => $feeMap[$m]['transactions']
                 ];
             }
@@ -5959,6 +5969,131 @@ class SchoolAdminService extends BaseService
         ]);
 
         return $this->getSchoolProfile($user);
+    }
+
+    public function uploadPrincipalSignature(array $user, $uploadedFile): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->classRepo->getPdo();
+
+        $sigPath = $this->handleFileUpload($uploadedFile);
+        $this->processTransparentSignature($sigPath);
+
+        $stmt = $pdo->prepare("UPDATE schools SET principal_signature_path = :path WHERE id = :id");
+        $stmt->execute([
+            ':path' => $sigPath,
+            ':id'   => $schoolId
+        ]);
+
+        return $this->getSchoolProfile($user);
+    }
+
+    public function removePrincipalSignature(array $user): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->classRepo->getPdo();
+
+        $stmt = $pdo->prepare("UPDATE schools SET principal_signature_path = NULL WHERE id = :id");
+        $stmt->execute([
+            ':id' => $schoolId
+        ]);
+
+        return $this->getSchoolProfile($user);
+    }
+
+    private function processTransparentSignature(string $relativeUploadPath): void
+    {
+        if (!function_exists('imagecreatefromstring')) {
+            return;
+        }
+
+        if (str_contains(__DIR__, DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR)) {
+            $directory = dirname(__DIR__, 5) . '/uploads';
+        } else {
+            $directory = dirname(__DIR__, 5) . '/backend/public/uploads';
+        }
+
+        $filename = ltrim(str_replace('/uploads/', '', $relativeUploadPath), '/\\');
+        $filePath = $directory . DIRECTORY_SEPARATOR . $filename;
+
+        if (!file_exists($filePath)) {
+            return;
+        }
+
+        $content = @file_get_contents($filePath);
+        if (!$content) return;
+
+        $img = @imagecreatefromstring($content);
+        if (!$img) return;
+
+        $w = imagesx($img);
+        $h = imagesy($img);
+
+        $totalLum = 0;
+        $maxLum = 0;
+        $pixelLum = [];
+
+        for ($x = 0; $x < $w; $x++) {
+            for ($y = 0; $y < $h; $y++) {
+                $rgba = imagecolorat($img, $x, $y);
+                $r = ($rgba >> 16) & 0xFF;
+                $g = ($rgba >> 8) & 0xFF;
+                $b = $rgba & 0xFF;
+                $lum = $r * 0.299 + $g * 0.587 + $b * 0.114;
+                $pixelLum[$x][$y] = ['r' => $r, 'g' => $g, 'b' => $b, 'lum' => $lum];
+                $totalLum += $lum;
+                if ($lum > $maxLum) $maxLum = $lum;
+            }
+        }
+
+        $avgLum = $totalLum / max(1, $w * $h);
+        $paperThreshold = min(240, max($avgLum * 0.88, $maxLum * 0.72));
+
+        $minX = $w; $minY = $h; $maxX = 0; $maxY = 0;
+        $hasInk = false;
+
+        $transparent = imagecreatetruecolor($w, $h);
+        imagealphablending($transparent, false);
+        imagesavealpha($transparent, true);
+
+        for ($x = 0; $x < $w; $x++) {
+            for ($y = 0; $y < $h; $y++) {
+                $p = $pixelLum[$x][$y];
+                $r = $p['r']; $g = $p['g']; $b = $p['b']; $lum = $p['lum'];
+
+                $isPaper = $lum >= $paperThreshold || ($r > 120 && $g > 120 && $b > 120 && abs($r - $g) < 25 && abs($g - $b) < 25 && $lum > 140);
+
+                if ($isPaper) {
+                    $color = imagecolorallocatealpha($transparent, 255, 255, 255, 127);
+                } else {
+                    $hasInk = true;
+                    if ($x < $minX) $minX = $x;
+                    if ($x > $maxX) $maxX = $x;
+                    if ($y < $minY) $minY = $y;
+                    if ($y > $maxY) $maxY = $y;
+
+                    $color = imagecolorallocatealpha($transparent, $r, $g, $b, 0);
+                }
+                imagesetpixel($transparent, $x, $y, $color);
+            }
+        }
+
+        if ($hasInk && $maxX > $minX && $maxY > $minY) {
+            $cropW = $maxX - $minX + 1;
+            $cropH = $maxY - $minY + 1;
+            $cropped = imagecreatetruecolor($cropW, $cropH);
+            imagealphablending($cropped, false);
+            imagesavealpha($cropped, true);
+
+            imagecopyresampled($cropped, $transparent, 0, 0, $minX, $minY, $cropW, $cropH, $cropW, $cropH);
+            imagepng($cropped, $filePath);
+            imagedestroy($cropped);
+        } else {
+            imagepng($transparent, $filePath);
+        }
+
+        imagedestroy($img);
+        imagedestroy($transparent);
     }
 
     public function updateClass(array $user, array $data): array

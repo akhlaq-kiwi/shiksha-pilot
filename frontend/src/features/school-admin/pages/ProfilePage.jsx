@@ -29,6 +29,8 @@ export default function ProfilePage({ mode = 'details' }) {
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isRemoveConfirmOpen, setIsRemoveConfirmOpen] = useState(false);
   const [logoError, setLogoError] = useState(false);
+  const [signatureError, setSignatureError] = useState(false);
+  const [isRemoveSignatureConfirmOpen, setIsRemoveSignatureConfirmOpen] = useState(false);
   const [contactOpen, setContactOpen] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
@@ -286,6 +288,144 @@ export default function ProfilePage({ mode = 'details' }) {
     }
   };
 
+  const handleSignatureUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['png', 'jpg', 'jpeg'].includes(ext)) {
+      alert('Only PNG, JPG, and JPEG files are accepted.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert('File size must be less than 5MB.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setSuccessMsg('');
+    try {
+      // Process canvas adaptively to extract ink and crop bounding box
+      const processedFile = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imgData.data;
+            const len = data.length;
+
+            let sumLum = 0;
+            let maxLum = 0;
+            const luminances = new Float32Array(len / 4);
+
+            for (let i = 0; i < len; i += 4) {
+              const r = data[i], g = data[i + 1], b = data[i + 2];
+              const lum = r * 0.299 + g * 0.587 + b * 0.114;
+              luminances[i / 4] = lum;
+              sumLum += lum;
+              if (lum > maxLum) maxLum = lum;
+            }
+
+            const avgLum = sumLum / (len / 4);
+            const paperThreshold = Math.min(240, Math.max(avgLum * 0.88, maxLum * 0.72));
+
+            let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0;
+            let hasInk = false;
+
+            for (let i = 0; i < len; i += 4) {
+              const idx = i / 4;
+              const lum = luminances[idx];
+              const x = idx % canvas.width;
+              const y = Math.floor(idx / canvas.width);
+              const r = data[i], g = data[i + 1], b = data[i + 2];
+
+              const isPaper = lum >= paperThreshold || (r > 120 && g > 120 && b > 120 && Math.abs(r - g) < 25 && Math.abs(g - b) < 25 && lum > 140);
+
+              if (isPaper) {
+                data[i + 3] = 0; // Paper pixel -> Transparent
+              } else {
+                hasInk = true;
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+
+                const contrastFactor = Math.max(0, (paperThreshold - lum) / paperThreshold);
+                data[i + 3] = Math.min(255, Math.round(contrastFactor * 255 * 1.8));
+              }
+            }
+
+            ctx.putImageData(imgData, 0, 0);
+
+            let finalCanvas = canvas;
+            if (hasInk && maxX > minX && maxY > minY) {
+              const cropW = maxX - minX + 1;
+              const cropH = maxY - minY + 1;
+              const cropCanvas = document.createElement('canvas');
+              cropCanvas.width = cropW;
+              cropCanvas.height = cropH;
+              const cropCtx = cropCanvas.getContext('2d');
+              cropCtx.drawImage(canvas, minX, minY, cropW, cropH, 0, 0, cropW, cropH);
+              finalCanvas = cropCanvas;
+            }
+
+            finalCanvas.toBlob((blob) => {
+              if (blob) {
+                const fileRes = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".png", { type: 'image/png' });
+                resolve(fileRes);
+              } else {
+                resolve(file);
+              }
+            }, 'image/png');
+          };
+          img.onerror = () => resolve(file);
+          img.src = event.target.result;
+        };
+        reader.onerror = () => resolve(file);
+        reader.readAsDataURL(file);
+      });
+
+      const formData = new FormData();
+      formData.append('signature', processedFile);
+
+      const updatedProfile = await schoolService.uploadPrincipalSignature(formData);
+      setProfile(updatedProfile);
+      setSuccessMsg('Principal signature uploaded successfully with transparent background.');
+      window.dispatchEvent(new CustomEvent('school-profile-updated', { detail: updatedProfile }));
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Failed to upload principal signature.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignatureRemove = async () => {
+    setIsRemoveSignatureConfirmOpen(false);
+    setLoading(true);
+    setError('');
+    setSuccessMsg('');
+    try {
+      const updatedProfile = await schoolService.removePrincipalSignature();
+      setProfile(updatedProfile);
+      setSuccessMsg('Principal signature removed.');
+      window.dispatchEvent(new CustomEvent('school-profile-updated', { detail: updatedProfile }));
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Failed to remove principal signature.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getInitials = () => {
     if (profile?.name) {
       return profile.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
@@ -351,7 +491,7 @@ export default function ProfilePage({ mode = 'details' }) {
             <CardContent className="p-6 space-y-6">
               
               {/* School Logo / Profile Image Upload Section */}
-              <div className="flex flex-col sm:flex-row items-center gap-6 p-4 bg-zinc-50/50 dark:bg-zinc-900/50 border border-border rounded-xl mb-6">
+              <div className="flex flex-col sm:flex-row items-center gap-6 p-4 bg-zinc-50/50 dark:bg-zinc-900/50 border border-border rounded-xl mb-4">
                 <div className="w-20 h-20 rounded-full border border-border flex items-center justify-center overflow-hidden bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100 text-xl font-black uppercase flex-shrink-0">
                   {!logoError && profile?.logo_path ? (
                     <img 
@@ -388,6 +528,50 @@ export default function ProfilePage({ mode = 'details' }) {
                         className="h-8 px-3 text-xs font-bold"
                       >
                         Remove Image
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Principal Signature Upload Section */}
+              <div className="flex flex-col sm:flex-row items-center gap-6 p-4 bg-zinc-50/50 dark:bg-zinc-900/50 border border-border rounded-xl mb-6">
+                <div className="w-32 h-16 rounded-xl border border-border flex items-center justify-center overflow-hidden bg-white dark:bg-zinc-800 p-1 flex-shrink-0">
+                  {!signatureError && profile?.principal_signature_path ? (
+                    <img 
+                      src={profile.principal_signature_path} 
+                      alt="Principal Signature" 
+                      className="w-full h-full object-contain" 
+                      onError={() => setSignatureError(true)}
+                    />
+                  ) : (
+                    <span className="text-[10px] font-bold text-text-muted italic">No Signature</span>
+                  )}
+                </div>
+
+                <div className="space-y-2 text-center sm:text-left flex-1">
+                  <h4 className="text-xs font-bold text-text-primary uppercase tracking-wide">Principal Signature</h4>
+                  <p className="text-[10px] text-text-muted">PNG, JPG, JPEG. White background paper will be automatically made transparent.</p>
+                  
+                  <div className="flex flex-wrap gap-2 justify-center sm:justify-start items-center">
+                    <label className="cursor-pointer inline-flex items-center justify-center rounded-md text-xs font-bold transition-colors border border-input bg-background hover:bg-zinc-50 dark:hover:bg-zinc-900 h-8 px-3">
+                      <span>{profile?.principal_signature_path ? 'Change Signature' : 'Upload Signature'}</span>
+                      <input 
+                        type="file" 
+                        accept=".png, .jpg, .jpeg" 
+                        onChange={handleSignatureUpload}
+                        className="hidden" 
+                      />
+                    </label>
+
+                    {profile?.principal_signature_path && (
+                      <Button 
+                        variant="destructive" 
+                        size="sm" 
+                        onClick={() => setIsRemoveSignatureConfirmOpen(true)}
+                        className="h-8 px-3 text-xs font-bold"
+                      >
+                        Remove Signature
                       </Button>
                     )}
                   </div>
@@ -755,6 +939,30 @@ export default function ProfilePage({ mode = 'details' }) {
           </div>
         </div>
       </Dialog>
+
+      {/* Remove Principal Signature Confirmation Modal */}
+      {isRemoveSignatureConfirmOpen && (
+        <Dialog
+          isOpen={isRemoveSignatureConfirmOpen}
+          onClose={() => setIsRemoveSignatureConfirmOpen(false)}
+          title="Remove Principal Signature"
+          description="Are you sure you want to remove the principal signature? This will hide the signature from all generated student identity cards."
+          footer={
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setIsRemoveSignatureConfirmOpen(false)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleSignatureRemove}>
+                Remove Signature
+              </Button>
+            </div>
+          }
+        >
+          <div className="p-2 text-xs font-medium text-text-secondary">
+            You can re-upload a new principal signature anytime.
+          </div>
+        </Dialog>
+      )}
 
       <ContactSuperAdminDialog isOpen={contactOpen} onClose={() => setContactOpen(false)} />
     </div>

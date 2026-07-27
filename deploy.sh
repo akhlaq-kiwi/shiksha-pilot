@@ -7,7 +7,7 @@ set -e
 SSH_USER="u554613359"
 SSH_HOST="92.249.46.170"
 SSH_PORT="65002"
-SSH_PASS='Billu@9012'
+SSH_PASS='Billu@9999'
 REMOTE_PATH="/home/u554613359/domains/qa.shikshapilot.com/public_html"
 
 # SMTP Configuration (not stored in .qa.env)
@@ -93,6 +93,14 @@ EOT
 
 # Create root .htaccess for frontend client-side routing
 cat <<EOT > "$TEMP_DIR/.htaccess"
+<IfModule mod_headers.c>
+    <FilesMatch "\.(html)$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Pragma "no-cache"
+        Header set Expires 0
+    </FilesMatch>
+</IfModule>
+
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteBase /

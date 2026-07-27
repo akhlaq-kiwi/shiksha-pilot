@@ -1077,6 +1077,48 @@ class SchoolAdminController extends BaseController
         return $this->success($response, $profile, 'School logo removed successfully');
     }
 
+    public function uploadPrincipalSignature(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $uploadedFiles = $request->getUploadedFiles();
+        if (empty($uploadedFiles)) {
+            return $this->error($response, 'No files uploaded', 400);
+        }
+
+        $fileKey = array_key_first($uploadedFiles);
+        $uploadedFile = $uploadedFiles[$fileKey];
+
+        if ($uploadedFile->getError() !== UPLOAD_ERR_OK) {
+            return $this->error($response, 'Failed to upload file', 400);
+        }
+
+        if ($uploadedFile->getSize() > 5 * 1024 * 1024) {
+            return $this->error($response, 'File size must be less than 5MB', 400);
+        }
+
+        $filename = $uploadedFile->getClientFilename();
+        $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+        if (!in_array($ext, ['png', 'jpg', 'jpeg'])) {
+            return $this->error($response, 'Only PNG, JPG, and JPEG files are accepted', 400);
+        }
+
+        $profile = $this->service->uploadPrincipalSignature($user, $uploadedFile);
+
+        return $this->success($response, $profile, 'Principal signature uploaded successfully');
+    }
+
+    public function removePrincipalSignature(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $profile = $this->service->removePrincipalSignature($user);
+
+        return $this->success($response, $profile, 'Principal signature removed successfully');
+    }
+
     public function updateClass(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);

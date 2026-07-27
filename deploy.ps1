@@ -76,6 +76,18 @@ Add-Content -Path "$TEMP_DIR/api/.env" -Value $env_secrets
 
 # Create root .htaccess for frontend client-side routing
 $htaccess_fe = @"
+<IfModule LiteSpeed>
+    CacheEngine off
+</IfModule>
+
+<IfModule mod_headers.c>
+    <FilesMatch "\.(html|htm)$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate, max-age=0, private"
+        Header set Pragma "no-cache"
+        Header set Expires "Thu, 01 Jan 1970 00:00:00 GMT"
+    </FilesMatch>
+</IfModule>
+
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteBase /

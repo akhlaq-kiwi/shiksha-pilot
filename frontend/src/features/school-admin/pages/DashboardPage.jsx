@@ -184,7 +184,7 @@ function LineChartWidget({ title, subtitle, icon: Icon, data, colorTheme = 'emer
                       style={{ top: `calc(${pctY * 0.78}% - 34px)` }}
                     >
                       <div className="px-2.5 py-1 text-[11px] font-black rounded-lg bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-xl border border-zinc-700 dark:border-zinc-200 whitespace-nowrap">
-                        ₹{pt.amt.toLocaleString()}
+                        ₹{Math.round(pt.amt).toLocaleString('en-IN')}
                       </div>
                     </div>
 
