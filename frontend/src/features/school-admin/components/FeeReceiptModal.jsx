@@ -7,8 +7,8 @@ import html2pdf from 'html2pdf.js';
 export function FeeReceiptModal({ receipt, student, schoolName, schoolLogoUrl, allPayments = [], onClose }) {
   const handlePrint = async () => {
     try {
-      const isAdditional = (receipt.is_additional || receipt.type === 'additional' || (receipt.fee_name && receipt.fee_name !== 'Previous Year Dues' && !receipt.fee_month)) ? 1 : 0;
-      const studentId = student?.id || receipt?.student_id || 0;
+      const isAdditional = receipt.is_additional || (receipt.fee_name && receipt.fee_name !== 'Previous Year Dues' && !receipt.fee_month) ? 1 : 0;
+      const studentId = student?.id || receipt?.student_id;
       const blob = await apiClient.get(`/api/school/students/${studentId}/fees/receipt?id=${receipt.id}&additional=${isAdditional}`);
       const url = window.URL.createObjectURL(blob);
       const iframe = document.createElement('iframe');
@@ -35,8 +35,8 @@ export function FeeReceiptModal({ receipt, student, schoolName, schoolLogoUrl, a
 
   const handleDownload = async () => {
     try {
-      const isAdditional = (receipt.is_additional || receipt.type === 'additional' || (receipt.fee_name && receipt.fee_name !== 'Previous Year Dues' && !receipt.fee_month)) ? 1 : 0;
-      const studentId = student?.id || receipt?.student_id || 0;
+      const isAdditional = receipt.is_additional || (receipt.fee_name && receipt.fee_name !== 'Previous Year Dues' && !receipt.fee_month) ? 1 : 0;
+      const studentId = student?.id || receipt?.student_id;
       const blob = await apiClient.get(`/api/school/students/${studentId}/fees/receipt?id=${receipt.id}&additional=${isAdditional}`);
       const cleanName = (student?.name || 'Student').split(/\s+/).join('');
       const cleanYear = (student?.academic_year_name || student?.academic_year || '2027-2028').replace(/[–—]/g, '-');

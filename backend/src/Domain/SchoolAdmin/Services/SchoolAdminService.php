@@ -835,7 +835,7 @@ class SchoolAdminService extends BaseService
                 JOIN schools sch ON afp.school_id = sch.id
                 JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
                 LEFT JOIN academic_years ay ON s.academic_year_id = ay.id
-                WHERE afp.id = :id AND (:student_id = 0 OR afp.student_id = :student_id) AND afp.school_id = :sid
+                WHERE afp.id = :id AND afp.student_id = :student_id AND afp.school_id = :sid
                 LIMIT 1
             ");
             $stmt->execute([':id' => $paymentId, ':student_id' => $studentId, ':sid' => $schoolId]);
@@ -862,7 +862,7 @@ class SchoolAdminService extends BaseService
                 LEFT JOIN classes c ON s.class_id = c.id
                 JOIN schools sch ON fp.school_id = sch.id
                 LEFT JOIN academic_years ay ON s.academic_year_id = ay.id
-                WHERE fp.id = :id AND (:student_id = 0 OR fp.student_id = :student_id) AND fp.school_id = :sid
+                WHERE fp.id = :id AND fp.student_id = :student_id AND fp.school_id = :sid
                 LIMIT 1
             ");
             $stmt->execute([':id' => $paymentId, ':student_id' => $studentId, ':sid' => $schoolId]);
@@ -5478,7 +5478,6 @@ class SchoolAdminService extends BaseService
         $stmtMonthly = $pdo->prepare("
             SELECT 
                 fp.id,
-                fp.student_id,
                 'monthly' AS type,
                 fp.receipt_no,
                 CASE 
@@ -5488,7 +5487,6 @@ class SchoolAdminService extends BaseService
                     TRIM(CONCAT(s.first_name, ' ', COALESCE(s.middle_name, ''), ' ', s.last_name))
                 END AS student_name,
                 s.roll_no AS student_roll_no,
-                s.sr_no AS student_sr_no,
                 c.name AS class_name,
                 CONCAT('Monthly Fee (', fp.fee_month, ')') AS fee_name,
                 fp.collected_by,
@@ -5503,9 +5501,9 @@ class SchoolAdminService extends BaseService
                 ay.status AS academic_year_status
             FROM fee_payments fp
             JOIN students s ON fp.student_id = s.id
-            LEFT JOIN classes c ON s.class_id = c.id
-            LEFT JOIN academic_years ay ON fp.academic_year_id = ay.id
-            WHERE fp.school_id = :school_id AND UPPER(fp.status) = 'PAID'
+            JOIN classes c ON s.class_id = c.id
+            JOIN academic_years ay ON fp.academic_year_id = ay.id
+            WHERE fp.school_id = :school_id AND fp.status = 'PAID' AND ay.status IN ('ACTIVE', 'Draft')
         ");
         $stmtMonthly->execute([':school_id' => $schoolId]);
         $monthly = $stmtMonthly->fetchAll(PDO::FETCH_ASSOC);
@@ -5514,7 +5512,6 @@ class SchoolAdminService extends BaseService
         $stmtAdditional = $pdo->prepare("
             SELECT 
                 afp.id,
-                afp.student_id,
                 'additional' AS type,
                 afp.receipt_no,
                 CASE 
@@ -5524,7 +5521,6 @@ class SchoolAdminService extends BaseService
                     TRIM(CONCAT(s.first_name, ' ', COALESCE(s.middle_name, ''), ' ', s.last_name))
                 END AS student_name,
                 s.roll_no AS student_roll_no,
-                s.sr_no AS student_sr_no,
                 c.name AS class_name,
                 aft.name AS fee_name,
                 afp.collected_by,
@@ -5539,10 +5535,10 @@ class SchoolAdminService extends BaseService
                 ay.status AS academic_year_status
             FROM additional_fee_payments afp
             JOIN students s ON afp.student_id = s.id
-            LEFT JOIN classes c ON s.class_id = c.id
-            LEFT JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
-            LEFT JOIN academic_years ay ON aft.academic_year_id = ay.id
-            WHERE afp.school_id = :school_id AND UPPER(afp.status) = 'PAID'
+            JOIN classes c ON c.id = s.class_id
+            JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+            JOIN academic_years ay ON aft.academic_year_id = ay.id
+            WHERE afp.school_id = :school_id AND afp.status = 'Paid' AND ay.status IN ('ACTIVE', 'Draft')
         ");
         $stmtAdditional->execute([':school_id' => $schoolId]);
         $additional = $stmtAdditional->fetchAll(PDO::FETCH_ASSOC);
