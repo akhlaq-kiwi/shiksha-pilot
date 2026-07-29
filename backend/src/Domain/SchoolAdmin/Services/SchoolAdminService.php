@@ -5845,6 +5845,16 @@ class SchoolAdminService extends BaseService
             $school['subscription_duration_unit'] = null;
         }
 
+        if (!empty($school['report_card_template_id'])) {
+            $stmtTpl = $pdo->prepare("SELECT id, name, code, description, layout_config FROM report_card_templates WHERE id = :tid LIMIT 1");
+            $stmtTpl->execute([':tid' => (int)$school['report_card_template_id']]);
+            $tpl = $stmtTpl->fetch(\PDO::FETCH_ASSOC);
+            if ($tpl) {
+                $tpl['layout_config'] = json_decode($tpl['layout_config'] ?? '{}', true) ?? [];
+                $school['report_card_template'] = $tpl;
+            }
+        }
+
         return $school;
     }
 
@@ -10274,13 +10284,80 @@ Only approve the settlement after reviewing all financial records.
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
         $academicYearId = $workingYear ? (int)$workingYear['id'] : 0;
 
+        if ($academicYearId > 0) {
+            $this->autoSeedDefaultSessionExams($pdo, $schoolId, $academicYearId);
+        }
+
         $stmt = $pdo->prepare("
             SELECT * FROM examinations 
             WHERE school_id = :sid AND academic_year_id = :ayid
-            ORDER BY start_date DESC
+            ORDER BY start_date ASC
         ");
         $stmt->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function autoSeedDefaultSessionExams(\PDO $pdo, int $schoolId, int $academicYearId): void
+    {
+        $stmtYear = $pdo->prepare("SELECT start_date, end_date FROM academic_years WHERE id = :ayid LIMIT 1");
+        $stmtYear->execute([':ayid' => $academicYearId]);
+        $year = $stmtYear->fetch(\PDO::FETCH_ASSOC);
+
+        $startYear = $year && !empty($year['start_date']) ? (int)date('Y', strtotime($year['start_date'])) : (int)date('Y');
+        $endYear = $year && !empty($year['end_date']) ? (int)date('Y', strtotime($year['end_date'])) : ($startYear + 1);
+
+        $defaultExams = [
+            [
+                'name' => 'Quarterly Examination',
+                'start_date' => sprintf('%04d-08-01', $startYear),
+                'end_date' => sprintf('%04d-08-10', $startYear),
+                'publish_date' => sprintf('%04d-08-15', $startYear),
+                'description' => 'First quarter evaluation of academic performance.'
+            ],
+            [
+                'name' => 'Half Yearly Examination',
+                'start_date' => sprintf('%04d-11-01', $startYear),
+                'end_date' => sprintf('%04d-11-12', $startYear),
+                'publish_date' => sprintf('%04d-11-18', $startYear),
+                'description' => 'Mid-term evaluation of academic performance.'
+            ],
+            [
+                'name' => 'Annual Examination',
+                'start_date' => sprintf('%04d-03-01', $endYear),
+                'end_date' => sprintf('%04d-03-15', $endYear),
+                'publish_date' => sprintf('%04d-03-22', $endYear),
+                'description' => 'Final cumulative examination of the academic session.'
+            ]
+        ];
+
+        $stmtInsert = $pdo->prepare("
+            INSERT INTO examinations (school_id, academic_year_id, name, start_date, end_date, publish_date, description, status)
+            VALUES (:sid, :ayid, :name, :start_date, :end_date, :publish_date, :description, 'Draft')
+        ");
+
+        foreach ($defaultExams as $ex) {
+            $keyword = explode(' ', $ex['name'])[0];
+            $stmtCheck = $pdo->prepare("
+                SELECT COUNT(*) FROM examinations 
+                WHERE school_id = :sid AND academic_year_id = :ayid AND LOWER(name) LIKE LOWER(:name)
+            ");
+            $stmtCheck->execute([
+                ':sid' => $schoolId,
+                ':ayid' => $academicYearId,
+                ':name' => '%' . $keyword . '%'
+            ]);
+            if ((int)$stmtCheck->fetchColumn() === 0) {
+                $stmtInsert->execute([
+                    ':sid' => $schoolId,
+                    ':ayid' => $academicYearId,
+                    ':name' => $ex['name'],
+                    ':start_date' => $ex['start_date'],
+                    ':end_date' => $ex['end_date'],
+                    ':publish_date' => $ex['publish_date'],
+                    ':description' => $ex['description']
+                ]);
+            }
+        }
     }
 
     public function createExamination(array $user, array $data): array
@@ -11551,6 +11628,8 @@ Only approve the settlement after reviewing all financial records.
                 'admission_no' => $s['sr_no'] ?? $s['admission_no'] ?? '',
                 'father_name' => $s['father_name'] ?? '',
                 'mother_name' => $s['mother_name'] ?? '',
+                'dob' => $s['dob'] ?? $s['date_of_birth'] ?? '',
+                'date_of_birth' => $s['dob'] ?? $s['date_of_birth'] ?? '',
                 'class_name' => $exam['class_name'],
                 'class_section' => $exam['class_section'],
                 'exam_name' => $exam['name'],

@@ -17,6 +17,8 @@ import { schoolAdminService } from '../../../common/services/schoolAdminService'
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 import { DropdownMenu, DropdownItem } from '../../../common/ui/DropdownMenu';
 import html2pdf from 'html2pdf.js';
+import ReportCardRenderer from '../../report-card-templates/ReportCardRenderer';
+import { compileFinalSessionReportCardData } from '../../../common/services/reportCardEngine';
 
 const formatDateString = (dateStr) => {
   if (!dateStr) return '—';
@@ -433,7 +435,7 @@ const CalendarDatePicker = ({ value, onChange, min, max, required, className, on
 
 export default function ExamsPage() {
   const navigate = useNavigate();
-  const { isReadOnly } = useAcademicYear();
+  const { currentAcademicYear, isReadOnly } = useAcademicYear();
   const [activeView, setActiveView] = useState('dashboard'); // 'dashboard', 'classes', 'timetable', 'marks', 'reports', 'grade_scale'
   
   // Data States
@@ -526,6 +528,19 @@ export default function ExamsPage() {
   const [pendingSubjects, setPendingSubjects] = useState([]);
   const [showPendingAlert, setShowPendingAlert] = useState(false);
   const [pendingValidationSource, setPendingValidationSource] = useState(''); // 'reports' or 'publish'
+
+  // Final Session Report Cards State
+  const [finalSessionReportCards, setFinalSessionReportCards] = useState([]);
+  const [isWeightageModalOpen, setIsWeightageModalOpen] = useState(false);
+  const [weightagePolicy, setWeightagePolicy] = useState({
+    strategy: 'weighted_percentage',
+    weights: { 'Quarterly': 20, 'Half Yearly': 30, 'Annual': 50 }
+  });
+  const [customWeightsInput, setCustomWeightsInput] = useState({
+    quarterly: 20,
+    halfYearly: 30,
+    annual: 50
+  });
 
   // Grade Configuration Scale States
   const [gradeScales, setGradeScales] = useState([]);
@@ -1448,6 +1463,56 @@ export default function ExamsPage() {
     }
   };
 
+  const handleOpenFinalSessionReportCards = async (classId) => {
+    setError('');
+    setSuccess('');
+    setLoading(true);
+    try {
+      setSelectedClassId(classId.toString());
+      
+      // Fetch all examinations for school
+      const allExamsList = (exams && exams.length > 0) ? exams : await schoolService.getExaminations();
+      
+      // Fetch report cards from all exams for this class
+      const allStudentCards = [];
+      for (const ex of allExamsList) {
+        try {
+          const reports = await schoolService.getReportCards(ex.id, classId);
+          if (Array.isArray(reports)) {
+            reports.forEach(r => allStudentCards.push({ ...r, exam_name: ex.name }));
+          }
+        } catch {}
+      }
+
+      if (allStudentCards.length === 0) {
+        setError('No exam report cards found for this class. Make sure marks are entered for session exams first.');
+        setLoading(false);
+        return;
+      }
+
+      // Group cards by student_id
+      const studentMap = {};
+      allStudentCards.forEach(card => {
+        const sId = card.student_id;
+        if (!studentMap[sId]) studentMap[sId] = [];
+        studentMap[sId].push(card);
+      });
+
+      // Compile Final Session Report Cards for each student
+      const sessionCards = Object.values(studentMap).map(cardsArray => 
+        compileFinalSessionReportCardData(cardsArray, weightagePolicy, schoolProfile, currentAcademicYear)
+      ).filter(Boolean);
+
+      setFinalSessionReportCards(sessionCards);
+      setActiveView('final_reports');
+    } catch (err) {
+      console.error(err);
+      setError('Failed to aggregate Final Session Report Cards.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handlePublishSchemeClick = () => {
     setError('');
     setSuccess('');
@@ -1628,6 +1693,67 @@ export default function ExamsPage() {
   const scheduledCount = timetablePapers.length;
   const pendingSubjectsCount = Math.max(0, totalSubjectsCount - scheduledCount);
   const allSubjectsScheduled = totalSubjectsCount > 0 && scheduledCount === totalSubjectsCount;
+
+  // Full Page Dedicated View for Individual Student Report Card
+  if (selectedReportCard) {
+    const selectedClass = classes.find(c => c.id.toString() === selectedClassId?.toString());
+    const studentName = selectedReportCard.student_name || selectedReportCard.student?.name || 'Student';
+    return (
+      <div className="space-y-6 animate-in fade-in duration-200">
+        {/* Top Sticky Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface border border-border p-4 rounded-xl shadow-xs sticky top-16 z-20">
+          <div className="flex items-center gap-3">
+            <Button
+              type="button"
+              variant="ghost"
+              className="flex items-center gap-1.5 text-xs font-bold"
+              onClick={() => { setSelectedReportCard(null); setIsReportCardOpen(false); }}
+            >
+              <ArrowLeft className="h-4 w-4" /> Back to Student List
+            </Button>
+            <div>
+              <h2 className="text-base font-bold text-text-primary font-display">
+                Report Card: {studentName}
+              </h2>
+              <p className="text-[11px] text-text-muted">
+                {selectedExam?.name || 'Final Academic Session Report Card'} {selectedClass ? `— Class ${selectedClass.name} (${selectedClass.section || ''})` : ''}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              onClick={() => window.print()}
+              className="flex items-center gap-2 text-xs font-bold"
+            >
+              <Printer className="h-4 w-4" /> Print Report Card
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => { setSelectedReportCard(null); setIsReportCardOpen(false); }}
+              className="text-xs font-bold"
+            >
+              Close Full View
+            </Button>
+          </div>
+        </div>
+
+        {/* Full Page Report Document Render Container */}
+        <div className="w-full py-8 bg-zinc-200 dark:bg-zinc-900 rounded-2xl flex justify-center items-start shadow-inner overflow-x-auto min-h-[calc(100vh-160px)]">
+          <div className="shadow-2xl bg-white rounded-2xl overflow-hidden border border-zinc-300">
+            <ReportCardRenderer
+              card={selectedReportCard}
+              schoolProfile={schoolProfile}
+              currentYear={currentAcademicYear}
+              exam={selectedExam || { name: 'FINAL ACADEMIC REPORT CARD', is_final_session_report: true }}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -2088,21 +2214,43 @@ export default function ExamsPage() {
                   </CardContent>
                 </Card>
 
-                {/* CARD 3: Report Cards */}
+                {/* CARD 3: Single Exam Report Cards */}
                 <Card className="hover:border-primary/20 transition-all shadow-xs flex flex-col justify-between">
                   <CardContent className="p-6 space-y-4 flex-1 flex flex-col justify-between">
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 text-primary">
                         <Award className="h-5 w-5" />
-                        <h4 className="text-base font-bold text-text-primary">Report Cards</h4>
+                        <h4 className="text-base font-bold text-text-primary">
+                          {selectedExam?.name ? `${selectedExam.name} Report Cards` : 'Exam Report Cards'}
+                        </h4>
                       </div>
                       <p className="text-xs text-text-secondary leading-relaxed">
-                        Generate, preview, print, or download academic report cards with automated class ranks, section ranks, and attendance.
+                        Generate, preview, print, or download individual exam report cards with automated class ranks, section ranks, and attendance.
                       </p>
                     </div>
                     <div className="pt-2">
                       <Button className="w-full flex items-center justify-center gap-2 text-xs font-bold text-primary border-primary/20 bg-primary/5 hover:bg-primary/10" onClick={() => handleOpenReportCards(selectedExam, currentClass.id)}>
-                        <Award className="h-4 w-4" /> Open Report Cards
+                        <Award className="h-4 w-4" /> Open {selectedExam?.name || 'Exam'} Report Cards
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* CARD 5: Final Academic Report Cards (Annual Session Summary) */}
+                <Card className="hover:border-amber-500/40 transition-all shadow-xs flex flex-col justify-between border-amber-500/30 bg-amber-500/5">
+                  <CardContent className="p-6 space-y-4 flex-1 flex flex-col justify-between">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-amber-600">
+                        <Award className="h-5 w-5" />
+                        <h4 className="text-base font-bold text-text-primary">Final Academic Report Card</h4>
+                      </div>
+                      <p className="text-xs text-text-secondary leading-relaxed">
+                        Generate consolidated annual session report cards combining marks from all session exams based on configurable calculation policies.
+                      </p>
+                    </div>
+                    <div className="pt-2">
+                      <Button className="w-full flex items-center justify-center gap-2 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white" onClick={() => handleOpenFinalSessionReportCards(currentClass.id)}>
+                        <Award className="h-4 w-4" /> Open Final Session Reports
                       </Button>
                     </div>
                   </CardContent>
@@ -2766,6 +2914,91 @@ export default function ExamsPage() {
         </div>
       )}
 
+      {/* VIEW 6: FINAL ACADEMIC REPORT CARDS LIST (SESSION SUMMARY) */}
+      {activeView === 'final_reports' && (
+        <div className="space-y-6 animate-in fade-in duration-300 no-print">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Button type="button" variant="ghost" className="h-8 w-8 p-0" onClick={() => setActiveView('classes')}>
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <div>
+                <h3 className="text-xl font-bold text-text-primary">Final Academic Report Cards</h3>
+                <p className="text-xs text-text-secondary">
+                  Annual Session Summary — Class: {classes.find(c => c.id === parseInt(selectedClassId))?.name || ''} | Session: {currentAcademicYear?.name || '2026–2027'}
+                </p>
+              </div>
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              className="h-8 text-xs font-bold flex items-center gap-2 border-amber-400 text-amber-700 bg-amber-50 dark:bg-amber-950/20"
+              onClick={() => setIsWeightageModalOpen(true)}
+            >
+              <Settings className="h-3.5 w-3.5" /> Strategy: {
+                weightagePolicy.strategy === 'weighted_percentage' ? `Weighted (${weightagePolicy.weights['Quarterly']}/${weightagePolicy.weights['Half Yearly']}/${weightagePolicy.weights['Annual']})` :
+                weightagePolicy.strategy === 'equal_average' ? 'Equal Average' :
+                weightagePolicy.strategy === 'best_score' ? 'Best Exam Score' : 'Annual Exam Only'
+              }
+            </Button>
+          </div>
+
+          <Card>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-16 whitespace-nowrap select-none">Rank</TableHead>
+                  <TableHead className="w-20 whitespace-nowrap select-none">Roll No</TableHead>
+                  <TableHead className="whitespace-nowrap select-none">Student Name</TableHead>
+                  <TableHead className="whitespace-nowrap select-none">Final Marks</TableHead>
+                  <TableHead className="whitespace-nowrap select-none">Percentage</TableHead>
+                  <TableHead className="whitespace-nowrap select-none">Overall Grade</TableHead>
+                  <TableHead className="whitespace-nowrap select-none">Attendance</TableHead>
+                  <TableHead className="whitespace-nowrap select-none">Final Verdict</TableHead>
+                  <TableHead className="whitespace-nowrap select-none">Promotion Status</TableHead>
+                  <TableHead className="text-right whitespace-nowrap select-none">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {finalSessionReportCards.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={10} className="text-center py-10 text-text-muted">
+                      No final session report cards calculated. Ensure marks are entered for conducted session exams.
+                    </TableCell>
+                  </TableRow>
+                ) : finalSessionReportCards.map((card, idx) => (
+                  <TableRow key={card.student.id || idx}>
+                    <TableCell className="font-bold text-text-primary">{card.summary.class_rank.split(' ')[0]}</TableCell>
+                    <TableCell className="font-mono text-xs text-text-muted">{card.student.roll_no}</TableCell>
+                    <TableCell className="font-semibold text-text-primary">{card.student.name}</TableCell>
+                    <TableCell className="font-mono text-xs whitespace-nowrap">{card.summary.total_obtained} / {card.summary.total_max}</TableCell>
+                    <TableCell className="font-mono text-xs font-bold text-amber-600">{card.summary.percentage}%</TableCell>
+                    <TableCell className="font-black text-xs text-amber-700">{card.summary.grade}</TableCell>
+                    <TableCell className="text-xs text-text-secondary">{card.summary.attendance.attendance_rate}%</TableCell>
+                    <TableCell>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                        card.summary.result === 'PASS' ? 'bg-green-500/10 text-green-600' : 'bg-red-500/10 text-red-600'
+                      }`}>
+                        {card.summary.result}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-xs font-bold text-text-primary uppercase tracking-wide">
+                      {card.summary.promotion_status}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="outline" className="h-7 px-2 text-xs flex items-center gap-1 text-amber-700 border-amber-400/30 bg-amber-500/10 hover:bg-amber-500/20 ml-auto font-bold" onClick={() => handleOpenSingleReportCard(card)}>
+                        <FileText className="h-3.5 w-3.5" /> View Final Card
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+        </div>
+      )}
+
       {/* PUBLISH SCHEME DIALOG */}
       <Dialog isOpen={showPublishSchemeModal} onClose={() => setShowPublishSchemeModal(false)}
         title="Publish Examination Scheme"
@@ -3149,7 +3382,7 @@ export default function ExamsPage() {
       </Dialog>
 
       {/* DETAILED REPORT CARD DIALOG MODAL (A4 PRINTABLE) */}
-      <Dialog isOpen={isReportCardOpen} onClose={() => setIsReportCardOpen(false)} size="lg">
+      <Dialog isOpen={Boolean(isReportCardOpen && !selectedReportCard)} onClose={() => { setSelectedReportCard(null); setIsReportCardOpen(false); }} className="max-w-5xl w-full">
         {selectedReportCard && (
           <div id="printable-report-card-container" className="space-y-6">
             {isReportCardOpen && (
@@ -3178,111 +3411,14 @@ export default function ExamsPage() {
               </div>
             </div>
 
-            {/* A4 Report Card document */}
+            {/* A4 Report Card document rendered dynamically by assigned school template */}
             <div className="w-full overflow-x-auto py-2 bg-zinc-100 dark:bg-zinc-800 rounded-lg flex justify-start lg:justify-center p-2">
-              <div id="printable-report-card" className="border-4 border-double border-zinc-400 p-8 bg-white text-zinc-900 rounded-sm font-sans relative w-[194mm] max-w-full" style={{ boxSizing: 'border-box' }}>
-                
-                {/* Report Card Header */}
-                <div className="text-center border-b-2 border-zinc-800 pb-6">
-                  <div className="flex justify-center mb-2">
-                    {selectedReportCard.school_logo ? (
-                      <img src={selectedReportCard.school_logo} alt="Logo" className="h-16 w-16 object-contain" />
-                    ) : (
-                      <div className="rounded-full bg-zinc-100 border border-zinc-300 flex items-center justify-center font-bold text-zinc-600 uppercase h-16 w-16 text-lg">
-                        {selectedReportCard.school_name.charAt(0)}
-                      </div>
-                    )}
-                  </div>
-                  <h2 className="text-2xl font-black uppercase tracking-tight text-zinc-900 font-display">{selectedReportCard.school_name}</h2>
-                  <h4 className="text-xs font-bold tracking-widest text-zinc-500 uppercase mt-1">
-                    {selectedReportCard.exam_name} ACADEMIC PERFORMANCE
-                  </h4>
-                  <p className="text-xs font-mono text-zinc-600 mt-1">Academic Year: {selectedReportCard.academic_year_name}</p>
-                </div>
-
-                {/* Student Metadata grid */}
-                <div className="grid grid-cols-3 gap-y-4 gap-x-4 py-8 text-xs border-b border-zinc-300 font-semibold leading-relaxed px-2">
-                  <div>Student: <span className="font-bold text-zinc-900">{selectedReportCard.student_name}</span></div>
-                  <div className="text-center">Class: <span className="font-bold text-zinc-900">{selectedReportCard.class_name} {selectedReportCard.class_section ? `(${selectedReportCard.class_section})` : ''}</span></div>
-                  <div className="text-right">SR No: <span className="font-mono text-zinc-700">{selectedReportCard.admission_no || 'N/A'}</span></div>
-                  
-                  <div>Father: <span className="text-zinc-700">{selectedReportCard.father_name || 'N/A'}</span></div>
-                  <div className="text-center">Mother: <span className="text-zinc-700">{selectedReportCard.mother_name || 'N/A'}</span></div>
-                  <div className="text-right">Roll No: <span className="font-mono text-zinc-700">{selectedReportCard.roll_no}</span></div>
-                </div>
-
-                {/* Marks Table */}
-                <div className="py-8">
-                  <table className="w-full text-left text-xs border border-zinc-400 border-collapse table-layout-fixed">
-                    <thead>
-                      <tr className="bg-zinc-100 border-b border-zinc-400">
-                        <th className="p-2 border-r border-zinc-400 font-bold uppercase whitespace-nowrap text-xs">Subject</th>
-                        <th className="p-2 border-r border-zinc-400 font-bold uppercase text-center w-32 whitespace-nowrap text-xs">Obtained Marks</th>
-                        <th className="p-2 border-r border-zinc-400 font-bold uppercase text-center w-28 whitespace-nowrap text-xs">Max Marks</th>
-                        <th className="p-2 border-r border-zinc-400 font-bold uppercase text-center w-28 whitespace-nowrap text-xs">Passing Marks</th>
-                        <th className="p-2 border-r border-zinc-400 font-bold uppercase text-center w-20 whitespace-nowrap text-xs">Grade</th>
-                        <th className="p-2 font-bold uppercase text-center w-24 whitespace-nowrap text-xs">Result</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedReportCard.subjects.map((s, idx) => (
-                        <tr key={idx} className="border-b border-zinc-300">
-                          <td className="p-2 border-r border-zinc-400 font-semibold text-xs">{s.subject_name}</td>
-                          <td className="p-2 border-r border-zinc-400 text-center font-mono font-bold text-xs">{s.marks_obtained}</td>
-                          <td className="p-2 border-r border-zinc-400 text-center font-mono text-xs">{s.max_marks}</td>
-                          <td className="p-2 border-r border-zinc-400 text-center font-mono text-xs">{s.passing_marks}</td>
-                          <td className="p-2 border-r border-zinc-400 text-center font-bold text-xs">{s.grade}</td>
-                          <td className="p-2 text-center whitespace-nowrap text-xs">
-                            <span className={`font-bold uppercase ${s.result === 'PASS' ? 'text-green-700' : 'text-red-700'}`}>
-                              {s.result}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Results Summary grid */}
-                <div className="grid grid-cols-3 gap-6 p-5 bg-zinc-50 border border-zinc-300 rounded-sm text-xs font-semibold mx-2">
-                  <div>Class Rank: <span className="font-bold text-zinc-900">{selectedReportCard.class_rank}</span></div>
-                  <div className="text-center">Section Rank: <span className="font-bold text-zinc-900">{selectedReportCard.section_rank}</span></div>
-                  <div className="text-right">Grand Total: <span className="font-mono font-bold text-zinc-900">{selectedReportCard.total_obtained} / {selectedReportCard.total_max}</span></div>
-                  
-                  <div>Percentage: <span className="font-mono font-bold text-primary">{selectedReportCard.percentage}%</span></div>
-                  <div className="text-center">Overall Grade: <span className="font-bold text-primary">{selectedReportCard.grade}</span></div>
-                  <div className="text-right">Attendance: <span className="font-mono text-zinc-700">{selectedReportCard.attendance.present_days} / {selectedReportCard.attendance.working_days} Days ({selectedReportCard.attendance.attendance_rate}%)</span></div>
-                </div>
-
-                {/* Remarks/Status display */}
-                <div className="py-8 px-2">
-                  <div className="flex flex-col">
-                    <h4 className="text-xs font-bold uppercase text-zinc-800 mb-2">Final Verdict & Teacher Remarks</h4>
-                    <div className="border border-zinc-300 p-5 min-h-[75px] text-xs leading-relaxed text-zinc-700 italic">
-                      {selectedReportCard.result === 'PASS' 
-                        ? (selectedReportCard.report_card_remark || schoolProfile?.report_card_remark || 'No report card remark has been configured.') 
-                        : 'The student requires additional academic assistance in one or more subjects to meet the passing standards.'
-                      }
-                    </div>
-                  </div>
-                </div>
-
-                {/* Dashed divider */}
-                <div className="border-t border-dashed border-zinc-300 my-8"></div>
-
-                {/* Signatures block */}
-                <div className="flex justify-between text-xs font-bold pt-8">
-                  <div className="text-center w-36">
-                    <div className="h-6"></div>
-                    <div className="border-t border-zinc-800 pt-1 text-zinc-700">Class Teacher</div>
-                  </div>
-                  <div className="text-center w-36">
-                    <div className="h-6"></div>
-                    <div className="border-t border-zinc-800 pt-1 text-zinc-700">Principal Signature</div>
-                  </div>
-                </div>
-
-              </div>
+              <ReportCardRenderer
+                card={selectedReportCard}
+                schoolProfile={schoolProfile}
+                currentYear={currentAcademicYear}
+                exam={selectedExam}
+              />
             </div>
           </div>
         )}
@@ -3325,6 +3461,141 @@ export default function ExamsPage() {
             </Button>
             <Button onClick={handleSaveRemark} disabled={remarkLoading}>
               {remarkLoading ? 'Saving...' : 'Save Remark'}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* WEIGHTAGE POLICY CONFIGURATION DIALOG */}
+      <Dialog isOpen={isWeightageModalOpen} onClose={() => setIsWeightageModalOpen(false)} title="Configure Final Report Calculation Strategy">
+        <div className="space-y-4 pt-2">
+          <p className="text-xs text-text-secondary leading-relaxed">
+            Select how individual exam marks (Quarterly, Half Yearly, Annual) should be combined to calculate the student's Final Academic Report Card.
+          </p>
+
+          <div className="space-y-3">
+            <label className="text-xs font-bold text-text-secondary uppercase">Calculation Strategy</label>
+            
+            <div className="space-y-2">
+              <label className="flex items-center gap-2.5 p-3 border border-border rounded-xl cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-all">
+                <input
+                  type="radio"
+                  name="strategy"
+                  value="weighted_percentage"
+                  checked={weightagePolicy.strategy === 'weighted_percentage'}
+                  onChange={() => setWeightagePolicy(p => ({ ...p, strategy: 'weighted_percentage' }))}
+                  className="accent-primary"
+                />
+                <div>
+                  <span className="text-xs font-bold text-text-primary block">Weighted Ratio Strategy (Configurable Weights)</span>
+                  <span className="text-[10px] text-text-muted block">Apply specific percentage weights to Quarterly, Half Yearly, and Annual exams.</span>
+                </div>
+              </label>
+
+              {weightagePolicy.strategy === 'weighted_percentage' && (
+                <div className="p-3 bg-zinc-50 dark:bg-zinc-900/50 border border-border rounded-xl space-y-3 pl-8 text-xs">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <span className="text-[10px] font-bold text-text-muted uppercase block">Quarterly (%)</span>
+                      <Input
+                        type="number"
+                        value={customWeightsInput.quarterly}
+                        onChange={e => setCustomWeightsInput(p => ({ ...p, quarterly: parseInt(e.target.value) || 0 }))}
+                        className="h-8 text-xs font-mono"
+                      />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold text-text-muted uppercase block">Half Yearly (%)</span>
+                      <Input
+                        type="number"
+                        value={customWeightsInput.halfYearly}
+                        onChange={e => setCustomWeightsInput(p => ({ ...p, halfYearly: parseInt(e.target.value) || 0 }))}
+                        className="h-8 text-xs font-mono"
+                      />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold text-text-muted uppercase block">Annual (%)</span>
+                      <Input
+                        type="number"
+                        value={customWeightsInput.annual}
+                        onChange={e => setCustomWeightsInput(p => ({ ...p, annual: parseInt(e.target.value) || 0 }))}
+                        className="h-8 text-xs font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <label className="flex items-center gap-2.5 p-3 border border-border rounded-xl cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-all">
+                <input
+                  type="radio"
+                  name="strategy"
+                  value="equal_average"
+                  checked={weightagePolicy.strategy === 'equal_average'}
+                  onChange={() => setWeightagePolicy(p => ({ ...p, strategy: 'equal_average' }))}
+                  className="accent-primary"
+                />
+                <div>
+                  <span className="text-xs font-bold text-text-primary block">Equal Average Strategy</span>
+                  <span className="text-[10px] text-text-muted block">Equal percentage weightage across all conducted session exams.</span>
+                </div>
+              </label>
+
+              <label className="flex items-center gap-2.5 p-3 border border-border rounded-xl cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-all">
+                <input
+                  type="radio"
+                  name="strategy"
+                  value="best_score"
+                  checked={weightagePolicy.strategy === 'best_score'}
+                  onChange={() => setWeightagePolicy(p => ({ ...p, strategy: 'best_score' }))}
+                  className="accent-primary"
+                />
+                <div>
+                  <span className="text-xs font-bold text-text-primary block">Best Examination Score Strategy</span>
+                  <span className="text-[10px] text-text-muted block">Takes highest subject percentage achieved across session exams.</span>
+                </div>
+              </label>
+
+              <label className="flex items-center gap-2.5 p-3 border border-border rounded-xl cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-all">
+                <input
+                  type="radio"
+                  name="strategy"
+                  value="annual_only"
+                  checked={weightagePolicy.strategy === 'annual_only'}
+                  onChange={() => setWeightagePolicy(p => ({ ...p, strategy: 'annual_only' }))}
+                  className="accent-primary"
+                />
+                <div>
+                  <span className="text-xs font-bold text-text-primary block">Annual Exam Only Strategy</span>
+                  <span className="text-[10px] text-text-muted block">100% weightage on final Annual Examination marks.</span>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 border-t border-border pt-4">
+            <Button type="button" variant="secondary" onClick={() => setIsWeightageModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                const updatedPolicy = {
+                  ...weightagePolicy,
+                  weights: {
+                    'Quarterly': customWeightsInput.quarterly,
+                    'Half Yearly': customWeightsInput.halfYearly,
+                    'Annual': customWeightsInput.annual
+                  }
+                };
+                setWeightagePolicy(updatedPolicy);
+                setIsWeightageModalOpen(false);
+                if (selectedClassId) {
+                  handleOpenFinalSessionReportCards(selectedClassId);
+                }
+              }}
+            >
+              Apply Calculation Strategy
             </Button>
           </div>
         </div>

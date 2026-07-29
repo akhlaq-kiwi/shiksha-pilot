@@ -13,6 +13,8 @@ use App\Domain\Student\Controllers\StudentController;
 use App\Domain\SchoolAdmin\Controllers\LeaveRequestController;
 use App\Domain\Student\Controllers\VocabularyController;
 
+use App\Domain\Platform\Controllers\ReportCardTemplateController;
+
 return function (App $app) {
     // Auth Domain
     $app->post('/api/auth/identify', [AuthController::class, 'identify']);
@@ -46,6 +48,13 @@ return function (App $app) {
     $app->get('/api/platform/schools/{id}/classes', [PlatformController::class, 'getSchoolClasses']);
     $app->get('/api/platform/admins', [PlatformController::class, 'getAdmins']);
     $app->post('/api/platform/admins', [PlatformController::class, 'createAdmin']);
+
+    // Super Admin Report Card Templates
+    $app->get('/api/platform/report-card-templates', [ReportCardTemplateController::class, 'listTemplates']);
+    $app->post('/api/platform/report-card-templates', [ReportCardTemplateController::class, 'createTemplate']);
+    $app->put('/api/platform/report-card-templates/{id}', [ReportCardTemplateController::class, 'updateTemplate']);
+    $app->delete('/api/platform/report-card-templates/{id}', [ReportCardTemplateController::class, 'deleteTemplate']);
+    $app->post('/api/platform/schools/{id}/report-card-template', [ReportCardTemplateController::class, 'assignTemplateToSchool']);
 
     // School Admin Domain
     $app->get('/api/school/stats', [SchoolAdminController::class, 'getDashboardStats']);

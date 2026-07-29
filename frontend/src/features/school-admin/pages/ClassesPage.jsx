@@ -536,12 +536,15 @@ export default function ClassesPage() {
 
     // Roster filters combination (Search + Section + Status)
     const filteredRoster = rosterStudents.filter(s => {
-      const term = rosterSearch.toLowerCase();
-      const matchesSearch = !rosterSearch || 
+      const term = rosterSearch.trim().toLowerCase();
+      const fullName = `${s.first_name || ''} ${s.middle_name || ''} ${s.last_name || ''} ${s.name || ''}`.trim().toLowerCase().replace(/\s+/g, ' ');
+      const matchesSearch = !term || 
+                            fullName.includes(term) ||
                             (s.first_name || '').toLowerCase().includes(term) || 
                             (s.last_name || '').toLowerCase().includes(term) || 
                             (s.name || '').toLowerCase().includes(term) || 
-                            (s.roll_no || '').toLowerCase().includes(term);
+                            (s.roll_no || '').toLowerCase().includes(term) ||
+                            (s.admission_no || s.sr_no || '').toLowerCase().includes(term);
       
       const matchesSection = rosterSectionFilter === 'All' || s.section === rosterSectionFilter;
       

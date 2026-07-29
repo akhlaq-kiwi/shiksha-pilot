@@ -11,12 +11,14 @@ import PlansPage from './pages/PlansPage';
 import SchoolTeachersPage from './pages/SchoolTeachersPage';
 import SchoolStudentsPage from './pages/SchoolStudentsPage';
 import SchoolHistoryPage from './pages/SchoolHistoryPage';
+import ReportCardTemplatesPage from './pages/ReportCardTemplatesPage';
 import CreateSchoolDialog from './components/CreateSchoolDialog';
 
 const NAV = [
   { path: '/super-admin',          label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { path: '/super-admin/schools',  label: 'Manage Schools',   icon: Building2 },
   { path: '/super-admin/plans',    label: 'Manage Plans',   icon: CreditCard },
+  { path: '/super-admin/report-card-templates', label: 'Report Cards', icon: Settings },
 ];
 
 export default function SuperAdminPortal() {
@@ -213,6 +215,9 @@ export default function SuperAdminPortal() {
           } />
           <Route path="plans" element={
             <PlansPage />
+          } />
+          <Route path="report-card-templates" element={
+            <ReportCardTemplatesPage />
           } />
           <Route path="*" element={<Navigate to="/super-admin" replace />} />
         </Routes>

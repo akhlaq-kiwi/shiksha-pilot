@@ -555,6 +555,21 @@ export const schoolService = {
   },
   getLatePaymentPenaltyHistory(params = {}) {
     return apiClient.get(buildUrl('/api/school/late-payment-penalty/history', params));
+  },
+  getReportCardTemplates() {
+    return apiClient.get('/api/platform/report-card-templates');
+  },
+  createReportCardTemplate(templateData) {
+    return apiClient.post('/api/platform/report-card-templates', templateData);
+  },
+  updateReportCardTemplate(id, templateData) {
+    return apiClient.put(`/api/platform/report-card-templates/${id}`, templateData);
+  },
+  deleteReportCardTemplate(id) {
+    return apiClient.delete(`/api/platform/report-card-templates/${id}`);
+  },
+  assignReportCardTemplateToSchool(schoolId, templateId) {
+    return apiClient.post(`/api/platform/schools/${schoolId}/report-card-template`, { template_id: templateId });
   }
 };
 

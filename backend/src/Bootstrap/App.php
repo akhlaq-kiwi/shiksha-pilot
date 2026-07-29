@@ -22,6 +22,7 @@ use App\Domain\Platform\Repositories\AuditLogRepository;
 use App\Domain\Platform\Repositories\PlansRepository;
 use App\Domain\Platform\Services\PlatformService;
 use App\Domain\Platform\Controllers\PlatformController;
+use App\Domain\Platform\Controllers\ReportCardTemplateController;
 
 // ── Domain: SchoolAdmin ───────────────────────────────────────────────────────
 use App\Domain\SchoolAdmin\Repositories\StudentRepository;
@@ -183,6 +184,13 @@ class App
             PlatformController::class => function ($c) {
                 return new PlatformController(
                     $c->get(PlatformService::class),
+                    $c->get(TokenService::class),
+                );
+            },
+
+            ReportCardTemplateController::class => function ($c) {
+                return new ReportCardTemplateController(
+                    $c->get(Connection::class)->getPdo(),
                     $c->get(TokenService::class),
                 );
             },
