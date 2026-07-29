@@ -4,6 +4,8 @@ import { Button } from '../../../common/ui/button';
 import { Card } from '../../../common/ui/card';
 import { schoolService } from '../../../common/services/schoolService';
 import html2pdf from 'html2pdf.js';
+import JSZip from 'jszip';
+import html2canvas from 'html2canvas';
 
 // Self-healing Student Avatar with gender/initials fallback for ID Cards
 const IdCardAvatar = ({ src, name, updatedAt }) => {
@@ -186,40 +188,87 @@ export default function ClassIdentityCardPreview({
     }
   };
 
-  // Handle PDF Generation (Using Admit Card configuration with letterRendering)
-  const handleDownloadPdf = (e) => {
+  const chunkArray = (arr, size) => {
+    const chunks = [];
+    for (let i = 0; i < arr.length; i += size) {
+      chunks.push(arr.slice(i, i + size));
+    }
+    return chunks;
+  };
+
+  const studentChunks = chunkArray(sortedStudents, 6);
+
+  // Handle High-Resolution Image Export (PNG ZIP)
+  const handleDownloadZip = async (e) => {
     if (e) e.preventDefault();
-    const element = printContainerRef.current;
-    if (!element) return;
+    const container = printContainerRef.current;
+    if (!container || sortedStudents.length === 0) return;
 
     setDownloading(true);
-    const opt = {
-      margin: [6, 6, 6, 6],
-      filename: `${classNameProp}_Student_Identity_Cards`.replace(/\s+/g, '_') + '.pdf',
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        letterRendering: true,
-        scrollY: 0,
-        scrollX: 0
-      },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['css', 'legacy'] }
-    };
+    try {
+      const zip = new JSZip();
+      const cardNodes = container.querySelectorAll('.id-card-wrapper');
 
-    html2pdf()
-      .from(element)
-      .set(opt)
-      .save()
-      .then(() => {
-        setDownloading(false);
-      })
-      .catch((err) => {
-        console.error('PDF generation error:', err);
-        setDownloading(false);
-      });
+      for (let i = 0; i < sortedStudents.length; i++) {
+        const student = sortedStudents[i];
+        const cardNode = cardNodes[i];
+
+        if (!cardNode) continue;
+
+        // Render card at 3x scale for crisp 300 DPI high-resolution output
+        const canvas = await html2canvas(cardNode, {
+          scale: 3,
+          useCORS: true,
+          logging: false,
+          backgroundColor: null,
+          scrollY: 0,
+          scrollX: 0
+        });
+
+        // Add 24px safe margin around the card so borders and rounded corners are 100% visible and NEVER cropped
+        const padding = 24;
+        const paddedCanvas = document.createElement('canvas');
+        paddedCanvas.width = canvas.width + (padding * 2);
+        paddedCanvas.height = canvas.height + (padding * 2);
+        const ctx = paddedCanvas.getContext('2d');
+
+        // Fill solid white background
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, paddedCanvas.width, paddedCanvas.height);
+
+        // Draw card canvas centered with padding
+        ctx.drawImage(canvas, padding, padding);
+
+        // Convert to PNG base64 string
+        const dataUrl = paddedCanvas.toDataURL('image/png', 1.0);
+        const base64Data = dataUrl.replace(/^data:image\/png;base64,/, '');
+
+        // Naming convention: RollNo_StudentName.png
+        const rawRoll = student.roll_no || student.roll || student.sr_no || student.admission_no || `SR-${student.id || i + 1}`;
+        const cleanRoll = String(rawRoll).trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+        const cleanName = String(student.name || 'Student').trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '');
+        const fileName = `${cleanRoll}_${cleanName}.png`;
+
+        zip.file(fileName, base64Data, { base64: true });
+      }
+
+      // Generate ZIP archive and trigger download
+      const zipContent = await zip.generateAsync({ type: 'blob' });
+      const zipFilename = `${classNameProp}_Student_Identity_Cards`.replace(/\s+/g, '_') + '.zip';
+
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(zipContent);
+      link.download = zipFilename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+    } catch (err) {
+      console.error('Error generating identity cards ZIP:', err);
+      alert('Failed to generate identity cards ZIP.');
+    } finally {
+      setDownloading(false);
+    }
   };
 
   // Extract all active document stylesheets for isolated print iframe
@@ -258,7 +307,7 @@ export default function ClassIdentityCardPreview({
           <style>
             @page {
               size: A4 portrait;
-              margin: 8mm;
+              margin: 6mm;
             }
             body {
               font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -268,6 +317,19 @@ export default function ClassIdentityCardPreview({
               color: #000000;
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
+            }
+            .id-card-page-container {
+              page-break-after: always !important;
+              break-after: page !important;
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
+              display: block !important;
+              box-sizing: border-box !important;
+              width: 100% !important;
+            }
+            .id-card-page-container:last-child {
+              page-break-after: auto !important;
+              break-after: auto !important;
             }
             .id-card-grid {
               display: grid !important;
@@ -310,7 +372,7 @@ export default function ClassIdentityCardPreview({
           </style>
         </head>
         <body>
-          <div class="id-card-grid">
+          <div class="printable-id-cards">
             ${printElement.innerHTML}
           </div>
           <script>
@@ -359,12 +421,12 @@ export default function ClassIdentityCardPreview({
         <div className="flex items-center gap-3 self-end sm:self-center">
           <Button
             variant="outline"
-            onClick={handleDownloadPdf}
+            onClick={handleDownloadZip}
             disabled={downloading || sortedStudents.length === 0}
             className="font-bold text-xs gap-2 border-border hover:bg-zinc-50"
           >
             <Download className="h-4 w-4 text-emerald-600" />
-            {downloading ? 'Generating PDF...' : 'Download PDF'}
+            {downloading ? 'Generating Cards...' : 'Download Identity Cards'}
           </Button>
 
           {/* Upload Signature button positioned directly next to Download PDF */}
@@ -405,30 +467,41 @@ export default function ClassIdentityCardPreview({
           No active students found in {classNameProp} to generate Identity Cards.
         </Card>
       ) : (
-        <div className="flex flex-col items-center space-y-6 w-full max-w-4xl mx-auto pb-12">
+        <div className="flex flex-col items-center space-y-8 w-full max-w-4xl mx-auto pb-12">
           {/* Printable 2-Column Element Wrapper */}
           <div
             ref={printContainerRef}
             id="printable-id-cards"
-            className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full"
+            className="flex flex-col gap-8 w-full"
           >
-            {sortedStudents.map((s, idx) => {
-              const studentRoll = s.roll_no || s.roll || '-';
-              const studentAdmNo = s.sr_no || s.admission_no || `SR-${s.id}`;
-              const classSecDisplay = `${s.class_name || classNameProp}${s.section ? ' (' + s.section + ')' : ''}`;
+            {studentChunks.map((chunk, pageIdx) => (
+              <div
+                key={pageIdx}
+                className="id-card-page-container w-full"
+                style={{
+                  pageBreakAfter: pageIdx < studentChunks.length - 1 ? 'always' : 'auto',
+                  breakAfter: pageIdx < studentChunks.length - 1 ? 'page' : 'auto'
+                }}
+              >
+                <div className="id-card-grid grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
+                  {chunk.map((s, idx) => {
+                    const studentRoll = s.roll_no || s.roll || '-';
+                    const studentAdmNo = s.sr_no || s.admission_no || `SR-${s.id}`;
+                    const classSecDisplay = `${s.class_name || classNameProp}${s.section ? ' (' + s.section + ')' : ''}`;
 
-              return (
-                <div
-                  key={s.id || idx}
-                  className="id-card-wrapper w-full max-w-[340px] mx-auto bg-white text-zinc-900 border-2 border-zinc-800 rounded-2xl overflow-hidden shadow-md relative transition-all hover:shadow-lg flex flex-col justify-between"
-                  style={{
-                    pageBreakInside: 'avoid',
-                    breakInside: 'avoid'
-                  }}
-                >
+                    return (
+                      <div
+                        key={s.id || idx}
+                        className="id-card-wrapper w-full max-w-[340px] mx-auto bg-white text-zinc-900 border-2 border-zinc-800 rounded-2xl overflow-hidden shadow-md relative transition-all hover:shadow-lg flex flex-col justify-between"
+                        style={{
+                          pageBreakInside: 'avoid',
+                          breakInside: 'avoid'
+                        }}
+                      >
                   {/* Top Branding Bar */}
-                  <div className="bg-gradient-to-r from-emerald-800 via-emerald-700 to-teal-800 text-white px-3.5 py-2.5 flex items-center justify-between border-b border-amber-400">
-                    <div className="flex items-center gap-2 min-w-0">
+                  <div className="bg-gradient-to-r from-emerald-800 via-emerald-700 to-teal-800 text-white px-3.5 py-3 flex items-center justify-between gap-3 border-b border-amber-400 min-h-[58px]">
+                    {/* Left Container: Logo + School Name & Subtitle Column */}
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
                       {/* Logo Reuse logic: if logo exists & loads, show it cleanly over green header; else hide container completely */}
                       {!logoError && schoolLogo ? (
                         <img
@@ -439,24 +512,24 @@ export default function ClassIdentityCardPreview({
                           style={{ maxHeight: '32px', maxWidth: '90px', width: 'auto', objectFit: 'contain' }}
                         />
                       ) : null}
-                      <div className="min-w-0">
-                        <h4
-                          className="text-xs font-black uppercase tracking-wider font-display text-amber-300 pb-0.5 leading-normal"
-                          style={{ lineHeight: '1.25', paddingBottom: '2px' }}
-                        >
+
+                      {/* Text Column: School Name (line 1) + Subtitle (line 2) */}
+                      <div className="min-w-0 flex-1 flex flex-col justify-center gap-0.5">
+                        <h4 className="text-xs font-black uppercase tracking-wider font-display text-amber-300 leading-snug">
                           {schoolName}
                         </h4>
-                        <p
-                          className="text-[8.5px] font-extrabold uppercase tracking-widest text-emerald-100 opacity-90 leading-normal"
-                          style={{ lineHeight: '1.2' }}
-                        >
+                        <p className="text-[8.5px] font-extrabold uppercase tracking-widest text-emerald-100 opacity-95 leading-tight">
                           Student Identity Card
                         </p>
                       </div>
                     </div>
-                    <span className="px-1.5 py-0.5 bg-amber-400 text-emerald-950 text-[8px] font-black rounded uppercase tracking-wider shrink-0">
-                      {academicYearName}
-                    </span>
+
+                    {/* Right Container: Plain Yellow Bold Academic Year Text */}
+                    <div className="shrink-0 flex items-center justify-end">
+                      <span className="text-xs font-black uppercase tracking-wider font-mono text-amber-300 leading-snug">
+                        {academicYearName}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Card Content Body */}
@@ -569,6 +642,9 @@ export default function ClassIdentityCardPreview({
                 </div>
               );
             })}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

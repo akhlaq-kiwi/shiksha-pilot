@@ -329,7 +329,6 @@ export default function CollectionHistoryPage() {
                     <TableHead className="font-bold text-xs whitespace-nowrap">Fee Description</TableHead>
                     <TableHead className="font-bold text-xs text-left whitespace-nowrap">Amount (₹)</TableHead>
                     <TableHead className="font-bold text-xs text-center whitespace-nowrap">(Prev → Credit → New)</TableHead>
-                    <TableHead className="font-bold text-xs text-right whitespace-nowrap">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -373,18 +372,6 @@ export default function CollectionHistoryPage() {
                             <span className="font-black text-text-primary font-mono">₹{parseFloat(t.updated_total).toLocaleString('en-IN')}</span>
                           </div>
                         </TableCell>
-
-                        {/* Action */}
-                        <TableCell className="text-right whitespace-nowrap">
-                          <Button 
-                            variant="secondary" 
-                            size="xs" 
-                            className="h-7 w-20 text-[10px] px-0 font-bold"
-                            onClick={() => handleDownloadSingleReceipt(t)}
-                          >
-                            Receipt
-                          </Button>
-                        </TableCell>
                       </TableRow>
                     );
                   })}
@@ -424,26 +411,13 @@ export default function CollectionHistoryPage() {
                       </div>
                     </div>
 
-                    {/* Bottom Row - Running balance and actions */}
-                    <div className="flex flex-col gap-2.5 sm:flex-row sm:justify-between sm:items-center pt-1">
-                      {/* Flow */}
-                      <div className="flex items-center gap-1.5 text-xs font-semibold text-text-secondary">
-                        <span className="text-text-muted font-mono">₹{parseFloat(t.previous_total).toLocaleString('en-IN')}</span>
-                        <span>→</span>
-                        <span className="text-emerald-600 font-black font-mono">+₹{t.amount.toLocaleString('en-IN')}</span>
-                        <span>→</span>
-                        <span className="font-black text-text-primary font-mono">₹{parseFloat(t.updated_total).toLocaleString('en-IN')}</span>
-                      </div>
-                      
-                      {/* Button */}
-                      <Button 
-                        variant="secondary" 
-                        size="xs" 
-                        className="h-7 w-full sm:w-24 text-[10px] font-bold"
-                        onClick={() => handleDownloadSingleReceipt(t)}
-                      >
-                        Download Receipt
-                      </Button>
+                    {/* Bottom Row - Running balance */}
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-text-secondary pt-1">
+                      <span className="text-text-muted font-mono">₹{parseFloat(t.previous_total).toLocaleString('en-IN')}</span>
+                      <span>→</span>
+                      <span className="text-emerald-600 font-black font-mono">+₹{t.amount.toLocaleString('en-IN')}</span>
+                      <span>→</span>
+                      <span className="font-black text-text-primary font-mono">₹{parseFloat(t.updated_total).toLocaleString('en-IN')}</span>
                     </div>
 
                   </div>
