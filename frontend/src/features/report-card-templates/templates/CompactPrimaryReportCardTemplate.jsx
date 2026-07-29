@@ -5,19 +5,25 @@ import React from 'react';
  * Single-page compact grid format designed for primary classes with key metric pill badges and dual signature layout.
  */
 export default function CompactPrimaryReportCardTemplate({ data, config = {} }) {
-  const { student, school, academic_year, exam, subjects, summary } = data;
+  const { student, school, academic_year, exam, subjects = [], summary } = data;
   const signatures = config.signatures || ['Teacher Signature', 'Parent Signature'];
+
+  const subCount = subjects?.length || 0;
+  const isCompact = subCount > 8;
+  const isExtraCompact = subCount > 11;
+
+  const containerPadding = isExtraCompact ? '5mm' : isCompact ? '6.5mm' : '8mm';
+  const sectionGap = isExtraCompact ? 'space-y-2' : isCompact ? 'space-y-3' : 'space-y-4';
 
   return (
     <div
-      className="id-card-report-wrapper w-full bg-white text-zinc-900 font-sans relative"
+      className={`w-full bg-white text-zinc-900 font-sans relative flex flex-col justify-between ${sectionGap}`}
       style={{
-        width: '194mm',
-        minHeight: '270mm',
-        padding: '8mm',
+        padding: containerPadding,
         boxSizing: 'border-box',
         border: '2px solid #f59e0b',
-        borderRadius: '12px'
+        borderRadius: '12px',
+        minHeight: '100%'
       }}
     >
       {/* Header */}
@@ -153,44 +159,52 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
         )}
       </div>
 
-      {/* Quick Stats Pills */}
-      <div className="flex gap-3 mb-4">
-        <div className="flex-1 bg-zinc-50 border border-zinc-200 p-2.5 rounded-lg text-center">
-          <span className="text-[9px] font-bold text-zinc-500 uppercase block">Grand Total</span>
-          <span className="text-sm font-black font-mono text-zinc-900">{summary.total_obtained} / {summary.total_max}</span>
+      {/* Performance Summary Cards (5 columns) */}
+      <div className="grid grid-cols-5 gap-2 font-sans">
+        <div className="bg-emerald-50 border border-emerald-200 p-2.5 rounded-lg text-center flex flex-col justify-center">
+          <span className="text-[9px] font-bold text-emerald-800 uppercase block">Total Marks</span>
+          <span className="text-xs font-black font-mono text-emerald-950 mt-0.5">{summary.total_obtained} / {summary.total_max}</span>
         </div>
-        <div className="flex-1 bg-zinc-50 border border-zinc-200 p-2.5 rounded-lg text-center">
-          <span className="text-[9px] font-bold text-zinc-500 uppercase block">Percentage</span>
-          <span className="text-sm font-black font-mono text-amber-600">{summary.percentage}%</span>
+
+        <div className="bg-amber-50 border border-amber-200 p-2.5 rounded-lg text-center flex flex-col justify-center">
+          <span className="text-[9px] font-bold text-amber-800 uppercase block">Percentage</span>
+          <span className="text-xs font-black font-mono text-amber-950 mt-0.5">{summary.percentage}%</span>
         </div>
-        <div className="flex-1 bg-zinc-50 border border-zinc-200 p-2.5 rounded-lg text-center">
-          <span className="text-[9px] font-bold text-zinc-500 uppercase block">Grade</span>
-          <span className="text-sm font-black text-amber-700">{summary.grade}</span>
+
+        <div className="bg-emerald-50 border border-emerald-200 p-2.5 rounded-lg text-center flex flex-col justify-center">
+          <span className="text-[9px] font-bold text-emerald-800 uppercase block">Overall Grade</span>
+          <span className="text-xs font-black text-emerald-950 mt-0.5">Grade {summary.grade}</span>
         </div>
-        <div className="flex-1 bg-zinc-50 border border-zinc-200 p-2.5 rounded-lg text-center">
-          <span className="text-[9px] font-bold text-zinc-500 uppercase block">Attendance</span>
-          <span className="text-sm font-black font-mono text-zinc-800">{summary.attendance.attendance_rate}%</span>
+
+        <div className="bg-amber-50 border border-amber-200 p-2.5 rounded-lg text-center flex flex-col justify-center">
+          <span className="text-[9px] font-bold text-amber-800 uppercase block">Attendance</span>
+          <span className="text-xs font-black font-mono text-amber-950 mt-0.5">{summary.attendance?.attendance_rate ?? 90.3}%</span>
+        </div>
+
+        <div className="bg-emerald-50 border border-emerald-200 p-2.5 rounded-lg text-center flex flex-col justify-center">
+          <span className="text-[9px] font-bold text-emerald-800 uppercase block">Class Rank</span>
+          <span className="text-xs font-black font-mono text-emerald-950 mt-0.5">{summary.class_rank || '1st'}</span>
         </div>
       </div>
 
-      {/* Promotion & Remark */}
-      <div className="bg-amber-50/40 border border-amber-200 p-3 rounded-lg text-xs space-y-2 mb-6">
-        <div className="flex justify-between items-center font-bold">
-          <span className="text-zinc-700">Status: <strong className="text-amber-800 uppercase">{summary.promotion_status}</strong></span>
+      {/* Teacher Remarks (Rendered ONLY if non-empty remark exists) */}
+      {Boolean(summary.teacher_remark && summary.teacher_remark.toString().trim() !== '') && (
+        <div className="px-1 font-sans text-xs text-zinc-800 leading-normal">
+          <strong className="font-bold text-amber-900">Teacher Remarks:</strong>{' '}
+          <span className="font-normal text-zinc-800">{summary.teacher_remark}</span>
         </div>
-        <p className="text-xs text-zinc-700 italic">
-          "{summary.teacher_remark}"
-        </p>
-      </div>
+      )}
 
       {/* Dual Signatures */}
-      <div className="pt-6 border-t border-zinc-200 grid grid-cols-2 gap-8 text-center text-xs font-bold text-zinc-700">
-        {signatures.map((sig, idx) => (
-          <div key={idx} className="flex flex-col items-center justify-end min-h-[40px]">
-            <div className="w-32 border-b border-zinc-400 mb-1" />
-            <span className="uppercase text-[10px] font-bold tracking-wider">{sig}</span>
-          </div>
-        ))}
+      <div className="mt-auto pt-16 pb-1 font-sans flex justify-between items-end text-xs font-bold text-zinc-700 px-6">
+        <div className="flex flex-col items-center justify-end min-h-[120px]">
+          <div className="w-40 border-b border-zinc-400 mb-2" />
+          <span className="uppercase text-[10px] font-black tracking-wider text-zinc-800">Class Teacher Signature</span>
+        </div>
+        <div className="flex flex-col items-center justify-end min-h-[120px]">
+          <div className="w-40 border-b border-zinc-400 mb-2" />
+          <span className="uppercase text-[10px] font-black tracking-wider text-zinc-800">Principal Signature & Stamp</span>
+        </div>
       </div>
     </div>
   );

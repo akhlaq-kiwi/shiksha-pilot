@@ -4,6 +4,7 @@ import ModernReportCardTemplate from './templates/ModernReportCardTemplate';
 import ClassicCBSEReportCardTemplate from './templates/ClassicCBSEReportCardTemplate';
 import TraditionalReportCardTemplate from './templates/TraditionalReportCardTemplate';
 import CompactPrimaryReportCardTemplate from './templates/CompactPrimaryReportCardTemplate';
+import SinglePageReportCardWrapper from './SinglePageReportCardWrapper';
 
 /**
  * Report Card Renderer (Layer 2 Presentation Dispatcher)
@@ -25,18 +26,27 @@ export default function ReportCardRenderer({
   const layoutConfig = customConfig || schoolProfile?.report_card_template?.layout_config || card?.school?.report_card_template?.layout_config || {};
 
   // Step 3: Dispatch to appropriate visual template
-  switch (activeTemplateCode) {
-    case 'modern':
-      return <ModernReportCardTemplate data={reportData} config={layoutConfig} />;
+  const renderTemplate = () => {
+    switch (activeTemplateCode) {
+      case 'modern':
+        return <ModernReportCardTemplate data={reportData} config={layoutConfig} />;
 
-    case 'cbse_classic':
-      return <ClassicCBSEReportCardTemplate data={reportData} config={layoutConfig} />;
+      case 'cbse_classic':
+        return <ClassicCBSEReportCardTemplate data={reportData} config={layoutConfig} />;
 
-    case 'primary_compact':
-      return <CompactPrimaryReportCardTemplate data={reportData} config={layoutConfig} />;
+      case 'primary_compact':
+        return <CompactPrimaryReportCardTemplate data={reportData} config={layoutConfig} />;
 
-    case 'traditional':
-    default:
-      return <TraditionalReportCardTemplate data={reportData} config={layoutConfig} />;
-  }
+      case 'traditional':
+      default:
+        return <TraditionalReportCardTemplate data={reportData} config={layoutConfig} />;
+    }
+  };
+
+  return (
+    <SinglePageReportCardWrapper subjectsCount={reportData.subjects?.length || 0}>
+      {renderTemplate()}
+    </SinglePageReportCardWrapper>
+  );
 }
+

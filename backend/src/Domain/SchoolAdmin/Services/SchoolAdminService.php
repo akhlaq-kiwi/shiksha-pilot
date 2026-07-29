@@ -5816,9 +5816,7 @@ class SchoolAdminService extends BaseService
             throw new NotFoundException('School not found');
         }
 
-        if (empty($school['report_card_remark'])) {
-            $school['report_card_remark'] = 'Congratulations! The student has passed all examinations and demonstrated excellent understanding.';
-        }
+        $school['report_card_remark'] = $school['report_card_remark'] ?? '';
 
         // Fetch active subscription details
         $stmtSub = $pdo->prepare("
@@ -11533,8 +11531,8 @@ Only approve the settlement after reviewing all financial records.
         $stmtSchool = $pdo->prepare("SELECT name, logo_path, report_card_remark FROM schools WHERE id = :sid LIMIT 1");
         $stmtSchool->execute([':sid' => $schoolId]);
         $school = $stmtSchool->fetch(PDO::FETCH_ASSOC);
-        if ($school && empty($school['report_card_remark'])) {
-            $school['report_card_remark'] = 'Congratulations! The student has passed all examinations and demonstrated excellent understanding.';
+        if ($school) {
+            $school['report_card_remark'] = $school['report_card_remark'] ?? '';
         }
 
         $reportCards = [];

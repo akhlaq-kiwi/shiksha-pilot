@@ -287,8 +287,8 @@ class StudentService extends BaseService
         $stmtSchool = $pdo->prepare("SELECT name, logo_path, report_card_remark FROM schools WHERE id = :sid LIMIT 1");
         $stmtSchool->execute([':sid' => $schoolId]);
         $school = $stmtSchool->fetch(\PDO::FETCH_ASSOC);
-        if ($school && empty($school['report_card_remark'])) {
-            $school['report_card_remark'] = 'Congratulations! The student has passed all examinations and demonstrated excellent understanding.';
+        if ($school) {
+            $school['report_card_remark'] = $school['report_card_remark'] ?? '';
         }
 
         foreach ($publishedExams as $ex) {

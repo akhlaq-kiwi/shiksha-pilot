@@ -5,23 +5,29 @@ import React from 'react';
  * Vintage certificate style layout inspired by traditional school marksheets with decorative border and result seal.
  */
 export default function TraditionalReportCardTemplate({ data, config = {} }) {
-  const { student, school, academic_year, exam, subjects, summary } = data;
+  const { student, school, academic_year, exam, subjects = [], summary } = data;
   const signatures = config.signatures || ['Class Teacher', 'Principal'];
+
+  const subCount = subjects?.length || 0;
+  const isCompact = subCount > 8;
+  const isExtraCompact = subCount > 11;
+
+  const containerPadding = isExtraCompact ? '5mm' : isCompact ? '6.5mm' : '8mm';
+  const innerPadding = isExtraCompact ? 'p-3' : isCompact ? 'p-4' : 'p-6';
 
   return (
     <div
-      className="id-card-report-wrapper w-full bg-amber-50/20 text-zinc-900 font-serif relative"
+      className="w-full bg-amber-50/20 text-zinc-900 font-serif relative h-full flex flex-col"
       style={{
-        width: '194mm',
-        minHeight: '270mm',
-        padding: '12mm',
+        padding: containerPadding,
         boxSizing: 'border-box',
         border: '8px double #1e3a8a',
-        borderRadius: '2px'
+        borderRadius: '2px',
+        minHeight: '100%'
       }}
     >
       {/* Decorative Outer Border */}
-      <div className="border border-blue-900 p-6 h-full flex flex-col justify-between" style={{ boxSizing: 'border-box' }}>
+      <div className={`border border-blue-900 ${innerPadding} h-full flex flex-col justify-between`} style={{ boxSizing: 'border-box' }}>
         <div>
           {/* Header */}
           <div className="text-center border-b-2 border-blue-900 pb-5 mb-6">
@@ -173,46 +179,53 @@ export default function TraditionalReportCardTemplate({ data, config = {} }) {
             )}
           </div>
 
-          {/* Results Summary Box & Promotion Seal */}
-          <div className="border border-blue-900 bg-white p-4 mb-6 font-sans text-xs grid grid-cols-3 gap-4">
-            <div>
-              <span className="text-[10px] font-bold text-zinc-500 uppercase block">Percentage</span>
-              <strong className="text-sm font-mono font-bold text-blue-950">{summary.percentage}%</strong>
+          {/* Performance Summary Cards (5 columns) */}
+          <div className="grid grid-cols-5 gap-2 font-sans mb-4">
+            <div className="bg-emerald-50 border border-emerald-200 p-2 rounded text-center flex flex-col justify-center">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-800 block">Total Marks</span>
+              <span className="text-xs font-black font-mono text-emerald-950 mt-0.5">{summary.total_obtained} / {summary.total_max}</span>
             </div>
-            <div className="text-center">
-              <span className="text-[10px] font-bold text-zinc-500 uppercase block">Class Rank</span>
-              <strong className="text-sm font-bold text-blue-950">{summary.class_rank}</strong>
+
+            <div className="bg-amber-50 border border-amber-200 p-2 rounded text-center flex flex-col justify-center">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-amber-800 block">Percentage</span>
+              <span className="text-xs font-black font-mono text-amber-950 mt-0.5">{summary.percentage}%</span>
             </div>
-            <div className="text-right">
-              <span className="text-[10px] font-bold text-zinc-500 uppercase block">Attendance Rate</span>
-              <strong className="text-sm font-mono text-zinc-800">{summary.attendance.attendance_rate}%</strong>
+
+            <div className="bg-emerald-50 border border-emerald-200 p-2 rounded text-center flex flex-col justify-center">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-800 block">Overall Grade</span>
+              <span className="text-xs font-black text-emerald-950 mt-0.5">Grade {summary.grade}</span>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 p-2 rounded text-center flex flex-col justify-center">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-amber-800 block">Attendance</span>
+              <span className="text-xs font-black font-mono text-amber-950 mt-0.5">{summary.attendance?.attendance_rate ?? 90.3}%</span>
+            </div>
+
+            <div className="bg-emerald-50 border border-emerald-200 p-2 rounded text-center flex flex-col justify-center">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-800 block">Class Rank</span>
+              <span className="text-xs font-black font-mono text-emerald-950 mt-0.5">{summary.class_rank || '1st'}</span>
             </div>
           </div>
 
-          {/* Verdict Box */}
-          <div className="border-2 border-dashed border-blue-900 bg-blue-50/50 p-4 rounded text-xs font-sans mb-6">
-            <span className="text-[10px] font-bold uppercase text-blue-900 tracking-wider block mb-1">Final Verdict & Promotion Status</span>
-            <p className="font-bold text-blue-950 text-sm uppercase">
-              {summary.promotion_status}
-            </p>
-            <p className="text-xs text-zinc-700 italic mt-1 font-serif">
-              "{summary.teacher_remark}"
-            </p>
-          </div>
+          {/* Teacher Remarks (Rendered ONLY if non-empty remark exists) */}
+          {Boolean(summary.teacher_remark && summary.teacher_remark.toString().trim() !== '') && (
+            <div className="px-1 font-sans text-xs text-zinc-900 leading-normal mb-2">
+              <strong className="font-bold text-blue-950">Teacher Remarks:</strong>{' '}
+              <span className="font-normal text-zinc-800">{summary.teacher_remark}</span>
+            </div>
+          )}
         </div>
 
         {/* Traditional Signatures */}
-        <div className="pt-6 font-sans border-t border-blue-900 grid grid-cols-2 gap-8 text-center text-xs font-bold text-blue-950">
-          {signatures.map((sig, idx) => (
-            <div key={idx} className="flex flex-col items-center justify-end min-h-[50px]">
-              {sig.toLowerCase().includes('principal') && school.principal_signature_path ? (
-                <img src={school.principal_signature_path} alt="Signature" className="h-8 w-auto max-w-[100px] object-contain mb-1" />
-              ) : (
-                <div className="w-36 border-b border-blue-900 mb-2" />
-              )}
-              <span className="uppercase text-[10px] tracking-wider font-bold">{sig}</span>
-            </div>
-          ))}
+        <div className="mt-auto pt-16 pb-1 font-sans border-t border-blue-900 flex justify-between items-end text-xs font-bold text-blue-950 px-6">
+          <div className="flex flex-col items-center justify-end min-h-[120px]">
+            <div className="w-40 border-b border-blue-900 mb-2" />
+            <span className="uppercase text-[10px] font-black tracking-wider text-blue-950">Class Teacher Signature</span>
+          </div>
+          <div className="flex flex-col items-center justify-end min-h-[120px]">
+            <div className="w-40 border-b border-blue-900 mb-2" />
+            <span className="uppercase text-[10px] font-black tracking-wider text-blue-950">Principal Signature & Stamp</span>
+          </div>
         </div>
       </div>
     </div>

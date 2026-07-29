@@ -531,6 +531,7 @@ export default function ExamsPage() {
 
   // Final Session Report Cards State
   const [finalSessionReportCards, setFinalSessionReportCards] = useState([]);
+  const [generatingClassPdf, setGeneratingClassPdf] = useState(false);
   const [isWeightageModalOpen, setIsWeightageModalOpen] = useState(false);
   const [weightagePolicy, setWeightagePolicy] = useState({
     strategy: 'weighted_percentage',
@@ -580,11 +581,31 @@ export default function ExamsPage() {
       const updatedProfile = await schoolService.updateSchoolProfile({
         report_card_remark: tempRemark.trim()
       });
-      setReportCardRemark(updatedProfile.report_card_remark || '');
+      const newRemark = updatedProfile?.report_card_remark || '';
+      setReportCardRemark(newRemark);
+      setSchoolProfile(prev => ({ ...(prev || {}), report_card_remark: newRemark }));
       setIsRemarkModalOpen(false);
     } catch (err) {
       console.error(err);
       setRemarkError(err.message || 'Failed to save remark.');
+    } finally {
+      setRemarkLoading(false);
+    }
+  };
+
+  const handleRemoveRemark = async () => {
+    setRemarkError('');
+    setRemarkLoading(true);
+    try {
+      await schoolService.updateSchoolProfile({
+        report_card_remark: ''
+      });
+      setReportCardRemark('');
+      setSchoolProfile(prev => ({ ...(prev || {}), report_card_remark: '' }));
+      setGradeSuccess('Report card remark removed successfully.');
+    } catch (err) {
+      console.error(err);
+      setGradeError(err.message || 'Failed to remove remark.');
     } finally {
       setRemarkLoading(false);
     }
@@ -1575,6 +1596,124 @@ export default function ExamsPage() {
     setIsReportCardOpen(true);
   };
 
+  const printNativeReportCardsContainer = async (elementId, documentTitle = 'Report Card') => {
+    if (document.fonts && document.fonts.ready) {
+      await document.fonts.ready;
+    }
+
+    const targetElement = document.getElementById(elementId);
+    if (!targetElement) return;
+
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    iframe.style.visibility = 'hidden';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow.document;
+    doc.open();
+
+    const styleTags = Array.from(document.head.querySelectorAll('link[rel="stylesheet"], style'))
+      .map(node => node.outerHTML)
+      .join('\n');
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${documentTitle}</title>
+          ${styleTags}
+          <style>
+            @page {
+              size: A4 portrait;
+              margin: 5mm;
+            }
+            html, body {
+              background-color: white !important;
+              color: #18181b !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+              font-family: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+            }
+            .no-print {
+              display: none !important;
+            }
+            .id-card-report-wrapper, .single-page-report-container {
+              box-shadow: none !important;
+              border: 1px solid #e4e4e7 !important;
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
+              page-break-after: always !important;
+              break-after: page !important;
+              max-height: 275mm !important;
+              overflow: hidden !important;
+              margin: 0 auto !important;
+            }
+            .report-card-page-break {
+              page-break-after: always !important;
+              break-after: page !important;
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
+            }
+          </style>
+        </head>
+        <body>
+          ${targetElement.innerHTML}
+        </body>
+      </html>
+    `;
+
+    doc.write(printContent);
+    doc.close();
+
+    if (iframe.contentWindow.document.fonts && iframe.contentWindow.document.fonts.ready) {
+      await iframe.contentWindow.document.fonts.ready;
+    }
+
+    setTimeout(() => {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+      setTimeout(() => {
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
+        }
+      }, 1000);
+    }, 250);
+  };
+
+  const handleDownloadSingleReportCardPdf = async (card) => {
+    if (!card) return;
+    const classNameClean = (card.student?.class_name || card.class_name || selectedClass?.name || 'Class').toString().replace(/\s+/g, '_');
+    const studentNameClean = (card.student?.name || card.student_name || card.name || 'Student').toString().replace(/\s+/g, '_');
+    const sessionClean = (currentAcademicYear?.name || '2026-2027').replace(/[\s–—]+/g, '-');
+    const filename = `Final_Report_Card_${classNameClean}_${studentNameClean}_${sessionClean}`;
+
+    await printNativeReportCardsContainer('printable-single-report-card', filename);
+  };
+
+  const handleDownloadEntireClassPdf = async () => {
+    if (!finalSessionReportCards || finalSessionReportCards.length === 0) return;
+    setGeneratingClassPdf(true);
+
+    const classNameClean = (classes.find(c => c.id === parseInt(selectedClassId))?.name || selectedClass?.name || 'Class').toString().replace(/\s+/g, '_');
+    const sessionClean = (currentAcademicYear?.name || '2026-2027').replace(/[\s–—]+/g, '-');
+    const filename = `Class_${classNameClean}_Final_Report_Cards_${sessionClean}`;
+
+    try {
+      await printNativeReportCardsContainer('printable-entire-class-container', filename);
+    } catch (err) {
+      console.error('Failed to generate class vector PDF:', err);
+    } finally {
+      setGeneratingClassPdf(false);
+    }
+  };
+
   const handlePublishClassResults = async (exam, classId) => {
     setError('');
     setSuccess('');
@@ -1700,8 +1839,40 @@ export default function ExamsPage() {
     const studentName = selectedReportCard.student_name || selectedReportCard.student?.name || 'Student';
     return (
       <div className="space-y-6 animate-in fade-in duration-200">
+        {/* Print Styles Overrides */}
+        <style dangerouslySetInnerHTML={{__html: `
+          @media print {
+            @page {
+              size: portrait !important;
+              margin: 5mm !important;
+            }
+            body {
+              background-color: white !important;
+              color: black !important;
+              padding: 0 !important;
+              margin: 0 !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            .no-print, header, sidebar, nav, button, .sticky {
+              display: none !important;
+            }
+            .id-card-report-wrapper, .single-page-report-container {
+              box-shadow: none !important;
+              border: 1px solid #e4e4e7 !important;
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
+              page-break-after: always !important;
+              break-after: page !important;
+              max-height: 275mm !important;
+              overflow: hidden !important;
+              margin: 0 auto !important;
+            }
+          }
+        `}} />
+
         {/* Top Sticky Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface border border-border p-4 rounded-xl shadow-xs sticky top-16 z-20">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface border border-border p-4 rounded-xl shadow-xs sticky top-16 z-20 no-print">
           <div className="flex items-center gap-3">
             <Button
               type="button"
@@ -1732,6 +1903,14 @@ export default function ExamsPage() {
             <Button
               type="button"
               variant="outline"
+              onClick={() => handleDownloadSingleReportCardPdf(selectedReportCard)}
+              className="flex items-center gap-2 text-xs font-bold border-border bg-background hover:bg-muted"
+            >
+              <Download className="h-4 w-4" /> Download PDF
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
               onClick={() => { setSelectedReportCard(null); setIsReportCardOpen(false); }}
               className="text-xs font-bold"
             >
@@ -1742,7 +1921,7 @@ export default function ExamsPage() {
 
         {/* Full Page Report Document Render Container */}
         <div className="w-full py-8 bg-zinc-200 dark:bg-zinc-900 rounded-2xl flex justify-center items-start shadow-inner overflow-x-auto min-h-[calc(100vh-160px)]">
-          <div className="shadow-2xl bg-white rounded-2xl overflow-hidden border border-zinc-300">
+          <div id="printable-single-report-card" className="shadow-2xl bg-white rounded-2xl overflow-hidden border border-zinc-300">
             <ReportCardRenderer
               card={selectedReportCard}
               schoolProfile={schoolProfile}
@@ -2795,9 +2974,20 @@ export default function ExamsPage() {
                   </p>
                   {!isReadOnly && (
                     <div className="flex gap-2">
-                      <Button variant="outline" className="h-8 text-xs font-bold" onClick={handleOpenRemarkModal}>
-                        Add Remark
-                      </Button>
+                      {Boolean(reportCardRemark && reportCardRemark.trim() !== '') ? (
+                        <Button
+                          variant="outline"
+                          className="h-8 text-xs font-bold text-red-600 border-red-200 hover:bg-red-50 dark:border-red-900/40 dark:text-red-400 dark:hover:bg-red-950/20"
+                          onClick={handleRemoveRemark}
+                          disabled={remarkLoading}
+                        >
+                          Remove Remark
+                        </Button>
+                      ) : (
+                        <Button variant="outline" className="h-8 text-xs font-bold" onClick={handleOpenRemarkModal}>
+                          Add Remark
+                        </Button>
+                      )}
                       <Button variant="outline" className="h-8 text-xs font-bold" onClick={handleResetGradesDefault}>
                         Reset to Defaults
                       </Button>
@@ -2916,8 +3106,62 @@ export default function ExamsPage() {
 
       {/* VIEW 6: FINAL ACADEMIC REPORT CARDS LIST (SESSION SUMMARY) */}
       {activeView === 'final_reports' && (
-        <div className="space-y-6 animate-in fade-in duration-300 no-print">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-6 animate-in fade-in duration-300">
+          {/* Print Styles Overrides for Class Export */}
+          <style dangerouslySetInnerHTML={{__html: `
+            @media print {
+              @page {
+                size: portrait !important;
+                margin: 5mm !important;
+              }
+              body {
+                background-color: white !important;
+                color: black !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+              }
+              .no-print, header, sidebar, nav, button, .sticky {
+                display: none !important;
+              }
+              .id-card-report-wrapper, .single-page-report-container {
+                box-shadow: none !important;
+                border: 1px solid #e4e4e7 !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                page-break-after: always !important;
+                break-after: page !important;
+                max-height: 275mm !important;
+                overflow: hidden !important;
+                margin: 0 auto !important;
+              }
+              .report-card-page-break {
+                page-break-after: always !important;
+                break-after: page !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+              }
+            }
+          `}} />
+
+          {/* Hidden Multi-Page Printable Container for Class PDF Export */}
+          <div className="sr-only opacity-0 pointer-events-none fixed -left-[9999px] -top-[9999px]">
+            <div id="printable-entire-class-container" className="w-[194mm]">
+              {finalSessionReportCards.map((card, idx) => (
+                <div key={card.student?.id || idx} className="report-card-page-break bg-white mb-6">
+                  <ReportCardRenderer
+                    card={card}
+                    schoolProfile={schoolProfile}
+                    currentYear={currentAcademicYear}
+                    exam={{ name: 'FINAL ACADEMIC REPORT CARD', is_final_session_report: true }}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 no-print">
             <div className="flex items-center gap-3">
               <Button type="button" variant="ghost" className="h-8 w-8 p-0" onClick={() => setActiveView('classes')}>
                 <ArrowLeft className="h-4 w-4" />
@@ -2930,18 +3174,31 @@ export default function ExamsPage() {
               </div>
             </div>
 
-            <Button
-              type="button"
-              variant="outline"
-              className="h-8 text-xs font-bold flex items-center gap-2 border-amber-400 text-amber-700 bg-amber-50 dark:bg-amber-950/20"
-              onClick={() => setIsWeightageModalOpen(true)}
-            >
-              <Settings className="h-3.5 w-3.5" /> Strategy: {
-                weightagePolicy.strategy === 'weighted_percentage' ? `Weighted (${weightagePolicy.weights['Quarterly']}/${weightagePolicy.weights['Half Yearly']}/${weightagePolicy.weights['Annual']})` :
-                weightagePolicy.strategy === 'equal_average' ? 'Equal Average' :
-                weightagePolicy.strategy === 'best_score' ? 'Best Exam Score' : 'Annual Exam Only'
-              }
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-8 text-xs font-bold flex items-center gap-2 border-emerald-600/40 text-emerald-700 bg-emerald-50 dark:bg-emerald-950/20 hover:bg-emerald-100"
+                onClick={handleDownloadEntireClassPdf}
+                disabled={generatingClassPdf || finalSessionReportCards.length === 0}
+              >
+                <Download className="h-3.5 w-3.5" />
+                {generatingClassPdf ? 'Generating Class PDF...' : 'Download Entire Class (PDF)'}
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                className="h-8 text-xs font-bold flex items-center gap-2 border-amber-400 text-amber-700 bg-amber-50 dark:bg-amber-950/20"
+                onClick={() => setIsWeightageModalOpen(true)}
+              >
+                <Settings className="h-3.5 w-3.5" /> Strategy: {
+                  weightagePolicy.strategy === 'weighted_percentage' ? `Weighted (${weightagePolicy.weights['Quarterly']}/${weightagePolicy.weights['Half Yearly']}/${weightagePolicy.weights['Annual']})` :
+                  weightagePolicy.strategy === 'equal_average' ? 'Equal Average' :
+                  weightagePolicy.strategy === 'best_score' ? 'Best Exam Score' : 'Annual Exam Only'
+                }
+              </Button>
+            </div>
           </div>
 
           <Card>

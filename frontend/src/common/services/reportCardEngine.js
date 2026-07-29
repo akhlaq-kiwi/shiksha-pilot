@@ -82,11 +82,7 @@ export function compileReportCardData(card = {}, schoolProfile = {}, currentYear
     ? `Promoted to ${getNextClassName(student.class_name)}`
     : `Retained in ${student.class_name}`;
 
-  const teacherRemark = card.report_card_remark || schoolProfile?.report_card_remark || (
-    resultStatus === 'PASS'
-      ? 'Excellent academic performance throughout the evaluation period.'
-      : 'The student requires additional academic assistance to meet standards.'
-  );
+  const teacherRemark = card.report_card_remark || schoolProfile?.report_card_remark || '';
 
   const attendance = {
     present_days: card.attendance?.present_days ?? card.present_days ?? 0,
@@ -266,11 +262,7 @@ export function compileFinalSessionReportCardData(
     ? parseFloat(((totalPresentDays / totalWorkingDays) * 100).toFixed(1))
     : (firstCard.attendance?.attendance_rate || 94.55);
 
-  const teacherRemark = schoolProfile?.report_card_remark || (
-    resultStatus === 'PASS'
-      ? 'Outstanding performance! Demonstrates exemplary academic dedication and leadership throughout the session.'
-      : 'The student requires additional academic assistance to meet promotion standards.'
-  );
+  const teacherRemark = schoolProfile?.report_card_remark || '';
 
   return {
     is_final_session_report: true,
