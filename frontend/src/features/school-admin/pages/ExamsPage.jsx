@@ -1537,8 +1537,8 @@ export default function ExamsPage() {
   const handlePublishSchemeClick = () => {
     setError('');
     setSuccess('');
-    if (!allSubjectsScheduled) {
-      setError('Please complete the examination timetable before publishing.');
+    if (!timetablePapers || timetablePapers.length === 0) {
+      setError('Please add at least one exam paper before publishing.');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
@@ -2541,7 +2541,7 @@ export default function ExamsPage() {
                     <div className="mr-3 flex flex-col items-end select-none border-r border-border pr-3">
                       <span className="text-[9px] font-black uppercase tracking-wider text-text-muted">Subjects Completed</span>
                       <span className="text-xl font-black font-display text-primary leading-tight">
-                        {scheduledCount} <span className="text-xs font-medium text-text-muted">/ {totalSubjectsCount}</span>
+                        {scheduledCount}
                       </span>
                     </div>
                     <Button 
@@ -2654,7 +2654,7 @@ export default function ExamsPage() {
             <Card>
               <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-row justify-between items-center space-y-0">
                 <CardTitle className="text-sm font-bold text-text-primary">Exam Papers</CardTitle>
-                {allSubjectsScheduled && (() => {
+                {timetablePapers.length > 0 && (() => {
                   const isSchemePublished = examClassStatuses.find(c => c.id === parseInt(selectedClassId))?.scheme_published === 1;
                   return (
                     <div className="flex items-center gap-2">

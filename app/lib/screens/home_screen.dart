@@ -150,10 +150,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       allowedRoles: ['PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL', 'STUDENT'],
     ),
     LauncherFeature(
-      name: 'Messages',
-      icon: Icons.chat_rounded,
-      color: Colors.purple,
+      name: 'Notifications',
+      icon: Icons.notifications_rounded,
+      color: Colors.indigo,
       allowedRoles: ['PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL', 'STUDENT'],
+      isAvailable: true,
     ),
     LauncherFeature(
       name: 'Settings',
@@ -1060,16 +1061,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
         );
-      } else if (feature.name == 'Notice') {
+      } else if (feature.name == 'Notifications' || feature.name == 'Notice' || feature.name == 'Messages') {
         final prefs = await SharedPreferences.getInstance();
         final token = prefs.getString('auth_token') ?? '';
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => NoticeScreen(
+            builder: (context) => NotificationCenterScreen(
               baseUrl: widget.leaveService.baseUrl,
-              token: token,
-              userRole: widget.userRole,
+              token: token.isNotEmpty ? token : widget.leaveService.token,
               studentId: _activeStudentId,
             ),
           ),
@@ -1161,43 +1161,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         ],
                       ),
                     ),
-                    if (widget.userRole.toUpperCase() == 'PARENT') ...[
-                      Stack(
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.notifications_none_rounded, size: 28, color: Colors.black87),
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => NotificationCenterScreen(
-                                    baseUrl: widget.leaveService.baseUrl,
-                                    token: widget.leaveService.token,
-                                    studentId: _activeStudentId,
-                                  ),
-                                ),
-                              ).then((_) {
-                                _fetchUnreadNotificationsCount();
-                              });
-                            },
-                          ),
-                          if (_unreadNotificationCount > 0)
-                            Positioned(
-                              right: 8,
-                              top: 8,
-                              child: Container(
-                                width: 10,
-                                height: 10,
-                                decoration: const BoxDecoration(
-                                  color: Colors.red,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(width: 8),
-                    ],
+                    const SizedBox(width: 12),
                     GestureDetector(
                       onTap: () {
                         String photoUrl = '';

@@ -7,6 +7,7 @@ class NoticeScreen extends StatefulWidget {
   final String token;
   final String userRole;
   final int? studentId;
+  final bool isEmbedded;
 
   const NoticeScreen({
     Key? key,
@@ -14,6 +15,7 @@ class NoticeScreen extends StatefulWidget {
     required this.token,
     required this.userRole,
     this.studentId,
+    this.isEmbedded = false,
   }) : super(key: key);
 
   @override
@@ -155,19 +157,9 @@ class _NoticeScreenState extends State<NoticeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Notice Board',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
-        ),
-        iconTheme: const IconThemeData(color: Colors.white),
-        backgroundColor: Colors.indigo.shade800,
-        elevation: 0,
-      ),
-      body: Column(
-        children: [
-          // Search box
+    final Widget bodyContent = Column(
+      children: [
+        // Search box
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             color: Colors.indigo.shade900,
@@ -369,9 +361,25 @@ class _NoticeScreenState extends State<NoticeScreen> {
                               },
                             ),
                           ),
-          ),
-        ],
+                        ),
+      ],
+    );
+
+    if (widget.isEmbedded) {
+      return bodyContent;
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'Notice Board',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
+        ),
+        iconTheme: const IconThemeData(color: Colors.white),
+        backgroundColor: Colors.indigo.shade800,
+        elevation: 0,
       ),
+      body: bodyContent,
     );
   }
 }

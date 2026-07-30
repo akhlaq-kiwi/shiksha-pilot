@@ -14,12 +14,14 @@ class NotificationCenterScreen extends StatefulWidget {
   final String baseUrl;
   final String token;
   final int? studentId;
+  final bool isEmbedded;
 
   const NotificationCenterScreen({
     Key? key,
     required this.baseUrl,
     required this.token,
     this.studentId,
+    this.isEmbedded = false,
   }) : super(key: key);
 
   @override
@@ -131,54 +133,53 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        title: const Text(
-          'Notifications',
-          style: TextStyle(fontWeight: FontWeight.w900, color: Colors.black87),
-        ),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black87),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.indigo))
-          : _errorText.isNotEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(_errorText, style: const TextStyle(color: Colors.red)),
-                      const SizedBox(height: 12),
-                      ElevatedButton(
-                        onPressed: _fetchNotifications,
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo),
-                        child: const Text('Retry'),
-                      ),
-                    ],
-                  ),
-                )
-              : _notifications.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.notifications_off_outlined, size: 64, color: Colors.grey.shade400),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No new notifications',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey.shade600,
+    final Widget bodyContent = _isLoading
+        ? const Center(child: CircularProgressIndicator(color: Colors.indigo))
+        : _errorText.isNotEmpty
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(_errorText, style: const TextStyle(color: Colors.red)),
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                      onPressed: _fetchNotifications,
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo),
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              )
+            : _notifications.isEmpty
+                ? RefreshIndicator(
+                    onRefresh: _fetchNotifications,
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: Container(
+                        height: MediaQuery.of(context).size.height * 0.7,
+                        alignment: Alignment.center,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.notifications_off_outlined, size: 64, color: Colors.grey.shade400),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No new notifications',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey.shade600,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    )
-                  : ListView.builder(
-                      physics: const BouncingScrollPhysics(),
+                    ),
+                  )
+                : RefreshIndicator(
+                    onRefresh: _fetchNotifications,
+                    child: ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       itemCount: _notifications.length,
                       itemBuilder: (context, index) {
@@ -489,6 +490,24 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                         );
                       },
                     ),
+                  );
+
+    if (widget.isEmbedded) {
+      return bodyContent;
+    }
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        title: const Text(
+          'Notifications',
+          style: TextStyle(fontWeight: FontWeight.w900, color: Colors.black87),
+        ),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.black87),
+      ),
+      body: bodyContent,
     );
   }
 }

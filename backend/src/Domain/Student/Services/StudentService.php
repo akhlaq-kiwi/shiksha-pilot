@@ -241,19 +241,24 @@ class StudentService extends BaseService
 
         // Fetch all exams the student has marks in and that are published for their class
         $stmt = $pdo->prepare("
-            SELECT DISTINCT e.id, e.name AS exam_name, e.academic_year_id, :cid AS class_id, ay.name AS academic_year_name, c.name AS class_name, c.section AS class_section
+            SELECT DISTINCT e.id, e.name AS exam_name, e.academic_year_id, c.id AS class_id, ay.name AS academic_year_name, c.name AS class_name, c.section AS class_section
             FROM examinations e
             JOIN examination_class_status ecs ON e.id = ecs.exam_id
             JOIN examination_marks em ON e.id = em.exam_id
             JOIN academic_years ay ON e.academic_year_id = ay.id
-            JOIN classes c ON c.id = :cid
+            JOIN classes c ON c.id = :cid_1
             WHERE em.student_id = :sid 
-              AND ecs.class_id = :cid 
+              AND ecs.class_id = :cid_2 
               AND ecs.status = 'Published' 
               AND e.school_id = :school_id
             ORDER BY e.start_date DESC
         ");
-        $stmt->execute([':sid' => $studentId, ':cid' => $classId, ':school_id' => $schoolId]);
+        $stmt->execute([
+            ':sid' => $studentId, 
+            ':cid_1' => $classId, 
+            ':cid_2' => $classId, 
+            ':school_id' => $schoolId
+        ]);
         $publishedExams = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
         $reportCards = [];
@@ -283,13 +288,28 @@ class StudentService extends BaseService
             return 'F';
         };
 
-        // Fetch School Profile Details
-        $stmtSchool = $pdo->prepare("SELECT name, logo_path, report_card_remark FROM schools WHERE id = :sid LIMIT 1");
+        // Fetch School Profile & Active Template Details
+        $stmtSchool = $pdo->prepare("
+            SELECT s.name, s.street_address, s.city, s.state, s.logo_path, s.report_card_remark, rct.code AS template_code 
+            FROM schools s 
+            LEFT JOIN report_card_templates rct ON s.report_card_template_id = rct.id 
+            WHERE s.id = :sid 
+            LIMIT 1
+        ");
         $stmtSchool->execute([':sid' => $schoolId]);
-        $school = $stmtSchool->fetch(\PDO::FETCH_ASSOC);
-        if ($school) {
-            $school['report_card_remark'] = $school['report_card_remark'] ?? '';
-        }
+        $school = $stmtSchool->fetch(\PDO::FETCH_ASSOC) ?: [];
+        $school['report_card_remark'] = $school['report_card_remark'] ?? '';
+        $schoolAddress = (string)($school['street_address'] ?? '');
+
+        $logoPath = (string)($school['logo_path'] ?? '');
+        $host = $_SERVER['HTTP_HOST'] ?? '10.55.253.71:8000';
+        $scheme = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
+        $baseUrl = "{$scheme}://{$host}";
+        $schoolLogoUrl = !empty($logoPath) 
+            ? (str_starts_with($logoPath, 'http') ? $logoPath : $baseUrl . '/' . ltrim($logoPath, '/')) 
+            : null;
+
+        $tplCode = $school['template_code'] ?? 'traditional';
 
         foreach ($publishedExams as $ex) {
             $examId = (int)$ex['id'];
@@ -478,12 +498,15 @@ class StudentService extends BaseService
                 'admission_no' => $student['sr_no'] ?? $student['admission_no'] ?? '',
                 'father_name' => $student['father_name'] ?? '',
                 'mother_name' => $student['mother_name'] ?? '',
+                'dob' => $student['dob'] ?? '',
                 'class_name' => $ex['class_name'],
                 'class_section' => $ex['class_section'],
                 'academic_year_name' => $ex['academic_year_name'],
                 'school_name' => $school['name'] ?? 'Academic Portal',
-                'school_logo' => $school['logo_path'] ?? null,
+                'school_address' => $schoolAddress,
+                'school_logo' => $schoolLogoUrl,
                 'report_card_remark' => $school['report_card_remark'] ?? null,
+                'template_code' => $tplCode,
                 'subjects' => $subjectMarks,
                 'total_max' => $totalMax,
                 'total_obtained' => $totalObtained,
@@ -893,7 +916,9 @@ class StudentService extends BaseService
             FROM examinations e
             JOIN examination_papers ep ON e.id = ep.exam_id
             LEFT JOIN examination_class_status ecs ON e.id = ecs.exam_id AND ecs.class_id = :class_id_1
-            WHERE ep.class_id = :class_id_2 AND e.school_id = :school_id AND e.status = 'Published'
+            WHERE ep.class_id = :class_id_2 
+              AND e.school_id = :school_id 
+              AND (e.status = 'Published' OR COALESCE(ecs.scheme_published, 0) = 1 OR COALESCE(ecs.admit_card_published, 0) = 1 OR ecs.status = 'Published')
             ORDER BY e.start_date DESC
         ");
         $stmt->execute([
@@ -1013,8 +1038,15 @@ class StudentService extends BaseService
         $resultPublished = ($statusInfo && $statusInfo['result_status'] === 'Published') ? 1 : 0;
 
         // Fetch Exam basic info
-        $stmtExam = $pdo->prepare("SELECT name, start_date, end_date FROM examinations WHERE id = :id AND school_id = :sid AND status = 'Published' LIMIT 1");
-        $stmtExam->execute([':id' => $examId, ':sid' => $schoolId]);
+        $stmtExam = $pdo->prepare("
+            SELECT e.name, e.start_date, e.end_date 
+            FROM examinations e
+            LEFT JOIN examination_class_status ecs ON e.id = ecs.exam_id AND ecs.class_id = :class_id
+            WHERE e.id = :id AND e.school_id = :sid 
+              AND (e.status = 'Published' OR COALESCE(ecs.scheme_published, 0) = 1 OR COALESCE(ecs.admit_card_published, 0) = 1 OR ecs.status = 'Published')
+            LIMIT 1
+        ");
+        $stmtExam->execute([':id' => $examId, ':sid' => $schoolId, ':class_id' => $classId]);
         $exam = $stmtExam->fetch(PDO::FETCH_ASSOC);
         if (!$exam) {
             throw new NotFoundException('Examination not found.');
@@ -1148,6 +1180,15 @@ class StudentService extends BaseService
                     'total_marks_obtained' => $totalObtained,
                     'status' => $allPassed ? 'Pass' : 'Fail'
                 ];
+
+                // Attach full report_card data for mobile view & download
+                $allRC = $this->getPublishedReportCards($user);
+                foreach ($allRC as $rc) {
+                    if ((int)$rc['exam_id'] === $examId) {
+                        $response['report_card'] = $rc;
+                        break;
+                    }
+                }
             }
         }
 

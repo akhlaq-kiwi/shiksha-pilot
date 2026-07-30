@@ -10881,6 +10881,11 @@ Only approve the settlement after reviewing all financial records.
                 ':status' => $status,
                 ':status2' => $status
             ]);
+
+            if ($status === 'Published') {
+                $stmtUpd = $pdo->prepare("UPDATE examinations SET status = 'Published' WHERE id = :id AND status = 'Draft'");
+                $stmtUpd->execute([':id' => $examId]);
+            }
             
             // Audit Log & Notification for single class
             $stmtInfo = $pdo->prepare("SELECT name AS class_name, (SELECT name FROM academic_years WHERE id = :ay_id) AS academic_year_name FROM classes WHERE id = :class_id LIMIT 1");
@@ -10954,17 +10959,13 @@ Only approve the settlement after reviewing all financial records.
             throw new NotFoundException('Examination not found.');
         }
 
-        // 2. Complete check (timetabled papers >= school subjects)
-        $stmtCountSubjects = $pdo->prepare("SELECT COUNT(*) FROM subjects WHERE school_id = :sid");
-        $stmtCountSubjects->execute([':sid' => $schoolId]);
-        $totalSubjects = (int)$stmtCountSubjects->fetchColumn();
-
+        // 2. Check at least 1 paper is scheduled
         $stmtCountPapers = $pdo->prepare("SELECT COUNT(*) FROM examination_papers WHERE exam_id = :exam_id AND class_id = :class_id");
         $stmtCountPapers->execute([':exam_id' => $examId, ':class_id' => $classId]);
         $scheduledPapers = (int)$stmtCountPapers->fetchColumn();
 
-        if ($scheduledPapers === 0 || $scheduledPapers < $totalSubjects) {
-            throw new ValidationException(['message' => 'Please complete the examination timetable before publishing.']);
+        if ($scheduledPapers === 0) {
+            throw new ValidationException(['message' => 'Please add at least one exam paper before publishing.']);
         }
 
         // 3. Update/Insert in examination_class_status
@@ -10977,6 +10978,9 @@ Only approve the settlement after reviewing all financial records.
             ':exam_id' => $examId,
             ':class_id' => $classId
         ]);
+
+        $stmtUpd = $pdo->prepare("UPDATE examinations SET status = 'Published' WHERE id = :id AND status = 'Draft'");
+        $stmtUpd->execute([':id' => $examId]);
 
         // 4. Fetch additional info for audit logging
         $stmtInfo = $pdo->prepare("

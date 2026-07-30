@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:school_hub/services/exam_service.dart';
 import 'package:school_hub/services/notification_helper.dart';
 import 'package:pdf/pdf.dart';
@@ -1027,187 +1028,875 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
   }
 
   void _showStudentResultsModal() {
-    final Map<String, dynamic>? result = _details['result'] != null 
-        ? Map<String, dynamic>.from(_details['result']) 
-        : null;
+    final Map<String, dynamic> rcData = _details['report_card'] != null 
+        ? Map<String, dynamic>.from(_details['report_card']) 
+        : (_details['result'] != null ? _buildFallbackReportCardData(_details['result']) : {});
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.8,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(24),
-            topRight: Radius.circular(24),
-          ),
-        ),
-        child: Column(
-          children: [
-            const SizedBox(height: 12),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
+      builder: (context) => StatefulBuilder(
+        builder: (BuildContext context, StateSetter setModalState) {
+          return Container(
+            height: MediaQuery.of(context).size.height * 0.88,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(24),
+                topRight: Radius.circular(24),
               ),
             ),
-            const SizedBox(height: 16),
-            const Text(
-              'Examination Report Card',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.black87),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              widget.examName,
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
-            ),
-            const Divider(height: 24),
-            Expanded(
-              child: result == null
-                  ? const Center(child: Text('No result records found.'))
-                  : Column(
-                      children: [
-                        // Summary Card
-                        Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          padding: const EdgeInsets.all(18),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: result['status']?.toUpperCase() == 'PASS'
-                                  ? [Colors.green.shade700, Colors.green.shade900]
-                                  : [Colors.red.shade700, Colors.red.shade900],
-                            ),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Column(
+              children: [
+                const SizedBox(height: 12),
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.workspace_premium_rounded, color: Colors.indigo.shade900, size: 24),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Academic Report Card',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.black87),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  widget.examName,
+                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
+                ),
+                const Divider(height: 24),
+                Expanded(
+                  child: rcData.isEmpty
+                      ? const Center(child: Text('No report card details found.'))
+                      : SingleChildScrollView(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
                             children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'GRAND TOTAL',
-                                    style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold),
+                              // Download Action Button
+                              ElevatedButton.icon(
+                                onPressed: _isDownloading ? null : () => _downloadReportCardPDF(rcData, setModalState),
+                                icon: _isDownloading
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Icon(Icons.download_rounded),
+                                label: Text(_isDownloading ? 'Downloading...' : 'Download Report Card (PDF)'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.indigo.shade900,
+                                  foregroundColor: Colors.white,
+                                  minimumSize: const Size.fromHeight(50),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${result['total_marks_obtained']} / ${result['total_max_marks']}',
-                                    style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900),
-                                  ),
-                                ],
+                                ),
                               ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(30),
-                                ),
-                                child: Text(
-                                  result['status']?.toUpperCase() ?? 'FAIL',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 16,
-                                  ),
-                                ),
+                              const SizedBox(height: 20),
+
+                              // Formatted Report Card Container (Dynamic Active Template Match)
+                              Builder(
+                                builder: (context) {
+                                  final String templateCode = (rcData['template_code'] ?? 'traditional').toString().toLowerCase();
+                                  final theme = _getTemplateTheme(templateCode);
+                                  final Color primaryColor = theme['primaryColor'] as Color;
+                                  final Color cardBg = theme['cardBg'] as Color;
+                                  final BoxBorder border = theme['border'] as BoxBorder;
+                                  final String badgeTitle = theme['badgeTitle'] as String;
+
+                                  return Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: cardBg,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: border,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.04),
+                                          blurRadius: 10,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                         // School Banner (Matching School Admin Modern Banner Header)
+                                         Container(
+                                           padding: const EdgeInsets.all(14),
+                                           decoration: BoxDecoration(
+                                             gradient: LinearGradient(
+                                               colors: [Colors.teal.shade900, Colors.teal.shade800],
+                                               begin: Alignment.topLeft,
+                                               end: Alignment.bottomRight,
+                                             ),
+                                             borderRadius: BorderRadius.circular(12),
+                                             border: Border.all(color: Colors.amber.shade400.withOpacity(0.4)),
+                                           ),
+                                           child: Row(
+                                             crossAxisAlignment: CrossAxisAlignment.center,
+                                             children: [
+                                               // School Logo
+                                               if (rcData['school_logo'] != null && rcData['school_logo'].toString().isNotEmpty)
+                                                 ClipRRect(
+                                                   borderRadius: BorderRadius.circular(10),
+                                                   child: Image.network(
+                                                     rcData['school_logo'].toString(),
+                                                     width: 54,
+                                                     height: 54,
+                                                     fit: BoxFit.cover,
+                                                     errorBuilder: (_, __, ___) => Container(
+                                                       width: 54,
+                                                       height: 54,
+                                                       decoration: BoxDecoration(
+                                                         color: Colors.amber.shade400,
+                                                         borderRadius: BorderRadius.circular(10),
+                                                       ),
+                                                       child: Center(
+                                                         child: Text(
+                                                           (rcData['school_name'] ?? 'S').toString().isNotEmpty
+                                                               ? (rcData['school_name'] ?? 'S').toString()[0].toUpperCase()
+                                                               : 'S',
+                                                           style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Color(0xFF042F2E)),
+                                                         ),
+                                                       ),
+                                                     ),
+                                                   ),
+                                                 )
+                                               else
+                                                 Container(
+                                                   width: 54,
+                                                   height: 54,
+                                                   decoration: BoxDecoration(
+                                                     color: Colors.amber.shade400,
+                                                     borderRadius: BorderRadius.circular(10),
+                                                   ),
+                                                   child: Center(
+                                                     child: Text(
+                                                       (rcData['school_name'] ?? 'S').toString().isNotEmpty
+                                                           ? (rcData['school_name'] ?? 'S').toString()[0].toUpperCase()
+                                                           : 'S',
+                                                       style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Color(0xFF042F2E)),
+                                                     ),
+                                                   ),
+                                                 ),
+                                               const SizedBox(width: 12),
+                                               // School Text Meta
+                                               Expanded(
+                                                 child: Column(
+                                                   crossAxisAlignment: CrossAxisAlignment.start,
+                                                   children: [
+                                                     Text(
+                                                       (rcData['school_name'] ?? 'SCHOOL NAME').toString().toUpperCase(),
+                                                       style: TextStyle(
+                                                         fontSize: 15,
+                                                         fontWeight: FontWeight.w900,
+                                                         color: Colors.amber.shade300,
+                                                         letterSpacing: 0.2,
+                                                       ),
+                                                       maxLines: 1,
+                                                       overflow: TextOverflow.ellipsis,
+                                                     ),
+                                                     if ((rcData['school_address'] ?? '').toString().isNotEmpty) ...[
+                                                       const SizedBox(height: 2),
+                                                       Text(
+                                                         rcData['school_address'].toString(),
+                                                         style: TextStyle(fontSize: 10, color: Colors.teal.shade50, fontWeight: FontWeight.w500),
+                                                         maxLines: 1,
+                                                         overflow: TextOverflow.ellipsis,
+                                                       ),
+                                                     ],
+                                                     const SizedBox(height: 6),
+                                                     Row(
+                                                       children: [
+                                                         Container(
+                                                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                                           decoration: BoxDecoration(
+                                                             color: Colors.amber.shade400,
+                                                             borderRadius: BorderRadius.circular(4),
+                                                           ),
+                                                           child: Text(
+                                                             (rcData['exam_name'] ?? widget.examName).toString().toUpperCase(),
+                                                             style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Color(0xFF042F2E)),
+                                                           ),
+                                                         ),
+                                                         const SizedBox(width: 8),
+                                                         Text(
+                                                           'Session: ${rcData['academic_year_name'] ?? '2026-2027'}',
+                                                           style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white70),
+                                                         ),
+                                                       ],
+                                                     ),
+                                                   ],
+                                                 ),
+                                               ),
+                                             ],
+                                           ),
+                                         ),
+                                         const SizedBox(height: 14),
+
+                                         // Student Details Grid (Exact matching Admin Portal structure with DOB & SR/Roll)
+                                         Container(
+                                           padding: const EdgeInsets.all(12),
+                                           decoration: BoxDecoration(
+                                             color: Colors.grey.shade50,
+                                             borderRadius: BorderRadius.circular(10),
+                                             border: Border.all(color: Colors.grey.shade300),
+                                           ),
+                                           child: Column(
+                                             children: [
+                                               Row(
+                                                 children: [
+                                                   Expanded(child: _buildStudentDetailCell('STUDENT NAME', (rcData['student_name'] ?? '').toString(), isBold: true)),
+                                                   Expanded(child: _buildStudentDetailCell("FATHER'S NAME", (rcData['father_name'] ?? '—').toString(), isBold: true)),
+                                                   Expanded(child: _buildStudentDetailCell("MOTHER'S NAME", (rcData['mother_name'] ?? '—').toString(), isBold: true)),
+                                                 ],
+                                               ),
+                                               const SizedBox(height: 8),
+                                               Row(
+                                                 children: [
+                                                   Expanded(child: _buildStudentDetailCell('CLASS & SECTION', '${rcData['class_name'] ?? ''} ${rcData['class_section'] != null ? '(${rcData['class_section']})' : ''}', isBold: true)),
+                                                   Expanded(child: _buildStudentDetailCell('ROLL / SR NO', '${rcData['roll_no'] ?? '—'} | ${rcData['admission_no'] ?? '—'}', isBold: true)),
+                                                   Expanded(child: _buildStudentDetailCell('DATE OF BIRTH', (rcData['dob'] ?? '—').toString(), isBold: true)),
+                                                 ],
+                                               ),
+                                             ],
+                                           ),
+                                         ),
+                                         const SizedBox(height: 16),
+
+                                         // Scholastic Performance Marks Table
+                                         Container(
+                                           decoration: BoxDecoration(
+                                             borderRadius: BorderRadius.circular(8),
+                                             border: Border.all(color: Colors.teal.shade900),
+                                           ),
+                                           child: Column(
+                                             children: [
+                                               // Table Header
+                                               Container(
+                                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                                 decoration: const BoxDecoration(
+                                                   color: Color(0xFF042F2E),
+                                                   borderRadius: BorderRadius.only(topLeft: Radius.circular(6), topRight: Radius.circular(6)),
+                                                 ),
+                                                 child: const Row(
+                                                   children: [
+                                                     Expanded(flex: 3, child: Text('SUBJECT', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white))),
+                                                     Expanded(flex: 2, child: Text('OBTAINED', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white))),
+                                                     Expanded(flex: 2, child: Text('MAX', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white))),
+                                                     Expanded(flex: 2, child: Text('PASS', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white))),
+                                                     Expanded(flex: 2, child: Text('GRADE', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white))),
+                                                     Expanded(flex: 2, child: Text('VERDICT', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white))),
+                                                   ],
+                                                 ),
+                                               ),
+                                               // Table Rows
+                                               ...((rcData['subjects'] as List? ?? []).map((sub) {
+                                                 final String sName = (sub['subject_name'] ?? '').toString();
+                                                 final String maxM = (sub['max_marks'] ?? '-').toString();
+                                                 final String passM = (sub['passing_marks'] ?? '-').toString();
+                                                 final String obt = (sub['marks_obtained'] ?? '-').toString();
+                                                 final String grade = (sub['grade'] ?? '-').toString();
+                                                 final String res = (sub['result'] ?? 'PASS').toString().toUpperCase();
+                                                 final bool isFail = res == 'FAIL';
+
+                                                 return Container(
+                                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                                   decoration: BoxDecoration(
+                                                     border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+                                                   ),
+                                                   child: Row(
+                                                     children: [
+                                                       Expanded(flex: 3, child: Text(sName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87))),
+                                                       Expanded(flex: 2, child: Text(obt, textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: isFail ? Colors.red.shade700 : Colors.teal.shade900))),
+                                                       Expanded(flex: 2, child: Text(maxM, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, color: Colors.black87))),
+                                                       Expanded(flex: 2, child: Text(passM, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, color: Colors.black54))),
+                                                       Expanded(flex: 2, child: Text(grade, textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isFail ? Colors.red.shade700 : Colors.teal.shade900))),
+                                                       Expanded(
+                                                         flex: 2,
+                                                         child: Center(
+                                                           child: Container(
+                                                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                             decoration: BoxDecoration(
+                                                               color: isFail ? Colors.red.shade100 : Colors.teal.shade100,
+                                                               borderRadius: BorderRadius.circular(4),
+                                                             ),
+                                                             child: Text(
+                                                               res,
+                                                               style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: isFail ? Colors.red.shade900 : Colors.teal.shade900),
+                                                             ),
+                                                           ),
+                                                         ),
+                                                       ),
+                                                     ],
+                                                   ),
+                                                 );
+                                               })).toList(),
+                                             ],
+                                           ),
+                                         ),
+                                         const SizedBox(height: 16),
+
+                                         // Performance Summary Cards Row (5 columns matching Admin Portal)
+                                         Row(
+                                           children: [
+                                             Expanded(child: _buildSummaryMetricCard('TOTAL MARKS', '${rcData['total_obtained'] ?? 0} / ${rcData['total_max'] ?? 0}', Colors.teal.shade50, const Color(0xFF042F2E))),
+                                             const SizedBox(width: 4),
+                                             Expanded(child: _buildSummaryMetricCard('PERCENTAGE', '${rcData['percentage'] ?? 0}%', Colors.amber.shade50, const Color(0xFF451A03))),
+                                             const SizedBox(width: 4),
+                                             Expanded(child: _buildSummaryMetricCard('OVERALL GRADE', 'Grade ${rcData['grade'] ?? 'A'}', Colors.teal.shade50, const Color(0xFF042F2E))),
+                                             const SizedBox(width: 4),
+                                             Expanded(child: _buildSummaryMetricCard('ATTENDANCE', '${rcData['attendance']?['attendance_rate'] ?? 100}%', Colors.amber.shade50, const Color(0xFF451A03))),
+                                             const SizedBox(width: 4),
+                                             Expanded(child: _buildSummaryMetricCard('CLASS RANK', '${(rcData['class_rank'] ?? '1').toString().split(' ')[0]}', Colors.teal.shade50, const Color(0xFF042F2E))),
+                                           ],
+                                         ),
+                                         const SizedBox(height: 16),
+
+                                         // Teacher Remarks (If exists)
+                                         if (rcData['report_card_remark'] != null && rcData['report_card_remark'].toString().trim().isNotEmpty) ...[
+                                           Padding(
+                                             padding: const EdgeInsets.symmetric(horizontal: 4),
+                                             child: RichText(
+                                               text: TextSpan(
+                                                 style: const TextStyle(fontSize: 11, color: Colors.black87),
+                                                 children: [
+                                                   const TextSpan(text: 'Teacher Remarks: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                                                   TextSpan(text: rcData['report_card_remark'].toString()),
+                                                 ],
+                                               ),
+                                             ),
+                                           ),
+                                           const SizedBox(height: 16),
+                                         ],
+
+                                         // Footer Signatures Box
+                                         Row(
+                                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                           children: [
+                                             Column(
+                                               children: [
+                                                 Container(width: 120, height: 1, color: Colors.grey.shade500),
+                                                 const SizedBox(height: 4),
+                                                 const Text('CLASS TEACHER SIGNATURE', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Colors.black87)),
+                                               ],
+                                             ),
+                                             Column(
+                                               children: [
+                                                 Container(width: 120, height: 1, color: Colors.grey.shade500),
+                                                 const SizedBox(height: 4),
+                                                 const Text('PRINCIPAL SIGNATURE & STAMP', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Colors.black87)),
+                                               ],
+                                             ),
+                                           ],
+                                         ),
+                                      ],
+                                    ),
+                                  );
+                                },
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 16),
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              'SUBJECT DETAILS',
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Colors.grey),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Map<String, dynamic> _buildFallbackReportCardData(Map<String, dynamic> result) {
+    final List<dynamic> papers = result['papers'] ?? [];
+    final double totalMax = double.tryParse((result['total_max_marks'] ?? 0.0).toString()) ?? 0.0;
+    final double totalObt = double.tryParse((result['total_marks_obtained'] ?? 0.0).toString()) ?? 0.0;
+    final double pct = totalMax > 0 ? (totalObt / totalMax * 100) : 0.0;
+
+    return {
+      'exam_name': widget.examName,
+      'school_name': 'ACADEMIC INSTITUTION',
+      'academic_year_name': '2026-2027',
+      'student_name': 'STUDENT',
+      'class_name': 'CLASS',
+      'roll_no': '—',
+      'father_name': '—',
+      'mother_name': '—',
+      'admission_no': '—',
+      'subjects': papers.map((p) => {
+        'subject_name': p['subject_name'] ?? 'Subject',
+        'max_marks': p['max_marks'],
+        'passing_marks': p['passing_marks'],
+        'marks_obtained': p['is_absent'] == 1 ? 'ABSENT' : p['marks_obtained'],
+        'grade': p['is_absent'] == 1 ? 'F' : 'A',
+        'result': p['is_absent'] == 1 ? 'FAIL' : 'PASS',
+      }).toList(),
+      'total_max': totalMax,
+      'total_obtained': totalObt,
+      'percentage': pct.toStringAsFixed(1),
+      'grade': pct >= 80 ? 'A' : (pct >= 60 ? 'B' : 'C'),
+      'result': result['status']?.toUpperCase() ?? 'PASS',
+      'class_rank': '1 of 1',
+      'attendance': {'attendance_rate': 100},
+    };
+  }
+
+  Map<String, dynamic> _getTemplateTheme(String templateCode) {
+    switch (templateCode) {
+      case 'modern':
+        return {
+          'primaryColor': Colors.indigo.shade900,
+          'headerBg': Colors.indigo.shade900,
+          'headerText': Colors.white,
+          'border': Border.all(color: Colors.indigo.shade900, width: 2),
+          'cardBg': Colors.indigo.shade50.withOpacity(0.3),
+          'badgeTitle': 'MODERN ACADEMIC REPORT CARD',
+        };
+      case 'cbse_classic':
+        return {
+          'primaryColor': Colors.blue.shade900,
+          'headerBg': Colors.blue.shade900,
+          'headerText': Colors.white,
+          'border': Border.all(color: Colors.blue.shade900, width: 2.5),
+          'cardBg': Colors.white,
+          'badgeTitle': 'CLASSIC CBSE REPORT CARD',
+        };
+      case 'primary_compact':
+        return {
+          'primaryColor': Colors.teal.shade900,
+          'headerBg': Colors.teal.shade900,
+          'headerText': Colors.white,
+          'border': Border.all(color: Colors.teal.shade800, width: 2),
+          'cardBg': Colors.teal.shade50.withOpacity(0.3),
+          'badgeTitle': 'PRIMARY COMPACT REPORT CARD',
+        };
+      case 'traditional':
+      default:
+        return {
+          'primaryColor': Colors.indigo.shade900,
+          'headerBg': Colors.indigo.shade900,
+          'headerText': Colors.white,
+          'border': Border.all(color: Colors.indigo.shade900, width: 2.5),
+          'cardBg': Colors.amber.shade50.withOpacity(0.2),
+          'badgeTitle': 'OFFICIAL ACADEMIC REPORT CARD',
+        };
+    }
+  }
+
+  Widget _buildStudentDetailCell(String label, String value, {bool isBold = false}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.grey.shade600)),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: TextStyle(fontSize: isBold ? 11 : 10, fontWeight: isBold ? FontWeight.w900 : FontWeight.bold, color: Colors.black87),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSummaryMetricCard(String label, String value, Color bg, Color textCol) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: textCol.withOpacity(0.3)),
+      ),
+      child: Column(
+        children: [
+          Text(label, style: TextStyle(fontSize: 7, fontWeight: FontWeight.bold, color: textCol)),
+          const SizedBox(height: 2),
+          Text(value, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: textCol)),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _downloadReportCardPDF(Map<String, dynamic> reportCard, StateSetter setModalState) async {
+    setModalState(() {
+      _isDownloading = true;
+    });
+    try {
+      final pdf = pw.Document();
+
+      final String schoolName = (reportCard['school_name'] ?? 'ACADEMIC INSTITUTION').toString().toUpperCase();
+      final String examName = (reportCard['exam_name'] ?? widget.examName).toString();
+      final String academicYear = (reportCard['academic_year_name'] ?? '2026-2027').toString();
+      final String studentName = (reportCard['student_name'] ?? 'Student Name').toString().toUpperCase();
+      final String className = (reportCard['class_name'] ?? '').toString();
+      final String classSection = (reportCard['class_section'] ?? '').toString();
+      final String fullClass = classSection.isNotEmpty ? '$className ($classSection)' : className;
+      final String rollNo = (reportCard['roll_no'] ?? '—').toString();
+      final String fatherName = (reportCard['father_name'] ?? '—').toString();
+      final String motherName = (reportCard['mother_name'] ?? '—').toString();
+      final String admissionNo = (reportCard['admission_no'] ?? '—').toString();
+      final List<dynamic> subjects = reportCard['subjects'] as List? ?? [];
+
+      final double totalMax = double.tryParse((reportCard['total_max'] ?? reportCard['total_max_marks'] ?? 0.0).toString()) ?? 0.0;
+      final double totalObtained = double.tryParse((reportCard['total_obtained'] ?? reportCard['total_marks_obtained'] ?? 0.0).toString()) ?? 0.0;
+      final double percentage = double.tryParse((reportCard['percentage'] ?? 0.0).toString()) ?? (totalMax > 0 ? (totalObtained / totalMax * 100) : 0.0);
+      final String grade = (reportCard['grade'] ?? 'F').toString();
+      final String result = (reportCard['result'] ?? reportCard['status'] ?? 'PASS').toString().toUpperCase();
+      final String classRank = (reportCard['class_rank'] ?? '1 of 1').toString();
+      final String remark = (reportCard['report_card_remark'] ?? '').toString();
+      final Map<String, dynamic> attendance = reportCard['attendance'] is Map ? Map<String, dynamic>.from(reportCard['attendance']) : {};
+      final String attRate = '${attendance['attendance_rate'] ?? 100}%';
+
+      final String schoolAddress = (reportCard['school_address'] ?? '').toString();
+      final String schoolLogo = (reportCard['school_logo'] ?? '').toString();
+      final String dob = (reportCard['dob'] ?? '—').toString();
+
+      pw.MemoryImage? logoImage;
+      if (schoolLogo.isNotEmpty) {
+        try {
+          final response = await http.get(Uri.parse(schoolLogo));
+          if (response.statusCode == 200) {
+            logoImage = pw.MemoryImage(response.bodyBytes);
+          }
+        } catch (_) {}
+      }
+
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(24),
+          build: (pw.Context context) {
+            return pw.Container(
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(color: PdfColors.teal900, width: 2),
+                borderRadius: pw.BorderRadius.circular(8),
+              ),
+              padding: const pw.EdgeInsets.all(16),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  // School Banner Header (Matching Modern Template Admin Banner)
+                  pw.Container(
+                    padding: const pw.EdgeInsets.all(12),
+                    decoration: pw.BoxDecoration(
+                      color: PdfColors.teal900,
+                      borderRadius: pw.BorderRadius.circular(6),
+                    ),
+                    child: pw.Row(
+                      children: [
+                        if (logoImage != null) ...[
+                          pw.Container(
+                            width: 50,
+                            height: 50,
+                            decoration: pw.BoxDecoration(
+                              borderRadius: pw.BorderRadius.circular(6),
+                              color: PdfColors.white,
                             ),
+                            padding: const pw.EdgeInsets.all(4),
+                            child: pw.Image(logoImage, fit: pw.BoxFit.contain),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Expanded(
-                          child: ListView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            itemCount: (result['papers'] as List).length,
-                            itemBuilder: (context, index) {
-                              final paper = result['papers'][index];
-                              final sub = paper['subject_name'] ?? '';
-                              final obt = paper['marks_obtained'];
-                              final max = paper['max_marks'];
-                              final pass = paper['passing_marks'];
-                              final isAbs = paper['is_absent'] == 1;
-
-                              final isPassed = !isAbs && obt != null && obt >= pass;
-
-                              return Container(
-                                margin: const EdgeInsets.only(bottom: 12),
-                                padding: const EdgeInsets.all(14),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: Colors.grey.shade200),
+                          pw.SizedBox(width: 12),
+                        ],
+                        pw.Expanded(
+                          child: pw.Column(
+                            crossAxisAlignment: pw.CrossAxisAlignment.start,
+                            children: [
+                              pw.Text(
+                                schoolName,
+                                style: pw.TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: PdfColors.amber300,
                                 ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            sub,
-                                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Colors.black87),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            'Passing Marks: $pass',
-                                            style: TextStyle(fontSize: 12, color: Colors.grey.shade500, fontWeight: FontWeight.bold),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.end,
-                                      children: [
-                                        Text(
-                                          isAbs ? 'ABSENT' : '$obt / $max',
-                                          style: TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w900,
-                                            color: isAbs 
-                                                ? Colors.red.shade700 
-                                                : (isPassed ? Colors.green.shade700 : Colors.red.shade700),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          isAbs ? 'Fail' : (isPassed ? 'Pass' : 'Fail'),
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                            color: isAbs 
-                                                ? Colors.red.shade700 
-                                                : (isPassed ? Colors.green.shade600 : Colors.red.shade600),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
+                              ),
+                              if (schoolAddress.isNotEmpty) ...[
+                                pw.SizedBox(height: 2),
+                                pw.Text(
+                                  schoolAddress,
+                                  style: const pw.TextStyle(fontSize: 9, color: PdfColors.teal100),
                                 ),
-                              );
-                            },
+                              ],
+                              pw.SizedBox(height: 4),
+                              pw.Row(
+                                children: [
+                                  pw.Container(
+                                    padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: const pw.BoxDecoration(color: PdfColors.amber400),
+                                    child: pw.Text(
+                                      examName.toUpperCase(),
+                                      style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#042F2E')),
+                                    ),
+                                  ),
+                                  pw.SizedBox(width: 8),
+                                  pw.Text(
+                                    'Session: $academicYear',
+                                    style: const pw.TextStyle(fontSize: 9, color: PdfColors.white),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
-            ),
-          ],
+                  ),
+                  pw.SizedBox(height: 10),
+
+                  // Student Details Grid
+                  pw.Container(
+                    padding: const pw.EdgeInsets.all(10),
+                    decoration: pw.BoxDecoration(
+                      color: PdfColors.grey100,
+                      borderRadius: pw.BorderRadius.circular(6),
+                      border: pw.Border.all(color: PdfColors.grey300),
+                    ),
+                    child: pw.Column(
+                      children: [
+                        pw.Row(
+                          children: [
+                            pw.Expanded(child: _pdfInfoCell('STUDENT NAME', studentName, isBold: true)),
+                            pw.Expanded(child: _pdfInfoCell("FATHER'S NAME", fatherName, isBold: true)),
+                            pw.Expanded(child: _pdfInfoCell("MOTHER'S NAME", motherName, isBold: true)),
+                          ],
+                        ),
+                        pw.SizedBox(height: 6),
+                        pw.Row(
+                          children: [
+                            pw.Expanded(child: _pdfInfoCell('CLASS & SECTION', fullClass, isBold: true)),
+                            pw.Expanded(child: _pdfInfoCell('ROLL / SR NO', '$rollNo | $admissionNo', isBold: true)),
+                            pw.Expanded(child: _pdfInfoCell('DATE OF BIRTH', dob, isBold: true)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  pw.SizedBox(height: 12),
+
+                  // Marks Table (Matching Admin Portal Column Headers: SUBJECT, OBTAINED, MAX, PASS, GRADE, VERDICT)
+                  pw.Table(
+                    border: pw.TableBorder.all(color: PdfColors.grey400),
+                    children: [
+                      // Header Row
+                      pw.TableRow(
+                        decoration: const pw.BoxDecoration(color: PdfColors.teal900),
+                        children: [
+                          _pdfTableHeaderCell('SUBJECT'),
+                          _pdfTableHeaderCell('OBTAINED'),
+                          _pdfTableHeaderCell('MAX'),
+                          _pdfTableHeaderCell('PASS'),
+                          _pdfTableHeaderCell('GRADE'),
+                          _pdfTableHeaderCell('VERDICT'),
+                        ],
+                      ),
+                      // Data Rows
+                      ...subjects.map((sub) {
+                        final String sName = (sub['subject_name'] ?? '').toString();
+                        final String maxM = (sub['max_marks'] ?? '-').toString();
+                        final String passM = (sub['passing_marks'] ?? '-').toString();
+                        final String obt = (sub['marks_obtained'] ?? '-').toString();
+                        final String sGrade = (sub['grade'] ?? '-').toString();
+                        final String sRes = (sub['result'] ?? (sub['is_absent'] == 1 ? 'FAIL' : 'PASS')).toString().toUpperCase();
+                        final bool isFail = sRes == 'FAIL';
+
+                        return pw.TableRow(
+                          children: [
+                            _pdfTableCell(sName, alignLeft: true),
+                            _pdfTableCell(obt, isBold: true, color: isFail ? PdfColors.red700 : PdfColors.teal900),
+                            _pdfTableCell(maxM),
+                            _pdfTableCell(passM),
+                            _pdfTableCell(sGrade),
+                            _pdfTableCell(sRes, color: isFail ? PdfColors.red700 : PdfColors.teal900, isBold: true),
+                          ],
+                        );
+                      }).toList(),
+                    ],
+                  ),
+                  pw.SizedBox(height: 12),
+
+                  // Summary Cards Row (5 columns matching Admin Portal)
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      _pdfSummaryBox('TOTAL MARKS', '${totalObtained.toStringAsFixed(0)} / ${totalMax.toStringAsFixed(0)}', PdfColors.teal50, PdfColors.teal900),
+                      _pdfSummaryBox('PERCENTAGE', '${percentage.toStringAsFixed(1)}%', PdfColors.amber50, PdfColors.amber900),
+                      _pdfSummaryBox('OVERALL GRADE', 'Grade $grade', PdfColors.teal50, PdfColors.teal900),
+                      _pdfSummaryBox('ATTENDANCE', attRate, PdfColors.amber50, PdfColors.amber900),
+                      _pdfSummaryBox('CLASS RANK', classRank.split(' ')[0], PdfColors.teal50, PdfColors.teal900),
+                    ],
+                  ),
+                  pw.SizedBox(height: 10),
+
+                  if (remark.isNotEmpty) ...[
+                    pw.Container(
+                      width: double.infinity,
+                      padding: const pw.EdgeInsets.all(8),
+                      decoration: pw.BoxDecoration(
+                        color: PdfColors.grey50,
+                        border: pw.Border.all(color: PdfColors.grey300),
+                        borderRadius: pw.BorderRadius.circular(4),
+                      ),
+                      child: pw.Text('Remarks: $remark', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey800)),
+                    ),
+                    pw.SizedBox(height: 10),
+                  ],
+
+                  pw.Spacer(),
+
+                  // Signatures Footer
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Column(
+                        children: [
+                          pw.Container(width: 120, height: 1, color: PdfColors.black),
+                          pw.SizedBox(height: 4),
+                          pw.Text('CLASS TEACHER SIGNATURE', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+                        ],
+                      ),
+                      pw.Column(
+                        children: [
+                          pw.Container(width: 120, height: 1, color: PdfColors.black),
+                          pw.SizedBox(height: 4),
+                          pw.Text('PRINCIPAL SIGNATURE & STAMP', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
         ),
+      );
+
+      final pdfBytes = await pdf.save();
+      final timestamp = DateTime.now().millisecondsSinceEpoch.toString().substring(8);
+      final defaultFilename = 'Report_Card_${studentName.replaceAll(RegExp(r'\s+'), '_')}_$timestamp.pdf';
+
+      String? savedPath;
+
+      if (Platform.isAndroid) {
+        const platform = MethodChannel('com.shikshapilot.schoolhub/battery');
+        try {
+          final savedUri = await platform.invokeMethod<String>(
+            'saveFileToDownloads',
+            {
+              'fileName': defaultFilename,
+              'bytes': pdfBytes,
+            },
+          );
+          savedPath = savedUri;
+        } catch (e) {
+          debugPrint('MethodChannel save failed: $e');
+          final appExternalDir = await getExternalStorageDirectory();
+          if (appExternalDir != null) {
+            final fallbackFile = File('${appExternalDir.path}/$defaultFilename');
+            await fallbackFile.writeAsBytes(pdfBytes);
+            savedPath = fallbackFile.path;
+          }
+        }
+      } else {
+        final appDocDir = await getApplicationDocumentsDirectory();
+        final file = File('${appDocDir.path}/$defaultFilename');
+        await file.writeAsBytes(pdfBytes);
+        savedPath = file.path;
+      }
+
+      if (savedPath != null) {
+        try {
+          await NotificationHelper.showDownloadNotification(
+            title: 'Report Card Downloaded',
+            fileName: defaultFilename,
+            bytes: pdfBytes,
+          );
+        } catch (_) {}
+        _showToast('Report Card downloaded successfully');
+      } else {
+        _showErrorToast('Failed to download Report Card.');
+      }
+    } catch (e) {
+      _showErrorToast('Failed to download Report Card: ${e.toString()}');
+    } finally {
+      setModalState(() {
+        _isDownloading = false;
+      });
+    }
+  }
+
+  pw.Widget _pdfInfoCell(String label, String value, {bool isBold = false}) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text(label, style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey600)),
+        pw.SizedBox(height: 2),
+        pw.Text(
+          value,
+          style: pw.TextStyle(
+            fontSize: isBold ? 10 : 9,
+            fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
+            color: PdfColors.black,
+          ),
+        ),
+      ],
+    );
+  }
+
+  pw.Widget _pdfTableHeaderCell(String text) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.all(4),
+      child: pw.Text(
+        text,
+        style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+        textAlign: pw.TextAlign.center,
+      ),
+    );
+  }
+
+  pw.Widget _pdfTableCell(String text, {bool alignLeft = false, bool isBold = false, PdfColor? color}) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+      child: pw.Text(
+        text,
+        style: pw.TextStyle(
+          fontSize: 8,
+          fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
+          color: color ?? PdfColors.black,
+        ),
+        textAlign: alignLeft ? pw.TextAlign.left : pw.TextAlign.center,
+      ),
+    );
+  }
+
+  pw.Widget _pdfSummaryBox(String label, String value, PdfColor bg, PdfColor textCol) {
+    return pw.Container(
+      width: 90,
+      padding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 6),
+      decoration: pw.BoxDecoration(
+        color: bg,
+        borderRadius: pw.BorderRadius.circular(6),
+        border: pw.Border.all(color: textCol, width: 0.5),
+      ),
+      child: pw.Column(
+        children: [
+          pw.Text(label, style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold, color: textCol)),
+          pw.SizedBox(height: 2),
+          pw.Text(value, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: textCol)),
+        ],
       ),
     );
   }
