@@ -353,7 +353,7 @@ class _LoginScreenState extends State<LoginScreen> {
       await prefs.setString('user_role', role);
       await prefs.setString('user_name', name);
       await prefs.setString('user_phone', (user['phone'] as String?) ?? '');
-      await prefs.setString('school_name', (user['school_name'] as String?) ?? 'Shiksha Pilot Academy');
+      await prefs.setString('school_name', ((user['school_name'] as String?) ?? 'Shiksha Pilot Academy').toUpperCase());
       await prefs.setString('user_photo', (user['staff_photo_path'] as String?) ?? '');
 
       final leaveService = LeaveService(baseUrl: _baseUrl, token: token);

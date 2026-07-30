@@ -995,65 +995,10 @@ class _AchievementsScreenState extends State<AchievementsScreen> with SingleTick
 
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          children: [
-            const Expanded(
-              child: Text(
-                'Hall of Fame & Achievements',
-                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: -0.2),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            if (_academicYears.isNotEmpty) ...[
-              const SizedBox(width: 4),
-              Container(
-                height: 28,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.amber.shade300, width: 1.5),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _selectedYearId,
-                    isDense: true,
-                    icon: Icon(Icons.keyboard_arrow_down_rounded, color: Colors.amber.shade900, size: 16),
-                    style: TextStyle(
-                      color: Colors.amber.shade900,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 11,
-                    ),
-                    dropdownColor: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    items: _academicYears.map<DropdownMenuItem<String>>((y) {
-                      final idStr = y['id'].toString();
-                      final name = (y['name'] ?? y['academic_year_name'] ?? idStr).toString();
-                      return DropdownMenuItem<String>(
-                        value: idStr,
-                        child: Text(
-                          name,
-                          style: TextStyle(
-                            fontWeight: idStr == _selectedYearId ? FontWeight.bold : FontWeight.normal,
-                            color: idStr == _selectedYearId ? Colors.amber.shade900 : Colors.black87,
-                            fontSize: 11,
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (newVal) {
-                      if (newVal != null && newVal != _selectedYearId) {
-                        setState(() {
-                          _selectedYearId = newVal;
-                        });
-                        _fetchAchievements();
-                      }
-                    },
-                  ),
-                ),
-              ),
-            ],
-          ],
+        title: const Text(
+          'Hall of Fame & Achievements',
+          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: -0.2),
+          overflow: TextOverflow.ellipsis,
         ),
         backgroundColor: Colors.amber.shade800,
         foregroundColor: Colors.white,
@@ -1205,70 +1150,6 @@ class _AchievementsScreenState extends State<AchievementsScreen> with SingleTick
             ),
           );
         }),
-
-        // School Overall Card at Bottom
-        if (schoolOverallList.isNotEmpty) ...[
-          const SizedBox(height: 4),
-          Card(
-            margin: const EdgeInsets.only(bottom: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(18),
-              side: BorderSide(color: Colors.amber.shade700, width: 2),
-            ),
-            elevation: 3,
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              children: [
-                // School Overall Card Header
-                ListTile(
-                  tileColor: const Color(0xFFFFFBEB),
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFFDE68A),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.workspace_premium_rounded, color: Color(0xFFB45309), size: 22),
-                  ),
-                  title: const Text(
-                    'School Overall Achievers',
-                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Color(0xFF78350F)),
-                  ),
-                  subtitle: Text(
-                    '${schoolOverallList.length} Top School Achievers (Rank 1 - Rank ${schoolOverallList.length})',
-                    style: const TextStyle(fontSize: 11, color: Color(0xFF92400E), fontWeight: FontWeight.w600),
-                  ),
-                  trailing: Icon(
-                    (_searchQuery.isNotEmpty || _expandedClassKey == 'school_overall')
-                        ? Icons.keyboard_arrow_up_rounded
-                        : Icons.keyboard_arrow_down_rounded,
-                    color: const Color(0xFFB45309),
-                  ),
-                  onTap: () {
-                    setState(() {
-                      if (_expandedClassKey == 'school_overall') {
-                        _expandedClassKey = null;
-                      } else {
-                        _expandedClassKey = 'school_overall';
-                      }
-                    });
-                  },
-                ),
-
-                // Expanded School Overall Toppers (Rank 1 at top -> Rank 2 in middle -> Rank 3 at bottom)
-                if (_searchQuery.isNotEmpty || _expandedClassKey == 'school_overall') ...[
-                  const Divider(height: 1),
-                  Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: Column(
-                      children: schoolOverallList.map((topper) => _buildTopperItemCard(topper, isAcademic)).toList(),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
       ],
     );
   }

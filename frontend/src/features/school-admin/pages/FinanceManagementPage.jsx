@@ -47,7 +47,7 @@ export default function FinanceManagementPage() {
 
   useEffect(() => {
     const tab = location.state?.tab || new URLSearchParams(location.search).get('tab');
-    if (tab && ['expenses', 'additional-fee', 'transport-fee', 'late-payment-penalty'].includes(tab)) {
+    if (tab && ['expenses', 'additional-fee', 'late-payment-penalty'].includes(tab)) {
       setActiveTab(tab);
     }
   }, [location]);
@@ -254,7 +254,7 @@ export default function FinanceManagementPage() {
         schoolService.getClasses(),
         schoolService.getAcademicYears(),
         schoolService.getAdditionalFeeTypes(),
-        schoolService.getTransportFees(),
+        Promise.resolve([]),
         schoolService.getStudents({ limit: 1000 })
       ]);
       setClasses(clsList || []);
@@ -1117,16 +1117,6 @@ export default function FinanceManagementPage() {
             🏷️ Additional Fees
           </button>
           <button 
-            onClick={() => { setActiveTab('transport-fee'); setError(''); setSuccess(''); }}
-            className={`pb-3 text-xs font-extrabold uppercase tracking-wider border-b-2 px-4 transition-all ${
-              activeTab === 'transport-fee' 
-                ? 'border-primary text-primary' 
-                : 'border-transparent text-text-muted hover:text-text-primary'
-            }`}
-          >
-            🚌 Transport Fees
-          </button>
-          <button 
             onClick={() => { setActiveTab('late-payment-penalty'); setError(''); setSuccess(''); }}
             className={`pb-3 text-xs font-extrabold uppercase tracking-wider border-b-2 px-4 transition-all ${
               activeTab === 'late-payment-penalty' 
@@ -1556,33 +1546,7 @@ export default function FinanceManagementPage() {
       {/* Tab 4: Late Payment Penalty View */}
       {!loading && activeTab === 'late-payment-penalty' && (
         <div className="flex-1 flex flex-col min-h-0 space-y-4 animate-in fade-in duration-200">
-          
-          {/* Sub Tab Navigation */}
-          <div className="flex border-b border-border mb-2 bg-surface p-2 rounded-xl border">
-            <button 
-              onClick={() => setLppSubView('apply')}
-              className={`pb-2 pt-2 text-[11px] font-black uppercase tracking-wider border-b-2 px-6 transition-all ${
-                lppSubView === 'apply' 
-                  ? 'border-primary text-primary' 
-                  : 'border-transparent text-text-muted hover:text-text-primary'
-              }`}
-            >
-              ⚙️ Configure Penalty
-            </button>
-            <button 
-              onClick={() => setLppSubView('history')}
-              className={`pb-2 pt-2 text-[11px] font-black uppercase tracking-wider border-b-2 px-6 transition-all ${
-                lppSubView === 'history' 
-                  ? 'border-primary text-primary' 
-                  : 'border-transparent text-text-muted hover:text-text-primary'
-              }`}
-            >
-              📚 Audit History Log
-            </button>
-          </div>
-
-          {lppSubView === 'apply' ? (
-            <div className="space-y-4 overflow-y-auto pr-1">
+          <div className="space-y-4 overflow-y-auto pr-1">
               
               {/* Dashboard Statistics */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1788,128 +1752,6 @@ export default function FinanceManagementPage() {
                 </Button>
               </div>
             </div>
-          ) : (
-            /* Audit History Log Sub View */
-            <div className="flex-1 flex flex-col min-h-0 space-y-4 animate-in fade-in duration-200">
-              
-              {/* History Search Filters */}
-              <div className="flex-shrink-0 bg-surface border border-border p-5 rounded-2xl shadow-2xs space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
-                  <div>
-                    <Input 
-                      placeholder="Search by Student Name..."
-                      value={lppHistoryFilters.student_name}
-                      onChange={e => handleLppHistoryFilterChange('student_name', e.target.value)}
-                      className="text-xs"
-                    />
-                  </div>
-                  <div>
-                    <Input 
-                      placeholder="Admission Number..."
-                      value={lppHistoryFilters.admission_no}
-                      onChange={e => handleLppHistoryFilterChange('admission_no', e.target.value)}
-                      className="text-xs"
-                    />
-                  </div>
-                  <div>
-                    <Select
-                      value={lppHistoryFilters.class_name}
-                      onChange={e => handleLppHistoryFilterChange('class_name', e.target.value)}
-                      className="text-xs cursor-pointer"
-                    >
-                      <option value="">All Classes</option>
-                      {classes.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                    </Select>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button onClick={loadLppHistory} className="flex-1 font-bold uppercase tracking-wider text-xs">
-                      <Search className="h-4 w-4 mr-1.5" /> Search
-                    </Button>
-                    <Button 
-                      onClick={() => {
-                        setLppHistoryFilters({
-                          academic_year_id: '',
-                          class_name: '',
-                          section_name: '',
-                          student_name: '',
-                          admission_no: '',
-                          date: '',
-                          applied_by_name: ''
-                        });
-                        loadLppHistory();
-                      }} 
-                      variant="secondary"
-                      className="font-bold uppercase tracking-wider text-xs"
-                    >
-                      Reset
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* History Log Toolbar */}
-              <div className="flex justify-between items-center">
-                <span className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Audit Records: {lppHistory.length} entries found</span>
-                <div className="flex items-center gap-2">
-                  <Button onClick={() => exportLppHistoryCSV()} variant="secondary" className="text-xs flex items-center gap-1.5 py-1">
-                    <FileDown className="h-3.5 w-3.5" /> CSV
-                  </Button>
-                  <Button onClick={() => exportLppHistoryExcel()} variant="secondary" className="text-xs flex items-center gap-1.5 py-1">
-                    <FileSpreadsheet className="h-3.5 w-3.5" /> Excel
-                  </Button>
-                  <Button onClick={() => exportLppHistoryPDF()} variant="secondary" className="text-xs flex items-center gap-1.5 py-1">
-                    <FileText className="h-3.5 w-3.5" /> PDF Report
-                  </Button>
-                </div>
-              </div>
-
-              {/* History Table */}
-              <div className="flex-1 min-h-0 overflow-y-auto border border-border rounded-2xl bg-surface shadow-2xs relative">
-                {lppHistoryLoading ? (
-                  <div className="flex justify-center items-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                  </div>
-                ) : lppHistory.length === 0 ? (
-                  <div className="p-12 text-center text-text-muted text-xs font-bold">
-                    No history log entries found matching criteria.
-                  </div>
-                ) : (
-                  <Table>
-                    <TableHeader className="sticky top-0 bg-surface z-10 border-b border-border shadow-3xs">
-                      <TableRow>
-                        <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Student Name</TableHead>
-                        <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Admission No</TableHead>
-                        <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Class</TableHead>
-                        <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Outstanding Due</TableHead>
-                        <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Penalty %</TableHead>
-                        <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Penalty Amount</TableHead>
-                        <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Description</TableHead>
-                        <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Applied By</TableHead>
-                        <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Applied Date</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {lppHistory.map(row => (
-                        <TableRow key={row.id} className="hover:bg-hover/30 transition-colors">
-                          <TableCell className="text-xs font-bold text-text-primary">{row.student_name}</TableCell>
-                          <TableCell className="text-xs text-text-secondary">{row.admission_no || '—'}</TableCell>
-                          <TableCell className="text-xs text-text-secondary">
-                            {row.class_name ? `${row.class_name}${row.section_name ? ` - ${row.section_name}` : ''}` : '—'}
-                          </TableCell>
-                          <TableCell className="text-xs font-semibold font-sans text-text-primary">{formatCurrency(row.outstanding_due)}</TableCell>
-                          <TableCell className="text-xs text-text-secondary font-sans font-bold">{row.penalty_percentage}%</TableCell>
-                          <TableCell className="text-xs font-black font-sans text-primary">{formatCurrency(row.penalty_amount)}</TableCell>
-                          <TableCell className="text-xs text-text-secondary">{row.description}</TableCell>
-                          <TableCell className="text-xs text-text-secondary font-semibold">{row.applied_by_name}</TableCell>
-                          <TableCell className="text-xs text-text-secondary">{formatDateFull(row.created_at)}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </div>
-            </div>
-          )}
         </div>
       )}
 

@@ -260,21 +260,6 @@ export default function AchievementsPage() {
           </div>
         </div>
 
-        {/* Global Academic Year Selector */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-text-muted uppercase tracking-wider">Academic Year:</span>
-          <select
-            value={selectedYearId}
-            onChange={(e) => setSelectedYearId(e.target.value)}
-            className="h-10 px-3 pr-8 rounded-xl border border-border bg-surface text-xs font-bold focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs cursor-pointer"
-          >
-            {(data.academic_years || []).map(y => (
-              <option key={y.id} value={y.id}>
-                {y.name} {y.is_current ? '(Current)' : ''}
-              </option>
-            ))}
-          </select>
-        </div>
       </div>
 
       {/* Error State */}
@@ -383,52 +368,9 @@ export default function AchievementsPage() {
           
           {/* Filters & Control Panel */}
           <Card className="p-5 shadow-2xs border border-border space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               
-              {/* Filter 1: Class */}
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-text-secondary uppercase tracking-wider">Class Filter</label>
-                <select
-                  value={selectedClassId}
-                  onChange={e => setSelectedClassId(e.target.value)}
-                  className="w-full h-10 px-3 rounded-xl border border-border bg-surface text-xs font-bold focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs cursor-pointer"
-                >
-                  <option value="ALL">All Classes</option>
-                  {(data.classes || []).map(c => (
-                    <option key={c.id} value={c.id}>{c.name} {c.section ? ` - ${c.section}` : ''}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Filter 2: Level Scope */}
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-text-secondary uppercase tracking-wider">Achievement Level</label>
-                <select
-                  value={selectedLevel}
-                  onChange={e => setSelectedLevel(e.target.value)}
-                  className="w-full h-10 px-3 rounded-xl border border-border bg-surface text-xs font-bold focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs cursor-pointer"
-                >
-                  <option value="all">All Levels (School & Class)</option>
-                  <option value="school">School Overall Champions Only</option>
-                  <option value="class">Class Toppers Only</option>
-                </select>
-              </div>
-
-              {/* Filter 3: Sort By */}
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-text-secondary uppercase tracking-wider">Sort By</label>
-                <select
-                  value={sortBy}
-                  onChange={e => setSortBy(e.target.value)}
-                  className="w-full h-10 px-3 rounded-xl border border-border bg-surface text-xs font-bold focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs cursor-pointer"
-                >
-                  <option value="newest">Newest First</option>
-                  <option value="rank">Highest Rank / Score First</option>
-                  <option value="class">Class Wise</option>
-                </select>
-              </div>
-
-              {/* Filter 4: Search Input */}
+              {/* Search Input (Left) */}
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-text-secondary uppercase tracking-wider">Search</label>
                 <form onSubmit={handleSearchSubmit} className="relative">
@@ -441,6 +383,21 @@ export default function AchievementsPage() {
                   />
                   <Search className="h-4 w-4 absolute left-3 top-3 text-text-muted" />
                 </form>
+              </div>
+
+              {/* Class Filter (Right) */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-text-secondary uppercase tracking-wider">Class Filter</label>
+                <select
+                  value={selectedClassId}
+                  onChange={e => setSelectedClassId(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-border bg-surface text-xs font-bold focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs cursor-pointer"
+                >
+                  <option value="ALL">All Classes</option>
+                  {(data.classes || []).map(c => (
+                    <option key={c.id} value={c.id}>{c.name} {c.section ? ` - ${c.section}` : ''}</option>
+                  ))}
+                </select>
               </div>
 
             </div>
@@ -456,39 +413,19 @@ export default function AchievementsPage() {
           ) : filteredAchievements.length === 0 ? (
             <Card className="p-16 text-center border-dashed border-2 border-border/80 rounded-3xl bg-zinc-50/50 dark:bg-zinc-950/20">
               <Trophy className="h-12 w-12 text-text-muted/40 mx-auto mb-3" />
-              <h4 className="text-base font-black text-text-primary">No matching achievements found.</h4>
-              <p className="text-xs text-text-secondary mt-1">Try adjusting your class or level filters.</p>
+              <h4 className="text-base font-black text-text-primary">
+                {currentYearObj?.status !== 'Archived' && currentYearObj?.migration_status !== 'Completed'
+                  ? 'Achievements & Certificates Pending Migration'
+                  : 'No matching achievements found.'}
+              </h4>
+              <p className="text-xs text-text-secondary mt-1">
+                {currentYearObj?.status !== 'Archived' && currentYearObj?.migration_status !== 'Completed'
+                  ? 'Official Achievement Certificates and Attendance Champions will be calculated and generated automatically upon Academic Year Migration at the end of the session.'
+                  : 'Try adjusting your class or level filters.'}
+              </p>
             </Card>
           ) : (
             <div className="space-y-10">
-              
-              {/* SECTION A: SCHOOL OVERALL CHAMPIONS (If available and level permits) */}
-              {schoolOverallAchievements.length > 0 && (selectedLevel === 'all' || selectedLevel === 'school') && (
-                <div className="space-y-5 border-b border-border/80 pb-8">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500">
-                      <Trophy className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-black text-text-primary tracking-tight font-display">
-                        School Overall Attendance Champions
-                      </h3>
-                      <p className="text-xs text-text-secondary font-bold">Top 3 achievers across the entire school</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {schoolOverallAchievements.map(item => (
-                      <AchievementCard
-                        key={item.id}
-                        item={item}
-                        onOpenCert={handleOpenCertificate}
-                        onOpenReport={handleOpenReportCard}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
 
               {/* SECTION B: CLASS WISE CHAMPIONS */}
               {Object.keys(classGroups).length > 0 && (selectedLevel === 'all' || selectedLevel === 'class') && (

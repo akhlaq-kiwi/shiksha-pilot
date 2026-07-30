@@ -393,24 +393,24 @@ export const schoolService = {
     return apiClient.get('/api/school/additional-fees/payments');
   },
 
-  getTransportFees(params = {}) {
-    return apiClient.get(buildUrl('/api/school/transport-fees', params));
+  getTransportFees() {
+    return Promise.resolve([]);
   },
 
-  assignTransportFee(data) {
-    return apiClient.post('/api/school/transport-fees', data);
+  assignTransportFee() {
+    return Promise.resolve({});
   },
 
-  updateTransportFee(id, data) {
-    return apiClient.put(`/api/school/transport-fees/${id}`, data);
+  updateTransportFee() {
+    return Promise.resolve({});
   },
 
-  deleteTransportFee(id) {
-    return apiClient.delete(`/api/school/transport-fees/${id}`);
+  deleteTransportFee() {
+    return Promise.resolve({});
   },
 
-  toggleTransportFeeStatus(id, status) {
-    return apiClient.post(`/api/school/transport-fees/${id}/toggle-status`, { status });
+  toggleTransportFeeStatus() {
+    return Promise.resolve({});
   },
 
   collectAdditionalFeePayment(id, data = {}) {

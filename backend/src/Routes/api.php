@@ -107,12 +107,7 @@ return function (App $app) {
     $app->get('/api/school/finance-settings', [SchoolAdminController::class, 'getFinanceSettings']);
     $app->post('/api/school/finance-settings', [SchoolAdminController::class, 'saveFinanceSettings']);
 
-    // Transport Fees Management
-    $app->get('/api/school/transport-fees', [SchoolAdminController::class, 'getTransportFees']);
-    $app->post('/api/school/transport-fees', [SchoolAdminController::class, 'assignTransportFee']);
-    $app->put('/api/school/transport-fees/{id}', [SchoolAdminController::class, 'updateTransportFee']);
-    $app->delete('/api/school/transport-fees/{id}', [SchoolAdminController::class, 'deleteTransportFee']);
-    $app->post('/api/school/transport-fees/{id}/toggle-status', [SchoolAdminController::class, 'toggleTransportFeeStatus']);
+
     $app->get('/api/school/classes', [SchoolAdminController::class, 'getClasses']);
     $app->post('/api/school/classes', [SchoolAdminController::class, 'createClass']);
     $app->put('/api/school/classes', [SchoolAdminController::class, 'updateClass']);

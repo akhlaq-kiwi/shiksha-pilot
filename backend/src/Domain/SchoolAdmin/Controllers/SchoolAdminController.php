@@ -235,7 +235,7 @@ class SchoolAdminController extends BaseController
     public function getAcademicYears(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'PARENT', 'STUDENT', 'TEACHER', 'PRINCIPAL']);
 
         $data = $this->service->getAcademicYears($user);
 

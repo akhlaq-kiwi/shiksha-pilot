@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import '../services/leave_service.dart';
 import '../services/auth_service.dart';
 import '../main.dart';
@@ -32,6 +34,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   List<dynamic> _children = [];
   int? _activeStudentId;
 
+  List<dynamic> _academicYears = [];
+  int? _selectedAcademicYearId;
+  String _selectedAcademicYearName = '';
+
   @override
   void initState() {
     super.initState();
@@ -42,7 +48,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _userName = prefs.getString('user_name') ?? 'User';
-      _schoolName = prefs.getString('school_name') ?? 'Shiksha Pilot Academy';
+      _schoolName = (prefs.getString('school_name') ?? 'Shiksha Pilot Academy').toUpperCase();
       _userPhone = prefs.getString('user_phone') ?? '';
       _userPhoto = prefs.getString('user_photo') ?? '';
       _notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
@@ -53,6 +59,91 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final role = widget.userRole.toUpperCase();
     if (role == 'PARENT' || role == 'STUDENT') {
       await _fetchChildrenList();
+    }
+    await _fetchAcademicYears();
+  }
+
+  Future<void> _fetchAcademicYears() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token') ?? widget.leaveService.token;
+      final url = Uri.parse('${widget.leaveService.baseUrl}/api/school/academic-years');
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        List<dynamic> years = [];
+        if (data is Map && data['academic_years'] != null) {
+          years = data['academic_years'];
+        } else if (data is Map && data['data'] != null) {
+          years = data['data'];
+        } else if (data is List) {
+          years = data;
+        }
+
+        final prefs = await SharedPreferences.getInstance();
+        int? savedAyId = prefs.getInt('selected_academic_year_id');
+        String savedAyName = prefs.getString('selected_academic_year_name') ?? '';
+
+        if (savedAyId == null && years.isNotEmpty) {
+          final currentYr = years.firstWhere(
+            (y) => y['is_current'] == 1 || y['is_current'] == true || y['status'] == 'ACTIVE',
+            orElse: () => years.first,
+          );
+          savedAyId = (currentYr['id'] is int) ? currentYr['id'] : int.tryParse(currentYr['id'].toString());
+          savedAyName = currentYr['name'] ?? '';
+          if (savedAyId != null) {
+            await prefs.setInt('selected_academic_year_id', savedAyId);
+            await prefs.setString('selected_academic_year_name', savedAyName);
+          }
+        } else if (savedAyId != null && savedAyName.isEmpty && years.isNotEmpty) {
+          final matched = years.firstWhere(
+            (y) => (y['id'] is int ? y['id'] : int.tryParse(y['id'].toString())) == savedAyId,
+            orElse: () => null,
+          );
+          if (matched != null) {
+            savedAyName = matched['name']?.toString() ?? '';
+          }
+        }
+
+        if (mounted) {
+          setState(() {
+            _academicYears = years;
+            _selectedAcademicYearId = savedAyId;
+            _selectedAcademicYearName = savedAyName;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching academic years in settings: $e');
+    }
+  }
+
+  Future<void> _handleSwitchAcademicYear(int yearId, String yearName) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('selected_academic_year_id', yearId);
+    await prefs.setString('selected_academic_year_name', yearName);
+
+    if (mounted) {
+      setState(() {
+        _selectedAcademicYearId = yearId;
+        _selectedAcademicYearName = yearName;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Switched Academic Year to $yearName'),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+          backgroundColor: Colors.indigo.shade800,
+        ),
+      );
     }
   }
 
@@ -494,6 +585,102 @@ class _SettingsScreenState extends State<SettingsScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         scrolledUnderElevation: 0,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: Center(
+              child: Container(
+                height: 34,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                decoration: BoxDecoration(
+                  color: Colors.indigo.shade50,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.indigo.shade200, width: 1),
+                ),
+                child: PopupMenuButton<int>(
+                  tooltip: 'Switch Academic Year',
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  offset: const Offset(0, 42),
+                  elevation: 4,
+                  onSelected: (int selectedId) {
+                    final yr = _academicYears.firstWhere(
+                      (y) => (y['id'] is int ? y['id'] : int.tryParse(y['id'].toString())) == selectedId,
+                      orElse: () => null,
+                    );
+                    if (yr != null) {
+                      _handleSwitchAcademicYear(selectedId, yr['name']?.toString() ?? '');
+                    }
+                  },
+                  itemBuilder: (BuildContext context) {
+                    if (_academicYears.isEmpty) {
+                      return [
+                        PopupMenuItem<int>(
+                          value: _selectedAcademicYearId ?? 0,
+                          child: Row(
+                            children: [
+                              Icon(Icons.check_circle_rounded, size: 16, color: Colors.indigo.shade700),
+                              const SizedBox(width: 8),
+                              Text(
+                                _selectedAcademicYearName.isNotEmpty ? _selectedAcademicYearName : '2026-2027 (Active)',
+                                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.indigo.shade900, fontSize: 13),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ];
+                    }
+                    return _academicYears.map((yr) {
+                      final yrId = (yr['id'] is int) ? yr['id'] as int : int.tryParse(yr['id'].toString()) ?? 0;
+                      final isSelected = yrId == _selectedAcademicYearId;
+                      final isCurrent = yr['is_current'] == 1 || yr['is_current'] == true || yr['status'] == 'ACTIVE';
+
+                      return PopupMenuItem<int>(
+                        value: yrId,
+                        child: Row(
+                          children: [
+                            Icon(
+                              isSelected ? Icons.check_circle_rounded : Icons.calendar_today_rounded,
+                              size: 16,
+                              color: isSelected ? Colors.indigo.shade700 : Colors.grey.shade600,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '${yr['name']}${isCurrent ? ' (Current)' : ''}',
+                              style: TextStyle(
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                color: isSelected ? Colors.indigo.shade900 : Colors.black87,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList();
+                  },
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.calendar_month_rounded, size: 16, color: Colors.indigo.shade700),
+                      const SizedBox(width: 6),
+                      Text(
+                        _selectedAcademicYearName.isNotEmpty
+                            ? _selectedAcademicYearName
+                            : '2026-2027',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.indigo.shade900,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(Icons.arrow_drop_down_rounded, size: 18, color: Colors.indigo.shade700),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
       body: SafeArea(
         child: Column(
@@ -559,9 +746,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Colors.indigo, letterSpacing: 0.8),
                           ),
                           const SizedBox(height: 2),
-                          Text(
-                            _schoolName,
-                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              _schoolName.toUpperCase(),
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87),
+                            ),
                           ),
                         ],
                       ),

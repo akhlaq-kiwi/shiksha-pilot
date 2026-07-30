@@ -137,18 +137,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       allowedRoles: ['PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL', 'STUDENT'],
       isAvailable: true,
     ),
-    LauncherFeature(
-      name: 'Transport',
-      icon: Icons.directions_bus_rounded,
-      color: Colors.blueGrey,
-      allowedRoles: ['PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL', 'STUDENT'],
-    ),
-    LauncherFeature(
-      name: 'Library',
-      icon: Icons.local_library_rounded,
-      color: Colors.brown,
-      allowedRoles: ['PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL', 'STUDENT'],
-    ),
+
     LauncherFeature(
       name: 'Notifications',
       icon: Icons.notifications_rounded,
@@ -280,7 +269,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     await prefs.setString('user_role', widget.userRole);
     setState(() {
       _userName = prefs.getString('user_name') ?? 'User';
-      _schoolName = prefs.getString('school_name') ?? 'Shiksha Pilot Academy';
+      _schoolName = (prefs.getString('school_name') ?? 'Shiksha Pilot Academy').toUpperCase();
       _userPhone = prefs.getString('user_phone') ?? '';
       _userPhoto = prefs.getString('user_photo') ?? '';
       
@@ -1145,20 +1134,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _schoolName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.black87,
-                            ),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          _schoolName.toUpperCase(),
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.black87,
+                            letterSpacing: -0.3,
                           ),
-                        ],
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),

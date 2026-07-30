@@ -3189,6 +3189,20 @@ class SchoolAdminService extends BaseService
                 $stmtUpdatePrevStatus = $pdo->prepare("UPDATE academic_years SET status = 'Archived', migration_status = 'Completed', is_current = 0 WHERE id = :id");
                 $stmtUpdatePrevStatus->execute([':id' => (int)$prevYearId]);
 
+                // Instantly calculate and generate Achievement Certificates for the completed academic year
+                try {
+                    $stmtCleanOld = $pdo->prepare("DELETE FROM academic_achievement_snapshots WHERE school_id = :sid AND academic_year_id = :ayid");
+                    $stmtCleanOld->execute([':sid' => $schoolId, ':ayid' => (int)$prevYearId]);
+
+                    $this->autoGenerateAchievementsSnapshots($pdo, $schoolId, (int)$prevYearId);
+                } catch (\Throwable $achEx) {
+                    $this->log('Failed to auto-generate achievement snapshots on migration', [
+                        'error' => $achEx->getMessage(),
+                        'school_id' => $schoolId,
+                        'prev_year_id' => $prevYearId
+                    ]);
+                }
+
                 // Automatically generate ONE Final Financial Report for the previous academic year
                 try {
                     // Fetch previous year metadata
@@ -3685,8 +3699,21 @@ class SchoolAdminService extends BaseService
             ];
         }
 
-        // 2. Auto-generate snapshots if not present for this academic year
-        $this->autoGenerateAchievementsSnapshots($pdo, $schoolId, $academicYearId);
+        // 2. Check if Academic Year Migration is Completed
+        $stmtAYCheck = $pdo->prepare("SELECT migration_status, status FROM academic_years WHERE id = :ayid AND school_id = :sid");
+        $stmtAYCheck->execute([':ayid' => $academicYearId, ':sid' => $schoolId]);
+        $ayData = $stmtAYCheck->fetch(PDO::FETCH_ASSOC);
+
+        $isMigrated = $ayData && ($ayData['migration_status'] === 'Completed' || $ayData['status'] === 'Archived');
+
+        if (!$isMigrated) {
+            // Clean up any premature snapshots created for active/ongoing academic year
+            $stmtCleanActive = $pdo->prepare("DELETE FROM academic_achievement_snapshots WHERE school_id = :sid AND academic_year_id = :ayid");
+            $stmtCleanActive->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+        } else {
+            // Auto-generate snapshots if not present for this completed/migrated academic year
+            $this->autoGenerateAchievementsSnapshots($pdo, $schoolId, $academicYearId);
+        }
 
         // 3. Build Filters
         $category = !empty($params['category']) ? trim($params['category']) : null;
@@ -3810,6 +3837,57 @@ class SchoolAdminService extends BaseService
 
     private function autoGenerateAchievementsSnapshots(PDO $pdo, int $schoolId, int $academicYearId): void
     {
+        // 0. Verify Academic Year Migration Status
+        $stmtAYCheck = $pdo->prepare("SELECT migration_status, status FROM academic_years WHERE id = :ayid AND school_id = :sid");
+        $stmtAYCheck->execute([':ayid' => $academicYearId, ':sid' => $schoolId]);
+        $ayData = $stmtAYCheck->fetch(PDO::FETCH_ASSOC);
+
+        // Achievements & certificates MUST ONLY be generated when Migration is completed!
+        if (!$ayData || ($ayData['migration_status'] !== 'Completed' && $ayData['status'] !== 'Archived')) {
+            return;
+        }
+
+        // Pre-calculate Final Exam Marks Percentage for all students in this Academic Year (used as Tie-Breaker)
+        $stmtExamMarks = $pdo->prepare("
+            SELECT 
+                em.student_id,
+                SUM(CASE WHEN em.is_absent = 0 AND em.marks_obtained IS NOT NULL THEN em.marks_obtained ELSE 0 END) AS total_obtained,
+                SUM(CASE WHEN em.marks_obtained IS NOT NULL OR em.is_absent = 1 THEN ep.max_marks ELSE 0 END) AS total_max
+            FROM examination_marks em
+            JOIN examination_papers ep ON em.paper_id = ep.id
+            JOIN examinations e ON em.exam_id = e.id
+            WHERE e.school_id = :sid AND e.academic_year_id = :ayid
+            GROUP BY em.student_id
+        ");
+        $stmtExamMarks->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+        $examRows = $stmtExamMarks->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $studentExamPctMap = [];
+        foreach ($examRows as $erow) {
+            $stuId = (int)$erow['student_id'];
+            $totMax = (float)$erow['total_max'];
+            $totObt = (float)$erow['total_obtained'];
+            $studentExamPctMap[$stuId] = $totMax > 0 ? round(($totObt / $totMax) * 100, 2) : 0.00;
+        }
+
+        // Reusable Attendance Roster Sorting Callback (Tie-Breaker: Exam Marks %)
+        $sortAttendanceRoster = function (&$roster) {
+            usort($roster, function ($a, $b) {
+                // 1. Primary: Attendance Percentage
+                if (abs($b['percentage'] - $a['percentage']) > 0.001) {
+                    return $b['percentage'] <=> $a['percentage'];
+                }
+                // 2. Tie-Breaker: Final Exam Marks Percentage
+                if (abs($b['exam_percentage'] - $a['exam_percentage']) > 0.001) {
+                    return $b['exam_percentage'] <=> $a['exam_percentage'];
+                }
+                // 3. Fallback: Present Days
+                if ($b['present_days'] != $a['present_days']) {
+                    return $b['present_days'] <=> $a['present_days'];
+                }
+                return strcasecmp($a['student_name'], $b['student_name']);
+            });
+        };
+
         // 1. Attendance Leaderboard Auto-Generation (if attendance exists)
         $stmtAttCheck = $pdo->prepare("SELECT COUNT(*) FROM academic_achievement_snapshots WHERE school_id = :sid AND academic_year_id = :ayid AND feature_type = 'attendance_leaderboard'");
         $stmtAttCheck->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
@@ -3837,19 +3915,20 @@ class SchoolAdminService extends BaseService
             if (!empty($studentsList)) {
                 $overallList = [];
                 foreach ($studentsList as $stu) {
+                    $stuId = (int)$stu['student_id'];
                     $total = (int)$stu['total_working_days'];
                     $present = (int)$stu['present_days'];
                     $pct = $total > 0 ? round(($present / $total) * 100, 2) : 0.00;
-                    $overallList[] = array_merge($stu, ['percentage' => $pct]);
+                    $examPct = isset($studentExamPctMap[$stuId]) ? (float)$studentExamPctMap[$stuId] : 0.00;
+
+                    $overallList[] = array_merge($stu, [
+                        'percentage' => $pct,
+                        'exam_percentage' => $examPct
+                    ]);
                 }
 
-                usort($overallList, function ($a, $b) {
-                    if ($b['percentage'] != $a['percentage']) return $b['percentage'] <=> $a['percentage'];
-                    if ($b['present_days'] != $a['present_days']) return $b['present_days'] <=> $a['present_days'];
-                    return strcasecmp($a['student_name'], $b['student_name']);
-                });
+                $sortAttendanceRoster($overallList);
 
-                $overallTop3 = array_slice($overallList, 0, 3);
                 $classGroups = [];
                 foreach ($overallList as $stu) {
                     $classGroups[$stu['class_id']][] = $stu;
@@ -3857,11 +3936,7 @@ class SchoolAdminService extends BaseService
 
                 $classWiseTop3 = [];
                 foreach ($classGroups as $classId => $roster) {
-                    usort($roster, function ($a, $b) {
-                        if ($b['percentage'] != $a['percentage']) return $b['percentage'] <=> $a['percentage'];
-                        if ($b['present_days'] != $a['present_days']) return $b['present_days'] <=> $a['present_days'];
-                        return strcasecmp($a['student_name'], $b['student_name']);
-                    });
+                    $sortAttendanceRoster($roster);
                     $classWiseTop3[$classId] = array_slice($roster, 0, 3);
                 }
 
@@ -3877,24 +3952,6 @@ class SchoolAdminService extends BaseService
                     )
                 ");
 
-                foreach ($overallTop3 as $idx => $row) {
-                    $rank = $idx + 1;
-                    $stmtInsert->execute([
-                        ':sid' => $schoolId,
-                        ':ay_id' => $academicYearId,
-                        ':class_id' => null,
-                        ':stu_id' => $row['student_id'],
-                        ':stu_name' => $row['student_name'],
-                        ':stu_photo' => $row['student_photo'],
-                        ':cls_name' => $row['class_name'],
-                        ':roll' => $row['roll_number'],
-                        ':score' => $row['percentage'],
-                        ':rank' => $rank,
-                        ':meta' => json_encode(['present_days' => $row['present_days'], 'total_working_days' => $row['total_working_days']])
-                    ]);
-                    $this->notifyAchievementGenerated($pdo, $schoolId, (int)$row['student_id'], $row['student_name'], 'School Attendance Champion!', "Congratulations! You have earned the School Attendance Champion Award (Rank #{$rank}).");
-                }
-
                 foreach ($classWiseTop3 as $classId => $roster) {
                     foreach ($roster as $idx => $row) {
                         $rank = $idx + 1;
@@ -3909,7 +3966,7 @@ class SchoolAdminService extends BaseService
                             ':roll' => $row['roll_number'],
                             ':score' => $row['percentage'],
                             ':rank' => $rank,
-                            ':meta' => json_encode(['present_days' => $row['present_days'], 'total_working_days' => $row['total_working_days']])
+                            ':meta' => json_encode(['present_days' => $row['present_days'], 'total_working_days' => $row['total_working_days'], 'exam_percentage' => $row['exam_percentage']])
                         ]);
                         $this->notifyAchievementGenerated($pdo, $schoolId, (int)$row['student_id'], $row['student_name'], 'Attendance Champion Award!', "Congratulations! You secured Rank #{$rank} in Class {$row['class_name']} Attendance. View your certificate from the Achievements section.");
                     }
