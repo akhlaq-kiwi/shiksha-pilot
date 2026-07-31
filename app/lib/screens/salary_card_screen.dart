@@ -146,7 +146,7 @@ class _SalaryCardScreenState extends State<SalaryCardScreen> {
               label: 'OPEN',
               textColor: Colors.amber.shade300,
               onPressed: () async {
-                await Printing.sharePdf(bytes: response.bodyBytes, filename: defaultFilename);
+                await Printing.layoutPdf(onLayout: (_) async => response.bodyBytes, name: defaultFilename);
               },
             ) : null,
             behavior: SnackBarBehavior.floating,
@@ -327,48 +327,13 @@ class _SalaryCardScreenState extends State<SalaryCardScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        yearLabel,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.indigo.shade800,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Academic Year: $yearName',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.indigo.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      '₹${baseSalary.toStringAsFixed(2)} / mo',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.indigo.shade900,
-                      ),
-                    ),
-                  ),
-                ],
+              Text(
+                'Academic Year: $yearName',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.black87,
+                ),
               ),
               const SizedBox(height: 16),
               Expanded(

@@ -376,6 +376,478 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
     });
   }
 
+  void _showEnterMarksModal() {
+    final scheme = (_details['scheme'] as List<dynamic>?) ?? [];
+    if (scheme.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No scheduled subjects found for this exam timetable.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    int selectedSubjectId = (scheme.first['subject_id'] is int)
+        ? scheme.first['subject_id'] as int
+        : int.tryParse(scheme.first['subject_id'].toString()) ?? 0;
+
+    Map<String, dynamic>? marksSheetData;
+    bool isLoadingSheet = false;
+    bool isSaving = false;
+    bool hasSavedForCurrentSubject = false;
+    bool isEditingMode = false;
+    String? sheetError;
+
+    final Map<int, TextEditingController> marksControllers = {};
+    final Map<int, bool> absentMap = {};
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext modalContext) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+
+            Future<void> loadMarksForSubject(int subId) async {
+              setModalState(() {
+                isLoadingSheet = true;
+                sheetError = null;
+                hasSavedForCurrentSubject = false;
+                isEditingMode = false;
+              });
+              try {
+                final data = await widget.examService.getMarksSheet(widget.examId, subId);
+                marksControllers.forEach((_, c) => c.dispose());
+                marksControllers.clear();
+                absentMap.clear();
+
+                bool anyExistingMarks = false;
+                final students = (data['students'] as List<dynamic>?) ?? [];
+                for (var s in students) {
+                  final sId = s['student_id'] as int;
+                  final marksObtained = s['marks_obtained'];
+                  final isAbsent = (s['is_absent'] == 1 || s['is_absent'] == true);
+                  
+                  if (marksObtained != null || isAbsent) {
+                    anyExistingMarks = true;
+                  }
+
+                  marksControllers[sId] = TextEditingController(
+                    text: (marksObtained != null && !isAbsent) ? marksObtained.toString() : '',
+                  );
+                  absentMap[sId] = isAbsent;
+                }
+
+                setModalState(() {
+                  marksSheetData = data;
+                  isLoadingSheet = false;
+                  hasSavedForCurrentSubject = anyExistingMarks;
+                  isEditingMode = !anyExistingMarks; // Read-only if marks already exist, Edit mode if new
+                });
+              } catch (e) {
+                setModalState(() {
+                  sheetError = e.toString().replaceAll('Exception: ', '');
+                  isLoadingSheet = false;
+                });
+              }
+            }
+
+            if (marksSheetData == null && !isLoadingSheet && sheetError == null) {
+              loadMarksForSubject(selectedSubjectId);
+            }
+
+            final className = marksSheetData?['class_name']?.toString() ?? '';
+            final maxM = (marksSheetData?['max_marks'] ?? 100.0).toDouble();
+            final passM = (marksSheetData?['passing_marks'] ?? 33.0).toDouble();
+            final isResultPublished = (marksSheetData?['is_result_published'] == true || _details['result_status'] == 'Published');
+            final studentsList = (marksSheetData?['students'] as List<dynamic>?) ?? [];
+
+            // Force read-only if result is published
+            if (isResultPublished && isEditingMode) {
+              isEditingMode = false;
+            }
+
+            Future<void> saveMarks() async {
+              if (isResultPublished) return;
+              setModalState(() {
+                isSaving = true;
+              });
+              try {
+                List<Map<String, dynamic>> marksPayload = [];
+                for (var s in studentsList) {
+                  final sId = s['student_id'] as int;
+                  final isAb = absentMap[sId] ?? false;
+                  final valStr = marksControllers[sId]?.text.trim() ?? '';
+                  final val = double.tryParse(valStr);
+
+                  marksPayload.add({
+                    'student_id': sId,
+                    'is_absent': isAb ? 1 : 0,
+                    'marks_obtained': isAb ? null : val,
+                  });
+                }
+
+                await widget.examService.saveMarksSheet(widget.examId, {
+                  'subject_id': selectedSubjectId,
+                  'marks': marksPayload,
+                });
+
+                if (mounted) {
+                  setModalState(() {
+                    isSaving = false;
+                    hasSavedForCurrentSubject = true;
+                    isEditingMode = false; // Lock back to Read-only mode after save
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Marks saved successfully! Reflected on Admin Portal.'),
+                      backgroundColor: Color(0xFF059669),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              } catch (e) {
+                setModalState(() {
+                  isSaving = false;
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Failed to save marks: ${e.toString().replaceAll('Exception: ', '')}'),
+                    backgroundColor: Colors.red,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            }
+
+            final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
+            return Padding(
+              padding: EdgeInsets.only(bottom: bottomInset),
+              child: Container(
+                height: MediaQuery.of(context).size.height * 0.85,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                ),
+                child: Column(
+                  children: [
+                  Center(
+                    child: Container(
+                      margin: const EdgeInsets.only(top: 12, bottom: 8),
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+
+                  // Header with Class Name: "Enter Marks - Class X"
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                className.isNotEmpty ? 'Enter Marks - $className' : 'Enter Marks',
+                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.indigo),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text(
+                                _details['exam_name'] ?? 'Exam Marks Sheet',
+                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(modalContext),
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+
+                  // Subjects Bar
+                  Container(
+                    height: 50,
+                    color: Colors.grey.shade50,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      itemCount: scheme.length,
+                      itemBuilder: (context, idx) {
+                        final item = scheme[idx];
+                        final subId = (item['subject_id'] is int)
+                            ? item['subject_id'] as int
+                            : int.tryParse(item['subject_id'].toString()) ?? 0;
+                        final subName = item['subject_name'] ?? 'Subject';
+                        final isSelected = subId == selectedSubjectId;
+
+                        return GestureDetector(
+                          onTap: () {
+                            if (subId != selectedSubjectId) {
+                              setModalState(() {
+                                selectedSubjectId = subId;
+                                marksSheetData = null;
+                              });
+                              loadMarksForSubject(subId);
+                            }
+                          },
+                          child: Container(
+                            margin: const EdgeInsets.only(right: 10),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: isSelected ? Colors.indigo.shade700 : Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: isSelected ? Colors.indigo.shade700 : Colors.grey.shade300,
+                              ),
+                            ),
+                            child: Text(
+                              subName,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: isSelected ? Colors.white : Colors.indigo.shade900,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const Divider(height: 1),
+
+                  Expanded(
+                    child: isLoadingSheet
+                        ? const Center(child: CircularProgressIndicator())
+                        : sheetError != null
+                            ? Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(20),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(sheetError!, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                                      const SizedBox(height: 12),
+                                      ElevatedButton(
+                                        onPressed: () => loadMarksForSubject(selectedSubjectId),
+                                        child: const Text('Retry'),
+                                      )
+                                    ],
+                                  ),
+                                ),
+                              )
+                            : Column(
+                                children: [
+                                  // Lock Banner if Result Published
+                                  if (isResultPublished)
+                                    Container(
+                                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                      decoration: BoxDecoration(
+                                        color: Colors.amber.shade50,
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(color: Colors.amber.shade400),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.lock_rounded, color: Colors.amber.shade900, size: 20),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Text(
+                                              'Report Card Published. Marks are locked and cannot be updated.',
+                                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.amber.shade900),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+
+                                  // Max Marks (Left Aligned) & Passing Marks (Right Aligned)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                                    color: Colors.indigo.shade50.withOpacity(0.5),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text('Max Marks: ${maxM.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87)),
+                                        Text('Passing Marks: ${passM.toStringAsFixed(0)}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.indigo.shade700)),
+                                      ],
+                                    ),
+                                  ),
+
+                                  Expanded(
+                                    child: studentsList.isEmpty
+                                        ? const Center(child: Text('No students found in this class.', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)))
+                                        : ListView.separated(
+                                            padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 12),
+                                            itemCount: studentsList.length,
+                                            separatorBuilder: (_, __) => const Divider(height: 16),
+                                            itemBuilder: (context, index) {
+                                              final st = studentsList[index];
+                                              final sId = st['student_id'] as int;
+                                              final name = st['student_name'] ?? 'Student';
+                                              final roll = st['roll_no']?.toString() ?? '—';
+                                              final isAb = absentMap[sId] ?? false;
+
+                                              return Row(
+                                                children: [
+                                                  Expanded(
+                                                    flex: 3,
+                                                    child: Column(
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      children: [
+                                                        Text(
+                                                          name,
+                                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                                          overflow: TextOverflow.ellipsis,
+                                                        ),
+                                                        const SizedBox(height: 2),
+                                                        Text(
+                                                          'Roll No: $roll',
+                                                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  Row(
+                                                    children: [
+                                                      Text(
+                                                        'Absent',
+                                                        style: TextStyle(
+                                                          fontSize: 11,
+                                                          fontWeight: FontWeight.bold,
+                                                          color: isAb ? Colors.red : Colors.grey,
+                                                        ),
+                                                      ),
+                                                      Switch(
+                                                        value: isAb,
+                                                        activeTrackColor: Colors.red.shade400,
+                                                        onChanged: (isEditingMode && !isResultPublished)
+                                                            ? (val) {
+                                                                setModalState(() {
+                                                                  absentMap[sId] = val;
+                                                                  if (val) {
+                                                                    marksControllers[sId]?.clear();
+                                                                  }
+                                                                });
+                                                              }
+                                                            : null,
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  const SizedBox(width: 8),
+
+                                                  // Marks Input Field - Editable only in Edit Mode & if Result Not Published
+                                                  SizedBox(
+                                                    width: 75,
+                                                    height: 42,
+                                                    child: TextField(
+                                                      controller: marksControllers[sId],
+                                                      enabled: isEditingMode && !isAb && !isResultPublished,
+                                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                                      inputFormatters: [
+                                                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                                                        MaxValueTextInputFormatter(maxM),
+                                                      ],
+                                                      textAlign: TextAlign.center,
+                                                      style: TextStyle(
+                                                        fontWeight: FontWeight.bold,
+                                                        fontSize: 14,
+                                                        color: (isEditingMode && !isResultPublished) ? Colors.black87 : Colors.indigo.shade900,
+                                                      ),
+                                                      decoration: InputDecoration(
+                                                        hintText: isAb ? 'ABS' : '0.0',
+                                                        hintStyle: TextStyle(fontSize: 12, color: isAb ? Colors.red : Colors.grey),
+                                                        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                                        filled: true,
+                                                        fillColor: isAb ? Colors.red.shade50 : ((isEditingMode && !isResultPublished) ? Colors.white : Colors.grey.shade100),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              );
+                                            },
+                                          ),
+                                  ),
+                                ],
+                              ),
+                  ),
+
+                  // Action Button (Hidden if Result Published)
+                  if (!isResultPublished)
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, -5),
+                          ),
+                        ],
+                      ),
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton.icon(
+                          onPressed: (isSaving || isLoadingSheet)
+                              ? null
+                              : () {
+                                  if (!isEditingMode) {
+                                    setModalState(() {
+                                      isEditingMode = true;
+                                    });
+                                  } else {
+                                    saveMarks();
+                                  }
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isEditingMode ? Colors.indigo.shade700 : Colors.amber.shade800,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          icon: isSaving
+                              ? const SizedBox.shrink()
+                              : Icon(isEditingMode ? Icons.save_rounded : Icons.edit_rounded, size: 20),
+                          label: isSaving
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                )
+                              : Text(
+                                  !isEditingMode
+                                      ? 'Update Marks'
+                                      : (hasSavedForCurrentSubject ? 'Save Updated Marks' : 'Save Marks'),
+                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    },
+  );
+}
+
   Future<void> _downloadAdmitCardPDF(Map<String, dynamic> admit, StateSetter setModalState) async {
     setModalState(() {
       _isDownloading = true;
@@ -2127,6 +2599,16 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                       onTap: _showSchemeModal,
                     ),
 
+                    // 1b. Enter Marks Card (TEACHER only)
+                    if (widget.userRole == 'TEACHER')
+                      _buildFeatureCard(
+                        title: 'Enter Marks',
+                        subtitle: 'Input student marks for assigned class',
+                        icon: Icons.edit_note_rounded,
+                        isPublished: true,
+                        onTap: _showEnterMarksModal,
+                      ),
+
                     // 2. Admit Card Card (STUDENT/PARENT only)
                     if (widget.userRole != 'TEACHER')
                       _buildFeatureCard(
@@ -2269,5 +2751,28 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
         ),
       ),
     );
+  }
+}
+
+class MaxValueTextInputFormatter extends TextInputFormatter {
+  final double maxValue;
+  MaxValueTextInputFormatter(this.maxValue);
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.isEmpty) {
+      return newValue;
+    }
+    final double? value = double.tryParse(newValue.text);
+    if (value == null) {
+      return oldValue;
+    }
+    if (value > maxValue) {
+      return oldValue;
+    }
+    return newValue;
   }
 }

@@ -38,4 +38,25 @@ class ExamService {
       throw Exception(json.decode(response.body)['message'] ?? 'Failed to load examination details.');
     }
   }
+
+  Future<Map<String, dynamic>> getMarksSheet(int examId, int subjectId) async {
+    final uri = Uri.parse('$baseUrl/api/teacher/exams-new/$examId/marks-sheet?subject_id=$subjectId');
+    final response = await http.get(uri, headers: _headers());
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body)['data'] ?? {};
+    } else {
+      throw Exception(json.decode(response.body)['message'] ?? 'Failed to load marks sheet.');
+    }
+  }
+
+  Future<void> saveMarksSheet(int examId, Map<String, dynamic> data) async {
+    final uri = Uri.parse('$baseUrl/api/teacher/exams-new/$examId/marks-sheet');
+    final response = await http.post(uri, headers: _headers(), body: json.encode(data));
+
+    if (response.statusCode != 200) {
+      final err = json.decode(response.body);
+      throw Exception(err['message'] ?? 'Failed to save marks.');
+    }
+  }
 }

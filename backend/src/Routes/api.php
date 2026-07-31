@@ -260,6 +260,8 @@ return function (App $app) {
     $app->post('/api/teacher/marks', [TeacherController::class, 'enterMarks']);
     $app->get('/api/teacher/exams-new', [TeacherController::class, 'getExamsList']);
     $app->get('/api/teacher/exams-new/{id}/details', [TeacherController::class, 'getExamDetails']);
+    $app->get('/api/teacher/exams-new/{id}/marks-sheet', [TeacherController::class, 'getMarksSheet']);
+    $app->post('/api/teacher/exams-new/{id}/marks-sheet', [TeacherController::class, 'saveMarksSheet']);
     $app->get('/api/teacher/schedule/today', [TeacherController::class, 'getTodaySchedule']);
     $app->get('/api/teacher/salaries', [TeacherController::class, 'getSalaries']);
     $app->get('/api/teacher/salaries/receipt', [TeacherController::class, 'getSalarySlip']);

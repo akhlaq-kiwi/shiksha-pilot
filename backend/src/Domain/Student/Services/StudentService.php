@@ -251,7 +251,7 @@ class StudentService extends BaseService
               AND ecs.class_id = :cid_2 
               AND ecs.status = 'Published' 
               AND e.school_id = :school_id
-            ORDER BY e.start_date DESC
+            ORDER BY e.start_date ASC, e.id ASC
         ");
         $stmt->execute([
             ':sid' => $studentId, 
@@ -823,29 +823,31 @@ class StudentService extends BaseService
     {
         $schoolId = (int)($user['school_id'] ?? 0);
         $userId = (int)($user['id'] ?? 0);
+        $role = strtoupper($user['role'] ?? '');
         $pdo = $this->repo->getPdo();
 
         $stmt = $pdo->prepare("
             SELECT * FROM dashboard_notifications
-            WHERE school_id = :school_id AND user_id = :user_id
+            WHERE school_id = :school_id AND (user_id = :user_id OR (user_role = :role AND user_id IS NULL))
             ORDER BY id DESC
         ");
-        $stmt->execute([':school_id' => $schoolId, ':user_id' => $userId]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $stmt->execute([':school_id' => $schoolId, ':user_id' => $userId, ':role' => $role]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
     public function markAllNotificationsRead(array $user): array
     {
         $schoolId = (int)($user['school_id'] ?? 0);
         $userId = (int)($user['id'] ?? 0);
+        $role = strtoupper($user['role'] ?? '');
         $pdo = $this->repo->getPdo();
 
         $stmt = $pdo->prepare("
             UPDATE dashboard_notifications
             SET is_read = 1
-            WHERE school_id = :school_id AND user_id = :user_id AND is_read = 0
+            WHERE school_id = :school_id AND (user_id = :user_id OR (user_role = :role AND user_id IS NULL)) AND is_read = 0
         ");
-        $stmt->execute([':school_id' => $schoolId, ':user_id' => $userId]);
+        $stmt->execute([':school_id' => $schoolId, ':user_id' => $userId, ':role' => $role]);
 
         return ['success' => true];
     }
@@ -919,7 +921,7 @@ class StudentService extends BaseService
             WHERE ep.class_id = :class_id_2 
               AND e.school_id = :school_id 
               AND (e.status = 'Published' OR COALESCE(ecs.scheme_published, 0) = 1 OR COALESCE(ecs.admit_card_published, 0) = 1 OR ecs.status = 'Published')
-            ORDER BY e.start_date DESC
+            ORDER BY e.start_date ASC, e.id ASC
         ");
         $stmt->execute([
             ':class_id_1' => $classId,

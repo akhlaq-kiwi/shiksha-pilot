@@ -220,4 +220,25 @@ class TeacherController extends BaseController
         $data = $this->service->getExamDetails($user, $examId);
         return $this->success($response, $data);
     }
+
+    public function getMarksSheet(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, 'TEACHER');
+        $examId = (int)$args['id'];
+        $queryParams = $request->getQueryParams();
+        $subjectId = (int)($queryParams['subject_id'] ?? 0);
+        $data = $this->service->getMarksSheet($user, $examId, $subjectId);
+        return $this->success($response, $data);
+    }
+
+    public function saveMarksSheet(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, 'TEACHER');
+        $examId = (int)$args['id'];
+        $body = (array)$request->getParsedBody();
+        $data = $this->service->saveMarksSheet($user, $examId, $body);
+        return $this->success($response, $data, 'Marks saved successfully');
+    }
 }

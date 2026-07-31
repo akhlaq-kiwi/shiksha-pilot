@@ -156,7 +156,7 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
               label: 'OPEN',
               textColor: Colors.amber.shade300,
               onPressed: () async {
-                await Printing.sharePdf(bytes: response.bodyBytes, filename: defaultFilename);
+                await Printing.layoutPdf(onLayout: (_) async => response.bodyBytes, name: defaultFilename);
               },
             ) : null,
             behavior: SnackBarBehavior.floating,

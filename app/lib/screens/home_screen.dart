@@ -99,7 +99,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     ),
     LauncherFeature(
       name: 'Salary',
-      icon: Icons.price_check_rounded,
+      icon: Icons.currency_rupee_rounded,
       color: Colors.teal,
       allowedRoles: ['TEACHER'],
       isAvailable: true,
@@ -489,6 +489,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       baseUrl: widget.leaveService.baseUrl,
                       token: widget.leaveService.token,
                       studentId: _activeStudentId,
+                      userRole: widget.userRole,
                     ),
                   ),
                 ).then((_) => _loadSessionInfo());
@@ -1050,7 +1051,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
         );
-      } else if (feature.name == 'Notifications' || feature.name == 'Notice' || feature.name == 'Messages') {
+      } else if (feature.name == 'Notice' || feature.name == 'Notice Board' || feature.name == 'Notices') {
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('auth_token') ?? '';
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => NoticeScreen(
+              baseUrl: widget.leaveService.baseUrl,
+              token: token.isNotEmpty ? token : widget.leaveService.token,
+              userRole: widget.userRole,
+              studentId: _activeStudentId,
+            ),
+          ),
+        );
+      } else if (feature.name == 'Notifications' || feature.name == 'Messages') {
         final prefs = await SharedPreferences.getInstance();
         final token = prefs.getString('auth_token') ?? '';
         Navigator.push(
@@ -1060,6 +1075,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               baseUrl: widget.leaveService.baseUrl,
               token: token.isNotEmpty ? token : widget.leaveService.token,
               studentId: _activeStudentId,
+              userRole: widget.userRole,
             ),
           ),
         ).then((_) => _fetchUnreadNotificationsCount());

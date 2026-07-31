@@ -76,7 +76,7 @@ class SimplePdf
         $imgStream = '';
         $logoPath = $fields['Logo Path'] ?? '';
 
-        if ($isFeeReceipt && !empty($logoPath)) {
+        if (($isFeeReceipt || $isSalarySlip) && !empty($logoPath)) {
             // Find absolute path with fallback checks
             $absPath = "";
             $searchPaths = [
@@ -199,7 +199,7 @@ class SimplePdf
             // =========================================================================
             // REDESIGNED FEE PAYMENT RECEIPT
             // =========================================================================
-            $schoolName = $title;
+            $schoolName = strtoupper(trim($title));
             $receiptTitle = "FEE PAYMENT RECEIPT";
             
             $studentName = $fields['Student Name'] ?? '—';
@@ -450,7 +450,7 @@ class SimplePdf
             // =========================================================================
             // REDESIGNED SALARY SLIP
             // =========================================================================
-            $schoolName = $fields['School'] ?? 'SHIKSHA PILOT SCHOOL';
+            $schoolName = strtoupper(trim($fields['School'] ?? 'SHIKSHA PILOT SCHOOL'));
             $slipTitle = "SALARY DISBURSEMENT SLIP";
             
             $staffName = $fields['Employee Name'] ?? '—';
@@ -466,103 +466,117 @@ class SimplePdf
             $stream .= "45 45 505.28 751.89 re\n";
             $stream .= "S\n";
 
+            // Draw Logo image if loaded
+            if ($logoObjId > 0 && !empty($imgStream)) {
+                $logoX = (595.28 - $logoWidth) / 2;
+                $stream .= "q\n";
+                $stream .= "{$logoWidth} 0 0 {$logoHeight} " . number_format($logoX, 2, '.', '') . " 735 cm\n";
+                $stream .= "/Img1 Do\n";
+                $stream .= "Q\n";
+            }
+
+            // Divider line below header/logo
+            $stream .= "0.09 0.17 0.35 RG\n";
+            $stream .= "0.75 w\n";
+            $stream .= "50 655 m 545.28 655 l S\n";
+
             $stream .= "0.88 0.90 0.94 RG\n";
             $stream .= "0.5 w\n";
-            $stream .= "45 535 505.28 65 re\n";
+            $stream .= "45 545 505.28 65 re\n";
             $stream .= "S\n";
 
             // Centered amount box
             $stream .= "0.92 0.94 0.98 rg\n";
             $amtX = (595.28 - 220) / 2;
-            $stream .= "{$amtX} 355 220 80 re\n";
+            $stream .= "{$amtX} 365 220 80 re\n";
             $stream .= "f\n";
             $stream .= "0.70 0.78 0.92 RG\n";
             $stream .= "1 w\n";
-            $stream .= "{$amtX} 355 220 80 re\n";
+            $stream .= "{$amtX} 365 220 80 re\n";
             $stream .= "S\n";
 
             // Draw Text elements
             $stream .= "BT\n";
 
+            // School Name (Centered)
             $stream .= "0.09 0.17 0.35 rg\n";
             $stream .= "/F2 18 Tf\n";
-            $schNameX = (595.28 - (strlen($schoolName) * 9.5)) / 2;
-            $stream .= "1 0 0 1 " . number_format($schNameX, 2, '.', '') . " 695 Tm\n";
+            $schNameX = (595.28 - $this->getStringWidth($schoolName, 18)) / 2;
+            $stream .= "1 0 0 1 " . number_format($schNameX, 2, '.', '') . " 700 Tm\n";
             $stream .= "(" . $this->escape($schoolName) . ") Tj\n";
 
+            // Title (Centered)
             $stream .= "/F2 11 Tf\n";
             $stream .= "0.3 0.3 0.3 rg\n";
-            $titleX = (595.28 - (strlen($slipTitle) * 6.5)) / 2;
-            $stream .= "1 0 0 1 " . number_format($titleX, 2, '.', '') . " 650 Tm\n";
+            $titleX = (595.28 - $this->getStringWidth($slipTitle, 11)) / 2;
+            $stream .= "1 0 0 1 " . number_format($titleX, 2, '.', '') . " 680 Tm\n";
             $stream .= "(" . $this->escape($slipTitle) . ") Tj\n";
 
+            // Month / Date Subtitle (Centered)
             $stream .= "/F1 9 Tf\n";
             $stream .= "0.4 0.4 0.4 rg\n";
             $metaStr = "Month: {$salaryMonth}   |   Date: {$disbursedDate}";
-            $metaX = (595.28 - (strlen($metaStr) * 4.8)) / 2;
-            $stream .= "1 0 0 1 " . number_format($metaX, 2, '.', '') . " 620 Tm\n";
+            $metaX = (595.28 - $this->getStringWidth($metaStr, 9)) / 2;
+            $stream .= "1 0 0 1 " . number_format($metaX, 2, '.', '') . " 663 Tm\n";
             $stream .= "(" . $this->escape($metaStr) . ") Tj\n";
 
+            // Employee Information Section
             $stream .= "0.09 0.17 0.35 rg\n";
             $stream .= "/F2 10 Tf\n";
-            $stream .= "1 0 0 1 50 608 Tm\n";
+            $stream .= "1 0 0 1 50 618 Tm\n";
             $stream .= "(EMPLOYEE INFORMATION) Tj\n";
 
             $stream .= "0.3 0.3 0.3 rg\n";
             $stream .= "/F2 9 Tf\n";
-            $stream .= "1 0 0 1 60 580 Tm\n";
+            $stream .= "1 0 0 1 60 590 Tm\n";
             $stream .= "(Employee Name:) Tj\n";
             $stream .= "/F1 9 Tf\n";
-            $stream .= "1 0 0 1 145 580 Tm\n";
+            $stream .= "1 0 0 1 145 590 Tm\n";
             $stream .= "(" . $this->escape($staffName) . ") Tj\n";
 
             $stream .= "/F2 9 Tf\n";
-            $stream .= "1 0 0 1 310 580 Tm\n";
+            $stream .= "1 0 0 1 310 590 Tm\n";
             $stream .= "(Disbursement Month:) Tj\n";
             $stream .= "/F1 9 Tf\n";
-            $stream .= "1 0 0 1 420 580 Tm\n";
+            $stream .= "1 0 0 1 420 590 Tm\n";
             $stream .= "(" . $this->escape($salaryMonth) . ") Tj\n";
 
             $stream .= "/F2 9 Tf\n";
-            $stream .= "1 0 0 1 60 550 Tm\n";
+            $stream .= "1 0 0 1 60 560 Tm\n";
             $stream .= "(Employee ID:) Tj\n";
             $stream .= "/F1 9 Tf\n";
-            $stream .= "1 0 0 1 145 550 Tm\n";
+            $stream .= "1 0 0 1 145 560 Tm\n";
             $stream .= "(" . $this->escape($employeeId) . ") Tj\n";
 
             $stream .= "/F2 9 Tf\n";
-            $stream .= "1 0 0 1 310 550 Tm\n";
+            $stream .= "1 0 0 1 310 560 Tm\n";
             $stream .= "(Status:) Tj\n";
             $stream .= "/F1 9 Tf\n";
-            $stream .= "1 0 0 1 420 550 Tm\n";
+            $stream .= "1 0 0 1 420 560 Tm\n";
             $stream .= "(" . $statusVal . ") Tj\n";
 
-            // Amount Box Text
+            // Amount Box Text (100% Centered inside Box)
+            $amtLabelStr = "TOTAL AMOUNT DISBURSED";
             $stream .= "0.09 0.17 0.35 rg\n";
             $stream .= "/F2 9.5 Tf\n";
-            $amtLabelX = $amtX + (220 - (strlen("TOTAL AMOUNT DISBURSED") * 5.2)) / 2;
-            $stream .= "1 0 0 1 " . number_format($amtLabelX, 2, '.', '') . " 413 Tm\n";
-            $stream .= "(TOTAL AMOUNT DISBURSED) Tj\n";
+            $amtLabelX = $amtX + (220 - $this->getStringWidth($amtLabelStr, 9.5)) / 2;
+            $stream .= "1 0 0 1 " . number_format($amtLabelX, 2, '.', '') . " 423 Tm\n";
+            $stream .= "(" . $amtLabelStr . ") Tj\n";
 
             $stream .= "0.09 0.17 0.35 rg\n";
             $stream .= "/F2 18 Tf\n";
-            $amtValX = $amtX + (220 - (strlen($amountDisbursed) * 9.5)) / 2;
-            $stream .= "1 0 0 1 " . number_format($amtValX, 2, '.', '') . " 385 Tm\n";
-            $stream .= "(" . $amountDisbursed . ") Tj\n";
+            $amtValX = $amtX + (220 - $this->getStringWidth($amountDisbursed, 18)) / 2;
+            $stream .= "1 0 0 1 " . number_format($amtValX, 2, '.', '') . " 393 Tm\n";
+            $stream .= "(" . $this->escape($amountDisbursed) . ") Tj\n";
 
-            // Footer
+            // Footer (Centered Disclaimer, No Powered By)
             $stream .= "0.5 0.5 0.5 rg\n";
             $stream .= "/F1 8.5 Tf\n";
             
             $foot1 = "This is a computer-generated salary slip. No signature is required.";
-            $foot1X = (595.28 - (strlen($foot1) * 4.3)) / 2;
+            $foot1X = (595.28 - $this->getStringWidth($foot1, 8.5)) / 2;
             $stream .= "1 0 0 1 " . number_format($foot1X, 2, '.', '') . " 120 Tm\n";
             $stream .= "(" . $foot1 . ") Tj\n";
-
-            $foot2 = "Powered by Shiksha Pilot ERP Support Services.";
-            $foot2X = (595.28 - (strlen($foot2) * 4.3)) / 2;
-            $stream .= "1 0 0 1 " . number_format($foot2X, 2, '.', '') . " 105 Tm\n";
-            $stream .= "(" . $foot2 . ") Tj\n";
 
             $stream .= "ET";
         } else {

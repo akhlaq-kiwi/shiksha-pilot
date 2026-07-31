@@ -14,6 +14,7 @@ class NotificationCenterScreen extends StatefulWidget {
   final String baseUrl;
   final String token;
   final int? studentId;
+  final String? userRole;
   final bool isEmbedded;
 
   const NotificationCenterScreen({
@@ -21,6 +22,7 @@ class NotificationCenterScreen extends StatefulWidget {
     required this.baseUrl,
     required this.token,
     this.studentId,
+    this.userRole,
     this.isEmbedded = false,
   }) : super(key: key);
 
@@ -258,8 +260,8 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                     baseUrl: widget.baseUrl,
                                     token: widget.token,
                                   );
-                                  final userRole = widget.studentId != null ? 'PARENT' : 'STUDENT';
-                                  final exams = await examService.getExamsList(userRole, widget.studentId);
+                                  final effectiveRole = widget.userRole ?? (widget.studentId != null ? 'PARENT' : 'TEACHER');
+                                  final exams = await examService.getExamsList(effectiveRole, widget.studentId);
                                   
                                   if (Navigator.canPop(context)) {
                                     Navigator.pop(context);
@@ -279,7 +281,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                             examService: examService,
                                             examId: targetExam['id'] as int,
                                             examName: targetExam['name'] ?? 'Exam Detail',
-                                            userRole: userRole,
+                                            userRole: effectiveRole,
                                             studentId: widget.studentId,
                                           ),
                                         ),
@@ -290,7 +292,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                         MaterialPageRoute(
                                           builder: (context) => ExamListScreen(
                                             examService: examService,
-                                            userRole: userRole,
+                                            userRole: effectiveRole,
                                             selectedStudentId: widget.studentId,
                                           ),
                                         ),

@@ -150,7 +150,7 @@ class StudentController extends BaseController
     public function getNotifications(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, self::ALLOWED_ROLES);
+        $this->requireRole($user, ['STUDENT', 'PARENT', 'TEACHER']);
 
         $data = $this->service->getNotifications($user);
 
@@ -160,7 +160,7 @@ class StudentController extends BaseController
     public function markAllNotificationsRead(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, self::ALLOWED_ROLES);
+        $this->requireRole($user, ['STUDENT', 'PARENT', 'TEACHER']);
 
         $data = $this->service->markAllNotificationsRead($user);
 
@@ -170,7 +170,7 @@ class StudentController extends BaseController
     public function markNotificationRead(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, self::ALLOWED_ROLES);
+        $this->requireRole($user, ['STUDENT', 'PARENT', 'TEACHER']);
 
         $id = (int)$args['id'];
         $data = $this->service->markNotificationRead($user, $id);
@@ -198,6 +198,12 @@ class StudentController extends BaseController
     public function getExamsList(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
+        $role = strtoupper($user['role'] ?? '');
+        if ($role === 'TEACHER') {
+            $teacherService = $this->container->get(\App\Domain\Teacher\Services\TeacherService::class);
+            $data = $teacherService->getExamsList($user);
+            return $this->success($response, $data);
+        }
         $this->requireRole($user, self::ALLOWED_ROLES);
         $data = $this->service->getExamsList($user);
         return $this->success($response, $data);
@@ -206,8 +212,14 @@ class StudentController extends BaseController
     public function getExamDetails(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, self::ALLOWED_ROLES);
+        $role = strtoupper($user['role'] ?? '');
         $examId = (int)$args['id'];
+        if ($role === 'TEACHER') {
+            $teacherService = $this->container->get(\App\Domain\Teacher\Services\TeacherService::class);
+            $data = $teacherService->getExamDetails($user, $examId);
+            return $this->success($response, $data);
+        }
+        $this->requireRole($user, self::ALLOWED_ROLES);
         $data = $this->service->getExamDetails($user, $examId);
         return $this->success($response, $data);
     }
