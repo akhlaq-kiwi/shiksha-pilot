@@ -1,1 +1,0 @@
-ALTER TABLE audit_logs ADD COLUMN user_role VARCHAR(50) NULL AFTER user;

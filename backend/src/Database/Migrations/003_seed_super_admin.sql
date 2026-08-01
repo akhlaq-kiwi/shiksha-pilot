@@ -1,5 +1,9 @@
--- Migration 003: Seed default Super Admin
--- Inserts the platform Super Admin only if the phone does not already exist.
+-- =====================================================================
+-- Migration 003: Seed the platform Super Admin
+--
+-- Carried over unchanged from the previous migration 003. Guarded so it is a
+-- no-op when the account already exists.
+-- =====================================================================
 
 INSERT INTO users (phone, password, role, name, status)
 SELECT
