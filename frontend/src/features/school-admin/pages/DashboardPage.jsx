@@ -11,14 +11,6 @@ import { Dialog } from '../../../common/ui/dialog';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../../common/ui/table';
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 
-const MOCK_AUDIT_LOGS = [
-  { id: 1, action: 'Student Enrolled', user: 'admin@school.edu', detail: 'Aryan Mehta enrolled in Class 10A', date: '2026-06-20 09:12' },
-  { id: 2, action: 'Fee Collected', user: 'accounts@school.edu', detail: '₹25,000 received from Aryan Mehta', date: '2026-06-20 11:45' },
-  { id: 3, action: 'Exam Created', user: 'admin@school.edu', detail: 'Unit Test 1 created for Class 10', date: '2026-06-18 14:00' },
-  { id: 4, action: 'Staff Added', user: 'admin@school.edu', detail: 'Mr. Vivek Tiwari added as Social Studies teacher', date: '2026-06-15 10:30' },
-  { id: 5, action: 'Timetable Updated', user: 'admin@school.edu', detail: 'Monday schedule updated for Class 10A', date: '2026-06-12 16:20' },
-];
-
 // Modern SVG Line Chart Widget (12 Bullets with Hover Tooltip, No Bars, No Total Box)
 function LineChartWidget({ title, subtitle, icon: Icon, data, colorTheme = 'emerald', onPointClick }) {
   const [hoveredIdx, setHoveredIdx] = useState(null);
@@ -223,7 +215,6 @@ export default function DashboardPage({ onNavigate }) {
     salary_disbursement_chart: []
   });
   const [loading, setLoading] = useState(true);
-  const [auditLogs] = useState(MOCK_AUDIT_LOGS);
 
   const [classes, setClasses] = useState([]);
   const [selectedClassId, setSelectedClassId] = useState('');

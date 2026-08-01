@@ -1,5 +1,24 @@
 import { apiClient } from './apiClient';
 
+/**
+ * Mock fallbacks exist so the UI can be developed without a backend. They must
+ * NEVER mask a failure in production: a teacher silently marking attendance for
+ * fabricated students, or a save that reports success after a 500, is worse than
+ * a visible error.
+ *
+ * - Reads  → fall back to mock data in dev only; rethrow in production.
+ * - Writes → always rethrow. A mutation must never claim success it didn't get.
+ */
+const ALLOW_MOCK_FALLBACK = import.meta.env.DEV;
+
+function readFallback(mock, err) {
+  if (ALLOW_MOCK_FALLBACK) {
+    console.warn('[teacherService] API unavailable — serving mock data (dev only).', err);
+    return mock;
+  }
+  throw err;
+}
+
 // Mock data for graceful fallback
 const MOCK_CLASSES = [
   { id: 'cls-1', name: 'Grade 8-A', subject: 'Mathematics', room: 'Room 201', students: 32 },
@@ -121,8 +140,8 @@ export const teacherService = {
     try {
       const data = await apiClient.get('/api/teacher/classes');
       return data.classes || data;
-    } catch {
-      return MOCK_CLASSES;
+    } catch (err) {
+      return readFallback(MOCK_CLASSES, err);
     }
   },
 
@@ -130,8 +149,8 @@ export const teacherService = {
     try {
       const data = await apiClient.get(`/api/teacher/classes/${classId}/students`);
       return data.students || data;
-    } catch {
-      return MOCK_STUDENTS[classId] || [];
+    } catch (err) {
+      return readFallback(MOCK_STUDENTS[classId] || [], err);
     }
   },
 
@@ -139,8 +158,8 @@ export const teacherService = {
     try {
       const data = await apiClient.get('/api/teacher/schedule/today');
       return data.schedule || data;
-    } catch {
-      return MOCK_SCHEDULE;
+    } catch (err) {
+      return readFallback(MOCK_SCHEDULE, err);
     }
   },
 
@@ -148,16 +167,17 @@ export const teacherService = {
     try {
       const data = await apiClient.get('/api/teacher/assignments');
       return data.assignments || data;
-    } catch {
-      return MOCK_ASSIGNMENTS;
+    } catch (err) {
+      return readFallback(MOCK_ASSIGNMENTS, err);
     }
   },
 
   async createAssignment(payload) {
     try {
       return await apiClient.post('/api/teacher/assignments', payload);
-    } catch {
-      return { success: true, id: 'mock-' + Date.now(), ...payload };
+    } catch (err) {
+      // Never fake success on a mutation — the caller must surface this.
+      throw err;
     }
   },
 
@@ -165,8 +185,8 @@ export const teacherService = {
     try {
       const data = await apiClient.get('/api/teacher/exams');
       return data.exams || data;
-    } catch {
-      return MOCK_EXAMS;
+    } catch (err) {
+      return readFallback(MOCK_EXAMS, err);
     }
   },
 
@@ -174,16 +194,40 @@ export const teacherService = {
     try {
       const data = await apiClient.get('/api/teacher/attendance/history');
       return data.records || data;
-    } catch {
-      return MOCK_ATTENDANCE_HISTORY;
+    } catch (err) {
+      return readFallback(MOCK_ATTENDANCE_HISTORY, err);
+    }
+  },
+
+  /**
+   * Existing attendance for one class on one date.
+   * Returns { marked: boolean, markedAt?, markedBy?, attendance: { [studentId]: status } }
+   * so the UI can distinguish "not yet marked" from "already marked — editing".
+   */
+  async getAttendanceForDate(classId, date) {
+    try {
+      const data = await apiClient.get(
+        `/api/teacher/attendance?classId=${encodeURIComponent(classId)}&date=${encodeURIComponent(date)}`
+      );
+      return {
+        marked: !!data?.marked,
+        markedAt: data?.marked_at ?? data?.markedAt ?? null,
+        markedBy: data?.marked_by ?? data?.markedBy ?? null,
+        attendance: data?.attendance ?? {},
+      };
+    } catch (err) {
+      // A missing record is a legitimate "not marked yet", not a failure.
+      if (err?.status === 404) return { marked: false, attendance: {} };
+      return readFallback({ marked: false, attendance: {} }, err);
     }
   },
 
   async submitAttendance(payload) {
     try {
       return await apiClient.post('/api/teacher/attendance', payload);
-    } catch {
-      return { success: true };
+    } catch (err) {
+      // Never fake success on a mutation — the caller must surface this.
+      throw err;
     }
   },
 
@@ -191,24 +235,26 @@ export const teacherService = {
     try {
       const data = await apiClient.get('/api/teacher/materials');
       return data.materials || data;
-    } catch {
-      return MOCK_MATERIALS;
+    } catch (err) {
+      return readFallback(MOCK_MATERIALS, err);
     }
   },
 
   async uploadMaterial(payload) {
     try {
       return await apiClient.post('/api/teacher/materials', payload);
-    } catch {
-      return { success: true, id: 'mock-' + Date.now(), ...payload };
+    } catch (err) {
+      // Never fake success on a mutation — the caller must surface this.
+      throw err;
     }
   },
 
   async submitMarks(payload) {
     try {
       return await apiClient.post('/api/teacher/marks', payload);
-    } catch {
-      return { success: true };
+    } catch (err) {
+      // Never fake success on a mutation — the caller must surface this.
+      throw err;
     }
   },
 
@@ -216,13 +262,13 @@ export const teacherService = {
     try {
       const data = await apiClient.get('/api/teacher/dashboard');
       return data;
-    } catch {
-      return {
+    } catch (err) {
+      return readFallback({
         schedule: MOCK_SCHEDULE,
         tasks: MOCK_TASKS,
         upcomingExams: MOCK_UPCOMING_EXAMS,
         classes: MOCK_CLASSES,
-      };
+      }, err);
     }
   },
 

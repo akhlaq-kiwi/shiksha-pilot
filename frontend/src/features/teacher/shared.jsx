@@ -93,12 +93,13 @@ export function Label({ children, htmlFor }) {
   );
 }
 
-export function FormSelect({ value, onChange, children, className = '' }) {
+export function FormSelect({ value, onChange, children, className = '', ...props }) {
   return (
     <select
       value={value}
       onChange={onChange}
-      className={`w-full h-9 rounded-md border border-border bg-background text-text-primary text-sm px-3 focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors ${className}`}
+      {...props}
+      className={`w-full h-9 rounded-md border border-border bg-background text-text-primary text-sm px-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:border-primary transition-colors ${className}`}
     >
       {children}
     </select>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { GraduationCap, Sun, Moon, Bell } from 'lucide-react';
+import { GraduationCap, Sun, Moon, Bell, LogOut } from 'lucide-react';
 import { useTheme } from '../theme/ThemeContext';
 import { authService } from '../common/services/authService';
 import { Button } from '../common/ui/button';
@@ -385,7 +385,7 @@ const AppLayout = ({ children }) => {
                     aria-label="Log out"
                     title="Log out"
                   >
-                    <GraduationCap className="w-4 h-4" />
+                    <LogOut className="w-4 h-4" />
                   </Button>
                 </div>
               )}
