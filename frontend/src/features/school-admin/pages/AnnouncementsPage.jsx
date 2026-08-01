@@ -381,7 +381,7 @@ export default function AnnouncementsPage() {
                 <Megaphone className="h-6 w-6" />
               </div>
               <div className="space-y-1">
-                <h3 className="font-extrabold text-text-primary text-base">No Announcements Found</h3>
+                <h3 className="font-bold text-text-primary text-base">No Announcements Found</h3>
                 <p className="text-xs text-text-secondary leading-relaxed">
                   No announcements match the selected audience filter.
                 </p>
@@ -410,7 +410,7 @@ export default function AnnouncementsPage() {
                       <div>
                         <span>{formatDate(ann.created_at)}</span>
                         {ann.status === 'Published' && ann.published_at && (
-                          <div className="text-[10px] text-emerald-600 font-bold mt-0.5">
+                          <div className="text-[11px] text-emerald-600 font-bold mt-0.5">
                             Published: {formatDate(ann.published_at)}
                           </div>
                         )}
@@ -420,11 +420,11 @@ export default function AnnouncementsPage() {
                     {/* Status */}
                     <TableCell>
                       {ann.status === 'Published' ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
                           Published
                         </span>
                       ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200">
                           Draft
                         </span>
                       )}
@@ -518,7 +518,7 @@ export default function AnnouncementsPage() {
         <div className="p-6 space-y-5">
           {/* Subject */}
           <div className="space-y-2">
-            <label className="block text-[10px] font-black text-text-secondary uppercase tracking-wider">
+            <label className="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">
               Subject <span className="text-destructive">*</span>
             </label>
             <Input
@@ -533,7 +533,7 @@ export default function AnnouncementsPage() {
 
           {/* Description Editor */}
           <div className="space-y-2">
-            <label className="block text-[10px] font-black text-text-secondary uppercase tracking-wider">
+            <label className="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">
               Description <span className="text-destructive">*</span>
             </label>
             
@@ -581,7 +581,7 @@ export default function AnnouncementsPage() {
 
           {/* Audience selection */}
           <div className="space-y-2">
-            <label className="block text-[10px] font-black text-text-secondary uppercase tracking-wider">
+            <label className="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">
               Audience <span className="text-destructive">*</span>
             </label>
             <div className="flex flex-col sm:flex-row gap-4 pt-1">
@@ -674,8 +674,8 @@ export default function AnnouncementsPage() {
           <div className="p-6 space-y-6">
             {/* Subject Title */}
             <div className="space-y-1">
-              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Subject</span>
-              <h3 className="text-base font-extrabold text-text-primary leading-snug">
+              <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest">Subject</span>
+              <h3 className="text-base font-bold text-text-primary leading-snug">
                 {selectedAnn.subject}
               </h3>
             </div>
@@ -683,20 +683,20 @@ export default function AnnouncementsPage() {
             {/* Meta row: Status & Audience */}
             <div className="grid grid-cols-2 gap-4 border-y border-border/60 py-3">
               <div className="space-y-1">
-                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block">Status</span>
+                <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest block">Status</span>
                 {selectedAnn.status === 'Published' ? (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
                     Published
                   </span>
                 ) : (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200">
                     Draft
                   </span>
                 )}
               </div>
 
               <div className="space-y-1">
-                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block">Audience</span>
+                <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest block">Audience</span>
                 <span className="text-xs font-bold text-text-primary">
                   {formatAudience(selectedAnn.audience)}
                 </span>
@@ -706,14 +706,14 @@ export default function AnnouncementsPage() {
             {/* Created & Published Dates */}
             <div className="grid grid-cols-2 gap-4 border-b border-border/60 pb-4">
               <div className="space-y-0.5">
-                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block">Created Date</span>
+                <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest block">Created Date</span>
                 <span className="text-xs font-semibold text-text-secondary whitespace-nowrap">
                   {formatDate(selectedAnn.created_at)}
                 </span>
               </div>
 
               <div className="space-y-0.5">
-                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block">Published Date</span>
+                <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest block">Published Date</span>
                 <span className="text-xs font-semibold text-text-secondary whitespace-nowrap">
                   {selectedAnn.status === 'Published' ? formatDate(selectedAnn.published_at) : '—'}
                 </span>
@@ -722,7 +722,7 @@ export default function AnnouncementsPage() {
 
             {/* Description Content */}
             <div className="space-y-2">
-              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Message Content</span>
+              <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest">Message Content</span>
               <div 
                 className="text-sm text-text-secondary leading-relaxed bg-zinc-50 border border-border/60 rounded-xl p-4 min-h-[100px] max-h-[250px] overflow-y-auto rich-render-wrapper"
                 dangerouslySetInnerHTML={{ __html: selectedAnn.description }}

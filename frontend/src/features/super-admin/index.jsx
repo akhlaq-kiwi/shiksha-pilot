@@ -154,7 +154,7 @@ export default function SuperAdminPortal() {
       {/* Sidebar */}
       <aside className="w-full md:w-[240px] flex-shrink-0 flex flex-col justify-between border-r border-border pl-6 pr-4 py-6 bg-surface md:sticky md:top-14 md:h-[calc(100vh-56px)] md:overflow-y-auto scrollbar-none">
         <div>
-          <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-4 px-3">Management</p>
+          <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-4 px-3">Management</p>
           <nav className="flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 scrollbar-none">
             {NAV.map(item => {
               const Icon = item.icon;
@@ -163,7 +163,7 @@ export default function SuperAdminPortal() {
                  <button
                    key={item.path}
                    onClick={() => nav(item.path)}
-                   className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all flex-shrink-0 focus-visible:outline-none ${active ? 'bg-primary text-surface dark:bg-primary dark:text-background font-extrabold shadow-xs' : 'text-text-secondary hover:bg-secondary/70 hover:text-text-primary'}`}
+                   className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all flex-shrink-0 focus-visible:outline-none ${active ? 'bg-primary text-primary-fg font-bold shadow-xs' : 'text-text-secondary hover:bg-secondary/70 hover:text-text-primary'}`}
                  >
                    <Icon className="h-3.5 w-3.5 flex-shrink-0" />
                    <span>{item.label}</span>

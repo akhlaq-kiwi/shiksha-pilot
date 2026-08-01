@@ -197,7 +197,7 @@ export default function AttendanceLeaderboardPage() {
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h2 className="text-2xl font-black text-text-primary tracking-tight font-display">🏆 Attendance Champions</h2>
+            <h2 className="text-2xl font-bold text-text-primary tracking-tight font-display">🏆 Attendance Champions</h2>
             <p className="text-text-secondary text-xs mt-0.5">Historical achievements and certificates for completed sessions.</p>
           </div>
         </div>
@@ -229,12 +229,12 @@ export default function AttendanceLeaderboardPage() {
             <Award className="h-5 w-5 text-amber-500 flex-shrink-0" />
             <div>
               <span className="text-xs font-bold text-text-secondary uppercase tracking-wider">Academic Year</span>
-              <p className="text-sm font-black text-text-primary mt-0.5">{currentYear?.name} (Completed)</p>
+              <p className="text-sm font-bold text-text-primary mt-0.5">{currentYear?.name} (Completed)</p>
             </div>
           </div>
 
           <div className="w-full sm:w-[220px] space-y-1">
-            <label className="text-[10px] font-black text-text-secondary uppercase tracking-wider">Select Leaderboard Category</label>
+            <label className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Select Leaderboard Category</label>
             <Select 
               value={selectedClassId} 
               onChange={e => setSelectedClassId(e.target.value)}
@@ -253,7 +253,7 @@ export default function AttendanceLeaderboardPage() {
       {loading ? (
         <div className="flex flex-col items-center justify-center py-24 gap-3">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Computing snapshot...</p>
+          <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Computing snapshot...</p>
         </div>
       ) : error ? (
         <Card className="border-dashed border-2 border-red-200 bg-red-50/10 p-8 text-center text-red-600">
@@ -264,7 +264,7 @@ export default function AttendanceLeaderboardPage() {
         <Card className="border-dashed border-2 p-16 text-center text-text-muted max-w-lg mx-auto">
           <div className="flex flex-col items-center justify-center gap-3">
             <Trophy className="h-10 w-10 text-text-muted/60 mb-2" />
-            <h3 className="text-base font-black text-text-primary">No Attendance Data Found</h3>
+            <h3 className="text-base font-bold text-text-primary">No Attendance Data Found</h3>
             <p className="text-xs text-text-secondary max-w-xs leading-relaxed">
               There are no attendance records marked for the selected Academic Year category, or no working days configured.
             </p>
@@ -279,10 +279,10 @@ export default function AttendanceLeaderboardPage() {
             {/* Soft decorative background rays */}
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-amber-200/20 via-transparent to-transparent -z-10 pointer-events-none dark:from-amber-950/20" />
 
-            <h3 className="text-xs font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-1">
+            <h3 className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-1">
               Honorary Awards
             </h3>
-            <h2 className="text-2xl font-black text-text-primary tracking-tight font-display text-center mb-10 px-4">
+            <h2 className="text-2xl font-bold text-text-primary tracking-tight font-display text-center mb-10 px-4">
               {selectedClassNameText} Attendance champions
             </h2>
 
@@ -304,7 +304,7 @@ export default function AttendanceLeaderboardPage() {
                     
                     {/* Floating Medal/Crown Icon */}
                     <div className="relative -mb-6 z-20">
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-md font-black text-xl border-2 ${
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-md font-bold text-xl border-2 ${
                         isRank1 
                           ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-yellow-950 border-yellow-300' 
                           : isRank2 
@@ -328,7 +328,7 @@ export default function AttendanceLeaderboardPage() {
                         <div className={`relative mx-auto rounded-full p-1 border-2 ${
                           isRank1 ? 'border-yellow-400' : isRank2 ? 'border-zinc-300' : 'border-orange-600/30'
                         }`}>
-                          <div className={`w-20 h-20 rounded-full overflow-hidden flex items-center justify-center text-lg font-black uppercase ${
+                          <div className={`w-20 h-20 rounded-full overflow-hidden flex items-center justify-center text-lg font-bold uppercase ${
                             isRank1 
                               ? 'bg-yellow-100 text-yellow-800' 
                               : isRank2 
@@ -349,7 +349,7 @@ export default function AttendanceLeaderboardPage() {
 
                         {/* Student Rank Title */}
                         <div className="space-y-1">
-                          <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                          <span className={`text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
                             isRank1 
                               ? 'bg-yellow-400/20 text-yellow-800 dark:text-yellow-400' 
                               : isRank2 
@@ -358,20 +358,20 @@ export default function AttendanceLeaderboardPage() {
                           }`}>
                             Rank #{winner.rank}
                           </span>
-                          <h4 className="text-base font-black text-text-primary truncate font-display pt-1.5 leading-snug">
+                          <h4 className="text-base font-bold text-text-primary truncate font-display pt-1.5 leading-snug">
                             {winner.student_name}
                           </h4>
-                          <p className="text-[10px] text-text-muted font-bold leading-none">
+                          <p className="text-[11px] text-text-muted font-bold leading-none">
                             Class {winner.class_name} · Roll No. {winner.roll_number || '—'}
                           </p>
                         </div>
 
                         {/* Score Indicator */}
                         <div className="pt-2 border-t border-border/60">
-                          <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight leading-none">
+                          <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 tracking-tight leading-none">
                             {winner.achievement_score}%
                           </p>
-                          <p className="text-[9px] text-text-muted font-extrabold uppercase tracking-wide mt-1.5">
+                          <p className="text-[11px] text-text-muted font-bold uppercase tracking-wide mt-1.5">
                             Present: <span className="text-text-primary">{winner.metadata?.present_days}</span> / {winner.metadata?.total_working_days} Days
                           </p>
                         </div>

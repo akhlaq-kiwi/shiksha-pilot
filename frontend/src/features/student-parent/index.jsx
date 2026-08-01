@@ -177,13 +177,13 @@ function AppSidebar({ currentPage, onNavigate, isParent, user, selectedChild, on
             </div>
             <div className="min-w-0">
               <p className="text-sm font-bold text-text-primary truncate">{displayName}</p>
-              <p className="text-[10px] text-text-muted font-semibold">{isParent ? 'Parent Account' : 'Grade 9-A · Roll 14'}</p>
+              <p className="text-[11px] text-text-muted font-semibold">{isParent ? 'Parent Account' : 'Grade 9-A · Roll 14'}</p>
             </div>
           </div>
 
           {isParent && (
             <div className="mt-3 pt-3 border-t border-border">
-              <p className="text-[10px] font-black text-text-muted uppercase tracking-wider mb-2">Viewing child</p>
+              <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-2">Viewing child</p>
               <Select
                 value={selectedChild.id}
                 onChange={e => onSelectChild(MOCK_CHILDREN.find(c => c.id === e.target.value))}
@@ -193,12 +193,12 @@ function AppSidebar({ currentPage, onNavigate, isParent, user, selectedChild, on
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </Select>
-              <p className="text-[10px] text-text-muted mt-1.5 font-semibold">{selectedChild.grade} · Roll {selectedChild.rollNo.split('-')[2]}</p>
+              <p className="text-[11px] text-text-muted mt-1.5 font-semibold">{selectedChild.grade} · Roll {selectedChild.rollNo.split('-')[2]}</p>
             </div>
           )}
         </div>
 
-        <p className="text-[10px] font-black text-text-muted uppercase tracking-wider mb-4 px-3">Portal</p>
+        <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-4 px-3">Portal</p>
         <nav className="flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 scrollbar-none">
           {navItems.map(({ id, icon: Icon, label }) => (
             <button
@@ -206,7 +206,7 @@ function AppSidebar({ currentPage, onNavigate, isParent, user, selectedChild, on
               onClick={() => onNavigate(id)}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all flex-shrink-0 focus-visible:outline-none ${
                 currentPage === id
-                  ? 'bg-primary text-surface dark:bg-primary dark:text-background font-extrabold shadow-xs'
+                  ? 'bg-primary text-primary-fg font-bold shadow-xs'
                   : 'text-text-secondary hover:bg-secondary/70 hover:text-text-primary'
               }`}
             >
@@ -221,11 +221,11 @@ function AppSidebar({ currentPage, onNavigate, isParent, user, selectedChild, on
       <div className="hidden md:block">
         {feeStatus.outstanding > 0 && (
           <div className="bg-amber-500/8 border border-amber-500/20 rounded-xl p-4">
-            <p className="text-xs font-black text-amber-700 dark:text-amber-400 mb-1">Fee Due</p>
-            <p className="text-lg font-black text-text-primary tabular-nums">
+            <p className="text-xs font-bold text-amber-700 dark:text-amber-400 mb-1">Fee Due</p>
+            <p className="text-lg font-bold text-text-primary tabular-nums">
               ₹{feeStatus.outstanding.toLocaleString()}
             </p>
-            <p className="text-[10px] text-text-muted mt-0.5">Due {feeStatus.dueDate}</p>
+            <p className="text-[11px] text-text-muted mt-0.5">Due {feeStatus.dueDate}</p>
             <Button
               onClick={onPayNow}
               className="mt-3 w-full text-xs py-1.5 justify-center bg-amber-600 hover:bg-amber-700 border-none text-white"

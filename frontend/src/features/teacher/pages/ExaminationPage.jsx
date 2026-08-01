@@ -335,8 +335,8 @@ export default function ExaminationPage({ classes, exams, allStudents }) {
             </Table>
             <div className="px-6 py-3 border-t border-border">
               <p className="text-xs text-text-muted">
-                Press <kbd className="px-1 py-0.5 rounded border border-border bg-secondary text-[10px]">Enter</kbd> or{' '}
-                <kbd className="px-1 py-0.5 rounded border border-border bg-secondary text-[10px]">↓</kbd> to move to the next student.
+                Press <kbd className="px-1 py-0.5 rounded border border-border bg-secondary text-[11px]">Enter</kbd> or{' '}
+                <kbd className="px-1 py-0.5 rounded border border-border bg-secondary text-[11px]">↓</kbd> to move to the next student.
               </p>
             </div>
           </CardContent>

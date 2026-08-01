@@ -53,15 +53,17 @@ function LineChartWidget({ title, subtitle, icon: Icon, data, colorTheme = 'emer
     areaPathD = `${linePathD} L ${points[points.length - 1].x} ${bottomY} L ${points[0].x} ${bottomY} Z`;
   }
 
-  const strokeColor = colorTheme === 'indigo' ? '#6366f1' : '#10b981';
+  // Chart colours come from tokens so they follow dark mode and per-school themes.
+  // SVG stroke/fill accept CSS custom properties directly.
+  const strokeColor = colorTheme === 'indigo' ? 'var(--chart-6)' : 'var(--chart-2)';
   const gradientId = `gradient-${title.replace(/\s+/g, '-').toLowerCase()}`;
 
   return (
     <div className="bg-surface border border-border rounded-2xl p-6 shadow-sm">
       {/* Card Header without Total Box */}
       <div className="mb-6 border-b border-border/60 pb-4">
-        <h3 className="text-base font-black text-text-primary tracking-tight font-display flex items-center gap-2">
-          {Icon && <Icon className={`h-5 w-5 ${colorTheme === 'indigo' ? 'text-indigo-500' : 'text-primary'}`} />}
+        <h3 className="text-base font-bold text-text-primary tracking-tight font-display flex items-center gap-2">
+          {Icon && <Icon className={`h-5 w-5 ${colorTheme === 'indigo' ? 'text-chart-6' : 'text-chart-2'}`} />}
           {title}
         </h3>
         {subtitle && <p className="text-xs text-text-muted font-medium mt-0.5">{subtitle}</p>}
@@ -142,7 +144,7 @@ function LineChartWidget({ title, subtitle, icon: Icon, data, colorTheme = 'emer
                       cx={pt.x} 
                       cy={pt.y} 
                       r={isHovered ? "7" : "5.5"} 
-                      fill="#ffffff" 
+                      fill="var(--bg-surface)" 
                       stroke={strokeColor} 
                       strokeWidth={isHovered ? "4" : "3"} 
                       className="transition-all duration-200 cursor-pointer shadow-md"
@@ -175,15 +177,15 @@ function LineChartWidget({ title, subtitle, icon: Icon, data, colorTheme = 'emer
                       }`}
                       style={{ top: `calc(${pctY * 0.78}% - 34px)` }}
                     >
-                      <div className="px-2.5 py-1 text-[11px] font-black rounded-lg bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-xl border border-zinc-700 dark:border-zinc-200 whitespace-nowrap">
+                      <div className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-xl border border-zinc-700 dark:border-zinc-200 whitespace-nowrap">
                         ₹{Math.round(pt.amt).toLocaleString('en-IN')}
                       </div>
                     </div>
 
                     {/* X-Axis Month Label at the bottom */}
                     <div className="absolute bottom-0 text-center">
-                      <span className={`text-[11px] font-extrabold transition-colors select-none ${
-                        isHovered ? (colorTheme === 'indigo' ? 'text-indigo-600 dark:text-indigo-400' : 'text-primary') : 'text-text-muted'
+                      <span className={`text-[11px] font-bold transition-colors select-none ${
+                        isHovered ? (colorTheme === 'indigo' ? 'text-chart-6' : 'text-chart-2') : 'text-text-muted'
                       }`}>
                         {pt.month}
                       </span>
@@ -491,8 +493,8 @@ export default function DashboardPage({ onNavigate }) {
               onClick={card.clickPath && onNavigate ? () => onNavigate(card.clickPath) : undefined}
             >
               <CardContent className="p-5">
-                <p className="text-text-muted text-[10px] font-bold uppercase tracking-wider">{card.label}</p>
-                <p className="text-2xl font-black text-text-primary mt-0.5 font-display">{card.value}</p>
+                <p className="text-text-muted text-[11px] font-bold uppercase tracking-wider">{card.label}</p>
+                <p className="text-2xl font-bold text-text-primary mt-0.5 font-display">{card.value}</p>
               </CardContent>
             </Card>
           );
@@ -582,17 +584,17 @@ export default function DashboardPage({ onNavigate }) {
                       className="flex flex-col justify-between p-4 bg-zinc-50 dark:bg-zinc-900/30 border border-border/60 rounded-xl space-y-2.5 shadow-2xs hover:border-primary/40 transition-colors"
                     >
                       <div className="flex items-center justify-between border-b border-border/50 pb-2">
-                        <span className="text-[10px] font-black text-primary uppercase tracking-wider">Period {p.period_number}</span>
-                        <span className="text-[11px] font-black text-text-primary font-mono whitespace-nowrap">
+                        <span className="text-[11px] font-bold text-primary uppercase tracking-wider">Period {p.period_number}</span>
+                        <span className="text-[11px] font-bold text-text-primary font-mono whitespace-nowrap">
                           {timingStr}
                         </span>
                       </div>
                       <div className="space-y-1">
-                        <h4 className="text-sm font-black text-text-primary truncate">{p.subject_name}</h4>
+                        <h4 className="text-sm font-bold text-text-primary truncate">{p.subject_name}</h4>
                         <p className="text-xs text-text-secondary font-semibold truncate flex items-center gap-1.5">
                           {teacherName}
                           {p.is_backup && (
-                            <span className="text-[9px] font-bold text-amber-600 dark:text-amber-500 uppercase tracking-wider bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded-full select-none">
+                            <span className="text-[11px] font-bold text-amber-600 dark:text-amber-500 uppercase tracking-wider bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded-full select-none">
                               Backup
                             </span>
                           )}
@@ -610,8 +612,8 @@ export default function DashboardPage({ onNavigate }) {
                         className="flex flex-col justify-between p-4 bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-2.5 shadow-2xs"
                       >
                         <div className="flex items-center justify-between border-b border-amber-500/20 pb-2">
-                          <span className="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-wider">Interval Break</span>
-                          <span className="text-[11px] font-black text-amber-600 dark:text-amber-400 font-mono whitespace-nowrap">
+                          <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Interval Break</span>
+                          <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 font-mono whitespace-nowrap">
                             {intervalTimeStr}
                           </span>
                         </div>

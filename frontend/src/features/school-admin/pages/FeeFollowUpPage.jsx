@@ -397,7 +397,7 @@ export default function FeeFollowUpPage() {
       default:
         classes = "bg-gray-500/10 text-gray-600";
     }
-    return <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${classes}`}>{status.replace('_', ' ')}</span>;
+    return <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider ${classes}`}>{status.replace('_', ' ')}</span>;
   };
 
   return (
@@ -406,7 +406,7 @@ export default function FeeFollowUpPage() {
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-4">
         <div>
-          <h2 className="text-xl font-black text-text-primary tracking-tight font-display">Fee Follow-ups</h2>
+          <h2 className="text-xl font-bold text-text-primary tracking-tight font-display">Fee Follow-ups</h2>
           <p className="text-xs text-text-secondary mt-1 font-medium">Track and manage future payment commitments from parents.</p>
         </div>
         <div className="flex items-center gap-2">
@@ -448,9 +448,9 @@ export default function FeeFollowUpPage() {
               className="shadow-2xs border border-border bg-surface select-none"
             >
               <CardContent className="p-4 flex flex-col justify-between h-24">
-                <span className="text-[10px] text-text-muted font-bold uppercase tracking-wider">{c.label}</span>
+                <span className="text-[11px] text-text-muted font-bold uppercase tracking-wider">{c.label}</span>
                 <div className="flex items-baseline justify-between mt-2">
-                  <span className="text-2xl font-black text-text-primary font-display">{c.count}</span>
+                  <span className="text-2xl font-bold text-text-primary font-display">{c.count}</span>
                   <span className={`w-6 h-6 rounded-full flex items-center justify-center ${c.color}`}>
                     <Icon className="h-3.5 w-3.5" />
                   </span>
@@ -466,7 +466,7 @@ export default function FeeFollowUpPage() {
         <CardContent className="p-0">
           <div className="flex flex-col md:flex-row items-end gap-4 max-w-xl">
             <div className="flex-1 space-y-1.5 w-full">
-              <label className="text-[10px] text-text-secondary font-bold uppercase">Search Student</label>
+              <label className="text-[11px] text-text-secondary font-bold uppercase">Search Student</label>
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-text-muted" />
                 <Input
@@ -480,7 +480,7 @@ export default function FeeFollowUpPage() {
             </div>
 
             <div className="w-full md:w-48 space-y-1.5">
-              <label className="text-[10px] text-text-secondary font-bold uppercase">Status Filter</label>
+              <label className="text-[11px] text-text-secondary font-bold uppercase">Status Filter</label>
               <select
                 value={filters.status}
                 onChange={e => setFilters(prev => ({ ...prev, status: e.target.value }))}
@@ -504,7 +504,7 @@ export default function FeeFollowUpPage() {
           <div id="followup-report-area" className="overflow-x-auto w-full bg-surface p-4">
             <div className="hidden pdf-only flex justify-between items-center border-b border-border pb-4 mb-4">
               <div>
-                <h1 className="text-lg font-black text-black">Fee Follow-ups Report</h1>
+                <h1 className="text-lg font-bold text-black">Fee Follow-ups Report</h1>
                 <p className="text-xs text-gray-500">Generated on: {new Date().toLocaleDateString()}</p>
               </div>
               <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Shiksha Pilot</span>
@@ -512,7 +512,7 @@ export default function FeeFollowUpPage() {
             
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="border-b border-border text-[10px] text-text-muted font-bold uppercase tracking-wider">
+                <tr className="border-b border-border text-[11px] text-text-muted font-bold uppercase tracking-wider">
                   <th className="py-3 px-4 whitespace-nowrap">Student Name</th>
                   <th className="py-3 px-4 whitespace-nowrap">Class</th>
                   <th className="py-3 px-4 whitespace-nowrap">Roll No.</th>
@@ -625,7 +625,7 @@ export default function FeeFollowUpPage() {
             
             {/* Student Searchable Picker */}
             <div className="space-y-1.5 relative" ref={studentSearchRef}>
-              <label className="text-[10px] text-text-secondary font-bold uppercase">Select Student *</label>
+              <label className="text-[11px] text-text-secondary font-bold uppercase">Select Student *</label>
               {modalMode === 'add' ? (
                 <>
                   <div className="relative">
@@ -660,7 +660,7 @@ export default function FeeFollowUpPage() {
                           >
                             <div>
                               <div className="font-bold text-text-primary text-xs">{s.name}</div>
-                              <div className="text-[10px] text-text-muted mt-0.5">Roll No: {s.roll_no || '—'} | Class: {s.class_name}</div>
+                              <div className="text-[11px] text-text-muted mt-0.5">Roll No: {s.roll_no || '—'} | Class: {s.class_name}</div>
                             </div>
                             <ChevronDown className="h-3 w-3 text-text-muted -rotate-90" />
                           </div>
@@ -673,7 +673,7 @@ export default function FeeFollowUpPage() {
                       )}
                     </div>
                   )}
-                  {formErrors.student_id && <p className="text-red-600 text-[10px] font-bold">{formErrors.student_id}</p>}
+                  {formErrors.student_id && <p className="text-red-600 text-[11px] font-bold">{formErrors.student_id}</p>}
                 </>
               ) : (
                 <div className="p-2 bg-hover rounded-lg border border-border text-xs text-text-primary font-bold">
@@ -684,7 +684,7 @@ export default function FeeFollowUpPage() {
 
             {/* Pending Amount */}
             <div className="space-y-1.5">
-              <label className="text-[10px] text-text-secondary font-bold uppercase">Pending Amount (₹) *</label>
+              <label className="text-[11px] text-text-secondary font-bold uppercase">Pending Amount (₹) *</label>
               <div className="relative">
                 <DollarSign className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-text-muted" />
                 <Input
@@ -696,13 +696,13 @@ export default function FeeFollowUpPage() {
                   className="pl-8 text-xs font-semibold text-text-primary border border-border bg-surface rounded-lg w-full focus:outline-hidden"
                 />
               </div>
-              <p className="text-[9px] text-text-muted leading-relaxed">Auto-fetched from student outstanding dues; editable if required.</p>
-              {formErrors.pending_amount && <p className="text-red-600 text-[10px] font-bold">{formErrors.pending_amount}</p>}
+              <p className="text-[11px] text-text-muted leading-relaxed">Auto-fetched from student outstanding dues; editable if required.</p>
+              {formErrors.pending_amount && <p className="text-red-600 text-[11px] font-bold">{formErrors.pending_amount}</p>}
             </div>
 
             {/* Promised Payment Date */}
             <div className="space-y-1.5">
-              <label className="text-[10px] text-text-secondary font-bold uppercase">Promised Payment Date *</label>
+              <label className="text-[11px] text-text-secondary font-bold uppercase">Promised Payment Date *</label>
               <div className="relative">
                 <Calendar className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-text-muted" />
                 <Input
@@ -712,12 +712,12 @@ export default function FeeFollowUpPage() {
                   className="pl-8 text-xs font-semibold text-text-primary border border-border bg-surface rounded-lg w-full focus:outline-hidden"
                 />
               </div>
-              {formErrors.promised_date && <p className="text-red-600 text-[10px] font-bold">{formErrors.promised_date}</p>}
+              {formErrors.promised_date && <p className="text-red-600 text-[11px] font-bold">{formErrors.promised_date}</p>}
             </div>
 
             {/* Commitment Reason */}
             <div className="space-y-1.5">
-              <label className="text-[10px] text-text-secondary font-bold uppercase">Reason / Commitment Notes *</label>
+              <label className="text-[11px] text-text-secondary font-bold uppercase">Reason / Commitment Notes *</label>
               <textarea
                 rows={3}
                 maxLength={500}
@@ -726,13 +726,13 @@ export default function FeeFollowUpPage() {
                 onChange={e => setForm(prev => ({ ...prev, reason: e.target.value }))}
                 className="w-full border border-border bg-surface rounded-lg p-2.5 text-xs text-text-primary font-semibold focus:outline-hidden focus:border-primary resize-y"
               />
-              <div className="flex items-center justify-between text-[9px] text-text-muted">
+              <div className="flex items-center justify-between text-[11px] text-text-muted">
                 <span>Maximum 25 words allowed</span>
                 <span className={countWords(form.reason) > 25 ? "text-red-500 font-bold" : ""}>
                   {countWords(form.reason)} / 25 words
                 </span>
               </div>
-              {formErrors.reason && <p className="text-red-600 text-[10px] font-bold">{formErrors.reason}</p>}
+              {formErrors.reason && <p className="text-red-600 text-[11px] font-bold">{formErrors.reason}</p>}
             </div>
 
             {/* Actions */}
@@ -770,20 +770,20 @@ export default function FeeFollowUpPage() {
             {/* Top Cards grid */}
             <div className="grid grid-cols-2 gap-4 bg-hover/50 p-3.5 rounded-xl border border-border">
               <div>
-                <span className="text-[9px] text-text-muted uppercase font-bold block">Student</span>
-                <span className="font-extrabold text-text-primary text-sm mt-0.5 block">{selectedItem.student_name}</span>
-                <span className="text-[10px] text-text-muted mt-0.5 block">Roll No: {selectedItem.roll_no || '—'} | Class {selectedItem.class_name}</span>
+                <span className="text-[11px] text-text-muted uppercase font-bold block">Student</span>
+                <span className="font-bold text-text-primary text-sm mt-0.5 block">{selectedItem.student_name}</span>
+                <span className="text-[11px] text-text-muted mt-0.5 block">Roll No: {selectedItem.roll_no || '—'} | Class {selectedItem.class_name}</span>
               </div>
               <div className="text-right">
-                <span className="text-[9px] text-text-muted uppercase font-bold block">Status</span>
+                <span className="text-[11px] text-text-muted uppercase font-bold block">Status</span>
                 <span className="inline-block mt-1">{getStatusBadge(selectedItem.status)}</span>
               </div>
               <div>
-                <span className="text-[9px] text-text-muted uppercase font-bold block">Pending Amount</span>
-                <span className="font-black text-text-primary font-mono text-sm mt-0.5 block">₹{number_format(selectedItem.pending_amount, 2)}</span>
+                <span className="text-[11px] text-text-muted uppercase font-bold block">Pending Amount</span>
+                <span className="font-bold text-text-primary font-mono text-sm mt-0.5 block">₹{number_format(selectedItem.pending_amount, 2)}</span>
               </div>
               <div className="text-right">
-                <span className="text-[9px] text-text-muted uppercase font-bold block">Promise Date</span>
+                <span className="text-[11px] text-text-muted uppercase font-bold block">Promise Date</span>
                 <span className="font-bold text-text-primary text-xs mt-1 block">
                   {new Date(selectedItem.promised_date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
                 </span>
@@ -793,11 +793,11 @@ export default function FeeFollowUpPage() {
             {/* Commitment Details */}
             <div className="space-y-2 border-b border-border pb-4">
               <div>
-                <span className="text-[9px] text-text-muted uppercase font-bold block">Contact Mobile</span>
+                <span className="text-[11px] text-text-muted uppercase font-bold block">Contact Mobile</span>
                 <span className="font-bold text-text-primary text-xs block">{selectedItem.mobile_number || '—'}</span>
               </div>
               <div>
-                <span className="text-[9px] text-text-muted uppercase font-bold block">Commitment Reason</span>
+                <span className="text-[11px] text-text-muted uppercase font-bold block">Commitment Reason</span>
                 <p className="text-text-primary text-xs italic leading-relaxed pt-0.5 whitespace-pre-line">{selectedItem.reason}</p>
               </div>
             </div>
@@ -831,7 +831,7 @@ export default function FeeFollowUpPage() {
                 <AlertCircle className="h-5 w-5" />
               </div>
               <div className="space-y-1">
-                <h4 className="font-extrabold text-text-primary text-sm">Delete this follow-up?</h4>
+                <h4 className="font-bold text-text-primary text-sm">Delete this follow-up?</h4>
                 <p className="leading-relaxed text-text-muted">
                   Are you sure you want to delete payment follow-up for <strong className="text-text-primary">{selectedItem.student_name}</strong>? This action cannot be undone.
                 </p>
@@ -868,14 +868,14 @@ export default function FeeFollowUpPage() {
         >
           <form onSubmit={handleSaveExtendFollowUp} className="space-y-4 text-xs font-medium text-text-secondary max-w-md">
             <div>
-              <span className="text-[10px] text-text-muted uppercase font-bold block">Student</span>
-              <span className="font-extrabold text-text-primary text-sm mt-0.5 block">{selectedItem.student_name}</span>
-              <span className="text-[10px] text-text-muted mt-0.5 block">Roll No: {selectedItem.roll_no || '—'} | Class {selectedItem.class_name}</span>
+              <span className="text-[11px] text-text-muted uppercase font-bold block">Student</span>
+              <span className="font-bold text-text-primary text-sm mt-0.5 block">{selectedItem.student_name}</span>
+              <span className="text-[11px] text-text-muted mt-0.5 block">Roll No: {selectedItem.roll_no || '—'} | Class {selectedItem.class_name}</span>
             </div>
 
             {/* New Promised Date */}
             <div className="space-y-1.5">
-              <label className="text-[10px] text-text-secondary font-bold uppercase">New Promised Date *</label>
+              <label className="text-[11px] text-text-secondary font-bold uppercase">New Promised Date *</label>
               <div className="relative">
                 <Calendar className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-text-muted" />
                 <Input
@@ -885,12 +885,12 @@ export default function FeeFollowUpPage() {
                   className="pl-8 text-xs font-semibold text-text-primary border border-border bg-surface rounded-lg w-full focus:outline-hidden"
                 />
               </div>
-              {extendFormErrors.promised_date && <p className="text-red-600 text-[10px] font-bold">{extendFormErrors.promised_date}</p>}
+              {extendFormErrors.promised_date && <p className="text-red-600 text-[11px] font-bold">{extendFormErrors.promised_date}</p>}
             </div>
 
             {/* New Reason */}
             <div className="space-y-1.5">
-              <label className="text-[10px] text-text-secondary font-bold uppercase">Reason / Update Notes (Optional)</label>
+              <label className="text-[11px] text-text-secondary font-bold uppercase">Reason / Update Notes (Optional)</label>
               <textarea
                 rows={3}
                 maxLength={500}
@@ -899,13 +899,13 @@ export default function FeeFollowUpPage() {
                 onChange={e => setExtendForm(prev => ({ ...prev, reason: e.target.value }))}
                 className="w-full border border-border bg-surface rounded-lg p-2.5 text-xs text-text-primary font-semibold focus:outline-hidden focus:border-primary resize-y"
               />
-              <div className="flex items-center justify-between text-[9px] text-text-muted">
+              <div className="flex items-center justify-between text-[11px] text-text-muted">
                 <span>Maximum 25 words allowed</span>
                 <span className={countWords(extendForm.reason) > 25 ? "text-red-500 font-bold" : ""}>
                   {countWords(extendForm.reason)} / 25 words
                 </span>
               </div>
-              {extendFormErrors.reason && <p className="text-red-600 text-[10px] font-bold">{extendFormErrors.reason}</p>}
+              {extendFormErrors.reason && <p className="text-red-600 text-[11px] font-bold">{extendFormErrors.reason}</p>}
             </div>
 
             {/* Actions */}

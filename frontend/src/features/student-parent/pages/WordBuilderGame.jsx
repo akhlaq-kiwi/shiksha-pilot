@@ -616,17 +616,17 @@ export default function WordBuilderGame() {
   return (
     <div className="flex justify-center items-start min-h-[calc(100vh-140px)] w-full py-4 px-2">
       {/* Premium Mobile Simulator Frame */}
-      <div className="w-full max-w-[430px] min-h-[82vh] bg-[#FAF9F6] border-4 border-[#E5E5E1] rounded-[36px] shadow-lg flex flex-col justify-between overflow-hidden relative font-sans">
+      <div className="w-full max-w-[430px] min-h-[82vh] bg-background border-4 border-border rounded-[36px] shadow-lg flex flex-col justify-between overflow-hidden relative font-sans">
         
         {/* Top Header Panel */}
-        <div className="bg-[#FAF9F6] px-5 pt-5 pb-3 border-b border-[#E5E5E1] flex flex-col gap-2.5 z-10">
+        <div className="bg-background px-5 pt-5 pb-3 border-b border-border flex flex-col gap-2.5 z-10">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-full bg-primary text-white flex items-center justify-center font-black text-[10px]">
+              <div className="w-7 h-7 rounded-full bg-primary text-white flex items-center justify-center font-bold text-[11px]">
                 {playerName.charAt(0)}
               </div>
               <div>
-                <p className="text-[10px] font-black text-text-primary truncate max-w-[80px]">{playerName}</p>
+                <p className="text-[11px] font-bold text-text-primary truncate max-w-[80px]">{playerName}</p>
                 <p className="text-[8px] font-bold text-text-muted mt-0.5">{studentClass}</p>
               </div>
             </div>
@@ -649,37 +649,37 @@ export default function WordBuilderGame() {
 
           {/* Stats Bar */}
           <div className="grid grid-cols-4 gap-1 pt-1.5">
-            <div className="bg-white border border-[#EBEAE8] px-2 py-1.5 rounded-xl flex items-center gap-1 shadow-2xs">
+            <div className="bg-white border border-border px-2 py-1.5 rounded-xl flex items-center gap-1 shadow-2xs">
               <Trophy className="h-3 w-3 text-amber-500 flex-shrink-0" />
               <div className="min-w-0">
                 <span className="block text-[7px] text-text-muted font-bold uppercase tracking-wider leading-none">Score</span>
-                <span className="text-xs font-black text-text-primary leading-none tabular-nums mt-0.5 block">{score}</span>
+                <span className="text-xs font-bold text-text-primary leading-none tabular-nums mt-0.5 block">{score}</span>
               </div>
             </div>
             
-            <div className="bg-white border border-[#EBEAE8] px-2 py-1.5 rounded-xl flex items-center gap-1 shadow-2xs">
+            <div className="bg-white border border-border px-2 py-1.5 rounded-xl flex items-center gap-1 shadow-2xs">
               <Coins className="h-3 w-3 text-yellow-500 flex-shrink-0" />
               <div className="min-w-0">
                 <span className="block text-[7px] text-text-muted font-bold uppercase tracking-wider leading-none">Coins</span>
-                <span className="text-xs font-black text-text-primary leading-none tabular-nums mt-0.5 block">{coins}</span>
+                <span className="text-xs font-bold text-text-primary leading-none tabular-nums mt-0.5 block">{coins}</span>
               </div>
             </div>
 
-            <div className="bg-white border border-[#EBEAE8] px-2 py-1.5 rounded-xl flex items-center gap-1 shadow-2xs">
+            <div className="bg-white border border-border px-2 py-1.5 rounded-xl flex items-center gap-1 shadow-2xs">
               <Flame className="h-3 w-3 text-orange-500 flex-shrink-0" />
               <div className="min-w-0">
                 <span className="block text-[7px] text-text-muted font-bold uppercase tracking-wider leading-none">Streak</span>
-                <span className="text-xs font-black text-text-primary leading-none tabular-nums mt-0.5 block">{currentStreak}</span>
+                <span className="text-xs font-bold text-text-primary leading-none tabular-nums mt-0.5 block">{currentStreak}</span>
               </div>
             </div>
 
-            <div className="bg-white border border-[#EBEAE8] px-2 py-1.5 rounded-xl flex items-center gap-1 shadow-2xs">
+            <div className="bg-white border border-border px-2 py-1.5 rounded-xl flex items-center gap-1 shadow-2xs">
               <Award className="h-3 w-3 text-indigo-500 flex-shrink-0" />
               <div className="min-w-0">
                 <span className="block text-[7px] text-text-muted font-bold uppercase tracking-wider leading-none">
                   {gameMode === 'daily' ? 'Daily' : gameMode === 'weekly' ? 'Weekly' : `Lvl ${currentLevel}`}
                 </span>
-                <span className="text-[10px] font-black text-text-primary leading-none mt-0.5 block truncate">
+                <span className="text-[11px] font-bold text-text-primary leading-none mt-0.5 block truncate">
                   Word {currentWordIdx + 1}/{wordsList.length}
                 </span>
               </div>
@@ -688,12 +688,12 @@ export default function WordBuilderGame() {
         </div>
 
         {/* Tab View Container */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 min-h-[420px] bg-[#FAF9F6]">
+        <div className="flex-1 overflow-y-auto px-5 py-4 min-h-[420px] bg-background">
           
           {loading ? (
             <div className="flex flex-col items-center justify-center min-h-[300px] gap-2">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Loading Word Builder...</p>
+              <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Loading Word Builder...</p>
             </div>
           ) : activeTab === 'game' ? (
             // GAMEPLAY MODE
@@ -705,13 +705,13 @@ export default function WordBuilderGame() {
                   <div className="flex items-center gap-2">
                     <Sparkles className="h-4 w-4 text-amber-600" />
                     <div>
-                      <p className="text-[10px] font-black text-amber-800 leading-none">Daily Login Reward!</p>
+                      <p className="text-[11px] font-bold text-amber-800 leading-none">Daily Login Reward!</p>
                       <p className="text-[8px] text-text-secondary mt-0.5 leading-none">Claim your daily +20 Coins</p>
                     </div>
                   </div>
                   <Button 
                     onClick={handleClaimDaily}
-                    className="h-6 px-2.5 text-[9px] font-black bg-amber-600 hover:bg-amber-700 text-white border-none rounded-lg shadow-sm"
+                    className="h-6 px-2.5 text-[11px] font-bold bg-amber-600 hover:bg-amber-700 text-white border-none rounded-lg shadow-sm"
                   >
                     Claim
                   </Button>
@@ -720,9 +720,9 @@ export default function WordBuilderGame() {
 
               {/* Central Gameplay Card */}
               {wordsList[currentWordIdx] && (
-                <Card className="border border-[#EBEAE8] shadow-sm rounded-3xl overflow-hidden bg-white">
-                  <CardHeader className="bg-[#EFEEEB] border-b border-[#EBEAE8] py-3 px-5 flex flex-row items-center justify-between">
-                    <span className="text-[9px] font-black text-text-primary uppercase tracking-wider">
+                <Card className="border border-border shadow-sm rounded-3xl overflow-hidden bg-white">
+                  <CardHeader className="bg-surface-sunken border-b border-border py-3 px-5 flex flex-row items-center justify-between">
+                    <span className="text-[11px] font-bold text-text-primary uppercase tracking-wider">
                       Category: {wordsList[currentWordIdx].category}
                     </span>
                     
@@ -745,11 +745,11 @@ export default function WordBuilderGame() {
                     {/* Visual Illustration Area */}
                     {wordsList[currentWordIdx].image_path && (
                       <div className="flex justify-center items-center py-1">
-                        <div className="relative w-28 h-28 rounded-2xl overflow-hidden border border-[#E5E5E1] bg-white flex items-center justify-center shadow-2xs">
+                        <div className="relative w-28 h-28 rounded-2xl overflow-hidden border border-border bg-white flex items-center justify-center shadow-2xs">
                           {imageError ? (
                             <div className="flex flex-col items-center justify-center gap-1.5 p-2">
                               <HelpCircle className="h-6 w-6 text-text-muted animate-pulse" />
-                              <span className="text-[8px] font-black text-text-muted uppercase tracking-wider text-center">Illustration Pending</span>
+                              <span className="text-[8px] font-bold text-text-muted uppercase tracking-wider text-center">Illustration Pending</span>
                             </div>
                           ) : (isPrePrimary || unlockedHints.image) ? (
                             <img 
@@ -761,7 +761,7 @@ export default function WordBuilderGame() {
                           ) : (
                             <div className="flex flex-col items-center justify-center gap-1.5 p-2">
                               <HelpCircle className="h-6 w-6 text-text-muted animate-pulse" />
-                              <span className="text-[8px] font-black text-text-muted uppercase tracking-wider text-center">Image Hint Locked</span>
+                              <span className="text-[8px] font-bold text-text-muted uppercase tracking-wider text-center">Image Hint Locked</span>
                             </div>
                           )}
                         </div>
@@ -769,9 +769,9 @@ export default function WordBuilderGame() {
                     )}
 
                     {/* Granular Hint Panel */}
-                    <div className="bg-[#FAF9F6] border border-[#EBEAE8] rounded-2xl p-4 space-y-2.5">
+                    <div className="bg-background border border-border rounded-2xl p-4 space-y-2.5">
                       <div className="flex justify-between items-center">
-                        <span className="text-[8px] font-black text-text-muted uppercase tracking-wider">Available Hints</span>
+                        <span className="text-[8px] font-bold text-text-muted uppercase tracking-wider">Available Hints</span>
                         <span className="text-[8px] font-bold text-text-secondary">Coins: {coins} 🪙</span>
                       </div>
                       
@@ -784,7 +784,7 @@ export default function WordBuilderGame() {
                             toast.success("First letter revealed!");
                           }}
                           variant="outline"
-                          className="h-8 text-[9px] font-bold flex items-center justify-center gap-1 border border-[#E5E5E1] rounded-lg shadow-3xs"
+                          className="h-8 text-[11px] font-bold flex items-center justify-center gap-1 border border-border rounded-lg shadow-3xs"
                         >
                           {unlockedHints.firstLetter ? `Starts with: ${wordsList[currentWordIdx].word.charAt(0)}` : "First Letter (5 🪙)"}
                         </Button>
@@ -797,7 +797,7 @@ export default function WordBuilderGame() {
                             toast.success("Meaning unlocked!");
                           }}
                           variant="outline"
-                          className="h-8 text-[9px] font-bold flex items-center justify-center gap-1 border border-[#E5E5E1] rounded-lg shadow-3xs"
+                          className="h-8 text-[11px] font-bold flex items-center justify-center gap-1 border border-border rounded-lg shadow-3xs"
                         >
                           {unlockedHints.meaning ? "Meaning Unlocked" : "Meaning (5 🪙)"}
                         </Button>
@@ -810,7 +810,7 @@ export default function WordBuilderGame() {
                             toast.success("Sentence unlocked!");
                           }}
                           variant="outline"
-                          className="h-8 text-[9px] font-bold flex items-center justify-center gap-1 border border-[#E5E5E1] rounded-lg shadow-3xs"
+                          className="h-8 text-[11px] font-bold flex items-center justify-center gap-1 border border-border rounded-lg shadow-3xs"
                         >
                           {unlockedHints.sentence ? "Sentence Unlocked" : "Sentence (5 🪙)"}
                         </Button>
@@ -824,7 +824,7 @@ export default function WordBuilderGame() {
                               toast.success("Image revealed!");
                             }}
                             variant="outline"
-                            className="h-8 text-[9px] font-bold flex items-center justify-center gap-1 border border-[#E5E5E1] rounded-lg shadow-3xs"
+                            className="h-8 text-[11px] font-bold flex items-center justify-center gap-1 border border-border rounded-lg shadow-3xs"
                           >
                             {(isPrePrimary || unlockedHints.image) ? "Image Unlocked" : "Reveal Image (10 🪙)"}
                           </Button>
@@ -832,15 +832,15 @@ export default function WordBuilderGame() {
                       </div>
 
                       {(unlockedHints.meaning || unlockedHints.sentence) && (
-                        <div className="border-t border-dashed border-[#E5E5E1] pt-2.5 text-left space-y-1.5">
+                        <div className="border-t border-dashed border-border pt-2.5 text-left space-y-1.5">
                           {unlockedHints.meaning && (
-                            <p className="text-[10px] text-text-primary font-bold">
-                              💡 <span className="font-extrabold text-text-secondary">Meaning:</span> {wordsList[currentWordIdx].english_meaning} ({wordsList[currentWordIdx].hindi_meaning})
+                            <p className="text-[11px] text-text-primary font-bold">
+                              💡 <span className="font-bold text-text-secondary">Meaning:</span> {wordsList[currentWordIdx].english_meaning} ({wordsList[currentWordIdx].hindi_meaning})
                             </p>
                           )}
                           {unlockedHints.sentence && (
-                            <p className="text-[10px] text-text-primary font-bold leading-relaxed">
-                              📝 <span className="font-extrabold text-text-secondary">Sentence:</span> "{wordsList[currentWordIdx].english_sentence}"
+                            <p className="text-[11px] text-text-primary font-bold leading-relaxed">
+                              📝 <span className="font-bold text-text-secondary">Sentence:</span> "{wordsList[currentWordIdx].english_sentence}"
                             </p>
                           )}
                         </div>
@@ -856,10 +856,10 @@ export default function WordBuilderGame() {
                         return (
                           <div 
                             key={idx} 
-                            className={`w-9 h-11 border-2 rounded-xl flex items-center justify-center text-lg font-black tracking-tight transition-all duration-150 ${
+                            className={`w-9 h-11 border-2 rounded-xl flex items-center justify-center text-lg font-bold tracking-tight transition-all duration-150 ${
                               letter 
                                 ? 'bg-primary border-primary text-white scale-100 shadow-sm' 
-                                : 'bg-[#FAF9F6] border-dashed border-[#E5E5E1] text-transparent scale-95'
+                                : 'bg-background border-dashed border-border text-transparent scale-95'
                             }`}
                           >
                             {letter}
@@ -870,7 +870,7 @@ export default function WordBuilderGame() {
 
                     {/* Scrambled letter tiles */}
                     <div className="space-y-2 pt-2">
-                      <p className="text-[8px] font-black text-text-muted uppercase tracking-wider">Tap letters to arrange</p>
+                      <p className="text-[8px] font-bold text-text-muted uppercase tracking-wider">Tap letters to arrange</p>
                       <div className="flex flex-wrap justify-center gap-2">
                         {scrambled.map((char, idx) => {
                           const isSelected = selectedLetters.includes(idx);
@@ -879,10 +879,10 @@ export default function WordBuilderGame() {
                               key={idx}
                               onClick={() => selectLetter(idx)}
                               disabled={showResult}
-                              className={`w-10 h-10 rounded-xl text-md font-black flex items-center justify-center border-2 transition-all shadow-2xs select-none active:scale-95 ${
+                              className={`w-10 h-10 rounded-xl text-md font-bold flex items-center justify-center border-2 transition-all shadow-2xs select-none active:scale-95 ${
                                 isSelected
-                                  ? 'bg-[#EFEEEB] border-[#E5E5E1] text-[#9ca3af] cursor-not-allowed scale-90'
-                                  : 'bg-white border-[#EBEAE8] text-text-primary hover:border-primary/80 hover:bg-zinc-50'
+                                  ? 'bg-surface-sunken border-border text-[#9ca3af] cursor-not-allowed scale-90'
+                                  : 'bg-white border-border text-text-primary hover:border-primary/80 hover:bg-zinc-50'
                               }`}
                             >
                               {char}
@@ -898,13 +898,13 @@ export default function WordBuilderGame() {
                         <Button 
                           onClick={handleSkipWord}
                           variant="outline"
-                          className="flex-1 h-10 text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 border border-[#E5E5E1] rounded-xl"
+                          className="flex-1 h-10 text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 border border-border rounded-xl"
                         >
                           <SkipForward className="h-3.5 w-3.5" /> Skip (10 🪙)
                         </Button>
                         <Button 
                           onClick={handleVerifyAnswer}
-                          className="flex-1 h-10 text-[10px] font-black uppercase tracking-wider flex items-center justify-center bg-primary text-white rounded-xl shadow-md"
+                          className="flex-1 h-10 text-[11px] font-bold uppercase tracking-wider flex items-center justify-center bg-primary text-white rounded-xl shadow-md"
                         >
                           Verify
                         </Button>
@@ -916,7 +916,7 @@ export default function WordBuilderGame() {
 
               {/* Resolved Overlay Panel (Meaning, Pronunciation, Next level actions) */}
               {showResult && wordsList[currentWordIdx] && (
-                <div className="bg-white border border-[#EBEAE8] rounded-3xl p-5 shadow-sm space-y-4 animate-in slide-in-from-bottom duration-300">
+                <div className="bg-white border border-border rounded-3xl p-5 shadow-sm space-y-4 animate-in slide-in-from-bottom duration-300">
                   <div className="flex items-center gap-2.5">
                     {isCorrect ? (
                       <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-600">
@@ -929,19 +929,19 @@ export default function WordBuilderGame() {
                     )
                     }
                     <div>
-                      <h4 className="text-sm font-black text-text-primary">
+                      <h4 className="text-sm font-bold text-text-primary">
                         {isCorrect ? '🎉 Correct Answer!' : '😞 Nice Try!'}
                       </h4>
-                      <p className="text-[10px] text-text-muted font-bold mt-0.5 leading-none">
-                        Word: <span className="text-text-primary text-xs font-black">{wordsList[currentWordIdx].word}</span>
+                      <p className="text-[11px] text-text-muted font-bold mt-0.5 leading-none">
+                        Word: <span className="text-text-primary text-xs font-bold">{wordsList[currentWordIdx].word}</span>
                       </p>
                     </div>
                   </div>
 
                   {/* Pronunciation & Meaning detail */}
-                  <div className="bg-[#FAF9F6] border border-[#EBEAE8] rounded-2xl p-4 space-y-3.5 text-left">
+                  <div className="bg-background border border-border rounded-2xl p-4 space-y-3.5 text-left">
                     <div className="flex items-center justify-between border-b border-border/80 pb-2">
-                      <span className="text-[9px] font-black text-text-muted uppercase tracking-wider">Pronunciation & Meaning</span>
+                      <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Pronunciation & Meaning</span>
                       <button 
                         onClick={() => handleTextToSpeech(wordsList[currentWordIdx].word)}
                         className="w-7 h-7 rounded-full bg-primary/10 text-text-primary hover:bg-primary/20 flex items-center justify-center transition-colors"
@@ -952,24 +952,24 @@ export default function WordBuilderGame() {
 
                     <div className="space-y-2">
                       <div>
-                        <span className="text-[8px] font-black text-text-muted uppercase tracking-wider block">English Meaning</span>
+                        <span className="text-[8px] font-bold text-text-muted uppercase tracking-wider block">English Meaning</span>
                         <p className="text-xs text-text-primary font-bold">{wordsList[currentWordIdx].english_meaning}</p>
                       </div>
                       <div>
-                        <span className="text-[8px] font-black text-text-muted uppercase tracking-wider block">Hindi Meaning</span>
+                        <span className="text-[8px] font-bold text-text-muted uppercase tracking-wider block">Hindi Meaning</span>
                         <p className="text-xs text-text-primary font-bold font-sans">{wordsList[currentWordIdx].hindi_meaning}</p>
                       </div>
                       <div className="pt-1.5 border-t border-dashed border-border">
-                        <span className="text-[8px] font-black text-text-muted uppercase tracking-wider block">Example Sentence</span>
+                        <span className="text-[8px] font-bold text-text-muted uppercase tracking-wider block">Example Sentence</span>
                         <p className="text-xs text-text-primary font-bold">"{wordsList[currentWordIdx].english_sentence}"</p>
-                        <p className="text-[10px] text-text-muted font-semibold mt-1 font-sans">"{wordsList[currentWordIdx].hindi_sentence}"</p>
+                        <p className="text-[11px] text-text-muted font-semibold mt-1 font-sans">"{wordsList[currentWordIdx].hindi_sentence}"</p>
                       </div>
                     </div>
                   </div>
 
                   <Button 
                     onClick={handleNextWord}
-                    className="w-full h-11 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 bg-primary text-white rounded-xl shadow-md"
+                    className="w-full h-11 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 bg-primary text-white rounded-xl shadow-md"
                   >
                     Continue <ArrowRight className="h-4 w-4" />
                   </Button>
@@ -981,27 +981,27 @@ export default function WordBuilderGame() {
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <BookOpen className="h-5 w-5 text-primary" />
-                <h3 className="text-lg font-black text-text-primary tracking-tight font-display">My Learned Words</h3>
+                <h3 className="text-lg font-bold text-text-primary tracking-tight font-display">My Learned Words</h3>
               </div>
-              <p className="text-[10px] text-text-secondary leading-relaxed font-bold">
+              <p className="text-[11px] text-text-secondary leading-relaxed font-bold">
                 Every correctly answered word is saved here. Tap the speaker icon to hear the pronunciation.
               </p>
 
               <div className="space-y-3 pt-2">
                 {learnedWords.length === 0 ? (
-                  <div className="bg-white border border-[#EBEAE8] p-8 text-center rounded-3xl space-y-2">
+                  <div className="bg-white border border-border p-8 text-center rounded-3xl space-y-2">
                     <p className="text-xs text-text-muted font-bold">Your vocabulary dictionary is empty.</p>
-                    <p className="text-[10px] text-text-secondary">Spell words correctly in gameplay mode to add them here.</p>
+                    <p className="text-[11px] text-text-secondary">Spell words correctly in gameplay mode to add them here.</p>
                   </div>
                 ) : (
                   learnedWords.map(wordObj => {
                     return (
-                      <Card key={wordObj.id} className="border border-[#EBEAE8] rounded-2xl bg-white shadow-2xs">
+                      <Card key={wordObj.id} className="border border-border rounded-2xl bg-white shadow-2xs">
                         <CardContent className="p-4 space-y-3">
                           <div className="flex items-center justify-between border-b border-border/60 pb-2">
                             <div>
-                              <h4 className="text-sm font-black text-text-primary tracking-wide leading-none">{wordObj.word}</h4>
-                              <span className="text-[7px] font-black text-text-muted uppercase tracking-wider mt-1 block">
+                              <h4 className="text-sm font-bold text-text-primary tracking-wide leading-none">{wordObj.word}</h4>
+                              <span className="text-[7px] font-bold text-text-muted uppercase tracking-wider mt-1 block">
                                 {wordObj.category}
                               </span>
                             </div>
@@ -1013,11 +1013,11 @@ export default function WordBuilderGame() {
                             </button>
                           </div>
                           
-                          <div className="space-y-1.5 text-[10px] text-text-secondary font-bold">
-                            <p><span className="text-text-muted text-[9px] uppercase block">Meaning</span> {wordObj.english_meaning}</p>
-                            <p><span className="text-text-muted text-[9px] uppercase block font-sans">Hindi Meaning</span> {wordObj.hindi_meaning}</p>
+                          <div className="space-y-1.5 text-[11px] text-text-secondary font-bold">
+                            <p><span className="text-text-muted text-[11px] uppercase block">Meaning</span> {wordObj.english_meaning}</p>
+                            <p><span className="text-text-muted text-[11px] uppercase block font-sans">Hindi Meaning</span> {wordObj.hindi_meaning}</p>
                             <div className="pt-1.5 border-t border-dashed border-border/80">
-                              <p><span className="text-text-muted text-[9px] uppercase block">Example</span> "{wordObj.english_sentence}"</p>
+                              <p><span className="text-text-muted text-[11px] uppercase block">Example</span> "{wordObj.english_sentence}"</p>
                               <p className="text-text-muted font-normal mt-0.5 font-sans">"{wordObj.hindi_sentence}"</p>
                             </div>
                           </div>
@@ -1033,39 +1033,39 @@ export default function WordBuilderGame() {
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <Activity className="h-5 w-5 text-primary" />
-                <h3 className="text-lg font-black text-text-primary tracking-tight font-display">Progress & Stats</h3>
+                <h3 className="text-lg font-bold text-text-primary tracking-tight font-display">Progress & Stats</h3>
               </div>
 
               <div className="grid grid-cols-2 gap-3 pt-1">
-                <div className="bg-white border border-[#EBEAE8] p-3 rounded-2xl shadow-2xs">
+                <div className="bg-white border border-border p-3 rounded-2xl shadow-2xs">
                   <span className="block text-[8px] text-text-muted font-bold uppercase tracking-wider leading-none">Words Learned</span>
-                  <span className="text-2xl font-black text-text-primary tracking-tight mt-1.5 block tabular-nums leading-none">
+                  <span className="text-2xl font-bold text-text-primary tracking-tight mt-1.5 block tabular-nums leading-none">
                     {learnedWords.length}
                   </span>
                 </div>
                 
-                <div className="bg-white border border-[#EBEAE8] p-3 rounded-2xl shadow-2xs">
+                <div className="bg-white border border-border p-3 rounded-2xl shadow-2xs">
                   <span className="block text-[8px] text-text-muted font-bold uppercase tracking-wider leading-none">Accuracy Rate</span>
-                  <span className="text-2xl font-black text-text-primary tracking-tight mt-1.5 block tabular-nums leading-none">
+                  <span className="text-2xl font-bold text-text-primary tracking-tight mt-1.5 block tabular-nums leading-none">
                     {correctAnswers + wrongAnswers > 0 
                       ? Math.round((correctAnswers / (correctAnswers + wrongAnswers)) * 100) 
                       : 0}%
                   </span>
                 </div>
 
-                <div className="bg-white border border-[#EBEAE8] p-3 rounded-2xl shadow-2xs">
+                <div className="bg-white border border-border p-3 rounded-2xl shadow-2xs">
                   <span className="block text-[8px] text-text-muted font-bold uppercase tracking-wider leading-none">Answers Status</span>
-                  <span className="text-xs font-black text-emerald-600 block mt-2.5 tabular-nums leading-none">
+                  <span className="text-xs font-bold text-emerald-600 block mt-2.5 tabular-nums leading-none">
                     ✓ {correctAnswers} Correct
                   </span>
-                  <span className="text-xs font-black text-red-500 block mt-1.5 tabular-nums leading-none">
+                  <span className="text-xs font-bold text-red-500 block mt-1.5 tabular-nums leading-none">
                     ✕ {wrongAnswers} Wrong
                   </span>
                 </div>
 
-                <div className="bg-white border border-[#EBEAE8] p-3 rounded-2xl shadow-2xs">
+                <div className="bg-white border border-border p-3 rounded-2xl shadow-2xs">
                   <span className="block text-[8px] text-text-muted font-bold uppercase tracking-wider leading-none">Play Time</span>
-                  <span className="text-lg font-black text-text-primary tracking-tight mt-2 block tabular-nums leading-none">
+                  <span className="text-lg font-bold text-text-primary tracking-tight mt-2 block tabular-nums leading-none">
                     {Math.floor(totalPlayTime / 60)}m {totalPlayTime % 60}s
                   </span>
                   <span className="text-[7px] text-text-muted font-bold block mt-1 uppercase">Total play session</span>
@@ -1073,14 +1073,14 @@ export default function WordBuilderGame() {
               </div>
 
               {/* Trophy Accomplishments Card */}
-              <Card className="border border-[#EBEAE8] rounded-2xl bg-white shadow-2xs mt-1">
+              <Card className="border border-border rounded-2xl bg-white shadow-2xs mt-1">
                 <CardContent className="p-4 space-y-3.5">
                   <div className="flex items-center gap-2 border-b border-border/60 pb-2">
                     <Trophy className="h-4 w-4 text-yellow-500" />
-                    <h4 className="text-xs font-black text-text-primary uppercase tracking-wider">Achievements</h4>
+                    <h4 className="text-xs font-bold text-text-primary uppercase tracking-wider">Achievements</h4>
                   </div>
 
-                  <div className="space-y-3 text-[10px] text-text-secondary font-bold">
+                  <div className="space-y-3 text-[11px] text-text-secondary font-bold">
                     <div className="flex items-center justify-between">
                       <p>Highest Correct Streak</p>
                       <span className="px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-600 tabular-nums">
@@ -1110,35 +1110,35 @@ export default function WordBuilderGame() {
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-primary" />
-                <h3 className="text-lg font-black text-text-primary tracking-tight font-display">Challenges</h3>
+                <h3 className="text-lg font-bold text-text-primary tracking-tight font-display">Challenges</h3>
               </div>
-              <p className="text-[10px] text-text-secondary leading-relaxed font-bold">
+              <p className="text-[11px] text-text-secondary leading-relaxed font-bold">
                 Solve unique challenges every day and week to earn trophies, coins, and extra XP!
               </p>
 
               {loadingChallenge ? (
                 <div className="flex flex-col items-center justify-center py-8 gap-2">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                  <span className="text-[9px] font-black text-text-muted uppercase tracking-wider">Starting challenge...</span>
+                  <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Starting challenge...</span>
                 </div>
               ) : (
                 <div className="space-y-4 pt-2">
                   {/* Daily Challenge Card */}
-                  <Card className="border border-[#EBEAE8] rounded-2xl bg-white shadow-2xs">
+                  <Card className="border border-border rounded-2xl bg-white shadow-2xs">
                     <CardContent className="p-4 space-y-3">
                       <div className="flex justify-between items-start">
                         <div>
-                          <h4 className="text-sm font-black text-text-primary">Daily Word Theme</h4>
-                          <p className="text-[9px] text-text-muted mt-0.5">10 questions · Topic-specific vocabulary</p>
+                          <h4 className="text-sm font-bold text-text-primary">Daily Word Theme</h4>
+                          <p className="text-[11px] text-text-muted mt-0.5">10 questions · Topic-specific vocabulary</p>
                         </div>
                         {challengesData.daily?.completed ? (
-                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 text-[8px] font-black uppercase">Completed</span>
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 text-[8px] font-bold uppercase">Completed</span>
                         ) : (
-                          <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 text-[8px] font-black uppercase">Available</span>
+                          <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 text-[8px] font-bold uppercase">Available</span>
                         )}
                       </div>
 
-                      <div className="flex items-center gap-4 text-[9px] font-black text-text-secondary uppercase">
+                      <div className="flex items-center gap-4 text-[11px] font-bold text-text-secondary uppercase">
                         <div>XP: <span className="text-text-primary font-bold">+100</span></div>
                         <div>Coins: <span className="text-text-primary font-bold">+50</span></div>
                       </div>
@@ -1146,7 +1146,7 @@ export default function WordBuilderGame() {
                       {!challengesData.daily?.completed && (
                         <Button 
                           onClick={() => startChallenge('daily')}
-                          className="w-full text-xs font-black uppercase tracking-wider py-2 justify-center bg-primary text-white"
+                          className="w-full text-xs font-bold uppercase tracking-wider py-2 justify-center bg-primary text-white"
                         >
                           Start Daily Challenge
                         </Button>
@@ -1155,21 +1155,21 @@ export default function WordBuilderGame() {
                   </Card>
 
                   {/* Weekly Challenge Card */}
-                  <Card className="border border-[#EBEAE8] rounded-2xl bg-white shadow-2xs">
+                  <Card className="border border-border rounded-2xl bg-white shadow-2xs">
                     <CardContent className="p-4 space-y-3">
                       <div className="flex justify-between items-start">
                         <div>
-                          <h4 className="text-sm font-black text-text-primary">Weekly Review Test</h4>
-                          <p className="text-[9px] text-text-muted mt-0.5">20 questions · Spaced-repetition review</p>
+                          <h4 className="text-sm font-bold text-text-primary">Weekly Review Test</h4>
+                          <p className="text-[11px] text-text-muted mt-0.5">20 questions · Spaced-repetition review</p>
                         </div>
                         {challengesData.weekly?.completed ? (
-                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 text-[8px] font-black uppercase">Completed</span>
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 text-[8px] font-bold uppercase">Completed</span>
                         ) : (
-                          <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 text-[8px] font-black uppercase">Available</span>
+                          <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 text-[8px] font-bold uppercase">Available</span>
                         )}
                       </div>
 
-                      <div className="flex items-center gap-4 text-[9px] font-black text-text-secondary uppercase">
+                      <div className="flex items-center gap-4 text-[11px] font-bold text-text-secondary uppercase">
                         <div>XP: <span className="text-text-primary font-bold">+250</span></div>
                         <div>Coins: <span className="text-text-primary font-bold">+100</span></div>
                         <div>Badge: <span className="text-text-primary font-bold">Trophy</span></div>
@@ -1178,7 +1178,7 @@ export default function WordBuilderGame() {
                       {!challengesData.weekly?.completed && (
                         <Button 
                           onClick={() => startChallenge('weekly')}
-                          className="w-full text-xs font-black uppercase tracking-wider py-2 justify-center bg-zinc-900 text-white dark:bg-white dark:text-black"
+                          className="w-full text-xs font-bold uppercase tracking-wider py-2 justify-center bg-zinc-900 text-white dark:bg-white dark:text-black"
                         >
                           Start Weekly Challenge
                         </Button>
@@ -1193,11 +1193,11 @@ export default function WordBuilderGame() {
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <Trophy className="h-5 w-5 text-primary" />
-                <h3 className="text-lg font-black text-text-primary tracking-tight font-display">Leaderboard</h3>
+                <h3 className="text-lg font-bold text-text-primary tracking-tight font-display">Leaderboard</h3>
               </div>
 
               {/* Sub tabs selector */}
-              <div className="flex border border-[#EBEAE8] rounded-xl overflow-hidden text-[9px] font-black uppercase tracking-wider">
+              <div className="flex border border-border rounded-xl overflow-hidden text-[11px] font-bold uppercase tracking-wider">
                 {['school', 'class', 'section'].map(tab => (
                   <button
                     key={tab}
@@ -1226,22 +1226,22 @@ export default function WordBuilderGame() {
                     return (
                       <div 
                         key={row.id}
-                        className={`flex items-center justify-between p-3.5 bg-white border border-[#EBEAE8] rounded-2xl shadow-2xs transition-all ${
+                        className={`flex items-center justify-between p-3.5 bg-white border border-border rounded-2xl shadow-2xs transition-all ${
                           row.id === studentService.getCurrentUser()?.student_id ? 'border-primary/60 bg-primary/5' : ''
                         }`}
                       >
                         <div className="flex items-center gap-3">
-                          <span className="text-xs font-black text-text-muted w-6 block">
+                          <span className="text-xs font-bold text-text-muted w-6 block">
                             {idx < 3 ? medals[idx] : `#${idx + 1}`}
                           </span>
                           <div className="min-w-0">
-                            <span className="text-xs font-black text-text-primary block truncate">{row.name}</span>
+                            <span className="text-xs font-bold text-text-primary block truncate">{row.name}</span>
                             <span className="text-[7px] font-bold text-text-muted block mt-0.5 uppercase">
                               {row.total_words_mastered} mastered
                             </span>
                           </div>
                         </div>
-                        <span className="text-xs font-black text-text-primary tabular-nums">
+                        <span className="text-xs font-bold text-text-primary tabular-nums">
                           {row.score} XP
                         </span>
                       </div>
@@ -1255,9 +1255,9 @@ export default function WordBuilderGame() {
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <Award className="h-5 w-5 text-primary" />
-                <h3 className="text-lg font-black text-text-primary tracking-tight font-display">My Badges</h3>
+                <h3 className="text-lg font-bold text-text-primary tracking-tight font-display">My Badges</h3>
               </div>
-              <p className="text-[10px] text-text-secondary leading-relaxed font-bold">
+              <p className="text-[11px] text-text-secondary leading-relaxed font-bold">
                 Check your unlocked accolades and practice milestones below.
               </p>
 
@@ -1270,8 +1270,8 @@ export default function WordBuilderGame() {
                   achievementsData.map(badge => (
                     <Card 
                       key={badge.key} 
-                      className={`border border-[#EBEAE8] rounded-2xl transition-all ${
-                        badge.unlocked ? 'bg-white opacity-100 shadow-2xs' : 'bg-[#FAF9F6] opacity-60'
+                      className={`border border-border rounded-2xl transition-all ${
+                        badge.unlocked ? 'bg-white opacity-100 shadow-2xs' : 'bg-background opacity-60'
                       }`}
                     >
                       <CardContent className="p-3 text-center flex flex-col items-center justify-between min-h-[145px] gap-2.5">
@@ -1281,10 +1281,10 @@ export default function WordBuilderGame() {
                           <Award className="h-5.5 w-5.5" />
                         </div>
                         <div>
-                          <h4 className="text-[11px] font-black text-text-primary leading-tight">{badge.title}</h4>
+                          <h4 className="text-[11px] font-bold text-text-primary leading-tight">{badge.title}</h4>
                           <p className="text-[8px] text-text-muted mt-1 leading-normal font-bold">{badge.desc}</p>
                         </div>
-                        <span className={`px-2 py-0.5 rounded-full text-[7px] font-black uppercase ${
+                        <span className={`px-2 py-0.5 rounded-full text-[7px] font-bold uppercase ${
                           badge.unlocked ? 'bg-emerald-500/10 text-emerald-600' : 'bg-zinc-200 text-zinc-500'
                         }`}>
                           {badge.unlocked ? 'Unlocked' : 'Locked'}
@@ -1299,10 +1299,10 @@ export default function WordBuilderGame() {
         </div>
 
         {/* Bottom Tab Menu Navigation */}
-        <div className="border-t border-[#E5E5E1] bg-white grid grid-cols-5 h-[60px] relative z-20 shadow-sm">
+        <div className="border-t border-border bg-white grid grid-cols-5 h-[60px] relative z-20 shadow-sm">
           <button 
             onClick={() => { setActiveTab('game'); setGameMode('normal'); }}
-            className={`flex flex-col items-center justify-center gap-1.5 text-[8px] font-black uppercase tracking-wider transition-colors ${
+            className={`flex flex-col items-center justify-center gap-1.5 text-[8px] font-bold uppercase tracking-wider transition-colors ${
               activeTab === 'game' 
                 ? 'text-primary' 
                 : 'text-text-muted hover:text-text-primary'
@@ -1314,7 +1314,7 @@ export default function WordBuilderGame() {
           
           <button 
             onClick={() => setActiveTab('notebook')}
-            className={`flex flex-col items-center justify-center gap-1.5 text-[8px] font-black uppercase tracking-wider transition-colors ${
+            className={`flex flex-col items-center justify-center gap-1.5 text-[8px] font-bold uppercase tracking-wider transition-colors ${
               activeTab === 'notebook' 
                 ? 'text-primary' 
                 : 'text-text-muted hover:text-text-primary'
@@ -1326,7 +1326,7 @@ export default function WordBuilderGame() {
 
           <button 
             onClick={() => setActiveTab('challenges')}
-            className={`flex flex-col items-center justify-center gap-1.5 text-[8px] font-black uppercase tracking-wider transition-colors ${
+            className={`flex flex-col items-center justify-center gap-1.5 text-[8px] font-bold uppercase tracking-wider transition-colors ${
               activeTab === 'challenges' 
                 ? 'text-primary' 
                 : 'text-text-muted hover:text-text-primary'
@@ -1338,7 +1338,7 @@ export default function WordBuilderGame() {
 
           <button 
             onClick={() => setActiveTab('leaderboard')}
-            className={`flex flex-col items-center justify-center gap-1.5 text-[8px] font-black uppercase tracking-wider transition-colors ${
+            className={`flex flex-col items-center justify-center gap-1.5 text-[8px] font-bold uppercase tracking-wider transition-colors ${
               activeTab === 'leaderboard' 
                 ? 'text-primary' 
                 : 'text-text-muted hover:text-text-primary'
@@ -1350,7 +1350,7 @@ export default function WordBuilderGame() {
 
           <button 
             onClick={() => setActiveTab('achievements')}
-            className={`flex flex-col items-center justify-center gap-1.5 text-[8px] font-black uppercase tracking-wider transition-colors ${
+            className={`flex flex-col items-center justify-center gap-1.5 text-[8px] font-bold uppercase tracking-wider transition-colors ${
               activeTab === 'achievements' 
                 ? 'text-primary' 
                 : 'text-text-muted hover:text-text-primary'

@@ -53,7 +53,7 @@ export default function ForcePasswordChange({ onDismiss }) {
           <KeyRound className="h-6 w-6 text-primary" />
         </div>
 
-        <h3 className="text-lg font-black text-text-primary">Set Your Password</h3>
+        <h3 className="text-lg font-bold text-text-primary">Set Your Password</h3>
         <p className="text-sm text-text-secondary mt-1 mb-5">
           Your account was created with a temporary password. Set a new one to secure your account.
         </p>

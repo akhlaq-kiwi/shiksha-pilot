@@ -87,7 +87,7 @@ export default function LoginForm({ onLoginSuccess }) {
                 />
               </div>
               {errors?.phone && errors.phone.trim() !== '' && (
-                <p className="text-[10px] font-bold text-red-500 mt-0.5">{errors.phone}</p>
+                <p className="text-[11px] font-bold text-red-500 mt-0.5">{errors.phone}</p>
               )}
             </div>
             <div className="space-y-1.5">
@@ -115,7 +115,7 @@ export default function LoginForm({ onLoginSuccess }) {
                 </button>
               </div>
               {errors?.password && (
-                <p className="text-[10px] font-bold text-red-500 mt-0.5">{errors.password}</p>
+                <p className="text-[11px] font-bold text-red-500 mt-0.5">{errors.password}</p>
               )}
             </div>
             <Button type="submit" className="w-full flex justify-center items-center gap-2 py-2.5" disabled={loading}>

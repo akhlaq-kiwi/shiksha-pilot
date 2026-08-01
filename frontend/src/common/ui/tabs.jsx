@@ -32,9 +32,9 @@ export const TabsTrigger = ({ value, children, className = '' }) => {
       onClick={() => onValueChange(value)}
       className={twMerge(
         clsx(
-          'inline-flex items-center justify-center whitespace-nowrap rounded-md px-3.5 py-1 text-[10px] font-bold uppercase tracking-wider transition-all focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 cursor-pointer',
+          'inline-flex items-center justify-center whitespace-nowrap rounded-md px-3.5 py-1 text-[11px] font-bold uppercase tracking-wider transition-all focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 cursor-pointer',
           isActive 
-            ? 'bg-surface text-text-primary shadow-2xs border border-border/30 font-black' 
+            ? 'bg-surface text-text-primary shadow-2xs border border-border/30 font-bold' 
             : 'hover:text-text-primary hover:bg-surface/30'
         ),
         className

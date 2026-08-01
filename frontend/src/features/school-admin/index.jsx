@@ -69,7 +69,7 @@ function OnboardingScreen() {
         <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
           <School className="h-6 w-6 text-primary" />
         </div>
-        <h3 className="text-xl font-black text-text-primary tracking-tight font-display">Welcome to Shiksha Pilot</h3>
+        <h3 className="text-xl font-bold text-text-primary tracking-tight font-display">Welcome to Shiksha Pilot</h3>
         <p className="text-xs text-text-secondary mt-3 leading-relaxed">
           Before you begin managing your school, please create your first Academic Year.
         </p>
@@ -126,7 +126,7 @@ function ContactSuperAdminDialog({ isOpen, onClose }) {
             <Button 
               size="xs" 
               variant="outline" 
-              className="flex items-center gap-1 font-bold text-[10px] py-1 px-2.5 h-7 rounded-lg"
+              className="flex items-center gap-1 font-bold text-[11px] py-1 px-2.5 h-7 rounded-lg"
               onClick={() => handleCopy('8650302499', 'Phone number')}
             >
               <Copy className="h-3 w-3" /> Copy
@@ -141,7 +141,7 @@ function ContactSuperAdminDialog({ isOpen, onClose }) {
             <Button 
               size="xs" 
               variant="outline" 
-              className="flex items-center gap-1 font-bold text-[10px] py-1 px-2.5 h-7 rounded-lg"
+              className="flex items-center gap-1 font-bold text-[11px] py-1 px-2.5 h-7 rounded-lg"
               onClick={() => handleCopy('Shikshapilot@gmail.com', 'Email address')}
             >
               <Copy className="h-3 w-3" /> Copy
@@ -182,7 +182,7 @@ function SubscriptionExpiredScreen({ profile }) {
           <div className="mx-auto w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-2">
             <AlertTriangle className="h-8 w-8 text-red-500" />
           </div>
-          <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">
+          <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">
             {hasNoPlan ? 'Subscription Required' : 'Subscription Expired'}
           </h2>
           <p className="text-sm text-text-secondary leading-relaxed font-medium">
@@ -191,7 +191,7 @@ function SubscriptionExpiredScreen({ profile }) {
               : 'Your subscription has expired.'}
           </p>
           <p className="text-sm text-text-secondary leading-relaxed font-medium mt-1">
-            Please purchase a subscription plan to continue using <span className="font-extrabold text-text-primary">ShikshaPilot</span>
+            Please purchase a subscription plan to continue using <span className="font-bold text-text-primary">ShikshaPilot</span>
           </p>
         </div>
 
@@ -200,11 +200,11 @@ function SubscriptionExpiredScreen({ profile }) {
           {loading ? (
             <div className="flex flex-col items-center gap-2 py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Fetching plans...</p>
+              <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Fetching plans...</p>
             </div>
           ) : plans.length === 0 ? (
             <div className="py-12 border border-border bg-surface rounded-2xl text-text-muted text-sm font-semibold max-w-lg mx-auto space-y-1.5 p-6">
-              <p className="text-text-primary font-black">No subscription plans are currently available.</p>
+              <p className="text-text-primary font-bold">No subscription plans are currently available.</p>
               <p className="text-xs font-medium">Please contact the Super Admin for assistance.</p>
             </div>
           ) : (
@@ -213,12 +213,12 @@ function SubscriptionExpiredScreen({ profile }) {
                 <Card key={p.id} className="shadow-sm border-border bg-surface flex flex-col justify-between p-6 rounded-2xl min-h-[350px] relative hover:shadow-md transition-all duration-200">
                   <div className="space-y-4">
                     <div className="border-b border-border/60 pb-4">
-                      <h4 className="text-base font-black text-text-primary font-display">{p.name}</h4>
-                      <p className="text-2xl font-black text-text-primary tracking-tight mt-1">
+                      <h4 className="text-base font-bold text-text-primary font-display">{p.name}</h4>
+                      <p className="text-2xl font-bold text-text-primary tracking-tight mt-1">
                         ₹{parseFloat(p.price).toLocaleString('en-IN')}
                         <span className="text-xs font-bold text-text-secondary tracking-normal">/{p.duration_unit}</span>
                       </p>
-                      <p className="text-[10px] text-primary font-extrabold uppercase mt-2.5 block">
+                      <p className="text-[11px] text-primary font-bold uppercase mt-2.5 block">
                         {p.student_limit ? `Up to ${p.student_limit.toLocaleString()} Students` : 'Unlimited Students'}
                       </p>
                     </div>
@@ -262,7 +262,7 @@ function ServerConnectionErrorScreen({ onRetry, retrying }) {
           </div>
           
           <div className="space-y-2">
-            <h3 className="text-2xl font-black text-text-primary tracking-tight font-display">
+            <h3 className="text-2xl font-bold text-text-primary tracking-tight font-display">
               Connection Failed
             </h3>
             <p className="text-sm text-text-secondary leading-relaxed font-medium">
@@ -483,9 +483,9 @@ export default function SchoolAdminPortal() {
         onClick={() => nav(item.path)}
         className={`flex items-center justify-start gap-3 rounded-lg transition-all flex-shrink-0 w-full text-left ${
           item.isSubmenu 
-            ? 'pl-8 pr-3 py-2 text-[10px] font-bold uppercase tracking-wider' 
+            ? 'pl-8 pr-3 py-2 text-[11px] font-bold uppercase tracking-wider' 
             : 'px-3 py-2.5 text-xs font-bold uppercase tracking-wider'
-        } ${active ? 'bg-primary text-surface dark:bg-primary dark:text-background font-extrabold shadow-xs' : 'text-text-secondary hover:bg-secondary/70 hover:text-text-primary'}`}
+        } ${active ? 'bg-primary text-primary-fg font-bold shadow-xs' : 'text-text-secondary hover:bg-secondary/70 hover:text-text-primary'}`}
       >
         <Icon className={`flex-shrink-0 ${item.isSubmenu ? 'h-3 w-3 ml-1' : 'h-3.5 w-3.5'}`} />
         <span>{item.label}</span>
@@ -525,7 +525,7 @@ export default function SchoolAdminPortal() {
             <ShieldAlert className="h-8 w-8" />
           </div>
           <div className="space-y-2">
-            <h3 className="font-extrabold text-text-primary text-xl tracking-tight font-display">
+            <h3 className="font-bold text-text-primary text-xl tracking-tight font-display">
               Access Removed
             </h3>
             <p className="text-sm text-text-secondary leading-relaxed">
@@ -552,7 +552,7 @@ export default function SchoolAdminPortal() {
     <div className="flex flex-col md:flex-row w-full min-h-[calc(100vh-56px)] bg-background">
 
       {/* Sidebar */}
-      <aside className="w-full md:w-[240px] flex-shrink-0 flex flex-col justify-between border-r border-[#E5E5E1] dark:border-border pl-6 pr-4 py-6 bg-sidebar md:sticky md:top-14 md:h-[calc(100vh-56px)]">
+      <aside className="w-full md:w-[240px] flex-shrink-0 flex flex-col justify-between border-r border-border dark:border-border pl-6 pr-4 py-6 bg-sidebar md:sticky md:top-14 md:h-[calc(100vh-56px)]">
         <div className="overflow-y-auto scrollbar-none flex-1 min-h-0">
           <nav className="flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 scrollbar-none">
             {visibleNavItems.map(navBtn)}
@@ -568,19 +568,19 @@ export default function SchoolAdminPortal() {
             <div>
               {remainingDays === 7 && (
                 <>
-                  <p className="font-extrabold">Your subscription plan will expire in 7 days.</p>
+                  <p className="font-bold">Your subscription plan will expire in 7 days.</p>
                   <p className="text-xs text-text-secondary mt-0.5">Please renew your subscription to avoid interruption.</p>
                 </>
               )}
               {remainingDays === 3 && (
                 <>
-                  <p className="font-extrabold">Your subscription plan will expire in 3 days.</p>
+                  <p className="font-bold">Your subscription plan will expire in 3 days.</p>
                   <p className="text-xs text-text-secondary mt-0.5">Renew your subscription before expiry.</p>
                 </>
               )}
               {remainingDays === 1 && (
                 <>
-                  <p className="font-extrabold">Your subscription expires tomorrow.</p>
+                  <p className="font-bold">Your subscription expires tomorrow.</p>
                   <p className="text-xs text-text-secondary mt-0.5">Renew now to continue uninterrupted access.</p>
                 </>
               )}
@@ -593,7 +593,7 @@ export default function SchoolAdminPortal() {
             <div className="mx-auto w-12 h-12 rounded-full bg-red-100 dark:bg-red-950/20 flex items-center justify-center mb-4 text-red-600">
               <AlertTriangle className="h-6 w-6" />
             </div>
-            <h3 className="text-xl font-black text-text-primary tracking-tight font-display">Access Denied</h3>
+            <h3 className="text-xl font-bold text-text-primary tracking-tight font-display">Access Denied</h3>
             <p className="text-xs text-text-secondary mt-3 leading-relaxed max-w-sm">
               You do not have permission to access this module.
             </p>

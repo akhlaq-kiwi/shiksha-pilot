@@ -114,7 +114,7 @@ export function FeeReceiptModal({ receipt, student, schoolName, schoolLogoUrl, a
       <div className="bg-surface border border-border rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-zinc-50 dark:bg-zinc-900/50">
-          <h3 className="font-extrabold text-text-primary text-base tracking-tight font-display">Fee Payment Receipt</h3>
+          <h3 className="font-bold text-text-primary text-base tracking-tight font-display">Fee Payment Receipt</h3>
           <button onClick={onClose} className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg transition-colors">
             <X className="h-4 w-4 text-text-secondary" />
           </button>
@@ -130,13 +130,13 @@ export function FeeReceiptModal({ receipt, student, schoolName, schoolLogoUrl, a
                 className="h-12 w-auto mb-2 object-contain" 
               />
             )}
-            <h2 className="text-xl font-black tracking-tight text-text-primary font-display uppercase">{displaySchoolName}</h2>
-            <p className="text-[10px] uppercase font-bold tracking-widest text-primary">Fee Payment Receipt</p>
+            <h2 className="text-xl font-bold tracking-tight text-text-primary font-display uppercase">{displaySchoolName}</h2>
+            <p className="text-[11px] uppercase font-bold tracking-widest text-primary">Fee Payment Receipt</p>
           </div>
 
           <div className="border-y border-dashed border-border py-4 space-y-2 text-xs">
-            <div className="flex justify-between"><span className="text-text-muted">Mode of Payment:</span> <span className="font-extrabold text-text-primary">{getModeOfPayment(receipt.payment_method)}</span></div>
-            <div className="flex justify-between"><span className="text-text-muted">Student Name:</span> <span className="font-extrabold text-text-primary uppercase">{student?.name || '—'}</span></div>
+            <div className="flex justify-between"><span className="text-text-muted">Mode of Payment:</span> <span className="font-bold text-text-primary">{getModeOfPayment(receipt.payment_method)}</span></div>
+            <div className="flex justify-between"><span className="text-text-muted">Student Name:</span> <span className="font-bold text-text-primary uppercase">{student?.name || '—'}</span></div>
             <div className="flex justify-between"><span className="text-text-muted">Class & Section:</span> <span className="font-bold text-text-primary">{student?.class_name || '—'}</span></div>
             <div className="flex justify-between"><span className="text-text-muted">Roll Number / SR No:</span> <span className="font-bold text-text-primary">{student?.roll_no || '—'} / {student?.sr_no || '—'}</span></div>
             <div className="flex justify-between"><span className="text-text-muted">Ref No:</span> <span className="font-mono font-bold text-text-primary">{receipt.receipt_no}</span></div>
@@ -147,10 +147,10 @@ export function FeeReceiptModal({ receipt, student, schoolName, schoolLogoUrl, a
           <div className="space-y-4">
             <div className="bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-xl border border-border flex justify-between items-center">
               <div>
-                <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">
+                <p className="text-[11px] text-text-muted font-bold uppercase tracking-wider">
                   {receipt.is_additional ? 'Description' : (sortedGroup.length > 1 ? 'Billing Months' : 'Billing Month')}
                 </p>
-                <p className="text-sm font-black text-text-primary mt-0.5 max-w-[200px] break-words">
+                <p className="text-sm font-bold text-text-primary mt-0.5 max-w-[200px] break-words">
                   {receipt.is_additional ? receipt.fee_name : (() => {
                     const months = sortedGroup.map(p => p.fee_month).filter(Boolean);
                     if (months.length === 0 && receipt.fee_month) months.push(receipt.fee_month);
@@ -170,10 +170,10 @@ export function FeeReceiptModal({ receipt, student, schoolName, schoolLogoUrl, a
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">
+                <p className="text-[11px] text-text-muted font-bold uppercase tracking-wider">
                   {sortedGroup.length > 1 ? 'Total Amount' : 'Amount Paid'}
                 </p>
-                <p className="text-lg font-black text-primary mt-0.5">
+                <p className="text-lg font-bold text-primary mt-0.5">
                   Rs {totalAmountPaid.toLocaleString()}
                 </p>
               </div>
@@ -182,7 +182,7 @@ export function FeeReceiptModal({ receipt, student, schoolName, schoolLogoUrl, a
               <div className="border border-border p-4 rounded-xl text-xs space-y-2 bg-zinc-50/50 dark:bg-zinc-900/10">
                 <div className="flex justify-between">
                   <span className="text-text-muted font-semibold">Fee Type:</span>
-                  <span className="font-extrabold text-text-primary">Previous Year Dues</span>
+                  <span className="font-bold text-text-primary">Previous Year Dues</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-text-muted font-semibold">Collected For:</span>
@@ -196,7 +196,7 @@ export function FeeReceiptModal({ receipt, student, schoolName, schoolLogoUrl, a
             )}
           </div>
 
-          <div className="text-center text-[10px] text-text-muted leading-relaxed pt-2">
+          <div className="text-center text-[11px] text-text-muted leading-relaxed pt-2">
             This is an automated system generated receipt.<br />Thank you for your payment.
           </div>
         </div>

@@ -329,7 +329,7 @@ export default function FinancePage() {
             <Landmark className="h-6 w-6" />
           </div>
           <div>
-            <h2 className="text-2xl font-black text-text-primary tracking-tight font-display">Fees Portal</h2>
+            <h2 className="text-2xl font-bold text-text-primary tracking-tight font-display">Fees Portal</h2>
             <p className="text-text-secondary text-xs mt-1">Monitor fee statuses, calculate dynamic outstanding monthly balances, and collect dues.</p>
           </div>
         </div>
@@ -401,12 +401,12 @@ export default function FinancePage() {
           <Table>
             <TableHeader className="sticky top-0 bg-surface z-10">
               <TableRow>
-                <TableHead className="text-xs uppercase font-extrabold text-text-secondary">Student Name</TableHead>
-                <TableHead className="text-xs uppercase font-extrabold text-text-secondary">Class</TableHead>
-                <TableHead className="text-xs uppercase font-extrabold text-text-secondary">Roll No.</TableHead>
-                <TableHead className="text-xs uppercase font-extrabold text-text-secondary">Outstanding</TableHead>
-                <TableHead className="text-xs uppercase font-extrabold text-text-secondary">Status</TableHead>
-                <TableHead className="text-right text-xs uppercase font-extrabold text-text-secondary">Action</TableHead>
+                <TableHead className="text-xs uppercase font-bold text-text-secondary">Student Name</TableHead>
+                <TableHead className="text-xs uppercase font-bold text-text-secondary">Class</TableHead>
+                <TableHead className="text-xs uppercase font-bold text-text-secondary">Roll No.</TableHead>
+                <TableHead className="text-xs uppercase font-bold text-text-secondary">Outstanding</TableHead>
+                <TableHead className="text-xs uppercase font-bold text-text-secondary">Status</TableHead>
+                <TableHead className="text-right text-xs uppercase font-bold text-text-secondary">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -416,19 +416,19 @@ export default function FinancePage() {
         ) : filteredStudents.length === 0 ? (
           <div className="p-12 text-center text-text-muted text-xs font-bold leading-relaxed space-y-1">
             <p>No students found.</p>
-            <p className="text-[10px] text-text-muted font-normal">Try another student name.</p>
+            <p className="text-[11px] text-text-muted font-normal">Try another student name.</p>
           </div>
         ) : (
           <>
             <Table>
               <TableHeader className="sticky top-0 bg-surface z-10 shadow-3xs border-b border-border">
                 <TableRow>
-                  <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Student Name</TableHead>
-                  <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Class</TableHead>
-                  <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Roll No.</TableHead>
-                  <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Outstanding</TableHead>
-                  <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Status</TableHead>
-                  <TableHead className="text-right text-xs uppercase font-extrabold text-text-secondary bg-surface">Action</TableHead>
+                  <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Student Name</TableHead>
+                  <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Class</TableHead>
+                  <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Roll No.</TableHead>
+                  <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Outstanding</TableHead>
+                  <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Status</TableHead>
+                  <TableHead className="text-right text-xs uppercase font-bold text-text-secondary bg-surface">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -443,11 +443,11 @@ export default function FinancePage() {
                     <TableCell className="text-xs font-mono font-bold text-text-muted py-3.5">
                       {s.roll_no || '—'}
                     </TableCell>
-                    <TableCell className={`text-xs font-bold font-sans py-3.5 ${s.outstanding_dues > 0 ? 'text-red-500 font-extrabold' : 'text-text-muted'}`}>
+                    <TableCell className={`text-xs font-bold font-sans py-3.5 ${s.outstanding_dues > 0 ? 'text-red-500 font-bold' : 'text-text-muted'}`}>
                       {formatCurrency(s.outstanding_dues)}
                     </TableCell>
                     <TableCell className="py-3.5">
-                      <span className={`inline-flex items-center justify-center w-[74px] py-0.5 rounded-full text-[9px] font-black uppercase border ${getStatusBadgeStyles(s.calculated_status)}`}>
+                      <span className={`inline-flex items-center justify-center w-[74px] py-0.5 rounded-full text-[11px] font-bold uppercase border ${getStatusBadgeStyles(s.calculated_status)}`}>
                         {s.calculated_status}
                       </span>
                     </TableCell>
@@ -456,7 +456,7 @@ export default function FinancePage() {
                         onClick={() => {
                           navigate(`/school-admin/classes?studentId=${s.id}`, { state: { from: location.pathname + location.search } });
                         }}
-                        className="px-4 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-text-primary border border-border transition-all inline-flex items-center gap-1 leading-none h-[22px]"
+                        className="px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-text-primary border border-border transition-all inline-flex items-center gap-1 leading-none h-[22px]"
                       >
                         Open Ledger <ChevronRight className="h-3 w-3 text-text-muted" />
                       </button>
@@ -470,7 +470,7 @@ export default function FinancePage() {
             {isFetchingMore && (
               <div className="py-5 flex flex-col items-center justify-center gap-2 border-t border-border bg-zinc-50/50 dark:bg-zinc-900/10">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                <span className="text-[10px] font-black text-text-muted uppercase tracking-wider">Loading more students...</span>
+                <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Loading more students...</span>
               </div>
             )}
           </>

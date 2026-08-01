@@ -93,7 +93,7 @@ export default function CredentialsDialog({ isOpen, onClose, role, target }) {
         <div className="p-4 bg-zinc-50 dark:bg-zinc-900/50 border border-border rounded-xl">
           <div className="flex flex-col gap-1 text-xs">
             <p className="font-semibold text-text-muted">Registered Name:</p>
-            <p className="font-extrabold text-text-primary text-sm">{target.name}</p>
+            <p className="font-bold text-text-primary text-sm">{target.name}</p>
             
             <p className="font-semibold text-text-muted mt-2">Login Mobile Number:</p>
             <p className="font-mono font-bold text-text-primary text-sm">{phone || 'Not Registered'}</p>
@@ -132,7 +132,7 @@ export default function CredentialsDialog({ isOpen, onClose, role, target }) {
                   {pwdError}
                 </p>
               ) : (
-                <p className="text-[10px] text-text-muted leading-tight">
+                <p className="text-[11px] text-text-muted leading-tight">
                   Must be at least 6 characters. If left empty, a secure password will be generated automatically.
                 </p>
               )}

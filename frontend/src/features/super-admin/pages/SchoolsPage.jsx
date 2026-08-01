@@ -388,7 +388,7 @@ function SubscriptionDetailsDialog({ school, onClose, onUpgradeClick }) {
           </div>
           <div className="flex justify-between border-b border-border/40 pb-2">
             <span>Plan Status:</span>
-            <span className={`font-black uppercase ${info.status === 'Expired' ? 'text-red-500' : 'text-green-600'}`}>
+            <span className={`font-bold uppercase ${info.status === 'Expired' ? 'text-red-500' : 'text-green-600'}`}>
               {info.text}
             </span>
           </div>
@@ -526,7 +526,7 @@ function PlanSelectionDialog({ school, onClose, onAssigned }) {
             </div>
             <div className="flex justify-between">
               <span>New Plan:</span>
-              <span className="text-primary font-extrabold">{upgradePreview.new_plan}</span>
+              <span className="text-primary font-bold">{upgradePreview.new_plan}</span>
             </div>
             <div className="flex justify-between">
               <span>Current Plan Remaining:</span>
@@ -534,15 +534,15 @@ function PlanSelectionDialog({ school, onClose, onAssigned }) {
             </div>
             <div className="flex justify-between">
               <span>Unused Subscription Credit:</span>
-              <span className="text-emerald-600 font-extrabold">₹{Number(upgradePreview.unused_credit).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span className="text-emerald-600 font-bold">₹{Number(upgradePreview.unused_credit).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
             <div className="flex justify-between">
               <span>New Plan Price:</span>
               <span className="text-text-primary font-bold">₹{Number(upgradePreview.new_plan_price).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
             <div className="flex justify-between border-t border-dashed border-border pt-3">
-              <span className="text-sm font-black text-text-primary">Final Amount Payable:</span>
-              <span className="text-base font-black text-primary">₹{Number(upgradePreview.final_amount_payable).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span className="text-sm font-bold text-text-primary">Final Amount Payable:</span>
+              <span className="text-base font-bold text-primary">₹{Number(upgradePreview.final_amount_payable).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
           </div>
 
@@ -593,25 +593,25 @@ function PlanSelectionDialog({ school, onClose, onAssigned }) {
                     >
                       <div className="flex justify-between items-start">
                         <div>
-                          <h4 className="font-extrabold text-sm text-text-primary flex items-center gap-1.5">
+                          <h4 className="font-bold text-sm text-text-primary flex items-center gap-1.5">
                             {p.name}
-                            {isCurrent && <span className="text-[9px] font-black uppercase bg-zinc-200 text-zinc-700 px-1.5 py-0.5 rounded-md">Current</span>}
+                            {isCurrent && <span className="text-[11px] font-bold uppercase bg-zinc-200 text-zinc-700 px-1.5 py-0.5 rounded-md">Current</span>}
                             {String(selectedPlanId) === String(p.id) && !isCurrent && <Sparkles className="h-3.5 w-3.5 text-primary" />}
                           </h4>
                           <p className="text-xs text-text-muted mt-1 leading-relaxed">{p.description || 'Standard plan benefits'}</p>
                         </div>
                         <div className="text-right">
-                          <span className="font-black text-sm text-text-primary">
+                          <span className="font-bold text-sm text-text-primary">
                             {p.price > 0 ? `₹${Number(p.price).toLocaleString()}` : 'Free'}
                           </span>
-                          <p className="text-[10px] text-text-secondary font-bold uppercase mt-0.5">
+                          <p className="text-[11px] text-text-secondary font-bold uppercase mt-0.5">
                             {p.duration_value} {p.duration_unit === 'month' ? 'Month' : 'Year'}{p.duration_value > 1 ? 's' : ''}
                           </p>
                         </div>
                       </div>
-                      <div className="mt-3 flex items-center justify-between text-[10px] text-text-secondary font-bold border-t border-border/40 pt-2.5">
+                      <div className="mt-3 flex items-center justify-between text-[11px] text-text-secondary font-bold border-t border-border/40 pt-2.5">
                         <span>Student Limit: {p.student_limit ? Number(p.student_limit).toLocaleString() : 'Unlimited'}</span>
-                        <span className="text-primary uppercase tracking-wider font-extrabold">
+                        <span className="text-primary uppercase tracking-wider font-bold">
                           {isCurrent ? '' : String(selectedPlanId) === String(p.id) ? 'Selected' : 'Click to select'}
                         </span>
                       </div>
@@ -681,7 +681,7 @@ export default function SchoolsPage({ schools, onCreateSchool, onToggleStatus, o
     <div className="space-y-6 animate-in fade-in duration-300">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-border/60 pb-6">
         <div>
-          <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">Manage Schools</h2>
+          <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Manage Schools</h2>
           <p className="text-text-secondary text-sm mt-1">Configure subscription tiers, view active staff/students, and update details.</p>
         </div>
         <Button className="flex items-center gap-2 justify-center" onClick={onCreateSchool}>
@@ -731,7 +731,7 @@ export default function SchoolsPage({ schools, onCreateSchool, onToggleStatus, o
             >
               
               <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${school.status === 'ACTIVE' ? 'bg-green-500/10 text-green-600 border border-green-500/20' : 'bg-red-500/10 text-red-600 border border-red-500/20'}`}>
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${school.status === 'ACTIVE' ? 'bg-green-500/10 text-green-600 border border-green-500/20' : 'bg-red-500/10 text-red-600 border border-red-500/20'}`}>
                   {school.status === 'ACTIVE' ? 'Active' : 'Inactive'}
                 </span>
                 
@@ -810,14 +810,14 @@ export default function SchoolsPage({ schools, onCreateSchool, onToggleStatus, o
                     className="w-16 h-16 rounded-2xl object-cover border border-border shadow-sm mt-2"
                   />
                 ) : (
-                  <div className={`w-16 h-16 rounded-2xl flex items-center justify-center font-black text-xl shadow-sm mt-2 ${getSchoolColor(school.name)}`}>
+                  <div className={`w-16 h-16 rounded-2xl flex items-center justify-center font-bold text-xl shadow-sm mt-2 ${getSchoolColor(school.name)}`}>
                     {school.name.substring(0, 2).toUpperCase()}
                   </div>
                 )}
  
                 {/* Name */}
                 <div className="w-full mt-1">
-                  <h3 className="font-extrabold text-text-primary text-base leading-snug break-words">
+                  <h3 className="font-bold text-text-primary text-base leading-snug break-words">
                     {school.name}
                   </h3>
                 </div>
@@ -846,7 +846,7 @@ export default function SchoolsPage({ schools, onCreateSchool, onToggleStatus, o
                             setSelectedSubSchool(school);
                           }
                         }}
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${style} ${school.active_plan ? 'cursor-pointer hover:opacity-80 transition-all' : ''}`}
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${style} ${school.active_plan ? 'cursor-pointer hover:opacity-80 transition-all' : ''}`}
                       >
                         {daysText}
                       </span>
@@ -871,7 +871,7 @@ export default function SchoolsPage({ schools, onCreateSchool, onToggleStatus, o
                   ) : (
                     <Button
                       size="sm"
-                      className="h-7 text-[10px] font-black uppercase tracking-wider py-1 px-3 rounded-lg"
+                      className="h-7 text-[11px] font-bold uppercase tracking-wider py-1 px-3 rounded-lg"
                       onClick={() => setUpgradeSchool(school)}
                     >
                       {school.active_plan ? 'Upgrade Plan' : 'Assign Plan'}

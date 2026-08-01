@@ -725,7 +725,7 @@ export default function TimetablePage() {
       {/* Top Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">Academic Timetable</h2>
+          <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Academic Timetable</h2>
           <p className="text-text-secondary text-sm mt-1">Manage weekly recurring schedules and track workloads.</p>
         </div>
         
@@ -733,7 +733,7 @@ export default function TimetablePage() {
           <Button 
             variant="outline"
             onClick={handleOpenSubjectModal}
-            className="font-extrabold flex items-center gap-2 border border-border shadow-2xs hover:bg-zinc-50"
+            className="font-bold flex items-center gap-2 border border-border shadow-2xs hover:bg-zinc-50"
           >
             <Users className="h-4 w-4" /> Manage Subjects
           </Button>
@@ -742,7 +742,7 @@ export default function TimetablePage() {
             <Button 
               variant="outline"
               onClick={handleToggleSelectionMode}
-              className={`font-extrabold flex items-center gap-2 border border-border shadow-2xs transition-all ${
+              className={`font-bold flex items-center gap-2 border border-border shadow-2xs transition-all ${
                 isSelectionMode 
                   ? 'bg-primary/10 text-text-primary border-primary/20 hover:bg-primary/20' 
                   : 'hover:bg-zinc-50'
@@ -771,7 +771,7 @@ export default function TimetablePage() {
                   <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
                     <Calendar className="h-6 w-6 text-text-primary" />
                   </div>
-                  <h3 className="text-xl font-black text-text-primary tracking-tight font-display">Timetable setup has not been completed yet.</h3>
+                  <h3 className="text-xl font-bold text-text-primary tracking-tight font-display">Timetable setup has not been completed yet.</h3>
                   <p className="text-xs text-text-secondary mt-3 leading-relaxed">
                     Configure your school timetable before creating daily schedules.
                   </p>
@@ -791,7 +791,7 @@ export default function TimetablePage() {
                   <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
                     <Users className="h-6 w-6 text-text-primary" />
                   </div>
-                  <h3 className="text-xl font-black text-text-primary tracking-tight font-display">No subjects have been created yet.</h3>
+                  <h3 className="text-xl font-bold text-text-primary tracking-tight font-display">No subjects have been created yet.</h3>
                   <p className="text-xs text-text-secondary mt-3 leading-relaxed">
                     Create school subjects before assigning timetable periods.
                   </p>
@@ -811,7 +811,7 @@ export default function TimetablePage() {
           <Card className="p-4 shadow-2xs border border-border flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-black text-text-secondary uppercase">Class Selection</span>
+                <span className="text-[11px] font-bold text-text-secondary uppercase">Class Selection</span>
                 <select
                   value={selectedClassId}
                   onChange={e => setSelectedClassId(e.target.value)}
@@ -824,7 +824,7 @@ export default function TimetablePage() {
               </div>
 
               <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-black text-text-secondary uppercase">Weekly Calendar Navigation</span>
+                <span className="text-[11px] font-bold text-text-secondary uppercase">Weekly Calendar Navigation</span>
                 <div className="flex items-center gap-1">
                   <Button 
                     variant="outline" 
@@ -858,8 +858,8 @@ export default function TimetablePage() {
 
             {/* Date range descriptor badge */}
             <div className="flex flex-col items-end gap-1">
-              <span className="text-[10px] font-black text-text-secondary uppercase">Active Range</span>
-              <span className="text-sm font-black text-text-primary font-sans">{getWeekRangeStr()}</span>
+              <span className="text-[11px] font-bold text-text-secondary uppercase">Active Range</span>
+              <span className="text-sm font-bold text-text-primary font-sans">{getWeekRangeStr()}</span>
             </div>
           </Card>
 
@@ -871,11 +871,11 @@ export default function TimetablePage() {
                   <Lock className="h-4 w-4 text-zinc-600" />
                 </div>
                 <div>
-                  <p className="text-xs font-black text-text-primary font-display">Schedule Locked (Past Week)</p>
-                  <p className="text-[10px] text-text-muted mt-0.5">{isReadOnly ? 'Timetable operations are read-only in archived years.' : 'Past dates are locked to preserve history. You cannot add, modify, or delete entries.'}</p>
+                  <p className="text-xs font-bold text-text-primary font-display">Schedule Locked (Past Week)</p>
+                  <p className="text-[11px] text-text-muted mt-0.5">{isReadOnly ? 'Timetable operations are read-only in archived years.' : 'Past dates are locked to preserve history. You cannot add, modify, or delete entries.'}</p>
                 </div>
               </div>
-              <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-zinc-200 text-zinc-600 border border-zinc-300">
+              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-zinc-200 text-zinc-600 border border-zinc-300">
                 LOCKED
               </span>
             </div>
@@ -936,15 +936,15 @@ export default function TimetablePage() {
                           </button>
                         )}
                         <div>
-                          <h3 className="text-xl font-black text-text-primary tracking-tight font-display">{dayName}</h3>
-                          <p className="text-[10px] text-text-muted font-bold mt-0.5">
+                          <h3 className="text-xl font-bold text-text-primary tracking-tight font-display">{dayName}</h3>
+                          <p className="text-[11px] text-text-muted font-bold mt-0.5">
                             {formatLocalDate(dateStr)}
                           </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
                         {periodsList.length > 0 && (
-                          <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
+                          <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider border ${
                             isPublished 
                               ? 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20'
                               : 'bg-amber-500/10 text-amber-600 dark:text-amber-500 border-amber-500/20'
@@ -993,18 +993,18 @@ export default function TimetablePage() {
                               className="flex items-center justify-between py-2 px-3 bg-zinc-100/60 dark:bg-zinc-900/40 border border-border/80 rounded-xl relative transition-all group"
                             >
                               <div className="space-y-0.5 min-w-0 flex-1">
-                                <h4 className="text-xs font-black text-text-primary truncate">
+                                <h4 className="text-xs font-bold text-text-primary truncate">
                                   Period {p.period_number}: {p.subject_name}
                                   {p.is_backup && (
                                     <span className="text-amber-500 font-bold ml-1">(Backup)</span>
                                   )}
                                 </h4>
                                 {timingStr ? (
-                                  <p className="text-[10px] text-text-secondary font-bold font-sans mt-0.5 truncate">
+                                  <p className="text-[11px] text-text-secondary font-bold font-sans mt-0.5 truncate">
                                     {teacherText} | {timingStr}
                                   </p>
                                 ) : (
-                                  <p className="text-[10px] text-text-secondary font-bold mt-0.5 truncate">
+                                  <p className="text-[11px] text-text-secondary font-bold mt-0.5 truncate">
                                     Taught by: {teacherText}
                                   </p>
                                 )}
@@ -1125,7 +1125,7 @@ export default function TimetablePage() {
                           </div>
 
                           {formErrors[dayName] && (
-                            <p className="text-[10px] text-red-500 font-bold leading-normal font-sans">
+                            <p className="text-[11px] text-red-500 font-bold leading-normal font-sans">
                               {formErrors[dayName]}
                             </p>
                           )}
@@ -1133,7 +1133,7 @@ export default function TimetablePage() {
                           <Button
                             onClick={() => handleAddPeriod(dayName)}
                             disabled={actionLoading === 'add-' + dayName}
-                            className="w-full h-9 bg-primary hover:bg-primary/95 text-white font-extrabold rounded-lg shadow-sm transition-all flex items-center justify-center gap-1.5"
+                            className="w-full h-9 bg-primary hover:bg-primary/95 text-white font-bold rounded-lg shadow-sm transition-all flex items-center justify-center gap-1.5"
                           >
                             <Plus className="h-4 w-4" /> Add Period
                           </Button>
@@ -1143,7 +1143,7 @@ export default function TimetablePage() {
                       <Button
                         onClick={() => handlePublishDay(dayName, dateStr)}
                         disabled={actionLoading === 'publish-' + dayName || isPublished || periodsList.length === 0}
-                        className="w-full h-9 bg-primary hover:bg-primary/95 text-white font-extrabold rounded-lg shadow-sm transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full h-9 bg-primary hover:bg-primary/95 text-white font-bold rounded-lg shadow-sm transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Publish
                       </Button>
@@ -1174,7 +1174,7 @@ export default function TimetablePage() {
 
           {/* Subject Add form */}
           <div className="p-4 border border-border bg-zinc-50/50 dark:bg-zinc-950/20 rounded-xl space-y-4">
-            <h4 className="text-xs font-black text-text-primary uppercase tracking-wide">
+            <h4 className="text-xs font-bold text-text-primary uppercase tracking-wide">
               Add Subject
             </h4>
             {subjectError && (
@@ -1184,7 +1184,7 @@ export default function TimetablePage() {
             )}
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="flex-1 space-y-1.5">
-                <label className="text-[10px] font-bold text-text-secondary uppercase">Subject Name *</label>
+                <label className="text-[11px] font-bold text-text-secondary uppercase">Subject Name *</label>
                 <Input
                   placeholder="e.g. English Literature"
                   value={newSubject.name}
@@ -1205,7 +1205,7 @@ export default function TimetablePage() {
 
           {/* Subjects List */}
           <div className="space-y-3">
-            <h4 className="text-xs font-black text-text-primary uppercase tracking-wide">Active Subjects</h4>
+            <h4 className="text-xs font-bold text-text-primary uppercase tracking-wide">Active Subjects</h4>
             <div className="flex flex-wrap gap-2 pt-2 max-h-[30vh] overflow-y-auto pr-1">
               {modalSubjects.length === 0 ? (
                 <p className="text-center text-text-muted text-xs py-4 w-full">No subjects found.</p>
@@ -1370,7 +1370,7 @@ export default function TimetablePage() {
                 </option>
               ))}
             </select>
-            <p className="text-[10px] text-text-muted mt-1">Note: This assignment will automatically expire. The main teacher returns on the next recurring date.</p>
+            <p className="text-[11px] text-text-muted mt-1">Note: This assignment will automatically expire. The main teacher returns on the next recurring date.</p>
           </div>
         </div>
       </Dialog>
@@ -1416,7 +1416,7 @@ export default function TimetablePage() {
                 </option>
               ))}
             </select>
-            <p className="text-[10px] text-text-muted mt-1">Warning: This update applies to all future weeks. History remains locked and unchanged.</p>
+            <p className="text-[11px] text-text-muted mt-1">Warning: This update applies to all future weeks. History remains locked and unchanged.</p>
           </div>
         </div>
       </Dialog>
@@ -1453,7 +1453,7 @@ export default function TimetablePage() {
           <div className="h-4 w-px bg-border" />
           <Button 
             onClick={handleDownloadPDF}
-            className="font-extrabold flex items-center gap-1.5 px-4 h-9 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-md"
+            className="font-bold flex items-center gap-1.5 px-4 h-9 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-md"
           >
             <Download className="h-3.5 w-3.5" /> Download PDF
           </Button>
@@ -1470,7 +1470,7 @@ export default function TimetablePage() {
       <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
         <div id="timetable-print-area" className="p-8 bg-white text-black font-sans space-y-8" style={{ width: '175mm' }}>
           <div className="border-b-2 border-black pb-4 text-center">
-            <h1 className="text-2xl font-black uppercase tracking-wider">Academic Timetable Schedule</h1>
+            <h1 className="text-2xl font-bold uppercase tracking-wider">Academic Timetable Schedule</h1>
             {selectedClassId && classes.find(c => String(c.id) === String(selectedClassId)) && (
               <p className="text-sm font-bold mt-1">Class: {classes.find(c => String(c.id) === String(selectedClassId)).name}</p>
             )}
@@ -1532,7 +1532,7 @@ export default function TimetablePage() {
                           if (item.type === 'interval') {
                             return (
                               <div key={`interval-${idx}`} className="text-center py-3 border-y border-dashed border-zinc-300 my-3 font-sans" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-                                <p className="text-[10px] font-bold text-zinc-900 uppercase tracking-widest">INTERVAL BREAK</p>
+                                <p className="text-[11px] font-bold text-zinc-900 uppercase tracking-widest">INTERVAL BREAK</p>
                                 {getIntervalTimingStr() && (
                                   <p className="text-xs font-bold text-zinc-600 mt-1">{getIntervalTimingStr()}</p>
                                 )}
@@ -1544,7 +1544,7 @@ export default function TimetablePage() {
                           const timingStr = getPeriodTimingStr(p.period_number);
                           const teacherText = p.is_backup ? (
                             <span>
-                              {p.backup_teacher_name} <span className="text-[9px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded ml-1">Backup</span>
+                              {p.backup_teacher_name} <span className="text-[11px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded ml-1">Backup</span>
                             </span>
                           ) : (
                             p.teacher_name
@@ -1558,10 +1558,10 @@ export default function TimetablePage() {
                               </div>
                               {timingStr && (
                                 <div className="text-right flex flex-col items-end flex-shrink-0 ml-4 w-36">
-                                  <span className="text-[9px] font-black text-zinc-500 uppercase tracking-wider bg-zinc-100 px-1.5 py-0.5 rounded border border-zinc-200">
+                                  <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider bg-zinc-100 px-1.5 py-0.5 rounded border border-zinc-200">
                                     Time
                                   </span>
-                                  <span className="text-[10px] font-bold text-zinc-900 mt-1 font-sans whitespace-nowrap">
+                                  <span className="text-[11px] font-bold text-zinc-900 mt-1 font-sans whitespace-nowrap">
                                     {timingStr}
                                   </span>
                                 </div>

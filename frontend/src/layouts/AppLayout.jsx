@@ -166,8 +166,8 @@ const AppLayout = ({ children }) => {
                 schoolProfile ? (
                   <div className="flex items-center gap-3">
                     <span 
-                      className="text-sm font-black text-text-primary font-display tracking-tight leading-none truncate uppercase"
-                      style={{ fontWeight: 900 }}
+                      className="text-sm font-bold text-text-primary font-display tracking-tight leading-none truncate uppercase"
+                      style={{ fontWeight: 700 }}
                     >
                       {schoolProfile.name}
                     </span>
@@ -182,7 +182,7 @@ const AppLayout = ({ children }) => {
                               selectYear(e.target.value);
                               navigate('/school-admin');
                             }}
-                            className="h-8 pl-2 pr-8 text-xs font-black rounded-lg border border-border bg-surface text-text-primary shadow-2xs focus:outline-hidden focus:ring-1 focus:ring-primary appearance-none cursor-pointer relative"
+                            className="h-8 pl-2 pr-8 text-xs font-bold rounded-lg border border-border bg-surface text-text-primary shadow-2xs focus:outline-hidden focus:ring-1 focus:ring-primary appearance-none cursor-pointer relative"
                             style={{
                               backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2371717a' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E")`,
                               backgroundPosition: 'right 0.25rem center',
@@ -208,7 +208,7 @@ const AppLayout = ({ children }) => {
                   <div className="flex items-center justify-center w-8 h-8 rounded-md bg-zinc-900 dark:bg-zinc-50 flex-shrink-0">
                     <GraduationCap className="w-4 h-4 text-zinc-50 dark:text-zinc-900" />
                   </div>
-                  <span className="text-sm font-black text-text-primary font-display tracking-tight leading-none">
+                  <span className="text-sm font-bold text-text-primary font-display tracking-tight leading-none">
                     Shiksha Pilot
                   </span>
                 </div>
@@ -240,7 +240,7 @@ const AppLayout = ({ children }) => {
                       <div className="p-3.5 border-b border-border flex items-center justify-between">
                         <span className="font-bold text-xs tracking-tight text-text-primary">Notifications</span>
                         {unreadNotifCount > 0 && (
-                          <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-bold">
+                          <span className="text-[11px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-bold">
                             {unreadNotifCount} New
                           </span>
                         )}
@@ -273,7 +273,7 @@ const AppLayout = ({ children }) => {
                                 <span className={`text-xs font-bold ${!n.is_read ? 'text-primary' : 'text-text-primary'}`}>
                                   {n.title}
                                 </span>
-                                <span className="text-[9px] text-text-muted shrink-0 font-mono">
+                                <span className="text-[11px] text-text-muted shrink-0 font-mono">
                                   {new Date(n.created_at).toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}
                                 </span>
                               </div>
@@ -323,7 +323,7 @@ const AppLayout = ({ children }) => {
                     className="flex items-center gap-2.5 hover:opacity-85 transition-all text-left focus:outline-hidden"
                   >
                     {/* Avatar */}
-                    <div className="w-8 h-8 rounded-full border border-border flex items-center justify-center overflow-hidden bg-secondary text-text-primary text-xs font-black uppercase flex-shrink-0">
+                    <div className="w-8 h-8 rounded-full border border-border flex items-center justify-center overflow-hidden bg-secondary text-text-primary text-xs font-bold uppercase flex-shrink-0">
                       {!logoError && schoolProfile?.logo_path ? (
                         <img 
                           src={schoolProfile.logo_path} 
@@ -374,7 +374,7 @@ const AppLayout = ({ children }) => {
                     <span className="font-semibold text-text-primary leading-none text-xs">
                       {displayName}
                     </span>
-                    <span className="text-[10px] text-text-muted leading-none mt-0.5 uppercase tracking-wide">
+                    <span className="text-[11px] text-text-muted leading-none mt-0.5 uppercase tracking-wide">
                       {roleLabel}
                     </span>
                   </div>

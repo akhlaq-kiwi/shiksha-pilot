@@ -72,7 +72,7 @@ function DocumentViewerModal({ docName, docPath, onClose }) {
       <div className="bg-surface border border-border rounded-2xl w-full max-w-3xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-zinc-50 dark:bg-zinc-900/50">
-          <h3 className="font-extrabold text-text-primary text-base tracking-tight">{docName}</h3>
+          <h3 className="font-bold text-text-primary text-base tracking-tight">{docName}</h3>
           <button onClick={onClose} className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg transition-colors">
             <X className="h-4 w-4 text-text-secondary" />
           </button>
@@ -198,7 +198,7 @@ function DepositModal({ student, availableMonths, paidMonths, classFeeConfig, on
       <div className="bg-surface border border-border rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-zinc-50 dark:bg-zinc-900/50">
-          <h3 className="font-extrabold text-text-primary text-base tracking-tight">Deposit Fees</h3>
+          <h3 className="font-bold text-text-primary text-base tracking-tight">Deposit Fees</h3>
           <button onClick={onClose} className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg transition-colors">
             <X className="h-4 w-4 text-text-secondary" />
           </button>
@@ -212,7 +212,7 @@ function DepositModal({ student, availableMonths, paidMonths, classFeeConfig, on
 
           {/* Payment Method Selector */}
           <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-text-muted uppercase tracking-wider block">Payment Method</label>
+            <label className="text-[11px] font-bold text-text-muted uppercase tracking-wider block">Payment Method</label>
             <select
               value={paymentMethod}
               onChange={(e) => setPaymentMethod(e.target.value)}
@@ -252,13 +252,13 @@ function DepositModal({ student, availableMonths, paidMonths, classFeeConfig, on
                       onChange={() => handleMonthToggle(m)}
                       className="rounded border-zinc-300 text-primary focus:ring-primary h-4 w-4 disabled:opacity-50"
                     />
-                    <span>{m} <span className="text-[10px] text-text-muted font-normal lowercase">(₹{getMonthAmount(m).toLocaleString()})</span></span>
+                    <span>{m} <span className="text-[11px] text-text-muted font-normal lowercase">(₹{getMonthAmount(m).toLocaleString()})</span></span>
                   </label>
                   <div>
                     {isPaid ? (
-                      <span className="text-[9px] font-black bg-green-500/10 text-green-600 px-2 py-0.5 rounded uppercase">Paid</span>
+                      <span className="text-[11px] font-bold bg-green-500/10 text-green-600 px-2 py-0.5 rounded uppercase">Paid</span>
                     ) : (
-                      <span className="text-[9px] font-bold text-text-muted">Pending</span>
+                      <span className="text-[11px] font-bold text-text-muted">Pending</span>
                     )}
                   </div>
                 </div>
@@ -316,7 +316,7 @@ function AdditionalDepositModal({ student, unpaidFees, initialSelectedIds = [], 
       <div className="bg-surface border border-border rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-zinc-50 dark:bg-zinc-900/50">
-          <h3 className="font-extrabold text-text-primary text-base tracking-tight font-display">Deposit Fees</h3>
+          <h3 className="font-bold text-text-primary text-base tracking-tight font-display">Deposit Fees</h3>
           <button onClick={onClose} className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg transition-colors">
             <X className="h-4 w-4 text-text-secondary" />
           </button>
@@ -329,7 +329,7 @@ function AdditionalDepositModal({ student, unpaidFees, initialSelectedIds = [], 
 
           {/* Payment Method Selector */}
           <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-text-muted uppercase tracking-wider block">Payment Method</label>
+            <label className="text-[11px] font-bold text-text-muted uppercase tracking-wider block">Payment Method</label>
             <select
               value={paymentMethod}
               onChange={(e) => setPaymentMethod(e.target.value)}
@@ -367,7 +367,7 @@ function AdditionalDepositModal({ student, unpaidFees, initialSelectedIds = [], 
                       onChange={() => handleToggle(fee.id)}
                       className="rounded border-border text-primary focus:ring-primary cursor-pointer h-4 w-4"
                     />
-                    <span className="font-extrabold uppercase tracking-wide">{fee.fee_name}</span>
+                    <span className="font-bold uppercase tracking-wide">{fee.fee_name}</span>
                   </div>
                   <span className="font-bold font-sans">₹{parseFloat(fee.amount).toLocaleString()}</span>
                 </label>
@@ -683,7 +683,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
       Inactive: 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700',
     };
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${map[status] || 'bg-zinc-100 text-zinc-500'}`}>
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase ${map[status] || 'bg-zinc-100 text-zinc-500'}`}>
         {status}
       </span>
     );
@@ -740,7 +740,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
           >
             Back
           </button>
-          <h2 className="text-2xl font-black text-text-primary tracking-tight font-display">Student Profile</h2>
+          <h2 className="text-2xl font-bold text-text-primary tracking-tight font-display">Student Profile</h2>
         </div>
         {!isReadOnly && student.status !== 'Alumni' && student.status !== 'Archived' && (
           <Button onClick={() => onEdit(student.id)} className="font-bold">
@@ -812,7 +812,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
               </div>
               
               {/* Name directly below */}
-              <h3 className="font-black text-text-primary text-base text-center mt-3 leading-tight">{student.name}</h3>
+              <h3 className="font-bold text-text-primary text-base text-center mt-3 leading-tight">{student.name}</h3>
               
               {/* Status Badge directly below */}
               <div className="mt-3">
@@ -912,7 +912,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                     <div className="space-y-1">
-                      <p className="font-bold text-text-primary uppercase text-[10px] tracking-wider mb-2">Current Residence Address</p>
+                      <p className="font-bold text-text-primary uppercase text-[11px] tracking-wider mb-2">Current Residence Address</p>
                       <p className="text-text-secondary leading-relaxed bg-zinc-50 dark:bg-zinc-900/50 border border-border p-3 rounded-lg min-h-[70px]">
                         {student.current_address_line ? (
                           `${student.current_address_line}, ${student.current_city}, ${student.current_state} - ${student.current_pin_code}, ${student.current_country || 'India'}`
@@ -922,10 +922,10 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                       </p>
                     </div>
                     <div className="space-y-1">
-                      <p className="font-bold text-text-primary uppercase text-[10px] tracking-wider mb-2">Permanent Address</p>
+                      <p className="font-bold text-text-primary uppercase text-[11px] tracking-wider mb-2">Permanent Address</p>
                       <p className="text-text-secondary leading-relaxed bg-zinc-50 dark:bg-zinc-900/50 border border-border p-3 rounded-lg min-h-[70px]">
                         {student.same_as_current === 1 ? (
-                          <span className="text-[10px] font-bold text-teal-600 bg-teal-500/10 px-2 py-0.5 rounded">SAME AS CURRENT ADDRESS</span>
+                          <span className="text-[11px] font-bold text-teal-600 bg-teal-500/10 px-2 py-0.5 rounded">SAME AS CURRENT ADDRESS</span>
                         ) : student.permanent_address_line ? (
                           `${student.permanent_address_line}, ${student.permanent_city}, ${student.permanent_state} - ${student.permanent_pin_code}, ${student.permanent_country || 'India'}`
                         ) : (
@@ -964,8 +964,8 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                         return (
                           <div key={doc.key} className="flex items-center justify-between p-3 border border-border rounded-xl bg-zinc-50/50 dark:bg-zinc-900/10">
                             <div>
-                              <p className="font-bold text-text-primary uppercase text-[10px] tracking-wider">{doc.label}</p>
-                              <p className="text-[10px] text-text-muted mt-0.5">
+                              <p className="font-bold text-text-primary uppercase text-[11px] tracking-wider">{doc.label}</p>
+                              <p className="text-[11px] text-text-muted mt-0.5">
                                 {hasDoc ? 'Scanned PDF/Image copy' : 'No document uploaded'}
                               </p>
                             </div>
@@ -978,7 +978,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                                 <span>View File</span>
                               </button>
                             ) : (
-                              <span className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Missing</span>
+                              <span className="text-[11px] text-text-muted font-bold uppercase tracking-wider">Missing</span>
                             )}
                           </div>
                         );
@@ -1002,7 +1002,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                   <div className="flex flex-col sm:flex-row items-center gap-6">
                     <div className="relative flex items-center justify-center">
                       <div className="w-24 h-24 rounded-full border-8 border-zinc-100 dark:border-zinc-800 flex flex-col items-center justify-center relative">
-                        <span className="text-lg font-black text-text-primary">{attendance_summary.percentage}%</span>
+                        <span className="text-lg font-bold text-text-primary">{attendance_summary.percentage}%</span>
                         <span className="text-[8px] text-text-muted uppercase font-bold">Rate</span>
                       </div>
                     </div>
@@ -1049,7 +1049,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                             <TableCell className="font-bold font-mono text-xs text-primary">{r.marks_obtained}</TableCell>
                             <TableCell className="font-mono text-xs text-text-muted">{r.max_marks}</TableCell>
                             <TableCell>
-                              <span className="px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-[10px] font-black uppercase text-primary border border-border">
+                              <span className="px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-[11px] font-bold uppercase text-primary border border-border">
                                 {r.grade || 'A'}
                               </span>
                             </TableCell>
@@ -1078,7 +1078,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                   <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-600">
                     <AlertCircle className="h-6 w-6" />
                   </div>
-                  <h3 className="font-extrabold text-text-primary text-base">Fee Structure Not Configured</h3>
+                  <h3 className="font-bold text-text-primary text-base">Fee Structure Not Configured</h3>
                   <p className="text-xs text-text-secondary leading-relaxed">
                     The monthly fee structure for <strong className="text-text-primary uppercase">{student.class_name || 'this class'}</strong> has not been configured for the current Academic Year. <br />
                     Please configure the class fee before collecting or managing student fees.
@@ -1152,10 +1152,10 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                           }`}
                         >
                           <div>
-                            <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">
+                            <p className="text-[11px] text-text-muted font-bold uppercase tracking-wider">
                               {activeLedgerTab === 'monthly' ? '✓ ' : ''}Monthly Fee Due
                             </p>
-                            <p className="text-2xl font-black text-amber-600 mt-1 font-display">₹{monthlyFeeDue.toLocaleString()}</p>
+                            <p className="text-2xl font-bold text-amber-600 mt-1 font-display">₹{monthlyFeeDue.toLocaleString()}</p>
                           </div>
                         </Card>
                         
@@ -1168,10 +1168,10 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                           }`}
                         >
                           <div>
-                            <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">
+                            <p className="text-[11px] text-text-muted font-bold uppercase tracking-wider">
                               {activeLedgerTab === 'additional' ? '✓ ' : ''}Additional Fee Due
                             </p>
-                            <p className="text-2xl font-black text-amber-600 mt-1 font-display">₹{additionalFeeDue.toLocaleString()}</p>
+                            <p className="text-2xl font-bold text-amber-600 mt-1 font-display">₹{additionalFeeDue.toLocaleString()}</p>
                           </div>
                         </Card>
                       </div>
@@ -1202,7 +1202,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                           <TableBody>
                             {monthWiseList.map(mw => (
                               <TableRow key={mw.month}>
-                                <TableCell className="font-extrabold text-text-primary text-xs uppercase tracking-wider">
+                                <TableCell className="font-bold text-text-primary text-xs uppercase tracking-wider">
                                   {mw.month}
                                 </TableCell>
                                 <TableCell className="text-xs text-text-primary">
@@ -1212,7 +1212,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                                   {mw.status === 'PAID' && mw.receipt?.payment_date ? formatDate(mw.receipt.payment_date) : '—'}
                                 </TableCell>
                                 <TableCell>
-                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase border ${mw.statusClass}`}>
+                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase border ${mw.statusClass}`}>
                                     {mw.status}
                                   </span>
                                 </TableCell>
@@ -1222,7 +1222,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                                        {!data?.is_ledger_locked && !isReadOnly && (
                                          <Button 
                                            variant="secondary" 
-                                           className="h-7 w-20 text-[10px] px-0 font-bold"
+                                           className="h-7 w-20 text-[11px] px-0 font-bold"
                                            onClick={() => handleRevertPayment(mw.receipt)}
                                          >
                                            Revert
@@ -1230,7 +1230,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                                        )}
                                        <Button 
                                          variant="secondary" 
-                                         className="h-7 w-20 text-[10px] px-0 font-bold"
+                                         className="h-7 w-20 text-[11px] px-0 font-bold"
                                          onClick={() => setViewingReceipt(mw.receipt)}
                                        >
                                          Receipt
@@ -1239,13 +1239,13 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                                   ) : (
                                     !data?.is_ledger_locked ? (
                                       <Button 
-                                        className="h-7 w-20 text-[10px] px-0 font-bold"
+                                        className="h-7 w-20 text-[11px] px-0 font-bold"
                                         onClick={() => setShowDepositModal(true)}
                                       >
                                         Deposit
                                       </Button>
                                     ) : (
-                                      <span className="text-[10px] text-text-muted font-bold">—</span>
+                                      <span className="text-[11px] text-text-muted font-bold">—</span>
                                     )
                                   )}
                                 </TableCell>
@@ -1272,9 +1272,9 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                             <TableBody>
                               {data.additional_fee_payments.map(af => (
                                 <TableRow key={af.id}>
-                                  <TableCell className="font-extrabold text-text-primary text-xs uppercase tracking-wider">
+                                  <TableCell className="font-bold text-text-primary text-xs uppercase tracking-wider">
                                     <div>{af.fee_name}</div>
-                                    {af.description && <div className="text-[10px] text-text-muted normal-case mt-0.5 font-semibold">{af.description}</div>}
+                                    {af.description && <div className="text-[11px] text-text-muted normal-case mt-0.5 font-semibold">{af.description}</div>}
                                   </TableCell>
                                   <TableCell className="text-xs text-text-primary font-bold">
                                     ₹{parseFloat(af.amount || 0).toLocaleString()}
@@ -1283,7 +1283,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                                     {af.status === 'Paid' && af.payment_date ? formatDate(af.payment_date) : '—'}
                                   </TableCell>
                                   <TableCell>
-                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase border ${
+                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase border ${
                                       af.status === 'Paid'
                                         ? 'bg-green-500/10 text-green-600 border-green-500/20'
                                         : 'bg-red-500/10 text-red-600 border-red-500/20'
@@ -1297,7 +1297,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                                         {!data?.is_ledger_locked && !isReadOnly && (
                                           <Button 
                                             variant="secondary" 
-                                            className="h-7 w-20 text-[10px] px-0 font-bold"
+                                            className="h-7 w-20 text-[11px] px-0 font-bold"
                                             onClick={() => handleRevertAdditionalPayment(af)}
                                           >
                                             Revert
@@ -1305,7 +1305,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                                         )}
                                         <Button 
                                           variant="secondary" 
-                                          className="h-7 w-20 text-[10px] px-0 font-bold"
+                                          className="h-7 w-20 text-[11px] px-0 font-bold"
                                           onClick={() => handleViewAdditionalReceipt(af)}
                                         >
                                           Receipt
@@ -1321,13 +1321,13 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                                         return !af.due_date || af.due_date <= todayStr || af.fee_name === 'Previous Year Dues';
                                       })() && !data?.is_ledger_locked) ? (
                                         <Button 
-                                          className="h-7 w-20 text-[10px] px-0 font-bold"
+                                          className="h-7 w-20 text-[11px] px-0 font-bold"
                                           onClick={() => handleCollectAdditionalPayment(af)}
                                         >
                                           Deposit
                                         </Button>
                                       ) : (
-                                        <span className="text-[10px] text-text-muted font-bold">—</span>
+                                        <span className="text-[11px] text-text-muted font-bold">—</span>
                                       )
                                     )}
                                   </TableCell>
@@ -1380,13 +1380,13 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                             <div className="space-y-1 text-xs">
                               <div className="flex items-center justify-between gap-2">
                                 <span className="font-bold text-text-primary text-sm">{item.title}</span>
-                                <span className="text-[10px] text-text-muted shrink-0 font-mono">{item.date}</span>
+                                <span className="text-[11px] text-text-muted shrink-0 font-mono">{item.date}</span>
                               </div>
                               <p className="text-text-secondary whitespace-pre-line leading-relaxed mt-1">
                                 {item.description}
                               </p>
                               {item.user && (
-                                <div className="text-[10px] text-text-muted font-medium pt-1">
+                                <div className="text-[11px] text-text-muted font-medium pt-1">
                                   Logged by: <span className="text-text-secondary">{item.user}</span>
                                 </div>
                               )}
@@ -1462,7 +1462,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
       {showRemovePhotoConfirm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-surface border border-border rounded-2xl w-full max-w-sm shadow-xl overflow-hidden flex flex-col p-6 space-y-4">
-            <h3 className="font-extrabold text-text-primary text-base tracking-tight text-center">
+            <h3 className="font-bold text-text-primary text-base tracking-tight text-center">
               Remove student profile picture?
             </h3>
             <div className="flex gap-3 justify-center pt-2">
@@ -1522,12 +1522,12 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                   You are about to revert fee payment for:
                 </p>
                 <div className="space-y-1">
-                  <span className="text-text-muted text-xs uppercase tracking-wider font-extrabold block">Student:</span>
-                  <span className="font-extrabold text-text-primary text-base block">{student?.name}</span>
+                  <span className="text-text-muted text-xs uppercase tracking-wider font-bold block">Student:</span>
+                  <span className="font-bold text-text-primary text-base block">{student?.name}</span>
                 </div>
                 
                 <div className="space-y-2">
-                  <span className="text-text-muted text-xs uppercase tracking-wider font-extrabold block">Months:</span>
+                  <span className="text-text-muted text-xs uppercase tracking-wider font-bold block">Months:</span>
                   <div className="space-y-1 text-sm font-bold text-text-primary">
                     {getRevertedMonthsList().map(m => (
                       <div key={m} className="flex items-center gap-2">
@@ -1539,8 +1539,8 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                 </div>
 
                 <div className="space-y-1">
-                  <span className="text-text-muted text-xs uppercase tracking-wider font-extrabold block">Total Months:</span>
-                  <span className="font-extrabold text-text-primary text-base block">{getRevertedMonthsList().length}</span>
+                  <span className="text-text-muted text-xs uppercase tracking-wider font-bold block">Total Months:</span>
+                  <span className="font-bold text-text-primary text-base block">{getRevertedMonthsList().length}</span>
                 </div>
 
                 <p className="text-xs text-text-muted leading-relaxed font-medium pt-2 border-t border-border">
@@ -1553,12 +1553,12 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                   You are about to revert the payment for:
                 </p>
                 <div className="space-y-1">
-                  <span className="text-text-muted text-xs uppercase tracking-wider font-extrabold block">Student:</span>
-                  <span className="font-extrabold text-text-primary text-base block">{student?.name}</span>
+                  <span className="text-text-muted text-xs uppercase tracking-wider font-bold block">Student:</span>
+                  <span className="font-bold text-text-primary text-base block">{student?.name}</span>
                 </div>
                 <div className="space-y-1">
-                  <span className="text-text-muted text-xs uppercase tracking-wider font-extrabold block">Fee Item:</span>
-                  <span className="font-extrabold text-text-primary text-sm block">{revertTarget?.label}</span>
+                  <span className="text-text-muted text-xs uppercase tracking-wider font-bold block">Fee Item:</span>
+                  <span className="font-bold text-text-primary text-sm block">{revertTarget?.label}</span>
                 </div>
                 <p className="text-xs text-text-muted leading-relaxed font-medium pt-2 border-t border-border">
                   This action will mark this item as unpaid and update all related financial records.

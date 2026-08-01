@@ -251,7 +251,7 @@ export default function FinancialReportsPage() {
             <FileText className="h-6 w-6" />
           </div>
           <div>
-            <h2 className="text-2xl font-black text-text-primary tracking-tight font-display">Financial Reports</h2>
+            <h2 className="text-2xl font-bold text-text-primary tracking-tight font-display">Financial Reports</h2>
             <p className="text-text-secondary text-xs mt-1">Preview current profit/loss statement and generate official accounts reports for the school owner.</p>
           </div>
         </div>
@@ -267,7 +267,7 @@ export default function FinancialReportsPage() {
           {/* Left Panel: Pending Report Info */}
           <Card className="bg-surface border border-border p-6 rounded-2xl shadow-2xs space-y-4">
             <CardHeader className="p-0 pb-2 border-b border-border">
-              <CardTitle className="text-sm font-black text-text-primary uppercase tracking-wider">Pending Report Info</CardTitle>
+              <CardTitle className="text-sm font-bold text-text-primary uppercase tracking-wider">Pending Report Info</CardTitle>
             </CardHeader>
             <div className="space-y-4">
               <div className="text-xs text-text-secondary leading-relaxed bg-zinc-50/50 dark:bg-zinc-900/10 p-3.5 rounded-xl border border-border border-dashed">
@@ -299,7 +299,7 @@ export default function FinancialReportsPage() {
           {/* Right Panel: Financial Statement Preview */}
           <Card className="bg-surface border border-border p-6 rounded-2xl shadow-2xs flex flex-col justify-between min-h-[300px]">
             <CardHeader className="p-0 pb-2 border-b border-border">
-              <CardTitle className="text-sm font-black text-text-primary uppercase tracking-wider">Financial Statement Preview</CardTitle>
+              <CardTitle className="text-sm font-bold text-text-primary uppercase tracking-wider">Financial Statement Preview</CardTitle>
             </CardHeader>
             
             <div className="flex-1 flex flex-col justify-center py-6">
@@ -309,7 +309,7 @@ export default function FinancialReportsPage() {
                     <BarChart2 className="h-6 w-6 text-text-muted" />
                   </div>
                   <p className="text-xs font-bold text-text-secondary">Click Preview Report to view pending statements.</p>
-                  <p className="text-[10px] text-text-muted max-w-[280px]">Previews are live calculations of pending transactions and do not create permanent database entries.</p>
+                  <p className="text-[11px] text-text-muted max-w-[280px]">Previews are live calculations of pending transactions and do not create permanent database entries.</p>
                 </div>
               )}
 
@@ -331,13 +331,13 @@ export default function FinancialReportsPage() {
                   
                   <div className="grid grid-cols-2 gap-4 pt-2">
                     <div className="bg-zinc-50 dark:bg-zinc-900/30 p-3.5 border border-border rounded-xl">
-                      <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Total Fees Collected</p>
-                      <p className="text-lg font-black text-text-primary mt-1 font-sans">{formatCurrency(previewData.fees_collected)}</p>
+                      <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Total Fees Collected</p>
+                      <p className="text-lg font-bold text-text-primary mt-1 font-sans">{formatCurrency(previewData.fees_collected)}</p>
                     </div>
 
                     <div className="bg-zinc-50 dark:bg-zinc-900/30 p-3.5 border border-border rounded-xl">
-                      <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Total Expenses & Salaries</p>
-                      <p className="text-lg font-black text-text-primary mt-1 font-sans text-red-500">{formatCurrency(previewData.salary_paid)}</p>
+                      <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Total Expenses & Salaries</p>
+                      <p className="text-lg font-bold text-text-primary mt-1 font-sans text-red-500">{formatCurrency(previewData.salary_paid)}</p>
                     </div>
                   </div>
 
@@ -345,8 +345,8 @@ export default function FinancialReportsPage() {
 
                   <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-zinc-50 dark:bg-zinc-900/20">
                     <div>
-                      <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Net Financial Outcome</p>
-                      <h4 className="text-2xl font-black font-sans mt-0.5">
+                      <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Net Financial Outcome</p>
+                      <h4 className="text-2xl font-bold font-sans mt-0.5">
                         {previewData.profit_loss >= 0 ? (
                           <span className="text-green-600 dark:text-green-400">Profit: {formatCurrency(previewData.profit_loss)}</span>
                         ) : (
@@ -356,7 +356,7 @@ export default function FinancialReportsPage() {
                     </div>
                     
                     <div className={`flex items-center justify-center rounded-full transition-all duration-200 ${previewData.profit_loss >= 0 ? 'bg-green-500/10 text-green-600' : 'bg-red-500/10 text-red-500'}`} style={{ width: '42px', height: '42px' }}>
-                      <span className="font-extrabold" style={{ fontSize: '22px', lineHeight: '1' }}>₹</span>
+                      <span className="font-bold" style={{ fontSize: '22px', lineHeight: '1' }}>₹</span>
                     </div>
                   </div>
                 </div>
@@ -381,8 +381,8 @@ export default function FinancialReportsPage() {
       {/* Bottom Panel: Financial Statements History */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-black text-text-primary uppercase tracking-wider">Financial Statements History</h3>
-          <span className="bg-zinc-100 text-text-secondary dark:bg-zinc-800 text-[10px] font-black px-2 py-0.5 rounded-md uppercase border border-border">
+          <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider">Financial Statements History</h3>
+          <span className="bg-zinc-100 text-text-secondary dark:bg-zinc-800 text-[11px] font-bold px-2 py-0.5 rounded-md uppercase border border-border">
             {reports.length} Reports
           </span>
         </div>
@@ -405,14 +405,14 @@ export default function FinancialReportsPage() {
                   {/* Card Header ID & Settle Action */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-black text-text-primary font-mono">{r.report_id}</span>
+                      <span className="text-sm font-bold text-text-primary font-mono">{r.report_id}</span>
                       {r.status === 'Request Sent' && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-black uppercase border bg-blue-500/10 text-blue-600 border-blue-500/20">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase border bg-blue-500/10 text-blue-600 border-blue-500/20">
                           Request Sent
                         </span>
                       )}
                       {r.status === 'Settled' && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-black uppercase border bg-green-500/10 text-green-600 border-green-500/20 font-sans">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase border bg-green-500/10 text-green-600 border-green-500/20 font-sans">
                           Settled
                         </span>
                       )}
@@ -420,7 +420,7 @@ export default function FinancialReportsPage() {
 
                     <button
                       onClick={() => handleExportReport(r)}
-                      className="text-[10px] font-extrabold uppercase tracking-tight text-primary hover:underline"
+                      className="text-[11px] font-bold uppercase tracking-tight text-primary hover:underline"
                     >
                       Export Report
                     </button>
@@ -428,7 +428,7 @@ export default function FinancialReportsPage() {
 
                   {/* Period dates */}
                   <div className="space-y-1">
-                    <p className="text-[9px] font-black text-text-muted uppercase tracking-wider">Report Period</p>
+                    <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Report Period</p>
                     <p className="text-xs font-semibold text-text-primary">
                       {formatDateFull(r.from_date)} ➔ {formatDateFull(r.to_date)}
                     </p>
@@ -439,25 +439,25 @@ export default function FinancialReportsPage() {
                   {/* Amounts */}
                   <div className="grid grid-cols-2 gap-4 text-xs">
                     <div>
-                      <p className="text-[9px] font-black text-text-muted uppercase tracking-wider">Total Revenue</p>
+                      <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Total Revenue</p>
                       <p className="text-sm font-bold text-text-primary mt-0.5 font-sans">{formatCurrency(r.fees_collected)}</p>
                     </div>
                     <div>
-                      <p className="text-[9px] font-black text-text-muted uppercase tracking-wider font-sans">Salaries & Expenses</p>
+                      <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider font-sans">Salaries & Expenses</p>
                       <p className="text-sm font-bold text-text-primary mt-0.5 font-sans text-red-500">{formatCurrency(r.salary_paid)}</p>
                     </div>
                   </div>
 
                   {/* Financial Result outcome */}
                   <div className={`p-3 rounded-xl border ${isProfit ? 'bg-green-500/5 border-green-500/10' : 'bg-red-500/5 border-red-500/10'}`}>
-                    <p className="text-[9px] font-black text-text-muted uppercase tracking-wider">Outcome</p>
-                    <p className={`text-base font-black font-sans mt-0.5 ${isProfit ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
+                    <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Outcome</p>
+                    <p className={`text-base font-bold font-sans mt-0.5 ${isProfit ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
                       {isProfit ? `Profit: ${formatCurrency(r.profit_loss)}` : `Loss: ${formatCurrency(Math.abs(r.profit_loss))}`}
                     </p>
                   </div>
 
                   {/* Generation details */}
-                  <div className="flex items-center justify-between text-[9px] text-text-muted border-t border-border pt-3">
+                  <div className="flex items-center justify-between text-[11px] text-text-muted border-t border-border pt-3">
                     <span className="font-bold">Generated</span>
                     <span className="font-mono">{formatServerTimestamp(r.created_at)}</span>
                   </div>

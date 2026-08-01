@@ -51,7 +51,7 @@ export default function AssignmentsPage({ assignments }) {
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
       <div>
-        <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">Assignments</h2>
+        <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Assignments</h2>
         <p className="text-text-secondary text-sm mt-1">View, submit, and track your homework and assignments.</p>
       </div>
 
@@ -82,7 +82,7 @@ export default function AssignmentsPage({ assignments }) {
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <h4 className="text-sm font-bold text-text-primary">{hw.title}</h4>
-                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${cfg.cls}`}>{cfg.label}</span>
+                      <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${cfg.cls}`}>{cfg.label}</span>
                     </div>
                     <p className="text-xs text-text-secondary mt-1">{hw.subject} · {hw.teacher}</p>
                     <div className="flex items-center gap-1 mt-1.5">
@@ -138,22 +138,22 @@ export default function AssignmentsPage({ assignments }) {
                 <TableCell className="font-semibold text-text-primary py-3.5">Organic Compounds Lab Report</TableCell>
                 <TableCell className="text-xs text-text-secondary">Chemistry</TableCell>
                 <TableCell className="text-xs text-text-muted">2026-06-18</TableCell>
-                <TableCell><span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-green-500/10 text-green-600">Graded</span></TableCell>
-                <TableCell className="font-black text-emerald-600">A</TableCell>
+                <TableCell><span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-green-500/10 text-green-600">Graded</span></TableCell>
+                <TableCell className="font-bold text-emerald-600">A</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell className="font-semibold text-text-primary py-3.5">Motion Graphs Analysis</TableCell>
                 <TableCell className="text-xs text-text-secondary">Physics</TableCell>
                 <TableCell className="text-xs text-text-muted">2026-06-10</TableCell>
-                <TableCell><span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-green-500/10 text-green-600">Graded</span></TableCell>
-                <TableCell className="font-black text-blue-600">B+</TableCell>
+                <TableCell><span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-green-500/10 text-green-600">Graded</span></TableCell>
+                <TableCell className="font-bold text-blue-600">B+</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell className="font-semibold text-text-primary py-3.5">Algebra Problem Set 2</TableCell>
                 <TableCell className="text-xs text-text-secondary">Mathematics</TableCell>
                 <TableCell className="text-xs text-text-muted">2026-06-03</TableCell>
-                <TableCell><span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-green-500/10 text-green-600">Graded</span></TableCell>
-                <TableCell className="font-black text-emerald-600">A+</TableCell>
+                <TableCell><span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-green-500/10 text-green-600">Graded</span></TableCell>
+                <TableCell className="font-bold text-emerald-600">A+</TableCell>
               </TableRow>
             </TableBody>
           </Table>
@@ -184,7 +184,7 @@ export default function AssignmentsPage({ assignments }) {
             <div className="h-14 w-14 rounded-full bg-blue-500/10 flex items-center justify-center">
               <CheckCircle2 className="h-7 w-7 text-blue-600" />
             </div>
-            <h3 className="text-lg font-black text-text-primary">Assignment Submitted</h3>
+            <h3 className="text-lg font-bold text-text-primary">Assignment Submitted</h3>
             <p className="text-sm text-text-secondary">Your submission has been recorded and sent to the teacher for review.</p>
           </div>
         ) : (
@@ -199,7 +199,7 @@ export default function AssignmentsPage({ assignments }) {
                 <p className="text-sm font-semibold text-text-secondary">
                   {submitFile ? submitFile.name : 'Click to upload PDF, DOCX, or image'}
                 </p>
-                <p className="text-[10px] text-text-muted mt-1">Max file size: 10 MB</p>
+                <p className="text-[11px] text-text-muted mt-1">Max file size: 10 MB</p>
                 <input
                   id="file-upload"
                   type="file"

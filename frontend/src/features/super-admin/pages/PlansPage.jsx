@@ -232,7 +232,7 @@ export default function PlansPage() {
     <div className="space-y-6 animate-in fade-in duration-300">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-border/60 pb-6">
         <div>
-          <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">Manage Plans</h2>
+          <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Manage Plans</h2>
           <p className="text-text-secondary text-sm mt-1">Configure subscription pricing tiers, student limits, and durations.</p>
         </div>
         <Button className="flex items-center gap-2 justify-center" onClick={() => setShowNewPlan(true)}>
@@ -248,7 +248,7 @@ export default function PlansPage() {
             onClick={() => setFilter(t)}
             className={`px-4 py-2 text-xs font-bold transition-all relative border-b-2 -mb-[2px] ${
               filter === t
-                ? 'border-primary text-primary font-black'
+                ? 'border-primary text-primary font-bold'
                 : 'border-transparent text-text-muted hover:text-text-primary'
             }`}
           >
@@ -280,13 +280,13 @@ export default function PlansPage() {
                   <div>
                     <div className="flex items-start justify-between">
                       <h3 className="text-lg font-bold text-text-primary truncate">{p.name}</h3>
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${p.is_active === 1 || p.is_active === '1' || p.is_active === true ? 'bg-green-500/10 text-green-600 border border-green-500/20' : 'bg-zinc-100 dark:bg-zinc-800 text-text-muted border border-zinc-200 dark:border-zinc-700'}`}>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase ${p.is_active === 1 || p.is_active === '1' || p.is_active === true ? 'bg-green-500/10 text-green-600 border border-green-500/20' : 'bg-zinc-100 dark:bg-zinc-800 text-text-muted border border-zinc-200 dark:border-zinc-700'}`}>
                         {p.is_active === 1 || p.is_active === '1' || p.is_active === true ? 'Active' : 'Inactive'}
                       </span>
                     </div>
 
                     <div className="mt-3 flex items-baseline gap-0.5">
-                      <span className="text-3xl font-black text-text-primary">
+                      <span className="text-3xl font-bold text-text-primary">
                         {p.price > 0 ? `₹${Number(p.price).toLocaleString()}` : 'Free'}
                       </span>
                       {p.price > 0 && (

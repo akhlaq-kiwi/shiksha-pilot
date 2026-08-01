@@ -13,7 +13,7 @@ const statusBadge = (status) => {
     Failed: 'bg-rose-500/15 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400 font-bold',
   };
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] uppercase ${map[status] || 'bg-zinc-100 text-zinc-500'}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] uppercase ${map[status] || 'bg-zinc-100 text-zinc-500'}`}>
       {status}
     </span>
   );
@@ -118,7 +118,7 @@ export default function SecurityPage() {
     <div className="space-y-6 animate-in fade-in duration-300">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">Security</h2>
+          <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Security</h2>
           <p className="text-text-secondary text-sm mt-1">Audit logs, login history, and access control.</p>
         </div>
         <Button variant="outline" size="sm" onClick={() => { fetchAuditLogs(); fetchLoginHistory(); }} className="gap-2">
@@ -290,7 +290,7 @@ export default function SecurityPage() {
                         <span className="text-xs font-bold text-text-primary">
                           {log.performed_by || '—'}
                         </span>
-                        <span className="text-[10px] text-text-muted font-mono truncate max-w-[200px]">
+                        <span className="text-[11px] text-text-muted font-mono truncate max-w-[200px]">
                           {log.user || '—'}
                         </span>
                       </div>

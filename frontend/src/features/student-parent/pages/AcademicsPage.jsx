@@ -59,7 +59,7 @@ export default function AcademicsPage({ timetable, subjects, results }) {
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
       <div>
-        <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">Academics</h2>
+        <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Academics</h2>
         <p className="text-text-secondary text-sm mt-1">Timetable, subject results, and performance overview.</p>
       </div>
 
@@ -70,9 +70,9 @@ export default function AcademicsPage({ timetable, subjects, results }) {
           <table className="w-full text-xs border-collapse">
             <thead>
               <tr className="bg-zinc-50 dark:bg-zinc-900">
-                <th className="p-3 text-left font-black text-text-muted uppercase tracking-wider border-b border-border w-28">Time Slot</th>
+                <th className="p-3 text-left font-bold text-text-muted uppercase tracking-wider border-b border-border w-28">Time Slot</th>
                 {['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map(d => (
-                  <th key={d} className="p-3 text-center font-black text-text-primary uppercase tracking-wider border-b border-border">{d}</th>
+                  <th key={d} className="p-3 text-center font-bold text-text-primary uppercase tracking-wider border-b border-border">{d}</th>
                 ))}
               </tr>
             </thead>
@@ -87,10 +87,10 @@ export default function AcademicsPage({ timetable, subjects, results }) {
                         {cell ? (
                           <div className={`rounded-lg px-2 py-1.5 ${getSubjectColor(cell.subject)}`}>
                             <p className="font-bold text-[11px] leading-tight">{cell.subject}</p>
-                            <p className="text-[9px] opacity-70 mt-0.5">{cell.room}</p>
+                            <p className="text-[11px] opacity-70 mt-0.5">{cell.room}</p>
                           </div>
                         ) : (
-                          <span className="text-text-muted text-[10px]">—</span>
+                          <span className="text-text-muted text-[11px]">—</span>
                         )}
                       </td>
                     );
@@ -121,7 +121,7 @@ export default function AcademicsPage({ timetable, subjects, results }) {
                 <TableRow key={sub.code}>
                   <TableCell className="py-3.5">
                     <div className="flex items-center gap-2">
-                      <span className={`text-[10px] font-black px-2 py-0.5 rounded ${getSubjectColor(sub.name)}`}>
+                      <span className={`text-[11px] font-bold px-2 py-0.5 rounded ${getSubjectColor(sub.name)}`}>
                         {sub.code.split('-')[0]}
                       </span>
                       <span className="font-bold text-text-primary">{sub.name}</span>
@@ -133,7 +133,7 @@ export default function AcademicsPage({ timetable, subjects, results }) {
                     <ScoreBar score={sub.score} max={sub.maxScore} />
                   </TableCell>
                   <TableCell>
-                    <span className={`font-black text-sm ${sub.score >= 90 ? 'text-emerald-600' : sub.score >= 75 ? 'text-blue-600' : sub.score >= 60 ? 'text-amber-600' : 'text-red-600'}`}>
+                    <span className={`font-bold text-sm ${sub.score >= 90 ? 'text-emerald-600' : sub.score >= 75 ? 'text-blue-600' : sub.score >= 60 ? 'text-amber-600' : 'text-red-600'}`}>
                       {sub.grade}
                     </span>
                   </TableCell>
@@ -161,10 +161,10 @@ export default function AcademicsPage({ timetable, subjects, results }) {
                         className={`h-full ${barColor} rounded flex items-center justify-end pr-2 transition-all duration-500`}
                         style={{ width: `${pct}%` }}
                       >
-                        <span className="text-[10px] font-black text-white tabular-nums">{pct}%</span>
+                        <span className="text-[11px] font-bold text-white tabular-nums">{pct}%</span>
                       </div>
                     </div>
-                    <span className={`w-10 text-right text-xs font-black tabular-nums ${pct >= 90 ? 'text-emerald-600' : pct >= 75 ? 'text-blue-600' : pct >= 60 ? 'text-amber-600' : 'text-red-600'}`}>
+                    <span className={`w-10 text-right text-xs font-bold tabular-nums ${pct >= 90 ? 'text-emerald-600' : pct >= 75 ? 'text-blue-600' : pct >= 60 ? 'text-amber-600' : 'text-red-600'}`}>
                       {sub.grade}
                     </span>
                   </div>
@@ -173,7 +173,7 @@ export default function AcademicsPage({ timetable, subjects, results }) {
             </div>
             <div className="mt-6 pt-5 border-t border-border flex items-center justify-between text-xs">
               <span className="text-text-muted font-semibold">Overall Average</span>
-              <span className="font-black text-lg text-text-primary tabular-nums">
+              <span className="font-bold text-lg text-text-primary tabular-nums">
                 {Math.round(subjects.reduce((a, s) => a + s.score, 0) / subjects.length)}
                 <span className="text-text-muted text-sm font-semibold">/100</span>
               </span>
@@ -197,7 +197,7 @@ export default function AcademicsPage({ timetable, subjects, results }) {
                   <FileText className="h-5 w-5 text-text-muted flex-shrink-0" />
                   <div>
                     <p className="text-sm font-bold text-text-primary">{card.exam_name}</p>
-                    <p className="text-[10px] text-text-muted">{card.academic_year_name} · Grade: {card.grade}</p>
+                    <p className="text-[11px] text-text-muted">{card.academic_year_name} · Grade: {card.grade}</p>
                   </div>
                 </div>
                 <button 
@@ -238,8 +238,8 @@ export default function AcademicsPage({ timetable, subjects, results }) {
                     </div>
                   )}
                 </div>
-                <h2 className="text-2xl font-black uppercase tracking-tight text-zinc-900 font-display">{selectedCard.school_name}</h2>
-                <h4 className="text-[10px] font-bold tracking-widest text-zinc-500 uppercase mt-1">ACADEMIC PERFORMANCE REPORT CARD</h4>
+                <h2 className="text-2xl font-bold uppercase tracking-tight text-zinc-900 font-display">{selectedCard.school_name}</h2>
+                <h4 className="text-[11px] font-bold tracking-widest text-zinc-500 uppercase mt-1">ACADEMIC PERFORMANCE REPORT CARD</h4>
                 <p className="text-xs font-mono text-zinc-600 mt-2">Academic Year: {selectedCard.academic_year_name}</p>
               </div>
 

@@ -122,7 +122,7 @@ export default function TeacherPortal() {
             onClick={() => handleNavigate(id)}
             className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all focus-visible:outline-none ${
               currentPage === id
-                ? 'bg-primary text-surface dark:bg-primary dark:text-background font-extrabold shadow-xs'
+                ? 'bg-primary text-primary-fg font-bold shadow-xs'
                 : 'text-text-secondary hover:text-text-primary hover:bg-secondary/70'
             }`}
           >

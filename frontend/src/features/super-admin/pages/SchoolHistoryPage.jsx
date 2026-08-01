@@ -60,7 +60,7 @@ export default function SchoolHistoryPage() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">{schoolName} — Billing History</h2>
+          <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">{schoolName} — Billing History</h2>
           <p className="text-text-secondary text-sm mt-1">Audit log of all subscription payments, renewals, and tier upgrades.</p>
         </div>
       </div>
@@ -93,18 +93,18 @@ export default function SchoolHistoryPage() {
                 <Card className={`shadow-sm border rounded-2xl p-6 bg-surface hover:shadow-md transition-all ${isCurrentActive ? 'border-primary/50' : 'border-border'}`}>
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/50 pb-4 mb-4">
                     <div>
-                      <span className={`inline-flex px-2.5 py-0.5 rounded border text-[10px] font-black uppercase tracking-wider ${badge.color}`}>
+                      <span className={`inline-flex px-2.5 py-0.5 rounded border text-[11px] font-bold uppercase tracking-wider ${badge.color}`}>
                         {badge.label}
                       </span>
-                      <h3 className="text-lg font-black text-text-primary mt-2 font-display">{tx.plan_name || 'Standard'} Tier</h3>
+                      <h3 className="text-lg font-bold text-text-primary mt-2 font-display">{tx.plan_name || 'Standard'} Tier</h3>
                       <p className="text-text-muted text-xs font-mono mt-0.5">Invoice {tx.invoice_no}</p>
                     </div>
                     
                     <div className="text-right sm:text-right flex flex-col items-start sm:items-end justify-between">
-                      <div className="text-2xl font-black text-text-primary">
+                      <div className="text-2xl font-bold text-text-primary">
                         {tx.amount > 0 ? `₹${Number(tx.amount).toLocaleString()}` : 'Free'}
                       </div>
-                      <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase mt-1 ${isCurrentActive ? 'bg-green-500/10 text-green-600' : 'bg-zinc-100 dark:bg-zinc-800 text-text-muted'}`}>
+                      <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase mt-1 ${isCurrentActive ? 'bg-green-500/10 text-green-600' : 'bg-zinc-100 dark:bg-zinc-800 text-text-muted'}`}>
                         {isCurrentActive ? 'Active Plan' : today > tx.expiry_date ? 'Expired' : 'Pending'}
                       </span>
                     </div>
@@ -114,14 +114,14 @@ export default function SchoolHistoryPage() {
                     <div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4 text-text-muted" />
                       <div>
-                        <p className="text-[10px] uppercase font-black text-text-muted tracking-wider">Purchase Date</p>
+                        <p className="text-[11px] uppercase font-bold text-text-muted tracking-wider">Purchase Date</p>
                         <p className="text-text-primary font-bold mt-0.5">{formatDate(tx.created_at || tx.start_date)}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-text-muted" />
                       <div>
-                        <p className="text-[10px] uppercase font-black text-text-muted tracking-wider">Plan Duration</p>
+                        <p className="text-[11px] uppercase font-bold text-text-muted tracking-wider">Plan Duration</p>
                         <p className="text-text-primary font-bold mt-0.5">
                           {tx.duration_value} {tx.duration_unit === 'month' ? 'Month' : 'Year'}{tx.duration_value > 1 ? 's' : ''}
                         </p>
@@ -130,7 +130,7 @@ export default function SchoolHistoryPage() {
                     <div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4 text-text-muted" />
                       <div>
-                        <p className="text-[10px] uppercase font-black text-text-muted tracking-wider">Expiry Date</p>
+                        <p className="text-[11px] uppercase font-bold text-text-muted tracking-wider">Expiry Date</p>
                         <p className="text-text-primary font-bold mt-0.5">{formatDate(tx.expiry_date)}</p>
                       </div>
                     </div>

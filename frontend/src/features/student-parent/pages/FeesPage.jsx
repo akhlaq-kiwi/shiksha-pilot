@@ -30,7 +30,7 @@ export default function FeesPage({ fees, payments }) {
     <div className="space-y-8 animate-in fade-in duration-300">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">Fees & Payments</h2>
+          <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Fees & Payments</h2>
           <p className="text-text-secondary text-sm mt-1">Outstanding balances, payment history, and receipts.</p>
         </div>
         <Button onClick={openPayDialog} className="flex items-center gap-2">
@@ -45,10 +45,10 @@ export default function FeesPage({ fees, payments }) {
           <div className="relative z-10">
             <div className="flex items-start justify-between mb-6">
               <div>
-                <p className="text-zinc-400 text-[10px] font-black uppercase tracking-wider">Outstanding Balance</p>
-                <p className="text-4xl font-black tabular-nums mt-1">₹{fees.outstanding.toLocaleString()}</p>
+                <p className="text-zinc-400 text-[11px] font-bold uppercase tracking-wider">Outstanding Balance</p>
+                <p className="text-4xl font-bold tabular-nums mt-1">₹{fees.outstanding.toLocaleString()}</p>
               </div>
-              <span className="bg-amber-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">Due</span>
+              <span className="bg-amber-500 text-white text-[11px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">Due</span>
             </div>
             <div className="space-y-2 mb-6">
               {fees.breakdown.map(item => (
@@ -73,19 +73,19 @@ export default function FeesPage({ fees, payments }) {
         <div className="space-y-4">
           <Card className="shadow-sm">
             <CardContent className="p-5">
-              <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Last Payment</p>
-              <p className="text-2xl font-black text-emerald-600 tabular-nums mt-1">₹{fees.lastPaid.toLocaleString()}</p>
+              <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Last Payment</p>
+              <p className="text-2xl font-bold text-emerald-600 tabular-nums mt-1">₹{fees.lastPaid.toLocaleString()}</p>
               <p className="text-xs text-text-muted mt-1">{fees.lastPaidDate}</p>
             </CardContent>
           </Card>
           <Card className="shadow-sm">
             <CardContent className="p-5">
-              <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Annual Fee Paid</p>
-              <p className="text-2xl font-black text-text-primary tabular-nums mt-1">₹66,000</p>
+              <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Annual Fee Paid</p>
+              <p className="text-2xl font-bold text-text-primary tabular-nums mt-1">₹66,000</p>
               <div className="mt-2 h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
                 <div className="h-full bg-blue-500 rounded-full" style={{ width: '75%' }} />
               </div>
-              <p className="text-[10px] text-text-muted mt-1.5">75% of ₹88,000 annual fee</p>
+              <p className="text-[11px] text-text-muted mt-1.5">75% of ₹88,000 annual fee</p>
             </CardContent>
           </Card>
         </div>
@@ -113,7 +113,7 @@ export default function FeesPage({ fees, payments }) {
                   <TableCell className="text-sm text-text-secondary">{r.description}</TableCell>
                   <TableCell className="text-xs text-text-muted">{r.date}</TableCell>
                   <TableCell>
-                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-text-secondary">{r.mode}</span>
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-text-secondary">{r.mode}</span>
                   </TableCell>
                   <TableCell className="font-mono font-bold text-text-primary tabular-nums">₹{r.amount.toLocaleString()}</TableCell>
                   <TableCell>
@@ -152,7 +152,7 @@ export default function FeesPage({ fees, payments }) {
             <div className="h-14 w-14 rounded-full bg-emerald-500/10 flex items-center justify-center">
               <CheckCircle2 className="h-7 w-7 text-emerald-600" />
             </div>
-            <h3 className="text-lg font-black text-text-primary">Payment Successful</h3>
+            <h3 className="text-lg font-bold text-text-primary">Payment Successful</h3>
             <p className="text-sm text-text-secondary">₹{parseInt(payForm.amount || 0).toLocaleString()} has been received. Receipt will be emailed shortly.</p>
           </div>
         ) : (
@@ -206,7 +206,7 @@ export default function FeesPage({ fees, payments }) {
                 />
               </div>
             </div>
-            <p className="text-[10px] text-text-muted flex items-center gap-1.5">
+            <p className="text-[11px] text-text-muted flex items-center gap-1.5">
               <span className="h-3 w-3 rounded-full border border-text-muted flex items-center justify-center text-[7px]">🔒</span>
               Simulated secure payment. No real data is transmitted.
             </p>

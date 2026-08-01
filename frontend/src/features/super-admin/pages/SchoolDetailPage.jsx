@@ -8,6 +8,7 @@ import { Select } from '../../../common/ui/select';
 import { platformService } from '../../../common/services/platformService';
 import { useToast } from '../../../common/components/Toast';
 import { DropdownMenu, DropdownItem } from '../../../common/ui/DropdownMenu';
+import { THEME_PRESET_COLORS } from '../../../theme/ThemeContext';
 
 const PRESET_PLANS = [
   { value: 'Standard',   label: 'Standard — ₹7,999/mo' },
@@ -154,11 +155,16 @@ function ManageSubscriptionDialog({ school, onClose, onSaved }) {
   );
 }
 
+/**
+ * Derived from the single source of truth in ThemeContext rather than a second
+ * hardcoded list, so the swatch a super admin picks is exactly the ramp the
+ * school's portal renders.
+ */
 const THEME_PRESETS = [
-  { id: 'default',    label: 'Default',    swatch: '#18181b' },
-  { id: 'enterprise', label: 'Enterprise', swatch: '#10b981' },
-  { id: 'fintech',    label: 'Fintech',    swatch: '#f59e0b' },
-  { id: 'healthcare', label: 'Healthcare', swatch: '#0d9488' },
+  { id: 'default', label: 'Scholar Indigo (Default)', swatch: '#4F46E5' },
+  ...Object.entries(THEME_PRESET_COLORS)
+    .filter(([id]) => id !== 'indigo')
+    .map(([id, { label, primary }]) => ({ id, label, swatch: primary })),
 ];
 
 const getSchoolColor = (name) => {
@@ -257,7 +263,7 @@ function ThemePickerDialog({ school, onClose, onSaved }) {
             >
               <span className="w-6 h-6 rounded-full flex-shrink-0 shadow-sm" style={{ backgroundColor: preset.swatch }} />
               <span className="text-sm font-bold text-text-primary">{preset.label}</span>
-              {selected === preset.id && <span className="ml-auto text-primary text-xs font-black">✓</span>}
+              {selected === preset.id && <span className="ml-auto text-primary text-xs font-bold">✓</span>}
             </button>
           ))}
         </div>
@@ -403,8 +409,8 @@ function StatBox({ icon: Icon, label, value, color }) {
         <Icon className="h-4 w-4" />
       </div>
       <div>
-        <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">{label}</p>
-        <p className="text-xl font-black text-text-primary font-display mt-0.5">{value}</p>
+        <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">{label}</p>
+        <p className="text-xl font-bold text-text-primary font-display mt-0.5">{value}</p>
       </div>
     </div>
   );
@@ -483,8 +489,8 @@ export default function SchoolDetailPage({ schools, onToggleStatus, onDeleteScho
           </div>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-black text-text-primary tracking-tight font-display">{school.name}</h1>
-              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${school.status === 'ACTIVE' ? 'bg-green-500/10 text-green-600' : 'bg-red-500/10 text-red-600'}`}>
+              <h1 className="text-3xl font-bold text-text-primary tracking-tight font-display">{school.name}</h1>
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase ${school.status === 'ACTIVE' ? 'bg-green-500/10 text-green-600' : 'bg-red-500/10 text-red-600'}`}>
                 {school.status}
               </span>
             </div>
@@ -520,31 +526,31 @@ export default function SchoolDetailPage({ schools, onToggleStatus, onDeleteScho
             </CardHeader>
             <CardContent className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div>
-                <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">School ID</p>
+                <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">School ID</p>
                 <p className="text-sm font-bold text-text-primary mt-1">SP-{String(school.id).padStart(4, '0')}</p>
               </div>
               <div>
-                <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Login URL</p>
+                <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Login URL</p>
                 <p className="text-sm font-bold text-text-primary mt-1">{window.location.host}</p>
               </div>
               <div>
-                <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">School Owner Email</p>
+                <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">School Owner Email</p>
                 <p className="text-sm font-bold text-text-primary mt-1">{school.contact_email || '—'}</p>
               </div>
               <div>
-                <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Admin Phone</p>
+                <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Admin Phone</p>
                 <p className="text-sm font-bold text-text-primary mt-1">{school.admin_phone || school.contact_phone || '—'}</p>
               </div>
               <div>
-                <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Contact Phone</p>
+                <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Contact Phone</p>
                 <p className="text-sm font-bold text-text-primary mt-1">{school.contact_phone || '—'}</p>
               </div>
               <div>
-                <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Plan</p>
+                <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Plan</p>
                 <p className="text-sm font-bold text-text-primary mt-1">{school.plan}</p>
               </div>
               <div>
-                <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Registered On</p>
+                <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Registered On</p>
                 <p className="text-sm font-bold text-text-primary mt-1">{school.created_at ? new Date(school.created_at).toLocaleDateString() : '—'}</p>
               </div>
             </CardContent>
@@ -558,7 +564,7 @@ export default function SchoolDetailPage({ schools, onToggleStatus, onDeleteScho
                   {school.name.substring(0, 1).toUpperCase()}
                 </div>
                 <div className="flex-1">
-                  <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Active Theme</p>
+                  <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Active Theme</p>
                   <p className="text-sm font-bold text-text-primary mt-0.5">{activeThemeLabel}</p>
                 </div>
                 <Button variant="outline" onClick={() => setShowThemeDialog(true)} className="flex items-center gap-1.5 text-xs">
@@ -582,8 +588,8 @@ export default function SchoolDetailPage({ schools, onToggleStatus, onDeleteScho
               <div className="bg-zinc-950 text-zinc-50 dark:bg-zinc-900 rounded-2xl p-6 shadow-md relative overflow-hidden">
                 <div className="absolute top-0 right-0 -mt-4 -mr-4 h-24 w-24 rounded-full bg-zinc-800/30 blur-xl" />
                 <div className="relative z-10">
-                  <p className="text-zinc-400 text-[10px] font-black uppercase tracking-wider mb-1">Current Plan</p>
-                  <h2 className="text-2xl font-black mb-6 font-display">{school.plan} Plan</h2>
+                  <p className="text-zinc-400 text-[11px] font-bold uppercase tracking-wider mb-1">Current Plan</p>
+                  <h2 className="text-2xl font-bold mb-6 font-display">{school.plan} Plan</h2>
                   <div className="space-y-3 mb-6 border-b border-zinc-800 pb-4">
                     <div className="flex justify-between text-xs font-semibold">
                       <span className="text-zinc-400">Monthly Cost</span>
@@ -603,7 +609,7 @@ export default function SchoolDetailPage({ schools, onToggleStatus, onDeleteScho
                       <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
                         <div className="h-full bg-zinc-100 rounded-full" style={{ width: `${usagePct.toFixed(1)}%` }} />
                       </div>
-                      <p className="text-[10px] text-zinc-500 mt-1">
+                      <p className="text-[11px] text-zinc-500 mt-1">
                         {schoolStats.students} / {studentLimit.toLocaleString()} students
                       </p>
                     </div>
@@ -638,11 +644,11 @@ export default function SchoolDetailPage({ schools, onToggleStatus, onDeleteScho
                 >
                   <div>
                     <p className="text-sm font-bold text-text-primary">{p.name}</p>
-                    <p className="text-[10px] text-text-muted">{p.student_limit ? `${Number(p.student_limit).toLocaleString()} students` : 'Unlimited students'}</p>
+                    <p className="text-[11px] text-text-muted">{p.student_limit ? `${Number(p.student_limit).toLocaleString()} students` : 'Unlimited students'}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-black text-text-primary">₹{Number(p.price).toLocaleString()}</p>
-                    <p className="text-[10px] text-text-muted">/month</p>
+                    <p className="text-sm font-bold text-text-primary">₹{Number(p.price).toLocaleString()}</p>
+                    <p className="text-[11px] text-text-muted">/month</p>
                   </div>
                 </div>
               ))}

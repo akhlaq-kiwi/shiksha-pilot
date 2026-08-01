@@ -17,7 +17,7 @@ export default function ResourcesPage({ materials }) {
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
       <div>
-        <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">Learning Resources</h2>
+        <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Learning Resources</h2>
         <p className="text-text-secondary text-sm mt-1">Notes, video lessons, and study materials from your teachers.</p>
       </div>
 
@@ -34,8 +34,8 @@ export default function ResourcesPage({ materials }) {
                 <div>
                   <p className="text-sm font-bold text-text-primary">{note.title}</p>
                   <div className="flex items-center gap-3 mt-0.5">
-                    <span className={`text-[10px] font-black px-2 py-0.5 rounded ${getSubjectColor(note.subject)}`}>{note.subject}</span>
-                    <span className="text-[10px] text-text-muted">{note.size} · {note.date}</span>
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded ${getSubjectColor(note.subject)}`}>{note.subject}</span>
+                    <span className="text-[11px] text-text-muted">{note.size} · {note.date}</span>
                   </div>
                 </div>
               </div>
@@ -58,10 +58,10 @@ export default function ResourcesPage({ materials }) {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold text-text-primary leading-tight">{vid.title}</p>
-                <p className={`text-[10px] font-black mt-1 ${getSubjectColor(vid.subject)} px-2 py-0.5 rounded w-fit`}>{vid.subject}</p>
+                <p className={`text-[11px] font-bold mt-1 ${getSubjectColor(vid.subject)} px-2 py-0.5 rounded w-fit`}>{vid.subject}</p>
                 <div className="flex items-center justify-between mt-2">
-                  <span className="text-[10px] text-text-muted">{vid.duration} · {vid.date}</span>
-                  <button className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1">
+                  <span className="text-[11px] text-text-muted">{vid.duration} · {vid.date}</span>
+                  <button className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1">
                     Watch <ChevronRight className="h-3 w-3" />
                   </button>
                 </div>
@@ -81,7 +81,7 @@ export default function ResourcesPage({ materials }) {
                 <Folder className="h-5 w-5 text-text-muted flex-shrink-0" />
                 <div>
                   <p className="text-sm font-bold text-text-primary">{mat.title}</p>
-                  <p className="text-[10px] text-text-muted">{mat.type} · {mat.size}</p>
+                  <p className="text-[11px] text-text-muted">{mat.type} · {mat.size}</p>
                 </div>
               </div>
               <button className="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-text-muted hover:text-text-primary">

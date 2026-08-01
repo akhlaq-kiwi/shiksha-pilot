@@ -209,7 +209,7 @@ export function SearchableSelect({ label, placeholder, value, onChange, options,
           )}
         </div>
       )}
-      {error && <p className="text-[10px] text-red-500 font-semibold">{error}</p>}
+      {error && <p className="text-[11px] text-red-500 font-semibold">{error}</p>}
     </div>
   );
 }

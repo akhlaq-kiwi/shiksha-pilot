@@ -41,7 +41,7 @@ export default function DashboardPage({ homework, upcomingExams, attendance, fee
     <div className="space-y-8 animate-in fade-in duration-300">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">
+          <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">
             {schoolName}
           </h2>
           <p className="text-text-secondary text-sm mt-1 font-bold">
@@ -61,7 +61,7 @@ export default function DashboardPage({ homework, upcomingExams, attendance, fee
             <div>
               <p className="text-sm font-bold text-text-primary">Fee payment due on {fees.dueDate}</p>
               <p className="text-xs text-text-secondary mt-0.5">
-                Outstanding balance: <span className="font-black text-amber-700 dark:text-amber-400 tabular-nums">₹{fees.outstanding.toLocaleString()}</span>
+                Outstanding balance: <span className="font-bold text-amber-700 dark:text-amber-400 tabular-nums">₹{fees.outstanding.toLocaleString()}</span>
               </p>
             </div>
           </div>
@@ -80,12 +80,12 @@ export default function DashboardPage({ homework, upcomingExams, attendance, fee
           <CardContent className="p-5">
             <div className="flex justify-between items-start mb-3">
               <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-600"><CalendarCheck className="h-4 w-4" /></div>
-              <span className="text-[10px] font-black text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+              <span className="text-[11px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full">
                 {attendance.percentage}%
               </span>
             </div>
-            <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Attendance</p>
-            <p className="text-2xl font-black text-text-primary mt-1 tabular-nums font-display">
+            <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Attendance</p>
+            <p className="text-2xl font-bold text-text-primary mt-1 tabular-nums font-display">
               {attendance.present}<span className="text-text-muted text-sm font-semibold">/{attendance.total}</span>
             </p>
             <div className="mt-3 h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
@@ -99,8 +99,8 @@ export default function DashboardPage({ homework, upcomingExams, attendance, fee
             <div className="flex justify-between items-start mb-3">
               <div className="p-2 bg-blue-500/10 rounded-lg text-blue-600"><BookOpen className="h-4 w-4" /></div>
             </div>
-            <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Upcoming Exams</p>
-            <p className="text-2xl font-black text-text-primary mt-1 font-display">{upcomingExams.length}</p>
+            <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Upcoming Exams</p>
+            <p className="text-2xl font-bold text-text-primary mt-1 font-display">{upcomingExams.length}</p>
             <p className="text-xs text-text-muted mt-2">Next: <span className="font-bold text-text-primary">{upcomingExams[0]?.subject}</span> on {upcomingExams[0]?.date}</p>
           </CardContent>
         </Card>
@@ -109,12 +109,12 @@ export default function DashboardPage({ homework, upcomingExams, attendance, fee
           <CardContent className="p-5">
             <div className="flex justify-between items-start mb-3">
               <div className="p-2 bg-orange-500/10 rounded-lg text-orange-600"><ClipboardList className="h-4 w-4" /></div>
-              <span className="text-[10px] font-black text-red-600 bg-red-500/10 px-2 py-0.5 rounded-full">
+              <span className="text-[11px] font-bold text-red-600 bg-red-500/10 px-2 py-0.5 rounded-full">
                 {homework.filter(h => h.status === 'overdue').length} overdue
               </span>
             </div>
-            <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Pending Tasks</p>
-            <p className="text-2xl font-black text-text-primary mt-1 font-display">
+            <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Pending Tasks</p>
+            <p className="text-2xl font-bold text-text-primary mt-1 font-display">
               {homework.filter(h => h.status === 'pending').length}
             </p>
             <p className="text-xs text-text-muted mt-2">assignments to submit</p>
@@ -125,10 +125,10 @@ export default function DashboardPage({ homework, upcomingExams, attendance, fee
           <CardContent className="p-5">
             <div className="flex justify-between items-start mb-3">
               <div className="p-2 bg-amber-500/10 rounded-lg text-amber-600"><CreditCard className="h-4 w-4" /></div>
-              <span className="text-[10px] font-black text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full">Due</span>
+              <span className="text-[11px] font-bold text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full">Due</span>
             </div>
-            <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Fee Balance</p>
-            <p className="text-2xl font-black text-text-primary mt-1 tabular-nums font-display">
+            <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Fee Balance</p>
+            <p className="text-2xl font-bold text-text-primary mt-1 tabular-nums font-display">
               ₹{fees.outstanding.toLocaleString()}
             </p>
             <p className="text-xs text-text-muted mt-2">due {fees.dueDate}</p>
@@ -154,15 +154,15 @@ export default function DashboardPage({ homework, upcomingExams, attendance, fee
               return (
                 <div key={hw.id} className="flex items-start justify-between p-4 bg-surface border border-border rounded-xl shadow-xs hover:shadow-sm transition-shadow">
                   <div className="flex items-start gap-3">
-                    <div className={`mt-0.5 text-[10px] font-black px-2 py-0.5 rounded ${getSubjectColor(hw.subject)}`}>
+                    <div className={`mt-0.5 text-[11px] font-bold px-2 py-0.5 rounded ${getSubjectColor(hw.subject)}`}>
                       {hw.subject.substring(0, 3).toUpperCase()}
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-text-primary leading-tight">{hw.title}</p>
-                      <p className="text-[10px] text-text-muted mt-0.5">Due {hw.dueDate} · {hw.teacher}</p>
+                      <p className="text-[11px] text-text-muted mt-0.5">Due {hw.dueDate} · {hw.teacher}</p>
                     </div>
                   </div>
-                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full whitespace-nowrap ml-2 ${cfg.cls}`}>
+                  <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ml-2 ${cfg.cls}`}>
                     {cfg.label}
                   </span>
                 </div>
@@ -185,13 +185,13 @@ export default function DashboardPage({ homework, upcomingExams, attendance, fee
             {upcomingExams.map(exam => (
               <div key={exam.id} className="flex items-center gap-4 p-4 bg-surface border border-border rounded-xl shadow-xs">
                 <div className="flex-shrink-0 text-center bg-blue-500/8 border border-blue-500/15 rounded-lg px-3 py-2 min-w-[58px]">
-                  <p className="text-[10px] font-bold text-blue-600 uppercase">{exam.date.split('-')[1] === '07' ? 'Jul' : 'Jun'}</p>
-                  <p className="text-lg font-black text-text-primary tabular-nums leading-none">{exam.date.split('-')[2]}</p>
+                  <p className="text-[11px] font-bold text-blue-600 uppercase">{exam.date.split('-')[1] === '07' ? 'Jul' : 'Jun'}</p>
+                  <p className="text-lg font-bold text-text-primary tabular-nums leading-none">{exam.date.split('-')[2]}</p>
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-text-primary">{exam.subject}</p>
-                  <p className="text-[10px] text-text-muted mt-0.5">{exam.time} · {exam.room}</p>
-                  <p className="text-[10px] text-text-secondary mt-0.5 italic">{exam.syllabus}</p>
+                  <p className="text-[11px] text-text-muted mt-0.5">{exam.time} · {exam.room}</p>
+                  <p className="text-[11px] text-text-secondary mt-0.5 italic">{exam.syllabus}</p>
                 </div>
               </div>
             ))}

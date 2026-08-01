@@ -14,7 +14,7 @@ const StatCard = ({ label, value, sub, icon: Icon, color }) => {
             </div>
           )}
           <div className="flex flex-col gap-0.5 min-w-0">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">
+            <span className="text-[11px] font-semibold uppercase tracking-widest text-text-muted">
               {label}
             </span>
             <span className="text-2xl font-bold text-text-primary font-display leading-tight tabular-nums">

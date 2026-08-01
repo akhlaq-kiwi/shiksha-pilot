@@ -26,7 +26,7 @@ const StudentAvatar = ({ src, name }) => {
     : 'S';
     
   return (
-    <div className="w-full h-full bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400 flex items-center justify-center text-lg font-black">
+    <div className="w-full h-full bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400 flex items-center justify-center text-lg font-bold">
       {initials}
     </div>
   );
@@ -123,7 +123,7 @@ export default function SchoolStudentsPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">Student Profile</h2>
+            <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Student Profile</h2>
             <p className="text-text-secondary text-sm mt-1">{s.name} · Complete details</p>
           </div>
         </div>
@@ -137,14 +137,14 @@ export default function SchoolStudentsPage() {
               <div className="w-24 h-24 rounded-full border-2 border-primary/20 bg-zinc-50 dark:bg-zinc-900/55 overflow-hidden shadow-sm relative flex items-center justify-center">
                 <StudentAvatar src={s.photo_path} name={s.name} />
               </div>
-              <h3 className="text-xl font-black text-text-primary tracking-tight font-display mt-4">{s.name}</h3>
-              <p className="text-xs text-text-muted mt-1.5 font-bold uppercase tracking-wider">Admission No: <span className="font-mono text-text-primary font-extrabold">{s.admission_no || '—'}</span></p>
+              <h3 className="text-xl font-bold text-text-primary tracking-tight font-display mt-4">{s.name}</h3>
+              <p className="text-xs text-text-muted mt-1.5 font-bold uppercase tracking-wider">Admission No: <span className="font-mono text-text-primary font-bold">{s.admission_no || '—'}</span></p>
 
               <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase border ${s.status === 'ACTIVE' ? 'bg-green-500/10 text-green-600 border-green-500/20' : 'bg-red-500/10 text-red-600 border-red-500/20'}`}>
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase border ${s.status === 'ACTIVE' ? 'bg-green-500/10 text-green-600 border-green-500/20' : 'bg-red-500/10 text-red-600 border-red-500/20'}`}>
                   {s.status}
                 </span>
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-zinc-100 text-text-secondary dark:bg-zinc-800 uppercase">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-zinc-100 text-text-secondary dark:bg-zinc-800 uppercase">
                   {s.class_name ? `${s.class_name}${s.section ? ` - ${s.section}` : ''}` : '—'}
                 </span>
               </div>
@@ -154,19 +154,19 @@ export default function SchoolStudentsPage() {
 
             <div className="space-y-4 text-xs font-semibold text-text-secondary">
               <div>
-                <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Roll Number</p>
+                <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Roll Number</p>
                 <p className="text-sm font-bold text-text-primary mt-0.5">{s.roll_no || '—'}</p>
               </div>
               <div>
-                <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">SR Number</p>
+                <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">SR Number</p>
                 <p className="text-sm font-bold text-text-primary mt-0.5">{s.sr_no || '—'}</p>
               </div>
               <div>
-                <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Category</p>
+                <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Category</p>
                 <p className="text-sm font-bold text-text-primary mt-0.5">{s.category || '—'}</p>
               </div>
               <div>
-                <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Academic Year</p>
+                <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Academic Year</p>
                 <p className="text-sm font-bold text-text-primary mt-0.5">{s.academic_year_name || '—'}</p>
               </div>
             </div>
@@ -177,22 +177,22 @@ export default function SchoolStudentsPage() {
             
             {/* Personal Details */}
             <Card className="p-6 bg-surface border border-border rounded-2xl shadow-xs">
-              <h3 className="text-sm font-extrabold text-text-primary uppercase tracking-wider mb-4 border-b border-border/60 pb-2">Personal Information</h3>
+              <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider mb-4 border-b border-border/60 pb-2">Personal Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-semibold text-text-secondary">
                 <div>
-                  <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Date of Birth</p>
+                  <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Date of Birth</p>
                   <p className="text-sm font-bold text-text-primary mt-0.5">{formatDate(s.dob)}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Gender</p>
+                  <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Gender</p>
                   <p className="text-sm font-bold text-text-primary mt-0.5 uppercase">{s.gender || '—'}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Blood Group</p>
+                  <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Blood Group</p>
                   <p className="text-sm font-bold text-text-primary mt-0.5">{s.blood_group || '—'}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Religion</p>
+                  <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Religion</p>
                   <p className="text-sm font-bold text-text-primary mt-0.5">{s.religion || '—'}</p>
                 </div>
               </div>
@@ -200,30 +200,30 @@ export default function SchoolStudentsPage() {
 
             {/* Parent details */}
             <Card className="p-6 bg-surface border border-border rounded-2xl shadow-xs">
-              <h3 className="text-sm font-extrabold text-text-primary uppercase tracking-wider mb-4 border-b border-border/60 pb-2">Parent / Guardian Information</h3>
+              <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider mb-4 border-b border-border/60 pb-2">Parent / Guardian Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-semibold text-text-secondary">
                 <div>
-                  <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Father's Name</p>
+                  <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Father's Name</p>
                   <p className="text-sm font-bold text-text-primary mt-0.5">{s.father_name || '—'}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Father's Phone</p>
+                  <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Father's Phone</p>
                   <p className="text-sm font-bold text-text-primary mt-0.5">{s.father_phone || '—'}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Mother's Name</p>
+                  <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Mother's Name</p>
                   <p className="text-sm font-bold text-text-primary mt-0.5">{s.mother_name || '—'}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Mother's Phone</p>
+                  <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Mother's Phone</p>
                   <p className="text-sm font-bold text-text-primary mt-0.5">{s.mother_phone || '—'}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Guardian Name</p>
+                  <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Guardian Name</p>
                   <p className="text-sm font-bold text-text-primary mt-0.5">{s.guardian_name || '—'}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Guardian Contact</p>
+                  <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Guardian Contact</p>
                   <p className="text-sm font-bold text-text-primary mt-0.5">{s.guardian_phone || '—'}</p>
                 </div>
               </div>
@@ -231,10 +231,10 @@ export default function SchoolStudentsPage() {
 
             {/* Address */}
             <Card className="p-6 bg-surface border border-border rounded-2xl shadow-xs">
-              <h3 className="text-sm font-extrabold text-text-primary uppercase tracking-wider mb-4 border-b border-border/60 pb-2">Address Details</h3>
+              <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider mb-4 border-b border-border/60 pb-2">Address Details</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
                 <div className="space-y-2">
-                  <h4 className="font-bold text-text-secondary uppercase text-[10px] tracking-wider">Current Address</h4>
+                  <h4 className="font-bold text-text-secondary uppercase text-[11px] tracking-wider">Current Address</h4>
                   <p className="text-sm text-text-primary leading-relaxed font-semibold">
                     {s.current_address_line || '—'}<br />
                     {s.current_city ? `${s.current_city}, ` : ''}{s.current_state || ''}<br />
@@ -242,7 +242,7 @@ export default function SchoolStudentsPage() {
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <h4 className="font-bold text-text-secondary uppercase text-[10px] tracking-wider">Permanent Address</h4>
+                  <h4 className="font-bold text-text-secondary uppercase text-[11px] tracking-wider">Permanent Address</h4>
                   {s.same_as_current === 1 ? (
                     <p className="text-xs text-text-muted italic">Same as Current Address</p>
                   ) : (
@@ -258,7 +258,7 @@ export default function SchoolStudentsPage() {
 
             {/* Documents */}
             <Card className="p-6 bg-surface border border-border rounded-2xl shadow-xs">
-              <h3 className="text-sm font-extrabold text-text-primary uppercase tracking-wider mb-4 border-b border-border/60 pb-2">Registered Documents</h3>
+              <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider mb-4 border-b border-border/60 pb-2">Registered Documents</h3>
               <div className="space-y-2">
                 {[
                   { name: 'Birth Certificate', path: s.birth_cert_path },
@@ -287,7 +287,7 @@ export default function SchoolStudentsPage() {
                           href={d.path} 
                           target="_blank" 
                           rel="noopener noreferrer"
-                          className="inline-flex items-center text-[10px] font-black text-primary hover:underline bg-primary/5 px-2.5 py-1 rounded"
+                          className="inline-flex items-center text-[11px] font-bold text-primary hover:underline bg-primary/5 px-2.5 py-1 rounded"
                         >
                           View Document
                         </a>
@@ -312,7 +312,7 @@ export default function SchoolStudentsPage() {
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
-              <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">{schoolName} — Roster</h2>
+              <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">{schoolName} — Roster</h2>
               <p className="text-text-secondary text-sm mt-1">{activeClass.name} · Student directory</p>
             </div>
           </div>
@@ -338,7 +338,7 @@ export default function SchoolStudentsPage() {
                   <StudentAvatar src={s.photo_path} name={s.name} />
                 </div>
                 <h3 className="font-bold text-text-primary text-base truncate w-full group-hover:text-primary transition-colors">{s.name}</h3>
-                <div className="text-[10px] text-text-muted font-bold tracking-tight uppercase mt-1.5 space-y-0.5">
+                <div className="text-[11px] text-text-muted font-bold tracking-tight uppercase mt-1.5 space-y-0.5">
                   <p>Roll No: {s.roll_no || '—'}</p>
                   {s.section && <p>Section: {s.section}</p>}
                 </div>
@@ -360,7 +360,7 @@ export default function SchoolStudentsPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">{schoolName} — Class Directory</h2>
+            <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">{schoolName} — Class Directory</h2>
             <p className="text-text-secondary text-sm mt-1">Select an academic year and browse student counts by class.</p>
           </div>
         </div>
@@ -418,10 +418,10 @@ export default function SchoolStudentsPage() {
               className="bg-surface border border-border rounded-2xl p-6 transition-all shadow-sm hover:shadow-md flex flex-col justify-between h-36 cursor-pointer select-none border-border/80 hover:border-primary/45 group"
             >
               <div>
-                <h3 className="font-extrabold text-text-primary text-lg group-hover:text-primary transition-colors leading-tight">
+                <h3 className="font-bold text-text-primary text-lg group-hover:text-primary transition-colors leading-tight">
                   {cls.name}
                 </h3>
-                <p className="text-[10px] text-text-muted font-bold tracking-tight uppercase mt-1">
+                <p className="text-[11px] text-text-muted font-bold tracking-tight uppercase mt-1">
                   Year: {cls.academic_year_name}
                 </p>
               </div>

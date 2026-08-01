@@ -1088,7 +1088,7 @@ export default function FinanceManagementPage() {
               <Landmark className="h-6 w-6" />
             </div>
             <div>
-              <h2 className="text-2xl font-black text-text-primary tracking-tight font-display">Finance Management</h2>
+              <h2 className="text-2xl font-bold text-text-primary tracking-tight font-display">Finance Management</h2>
               <p className="text-text-secondary text-xs mt-1">Record daily school operational expenses and manage student non-tuition fees ledger payouts.</p>
             </div>
           </div>
@@ -1098,7 +1098,7 @@ export default function FinanceManagementPage() {
         <div className="flex border-b border-border mt-6">
           <button 
             onClick={() => { setActiveTab('expenses'); setError(''); setSuccess(''); }}
-            className={`pb-3 text-xs font-extrabold uppercase tracking-wider border-b-2 px-4 transition-all ${
+            className={`pb-3 text-xs font-bold uppercase tracking-wider border-b-2 px-4 transition-all ${
               activeTab === 'expenses' 
                 ? 'border-primary text-primary' 
                 : 'border-transparent text-text-muted hover:text-text-primary'
@@ -1108,7 +1108,7 @@ export default function FinanceManagementPage() {
           </button>
           <button 
             onClick={() => { setActiveTab('additional-fee'); setError(''); setSuccess(''); }}
-            className={`pb-3 text-xs font-extrabold uppercase tracking-wider border-b-2 px-4 transition-all ${
+            className={`pb-3 text-xs font-bold uppercase tracking-wider border-b-2 px-4 transition-all ${
               activeTab === 'additional-fee' 
                 ? 'border-primary text-primary' 
                 : 'border-transparent text-text-muted hover:text-text-primary'
@@ -1118,7 +1118,7 @@ export default function FinanceManagementPage() {
           </button>
           <button 
             onClick={() => { setActiveTab('late-payment-penalty'); setError(''); setSuccess(''); }}
-            className={`pb-3 text-xs font-extrabold uppercase tracking-wider border-b-2 px-4 transition-all ${
+            className={`pb-3 text-xs font-bold uppercase tracking-wider border-b-2 px-4 transition-all ${
               activeTab === 'late-payment-penalty' 
                 ? 'border-primary text-primary' 
                 : 'border-transparent text-text-muted hover:text-text-primary'
@@ -1155,8 +1155,8 @@ export default function FinanceManagementPage() {
           <div className="flex-shrink-0 bg-surface border border-border p-5 rounded-2xl shadow-2xs space-y-4">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border pb-4">
               <div>
-                <span className="text-[10px] text-text-muted font-black uppercase tracking-wider">Total Expenses for Selected Month</span>
-                <p className="text-xl font-black text-red-500 font-sans mt-0.5">{formatCurrency(filteredTotalExpensesAmount)}</p>
+                <span className="text-[11px] text-text-muted font-bold uppercase tracking-wider">Total Expenses for Selected Month</span>
+                <p className="text-xl font-bold text-red-500 font-sans mt-0.5">{formatCurrency(filteredTotalExpensesAmount)}</p>
               </div>
             </div>
 
@@ -1209,10 +1209,10 @@ export default function FinanceManagementPage() {
                 <Table>
                   <TableHeader className="sticky top-0 bg-surface z-10 border-b border-border shadow-3xs">
                     <TableRow>
-                      <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Description</TableHead>
-                      <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Expense Date</TableHead>
-                      <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Amount</TableHead>
-                      <TableHead className="text-right text-xs uppercase font-extrabold text-text-secondary bg-surface w-16">Actions</TableHead>
+                      <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Description</TableHead>
+                      <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Expense Date</TableHead>
+                      <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Amount</TableHead>
+                      <TableHead className="text-right text-xs uppercase font-bold text-text-secondary bg-surface w-16">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1220,7 +1220,7 @@ export default function FinanceManagementPage() {
                       <TableRow key={e.id}>
                         <TableCell className="text-xs font-semibold text-text-primary py-3.5 max-w-[300px] truncate">{e.description}</TableCell>
                         <TableCell className="text-xs font-mono font-bold text-text-secondary py-3.5 whitespace-nowrap">{formatDateFull(e.expense_date)}</TableCell>
-                        <TableCell className="text-xs font-extrabold font-sans text-red-500 py-3.5">{formatCurrency(e.amount)}</TableCell>
+                        <TableCell className="text-xs font-bold font-sans text-red-500 py-3.5">{formatCurrency(e.amount)}</TableCell>
                         <TableCell className="text-right py-3.5 relative">
                           <button 
                             onClick={(ev) => {
@@ -1255,7 +1255,7 @@ export default function FinanceManagementPage() {
                             >
                               {isReadOnly || e.is_locked ? (
                                 <div className="px-3 py-1.5 text-text-muted font-bold italic flex flex-col">
-                                  <span className="text-[9px] uppercase tracking-wider text-amber-600 flex items-center gap-0.5"><AlertTriangle className="h-3 w-3" /> Locked</span>
+                                  <span className="text-[11px] uppercase tracking-wider text-amber-600 flex items-center gap-0.5"><AlertTriangle className="h-3 w-3" /> Locked</span>
                                   {isReadOnly && <span className="text-[8px] text-text-muted mt-0.5">Archived Year</span>}
                                 </div>
                               ) : (
@@ -1286,7 +1286,7 @@ export default function FinanceManagementPage() {
                 {isFetchingMoreExpenses && (
                   <div className="py-4 flex flex-col items-center justify-center gap-2 border-t border-border bg-zinc-50/50 dark:bg-zinc-900/10">
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                    <span className="text-[10px] font-black text-text-muted uppercase tracking-wider">Loading more expenses...</span>
+                    <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Loading more expenses...</span>
                   </div>
                 )}
               </>
@@ -1345,17 +1345,17 @@ export default function FinanceManagementPage() {
                 <Table>
                   <TableHeader className="sticky top-0 bg-surface z-10 border-b border-border shadow-3xs">
                     <TableRow>
-                      <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Fee Description</TableHead>
-                      <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Class</TableHead>
-                      <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Due Date</TableHead>
-                      <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Amount</TableHead>
-                      <TableHead className="text-right text-xs uppercase font-extrabold text-text-secondary bg-surface w-24">Action</TableHead>
+                      <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Fee Description</TableHead>
+                      <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Class</TableHead>
+                      <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Due Date</TableHead>
+                      <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Amount</TableHead>
+                      <TableHead className="text-right text-xs uppercase font-bold text-text-secondary bg-surface w-24">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {paginatedFees.map((ft) => (
                       <TableRow key={ft.id}>
-                        <TableCell className="font-extrabold text-text-primary text-xs uppercase tracking-wider py-3.5 max-w-[200px] truncate">{ft.name}</TableCell>
+                        <TableCell className="font-bold text-text-primary text-xs uppercase tracking-wider py-3.5 max-w-[200px] truncate">{ft.name}</TableCell>
                         <TableCell className="text-xs text-text-secondary font-bold py-3.5 uppercase truncate max-w-[150px]">{ft.assigned_to}</TableCell>
                         <TableCell className="text-xs text-text-muted font-mono whitespace-nowrap py-3.5">{formatDateFull(ft.due_date)}</TableCell>
                         <TableCell className="text-xs text-text-primary font-bold font-sans py-3.5">{formatCurrency(ft.amount)}</TableCell>
@@ -1418,7 +1418,7 @@ export default function FinanceManagementPage() {
 
                               {isReadOnly && (
                                 <div className="px-3 py-1.5 text-text-muted font-bold italic border-t border-border flex flex-col">
-                                  <span className="text-[9px] uppercase tracking-wider text-amber-600 flex items-center gap-0.5"><AlertTriangle className="h-3 w-3" /> Read Only</span>
+                                  <span className="text-[11px] uppercase tracking-wider text-amber-600 flex items-center gap-0.5"><AlertTriangle className="h-3 w-3" /> Read Only</span>
                                   <span className="text-[8px] text-text-muted mt-0.5">Archived Year</span>
                                 </div>
                               )}
@@ -1434,7 +1434,7 @@ export default function FinanceManagementPage() {
                 {isFetchingMoreFees && (
                   <div className="py-4 flex flex-col items-center justify-center gap-2 border-t border-border bg-zinc-50/50 dark:bg-zinc-900/10">
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                    <span className="text-[10px] font-black text-text-muted uppercase tracking-wider">Loading more fees...</span>
+                    <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Loading more fees...</span>
                   </div>
                 )}
               </>
@@ -1494,14 +1494,14 @@ export default function FinanceManagementPage() {
               <Table>
                 <TableHeader className="sticky top-0 bg-surface z-10 border-b border-border shadow-3xs">
                   <TableRow>
-                    <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Student Name</TableHead>
-                    <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">SR No</TableHead>
-                    <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Class</TableHead>
-                    <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Monthly Fee</TableHead>
-                    <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Start Date</TableHead>
-                    <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Status</TableHead>
-                    <TableHead className="text-xs uppercase font-extrabold text-text-secondary bg-surface">Next Charge Amount</TableHead>
-                    <TableHead className="text-right text-xs uppercase font-extrabold text-text-secondary bg-surface w-24">Action</TableHead>
+                    <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Student Name</TableHead>
+                    <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">SR No</TableHead>
+                    <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Class</TableHead>
+                    <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Monthly Fee</TableHead>
+                    <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Start Date</TableHead>
+                    <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Status</TableHead>
+                    <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Next Charge Amount</TableHead>
+                    <TableHead className="text-right text-xs uppercase font-bold text-text-secondary bg-surface w-24">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1515,7 +1515,7 @@ export default function FinanceManagementPage() {
                       <TableCell className="text-xs font-semibold font-sans text-text-primary">{formatCurrency(tf.monthly_fee)}</TableCell>
                       <TableCell className="text-xs text-text-secondary">{formatDateFull(tf.start_date)}</TableCell>
                       <TableCell className="text-xs">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${
                           tf.status === 'Active' 
                             ? 'bg-green-500/10 text-green-600' 
                             : 'bg-zinc-500/10 text-zinc-500'
@@ -1523,7 +1523,7 @@ export default function FinanceManagementPage() {
                           {tf.status}
                         </span>
                       </TableCell>
-                      <TableCell className="text-xs font-extrabold font-sans text-primary">
+                      <TableCell className="text-xs font-bold font-sans text-primary">
                         {tf.status === 'Active' ? formatCurrency(tf.next_charge) : '—'}
                       </TableCell>
                       <TableCell className="text-right">
@@ -1552,36 +1552,36 @@ export default function FinanceManagementPage() {
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <Card className="bg-surface border border-border shadow-3xs p-4">
                   <div className="flex justify-between items-center">
-                    <span className="text-[10px] text-text-secondary uppercase font-bold">Academic Session</span>
+                    <span className="text-[11px] text-text-secondary uppercase font-bold">Academic Session</span>
                     <Calendar className="h-4 w-4 text-primary" />
                   </div>
-                  <div className="text-base font-black text-text-primary mt-2">{lppStats.current_academic_session}</div>
+                  <div className="text-base font-bold text-text-primary mt-2">{lppStats.current_academic_session}</div>
                 </Card>
                 <Card className="bg-surface border border-border shadow-3xs p-4">
                   <div className="flex justify-between items-center">
-                    <span className="text-[10px] text-text-secondary uppercase font-bold">Total Students</span>
+                    <span className="text-[11px] text-text-secondary uppercase font-bold">Total Students</span>
                     <User className="h-4 w-4 text-indigo-500" />
                   </div>
-                  <div className="text-base font-black text-text-primary mt-2">{lppStats.total_students}</div>
+                  <div className="text-base font-bold text-text-primary mt-2">{lppStats.total_students}</div>
                 </Card>
                 <Card className="bg-surface border border-border shadow-3xs p-4">
                   <div className="flex justify-between items-center">
-                    <span className="text-[10px] text-text-secondary uppercase font-bold">Students with Due</span>
+                    <span className="text-[11px] text-text-secondary uppercase font-bold">Students with Due</span>
                     <AlertTriangle className="h-4 w-4 text-amber-500" />
                   </div>
-                  <div className="text-base font-black text-amber-600 mt-2">{lppStats.students_having_due}</div>
+                  <div className="text-base font-bold text-amber-600 mt-2">{lppStats.students_having_due}</div>
                 </Card>
                 <Card className="bg-surface border border-border shadow-3xs p-4">
                   <div className="flex justify-between items-center">
-                    <span className="text-[10px] text-text-secondary uppercase font-bold">Total Outstanding</span>
+                    <span className="text-[11px] text-text-secondary uppercase font-bold">Total Outstanding</span>
                     <Landmark className="h-4 w-4 text-emerald-500" />
                   </div>
-                  <div className="text-base font-black text-emerald-600 mt-2">{formatCurrency(lppStats.total_outstanding_due)}</div>
+                  <div className="text-base font-bold text-emerald-600 mt-2">{formatCurrency(lppStats.total_outstanding_due)}</div>
                 </Card>
               </div>
 
               {lppStats.last_applied_date && (
-                <div className="text-[10px] text-text-secondary bg-surface border p-3 rounded-xl flex items-center gap-1.5 shadow-3xs">
+                <div className="text-[11px] text-text-secondary bg-surface border p-3 rounded-xl flex items-center gap-1.5 shadow-3xs">
                   <CheckCircle className="h-3.5 w-3.5 text-green-500" />
                   <span>Late Payment Penalty was last successfully applied for this session on <strong>{formatDateFull(lppStats.last_applied_date)}</strong> by <strong>{lppStats.last_applied_by}</strong>.</span>
                 </div>
@@ -1589,7 +1589,7 @@ export default function FinanceManagementPage() {
 
               {/* Configuration Settings Input Form */}
               <Card className="bg-surface border border-border p-5 rounded-2xl shadow-2xs space-y-4">
-                <h3 className="text-sm font-black text-text-primary uppercase tracking-tight">Late Payment Penalty For AY ({lppStats.current_academic_session})</h3>
+                <h3 className="text-sm font-bold text-text-primary uppercase tracking-tight">Late Payment Penalty For AY ({lppStats.current_academic_session})</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-text-secondary uppercase flex items-center gap-1">
@@ -1636,7 +1636,7 @@ export default function FinanceManagementPage() {
               <div className="p-4 bg-amber-500/10 border border-amber-500/20 text-amber-600 rounded-2xl text-xs flex gap-3">
                 <AlertTriangle className="h-5 w-5 flex-shrink-0 text-amber-500" />
                 <div className="space-y-1">
-                  <p className="font-extrabold uppercase tracking-wider">Late Payment Penalty Information</p>
+                  <p className="font-bold uppercase tracking-wider">Late Payment Penalty Information</p>
                   <p className="leading-relaxed">If you configure a Late Payment Penalty, it will be added automatically after the Academic Year Migration is completed. Only students who have pending dues will receive the penalty. Students who have no pending dues will not be affected. You can change or remove this configuration anytime before migration.</p>
                 </div>
               </div>
@@ -1644,7 +1644,7 @@ export default function FinanceManagementPage() {
               {/* Student Document Restriction Configuration Form */}
               <Card className="bg-surface border border-border p-5 rounded-2xl shadow-2xs space-y-4">
                 <div className="space-y-1">
-                  <h3 className="text-sm font-black text-text-primary uppercase tracking-tight">Student Document Restriction</h3>
+                  <h3 className="text-sm font-bold text-text-primary uppercase tracking-tight">Student Document Restriction</h3>
                   <p className="text-xs text-text-secondary font-medium">Control access to student documents based on outstanding fee amount.</p>
                 </div>
 
@@ -1654,7 +1654,7 @@ export default function FinanceManagementPage() {
                       <label className="text-xs font-bold text-text-primary uppercase cursor-pointer" htmlFor="enable-due-restriction-toggle">
                         Enable Due Amount Restriction
                       </label>
-                      <p className="text-[10px] text-text-secondary leading-relaxed">Toggle to block access to selected student documents when dues exceed the allowed limit.</p>
+                      <p className="text-[11px] text-text-secondary leading-relaxed">Toggle to block access to selected student documents when dues exceed the allowed limit.</p>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input 
@@ -1682,7 +1682,7 @@ export default function FinanceManagementPage() {
                           className="text-xs font-semibold"
                           required
                         />
-                        <p className="text-[10px] text-text-muted">Students whose outstanding dues are greater than this amount will not be able to access the selected documents.</p>
+                        <p className="text-[11px] text-text-muted">Students whose outstanding dues are greater than this amount will not be able to access the selected documents.</p>
                       </div>
 
                       <div className="space-y-2">
@@ -1715,7 +1715,7 @@ export default function FinanceManagementPage() {
                   <div className="p-4 bg-amber-500/10 border border-amber-500/20 text-amber-600 rounded-2xl text-xs flex gap-3 max-w-2xl">
                     <Info className="h-5 w-5 flex-shrink-0 text-amber-500 mt-0.5" />
                     <div className="space-y-1">
-                      <p className="font-extrabold uppercase tracking-wider">How this works</p>
+                      <p className="font-bold uppercase tracking-wider">How this works</p>
                       <p className="leading-relaxed">If a student's outstanding fee is greater than the amount you enter above, they will not be able to view their Admit Card or Exam Result in the mobile application.</p>
                       <p className="leading-relaxed font-semibold">Once the pending amount is paid and comes within the allowed limit, access will be restored automatically.</p>
                       <p className="leading-relaxed text-amber-500 font-medium">This restriction does not apply to the Scheme section.</p>
@@ -1817,7 +1817,7 @@ export default function FinanceManagementPage() {
       >
         <div className="text-xs text-text-secondary leading-relaxed py-2">
           Delete this expense? <br/>
-          <strong className="text-red-500 font-extrabold">This action cannot be undone.</strong>
+          <strong className="text-red-500 font-bold">This action cannot be undone.</strong>
         </div>
       </Dialog>
 
@@ -1834,7 +1834,7 @@ export default function FinanceManagementPage() {
       >
         <div className="text-xs text-text-secondary leading-relaxed py-2">
           Delete this additional fee definition and all assigned student pending payments? <br/>
-          <strong className="text-red-500 font-extrabold">This action cannot be undone.</strong>
+          <strong className="text-red-500 font-bold">This action cannot be undone.</strong>
         </div>
       </Dialog>
 
@@ -1855,7 +1855,7 @@ export default function FinanceManagementPage() {
           {/* Apply Fee To Selection (Hide when editing) */}
           {!editingFeeType && (
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-text-secondary uppercase tracking-wider">Apply Fee To</label>
+              <label className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Apply Fee To</label>
               <div className="flex items-center gap-6 mt-1">
                 <label className="flex items-center gap-2 font-bold cursor-pointer">
                   <input 
@@ -1885,7 +1885,7 @@ export default function FinanceManagementPage() {
 
           {/* Description */}
           <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-text-secondary uppercase tracking-wider">Fee Description *</label>
+            <label className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Fee Description *</label>
             <Input 
               placeholder="e.g. Annual Sports Fee" 
               value={feeDescription} 
@@ -1893,14 +1893,14 @@ export default function FinanceManagementPage() {
               className="text-xs"
             />
             {feeFormErrors.description && (
-              <p className="text-[10px] text-red-500 font-bold mt-1">{feeFormErrors.description}</p>
+              <p className="text-[11px] text-red-500 font-bold mt-1">{feeFormErrors.description}</p>
             )}
           </div>
 
           {/* Case 1: Entire School Amount */}
           {applyType === 'school' && (
             <div className="space-y-1.5 animate-in slide-in-from-top-1 duration-200">
-              <label className="text-[10px] font-black text-text-secondary uppercase tracking-wider">Amount (₹) *</label>
+              <label className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Amount (₹) *</label>
               <Input 
                 type="number" 
                 placeholder="e.g. 500" 
@@ -1910,10 +1910,10 @@ export default function FinanceManagementPage() {
                 className="text-xs"
               />
               {feeFormErrors.amount && (
-                <p className="text-[10px] text-red-500 font-bold mt-1">{feeFormErrors.amount}</p>
+                <p className="text-[11px] text-red-500 font-bold mt-1">{feeFormErrors.amount}</p>
               )}
               {editingFeeType && editingFeeType.collected_students > 0 && (
-                <p className="text-[9px] text-amber-600 mt-1 font-semibold leading-none">
+                <p className="text-[11px] text-amber-600 mt-1 font-semibold leading-none">
                   Amount cannot be changed as some students have already paid.
                 </p>
               )}
@@ -1923,13 +1923,13 @@ export default function FinanceManagementPage() {
           {/* Case 2: Selected Classes Table amount mapping (Hide when editing) */}
           {!editingFeeType && applyType === 'classes' && (
             <div className="space-y-2 animate-in slide-in-from-top-1 duration-200">
-              <label className="text-[10px] font-black text-text-secondary uppercase tracking-wider">Class Dues Allocation</label>
+              <label className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Class Dues Allocation</label>
               <div className="border border-border rounded-xl overflow-hidden max-h-[220px] overflow-y-auto bg-zinc-50/50 dark:bg-zinc-900/50">
                 <Table>
                   <TableHeader className="sticky top-0 bg-zinc-50 dark:bg-zinc-900 z-10">
                     <TableRow>
-                      <TableHead className="text-[10px] uppercase font-black py-2 bg-zinc-50 dark:bg-zinc-900">Class</TableHead>
-                      <TableHead className="text-[10px] uppercase font-black py-2 bg-zinc-50 dark:bg-zinc-900 w-32">Amount (₹)</TableHead>
+                      <TableHead className="text-[11px] uppercase font-bold py-2 bg-zinc-50 dark:bg-zinc-900">Class</TableHead>
+                      <TableHead className="text-[11px] uppercase font-bold py-2 bg-zinc-50 dark:bg-zinc-900 w-32">Amount (₹)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1951,7 +1951,7 @@ export default function FinanceManagementPage() {
                 </Table>
               </div>
               {feeFormErrors.classAmounts && (
-                <p className="text-[10px] text-red-500 font-bold mt-1">{feeFormErrors.classAmounts}</p>
+                <p className="text-[11px] text-red-500 font-bold mt-1">{feeFormErrors.classAmounts}</p>
               )}
             </div>
           )}
@@ -1965,7 +1965,7 @@ export default function FinanceManagementPage() {
 
           {/* Due Date (Manual Input Disabled) */}
           <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-text-secondary uppercase tracking-wider">Due Date *</label>
+            <label className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Due Date *</label>
             <Input 
               type="date" 
               value={feeDueDate} 
@@ -1974,9 +1974,9 @@ export default function FinanceManagementPage() {
               className="text-xs"
             />
             {feeFormErrors.dueDate && (
-              <p className="text-[10px] text-red-500 font-bold mt-1">{feeFormErrors.dueDate}</p>
+              <p className="text-[11px] text-red-500 font-bold mt-1">{feeFormErrors.dueDate}</p>
             )}
-            <p className="text-[9px] text-text-muted mt-1 font-semibold leading-relaxed">
+            <p className="text-[11px] text-text-muted mt-1 font-semibold leading-relaxed">
               The selected Due Date determines when this fee becomes payable. Students will not see this fee as due until the selected date is reached.
             </p>
           </div>
@@ -1996,22 +1996,22 @@ export default function FinanceManagementPage() {
           <div className="space-y-4 text-xs leading-relaxed">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <div>
-                <span className="text-[10px] text-text-muted font-black uppercase tracking-wider">Fee Description</span>
-                <p className="text-sm font-black text-text-primary mt-0.5 uppercase">{viewingFeeType.name}</p>
+                <span className="text-[11px] text-text-muted font-bold uppercase tracking-wider">Fee Description</span>
+                <p className="text-sm font-bold text-text-primary mt-0.5 uppercase">{viewingFeeType.name}</p>
               </div>
-              <span className="inline-flex px-3 py-1 bg-zinc-100 text-zinc-950 dark:bg-zinc-800 dark:text-zinc-50 border border-border font-black text-[10px] uppercase rounded-full tracking-wider">
+              <span className="inline-flex px-3 py-1 bg-zinc-100 text-zinc-950 dark:bg-zinc-800 dark:text-zinc-50 border border-border font-bold text-[11px] uppercase rounded-full tracking-wider">
                 {viewingFeeType.assigned_to}
               </span>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-[10px] text-text-muted font-black uppercase tracking-wider">Due Date</p>
+                <p className="text-[11px] text-text-muted font-bold uppercase tracking-wider">Due Date</p>
                 <p className="font-bold mt-0.5 text-text-primary">{formatDateFull(viewingFeeType.due_date)}</p>
               </div>
               {(!viewingFeeType.class_amounts || viewingFeeType.class_amounts.length <= 1) && (
                 <div>
-                  <p className="text-[10px] text-text-muted font-black uppercase tracking-wider">Fee Amount</p>
+                  <p className="text-[11px] text-text-muted font-bold uppercase tracking-wider">Fee Amount</p>
                   <p className="font-bold mt-0.5 text-primary font-sans">{formatCurrency(viewingFeeType.amount)}</p>
                 </div>
               )}
@@ -2019,7 +2019,7 @@ export default function FinanceManagementPage() {
 
             {viewingFeeType.class_amounts && viewingFeeType.class_amounts.length > 0 && (
               <div className="border-t border-border pt-4 space-y-2">
-                <p className="text-[10px] text-text-muted font-black uppercase tracking-wider">Class-Wise Fee Configuration</p>
+                <p className="text-[11px] text-text-muted font-bold uppercase tracking-wider">Class-Wise Fee Configuration</p>
                 <div className="space-y-1.5 bg-zinc-50 dark:bg-zinc-900/50 p-3.5 rounded-xl border border-border">
                   {(() => {
                     const groups = {};
@@ -2033,7 +2033,7 @@ export default function FinanceManagementPage() {
                     return Object.entries(groups).map(([amt, classes], idx) => (
                       <div key={idx} className="flex justify-between items-center py-1 border-b border-border/40 last:border-0 text-text-primary">
                         <span className="font-bold pr-4 truncate">{classes.join(', ')}</span>
-                        <span className="font-black text-primary font-sans shrink-0">{formatCurrency(parseFloat(amt))}</span>
+                        <span className="font-bold text-primary font-sans shrink-0">{formatCurrency(parseFloat(amt))}</span>
                       </div>
                     ));
                   })()}
@@ -2042,19 +2042,19 @@ export default function FinanceManagementPage() {
             )}
 
             <div className="border-t border-border pt-4 space-y-3">
-              <h4 className="text-[10px] text-text-muted font-black uppercase tracking-wider">Fee Collection Summary</h4>
+              <h4 className="text-[11px] text-text-muted font-bold uppercase tracking-wider">Fee Collection Summary</h4>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-xl border border-border">
                 <div>
-                  <p className="text-[9px] text-text-muted font-bold uppercase tracking-wider">Total Amount</p>
-                  <p className="text-sm font-black text-text-primary mt-0.5 font-sans">{formatCurrency(viewingFeeType.total_amount)}</p>
+                  <p className="text-[11px] text-text-muted font-bold uppercase tracking-wider">Total Amount</p>
+                  <p className="text-sm font-bold text-text-primary mt-0.5 font-sans">{formatCurrency(viewingFeeType.total_amount)}</p>
                 </div>
                 <div>
-                  <p className="text-[9px] text-text-muted font-bold uppercase tracking-wider">Collected Amount</p>
-                  <p className="text-sm font-black text-green-600 mt-0.5 font-sans">{formatCurrency(viewingFeeType.collected_amount)}</p>
+                  <p className="text-[11px] text-text-muted font-bold uppercase tracking-wider">Collected Amount</p>
+                  <p className="text-sm font-bold text-green-600 mt-0.5 font-sans">{formatCurrency(viewingFeeType.collected_amount)}</p>
                 </div>
                 <div>
-                  <p className="text-[9px] text-text-muted font-bold uppercase tracking-wider">Pending Amount</p>
-                  <p className="text-sm font-black text-red-500 mt-0.5 font-sans">{formatCurrency(viewingFeeType.pending_amount)}</p>
+                  <p className="text-[11px] text-text-muted font-bold uppercase tracking-wider">Pending Amount</p>
+                  <p className="text-sm font-bold text-red-500 mt-0.5 font-sans">{formatCurrency(viewingFeeType.pending_amount)}</p>
                 </div>
               </div>
             </div>
@@ -2074,7 +2074,7 @@ export default function FinanceManagementPage() {
             
             {/* Student Search Picker */}
             <div className="space-y-1.5 relative" ref={studentSearchRef}>
-              <label className="text-[10px] text-text-secondary font-bold uppercase font-black tracking-wider">Student *</label>
+              <label className="text-[11px] text-text-secondary font-bold uppercase font-bold tracking-wider">Student *</label>
               {!selectedStudent ? (
                 <>
                   <div className="relative">
@@ -2113,7 +2113,7 @@ export default function FinanceManagementPage() {
                           >
                             <div>
                               <div className="font-bold text-text-primary text-xs">{s.name}</div>
-                              <div className="text-[10px] text-text-muted mt-0.5">Class: {s.class_name} | Roll No: {s.roll_no || '—'} | SR No: {s.sr_no || '—'}</div>
+                              <div className="text-[11px] text-text-muted mt-0.5">Class: {s.class_name} | Roll No: {s.roll_no || '—'} | SR No: {s.sr_no || '—'}</div>
                             </div>
                             <ChevronDown className="h-3 w-3 text-text-muted -rotate-90" />
                           </div>
@@ -2128,7 +2128,7 @@ export default function FinanceManagementPage() {
                     <button 
                       type="button" 
                       onClick={() => { setSelectedStudent(null); setStudentSearchVal(''); }}
-                      className="text-text-muted hover:text-red-500 font-extrabold text-xs"
+                      className="text-text-muted hover:text-red-500 font-bold text-xs"
                     >
                       Clear
                     </button>
@@ -2136,13 +2136,13 @@ export default function FinanceManagementPage() {
                 </div>
               )}
               {transportFormErrors.student && (
-                <p className="text-[10px] text-red-500 font-bold mt-1">{transportFormErrors.student}</p>
+                <p className="text-[11px] text-red-500 font-bold mt-1">{transportFormErrors.student}</p>
               )}
             </div>
 
             {/* Monthly Transport Fee amount */}
             <div className="space-y-1.5">
-              <label className="text-[10px] text-text-secondary font-bold uppercase font-black tracking-wider">Monthly Transport Fee (₹) *</label>
+              <label className="text-[11px] text-text-secondary font-bold uppercase font-bold tracking-wider">Monthly Transport Fee (₹) *</label>
               <Input
                 type="number"
                 placeholder="e.g. 1000"
@@ -2151,13 +2151,13 @@ export default function FinanceManagementPage() {
                 className="text-xs"
               />
               {transportFormErrors.monthly_fee && (
-                <p className="text-[10px] text-red-500 font-bold mt-1">{transportFormErrors.monthly_fee}</p>
+                <p className="text-[11px] text-red-500 font-bold mt-1">{transportFormErrors.monthly_fee}</p>
               )}
             </div>
 
             {/* Transport Start Date */}
             <div className="space-y-1.5">
-              <label className="text-[10px] text-text-secondary font-bold uppercase font-black tracking-wider">Transport Start Date *</label>
+              <label className="text-[11px] text-text-secondary font-bold uppercase font-bold tracking-wider">Transport Start Date *</label>
               <Input
                 type="date"
                 value={transportStartDate}
@@ -2165,13 +2165,13 @@ export default function FinanceManagementPage() {
                 className="text-xs"
               />
               {transportFormErrors.start_date && (
-                <p className="text-[10px] text-red-500 font-bold mt-1">{transportFormErrors.start_date}</p>
+                <p className="text-[11px] text-red-500 font-bold mt-1">{transportFormErrors.start_date}</p>
               )}
             </div>
 
             {/* Status selection */}
             <div className="space-y-1.5">
-              <label className="text-[10px] text-text-secondary font-bold uppercase font-black tracking-wider">Status *</label>
+              <label className="text-[11px] text-text-secondary font-bold uppercase font-bold tracking-wider">Status *</label>
               <Select
                 value={transportStatus}
                 onChange={e => setTransportStatus(e.target.value)}
@@ -2207,8 +2207,8 @@ export default function FinanceManagementPage() {
         >
           <div className="text-xs text-text-secondary leading-relaxed py-2">
             Are you sure you want to delete this transport fee assignment? <br/>
-            <strong className="text-red-500 font-extrabold">This action cannot be undone.</strong>
-            <p className="text-[10px] text-text-muted mt-2">
+            <strong className="text-red-500 font-bold">This action cannot be undone.</strong>
+            <p className="text-[11px] text-text-muted mt-2">
               Note: Deletion will fail if a billing invoice has already been generated.
             </p>
           </div>
@@ -2252,14 +2252,14 @@ export default function FinanceManagementPage() {
             <div className="flex flex-col gap-1">
               <span className="text-text-muted font-medium">Status</span>
               <span className="text-text-primary font-bold">
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${viewingTransportDetails.status === 'Active' ? 'bg-green-50 text-green-700' : 'bg-zinc-100 text-zinc-600'}`}>
+                <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${viewingTransportDetails.status === 'Active' ? 'bg-green-50 text-green-700' : 'bg-zinc-100 text-zinc-600'}`}>
                   {viewingTransportDetails.status}
                 </span>
               </span>
             </div>
             <div className="flex flex-col gap-1 col-span-2 border-t border-border pt-3 mt-1">
               <span className="text-text-muted font-medium">Next Charge Amount</span>
-              <span className="text-primary font-extrabold text-sm">₹{viewingTransportDetails.next_charge}</span>
+              <span className="text-primary font-bold text-sm">₹{viewingTransportDetails.next_charge}</span>
             </div>
           </div>
         )}
@@ -2350,7 +2350,7 @@ export default function FinanceManagementPage() {
           <div className="flex gap-3 p-4 bg-amber-500/10 border border-amber-500/20 text-amber-600 rounded-xl text-xs">
             <AlertTriangle className="h-5 w-5 flex-shrink-0 text-amber-500" />
             <div>
-              <p className="font-extrabold uppercase tracking-wider">Confirm Removal</p>
+              <p className="font-bold uppercase tracking-wider">Confirm Removal</p>
               <p className="mt-1 leading-relaxed">
                 Are you sure you want to completely remove this configuration? Academic Year Migration will skip generating any late payment penalty once this is done.
               </p>
@@ -2397,7 +2397,7 @@ export default function FinanceManagementPage() {
 
           {/* Apply To Radio Selection */}
           <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-text-secondary uppercase tracking-wider">Apply To</label>
+            <label className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Apply To</label>
             <div className="flex items-center gap-6 pt-1">
               <label className="flex items-center gap-2 text-xs font-semibold text-text-primary cursor-pointer">
                 <input
@@ -2427,7 +2427,7 @@ export default function FinanceManagementPage() {
           {/* If Entire School Selected */}
           {annualFeeApplyType === 'school' ? (
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-text-secondary uppercase tracking-wider">Annual Fee Amount *</label>
+              <label className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Annual Fee Amount *</label>
               <div className="relative">
                 <span className="absolute left-3 top-2.5 text-xs font-bold text-text-muted">₹</span>
                 <Input
@@ -2441,24 +2441,24 @@ export default function FinanceManagementPage() {
                 />
               </div>
               {annualFeeFormErrors.amount && (
-                <p className="text-[10px] text-red-500 font-bold mt-1">{annualFeeFormErrors.amount}</p>
+                <p className="text-[11px] text-red-500 font-bold mt-1">{annualFeeFormErrors.amount}</p>
               )}
             </div>
           ) : (
             /* If Class Wise Selected */
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-[10px] font-black text-text-secondary uppercase tracking-wider">Class-Wise Fee Allocation *</label>
+                <label className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Class-Wise Fee Allocation *</label>
                 {annualFeeFormErrors.classes && (
-                  <p className="text-[10px] text-red-500 font-bold">{annualFeeFormErrors.classes}</p>
+                  <p className="text-[11px] text-red-500 font-bold">{annualFeeFormErrors.classes}</p>
                 )}
               </div>
               <div className="max-h-56 overflow-y-auto border border-border rounded-xl">
                 <Table className="text-xs">
                   <TableHeader>
                     <TableRow className="bg-muted/50">
-                      <TableHead className="font-bold text-[10px] uppercase">Class</TableHead>
-                      <TableHead className="font-bold text-[10px] uppercase text-right">Annual Fee (₹)</TableHead>
+                      <TableHead className="font-bold text-[11px] uppercase">Class</TableHead>
+                      <TableHead className="font-bold text-[11px] uppercase text-right">Annual Fee (₹)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

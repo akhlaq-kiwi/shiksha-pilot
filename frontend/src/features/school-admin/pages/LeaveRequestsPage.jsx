@@ -392,7 +392,7 @@ export default function LeaveRequestsPage() {
       {activeTab === 'holidays' && (
         <div className="space-y-4">
           <div className="border-b border-border pb-2">
-            <h2 className="text-lg font-black text-text-primary uppercase tracking-tight">Official Holidays</h2>
+            <h2 className="text-lg font-bold text-text-primary uppercase tracking-tight">Official Holidays</h2>
           </div>
 
         {/* Add Holiday Form */}
@@ -476,7 +476,7 @@ export default function LeaveRequestsPage() {
                           <div className="space-y-3">
                             <div className="space-y-2">
                               <div className="space-y-1">
-                                <label className="text-[10px] font-black uppercase text-text-secondary">Holiday Name</label>
+                                <label className="text-[11px] font-bold uppercase text-text-secondary">Holiday Name</label>
                                 <Input 
                                   value={editName} 
                                   onChange={e => setEditName(e.target.value)} 
@@ -484,7 +484,7 @@ export default function LeaveRequestsPage() {
                                 />
                               </div>
                               <div className="space-y-1">
-                                <label className="text-[10px] font-black uppercase text-text-secondary">Date</label>
+                                <label className="text-[11px] font-bold uppercase text-text-secondary">Date</label>
                                 <Input 
                                   type="date"
                                   value={editDate} 
@@ -511,7 +511,7 @@ export default function LeaveRequestsPage() {
                           <div className="flex items-center justify-between gap-4">
                             <div>
                               <h4 className="font-bold text-text-primary text-sm tracking-tight">{h.name}</h4>
-                              <p className="text-[10px] font-bold text-text-secondary mt-0.5 flex items-center gap-1">
+                              <p className="text-[11px] font-bold text-text-secondary mt-0.5 flex items-center gap-1">
                                 <Calendar className="h-3 w-3" /> {dateFormatted}
                                 {isPast && <Lock className="h-3 w-3 ml-1 text-text-muted" />}
                               </p>
@@ -547,7 +547,7 @@ export default function LeaveRequestsPage() {
         <>
           <div className="space-y-4 mt-4">
             <div className="border-b border-border pb-2">
-              <h2 className="text-lg font-black text-text-primary uppercase tracking-tight">Student Leave Requests</h2>
+              <h2 className="text-lg font-bold text-text-primary uppercase tracking-tight">Student Leave Requests</h2>
             </div>
 
         {/* Student Stats */}
@@ -559,7 +559,7 @@ export default function LeaveRequestsPage() {
               </div>
               <div>
                 <p className="text-xs font-bold text-text-muted uppercase tracking-wider">Pending Leaves</p>
-                <h3 className="text-2xl font-black text-text-primary mt-1">{studentStats.pending}</h3>
+                <h3 className="text-2xl font-bold text-text-primary mt-1">{studentStats.pending}</h3>
               </div>
             </CardContent>
           </Card>
@@ -571,7 +571,7 @@ export default function LeaveRequestsPage() {
               </div>
               <div>
                 <p className="text-xs font-bold text-text-muted uppercase tracking-wider">Approved Leaves</p>
-                <h3 className="text-2xl font-black text-text-primary mt-1">{studentStats.approved}</h3>
+                <h3 className="text-2xl font-bold text-text-primary mt-1">{studentStats.approved}</h3>
               </div>
             </CardContent>
           </Card>
@@ -583,7 +583,7 @@ export default function LeaveRequestsPage() {
               </div>
               <div>
                 <p className="text-xs font-bold text-text-muted uppercase tracking-wider">Rejected Leaves</p>
-                <h3 className="text-2xl font-black text-text-primary mt-1">{studentStats.rejected}</h3>
+                <h3 className="text-2xl font-bold text-text-primary mt-1">{studentStats.rejected}</h3>
               </div>
             </CardContent>
           </Card>
@@ -659,13 +659,13 @@ export default function LeaveRequestsPage() {
                     <tr key={lr.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/10">
                       <td className="p-4">
                         <div className="font-bold text-text-primary">{lr.student_name}</div>
-                        <div className="text-[10px] text-text-muted font-medium mt-0.5">Applied by {lr.creator_name}</div>
+                        <div className="text-[11px] text-text-muted font-medium mt-0.5">Applied by {lr.creator_name}</div>
                       </td>
                       <td className="p-4 font-semibold text-text-secondary">
                         {lr.class_name || ''}-{lr.class_section || ''}
                       </td>
                       <td className="p-4">
-                        <span className="px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-[10px] font-semibold text-text-secondary">
+                        <span className="px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-[11px] font-semibold text-text-secondary">
                           {lr.leave_type}
                         </span>
                       </td>
@@ -674,7 +674,7 @@ export default function LeaveRequestsPage() {
                           <Calendar className="h-3 w-3 text-text-muted" />
                           <span>{new Date(lr.from_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} to {new Date(lr.to_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                         </div>
-                        <div className="text-[10px] text-text-muted font-medium mt-0.5">
+                        <div className="text-[11px] text-text-muted font-medium mt-0.5">
                           {Math.ceil((new Date(lr.to_date) - new Date(lr.from_date)) / (1000 * 60 * 60 * 24)) + 1} Days
                         </div>
                       </td>
@@ -723,7 +723,7 @@ export default function LeaveRequestsPage() {
           ────────────────────────────────────────────────────────────────────────── */}
       <div className="space-y-4 mt-4">
         <div className="border-b border-border pb-2">
-          <h2 className="text-lg font-black text-text-primary uppercase tracking-tight">Teacher Leave Requests</h2>
+          <h2 className="text-lg font-bold text-text-primary uppercase tracking-tight">Teacher Leave Requests</h2>
         </div>
 
         {/* Teacher Stats */}
@@ -735,7 +735,7 @@ export default function LeaveRequestsPage() {
               </div>
               <div>
                 <p className="text-xs font-bold text-text-muted uppercase tracking-wider">Pending Leaves</p>
-                <h3 className="text-2xl font-black text-text-primary mt-1">{teacherStats.pending}</h3>
+                <h3 className="text-2xl font-bold text-text-primary mt-1">{teacherStats.pending}</h3>
               </div>
             </CardContent>
           </Card>
@@ -747,7 +747,7 @@ export default function LeaveRequestsPage() {
               </div>
               <div>
                 <p className="text-xs font-bold text-text-muted uppercase tracking-wider">Approved Leaves</p>
-                <h3 className="text-2xl font-black text-text-primary mt-1">{teacherStats.approved}</h3>
+                <h3 className="text-2xl font-bold text-text-primary mt-1">{teacherStats.approved}</h3>
               </div>
             </CardContent>
           </Card>
@@ -759,7 +759,7 @@ export default function LeaveRequestsPage() {
               </div>
               <div>
                 <p className="text-xs font-bold text-text-muted uppercase tracking-wider">Rejected Leaves</p>
-                <h3 className="text-2xl font-black text-text-primary mt-1">{teacherStats.rejected}</h3>
+                <h3 className="text-2xl font-bold text-text-primary mt-1">{teacherStats.rejected}</h3>
               </div>
             </CardContent>
           </Card>
@@ -824,13 +824,13 @@ export default function LeaveRequestsPage() {
                     <tr key={lr.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/10">
                       <td className="p-4">
                         <div className="font-bold text-text-primary">{lr.teacher_name}</div>
-                        <div className="text-[10px] text-text-muted font-medium mt-0.5">Applied by {lr.creator_name}</div>
+                        <div className="text-[11px] text-text-muted font-medium mt-0.5">Applied by {lr.creator_name}</div>
                       </td>
                       <td className="p-4 font-semibold text-text-secondary">
                         {lr.teacher_department || '—'}
                       </td>
                       <td className="p-4">
-                        <span className="px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-[10px] font-semibold text-text-secondary">
+                        <span className="px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-[11px] font-semibold text-text-secondary">
                           {lr.leave_type}
                         </span>
                       </td>
@@ -839,7 +839,7 @@ export default function LeaveRequestsPage() {
                           <Calendar className="h-3 w-3 text-text-muted" />
                           <span>{new Date(lr.from_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} to {new Date(lr.to_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                         </div>
-                        <div className="text-[10px] text-text-muted font-medium mt-0.5">
+                        <div className="text-[11px] text-text-muted font-medium mt-0.5">
                           {Math.ceil((new Date(lr.to_date) - new Date(lr.from_date)) / (1000 * 60 * 60 * 24)) + 1} Days
                         </div>
                       </td>
@@ -937,7 +937,7 @@ export default function LeaveRequestsPage() {
                   <h4 className="text-sm font-bold text-text-primary">
                     {selectedLeave.applicant_role === 'STUDENT' ? selectedLeave.student_name : selectedLeave.teacher_name}
                   </h4>
-                  <p className="text-[10px] text-text-muted mt-0.5">
+                  <p className="text-[11px] text-text-muted mt-0.5">
                     {selectedLeave.applicant_role === 'STUDENT' ? `Student · Class ${selectedLeave.class_name}-${selectedLeave.class_section}` : `Teacher · Dept: ${selectedLeave.teacher_department || 'N/A'}`}
                   </p>
                 </div>
@@ -946,11 +946,11 @@ export default function LeaveRequestsPage() {
 
               <div className="grid grid-cols-2 gap-4 mt-3 pt-3 border-t border-border">
                 <div>
-                  <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Leave Type</span>
+                  <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider block">Leave Type</span>
                   <span className="text-xs font-bold text-text-primary mt-0.5 block">{selectedLeave.leave_type}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Duration</span>
+                  <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider block">Duration</span>
                   <span className="text-xs font-bold text-text-primary mt-0.5 block">
                     {selectedLeave.from_date} to {selectedLeave.to_date}
                   </span>
@@ -959,7 +959,7 @@ export default function LeaveRequestsPage() {
             </div>
 
             <div>
-              <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block mb-1">Reason for Leave</span>
+              <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider block mb-1">Reason for Leave</span>
               <p className="text-xs text-text-secondary leading-relaxed bg-zinc-50 dark:bg-zinc-900 border border-border rounded-xl p-3 whitespace-pre-wrap">
                 {selectedLeave.reason}
               </p>
@@ -967,7 +967,7 @@ export default function LeaveRequestsPage() {
 
             {selectedLeave.attachment_path && (
               <div>
-                <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block mb-1">Attachment</span>
+                <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider block mb-1">Attachment</span>
                 <a 
                   href={`http://localhost:8000${selectedLeave.attachment_path}`} 
                   target="_blank" 
@@ -981,16 +981,16 @@ export default function LeaveRequestsPage() {
 
             {selectedLeave.status === 'REJECTED' && (
               <div className="bg-rose-500/8 border border-rose-500/20 rounded-xl p-3">
-                <span className="text-[10px] font-bold text-rose-700 dark:text-rose-400 block mb-1">Rejection Reason</span>
+                <span className="text-[11px] font-bold text-rose-700 dark:text-rose-400 block mb-1">Rejection Reason</span>
                 <p className="text-xs text-text-secondary">{selectedLeave.reject_reason}</p>
-                <span className="text-[10px] text-text-muted block mt-1.5">Rejected by {selectedLeave.rejecter_name}</span>
+                <span className="text-[11px] text-text-muted block mt-1.5">Rejected by {selectedLeave.rejecter_name}</span>
               </div>
             )}
 
             {selectedLeave.status === 'APPROVED' && (
               <div className="bg-emerald-500/8 border border-emerald-500/20 rounded-xl p-3">
-                <span className="text-[10px] text-emerald-700 dark:text-emerald-400 block font-bold">Approved Request</span>
-                <span className="text-[10px] text-text-muted block mt-1">Approved by {selectedLeave.approver_name}</span>
+                <span className="text-[11px] text-emerald-700 dark:text-emerald-400 block font-bold">Approved Request</span>
+                <span className="text-[11px] text-text-muted block mt-1">Approved by {selectedLeave.approver_name}</span>
               </div>
             )}
 
@@ -1084,16 +1084,16 @@ export default function LeaveRequestsPage() {
                 maxLength={300}
               />
               <div className="flex justify-between items-center mt-1">
-                <span className="text-[10px] text-text-muted">
+                <span className="text-[11px] text-text-muted">
                   {rejectReason.length}/300 characters (Maximum 300 characters allowed.)
                 </span>
                 {rejectReason.length >= 300 && (
-                  <span className="text-[10px] font-bold text-red-500">
+                  <span className="text-[11px] font-bold text-red-500">
                     Limit reached
                   </span>
                 )}
               </div>
-              {rejectError && <p className="text-[10px] font-bold text-red-500 mt-0.5">{rejectError}</p>}
+              {rejectError && <p className="text-[11px] font-bold text-red-500 mt-0.5">{rejectError}</p>}
             </div>
             <div className="flex justify-end gap-3">
               <Button 

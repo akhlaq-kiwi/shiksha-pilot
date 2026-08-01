@@ -218,7 +218,7 @@ function SearchableSelect({ label, placeholder, value, onChange, options, disabl
           )}
         </div>
       )}
-      {error && <p className="text-[10px] text-red-500 font-semibold">{error}</p>}
+      {error && <p className="text-[11px] text-red-500 font-semibold">{error}</p>}
     </div>
   );
 }
@@ -962,17 +962,17 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-text-secondary uppercase">Student Name <span className="text-red-500">*</span></label>
                       <Input name="student_name" value={formData.student_name} onChange={handleTextChange} placeholder="Student Name" required />
-                      {errors.student_name && <p className="text-[10px] text-red-500 font-semibold">{errors.student_name}</p>}
+                      {errors.student_name && <p className="text-[11px] text-red-500 font-semibold">{errors.student_name}</p>}
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-text-secondary uppercase">Father Name <span className="text-red-500">*</span></label>
                       <Input name="father_name" value={formData.father_name} onChange={handleTextChange} placeholder="Father Name" required />
-                      {errors.father_name && <p className="text-[10px] text-red-500 font-semibold">{errors.father_name}</p>}
+                      {errors.father_name && <p className="text-[11px] text-red-500 font-semibold">{errors.father_name}</p>}
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-text-secondary uppercase">Mother Name <span className="text-red-500">*</span></label>
                       <Input name="mother_name" value={formData.mother_name} onChange={handleTextChange} placeholder="Mother Name" required />
-                      {errors.mother_name && <p className="text-[10px] text-red-500 font-semibold">{errors.mother_name}</p>}
+                      {errors.mother_name && <p className="text-[11px] text-red-500 font-semibold">{errors.mother_name}</p>}
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-text-secondary uppercase">Parent Occupation</label>
@@ -993,7 +993,7 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                         <option value="Female">Female</option>
                         <option value="Other">Other</option>
                       </select>
-                      {errors.gender && <p className="text-[10px] text-red-500 font-semibold">{errors.gender}</p>}
+                      {errors.gender && <p className="text-[11px] text-red-500 font-semibold">{errors.gender}</p>}
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-text-secondary uppercase">Date of Birth <span className="text-red-500">*</span></label>
@@ -1008,7 +1008,7 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                         />
                         <Calendar className="absolute right-3 top-2.5 h-4 w-4 text-text-muted pointer-events-none" />
                       </div>
-                      {errors.dob && <p className="text-[10px] text-red-500 font-semibold">{errors.dob}</p>}
+                      {errors.dob && <p className="text-[11px] text-red-500 font-semibold">{errors.dob}</p>}
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-text-secondary uppercase">Admission Date <span className="text-red-500">*</span></label>
@@ -1023,7 +1023,7 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                         />
                         <Calendar className="absolute right-3 top-2.5 h-4 w-4 text-text-muted pointer-events-none" />
                       </div>
-                      {errors.admission_date && <p className="text-[10px] text-red-500 font-semibold">{errors.admission_date}</p>}
+                      {errors.admission_date && <p className="text-[11px] text-red-500 font-semibold">{errors.admission_date}</p>}
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-text-secondary uppercase">Admission Fee</label>
@@ -1040,7 +1040,7 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                           className="pl-7 text-text-primary text-sm"
                         />
                       </div>
-                      {errors.admission_fee && <p className="text-[10px] text-red-500 font-semibold">{errors.admission_fee}</p>}
+                      {errors.admission_fee && <p className="text-[11px] text-red-500 font-semibold">{errors.admission_fee}</p>}
                     </div>
 
                     {(((academicYears || []).length <= 1 || (formData.academic_year_id && String(formData.academic_year_id) === String(academicYears[0]?.id))) || formData.student_category) && (
@@ -1059,7 +1059,7 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                           <option value="Existing Student">Existing Student</option>
                           <option value="New Admission">New Admission</option>
                         </select>
-                        {errors.student_category && <p className="text-[10px] text-red-500 font-semibold">{errors.student_category}</p>}
+                        {errors.student_category && <p className="text-[11px] text-red-500 font-semibold">{errors.student_category}</p>}
                       </div>
                     )}
                     <div className="space-y-1.5">
@@ -1100,18 +1100,18 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-text-secondary uppercase">Aadhaar Number</label>
                       <Input name="aadhaar_no" value={formData.aadhaar_no} onChange={handleNumericChange} placeholder="12 digit Aadhaar" />
-                      {errors.aadhaar_no && <p className="text-[10px] text-red-500 font-semibold">{errors.aadhaar_no}</p>}
+                      {errors.aadhaar_no && <p className="text-[11px] text-red-500 font-semibold">{errors.aadhaar_no}</p>}
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-text-secondary uppercase">Contact Number <span className="text-red-500">*</span></label>
                       <Input name="student_mobile" value={formData.student_mobile} onChange={handleNumericChange} placeholder="Contact number" required />
-                      {errors.student_mobile && <p className="text-[10px] text-red-500 font-semibold">{errors.student_mobile}</p>}
+                      {errors.student_mobile && <p className="text-[11px] text-red-500 font-semibold">{errors.student_mobile}</p>}
                     </div>
 
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-text-secondary uppercase">Student Email</label>
                       <Input type="email" name="student_email" value={formData.student_email} onChange={handleTextChange} placeholder="student@domain.com" />
-                      {errors.student_email && <p className="text-[10px] text-red-500 font-semibold">{errors.student_email}</p>}
+                      {errors.student_email && <p className="text-[11px] text-red-500 font-semibold">{errors.student_email}</p>}
                     </div>
                     {isFirstYear && (
                       <div className="space-y-1.5">
@@ -1124,7 +1124,7 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                           placeholder="Enter SR Number" 
                           className="font-bold"
                         />
-                        {errors.sr_no && <p className="text-[10px] text-red-500 font-semibold">{errors.sr_no}</p>}
+                        {errors.sr_no && <p className="text-[11px] text-red-500 font-semibold">{errors.sr_no}</p>}
                       </div>
                     )}
 
@@ -1145,7 +1145,7 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                             </option>
                           ))}
                         </select>
-                        {errors.section_name && <p className="text-[10px] text-red-500 font-semibold">{errors.section_name}</p>}
+                        {errors.section_name && <p className="text-[11px] text-red-500 font-semibold">{errors.section_name}</p>}
                       </div>
                     )}
 
@@ -1198,7 +1198,7 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-text-secondary uppercase">Address Line 1 <span className="text-red-500">*</span></label>
                       <Input name="current_address_line_1" value={formData.current_address_line_1} onChange={handleTextChange} placeholder="House no, street, locality..." required />
-                      {errors.current_address_line_1 && <p className="text-[10px] text-red-500 font-semibold">{errors.current_address_line_1}</p>}
+                      {errors.current_address_line_1 && <p className="text-[11px] text-red-500 font-semibold">{errors.current_address_line_1}</p>}
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-text-secondary uppercase">Address Line 2</label>
@@ -1231,7 +1231,7 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-text-secondary uppercase">PIN Code <span className="text-red-500">*</span></label>
                       <Input name="current_pin_code" value={formData.current_pin_code} onChange={handleNumericChange} placeholder="ZIP/PIN Code" required />
-                      {errors.current_pin_code && <p className="text-[10px] text-red-500 font-semibold">{errors.current_pin_code}</p>}
+                      {errors.current_pin_code && <p className="text-[11px] text-red-500 font-semibold">{errors.current_pin_code}</p>}
                     </div>
                   </div>
                 </div>
@@ -1255,7 +1255,7 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                         <div className="space-y-1.5">
                           <label className="text-xs font-bold text-text-secondary uppercase">Permanent Address Line 1 <span className="text-red-500">*</span></label>
                           <Input name="permanent_address_line_1" value={formData.permanent_address_line_1} onChange={handleTextChange} placeholder="House no, street, locality..." required />
-                          {errors.permanent_address_line_1 && <p className="text-[10px] text-red-500 font-semibold">{errors.permanent_address_line_1}</p>}
+                          {errors.permanent_address_line_1 && <p className="text-[11px] text-red-500 font-semibold">{errors.permanent_address_line_1}</p>}
                         </div>
                         <div className="space-y-1.5">
                           <label className="text-xs font-bold text-text-secondary uppercase">Permanent Address Line 2</label>
@@ -1288,7 +1288,7 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                         <div className="space-y-1.5">
                           <label className="text-xs font-bold text-text-secondary uppercase">PIN Code <span className="text-red-500">*</span></label>
                           <Input name="permanent_pin_code" value={formData.permanent_pin_code} onChange={handleNumericChange} placeholder="ZIP/PIN Code" required />
-                          {errors.permanent_pin_code && <p className="text-[10px] text-red-500 font-semibold">{errors.permanent_pin_code}</p>}
+                          {errors.permanent_pin_code && <p className="text-[11px] text-red-500 font-semibold">{errors.permanent_pin_code}</p>}
                         </div>
                       </div>
                     </div>
@@ -1317,7 +1317,7 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-bold text-text-secondary uppercase">{doc.label}</span>
                           {formData[doc.key] && (
-                            <span className="text-[10px] bg-green-500/10 text-green-600 px-2 py-0.5 rounded font-black flex items-center gap-1">
+                            <span className="text-[11px] bg-green-500/10 text-green-600 px-2 py-0.5 rounded font-bold flex items-center gap-1">
                               <Check className="h-3 w-3" /> UPLOADED
                             </span>
                           )}
@@ -1337,19 +1337,19 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                             </label>
                             
                             {uploadStates[doc.key] === 'uploading' && (
-                              <span className="text-[10px] text-text-muted animate-pulse font-medium">Uploading...</span>
+                              <span className="text-[11px] text-text-muted animate-pulse font-medium">Uploading...</span>
                             )}
                             {uploadStates[doc.key] === 'error' && (
-                              <span className="text-[10px] text-red-500 font-medium">Upload failed. Try again.</span>
+                              <span className="text-[11px] text-red-500 font-medium">Upload failed. Try again.</span>
                             )}
                             {formData[doc.key] && !uploadStates[doc.key] && (
-                              <span className="text-[10px] text-text-muted truncate max-w-[200px]" title={formData[doc.key]}>
+                              <span className="text-[11px] text-text-muted truncate max-w-[200px]" title={formData[doc.key]}>
                                 {formData[doc.key].split('/').pop()}
                               </span>
                             )}
                           </div>
                           {uploadStates[doc.key] === 'validation_error' && doc.key === 'photo_path' && (
-                            <p className="text-[10px] font-bold text-red-500 mt-1">⚠️ Only JPG, JPEG, PNG and WEBP image files are allowed.</p>
+                            <p className="text-[11px] font-bold text-red-500 mt-1">⚠️ Only JPG, JPEG, PNG and WEBP image files are allowed.</p>
                           )}
                         </div>
                       </div>

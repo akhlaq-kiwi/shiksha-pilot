@@ -358,14 +358,14 @@ export default function ReportCardTemplatesPage() {
                     <CardTitle className="text-sm font-bold text-text-primary">
                       {tpl.name}
                     </CardTitle>
-                    <span className="text-[10px] font-mono text-text-muted uppercase">
+                    <span className="text-[11px] font-mono text-text-muted uppercase">
                       Code: {tpl.code}
                     </span>
                   </div>
                 </div>
 
                 {tpl.is_system_default ? (
-                  <span className="px-2 py-0.5 bg-amber-400/15 text-amber-600 border border-amber-400/30 text-[9px] font-black rounded-md uppercase tracking-wider">
+                  <span className="px-2 py-0.5 bg-amber-400/15 text-amber-600 border border-amber-400/30 text-[11px] font-bold rounded-md uppercase tracking-wider">
                     System Default
                   </span>
                 ) : (

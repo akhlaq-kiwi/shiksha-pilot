@@ -48,7 +48,7 @@ export default function DashboardPage({ stats }) {
             <Sparkles className="h-3.5 w-3.5" />
             Super Admin Console
           </div>
-          <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">System Overview</h2>
+          <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">System Overview</h2>
           <p className="text-text-secondary text-sm mt-1 max-w-xl">
             Real-time administrative snapshot across all active subdomains and subscription tiers.
           </p>
@@ -75,8 +75,8 @@ export default function DashboardPage({ stats }) {
               
               <div className="flex justify-between items-start">
                 <div className="space-y-1">
-                  <p className="text-text-muted text-xs uppercase tracking-wider font-extrabold">{card.title}</p>
-                  <p className="text-4xl font-black text-text-primary font-display tracking-tight mt-2">{card.value}</p>
+                  <p className="text-text-muted text-xs uppercase tracking-wider font-bold">{card.title}</p>
+                  <p className="text-4xl font-bold text-text-primary font-display tracking-tight mt-2">{card.value}</p>
                 </div>
                 <div className={`p-3 rounded-xl ${card.iconBg} group-hover:scale-105 transition-transform`}>
                   <Icon className="h-6 w-6" />

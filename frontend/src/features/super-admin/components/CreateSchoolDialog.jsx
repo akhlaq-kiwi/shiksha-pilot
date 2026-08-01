@@ -98,7 +98,7 @@ export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating
               className={localErrors?.contact_phone ? 'border-red-500 ring-1 ring-red-500' : ''}
             />
             {localErrors?.contact_phone && (
-              <p className="text-[10px] font-bold text-red-500 mt-0.5">{localErrors.contact_phone}</p>
+              <p className="text-[11px] font-bold text-red-500 mt-0.5">{localErrors.contact_phone}</p>
             )}
           </div>
           <div className="space-y-1.5">
@@ -112,7 +112,7 @@ export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating
               className={localErrors?.contact_email ? 'border-red-500 ring-1 ring-red-500' : ''}
             />
             {localErrors?.contact_email && (
-              <p className="text-[10px] font-bold text-red-500 mt-0.5">{localErrors.contact_email}</p>
+              <p className="text-[11px] font-bold text-red-500 mt-0.5">{localErrors.contact_email}</p>
             )}
           </div>
         </div>
@@ -131,7 +131,7 @@ export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating
                 className={localErrors?.admin_phone ? 'border-red-500 ring-1 ring-red-500' : ''}
               />
               {localErrors?.admin_phone && (
-                <p className="text-[10px] font-bold text-red-500 mt-0.5">{localErrors.admin_phone}</p>
+                <p className="text-[11px] font-bold text-red-500 mt-0.5">{localErrors.admin_phone}</p>
               )}
             </div>
             <div className="space-y-1.5">

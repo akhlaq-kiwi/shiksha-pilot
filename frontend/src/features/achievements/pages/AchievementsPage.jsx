@@ -241,7 +241,7 @@ export default function AchievementsPage() {
               </Button>
             )}
             <div>
-              <h2 className="text-3xl font-black text-text-primary tracking-tight font-display flex items-center gap-2.5">
+              <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display flex items-center gap-2.5">
                 <Trophy className="h-7 w-7 text-amber-500" />
                 {selectedCategory === 'attendance_champions'
                   ? 'Attendance Champions'
@@ -293,13 +293,13 @@ export default function AchievementsPage() {
                   <div className="w-14 h-14 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center border border-amber-500/20 group-hover:scale-105 transition-transform">
                     <Award className="h-7 w-7" />
                   </div>
-                  <span className="px-3.5 py-1 rounded-full text-xs font-black bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                  <span className="px-3.5 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
                     {data.categories_summary.attendance_champions.count} Achievements
                   </span>
                 </div>
 
                 <div>
-                  <h3 className="text-2xl font-black text-text-primary tracking-tight font-display group-hover:text-amber-600 transition-colors flex items-center gap-2">
+                  <h3 className="text-2xl font-bold text-text-primary tracking-tight font-display group-hover:text-amber-600 transition-colors flex items-center gap-2">
                     Attendance Champions
                     <ChevronRight className="h-5 w-5 opacity-0 group-hover:opacity-100 transform -translate-x-2 group-hover:translate-x-0 transition-all text-amber-500" />
                   </h3>
@@ -310,7 +310,7 @@ export default function AchievementsPage() {
 
                 <div className="pt-4 border-t border-border/60 flex items-center justify-between text-xs font-bold text-amber-600 dark:text-amber-400">
                   <span>Explore School & Class Champions</span>
-                  <span className="flex items-center gap-1 font-black">
+                  <span className="flex items-center gap-1 font-bold">
                     View Gallery <ChevronRight className="h-4 w-4" />
                   </span>
                 </div>
@@ -331,13 +331,13 @@ export default function AchievementsPage() {
                   <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center border border-emerald-500/20 group-hover:scale-105 transition-transform">
                     <GraduationCap className="h-7 w-7" />
                   </div>
-                  <span className="px-3.5 py-1 rounded-full text-xs font-black bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                  <span className="px-3.5 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                     {data.categories_summary.academic_excellence.count} Achievements
                   </span>
                 </div>
 
                 <div>
-                  <h3 className="text-2xl font-black text-text-primary tracking-tight font-display group-hover:text-emerald-600 transition-colors flex items-center gap-2">
+                  <h3 className="text-2xl font-bold text-text-primary tracking-tight font-display group-hover:text-emerald-600 transition-colors flex items-center gap-2">
                     Academic Excellence
                     <ChevronRight className="h-5 w-5 opacity-0 group-hover:opacity-100 transform -translate-x-2 group-hover:translate-x-0 transition-all text-emerald-500" />
                   </h3>
@@ -348,7 +348,7 @@ export default function AchievementsPage() {
 
                 <div className="pt-4 border-t border-border/60 flex items-center justify-between text-xs font-bold text-emerald-600 dark:text-emerald-400">
                   <span>Explore Class Examination Toppers</span>
-                  <span className="flex items-center gap-1 font-black">
+                  <span className="flex items-center gap-1 font-bold">
                     View Gallery <ChevronRight className="h-4 w-4" />
                   </span>
                 </div>
@@ -372,7 +372,7 @@ export default function AchievementsPage() {
               
               {/* Search Input (Left) */}
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-text-secondary uppercase tracking-wider">Search</label>
+                <label className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Search</label>
                 <form onSubmit={handleSearchSubmit} className="relative">
                   <Input
                     type="text"
@@ -387,7 +387,7 @@ export default function AchievementsPage() {
 
               {/* Class Filter (Right) */}
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-text-secondary uppercase tracking-wider">Class Filter</label>
+                <label className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Class Filter</label>
                 <select
                   value={selectedClassId}
                   onChange={e => setSelectedClassId(e.target.value)}
@@ -413,7 +413,7 @@ export default function AchievementsPage() {
           ) : filteredAchievements.length === 0 ? (
             <Card className="p-16 text-center border-dashed border-2 border-border/80 rounded-3xl bg-zinc-50/50 dark:bg-zinc-950/20">
               <Trophy className="h-12 w-12 text-text-muted/40 mx-auto mb-3" />
-              <h4 className="text-base font-black text-text-primary">
+              <h4 className="text-base font-bold text-text-primary">
                 {currentYearObj?.status !== 'Archived' && currentYearObj?.migration_status !== 'Completed'
                   ? 'Achievements & Certificates Pending Migration'
                   : 'No matching achievements found.'}
@@ -433,7 +433,7 @@ export default function AchievementsPage() {
                   {Object.entries(classGroups).map(([className, items]) => (
                     <div key={className} className="space-y-4">
                       <div className="flex items-center gap-2 pb-2 border-b border-border">
-                        <span className="px-3 py-1 rounded-xl text-xs font-black bg-primary/10 text-primary uppercase tracking-wider">
+                        <span className="px-3 py-1 rounded-xl text-xs font-bold bg-primary/10 text-primary uppercase tracking-wider">
                           {className}
                         </span>
                         <span className="text-xs text-text-muted font-bold">Top Achievers</span>
@@ -500,7 +500,7 @@ export default function AchievementsPage() {
                     <p className="text-xs sm:text-sm font-bold text-zinc-700 uppercase tracking-wide">
                       {schoolProfile?.name || 'Jamiya Sams Academy'}
                     </p>
-                    <h1 className="text-lg sm:text-2xl font-black text-zinc-900 tracking-tight uppercase font-display">
+                    <h1 className="text-lg sm:text-2xl font-bold text-zinc-900 tracking-tight uppercase font-display">
                       {activeCertificate.category === 'academic_excellence' 
                         ? 'CERTIFICATE OF ACADEMIC EXCELLENCE' 
                         : 'CERTIFICATE OF ATTENDANCE ACHIEVEMENT'}
@@ -516,7 +516,7 @@ export default function AchievementsPage() {
                     <p className="text-xs sm:text-sm font-medium italic text-zinc-600">
                       This certificate is honorably presented to the top {activeCertificate.category === 'academic_excellence' ? 'academic' : 'attendance'} achievers of
                     </p>
-                    <h2 className="text-sm sm:text-base font-black text-zinc-900 uppercase tracking-wider font-display">
+                    <h2 className="text-sm sm:text-base font-bold text-zinc-900 uppercase tracking-wider font-display">
                       {activeCertificate.level === 'school' ? 'SCHOOL OVERALL' : formatClassScope(activeCertificate.class_name)}
                     </h2>
                     <p className="text-[11px] sm:text-xs text-zinc-500 max-w-md mx-auto leading-relaxed">
@@ -534,7 +534,7 @@ export default function AchievementsPage() {
                       <span className="text-2xl sm:text-3xl">
                         {activeCertificate.rank === 1 ? '🥇' : activeCertificate.rank === 2 ? '🥈' : '🥉'}
                       </span>
-                      <span className="text-[11px] font-black text-amber-700 uppercase tracking-wider">
+                      <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wider">
                         Rank #{activeCertificate.rank}
                       </span>
                     </div>
@@ -548,14 +548,14 @@ export default function AchievementsPage() {
                           className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-2 border-amber-400 shadow-sm"
                         />
                       ) : (
-                        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-zinc-200 border-2 border-zinc-300 text-zinc-800 font-black text-2xl sm:text-3xl flex items-center justify-center shadow-sm">
+                        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-zinc-200 border-2 border-zinc-300 text-zinc-800 font-bold text-2xl sm:text-3xl flex items-center justify-center shadow-sm">
                           {activeCertificate.student_name ? activeCertificate.student_name.substring(0, 2).toUpperCase() : 'ST'}
                         </div>
                       )}
                     </div>
 
                     {/* Student Name */}
-                    <h3 className="text-base sm:text-lg font-black text-zinc-900 tracking-tight leading-tight">
+                    <h3 className="text-base sm:text-lg font-bold text-zinc-900 tracking-tight leading-tight">
                       {activeCertificate.student_name}
                     </h3>
 
@@ -565,12 +565,12 @@ export default function AchievementsPage() {
                     </p>
 
                     {/* Big Green Percentage */}
-                    <p className="text-xl sm:text-2xl font-black text-emerald-600 pt-1 font-sans">
+                    <p className="text-xl sm:text-2xl font-bold text-emerald-600 pt-1 font-sans">
                       {activeCertificate.achievement_score}%
                     </p>
 
                     {/* Sub detail (Days / Marks) */}
-                    <p className="text-[10px] sm:text-[11px] font-bold text-zinc-500">
+                    <p className="text-[11px] sm:text-[11px] font-bold text-zinc-500">
                       {activeCertificate.category === 'academic_excellence'
                         ? (activeCertificate.metadata?.total_obtained 
                             ? `Total: ${activeCertificate.metadata.total_obtained} / ${activeCertificate.metadata.total_max} Marks` 
@@ -624,10 +624,10 @@ export default function AchievementsPage() {
             {/* Header info */}
             <div className="bg-surface border border-border p-5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="space-y-1">
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
                   {activeReportCard.result || 'PASS'}
                 </span>
-                <h3 className="text-xl font-black text-text-primary">{activeReportCard.student_name}</h3>
+                <h3 className="text-xl font-bold text-text-primary">{activeReportCard.student_name}</h3>
                 <p className="text-xs text-text-secondary font-bold">
                   Class: {activeReportCard.class_name} {activeReportCard.class_section ? `(${activeReportCard.class_section})` : ''} · Roll No. {activeReportCard.roll_no || '—'}
                 </p>
@@ -635,16 +635,16 @@ export default function AchievementsPage() {
 
               <div className="flex gap-4 border-t md:border-t-0 md:border-l border-border pt-3 md:pt-0 md:pl-6 text-right">
                 <div>
-                  <p className="text-[10px] font-bold text-text-muted uppercase">Overall Marks</p>
-                  <p className="text-lg font-black text-text-primary">{activeReportCard.total_obtained} / {activeReportCard.total_max}</p>
+                  <p className="text-[11px] font-bold text-text-muted uppercase">Overall Marks</p>
+                  <p className="text-lg font-bold text-text-primary">{activeReportCard.total_obtained} / {activeReportCard.total_max}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-text-muted uppercase">Percentage</p>
-                  <p className="text-lg font-black text-emerald-600">{activeReportCard.percentage}%</p>
+                  <p className="text-[11px] font-bold text-text-muted uppercase">Percentage</p>
+                  <p className="text-lg font-bold text-emerald-600">{activeReportCard.percentage}%</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-text-muted uppercase">Grade</p>
-                  <p className="text-lg font-black text-amber-500">{activeReportCard.grade}</p>
+                  <p className="text-[11px] font-bold text-text-muted uppercase">Grade</p>
+                  <p className="text-lg font-bold text-amber-500">{activeReportCard.grade}</p>
                 </div>
               </div>
             </div>
@@ -652,7 +652,7 @@ export default function AchievementsPage() {
             {/* Subject Marks Table */}
             <div className="border border-border rounded-2xl overflow-hidden shadow-2xs">
               <table className="w-full text-left text-xs">
-                <thead className="bg-secondary/40 border-b border-border text-text-secondary uppercase text-[10px] font-black">
+                <thead className="bg-secondary/40 border-b border-border text-text-secondary uppercase text-[11px] font-bold">
                   <tr>
                     <th className="p-3">Subject</th>
                     <th className="p-3">Paper Type</th>
@@ -670,10 +670,10 @@ export default function AchievementsPage() {
                       <td className="p-3 text-text-muted">{sub.paper_type || 'Written'}</td>
                       <td className="p-3 text-right">{sub.max_marks}</td>
                       <td className="p-3 text-right">{sub.passing_marks}</td>
-                      <td className="p-3 text-right font-black text-text-primary">{sub.marks_obtained}</td>
-                      <td className="p-3 text-center font-black">{sub.grade}</td>
+                      <td className="p-3 text-right font-bold text-text-primary">{sub.marks_obtained}</td>
+                      <td className="p-3 text-center font-bold">{sub.grade}</td>
                       <td className="p-3 text-center">
-                        <span className={`px-2 py-0.5 rounded-md text-[9px] font-black ${
+                        <span className={`px-2 py-0.5 rounded-md text-[11px] font-bold ${
                           sub.result === 'PASS' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-red-500/10 text-red-600'
                         }`}>
                           {sub.result}
@@ -688,7 +688,7 @@ export default function AchievementsPage() {
             {/* Remark */}
             {activeReportCard.report_card_remark && (
               <div className="p-4 bg-zinc-50 dark:bg-zinc-950/40 border border-border rounded-xl space-y-1">
-                <p className="text-[10px] font-black text-text-muted uppercase">Teacher Remark</p>
+                <p className="text-[11px] font-bold text-text-muted uppercase">Teacher Remark</p>
                 <p className="text-xs text-text-primary font-medium italic">&quot;{activeReportCard.report_card_remark}&quot;</p>
               </div>
             )}
@@ -729,11 +729,11 @@ function AchievementCard({ item, onOpenCert, onOpenReport }) {
       <div className="flex items-center justify-between pb-4 border-b border-border/60">
         <div className="flex items-center gap-2">
           <span className="text-2xl">{medalBadge}</span>
-          <span className="text-xs font-black uppercase tracking-wider text-text-primary">
+          <span className="text-xs font-bold uppercase tracking-wider text-text-primary">
             Rank #{item.rank}
           </span>
         </div>
-        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-surface border border-border text-text-secondary">
+        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-surface border border-border text-text-secondary">
           {item.level === 'school' ? 'School Overall' : item.class_name}
         </span>
       </div>
@@ -748,24 +748,24 @@ function AchievementCard({ item, onOpenCert, onOpenReport }) {
               className="w-14 h-14 rounded-2xl object-cover border-2 border-border shadow-xs"
             />
           ) : (
-            <div className="w-14 h-14 rounded-2xl bg-primary/10 border-2 border-primary/20 text-primary font-black text-lg flex items-center justify-center shadow-xs">
+            <div className="w-14 h-14 rounded-2xl bg-primary/10 border-2 border-primary/20 text-primary font-bold text-lg flex items-center justify-center shadow-xs">
               {item.student_name ? item.student_name.substring(0, 2).toUpperCase() : 'ST'}
             </div>
           )}
         </div>
 
         <div className="min-w-0 flex-1 space-y-1">
-          <h4 className="text-base font-black text-text-primary truncate group-hover:text-primary transition-colors font-display">
+          <h4 className="text-base font-bold text-text-primary truncate group-hover:text-primary transition-colors font-display">
             {item.student_name}
           </h4>
           <p className="text-xs text-text-secondary font-bold truncate">
             {formatClassName(item.class_name)} {item.roll_number ? `· Roll No. ${item.roll_number}` : ''}
           </p>
           <div className="flex items-center gap-2 pt-1">
-            <span className="text-xs font-black text-emerald-600 font-sans">
+            <span className="text-xs font-bold text-emerald-600 font-sans">
               {item.achievement_score}%
             </span>
-            <span className="text-[10px] text-text-muted font-bold">
+            <span className="text-[11px] text-text-muted font-bold">
               {isAcademic ? 'Exam Score' : 'Attendance Rate'}
             </span>
           </div>
@@ -777,13 +777,13 @@ function AchievementCard({ item, onOpenCert, onOpenReport }) {
         onClick={() => onOpenCert(item)}
         className="p-3 bg-surface border border-border rounded-2xl hover:border-primary/50 transition-all cursor-pointer space-y-2 group/thumb"
       >
-        <div className="flex items-center justify-between text-[10px] font-extrabold text-text-muted">
+        <div className="flex items-center justify-between text-[11px] font-bold text-text-muted">
           <span>Certificate Preview</span>
           <Eye className="h-3.5 w-3.5 text-primary opacity-0 group-hover/thumb:opacity-100 transition-opacity" />
         </div>
         <div className="h-16 rounded-xl bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-amber-500/10 border border-amber-400/30 p-2 flex items-center justify-between">
           <div className="space-y-0.5 text-left">
-            <p className="text-[9px] font-black text-amber-700 dark:text-amber-400 uppercase truncate max-w-[140px]">
+            <p className="text-[11px] font-bold text-amber-700 dark:text-amber-400 uppercase truncate max-w-[140px]">
               {isAcademic ? 'Academic Excellence' : 'Attendance Champion'}
             </p>
             <p className="text-[8px] text-zinc-500 font-bold truncate max-w-[140px]">

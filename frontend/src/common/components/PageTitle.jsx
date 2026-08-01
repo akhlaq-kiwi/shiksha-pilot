@@ -4,7 +4,7 @@ const PageTitle = ({ title, subtitle, action }) => {
   return (
     <div className="flex items-start justify-between gap-4 mb-6">
       <div className="flex flex-col gap-1">
-        <h2 className="text-3xl font-black text-text-primary font-display tracking-tight leading-tight">
+        <h2 className="text-3xl font-bold text-text-primary font-display tracking-tight leading-tight">
           {title}
         </h2>
         {subtitle && (

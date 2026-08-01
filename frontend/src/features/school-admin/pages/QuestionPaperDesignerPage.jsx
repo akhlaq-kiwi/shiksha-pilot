@@ -2039,7 +2039,7 @@ export default function QuestionPaperDesignerPage() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-xl font-black font-display tracking-tight text-text-primary">
+            <h1 className="text-xl font-bold font-display tracking-tight text-text-primary">
               Question Paper Designer
             </h1>
             <p className="text-xs text-text-secondary">
@@ -2199,7 +2199,7 @@ export default function QuestionPaperDesignerPage() {
           <Card className="sticky top-32 z-30 shadow-md">
 
             <CardContent className="p-3 flex flex-wrap gap-2 items-center bg-white dark:bg-zinc-950">
-              <span className="text-[10px] font-black text-text-muted uppercase">Quick Blocks:</span>
+              <span className="text-[11px] font-bold text-text-muted uppercase">Quick Blocks:</span>
               <Button type="button" size="sm" variant="outline" className="h-7 text-xs font-bold py-0" onClick={() => insertQuestionBlock('mcq')}>+ MCQ</Button>
               <Button type="button" size="sm" variant="outline" className="h-7 text-xs font-bold py-0" onClick={() => insertQuestionBlock('true_false')}>+ True/False</Button>
               <Button type="button" size="sm" variant="outline" className="h-7 text-xs font-bold py-0" onClick={() => insertQuestionBlock('fill_blanks')}>+ Blank</Button>
@@ -2254,16 +2254,16 @@ export default function QuestionPaperDesignerPage() {
                       <CardHeader className="py-2.5 px-4 border-b border-border bg-zinc-50/30 flex flex-row justify-between items-center space-y-0">
                         <div className="flex items-center gap-2">
                           {isStructural || isSubParts ? (
-                            <span className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase">
+                            <span className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase">
                               {q.type === 'section' ? 'Section' : q.type === 'heading' ? 'Heading' : q.type === 'instruction' ? 'Instruction' : 'Sub-Parts'}
                             </span>
                           ) : (
-                            <span className="bg-primary/10 text-primary px-2.5 py-0.5 rounded-full text-xs font-black">
+                            <span className="bg-primary/10 text-primary px-2.5 py-0.5 rounded-full text-xs font-bold">
                               Q {qNumber}
                             </span>
                           )}
                           {!isStructural && (
-                            <span className="text-[10px] font-black uppercase text-text-muted">
+                            <span className="text-[11px] font-bold uppercase text-text-muted">
                               {q.type.replace('_', ' ')}
                             </span>
                           )}
@@ -2282,7 +2282,7 @@ export default function QuestionPaperDesignerPage() {
                       {q.type === 'section' ? (
                         <div className="space-y-4">
                           <div className="space-y-1.5">
-                            <label className="text-[10px] font-black text-text-secondary uppercase">Section Divider Title</label>
+                            <label className="text-[11px] font-bold text-text-secondary uppercase">Section Divider Title</label>
                             <Input 
                               value={q.text} 
                               onChange={(e) => updateQuestionText(q.id, e.target.value)}
@@ -2329,7 +2329,7 @@ export default function QuestionPaperDesignerPage() {
                       ) : q.type === 'heading' ? (
                         <div className="space-y-4">
                           <div className="space-y-1.5">
-                            <label className="text-[10px] font-black text-text-secondary uppercase">Heading Title</label>
+                            <label className="text-[11px] font-bold text-text-secondary uppercase">Heading Title</label>
                             <Input 
                               value={q.text} 
                               onChange={(e) => updateQuestionText(q.id, e.target.value)}
@@ -2359,7 +2359,7 @@ export default function QuestionPaperDesignerPage() {
                         </div>
                       ) : q.type === 'instruction' ? (
                         <div className="space-y-1.5">
-                          <label className="text-[10px] font-black text-text-secondary uppercase">Group Instructions</label>
+                          <label className="text-[11px] font-bold text-text-secondary uppercase">Group Instructions</label>
                           <textarea 
                             rows={2}
                             value={q.text} 
@@ -2373,18 +2373,18 @@ export default function QuestionPaperDesignerPage() {
                         <>
                           <div className="space-y-1">
                             <div className="flex justify-between items-center flex-wrap gap-2">
-                              <label className="text-[10px] font-black text-text-secondary uppercase">Question Text</label>
+                              <label className="text-[11px] font-bold text-text-secondary uppercase">Question Text</label>
                               <div className="flex gap-1.5 items-center flex-wrap">
-                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold" onClick={() => triggerFloatingImageUpload(q.id)}>+ Image</Button>
-                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold" onClick={() => { activeQuestionIdRef.current = q.id; setActiveFloatingId(null); setIsTableOpen(true); }}>+ Table</Button>
-                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold" onClick={() => handleOpenEquationDialog(q.id)}>+ Math</Button>
-                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold" onClick={() => { activeQuestionIdRef.current = q.id; setActiveFloatingId(null); setShapes([]); setIsDrawingOpen(true); }}>+ Drawing</Button>
+                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[11px] font-bold" onClick={() => triggerFloatingImageUpload(q.id)}>+ Image</Button>
+                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[11px] font-bold" onClick={() => { activeQuestionIdRef.current = q.id; setActiveFloatingId(null); setIsTableOpen(true); }}>+ Table</Button>
+                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[11px] font-bold" onClick={() => handleOpenEquationDialog(q.id)}>+ Math</Button>
+                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[11px] font-bold" onClick={() => { activeQuestionIdRef.current = q.id; setActiveFloatingId(null); setShapes([]); setIsDrawingOpen(true); }}>+ Drawing</Button>
                                 <div className="h-4 w-px bg-border mx-1" />
-                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold text-primary hover:bg-primary/5" title="Insert answer box for students to fill in" onClick={() => insertAnswerSpace(q.id, 'box')}>+ Answer Box [ ]</Button>
-                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold text-primary hover:bg-primary/5" title="Insert answer circle for students to circle" onClick={() => insertAnswerSpace(q.id, 'circle')}>+ Circle ( )</Button>
-                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold text-primary hover:bg-primary/5" title="Insert write-in line space" onClick={() => insertAnswerSpace(q.id, 'line')}>+ Line ___</Button>
-                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold text-primary hover:bg-primary/5" title="Insert square shape" onClick={() => insertAnswerSpace(q.id, 'square')}>+ Square</Button>
-                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] font-bold text-primary hover:bg-primary/5" title="Insert rectangle shape" onClick={() => insertAnswerSpace(q.id, 'rectangle')}>+ Rectangle</Button>
+                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[11px] font-bold text-primary hover:bg-primary/5" title="Insert answer box for students to fill in" onClick={() => insertAnswerSpace(q.id, 'box')}>+ Answer Box [ ]</Button>
+                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[11px] font-bold text-primary hover:bg-primary/5" title="Insert answer circle for students to circle" onClick={() => insertAnswerSpace(q.id, 'circle')}>+ Circle ( )</Button>
+                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[11px] font-bold text-primary hover:bg-primary/5" title="Insert write-in line space" onClick={() => insertAnswerSpace(q.id, 'line')}>+ Line ___</Button>
+                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[11px] font-bold text-primary hover:bg-primary/5" title="Insert square shape" onClick={() => insertAnswerSpace(q.id, 'square')}>+ Square</Button>
+                                <Button type="button" size="sm" variant="ghost" className="h-5 px-1.5 text-[11px] font-bold text-primary hover:bg-primary/5" title="Insert rectangle shape" onClick={() => insertAnswerSpace(q.id, 'rectangle')}>+ Rectangle</Button>
                               </div>
                             </div>
                             <div 
@@ -2405,8 +2405,8 @@ export default function QuestionPaperDesignerPage() {
                           {q.table && (
                             <div className="p-3 bg-zinc-50 dark:bg-zinc-950 border border-border rounded-lg space-y-2">
                               <div className="flex justify-between items-center">
-                                <span className="text-[10px] font-black uppercase text-text-secondary">Question Table Grid ({q.table.rows}x{q.table.cols})</span>
-                                <Button type="button" size="sm" variant="ghost" className="h-5 text-red-500 text-[10px]" onClick={() => removeTable(q.id)}>Remove Table</Button>
+                                <span className="text-[11px] font-bold uppercase text-text-secondary">Question Table Grid ({q.table.rows}x{q.table.cols})</span>
+                                <Button type="button" size="sm" variant="ghost" className="h-5 text-red-500 text-[11px]" onClick={() => removeTable(q.id)}>Remove Table</Button>
                               </div>
                               <div className="overflow-x-auto">
                                 <table className="border-collapse border border-zinc-300 w-full text-xs">
@@ -2435,10 +2435,10 @@ export default function QuestionPaperDesignerPage() {
                           {q.drawing && q.drawing.length > 0 && (
                             <div className="p-3 bg-zinc-50 dark:bg-zinc-950 border border-border rounded-lg space-y-2">
                               <div className="flex justify-between items-center">
-                                <span className="text-[10px] font-black uppercase text-text-secondary">Vector Drawing Embedded</span>
+                                <span className="text-[11px] font-bold uppercase text-text-secondary">Vector Drawing Embedded</span>
                                 <div className="flex gap-2">
-                                  <Button type="button" size="sm" variant="ghost" className="h-5 text-primary text-[10px]" onClick={() => handleOpenDrawingDialog(q.id)}>Edit Drawing</Button>
-                                  <Button type="button" size="sm" variant="ghost" className="h-5 text-red-500 text-[10px]" onClick={() => removeDrawing(q.id)}>Remove</Button>
+                                  <Button type="button" size="sm" variant="ghost" className="h-5 text-primary text-[11px]" onClick={() => handleOpenDrawingDialog(q.id)}>Edit Drawing</Button>
+                                  <Button type="button" size="sm" variant="ghost" className="h-5 text-red-500 text-[11px]" onClick={() => removeDrawing(q.id)}>Remove</Button>
                                 </div>
                               </div>
                               <div className="w-full border border-border bg-white p-2 rounded flex justify-center items-center h-[140px]">
@@ -2477,8 +2477,8 @@ export default function QuestionPaperDesignerPage() {
                           {q.image && (
                             <div className="p-3 bg-zinc-50 dark:bg-zinc-950 border border-border rounded-lg space-y-2">
                               <div className="flex justify-between items-center">
-                                <span className="text-[10px] font-black uppercase text-text-secondary">Image Attachment</span>
-                                <Button type="button" size="sm" variant="ghost" className="h-5 text-red-500 text-[10px]" onClick={() => removeQuestionImage(q.id)}>Remove Image</Button>
+                                <span className="text-[11px] font-bold uppercase text-text-secondary">Image Attachment</span>
+                                <Button type="button" size="sm" variant="ghost" className="h-5 text-red-500 text-[11px]" onClick={() => removeQuestionImage(q.id)}>Remove Image</Button>
                               </div>
                               <div className="flex flex-col md:flex-row gap-4 items-center">
                                 <img 
@@ -2490,7 +2490,7 @@ export default function QuestionPaperDesignerPage() {
                                 <div className="space-y-3 w-full md:w-auto flex-1 text-xs">
                                   {/* Resize slider */}
                                   <div className="space-y-1">
-                                    <span className="text-[10px] font-bold text-text-secondary">Size: {q.image.width}%</span>
+                                    <span className="text-[11px] font-bold text-text-secondary">Size: {q.image.width}%</span>
                                     <input 
                                       type="range" 
                                       min="10" 
@@ -2506,7 +2506,7 @@ export default function QuestionPaperDesignerPage() {
                                       type="button" 
                                       variant="outline" 
                                       size="sm" 
-                                      className="h-7 text-[10px] font-bold py-0"
+                                      className="h-7 text-[11px] font-bold py-0"
                                       onClick={() => updateQuestionImage(q.id, 'rotate', (q.image.rotate + 90) % 360)}
                                     >
                                       <RotateCw className="h-3 w-3 mr-1" /> Rotate 90°
@@ -2515,7 +2515,7 @@ export default function QuestionPaperDesignerPage() {
                                     <select
                                       value={q.image.align}
                                       onChange={(e) => updateQuestionImage(q.id, 'align', e.target.value)}
-                                      className="h-7 px-2 border border-border bg-background rounded text-[10px]"
+                                      className="h-7 px-2 border border-border bg-background rounded text-[11px]"
                                     >
                                       <option value="left">Left</option>
                                       <option value="center">Center</option>
@@ -2530,7 +2530,7 @@ export default function QuestionPaperDesignerPage() {
                           {/* MCQ OPTIONS EDITOR */}
                           {q.type === 'mcq' && q.options && (
                             <div className="space-y-2 border-l-2 border-primary/20 pl-4 mt-2">
-                              <label className="text-[10px] font-black text-text-secondary uppercase">Multiple Choice Options</label>
+                              <label className="text-[11px] font-bold text-text-secondary uppercase">Multiple Choice Options</label>
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                                 {q.options.map((opt, optIdx) => (
                                   <div key={optIdx} className="flex items-center gap-2 text-xs">
@@ -2551,12 +2551,12 @@ export default function QuestionPaperDesignerPage() {
                           {q.type === 'matching' && q.matchingColumns && (
                             <div className="space-y-3 border-l-2 border-primary/20 pl-4 mt-2">
                               <div className="flex justify-between items-center">
-                                <label className="text-[10px] font-black text-text-secondary uppercase">Column A & Column B Configuration</label>
+                                <label className="text-[11px] font-bold text-text-secondary uppercase">Column A & Column B Configuration</label>
                                 <Button
                                   type="button"
                                   variant="outline"
                                   size="xs"
-                                  className="h-6 text-[10px] font-bold"
+                                  className="h-6 text-[11px] font-bold"
                                   onClick={() => {
                                     const nextLeft = [...q.matchingColumns.left, ''];
                                     const nextRight = [...q.matchingColumns.right, ''];
@@ -2572,7 +2572,7 @@ export default function QuestionPaperDesignerPage() {
                               </div>
                               
                               <div className="space-y-2">
-                                <div className="grid grid-cols-[1fr_1fr_auto] gap-2 text-[10px] font-bold text-text-muted">
+                                <div className="grid grid-cols-[1fr_1fr_auto] gap-2 text-[11px] font-bold text-text-muted">
                                   <span>Column A (Left Item)</span>
                                   <span>Column B (Right Match)</span>
                                   <span className="w-8"></span>
@@ -2628,12 +2628,12 @@ export default function QuestionPaperDesignerPage() {
                           {q.type === 'sub_parts' && (
                             <div className="space-y-3 pt-2">
                             <div className="flex justify-between items-center">
-                              <label className="text-[10px] font-black text-text-secondary uppercase">Sub-Questions / Parts</label>
+                              <label className="text-[11px] font-bold text-text-secondary uppercase">Sub-Questions / Parts</label>
                               <Button 
                                 type="button" 
                                 size="sm" 
                                 variant="ghost" 
-                                className="h-6 text-[10px] font-bold text-primary"
+                                className="h-6 text-[11px] font-bold text-primary"
                                 onClick={() => insertSubQuestion(q.id)}
                               >
                                 + Add Sub-Question
@@ -2677,12 +2677,12 @@ export default function QuestionPaperDesignerPage() {
                           {/* Marks fields (If no sub-questions) */}
                           {q.type !== 'sub_parts' && (!q.subQuestions || q.subQuestions.length === 0) && (
                             <div className="flex items-center gap-2 border-t border-border pt-3">
-                              <label className="text-[10px] font-black text-text-secondary uppercase">Allocated Marks for Q {qNumber}</label>
+                              <label className="text-[11px] font-bold text-text-secondary uppercase">Allocated Marks for Q {qNumber}</label>
                               <Input 
                                 type="number"
                                 value={q.marks}
                                 onChange={(e) => updateQuestionMarks(q.id, e.target.value)}
-                                className="w-20 h-8 font-black"
+                                className="w-20 h-8 font-bold"
                               />
                             </div>
                           )}
@@ -2742,7 +2742,7 @@ export default function QuestionPaperDesignerPage() {
               
               {/* HEADING SECTION */}
               <div className="pt-0 pb-1 px-4 text-center space-y-1">
-                <h1 className="text-xl font-extrabold uppercase tracking-wide m-0 p-0">{schoolProfile.name}</h1>
+                <h1 className="text-xl font-bold uppercase tracking-wide m-0 p-0">{schoolProfile.name}</h1>
                 <h2 className="text-sm font-bold tracking-tight uppercase m-0 p-0">
                   {paperTitle || 'Terminal Examination'}
                 </h2>
@@ -2759,7 +2759,7 @@ export default function QuestionPaperDesignerPage() {
               {/* INSTRUCTIONS BOX */}
               {instructions && (
                 <div className="border border-black/45 p-3 rounded-sm space-y-1.5">
-                  <h4 className="text-xs font-extrabold uppercase pb-0.5">General Instructions:</h4>
+                  <h4 className="text-xs font-bold uppercase pb-0.5">General Instructions:</h4>
                   <div className="text-xs space-y-1 font-sans leading-relaxed text-zinc-800">
                     {instructions.split('\n').map((line, idx) => (
                       <div key={idx} className="flex gap-1.5 items-start">
@@ -2822,7 +2822,7 @@ export default function QuestionPaperDesignerPage() {
                         <div 
                           key={q.id} 
                           id={`preview-q-${q.id}`}
-                          className={`w-full py-1 my-2 font-extrabold text-sm uppercase tracking-wide border-black ${alignClass} ${borderClass} q-block q-block-section`}
+                          className={`w-full py-1 my-2 font-bold text-sm uppercase tracking-wide border-black ${alignClass} ${borderClass} q-block q-block-section`}
                         >
                           {q.text}
                         </div>
@@ -2858,7 +2858,7 @@ export default function QuestionPaperDesignerPage() {
                       <div key={q.id} id={`preview-q-${q.id}`} className="space-y-1.5 q-block">
                         <div className="flex justify-between items-start leading-relaxed">
                           <div className="flex-1 flex gap-2">
-                            {!isSubParts && <span className="font-extrabold text-sm font-sans">Q {qNum}.</span>}
+                            {!isSubParts && <span className="font-bold text-sm font-sans">Q {qNum}.</span>}
                             <div className="flex-1">
                               {q.text && (
                                 <span 
@@ -3136,14 +3136,14 @@ export default function QuestionPaperDesignerPage() {
                     />
                   )}
                   {/* Actions toolbar on hover */}
-                  <div className="absolute -top-7 left-0 right-0 hidden group-hover:flex justify-between items-center bg-white dark:bg-zinc-900 shadow-md border border-border px-1.5 py-0.5 rounded text-[10px] gap-1.5 z-50 print:hidden font-sans">
+                  <div className="absolute -top-7 left-0 right-0 hidden group-hover:flex justify-between items-center bg-white dark:bg-zinc-900 shadow-md border border-border px-1.5 py-0.5 rounded text-[11px] gap-1.5 z-50 print:hidden font-sans">
                     <span className="font-bold text-text-muted">{img.width}px</span>
                     <div className="flex gap-1 items-center">
                       {img.type === 'table' && (
                         <>
                           <button 
                             type="button" 
-                            className="px-1 py-0.5 text-[9px] bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 rounded font-bold text-primary"
+                            className="px-1 py-0.5 text-[11px] bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 rounded font-bold text-primary"
                             onClick={(e) => { e.stopPropagation(); handleAddTableDimension(img.id, 'row'); }}
                             title="Add Row"
                           >
@@ -3151,7 +3151,7 @@ export default function QuestionPaperDesignerPage() {
                           </button>
                           <button 
                             type="button" 
-                            className="px-1 py-0.5 text-[9px] bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 rounded font-bold text-primary"
+                            className="px-1 py-0.5 text-[11px] bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 rounded font-bold text-primary"
                             onClick={(e) => { e.stopPropagation(); handleAddTableDimension(img.id, 'col'); }}
                             title="Add Column"
                           >
@@ -3162,7 +3162,7 @@ export default function QuestionPaperDesignerPage() {
                       {img.type === 'drawing' && (
                         <button 
                           type="button" 
-                          className="px-1.5 py-0.5 text-[9px] bg-primary text-white hover:bg-primary/95 rounded font-bold"
+                          className="px-1.5 py-0.5 text-[11px] bg-primary text-white hover:bg-primary/95 rounded font-bold"
                           onClick={(e) => { e.stopPropagation(); handleOpenDrawingDialogForFloating(img.id); }}
                           title="Edit Drawing"
                         >
@@ -3172,7 +3172,7 @@ export default function QuestionPaperDesignerPage() {
                       <div className="h-3 w-px bg-zinc-200 dark:bg-zinc-700 mx-0.5" />
                       <button 
                         type="button" 
-                        className="px-1 py-0.5 text-[9px] bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 rounded font-bold text-text-primary"
+                        className="px-1 py-0.5 text-[11px] bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 rounded font-bold text-text-primary"
                         onClick={(e) => { e.stopPropagation(); resizeFloatingImage(img.id, -20); }}
                         title="Shrink"
                       >
@@ -3180,7 +3180,7 @@ export default function QuestionPaperDesignerPage() {
                       </button>
                       <button 
                         type="button" 
-                        className="px-1 py-0.5 text-[9px] bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 rounded font-bold text-text-primary"
+                        className="px-1 py-0.5 text-[11px] bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 rounded font-bold text-text-primary"
                         onClick={(e) => { e.stopPropagation(); resizeFloatingImage(img.id, 20); }}
                         title="Grow"
                       >
@@ -3188,7 +3188,7 @@ export default function QuestionPaperDesignerPage() {
                       </button>
                       <button 
                         type="button" 
-                        className="px-1 py-0.5 text-[9px] bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 rounded font-bold text-text-primary"
+                        className="px-1 py-0.5 text-[11px] bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 rounded font-bold text-text-primary"
                         onClick={(e) => { e.stopPropagation(); rotateFloatingImage(img.id); }}
                         title="Rotate"
                       >
@@ -3196,7 +3196,7 @@ export default function QuestionPaperDesignerPage() {
                       </button>
                       <button 
                         type="button" 
-                        className="px-1 py-0.5 text-[9px] bg-red-50 hover:bg-red-100 text-red-600 rounded font-bold"
+                        className="px-1 py-0.5 text-[11px] bg-red-50 hover:bg-red-100 text-red-600 rounded font-bold"
                         onClick={(e) => { e.stopPropagation(); deleteFloatingImage(img.id); }}
                         title="Delete"
                       >
@@ -3216,7 +3216,7 @@ export default function QuestionPaperDesignerPage() {
       {/* MODAL 1: LOAD TEMPLATE */}
       <Dialog isOpen={isTemplateOpen} onClose={() => setIsTemplateOpen(false)}>
         <div className="p-6 space-y-4 max-w-md bg-card rounded-lg border border-border shadow-xl">
-          <h2 className="text-base font-black flex items-center gap-2"><LayoutTemplate className="h-5 w-5 text-primary" /> Load Examination Template</h2>
+          <h2 className="text-base font-bold flex items-center gap-2"><LayoutTemplate className="h-5 w-5 text-primary" /> Load Examination Template</h2>
           <p className="text-xs text-text-secondary">Loading a template will overwrite current settings and questions. Select a predefined paper standard below:</p>
           <div className="grid grid-cols-2 gap-3.5 pt-2">
             {Object.keys(PAPER_TEMPLATES).map((key) => (
@@ -3227,8 +3227,8 @@ export default function QuestionPaperDesignerPage() {
                 className="justify-start font-bold text-xs p-3.5 h-auto text-left flex flex-col items-start gap-1"
                 onClick={() => handleLoadTemplate(key)}
               >
-                <span className="font-black text-text-primary">{PAPER_TEMPLATES[key].name}</span>
-                <span className="text-[10px] text-text-muted">Marks: {PAPER_TEMPLATES[key].maxMarks} | {PAPER_TEMPLATES[key].duration}</span>
+                <span className="font-bold text-text-primary">{PAPER_TEMPLATES[key].name}</span>
+                <span className="text-[11px] text-text-muted">Marks: {PAPER_TEMPLATES[key].maxMarks} | {PAPER_TEMPLATES[key].duration}</span>
               </Button>
             ))}
           </div>
@@ -3242,7 +3242,7 @@ export default function QuestionPaperDesignerPage() {
       {/* MODAL 2: VERSION HISTORY */}
       <Dialog isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)}>
         <div className="p-6 space-y-4 max-w-md bg-card rounded-lg border border-border shadow-xl">
-          <h2 className="text-base font-black flex items-center gap-2"><RefreshCw className="h-5 w-5 text-primary" /> Version History / Revisions</h2>
+          <h2 className="text-base font-bold flex items-center gap-2"><RefreshCw className="h-5 w-5 text-primary" /> Version History / Revisions</h2>
           <p className="text-xs text-text-secondary">Select a previous auto-saved version to restore the editor state:</p>
           
           <div className="max-h-[300px] overflow-y-auto space-y-2 pr-1 pt-1">
@@ -3253,7 +3253,7 @@ export default function QuestionPaperDesignerPage() {
                 <div key={rev.id} className="flex justify-between items-center p-2.5 bg-zinc-50 rounded border border-border text-xs hover:bg-zinc-100 transition-all">
                   <div>
                     <div className="font-bold text-text-primary">{rev.title}</div>
-                    <div className="text-[10px] text-text-muted">{rev.timestamp} • {rev.questionCount} Questions</div>
+                    <div className="text-[11px] text-text-muted">{rev.timestamp} • {rev.questionCount} Questions</div>
                   </div>
                   <Button type="button" size="sm" variant="ghost" className="h-7 text-xs font-bold text-primary" onClick={() => handleRestoreRevision(rev)}>
                     Restore
@@ -3272,7 +3272,7 @@ export default function QuestionPaperDesignerPage() {
       {/* MODAL 3: EQUATION EDITOR */}
       <Dialog isOpen={isEquationOpen} onClose={() => setIsEquationOpen(false)} containerClassName="md:justify-start md:pl-20">
         <div className="p-6 space-y-4 max-w-2xl w-full bg-card rounded-lg border border-border shadow-xl">
-          <h2 className="text-base font-black flex items-center gap-2 text-text-primary">
+          <h2 className="text-base font-bold flex items-center gap-2 text-text-primary">
             <PlusCircle className="h-5 w-5 text-primary" /> Visual Math Question Editor
           </h2>
           <p className="text-xs text-text-secondary leading-normal">
@@ -3295,7 +3295,7 @@ export default function QuestionPaperDesignerPage() {
           <div className="space-y-4 pt-2 border-t border-border/50">
             {/* Templates */}
             <div>
-              <span className="text-[10px] font-black text-text-secondary uppercase tracking-wider block mb-1.5">Equation Templates</span>
+              <span className="text-[11px] font-bold text-text-secondary uppercase tracking-wider block mb-1.5">Equation Templates</span>
               <div className="flex flex-wrap gap-1.5">
                 {MATH_TEMPLATES.map((item) => (
                   <Button
@@ -3314,7 +3314,7 @@ export default function QuestionPaperDesignerPage() {
 
             {/* Greek Letters */}
             <div>
-              <span className="text-[10px] font-black text-text-secondary uppercase tracking-wider block mb-1.5">Greek Symbols</span>
+              <span className="text-[11px] font-bold text-text-secondary uppercase tracking-wider block mb-1.5">Greek Symbols</span>
               <div className="flex flex-wrap gap-1.5">
                 {GREEK_SYMBOLS.map((item) => (
                   <Button
@@ -3334,7 +3334,7 @@ export default function QuestionPaperDesignerPage() {
 
             {/* Mathematical Operators */}
             <div>
-              <span className="text-[10px] font-black text-text-secondary uppercase tracking-wider block mb-1.5">Mathematical Operators & Accents</span>
+              <span className="text-[11px] font-bold text-text-secondary uppercase tracking-wider block mb-1.5">Mathematical Operators & Accents</span>
               <div className="flex flex-wrap gap-1.5">
                 {MATH_OPERATORS.map((item, idx) => (
                   <Button
@@ -3369,7 +3369,7 @@ export default function QuestionPaperDesignerPage() {
       {/* MODAL 4: TABLE DIALOG */}
       <Dialog isOpen={isTableOpen} onClose={() => setIsTableOpen(false)}>
         <div className="p-6 space-y-4 max-w-sm bg-card rounded-lg border border-border shadow-xl">
-          <h2 className="text-base font-black flex items-center gap-2"><Grid className="h-5 w-5 text-primary" /> Insert Custom Table</h2>
+          <h2 className="text-base font-bold flex items-center gap-2"><Grid className="h-5 w-5 text-primary" /> Insert Custom Table</h2>
           <div className="grid grid-cols-2 gap-4 text-xs font-bold">
             <div className="space-y-1">
               <span>Rows</span>
@@ -3391,7 +3391,7 @@ export default function QuestionPaperDesignerPage() {
       <Dialog isOpen={isDrawingOpen} onClose={() => setIsDrawingOpen(false)}>
         <div className="p-6 space-y-4 max-w-4xl w-full bg-card rounded-xl border border-border shadow-2xl">
           <div className="flex justify-between items-center pb-2 border-b border-border">
-            <h2 className="text-base font-black flex items-center gap-2">
+            <h2 className="text-base font-bold flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-primary" /> Interactive Vector Drawing Editor
             </h2>
             <div className="flex gap-2">
@@ -3408,7 +3408,7 @@ export default function QuestionPaperDesignerPage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             {/* Draw Properties Panel */}
             <div className="space-y-4 text-xs font-bold bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-xl border border-border">
-              <span className="text-[10px] font-black uppercase text-text-muted">Shape Attributes</span>
+              <span className="text-[11px] font-bold uppercase text-text-muted">Shape Attributes</span>
               
               <div className="space-y-2">
                 <span>Stroke Color</span>
@@ -3486,13 +3486,13 @@ export default function QuestionPaperDesignerPage() {
 
               {/* Operations */}
               <div className="border-t border-border pt-4 grid grid-cols-2 gap-2">
-                <Button type="button" variant="outline" size="sm" className="h-8 font-bold text-[10px]" onClick={bringShapeForward}>Bring Front</Button>
-                <Button type="button" variant="outline" size="sm" className="h-8 font-bold text-[10px]" onClick={sendShapeBackward}>Send Back</Button>
-                <Button type="button" variant="outline" size="sm" className="h-8 font-bold text-[10px]" onClick={() => rotateSelectedShape(15)}>Rotate 15°</Button>
-                <Button type="button" variant="outline" size="sm" className="h-8 font-bold text-[10px]" onClick={duplicateSelectedShape}>Duplicate</Button>
-                <Button type="button" variant="outline" size="sm" className="h-8 font-bold text-[10px]" onClick={() => resizeSelectedShape(10, 10)}>Size +</Button>
-                <Button type="button" variant="outline" size="sm" className="h-8 font-bold text-[10px]" onClick={() => resizeSelectedShape(-10, -10)}>Size -</Button>
-                <Button type="button" variant="outline" size="sm" className="h-8 font-bold text-[10px] text-red-500 bg-red-50 hover:bg-red-100 col-span-2" onClick={deleteSelectedShape}>Delete Selected</Button>
+                <Button type="button" variant="outline" size="sm" className="h-8 font-bold text-[11px]" onClick={bringShapeForward}>Bring Front</Button>
+                <Button type="button" variant="outline" size="sm" className="h-8 font-bold text-[11px]" onClick={sendShapeBackward}>Send Back</Button>
+                <Button type="button" variant="outline" size="sm" className="h-8 font-bold text-[11px]" onClick={() => rotateSelectedShape(15)}>Rotate 15°</Button>
+                <Button type="button" variant="outline" size="sm" className="h-8 font-bold text-[11px]" onClick={duplicateSelectedShape}>Duplicate</Button>
+                <Button type="button" variant="outline" size="sm" className="h-8 font-bold text-[11px]" onClick={() => resizeSelectedShape(10, 10)}>Size +</Button>
+                <Button type="button" variant="outline" size="sm" className="h-8 font-bold text-[11px]" onClick={() => resizeSelectedShape(-10, -10)}>Size -</Button>
+                <Button type="button" variant="outline" size="sm" className="h-8 font-bold text-[11px] text-red-500 bg-red-50 hover:bg-red-100 col-span-2" onClick={deleteSelectedShape}>Delete Selected</Button>
               </div>
 
             </div>
@@ -3608,7 +3608,7 @@ export default function QuestionPaperDesignerPage() {
       {/* MODAL 6: FIND / STATS */}
       <Dialog isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)}>
         <div className="p-6 space-y-4 max-w-sm bg-card rounded-lg border border-border shadow-xl">
-          <h2 className="text-base font-black flex items-center gap-2"><Search className="h-5 w-5 text-primary" /> Document Statistics & Search</h2>
+          <h2 className="text-base font-bold flex items-center gap-2"><Search className="h-5 w-5 text-primary" /> Document Statistics & Search</h2>
           
           <div className="p-3 bg-zinc-50 rounded border text-xs space-y-1.5 font-sans">
             <div className="flex justify-between">
@@ -3642,7 +3642,7 @@ export default function QuestionPaperDesignerPage() {
       {/* MODAL 7: SAVED PAPERS LIBRARY */}
       <Dialog isOpen={isLibraryOpen} onClose={() => setIsLibraryOpen(false)}>
         <div className="p-6 space-y-4 max-w-lg bg-card rounded-lg border border-border shadow-xl w-full">
-          <h2 className="text-base font-black flex items-center gap-2">
+          <h2 className="text-base font-bold flex items-center gap-2">
             <FileText className="h-5 w-5 text-primary" /> Saved Papers Library
           </h2>
           <p className="text-xs text-text-secondary">
@@ -3669,8 +3669,8 @@ export default function QuestionPaperDesignerPage() {
                     >
                       <FolderOpen className="h-5 w-5 text-primary shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <span className="font-black text-sm text-text-primary block truncate">{clsName}</span>
-                        <span className="text-[10px] text-text-muted font-bold block">{classPapers.length} {classPapers.length === 1 ? 'Paper' : 'Papers'}</span>
+                        <span className="font-bold text-sm text-text-primary block truncate">{clsName}</span>
+                        <span className="text-[11px] text-text-muted font-bold block">{classPapers.length} {classPapers.length === 1 ? 'Paper' : 'Papers'}</span>
                       </div>
                     </Button>
                   );
@@ -3700,12 +3700,12 @@ export default function QuestionPaperDesignerPage() {
                           <div className="font-bold text-text-primary text-sm">
                             {paper.paperTitle || 'Untitled Paper'}
                           </div>
-                          <div className="flex flex-wrap gap-2 text-[10px] text-text-muted font-bold">
-                            <span className="bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded font-extrabold uppercase">
+                          <div className="flex flex-wrap gap-2 text-[11px] text-text-muted font-bold">
+                            <span className="bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded font-bold uppercase">
                               Subject: {paper.subjectName || 'N/A'}
                             </span>
                           </div>
-                          <div className="text-[10px] text-text-muted">
+                          <div className="text-[11px] text-text-muted">
                             Last Saved: {new Date(paper.lastSaved).toLocaleString()} • {paper.questions?.length || 0} Questions
                           </div>
                         </div>
@@ -3745,7 +3745,7 @@ export default function QuestionPaperDesignerPage() {
       {/* CUSTOM CONFIRMATION DIALOG */}
       <Dialog isOpen={confirmDialog.isOpen} onClose={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}>
         <div className="p-6 space-y-4 max-w-sm bg-card rounded-lg border border-border shadow-xl w-full">
-          <h2 className="text-base font-black flex items-center gap-2 text-text-primary">
+          <h2 className="text-base font-bold flex items-center gap-2 text-text-primary">
             <Info className="h-5 w-5 text-amber-500" /> {confirmDialog.title}
           </h2>
           <p className="text-xs text-text-secondary leading-relaxed">

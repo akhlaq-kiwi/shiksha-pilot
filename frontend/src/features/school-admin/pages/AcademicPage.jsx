@@ -16,7 +16,7 @@ const statusBadge = (status) => {
     Inactive: 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800',
   };
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${map[status] || 'bg-zinc-100 text-zinc-500'}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold uppercase ${map[status] || 'bg-zinc-100 text-zinc-500'}`}>
       {status}
     </span>
   );
@@ -89,7 +89,7 @@ export default function AcademicPage() {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       <div>
-        <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">Academic Management</h2>
+        <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Academic Management</h2>
         <p className="text-text-secondary text-sm mt-1">Configure academic years, classes, sections, and subjects.</p>
       </div>
 
@@ -170,7 +170,7 @@ export default function AcademicPage() {
                   <TableCell className="font-mono text-xs text-text-muted">{r.code}</TableCell>
                   <TableCell className="text-text-secondary text-xs">{r.dept}</TableCell>
                   <TableCell className="text-text-secondary text-xs">{r.cl}</TableCell>
-                  <TableCell><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${r.type === 'Core' ? 'bg-primary/10 text-primary' : 'bg-amber-500/10 text-amber-600'}`}>{r.type}</span></TableCell>
+                  <TableCell><span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${r.type === 'Core' ? 'bg-primary/10 text-primary' : 'bg-amber-500/10 text-amber-600'}`}>{r.type}</span></TableCell>
                 </TableRow>
               ))}
             </TableBody>

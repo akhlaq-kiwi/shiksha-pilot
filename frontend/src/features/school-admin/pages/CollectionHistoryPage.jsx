@@ -229,7 +229,7 @@ export default function CollectionHistoryPage() {
           >
             <ArrowLeft className="h-3.5 w-3.5" /> Back to Dashboard
           </button>
-          <h1 className="text-2xl font-black text-text-primary tracking-tight font-display">Collection History</h1>
+          <h1 className="text-2xl font-bold text-text-primary tracking-tight font-display">Collection History</h1>
           <p className="text-xs text-text-secondary">
             View every fee collection transaction with complete payment history.
           </p>
@@ -249,8 +249,8 @@ export default function CollectionHistoryPage() {
             <Card key={i} className="shadow-xs border border-border bg-surface">
               <CardContent className="p-5 flex items-center justify-between">
                 <div className="space-y-1">
-                  <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">{c.label}</p>
-                  <p className="text-xl font-black text-text-primary tracking-tight font-display">{c.value}</p>
+                  <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">{c.label}</p>
+                  <p className="text-xl font-bold text-text-primary tracking-tight font-display">{c.value}</p>
                 </div>
                 <div className={`p-2.5 rounded-xl border ${c.color}`}>
                   <Icon className="h-5 w-5" />
@@ -310,7 +310,7 @@ export default function CollectionHistoryPage() {
               <FileText className="h-8 w-8" />
             </div>
             <div className="space-y-1">
-              <h3 className="font-extrabold text-text-primary text-base tracking-tight font-display">No Collection History Found</h3>
+              <h3 className="font-bold text-text-primary text-base tracking-tight font-display">No Collection History Found</h3>
               <p className="text-xs text-text-secondary leading-relaxed font-medium">
                 No fee collection transactions were recorded during the selected month.
               </p>
@@ -343,13 +343,13 @@ export default function CollectionHistoryPage() {
                         {/* Date and Time */}
                         <TableCell className="text-xs whitespace-nowrap">
                           <div className="font-bold text-text-primary">{formatDate(t.payment_date)}</div>
-                          <div className="text-[10px] text-text-muted font-mono">{formatTime(t.created_at)}</div>
+                          <div className="text-[11px] text-text-muted font-mono">{formatTime(t.created_at)}</div>
                         </TableCell>
 
                         {/* Name & Class */}
                         <TableCell className="text-xs whitespace-nowrap">
-                          <div className="font-extrabold text-text-primary uppercase tracking-wider">{cleanStudentName(t.student_name)}</div>
-                          <div className="text-[10px] text-text-secondary mt-0.5">{t.class_name}</div>
+                          <div className="font-bold text-text-primary uppercase tracking-wider">{cleanStudentName(t.student_name)}</div>
+                          <div className="text-[11px] text-text-secondary mt-0.5">{t.class_name}</div>
                         </TableCell>
 
                         {/* Fee Name */}
@@ -358,7 +358,7 @@ export default function CollectionHistoryPage() {
                         </TableCell>
 
                         {/* Amount */}
-                        <TableCell className="text-left font-mono font-black text-emerald-600 text-sm whitespace-nowrap">
+                        <TableCell className="text-left font-mono font-bold text-emerald-600 text-sm whitespace-nowrap">
                           + ₹{t.amount.toLocaleString('en-IN')}
                         </TableCell>
 
@@ -367,9 +367,9 @@ export default function CollectionHistoryPage() {
                           <div className="flex items-center justify-center gap-1 text-sm font-semibold text-text-secondary bg-zinc-50 dark:bg-zinc-900/50 py-1.5 px-3 rounded-lg border border-border max-w-[340px] mx-auto">
                             <span className="text-text-muted font-mono">₹{parseFloat(t.previous_total).toLocaleString('en-IN')}</span>
                             <span className="text-text-muted">→</span>
-                            <span className="text-emerald-600 font-black font-mono">+₹{t.amount.toLocaleString('en-IN')}</span>
+                            <span className="text-emerald-600 font-bold font-mono">+₹{t.amount.toLocaleString('en-IN')}</span>
                             <span className="text-text-muted">→</span>
-                            <span className="font-black text-text-primary font-mono">₹{parseFloat(t.updated_total).toLocaleString('en-IN')}</span>
+                            <span className="font-bold text-text-primary font-mono">₹{parseFloat(t.updated_total).toLocaleString('en-IN')}</span>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -389,11 +389,11 @@ export default function CollectionHistoryPage() {
                     <div className="flex justify-between items-start">
                       <div className="space-y-0.5">
                         <span className="font-mono text-xs font-bold text-text-primary block">{t.receipt_no}</span>
-                        <span className="text-[10px] text-text-muted font-mono">{formatDate(t.payment_date)} • {formatTime(t.created_at)}</span>
+                        <span className="text-[11px] text-text-muted font-mono">{formatDate(t.payment_date)} • {formatTime(t.created_at)}</span>
                       </div>
                       <div className="text-right">
-                        <span className="font-mono font-black text-emerald-600 text-sm block">+ ₹{t.amount.toLocaleString('en-IN')}</span>
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-600 border border-emerald-500/10 mt-1">
+                        <span className="font-mono font-bold text-emerald-600 text-sm block">+ ₹{t.amount.toLocaleString('en-IN')}</span>
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 border border-emerald-500/10 mt-1">
                           Completed
                         </span>
                       </div>
@@ -403,7 +403,7 @@ export default function CollectionHistoryPage() {
                     <div className="text-xs space-y-1.5 bg-zinc-50/50 dark:bg-zinc-900/20 p-3 rounded-xl border border-border/80">
                       <div className="flex justify-between">
                         <span className="text-text-muted">Name & Class:</span>
-                        <span className="font-extrabold text-text-primary uppercase">{cleanStudentName(t.student_name)} ({t.class_name})</span>
+                        <span className="font-bold text-text-primary uppercase">{cleanStudentName(t.student_name)} ({t.class_name})</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-text-muted">Fee Description:</span>
@@ -415,9 +415,9 @@ export default function CollectionHistoryPage() {
                     <div className="flex items-center gap-1.5 text-xs font-semibold text-text-secondary pt-1">
                       <span className="text-text-muted font-mono">₹{parseFloat(t.previous_total).toLocaleString('en-IN')}</span>
                       <span>→</span>
-                      <span className="text-emerald-600 font-black font-mono">+₹{t.amount.toLocaleString('en-IN')}</span>
+                      <span className="text-emerald-600 font-bold font-mono">+₹{t.amount.toLocaleString('en-IN')}</span>
                       <span>→</span>
-                      <span className="font-black text-text-primary font-mono">₹{parseFloat(t.updated_total).toLocaleString('en-IN')}</span>
+                      <span className="font-bold text-text-primary font-mono">₹{parseFloat(t.updated_total).toLocaleString('en-IN')}</span>
                     </div>
 
                   </div>
@@ -439,7 +439,7 @@ export default function CollectionHistoryPage() {
                     </span>
                   </div>
                 ) : (
-                  <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
+                  <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
                     Scroll to load more
                   </span>
                 )}

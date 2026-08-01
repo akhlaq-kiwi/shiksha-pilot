@@ -83,16 +83,16 @@ const getDynamicScalingStyles = (numSubjects, numInstructions) => {
     instructionsSpacing = 'space-y-1';
     instructionsMargin = 'mt-6 pt-6';
   } else if (numSubjects >= 10 && numSubjects <= 13) {
-    tableFontSize = 'text-[10px]';
+    tableFontSize = 'text-[11px]';
     tablePadding = 'p-1.5';
     headerPadding = 'pb-2';
     tableMargin = 'py-2';
-    instructionsFontSize = 'text-[10px]';
+    instructionsFontSize = 'text-[11px]';
     instructionsSpacing = 'space-y-0.5';
     instructionsMargin = 'mt-3 pt-3';
   } else {
     // 14 or more subjects (instructions are hidden)
-    tableFontSize = 'text-[9px]';
+    tableFontSize = 'text-[11px]';
     tablePadding = 'p-1';
     headerPadding = 'pb-2';
     tableMargin = 'py-2';
@@ -377,7 +377,7 @@ const CalendarDatePicker = ({ value, onChange, min, max, required, className, on
             </button>
           </div>
           
-          <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-text-muted mb-1">
+          <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-bold text-text-muted mb-1">
             <span className="text-red-500">Su</span>
             <span>Mo</span>
             <span>Tu</span>
@@ -1988,7 +1988,7 @@ export default function ExamsPage() {
       {/* Header section */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 no-print">
         <div>
-          <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">Examinations</h2>
+          <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Examinations</h2>
           <p className="text-text-secondary text-sm mt-1">Configure exams, manage timetables, enter marks, and generate student report cards.</p>
         </div>
         {activeView === 'dashboard' && !isReadOnly && (
@@ -2043,8 +2043,8 @@ export default function ExamsPage() {
                   }`}
                 >
                   <CardContent className="p-5 text-center">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-text-muted">{c.label}</p>
-                    <p className={`text-3xl font-black mt-1 font-display ${c.color}`}>{c.value}</p>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-text-muted">{c.label}</p>
+                    <p className={`text-3xl font-bold mt-1 font-display ${c.color}`}>{c.value}</p>
                   </CardContent>
                 </Card>
               );
@@ -2089,7 +2089,7 @@ export default function ExamsPage() {
                     <TableCell className="text-xs font-mono text-text-muted">{formatDateString(e.end_date)}</TableCell>
                     <TableCell className="text-xs font-mono text-text-muted">{formatDateString(e.publish_date)}</TableCell>
                     <TableCell>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold uppercase ${
                         e.status === 'Published' ? 'bg-green-500/10 text-green-600' : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800'
                       }`}>
                         {e.status}
@@ -2183,7 +2183,7 @@ export default function ExamsPage() {
                         <AlertCircle className="h-5 w-5" />
                       </div>
                       <div className="space-y-3 flex-1 pr-6">
-                        <h4 className="text-sm font-black font-display text-text-primary tracking-wider uppercase">
+                        <h4 className="text-sm font-bold font-display text-text-primary tracking-wider uppercase">
                           {pendingValidationSource === 'reports_empty_timetable'
                             ? 'REPORT CARDS ARE NOT AVAILABLE YET'
                             : pendingValidationSource === 'publish_empty_timetable'
@@ -2221,7 +2221,7 @@ export default function ExamsPage() {
                           </p>
                         </div>
                         <div className="border-t border-border pt-3">
-                          <span className="text-[10px] font-black uppercase tracking-wider text-text-muted">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-text-muted">
                             {['reports_empty_timetable', 'publish_empty_timetable', 'marks_entry_empty_timetable'].includes(pendingValidationSource)
                               ? 'Required Action'
                               : (pendingSubjects.length === 1 ? 'Pending Subject' : 'Pending Subjects')
@@ -2447,7 +2447,7 @@ export default function ExamsPage() {
                         <div className="flex justify-between py-1 border-b border-border">
                           <span className="text-text-secondary">Publish Status:</span>
                           <span 
-                            className={`font-black uppercase px-2 py-0.5 rounded-full text-[10px] select-none transition-all ${
+                            className={`font-bold uppercase px-2 py-0.5 rounded-full text-[11px] select-none transition-all ${
                               currentClass.status === 'Published' 
                                 ? 'bg-green-500/10 text-green-600 cursor-pointer hover:bg-green-500/20 active:scale-95' 
                                 : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800'
@@ -2539,8 +2539,8 @@ export default function ExamsPage() {
                       </Button>
                     )}
                     <div className="mr-3 flex flex-col items-end select-none border-r border-border pr-3">
-                      <span className="text-[9px] font-black uppercase tracking-wider text-text-muted">Subjects Completed</span>
-                      <span className="text-xl font-black font-display text-primary leading-tight">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-text-muted">Subjects Completed</span>
+                      <span className="text-xl font-bold font-display text-primary leading-tight">
                         {scheduledCount}
                       </span>
                     </div>
@@ -2788,10 +2788,10 @@ export default function ExamsPage() {
             {marksSheet && (
               <Card className="flex flex-col justify-center p-4 h-24 bg-zinc-50/50 dark:bg-zinc-900/50 select-none">
                 <div className="flex items-baseline gap-2 whitespace-nowrap">
-                  <span className="text-sm font-black font-display text-text-primary tracking-wider uppercase">
+                  <span className="text-sm font-bold font-display text-text-primary tracking-wider uppercase">
                     COMPLETED SUBJECT:
                   </span>
-                  <span className="text-2xl font-black font-display text-primary leading-none align-baseline">
+                  <span className="text-2xl font-bold font-display text-primary leading-none align-baseline">
                     {timetablePapers.filter(p => p.marks_completed).length}
                     <span className="text-sm font-bold text-text-muted ml-1">/{timetablePapers.length}</span>
                   </span>
@@ -2852,7 +2852,7 @@ export default function ExamsPage() {
                             onChange={e => handleMarkCellChange(s.student_id, 'remarks', e.target.value)}
                           />
                         </TableCell>
-                        <TableCell className="text-right text-[10px] font-semibold text-text-muted">
+                        <TableCell className="text-right text-[11px] font-semibold text-text-muted">
                           {savingMarkStudentId === s.student_id ? (
                             <span className="text-primary font-bold">Saving...</span>
                           ) : (
@@ -2915,10 +2915,10 @@ export default function ExamsPage() {
                     <TableCell className="font-semibold text-text-primary">{card.student_name}</TableCell>
                     <TableCell className="font-mono text-xs whitespace-nowrap">{card.total_obtained} / {card.total_max}</TableCell>
                     <TableCell className="font-mono text-xs font-bold text-primary">{card.percentage}%</TableCell>
-                    <TableCell className="font-black text-xs text-primary">{card.grade}</TableCell>
+                    <TableCell className="font-bold text-xs text-primary">{card.grade}</TableCell>
                     <TableCell className="text-xs text-text-secondary">{card.attendance.attendance_rate}%</TableCell>
                     <TableCell>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold uppercase ${
                         card.result === 'PASS' ? 'bg-green-500/10 text-green-600' : 'bg-red-500/10 text-red-600'
                       }`}>
                         {card.result}
@@ -3000,7 +3000,7 @@ export default function ExamsPage() {
 
                 {/* Report Card Remark Block */}
                 <div className="p-4 bg-zinc-50 dark:bg-zinc-900/20 border border-border rounded-xl flex flex-col gap-1.5 shadow-2xs">
-                  <span className="text-[10px] font-black text-text-secondary uppercase tracking-wider">Report Card Remark</span>
+                  <span className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Report Card Remark</span>
                   {reportCardRemark ? (
                     <p className="text-xs text-green-700 dark:text-green-400 font-bold italic leading-relaxed">
                       "{reportCardRemark}"
@@ -3231,10 +3231,10 @@ export default function ExamsPage() {
                     <TableCell className="font-semibold text-text-primary">{card.student.name}</TableCell>
                     <TableCell className="font-mono text-xs whitespace-nowrap">{card.summary.total_obtained} / {card.summary.total_max}</TableCell>
                     <TableCell className="font-mono text-xs font-bold text-amber-600">{card.summary.percentage}%</TableCell>
-                    <TableCell className="font-black text-xs text-amber-700">{card.summary.grade}</TableCell>
+                    <TableCell className="font-bold text-xs text-amber-700">{card.summary.grade}</TableCell>
                     <TableCell className="text-xs text-text-secondary">{card.summary.attendance.attendance_rate}%</TableCell>
                     <TableCell>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold uppercase ${
                         card.summary.result === 'PASS' ? 'bg-green-500/10 text-green-600' : 'bg-red-500/10 text-red-600'
                       }`}>
                         {card.summary.result}
@@ -3495,7 +3495,7 @@ export default function ExamsPage() {
                 {editingInstructionIndex !== null ? 'Save' : 'Add'}
               </Button>
             </div>
-            <p className="text-[10px] text-text-muted">Maximum 3 instructions allowed. Each instruction can contain a maximum of 25 words.</p>
+            <p className="text-[11px] text-text-muted">Maximum 3 instructions allowed. Each instruction can contain a maximum of 25 words.</p>
           </form>
 
           <div className="space-y-2 mt-4 max-h-[300px] overflow-y-auto pr-1">
@@ -3580,7 +3580,7 @@ export default function ExamsPage() {
                     
                     {/* Header */}
                     <div className={`text-center border-b-2 border-zinc-800 text-zinc-900 ${scaling.headerPadding}`}>
-                      <h2 className="text-2xl font-black uppercase tracking-tight font-display">
+                      <h2 className="text-2xl font-bold uppercase tracking-tight font-display">
                         {schoolProfile?.name || 'SCHOOL TIMETABLE'}
                       </h2>
                       <h3 className="text-xl font-bold uppercase tracking-wide mt-1">
@@ -3704,7 +3704,7 @@ export default function ExamsPage() {
               placeholder="e.g. Excellent performance throughout the examination. Keep improving."
               className="w-full p-3.5 text-xs bg-background border border-border rounded-xl focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs resize-none text-text-primary font-medium"
             />
-            <div className="flex justify-between items-center text-[10px] text-text-muted mt-1 px-1">
+            <div className="flex justify-between items-center text-[11px] text-text-muted mt-1 px-1">
               <span>Maximum 12 words</span>
               <span className={`font-semibold ${getWordCount(tempRemark) > 12 ? 'text-red-500 font-bold' : ''}`}>
                 {getWordCount(tempRemark)} / 12 words
@@ -3745,7 +3745,7 @@ export default function ExamsPage() {
                 />
                 <div>
                   <span className="text-xs font-bold text-text-primary block">Weighted Ratio Strategy (Configurable Weights)</span>
-                  <span className="text-[10px] text-text-muted block">Apply specific percentage weights to Quarterly, Half Yearly, and Annual exams.</span>
+                  <span className="text-[11px] text-text-muted block">Apply specific percentage weights to Quarterly, Half Yearly, and Annual exams.</span>
                 </div>
               </label>
 
@@ -3753,7 +3753,7 @@ export default function ExamsPage() {
                 <div className="p-3 bg-zinc-50 dark:bg-zinc-900/50 border border-border rounded-xl space-y-3 pl-8 text-xs">
                   <div className="grid grid-cols-3 gap-3">
                     <div>
-                      <span className="text-[10px] font-bold text-text-muted uppercase block">Quarterly (%)</span>
+                      <span className="text-[11px] font-bold text-text-muted uppercase block">Quarterly (%)</span>
                       <Input
                         type="number"
                         value={customWeightsInput.quarterly}
@@ -3762,7 +3762,7 @@ export default function ExamsPage() {
                       />
                     </div>
                     <div>
-                      <span className="text-[10px] font-bold text-text-muted uppercase block">Half Yearly (%)</span>
+                      <span className="text-[11px] font-bold text-text-muted uppercase block">Half Yearly (%)</span>
                       <Input
                         type="number"
                         value={customWeightsInput.halfYearly}
@@ -3771,7 +3771,7 @@ export default function ExamsPage() {
                       />
                     </div>
                     <div>
-                      <span className="text-[10px] font-bold text-text-muted uppercase block">Annual (%)</span>
+                      <span className="text-[11px] font-bold text-text-muted uppercase block">Annual (%)</span>
                       <Input
                         type="number"
                         value={customWeightsInput.annual}
@@ -3794,7 +3794,7 @@ export default function ExamsPage() {
                 />
                 <div>
                   <span className="text-xs font-bold text-text-primary block">Equal Average Strategy</span>
-                  <span className="text-[10px] text-text-muted block">Equal percentage weightage across all conducted session exams.</span>
+                  <span className="text-[11px] text-text-muted block">Equal percentage weightage across all conducted session exams.</span>
                 </div>
               </label>
 
@@ -3809,7 +3809,7 @@ export default function ExamsPage() {
                 />
                 <div>
                   <span className="text-xs font-bold text-text-primary block">Best Examination Score Strategy</span>
-                  <span className="text-[10px] text-text-muted block">Takes highest subject percentage achieved across session exams.</span>
+                  <span className="text-[11px] text-text-muted block">Takes highest subject percentage achieved across session exams.</span>
                 </div>
               </label>
 
@@ -3824,7 +3824,7 @@ export default function ExamsPage() {
                 />
                 <div>
                   <span className="text-xs font-bold text-text-primary block">Annual Exam Only Strategy</span>
-                  <span className="text-[10px] text-text-muted block">100% weightage on final Annual Examination marks.</span>
+                  <span className="text-[11px] text-text-muted block">100% weightage on final Annual Examination marks.</span>
                 </div>
               </label>
             </div>
