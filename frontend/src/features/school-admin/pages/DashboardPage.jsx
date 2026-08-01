@@ -10,196 +10,10 @@ import { schoolAdminService } from '../../../common/services/schoolAdminService'
 import { Dialog } from '../../../common/ui/dialog';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../../common/ui/table';
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
-
-// Modern SVG Line Chart Widget (12 Bullets with Hover Tooltip, No Bars, No Total Box)
-function LineChartWidget({ title, subtitle, icon: Icon, data, colorTheme = 'emerald', onPointClick }) {
-  const [hoveredIdx, setHoveredIdx] = useState(null);
-
-  const amounts = (data || []).map(d => d.amount || 0);
-  const maxVal = Math.max(...amounts, 1);
-
-  // SVG dimensions
-  const width = 1000;
-  const height = 200;
-  const paddingX = 40;
-  const topY = 40;
-  const bottomY = 155;
-  const usableH = bottomY - topY;
-  const usableW = width - (paddingX * 2);
-
-  const points = (data || []).map((item, i) => {
-    const amt = item.amount || 0;
-    const ratio = maxVal > 0 ? (amt / maxVal) : 0;
-    const x = paddingX + (i / Math.max((data || []).length - 1, 1)) * usableW;
-    const y = bottomY - (ratio * usableH);
-    return { x, y, amt, month: item.month, label: item.label, raw: item, i };
-  });
-
-  // Smooth Bezier Curve Path
-  let linePathD = '';
-  let areaPathD = '';
-
-  if (points.length > 0) {
-    linePathD = `M ${points[0].x} ${points[0].y}`;
-    for (let i = 0; i < points.length - 1; i++) {
-      const p0 = points[i];
-      const p1 = points[i + 1];
-      const cpX1 = p0.x + (p1.x - p0.x) / 2;
-      const cpY1 = p0.y;
-      const cpX2 = p0.x + (p1.x - p0.x) / 2;
-      const cpY2 = p1.y;
-      linePathD += ` C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, ${p1.x} ${p1.y}`;
-    }
-    areaPathD = `${linePathD} L ${points[points.length - 1].x} ${bottomY} L ${points[0].x} ${bottomY} Z`;
-  }
-
-  // Chart colours come from tokens so they follow dark mode and per-school themes.
-  // SVG stroke/fill accept CSS custom properties directly.
-  const strokeColor = colorTheme === 'indigo' ? 'var(--chart-6)' : 'var(--chart-2)';
-  const gradientId = `gradient-${title.replace(/\s+/g, '-').toLowerCase()}`;
-
-  return (
-    <div className="bg-surface border border-border rounded-2xl p-6 shadow-sm">
-      {/* Card Header without Total Box */}
-      <div className="mb-6 border-b border-border/60 pb-4">
-        <h3 className="text-base font-bold text-text-primary tracking-tight font-display flex items-center gap-2">
-          {Icon && <Icon className={`h-5 w-5 ${colorTheme === 'indigo' ? 'text-chart-6' : 'text-chart-2'}`} />}
-          {title}
-        </h3>
-        {subtitle && <p className="text-xs text-text-muted font-medium mt-0.5">{subtitle}</p>}
-      </div>
-
-      <div className="w-full overflow-x-auto scrollbar-none">
-        <div className="min-w-[760px] relative pt-6 pb-2">
-          {/* Background Grid Lines */}
-          <div className="absolute inset-x-0 top-6 bottom-12 flex flex-col justify-between pointer-events-none opacity-30">
-            <div className="border-b border-dashed border-border/80 w-full"></div>
-            <div className="border-b border-dashed border-border/50 w-full"></div>
-            <div className="border-b border-dashed border-border/50 w-full"></div>
-            <div className="border-b border-dashed border-border/50 w-full"></div>
-            <div className="border-b border-border w-full"></div>
-          </div>
-
-          {/* SVG Line Chart Graph */}
-          <div className="relative h-56 w-full">
-            <svg 
-              viewBox={`0 0 ${width} ${height}`} 
-              preserveAspectRatio="none" 
-              className="w-full h-44 overflow-visible"
-            >
-              <defs>
-                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={strokeColor} stopOpacity="0.22" />
-                  <stop offset="100%" stopColor={strokeColor} stopOpacity="0.0" />
-                </linearGradient>
-              </defs>
-
-              {/* Area Under Curve */}
-              {areaPathD && <path d={areaPathD} fill={`url(#${gradientId})`} />}
-
-              {/* Connected Line Path */}
-              {linePathD && (
-                <path 
-                  d={linePathD} 
-                  fill="none" 
-                  stroke={strokeColor} 
-                  strokeWidth="3.5" 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                />
-              )}
-
-              {/* Perpendicular Vertical Drop Guidelines for each Bullet Point */}
-              {points.map((pt) => (
-                <line 
-                  key={`drop-${pt.i}`}
-                  x1={pt.x} 
-                  y1={pt.y} 
-                  x2={pt.x} 
-                  y2={bottomY} 
-                  stroke={strokeColor} 
-                  strokeWidth="1.5" 
-                  strokeDasharray="3 3" 
-                  strokeOpacity={hoveredIdx === pt.i ? "0.6" : "0.15"} 
-                  className="transition-opacity duration-200"
-                />
-              ))}
-
-              {/* 12 Bullet Points (Dots) on Line */}
-              {points.map((pt) => {
-                const isHovered = hoveredIdx === pt.i;
-                return (
-                  <g key={pt.i}>
-                    {isHovered && (
-                      <circle 
-                        cx={pt.x} 
-                        cy={pt.y} 
-                        r="12" 
-                        fill={strokeColor} 
-                        fillOpacity="0.25" 
-                        className="animate-ping"
-                      />
-                    )}
-                    <circle 
-                      cx={pt.x} 
-                      cy={pt.y} 
-                      r={isHovered ? "7" : "5.5"} 
-                      fill="var(--bg-surface)" 
-                      stroke={strokeColor} 
-                      strokeWidth={isHovered ? "4" : "3"} 
-                      className="transition-all duration-200 cursor-pointer shadow-md"
-                    />
-                  </g>
-                );
-              })}
-            </svg>
-
-            {/* Column Triggers, Hover Tooltips & Month Labels */}
-            <div className="absolute inset-0 flex justify-between pointer-events-none">
-              {points.map((pt) => {
-                const isHovered = hoveredIdx === pt.i;
-                const pctX = (pt.x / width) * 100;
-                const pctY = (pt.y / height) * 100;
-
-                return (
-                  <div 
-                    key={pt.i} 
-                    className="absolute top-0 bottom-0 flex flex-col items-center pointer-events-auto cursor-pointer group"
-                    style={{ left: `${pctX}%`, transform: 'translateX(-50%)', width: '60px' }}
-                    onMouseEnter={() => setHoveredIdx(pt.i)}
-                    onMouseLeave={() => setHoveredIdx(null)}
-                    onClick={onPointClick ? () => onPointClick(pt.raw) : undefined}
-                  >
-                    {/* Floating Tooltip Badge on Hover */}
-                    <div 
-                      className={`absolute transition-all duration-200 pointer-events-none select-none z-20 ${
-                        isHovered ? 'opacity-100 scale-105 -translate-y-2' : 'opacity-0 scale-95 translate-y-0'
-                      }`}
-                      style={{ top: `calc(${pctY * 0.78}% - 34px)` }}
-                    >
-                      <div className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-xl border border-zinc-700 dark:border-zinc-200 whitespace-nowrap">
-                        ₹{Math.round(pt.amt).toLocaleString('en-IN')}
-                      </div>
-                    </div>
-
-                    {/* X-Axis Month Label at the bottom */}
-                    <div className="absolute bottom-0 text-center">
-                      <span className={`text-[11px] font-bold transition-colors select-none ${
-                        isHovered ? (colorTheme === 'indigo' ? 'text-chart-6' : 'text-chart-2') : 'text-text-muted'
-                      }`}>
-                        {pt.month}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+import { LineChart } from '../../../common/ui/charts/LineChart';
+import { ChartCard } from '../../../common/ui/charts/ChartCard';
+import { SkeletonStatGrid } from '../../../common/ui/skeleton';
+import { formatCurrency } from '../../../common/utils/format';
 
 export default function DashboardPage({ onNavigate }) {
   const { currentYear } = useAcademicYear();
@@ -504,23 +318,35 @@ export default function DashboardPage({ onNavigate }) {
       {/* Charts Row */}
       <div className="grid grid-cols-1 gap-6">
         {/* Monthly Fee Collection */}
-        <LineChartWidget
-          title="Monthly Fee Collection"
-          subtitle={`Live collection breakdown per month for academic year ${currentYear?.name || ''}`}
+        <ChartCard
+          title="Monthly fee collection"
+          subtitle={`Collection per month for academic year ${currentYear?.name || ''}`}
           icon={Banknote}
-          data={FEE_DATA}
-          colorTheme="emerald"
-        />
+          iconTone="text-chart-2"
+          loading={loading}
+          isEmpty={!FEE_DATA.some(d => (d.amount || 0) > 0)}
+          emptyMessage="No fee payments recorded for this academic year yet."
+        >
+          <LineChart data={FEE_DATA} series={2} formatValue={formatCurrency} />
+        </ChartCard>
 
         {/* Salary Disbursement */}
-        <LineChartWidget
-          title="Salary Disbursement"
-          subtitle="Live monthly staff salary disbursements"
+        <ChartCard
+          title="Salary disbursement"
+          subtitle="Monthly staff salary disbursements"
           icon={CreditCard}
-          data={SALARY_DATA}
-          colorTheme="emerald"
-          onPointClick={(item) => onNavigate('salary-disbursement?month=' + encodeURIComponent(item.label))}
-        />
+          iconTone="text-chart-6"
+          loading={loading}
+          isEmpty={!SALARY_DATA.some(d => (d.amount || 0) > 0)}
+          emptyMessage="No salary disbursements recorded for this academic year yet."
+        >
+          <LineChart
+            data={SALARY_DATA}
+            series={6}
+            formatValue={formatCurrency}
+            onPointClick={(item) => onNavigate('salary-disbursement?month=' + encodeURIComponent(item.label))}
+          />
+        </ChartCard>
       </div>
 
         {/* Today's Timetable Panel */}
