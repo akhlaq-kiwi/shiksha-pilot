@@ -1,4 +1,5 @@
 import React from 'react';
+import { SIGNATURE_GAP, STAMP_SPACE } from '../reportCardLayout';
 
 /**
  * Template 3: Traditional School Format Report Card
@@ -26,8 +27,10 @@ export default function TraditionalReportCardTemplate({ data, config = {} }) {
         minHeight: '100%'
       }}
     >
-      {/* Decorative Outer Border */}
-      <div className={`border border-blue-900 ${innerPadding} h-full flex flex-col justify-between`} style={{ boxSizing: 'border-box' }}>
+      {/* Decorative Outer Border. flex-1 (not h-full) so it fills the card's
+          min-height — h-full resolves to auto against a parent that only has a
+          min-height, which would leave the footer riding up under the table. */}
+      <div className={`border border-blue-900 ${innerPadding} flex-1 flex flex-col`} style={{ boxSizing: 'border-box' }}>
         <div>
           {/* Header */}
           <div className="text-center border-b-2 border-blue-900 pb-5 mb-6">
@@ -179,8 +182,22 @@ export default function TraditionalReportCardTemplate({ data, config = {} }) {
             )}
           </div>
 
+          {/* Teacher Remarks (Rendered ONLY if non-empty remark exists) */}
+          {Boolean(summary.teacher_remark && summary.teacher_remark.toString().trim() !== '') && (
+            <div className="px-1 font-sans text-xs text-zinc-900 leading-normal mb-2">
+              <strong className="font-bold text-blue-950">Teacher Remarks:</strong>{' '}
+              <span className="font-normal text-zinc-800">{summary.teacher_remark}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Footer block: performance summary sits directly above the signatures,
+            both pinned to the bottom of the page. */}
+        {/* marginTop is inline rather than the mt-auto utility, so it cannot be
+            outweighed by a more specific spacing rule on the parent. */}
+        <div style={{ marginTop: 'auto' }}>
           {/* Performance Summary Cards (5 columns) */}
-          <div className="grid grid-cols-5 gap-2 font-sans mb-4">
+          <div className="grid grid-cols-5 gap-2 font-sans">
             <div className="bg-emerald-50 border border-emerald-200 p-2 rounded text-center flex flex-col justify-center">
               <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-800 block">Total Marks</span>
               <span className="text-xs font-black font-mono text-emerald-950 mt-0.5">{summary.total_obtained} / {summary.total_max}</span>
@@ -207,24 +224,21 @@ export default function TraditionalReportCardTemplate({ data, config = {} }) {
             </div>
           </div>
 
-          {/* Teacher Remarks (Rendered ONLY if non-empty remark exists) */}
-          {Boolean(summary.teacher_remark && summary.teacher_remark.toString().trim() !== '') && (
-            <div className="px-1 font-sans text-xs text-zinc-900 leading-normal mb-2">
-              <strong className="font-bold text-blue-950">Teacher Remarks:</strong>{' '}
-              <span className="font-normal text-zinc-800">{summary.teacher_remark}</span>
+          {/* Traditional Signatures. Gaps are in mm so the clear area survives print scaling. */}
+          <div
+            className="pt-4 pb-1 font-sans border-t border-blue-900 flex justify-between items-end text-xs font-bold text-blue-950 px-6"
+            style={{ marginTop: SIGNATURE_GAP }}
+          >
+            <div className="flex flex-col items-center">
+              <div style={{ height: STAMP_SPACE }} aria-hidden="true" />
+              <div className="w-40 border-b border-blue-900 mb-2" />
+              <span className="uppercase text-[10px] font-black tracking-wider text-blue-950">Class Teacher Signature</span>
             </div>
-          )}
-        </div>
-
-        {/* Traditional Signatures */}
-        <div className="mt-auto pt-16 pb-1 font-sans border-t border-blue-900 flex justify-between items-end text-xs font-bold text-blue-950 px-6">
-          <div className="flex flex-col items-center justify-end min-h-[120px]">
-            <div className="w-40 border-b border-blue-900 mb-2" />
-            <span className="uppercase text-[10px] font-black tracking-wider text-blue-950">Class Teacher Signature</span>
-          </div>
-          <div className="flex flex-col items-center justify-end min-h-[120px]">
-            <div className="w-40 border-b border-blue-900 mb-2" />
-            <span className="uppercase text-[10px] font-black tracking-wider text-blue-950">Principal Signature & Stamp</span>
+            <div className="flex flex-col items-center">
+              <div style={{ height: STAMP_SPACE }} aria-hidden="true" />
+              <div className="w-40 border-b border-blue-900 mb-2" />
+              <span className="uppercase text-[10px] font-black tracking-wider text-blue-950">Principal Signature & Stamp</span>
+            </div>
           </div>
         </div>
       </div>
