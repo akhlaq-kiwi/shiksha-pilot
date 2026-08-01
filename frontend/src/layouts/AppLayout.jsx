@@ -8,6 +8,17 @@ import { useNavigate } from 'react-router-dom';
 import { schoolService } from '../common/services/schoolService';
 import { useAcademicYear } from '../common/contexts/AcademicYearContext';
 import { Dialog } from '../common/ui/dialog';
+import GlobalSearch from '../common/components/GlobalSearch';
+import { useGlobalSearch } from '../common/hooks/useGlobalSearch';
+
+/** Drives the [data-portal] accent so each audience is distinguishable. */
+const PORTAL_BY_ROLE = {
+  SUPER_ADMIN: 'super-admin',
+  SCHOOL_ADMIN: 'school-admin',
+  TEACHER: 'teacher',
+  STUDENT: 'student',
+  PARENT: 'parent',
+};
 
 const ROLE_LABELS = {
   SUPER_ADMIN: 'Super Admin',
@@ -18,7 +29,7 @@ const ROLE_LABELS = {
 };
 
 const AppLayout = ({ children }) => {
-  const { theme, toggleTheme, applySchoolTheme } = useTheme();
+  const { theme, resolvedTheme, toggleTheme, applySchoolTheme } = useTheme();
   const navigate = useNavigate();
 
   const user = authService.getCurrentUser();
@@ -136,6 +147,9 @@ const AppLayout = ({ children }) => {
 
   const roleLabel = ROLE_LABELS[role] || role || 'Member';
 
+  // Command palette sources for this role.
+  const { destinations, searchRecords, enabled: searchEnabled } = useGlobalSearch(role, navigate);
+
   const handleLogout = () => {
     setShowLogoutConfirm(true);
   };
@@ -154,7 +168,9 @@ const AppLayout = ({ children }) => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="min-h-screen flex flex-col bg-background" data-portal={PORTAL_BY_ROLE[role]}>
+      {/* First tab stop: lets keyboard users bypass the header nav. */}
+      <a href="#main-content" className="skip-link">Skip to main content</a>
       {/* Sticky header */}
       <header className="sticky top-0 z-50 border-b border-border bg-surface">
         <div className="w-full px-6">
@@ -174,21 +190,41 @@ const AppLayout = ({ children }) => {
                     
                     {isSchoolAdmin && currentYear && (
                       <>
-                        <div className="h-4 w-px bg-border"></div>
-                        <div className="flex items-center gap-2">
+                        <div className="h-4 w-px bg-border" aria-hidden="true"></div>
+                        {/*
+                          Academic year is a SCOPE control: changing it changes
+                          every figure on every downstream screen. It was
+                          previously an unlabelled native select sitting next to
+                          the school name. It now carries a visible label, a
+                          distinct bordered treatment, and a confirmation when
+                          moving away from the active year.
+                        */}
+                        <div className="flex items-center gap-2 rounded-lg border border-border-strong bg-surface-sunken px-2 py-1">
+                          <label
+                            htmlFor="academic-year-switcher"
+                            className="hidden text-overline text-text-muted sm:block"
+                          >
+                            Academic year
+                          </label>
                           <select
+                            id="academic-year-switcher"
                             value={currentYear.id}
                             onChange={(e) => {
-                              selectYear(e.target.value);
+                              const nextId = e.target.value;
+                              const next = academicYears.find((y) => String(y.id) === String(nextId));
+                              const leavingActive = currentYear.status === 'ACTIVE' && next?.status !== 'ACTIVE';
+                              if (leavingActive) {
+                                const ok = window.confirm(
+                                  `Switch from the active year to ${next?.name}?\n\n` +
+                                  'All dashboards, fees, attendance and exam figures will show ' +
+                                  `${next?.name} data until you switch back.`
+                                );
+                                if (!ok) return;
+                              }
+                              selectYear(nextId);
                               navigate('/school-admin');
                             }}
-                            className="h-8 pl-2 pr-8 text-xs font-bold rounded-lg border border-border bg-surface text-text-primary shadow-2xs focus:outline-hidden focus:ring-1 focus:ring-primary appearance-none cursor-pointer relative"
-                            style={{
-                              backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2371717a' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E")`,
-                              backgroundPosition: 'right 0.25rem center',
-                              backgroundSize: '1.25rem',
-                              backgroundRepeat: 'no-repeat',
-                            }}
+                            className="h-7 cursor-pointer rounded-md border-0 bg-transparent pr-6 text-body-sm font-semibold text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
                           >
                             {academicYears.map(y => (
                               <option key={y.id} value={y.id}>
@@ -217,9 +253,14 @@ const AppLayout = ({ children }) => {
 
             {/* Right controls */}
             <div className="flex items-center gap-1.5">
-              
+
+              {/* Global search (Cmd/Ctrl-K) */}
+              {searchEnabled && (
+                <GlobalSearch destinations={destinations} onSearchRecords={searchRecords} />
+              )}
+
               {/* Notification Bell */}
-              {isSchoolAdmin && role === 'SCHOOL_ADMIN' && (
+              {isSchoolAdmin && (
                 <div className="relative" ref={notifRef}>
                   <Button
                     variant="ghost"
@@ -289,20 +330,40 @@ const AppLayout = ({ children }) => {
                 </div>
               )}
 
-              {/* Dark/light toggle */}
-              {(role === 'SCHOOL_ADMIN' || role === 'SUPER_ADMIN') && (
+              {/*
+                Dark/light toggle — now available to every role. Teachers and
+                students spend the longest in these screens and it was
+                previously gated to admins.
+              */}
+              {(
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={toggleTheme}
-                  aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-                  title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                  aria-label={resolvedTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                  title={resolvedTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
                 >
-                  {theme === 'dark'
+                  {resolvedTheme === 'dark'
                     ? <Sun className="w-4 h-4" />
                     : <Moon className="w-4 h-4" />
                   }
                 </Button>
+              )}
+
+              {/*
+                Who is signed in. The header previously showed only the SCHOOL
+                logo where the USER's identity belongs, so on a shared staff-room
+                device there was no way to tell whose account was active.
+              */}
+              {role !== 'SUPER_ADMIN' && (
+                <div className="mr-1 hidden flex-col items-end sm:flex">
+                  <span className="text-body-sm font-semibold leading-none text-text-primary">
+                    {displayName}
+                  </span>
+                  <span className="mt-0.5 text-[11px] leading-none text-text-muted">
+                    {roleLabel}
+                  </span>
+                </div>
               )}
 
               {/* User profile dropdown avatar controls */}
@@ -401,7 +462,7 @@ const AppLayout = ({ children }) => {
       )}
 
       {/* Page content */}
-      <main className="flex-1 w-full flex flex-col md:flex-row">
+      <main id="main-content" className="flex-1 w-full flex flex-col md:flex-row">
         {children}
       </main>
 

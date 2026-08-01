@@ -39,26 +39,69 @@ import { Dialog } from '../../common/ui/dialog';
 import { Button } from '../../common/ui/button';
 
 import { useAcademicYear } from '../../common/contexts/AcademicYearContext';
+import AppSidebar from '../../common/components/AppSidebar';
 
 // ─── Nav Items ────────────────────────────────────────────────────────────────
 
-const NAV_ITEMS = [
-  { path: '/school-admin',            label: 'Dashboard', icon: LayoutDashboard, exact: true },
-  { path: '/school-admin/classes',    label: 'Classes', icon: Users },
-  { path: '/school-admin/staff',      label: 'Teachers', icon: UserCog },
-  { path: '/school-admin/timetable',  label: 'Timetable', icon: Clock },
-  { path: '/school-admin/attendance', label: 'Attendance', icon: ClipboardCheck },
-  { path: '/school-admin/leave-requests', label: 'Manage Leaves', icon: FileText },
-  { path: '/school-admin/exams',      label: 'Examinations', icon: FileText },
-  { path: '/school-admin/finance',    label: 'Fees Portal', icon: DollarSign },
-  { path: '/school-admin/financial-reports', label: 'Financial Reports', icon: FileText },
-  { path: '/school-admin/finance-management', label: 'Finance Management', icon: Landmark },
-  { path: '/school-admin/fee-follow-ups',     label: 'Fee Follow-up', icon: PhoneCall },
-  { path: '/school-admin/announcements',      label: 'Announcements', icon: Megaphone },
-  { path: '/school-admin/audits-settings',    label: 'Audits & Settings', icon: Settings },
-  { path: '/school-admin/achievements', label: 'Achievements', icon: Trophy },
-  { path: '/school-admin/security',   label: 'Security', icon: Shield },
+/**
+ * Navigation, grouped.
+ *
+ * Previously this was a flat list of 15 destinations, which exceeds comfortable
+ * scanning — and three of them ("Fees Portal", "Financial Reports", "Finance
+ * Management") were named so similarly that a new admin had to open all three to
+ * learn the difference. Four labelled groups of 2-5 replaces one list of 15.
+ *
+ * IMPORTANT: `permissionKey` is the value teacher permissions are stored against
+ * server-side. It must keep the ORIGINAL label text even where the displayed
+ * label changes, or renaming a menu item would silently revoke a teacher's
+ * access to that page.
+ */
+const NAV_GROUPS = [
+  {
+    label: 'Overview',
+    items: [
+      { path: '/school-admin', label: 'Dashboard', permissionKey: 'Dashboard', icon: LayoutDashboard, exact: true },
+    ],
+  },
+  {
+    label: 'Academics',
+    items: [
+      { path: '/school-admin/classes',    label: 'Classes',      permissionKey: 'Classes',      icon: Users },
+      { path: '/school-admin/timetable',  label: 'Timetable',    permissionKey: 'Timetable',    icon: Clock },
+      { path: '/school-admin/attendance', label: 'Attendance',   permissionKey: 'Attendance',   icon: ClipboardCheck },
+      { path: '/school-admin/exams',      label: 'Examinations', permissionKey: 'Examinations', icon: FileText },
+    ],
+  },
+  {
+    label: 'People',
+    items: [
+      { path: '/school-admin/staff',          label: 'Teachers',      permissionKey: 'Teachers',      icon: UserCog },
+      { path: '/school-admin/leave-requests', label: 'Leave requests', permissionKey: 'Manage Leaves', icon: FileText },
+      { path: '/school-admin/achievements',   label: 'Achievements',  permissionKey: 'Achievements',  icon: Trophy },
+    ],
+  },
+  {
+    label: 'Finance',
+    items: [
+      // Renamed for distinguishability; permissionKey preserves the stored value.
+      { path: '/school-admin/finance',            label: 'Fee collection',   permissionKey: 'Fees Portal',        icon: DollarSign },
+      { path: '/school-admin/fee-follow-ups',     label: 'Fee follow-up',    permissionKey: 'Fee Follow-up',      icon: PhoneCall },
+      { path: '/school-admin/financial-reports',  label: 'Reports',          permissionKey: 'Financial Reports',  icon: FileText },
+      { path: '/school-admin/finance-management', label: 'Accounts & payroll', permissionKey: 'Finance Management', icon: Landmark },
+    ],
+  },
+  {
+    label: 'School',
+    items: [
+      { path: '/school-admin/announcements',   label: 'Announcements',    permissionKey: 'Announcements',     icon: Megaphone },
+      { path: '/school-admin/audits-settings', label: 'Settings',         permissionKey: 'Audits & Settings', icon: Settings },
+      { path: '/school-admin/security',        label: 'Security',         permissionKey: 'Security',          icon: Shield },
+    ],
+  },
 ];
+
+/** Flat list retained for route guards and redirects. */
+const NAV_ITEMS = NAV_GROUPS.flatMap((g) => g.items);
 
 // Onboarding content screen when no active academic year is present
 function OnboardingScreen() {
@@ -316,13 +359,22 @@ export default function SchoolAdminPortal() {
 
   const role = localStorage.getItem('shiksha_pilot_role') || '';
 
-  // Sidebar dynamic navigation list filtering
-  const visibleNavItems = NAV_ITEMS.filter(item => {
+  // Sidebar dynamic navigation list filtering.
+  // Matches on permissionKey, not the display label — the labels are now
+  // human-facing copy and must be free to change without affecting access.
+  const isPermitted = (item) => {
     if (role !== 'TEACHER') return true;
-    if (item.label === 'Achievements') return true;
+    if (item.permissionKey === 'Achievements') return true;
     if (loadingPermissions || permissions === null) return false;
-    return permissions.includes(item.label);
-  });
+    return permissions.includes(item.permissionKey);
+  };
+
+  const visibleNavItems = NAV_ITEMS.filter(isPermitted);
+
+  /** Grouped nav with empty groups dropped, for the sidebar. */
+  const visibleNavGroups = NAV_GROUPS
+    .map((group) => ({ ...group, items: group.items.filter(isPermitted) }))
+    .filter((group) => group.items.length > 0);
 
   // URL route guard access logic
   const currentItem = NAV_ITEMS.find(item => {
@@ -332,11 +384,11 @@ export default function SchoolAdminPortal() {
 
   const hasAccess = (() => {
     if (role !== 'TEACHER') return true;
-    if (currentItem && currentItem.label === 'Achievements') return true;
+    if (currentItem && currentItem.permissionKey === 'Achievements') return true;
     if (loadingPermissions) return true;
     if (!currentItem) return true; // Profile pages, change-password are open to all logged in users
     if (permissions === null) return true;
-    return permissions.includes(currentItem.label);
+    return permissions.includes(currentItem.permissionKey);
   })();
 
   // Redirect unpermitted pages immediately
@@ -474,25 +526,6 @@ export default function SchoolAdminPortal() {
     return location.pathname.startsWith(path);
   };
 
-  const navBtn = (item) => {
-    const Icon = item.icon;
-    const active = isActive(item.path, item.exact);
-    return (
-      <button
-        key={item.path}
-        onClick={() => nav(item.path)}
-        className={`flex items-center justify-start gap-3 rounded-lg transition-all flex-shrink-0 w-full text-left ${
-          item.isSubmenu 
-            ? 'pl-8 pr-3 py-2 text-[11px] font-bold uppercase tracking-wider' 
-            : 'px-3 py-2.5 text-xs font-bold uppercase tracking-wider'
-        } ${active ? 'bg-primary text-primary-fg font-bold shadow-xs' : 'text-text-secondary hover:bg-secondary/70 hover:text-text-primary'}`}
-      >
-        <Icon className={`flex-shrink-0 ${item.isSubmenu ? 'h-3 w-3 ml-1' : 'h-3.5 w-3.5'}`} />
-        <span>{item.label}</span>
-      </button>
-    );
-  };
-
   if (loadError) {
     return <ServerConnectionErrorScreen onRetry={handleRetry} retrying={retrying} />;
   }
@@ -551,14 +584,13 @@ export default function SchoolAdminPortal() {
   return (
     <div className="flex flex-col md:flex-row w-full min-h-[calc(100vh-56px)] bg-background">
 
-      {/* Sidebar */}
-      <aside className="w-full md:w-[240px] flex-shrink-0 flex flex-col justify-between border-r border-border dark:border-border pl-6 pr-4 py-6 bg-sidebar md:sticky md:top-14 md:h-[calc(100vh-56px)]">
-        <div className="overflow-y-auto scrollbar-none flex-1 min-h-0">
-          <nav className="flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 scrollbar-none">
-            {visibleNavItems.map(navBtn)}
-          </nav>
-        </div>
-      </aside>
+      {/* Sidebar — shared across portals; groups on desktop, drawer on mobile */}
+      <AppSidebar
+        groups={visibleNavGroups}
+        isActive={(item) => isActive(item.path, item.exact)}
+        onNavigate={(path) => nav(path)}
+        title={role === 'TEACHER' ? 'Teacher menu' : 'School admin menu'}
+      />
 
       {/* Main Area */}
       <div className="flex-1 min-w-0 p-6 md:p-8 max-w-7xl mx-auto w-full">

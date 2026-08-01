@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { teacherService } from '../../common/services/teacherService';
+import AppSidebar from '../../common/components/AppSidebar';
 import DashboardPage   from './pages/DashboardPage';
 import ClassesPage     from './pages/ClassesPage';
 import AttendancePage  from './pages/AttendancePage';
@@ -21,16 +22,40 @@ import TeacherLeavePage from './pages/TeacherLeavePage';
 import SettingsPage from './pages/SettingsPage';
 import AchievementsPage from '../achievements/pages/AchievementsPage';
 
-const NAV_ITEMS = [
-  { id: 'dashboard',   label: 'Dashboard',         icon: LayoutDashboard },
-  { id: 'classes',     label: 'My Classes',         icon: BookOpen },
-  { id: 'attendance',  label: 'Attendance',         icon: ClipboardCheck },
-  { id: 'achievements', label: 'Achievements',      icon: Trophy },
-  { id: 'assignments', label: 'Assignments',        icon: FileText },
-  { id: 'examination', label: 'Examination',        icon: Award },
-  { id: 'materials',   label: 'Learning Materials', icon: FolderOpen },
-  { id: 'leaves',      label: 'Leaves',             icon: CheckSquare },
+/**
+ * Teacher navigation, grouped to match every other portal.
+ *
+ * This portal previously used a horizontal wrapping nav while School Admin,
+ * Super Admin and Student/Parent all used sidebars — the same product looked
+ * like two different products depending on who logged in.
+ */
+const NAV_GROUPS = [
+  {
+    label: 'Teaching',
+    items: [
+      { id: 'dashboard',   label: 'Dashboard',   icon: LayoutDashboard },
+      { id: 'classes',     label: 'My classes',  icon: BookOpen },
+      { id: 'attendance',  label: 'Attendance',  icon: ClipboardCheck },
+    ],
+  },
+  {
+    label: 'Assessment',
+    items: [
+      { id: 'assignments', label: 'Assignments',  icon: FileText },
+      { id: 'examination', label: 'Marks & exams', icon: Award },
+      { id: 'achievements', label: 'Achievements', icon: Trophy },
+    ],
+  },
+  {
+    label: 'Resources',
+    items: [
+      { id: 'materials', label: 'Learning materials', icon: FolderOpen },
+      { id: 'leaves',    label: 'My leave',           icon: CheckSquare },
+    ],
+  },
 ];
+
+const NAV_ITEMS = NAV_GROUPS.flatMap((g) => g.items);
 
 export default function TeacherPortal() {
   const location = useLocation();
@@ -101,37 +126,15 @@ export default function TeacherPortal() {
   useEffect(() => { loadData(); }, [loadData]);
 
   return (
-    <div className="flex flex-col gap-6 max-w-7xl mx-auto w-full p-6 md:p-8">
+    <div className="flex w-full min-h-[calc(100vh-56px)] flex-col bg-background md:flex-row">
+      <AppSidebar
+        groups={NAV_GROUPS}
+        currentPage={currentPage}
+        onNavigate={handleNavigate}
+        title="Teacher menu"
+      />
 
-      {/* Portal identity strip */}
-      <div className="flex items-center gap-3 pb-1 border-b border-border">
-        <div className="h-9 w-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
-          <CheckSquare className="h-5 w-5" />
-        </div>
-        <div>
-          <h1 className="text-base font-bold text-text-primary tracking-tight font-display">Teacher Portal</h1>
-          <p className="text-xs text-text-muted">Shiksha Pilot</p>
-        </div>
-      </div>
-
-      {/* Horizontal nav */}
-      <nav className="flex flex-wrap gap-1 bg-background rounded-xl border border-border p-1" role="navigation" aria-label="Teacher portal sections">
-        {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            onClick={() => handleNavigate(id)}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all focus-visible:outline-none ${
-              currentPage === id
-                ? 'bg-primary text-primary-fg font-bold shadow-xs'
-                : 'text-text-secondary hover:text-text-primary hover:bg-secondary/70'
-            }`}
-          >
-            <Icon className="h-3.5 w-3.5 flex-shrink-0" />
-            <span className="hidden sm:inline">{label}</span>
-          </button>
-        ))}
-      </nav>
-
+      <div className="mx-auto w-full max-w-7xl min-w-0 flex-1 p-6 md:p-8">
       {/* Page content */}
       <div className="min-h-[400px]">
         {loading ? (
@@ -152,6 +155,7 @@ export default function TeacherPortal() {
             {currentPage === 'settings'    && <SettingsPage />}
           </>
         )}
+        </div>
       </div>
     </div>
   );

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Building2, CreditCard, Settings, AlertCircle } from 'lucide-react';
 import { platformService } from '../../common/services/platformService';
+import AppSidebar from '../../common/components/AppSidebar';
 import { useToast } from '../../common/components/Toast';
 import { useConfirm } from '../../common/components/ConfirmDialog';
 import DashboardPage from './pages/DashboardPage';
@@ -151,28 +152,13 @@ export default function SuperAdminPortal() {
   return (
     <div className="flex flex-col md:flex-row w-full min-h-[calc(100vh-56px)] bg-background">
 
-      {/* Sidebar */}
-      <aside className="w-full md:w-[240px] flex-shrink-0 flex flex-col justify-between border-r border-border pl-6 pr-4 py-6 bg-surface md:sticky md:top-14 md:h-[calc(100vh-56px)] md:overflow-y-auto scrollbar-none">
-        <div>
-          <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-4 px-3">Management</p>
-          <nav className="flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 scrollbar-none">
-            {NAV.map(item => {
-              const Icon = item.icon;
-              const active = isActive(item.path, item.exact);
-              return (
-                 <button
-                   key={item.path}
-                   onClick={() => nav(item.path)}
-                   className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all flex-shrink-0 focus-visible:outline-none ${active ? 'bg-primary text-primary-fg font-bold shadow-xs' : 'text-text-secondary hover:bg-secondary/70 hover:text-text-primary'}`}
-                 >
-                   <Icon className="h-3.5 w-3.5 flex-shrink-0" />
-                   <span>{item.label}</span>
-                 </button>
-              );
-            })}
-          </nav>
-        </div>
-      </aside>
+      {/* Sidebar — shared shell */}
+      <AppSidebar
+        groups={[{ label: 'Management', items: NAV }]}
+        isActive={(item) => isActive(item.path, item.exact)}
+        onNavigate={(path) => nav(path)}
+        title="Platform menu"
+      />
 
       {/* Main content */}
       <div className="flex-1 min-w-0 p-6 md:p-8 max-w-7xl mx-auto w-full">
