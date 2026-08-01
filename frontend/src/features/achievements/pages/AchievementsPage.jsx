@@ -372,9 +372,9 @@ export default function AchievementsPage() {
               
               {/* Search Input (Left) */}
               <div className="space-y-1">
-                <label className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Search</label>
+                <label htmlFor="search" className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Search</label>
                 <form onSubmit={handleSearchSubmit} className="relative">
-                  <Input
+                  <Input id="search"
                     type="text"
                     placeholder="Search by name, roll..."
                     value={searchQuery}

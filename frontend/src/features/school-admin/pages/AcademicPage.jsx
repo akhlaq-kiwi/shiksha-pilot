@@ -187,17 +187,17 @@ export default function AcademicPage() {
         </>}>
         <form onSubmit={handleAddClass} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-text-secondary uppercase">Class Name</label>
-            <Input placeholder="e.g. Class 10" value={newClass.name} onChange={e => setNewClass(p => ({ ...p, name: e.target.value }))} required />
+            <label htmlFor="class-name" className="text-xs font-bold text-text-secondary uppercase">Class Name</label>
+            <Input id="class-name" placeholder="e.g. Class 10" value={newClass.name} onChange={e => setNewClass(p => ({ ...p, name: e.target.value }))} required />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">Section</label>
-              <Input placeholder="e.g. A" value={newClass.section} onChange={e => setNewClass(p => ({ ...p, section: e.target.value }))} />
+              <label htmlFor="section" className="text-xs font-bold text-text-secondary uppercase">Section</label>
+              <Input id="section" placeholder="e.g. A" value={newClass.section} onChange={e => setNewClass(p => ({ ...p, section: e.target.value }))} />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">Stream / Specialization</label>
-              <Input placeholder="e.g. Science" value={newClass.stream} onChange={e => setNewClass(p => ({ ...p, stream: e.target.value }))} />
+              <label htmlFor="stream-specialization" className="text-xs font-bold text-text-secondary uppercase">Stream / Specialization</label>
+              <Input id="stream-specialization" placeholder="e.g. Science" value={newClass.stream} onChange={e => setNewClass(p => ({ ...p, stream: e.target.value }))} />
             </div>
           </div>
         </form>

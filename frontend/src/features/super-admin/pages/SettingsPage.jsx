@@ -50,17 +50,17 @@ function AddAdminDialog({ onClose, onAdd }) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-text-secondary uppercase">Full Name</label>
-            <Input placeholder="e.g. John Smith" value={form.name} onChange={set('name')} required />
+            <label htmlFor="full-name" className="text-xs font-bold text-text-secondary uppercase">Full Name</label>
+            <Input id="full-name" placeholder="e.g. John Smith" value={form.name} onChange={set('name')} required />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">Phone</label>
-              <Input placeholder="e.g. 1000000004" value={form.phone} onChange={set('phone')} required />
+              <label htmlFor="phone" className="text-xs font-bold text-text-secondary uppercase">Phone</label>
+              <Input id="phone" placeholder="e.g. 1000000004" value={form.phone} onChange={set('phone')} required />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">Password</label>
-              <Input type="password" placeholder="Min. 6 chars" value={form.password} onChange={set('password')} required minLength={6} />
+              <label htmlFor="password" className="text-xs font-bold text-text-secondary uppercase">Password</label>
+              <Input id="password" type="password" placeholder="Min. 6 chars" value={form.password} onChange={set('password')} required minLength={6} />
             </div>
           </div>
           <div className="flex gap-3 pt-2">

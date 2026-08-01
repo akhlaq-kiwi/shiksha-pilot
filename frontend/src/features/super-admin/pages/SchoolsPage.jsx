@@ -693,7 +693,7 @@ export default function SchoolsPage({ schools, onCreateSchool, onToggleStatus, o
       <div className="bg-surface border border-border rounded-2xl p-4 flex flex-col md:flex-row gap-4 items-center justify-between shadow-sm">
         <div className="relative w-full md:w-96">
           <Search className="absolute left-3 top-3 h-4 w-4 text-text-muted" />
-          <Input
+          <Input aria-label="Search by name or subdomain..."
             placeholder="Search by name or subdomain..."
             className="pl-9"
             value={search}

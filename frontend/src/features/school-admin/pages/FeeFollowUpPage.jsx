@@ -466,10 +466,10 @@ export default function FeeFollowUpPage() {
         <CardContent className="p-0">
           <div className="flex flex-col md:flex-row items-end gap-4 max-w-xl">
             <div className="flex-1 space-y-1.5 w-full">
-              <label className="text-[11px] text-text-secondary font-bold uppercase">Search Student</label>
+              <label htmlFor="search-student" className="text-[11px] text-text-secondary font-bold uppercase">Search Student</label>
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-text-muted" />
-                <Input
+                <Input id="search-student"
                   type="text"
                   placeholder="Search by name, admission no or roll no..."
                   value={filters.student_search}
@@ -625,12 +625,12 @@ export default function FeeFollowUpPage() {
             
             {/* Student Searchable Picker */}
             <div className="space-y-1.5 relative" ref={studentSearchRef}>
-              <label className="text-[11px] text-text-secondary font-bold uppercase">Select Student *</label>
+              <label htmlFor="select-student" className="text-[11px] text-text-secondary font-bold uppercase">Select Student *</label>
               {modalMode === 'add' ? (
                 <>
                   <div className="relative">
                     <User className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-text-muted" />
-                    <Input
+                    <Input id="select-student"
                       type="text"
                       placeholder="Type student name to search..."
                       value={studentSearchVal}
@@ -684,10 +684,10 @@ export default function FeeFollowUpPage() {
 
             {/* Pending Amount */}
             <div className="space-y-1.5">
-              <label className="text-[11px] text-text-secondary font-bold uppercase">Pending Amount (₹) *</label>
+              <label htmlFor="pending-amount" className="text-[11px] text-text-secondary font-bold uppercase">Pending Amount (₹) *</label>
               <div className="relative">
                 <DollarSign className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-text-muted" />
-                <Input
+                <Input id="pending-amount"
                   type="number"
                   step="0.01"
                   placeholder="0.00"
@@ -717,8 +717,8 @@ export default function FeeFollowUpPage() {
 
             {/* Commitment Reason */}
             <div className="space-y-1.5">
-              <label className="text-[11px] text-text-secondary font-bold uppercase">Reason / Commitment Notes *</label>
-              <textarea
+              <label htmlFor="reason-commitment-notes" className="text-[11px] text-text-secondary font-bold uppercase">Reason / Commitment Notes *</label>
+              <textarea id="reason-commitment-notes"
                 rows={3}
                 maxLength={500}
                 placeholder="Examples: Salary delayed, cheque clearing, family emergency..."
@@ -890,8 +890,8 @@ export default function FeeFollowUpPage() {
 
             {/* New Reason */}
             <div className="space-y-1.5">
-              <label className="text-[11px] text-text-secondary font-bold uppercase">Reason / Update Notes (Optional)</label>
-              <textarea
+              <label htmlFor="reason-update-notes-optional" className="text-[11px] text-text-secondary font-bold uppercase">Reason / Update Notes (Optional)</label>
+              <textarea id="reason-update-notes-optional"
                 rows={3}
                 maxLength={500}
                 placeholder="Reason for extension e.g. delay in crop sale, medical urgency..."

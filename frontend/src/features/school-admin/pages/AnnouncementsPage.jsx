@@ -518,10 +518,8 @@ export default function AnnouncementsPage() {
         <div className="p-6 space-y-5">
           {/* Subject */}
           <div className="space-y-2">
-            <label className="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">
-              Subject <span className="text-destructive">*</span>
-            </label>
-            <Input
+            <label htmlFor="subject" className="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">Subject</label>
+            <Input id="subject"
               placeholder="e.g. School Reopens from 15 July"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}

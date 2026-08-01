@@ -653,12 +653,12 @@ export default function ParentLeavePage() {
 
             <div className="space-y-1.5">
               <div className="flex justify-between items-center">
-                <label className="text-xs font-bold text-text-secondary uppercase">Reason for Leave</label>
+                <label htmlFor="reason-for-leave" className="text-xs font-bold text-text-secondary uppercase">Reason for Leave</label>
                 <span className={`text-[11px] font-bold ${wordCount > 100 ? 'text-red-500' : 'text-text-muted'}`}>
                   {wordCount}/100 Words
                 </span>
               </div>
-              <textarea
+              <textarea id="reason-for-leave"
                 placeholder="Type the reason for the leave request here (max 100 words)..."
                 rows={4}
                 value={form.reason}

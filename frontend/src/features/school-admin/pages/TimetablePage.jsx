@@ -1184,8 +1184,8 @@ export default function TimetablePage() {
             )}
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="flex-1 space-y-1.5">
-                <label className="text-[11px] font-bold text-text-secondary uppercase">Subject Name *</label>
-                <Input
+                <label htmlFor="subject-name" className="text-[11px] font-bold text-text-secondary uppercase">Subject Name *</label>
+                <Input id="subject-name"
                   placeholder="e.g. English Literature"
                   value={newSubject.name}
                   onChange={e => {

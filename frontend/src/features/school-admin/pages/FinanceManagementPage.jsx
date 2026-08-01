@@ -1162,7 +1162,7 @@ export default function FinanceManagementPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
               <div>
-                <Input 
+                <Input aria-label="Search by Description..." 
                   placeholder="Search by Description..." 
                   value={expenseSearch} 
                   onChange={e => setExpenseSearch(e.target.value)} 
@@ -1303,7 +1303,7 @@ export default function FinanceManagementPage() {
           <div className="flex-shrink-0 bg-surface border border-border p-5 rounded-2xl shadow-2xs space-y-4">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="relative flex-1 max-w-md w-full">
-                <Input 
+                <Input aria-label="Search by Fee Description..." 
                   placeholder="Search by Fee Description..." 
                   value={feeSearch} 
                   onChange={e => setFeeSearch(e.target.value)} 
@@ -1451,7 +1451,7 @@ export default function FinanceManagementPage() {
           <div className="flex-shrink-0 bg-surface border border-border p-5 rounded-2xl shadow-2xs space-y-4">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="relative flex-1 max-w-md w-full">
-                <Input 
+                <Input aria-label="Search by Student Name or Admission Number..." 
                   placeholder="Search by Student Name or Admission Number..." 
                   value={transportSearch} 
                   onChange={e => setTransportSearch(e.target.value)} 
@@ -1596,7 +1596,7 @@ export default function FinanceManagementPage() {
                       Penalty Percentage (%) *
                       <Percent className="h-3 w-3 text-text-muted" />
                     </label>
-                    <Input 
+                    <Input aria-label="e.g. 5.50" 
                       type="number"
                       step="0.01"
                       min="0.01"
@@ -1671,8 +1671,8 @@ export default function FinanceManagementPage() {
                   {enableDueRestriction && (
                     <div className="space-y-4 max-w-2xl animate-in slide-in-from-top-2 duration-150">
                       <div className="space-y-1.5 max-w-md">
-                        <label className="text-xs font-bold text-text-secondary uppercase">Maximum Allowed Due Amount (₹) *</label>
-                        <Input 
+                        <label htmlFor="maximum-allowed-due-amount" className="text-xs font-bold text-text-secondary uppercase">Maximum Allowed Due Amount (₹) *</label>
+                        <Input id="maximum-allowed-due-amount" 
                           type="number"
                           min="0"
                           step="1"
@@ -1686,7 +1686,7 @@ export default function FinanceManagementPage() {
                       </div>
 
                       <div className="space-y-2">
-                        <label className="text-xs font-bold text-text-secondary uppercase block">Restriction Applies To</label>
+                        <label htmlFor="restriction-applies-to" className="text-xs font-bold text-text-secondary uppercase block">Restriction Applies To</label>
                         <div className="flex flex-wrap gap-6 items-center">
                           <label className="flex items-center gap-2 text-xs font-semibold text-text-primary cursor-pointer">
                             <input 
@@ -1770,7 +1770,7 @@ export default function FinanceManagementPage() {
         <form onSubmit={handleSaveExpense} className="space-y-4">
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-text-secondary uppercase">Description *</label>
-            <Input 
+            <Input id="restriction-applies-to" 
               placeholder="e.g. Electricity bill June" 
               value={expenseDesc} 
               onChange={e => setExpenseDesc(e.target.value)} 
@@ -1780,8 +1780,8 @@ export default function FinanceManagementPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">Amount (₹) *</label>
-              <Input 
+              <label htmlFor="amount" className="text-xs font-bold text-text-secondary uppercase">Amount (₹) *</label>
+              <Input id="amount" 
                 type="number" 
                 placeholder="Rupees" 
                 value={expenseAmount} 
@@ -1855,7 +1855,7 @@ export default function FinanceManagementPage() {
           {/* Apply Fee To Selection (Hide when editing) */}
           {!editingFeeType && (
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Apply Fee To</label>
+              <label htmlFor="apply-fee-to" className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Apply Fee To</label>
               <div className="flex items-center gap-6 mt-1">
                 <label className="flex items-center gap-2 font-bold cursor-pointer">
                   <input 
@@ -1886,7 +1886,7 @@ export default function FinanceManagementPage() {
           {/* Description */}
           <div className="space-y-1.5">
             <label className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Fee Description *</label>
-            <Input 
+            <Input id="apply-fee-to" 
               placeholder="e.g. Annual Sports Fee" 
               value={feeDescription} 
               onChange={e => setFeeDescription(e.target.value)} 
@@ -1900,8 +1900,8 @@ export default function FinanceManagementPage() {
           {/* Case 1: Entire School Amount */}
           {applyType === 'school' && (
             <div className="space-y-1.5 animate-in slide-in-from-top-1 duration-200">
-              <label className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Amount (₹) *</label>
-              <Input 
+              <label htmlFor="amount-2" className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Amount (₹) *</label>
+              <Input id="amount-2" 
                 type="number" 
                 placeholder="e.g. 500" 
                 value={feeSchoolAmount} 
@@ -1923,7 +1923,7 @@ export default function FinanceManagementPage() {
           {/* Case 2: Selected Classes Table amount mapping (Hide when editing) */}
           {!editingFeeType && applyType === 'classes' && (
             <div className="space-y-2 animate-in slide-in-from-top-1 duration-200">
-              <label className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Class Dues Allocation</label>
+              <label htmlFor="class-dues-allocation" className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Class Dues Allocation</label>
               <div className="border border-border rounded-xl overflow-hidden max-h-[220px] overflow-y-auto bg-zinc-50/50 dark:bg-zinc-900/50">
                 <Table>
                   <TableHeader className="sticky top-0 bg-zinc-50 dark:bg-zinc-900 z-10">
@@ -1937,7 +1937,7 @@ export default function FinanceManagementPage() {
                       <TableRow key={c.id}>
                         <TableCell className="py-2 font-bold text-xs">{c.name}</TableCell>
                         <TableCell className="py-1">
-                          <Input 
+                          <Input id="class-dues-allocation" 
                             type="number" 
                             placeholder="Blank if none" 
                             value={classAmountsMap[c.id] || ''} 
@@ -2074,12 +2074,12 @@ export default function FinanceManagementPage() {
             
             {/* Student Search Picker */}
             <div className="space-y-1.5 relative" ref={studentSearchRef}>
-              <label className="text-[11px] text-text-secondary font-bold uppercase font-bold tracking-wider">Student *</label>
+              <label htmlFor="student" className="text-[11px] text-text-secondary font-bold uppercase font-bold tracking-wider">Student *</label>
               {!selectedStudent ? (
                 <>
                   <div className="relative">
                     <User className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-text-muted" />
-                    <Input
+                    <Input id="student"
                       type="text"
                       placeholder="Search student by name, roll no, or SR no..."
                       value={studentSearchVal}
@@ -2142,8 +2142,8 @@ export default function FinanceManagementPage() {
 
             {/* Monthly Transport Fee amount */}
             <div className="space-y-1.5">
-              <label className="text-[11px] text-text-secondary font-bold uppercase font-bold tracking-wider">Monthly Transport Fee (₹) *</label>
-              <Input
+              <label htmlFor="monthly-transport-fee" className="text-[11px] text-text-secondary font-bold uppercase font-bold tracking-wider">Monthly Transport Fee (₹) *</label>
+              <Input id="monthly-transport-fee"
                 type="number"
                 placeholder="e.g. 1000"
                 value={transportMonthlyFee}
@@ -2397,7 +2397,7 @@ export default function FinanceManagementPage() {
 
           {/* Apply To Radio Selection */}
           <div className="space-y-1.5">
-            <label className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Apply To</label>
+            <label htmlFor="apply-to" className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Apply To</label>
             <div className="flex items-center gap-6 pt-1">
               <label className="flex items-center gap-2 text-xs font-semibold text-text-primary cursor-pointer">
                 <input
@@ -2430,7 +2430,7 @@ export default function FinanceManagementPage() {
               <label className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Annual Fee Amount *</label>
               <div className="relative">
                 <span className="absolute left-3 top-2.5 text-xs font-bold text-text-muted">₹</span>
-                <Input
+                <Input id="apply-to"
                   type="number"
                   placeholder="1000"
                   value={annualFeeAmount}
@@ -2448,7 +2448,7 @@ export default function FinanceManagementPage() {
             /* If Class Wise Selected */
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Class-Wise Fee Allocation *</label>
+                <label htmlFor="class-wise-fee-allocation" className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Class-Wise Fee Allocation *</label>
                 {annualFeeFormErrors.classes && (
                   <p className="text-[11px] text-red-500 font-bold">{annualFeeFormErrors.classes}</p>
                 )}
@@ -2468,7 +2468,7 @@ export default function FinanceManagementPage() {
                           {cls.name} {cls.section ? `- ${cls.section}` : ''}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Input
+                          <Input id="class-wise-fee-allocation"
                             type="number"
                             placeholder="0"
                             value={annualFeeClassAmountsMap[cls.id] || ''}

@@ -406,8 +406,8 @@ export default function LeaveRequestsPage() {
             <CardContent className="pt-4">
               <form onSubmit={handleCreateHoliday} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-text-secondary uppercase">Leave Title</label>
-                  <Input
+                  <label htmlFor="leave-title" className="text-xs font-bold text-text-secondary uppercase">Leave Title</label>
+                  <Input id="leave-title"
                     type="text"
                     placeholder="e.g. Republic Day"
                     value={newLeaveTitle}
@@ -594,7 +594,7 @@ export default function LeaveRequestsPage() {
           <div className="flex flex-col sm:flex-row flex-1 items-stretch sm:items-center gap-3 w-full">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />
-              <Input
+              <Input aria-label="Search student name, class..."
                 type="text"
                 placeholder="Search student name, class..."
                 className="pl-9 text-xs w-full"
@@ -770,7 +770,7 @@ export default function LeaveRequestsPage() {
           <div className="flex flex-col sm:flex-row flex-1 items-stretch sm:items-center gap-3 w-full">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />
-              <Input
+              <Input aria-label="Search teacher, department..."
                 type="text"
                 placeholder="Search teacher, department..."
                 className="pl-9 text-xs w-full"
@@ -1069,8 +1069,8 @@ export default function LeaveRequestsPage() {
         >
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">Reason for Rejection</label>
-              <textarea
+              <label htmlFor="reason-for-rejection" className="text-xs font-bold text-text-secondary uppercase">Reason for Rejection</label>
+              <textarea id="reason-for-rejection"
                 placeholder="Type the reason for rejection here..."
                 rows={3}
                 value={rejectReason}

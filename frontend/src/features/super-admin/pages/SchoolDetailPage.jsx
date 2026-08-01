@@ -101,8 +101,8 @@ function ManageSubscriptionDialog({ school, onClose, onSaved }) {
               <p className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">Trial Period</p>
               <div className="flex items-center gap-2">
                 <div className="flex-1 space-y-1">
-                  <label className="text-xs text-text-secondary font-semibold">Duration</label>
-                  <Input type="number" min="1" max="24" placeholder="e.g. 3" value={trialDuration} onChange={e => setTrialDuration(e.target.value)} required />
+                  <label htmlFor="duration" className="text-xs text-text-secondary font-semibold">Duration</label>
+                  <Input id="duration" type="number" min="1" max="24" placeholder="e.g. 3" value={trialDuration} onChange={e => setTrialDuration(e.target.value)} required />
                 </div>
                 <div className="flex-1 space-y-1">
                   <label className="text-xs text-text-secondary font-semibold">Unit</label>
@@ -124,21 +124,21 @@ function ManageSubscriptionDialog({ school, onClose, onSaved }) {
               <p className="text-xs font-bold text-blue-700 dark:text-blue-400 uppercase tracking-wider">Custom Plan Details</p>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs text-text-secondary font-semibold">Plan Name</label>
-                  <Input placeholder="e.g. District Pro" value={customName} onChange={e => setCustomName(e.target.value)} required />
+                  <label htmlFor="plan-name" className="text-xs text-text-secondary font-semibold">Plan Name</label>
+                  <Input id="plan-name" placeholder="e.g. District Pro" value={customName} onChange={e => setCustomName(e.target.value)} required />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs text-text-secondary font-semibold">Monthly Price (₹)</label>
-                  <Input type="number" min="0" placeholder="e.g. 14999" value={customPrice} onChange={e => setCustomPrice(e.target.value)} required />
+                  <label htmlFor="monthly-price" className="text-xs text-text-secondary font-semibold">Monthly Price (₹)</label>
+                  <Input id="monthly-price" type="number" min="0" placeholder="e.g. 14999" value={customPrice} onChange={e => setCustomPrice(e.target.value)} required />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs text-text-secondary font-semibold">Student Limit</label>
-                  <Input type="number" min="0" placeholder="Leave blank for unlimited" value={customLimit} onChange={e => setCustomLimit(e.target.value)} />
+                  <label htmlFor="student-limit" className="text-xs text-text-secondary font-semibold">Student Limit</label>
+                  <Input id="student-limit" type="number" min="0" placeholder="Leave blank for unlimited" value={customLimit} onChange={e => setCustomLimit(e.target.value)} />
                 </div>
               </div>
               <div className="space-y-1">
-                <label className="text-xs text-text-secondary font-semibold">Description</label>
-                <Input placeholder="Brief description of this plan" value={customDesc} onChange={e => setCustomDesc(e.target.value)} />
+                <label htmlFor="description" className="text-xs text-text-secondary font-semibold">Description</label>
+                <Input id="description" placeholder="Brief description of this plan" value={customDesc} onChange={e => setCustomDesc(e.target.value)} />
               </div>
             </div>
           )}
@@ -201,17 +201,17 @@ function ChangePasswordDialog({ schoolName, onClose, onSave }) {
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-text-secondary uppercase">New Password</label>
+            <label htmlFor="new-password" className="text-xs font-bold text-text-secondary uppercase">New Password</label>
             <div className="relative">
-              <Input type={showPw ? 'text' : 'password'} placeholder="Min. 6 characters" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} className="pr-10" />
+              <Input id="new-password" type={showPw ? 'text' : 'password'} placeholder="Min. 6 characters" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} className="pr-10" />
               <button type="button" onClick={() => setShowPw(v => !v)} className="absolute right-3 top-2.5 text-text-muted hover:text-text-primary">
                 {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-text-secondary uppercase">Confirm Password</label>
-            <Input type="password" placeholder="Repeat password" value={confirm} onChange={e => setConfirm(e.target.value)} required className={mismatch ? 'border-red-400' : ''} />
+            <label htmlFor="confirm-password" className="text-xs font-bold text-text-secondary uppercase">Confirm Password</label>
+            <Input id="confirm-password" type="password" placeholder="Repeat password" value={confirm} onChange={e => setConfirm(e.target.value)} required className={mismatch ? 'border-red-400' : ''} />
             {mismatch && <p className="text-xs text-red-500 font-semibold">Passwords do not match</p>}
           </div>
           <div className="flex gap-3 pt-2">
@@ -372,12 +372,12 @@ function EditSchoolDetailsDialog({ school, onClose, onSaved }) {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">Contact Phone</label>
-              <Input placeholder="e.g. 9900000001" value={contactPhone} onChange={e => setContactPhone(e.target.value)} />
+              <label htmlFor="contact-phone" className="text-xs font-bold text-text-secondary uppercase">Contact Phone</label>
+              <Input id="contact-phone" placeholder="e.g. 9900000001" value={contactPhone} onChange={e => setContactPhone(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">School Owner Email *</label>
-              <Input type="email" placeholder="owner@school.com" value={contactEmail} onChange={e => setContactEmail(e.target.value)} required />
+              <label htmlFor="school-owner-email" className="text-xs font-bold text-text-secondary uppercase">School Owner Email *</label>
+              <Input id="school-owner-email" type="email" placeholder="owner@school.com" value={contactEmail} onChange={e => setContactEmail(e.target.value)} required />
             </div>
           </div>
 

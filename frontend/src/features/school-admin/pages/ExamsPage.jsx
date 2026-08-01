@@ -340,7 +340,7 @@ const CalendarDatePicker = ({ value, onChange, min, max, required, className, on
   return (
     <div className="relative w-full font-sans" ref={containerRef}>
       <div className="relative flex items-center">
-        <Input
+        <Input aria-label="e.g. 10 July 2026"
           placeholder="e.g. 10 July 2026"
           value={inputValue}
           onChange={handleInputChange}
@@ -2844,7 +2844,7 @@ export default function ExamsPage() {
                           />
                         </TableCell>
                         <TableCell>
-                          <Input 
+                          <Input aria-label="Add remarks..." 
                             placeholder="Add remarks..." 
                             className="h-8 text-xs w-full"
                             disabled={isReadOnlyField}
@@ -3034,7 +3034,7 @@ export default function ExamsPage() {
                       ) : gradeScales.map((s, idx) => (
                         <TableRow key={idx}>
                           <TableCell>
-                            <Input
+                            <Input aria-label="e.g. A+"
                               value={s.grade}
                               placeholder="e.g. A+"
                               disabled={isReadOnly}
@@ -3070,7 +3070,7 @@ export default function ExamsPage() {
                             />
                           </TableCell>
                           <TableCell>
-                            <Input
+                            <Input aria-label="e.g. Excellent"
                               value={s.remark || ''}
                               placeholder="e.g. Excellent"
                               disabled={isReadOnly}
@@ -3334,8 +3334,8 @@ export default function ExamsPage() {
         </>}>
         <form onSubmit={handleCreateExam} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-text-secondary uppercase">Examination Name</label>
-            <Input placeholder="e.g. Half Yearly, Pre Board, Unit Test 1" value={newExam.name} onChange={e => setNewExam(p => ({ ...p, name: e.target.value }))} required />
+            <label htmlFor="examination-name" className="text-xs font-bold text-text-secondary uppercase">Examination Name</label>
+            <Input id="examination-name" placeholder="e.g. Half Yearly, Pre Board, Unit Test 1" value={newExam.name} onChange={e => setNewExam(p => ({ ...p, name: e.target.value }))} required />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -3355,8 +3355,8 @@ export default function ExamsPage() {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-text-secondary uppercase">Description (Optional)</label>
-            <Input placeholder="Brief details about terms or exam guidelines" value={newExam.description} onChange={e => setNewExam(p => ({ ...p, description: e.target.value }))} />
+            <label htmlFor="description-optional" className="text-xs font-bold text-text-secondary uppercase">Description (Optional)</label>
+            <Input id="description-optional" placeholder="Brief details about terms or exam guidelines" value={newExam.description} onChange={e => setNewExam(p => ({ ...p, description: e.target.value }))} />
           </div>
         </form>
       </Dialog>
@@ -3412,8 +3412,8 @@ export default function ExamsPage() {
         </>}>
         <form onSubmit={handleUpdateExam} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-text-secondary uppercase">Examination Name</label>
-            <Input placeholder="e.g. Half Yearly, Pre Board, Unit Test 1" value={editExamData.name} onChange={e => setEditExamData(p => ({ ...p, name: e.target.value }))} required />
+            <label htmlFor="examination-name-2" className="text-xs font-bold text-text-secondary uppercase">Examination Name</label>
+            <Input id="examination-name-2" placeholder="e.g. Half Yearly, Pre Board, Unit Test 1" value={editExamData.name} onChange={e => setEditExamData(p => ({ ...p, name: e.target.value }))} required />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -3433,8 +3433,8 @@ export default function ExamsPage() {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-text-secondary uppercase">Description (Optional)</label>
-            <Input placeholder="Brief details about terms or exam guidelines" value={editExamData.description || ''} onChange={e => setEditExamData(p => ({ ...p, description: e.target.value }))} />
+            <label htmlFor="description-optional-2" className="text-xs font-bold text-text-secondary uppercase">Description (Optional)</label>
+            <Input id="description-optional-2" placeholder="Brief details about terms or exam guidelines" value={editExamData.description || ''} onChange={e => setEditExamData(p => ({ ...p, description: e.target.value }))} />
           </div>
         </form>
       </Dialog>
@@ -3483,7 +3483,7 @@ export default function ExamsPage() {
               {editingInstructionIndex !== null ? 'Edit Instruction' : 'Add New Instruction'}
             </label>
             <div className="flex gap-2">
-              <Input
+              <Input aria-label="e.g. Carry your School ID Card."
                 placeholder="e.g. Carry your School ID Card."
                 value={newInstruction}
                 onChange={e => setNewInstruction(e.target.value)}

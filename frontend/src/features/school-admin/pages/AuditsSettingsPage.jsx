@@ -1091,7 +1091,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
             </div>
 
             <div className="flex-1 flex flex-col justify-end min-w-[280px]">
-              <label className="text-xs font-bold text-text-secondary uppercase mb-2">Fee Mode</label>
+              <label htmlFor="fee-mode" className="text-xs font-bold text-text-secondary uppercase mb-2">Fee Mode</label>
               <div className="flex items-center gap-6 h-10">
                 <label className="flex items-center gap-2 text-xs font-bold uppercase cursor-pointer select-none">
                   <input
@@ -1127,7 +1127,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                 <label className="text-xs font-bold text-text-secondary uppercase">Fee Amount</label>
                 <div className="relative">
                   <span className="absolute left-3 top-2.5 text-xs text-text-muted">₹</span>
-                  <Input
+                  <Input id="fee-mode"
                     type="number"
                     placeholder="e.g. 1500"
                     value={sameFeeAmount}
@@ -1147,7 +1147,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                       <label className="text-[11px] font-bold text-text-secondary uppercase">{m}</label>
                       <div className="relative">
                         <span className="absolute left-3 top-2.5 text-xs text-text-muted">₹</span>
-                        <Input
+                        <Input aria-label="0"
                           type="number"
                           placeholder="0"
                           value={monthlyFeesMap[m] || ''}
@@ -1559,8 +1559,8 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
           )}
 
           <div className="space-y-2">
-            <label className="text-xs font-bold text-text-secondary uppercase">Academic Year</label>
-            <Input 
+            <label htmlFor="academic-year" className="text-xs font-bold text-text-secondary uppercase">Academic Year</label>
+            <Input id="academic-year" 
               placeholder="e.g. 2027–2028" 
               value={createYearName} 
               onChange={e => setCreateYearName(e.target.value)} 

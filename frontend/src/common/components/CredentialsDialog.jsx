@@ -117,10 +117,8 @@ export default function CredentialsDialog({ isOpen, onClose, role, target }) {
           <>
             {/* Optional custom manual password entry */}
             <div className="space-y-2 border-t border-border pt-4">
-              <label className="text-xs font-bold text-text-muted uppercase tracking-wider">
-                Manual Password (Optional)
-              </label>
-              <Input
+              <label htmlFor="manual-password-optional" className="text-xs font-bold text-text-muted uppercase tracking-wider">Manual Password (Optional)</label>
+              <Input id="manual-password-optional"
                 type="text"
                 placeholder="Leave blank to generate randomly..."
                 value={customPassword}

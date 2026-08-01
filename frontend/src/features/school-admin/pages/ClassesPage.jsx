@@ -619,7 +619,7 @@ export default function ClassesPage() {
           <div className="bg-surface border border-border rounded-xl p-4 shadow-xs flex flex-col md:flex-row gap-4 items-center justify-between">
             <div className="relative w-full md:max-w-xs">
               <Search className="absolute left-3 top-3 h-4 w-4 text-text-muted" />
-              <Input 
+              <Input aria-label="Search roster by name or roll number..." 
                 placeholder="Search roster by name or roll number..." 
                 className="pl-9" 
                 value={rosterSearch} 

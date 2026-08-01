@@ -669,8 +669,8 @@ export default function SeatingPlanPage() {
                             />
                           </div>
                           <div className="w-28">
-                            <label className="text-[11px] font-bold text-text-muted">Bench Count</label>
-                            <Input 
+                            <label htmlFor="bench-count" className="text-[11px] font-bold text-text-muted">Bench Count</label>
+                            <Input id="bench-count" 
                               type="number"
                               min="1"
                               placeholder="Count"

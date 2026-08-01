@@ -650,8 +650,8 @@ export default function ProfilePage({ mode = 'details' }) {
           <CardContent className="p-6">
             <form onSubmit={handlePasswordChange} className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-text-secondary uppercase">New Password</label>
-                <Input 
+                <label htmlFor="new-password" className="text-xs font-bold text-text-secondary uppercase">New Password</label>
+                <Input id="new-password" 
                   type="password" 
                   placeholder="Minimum 6 characters" 
                   value={passwordForm.newPassword} 
@@ -661,8 +661,8 @@ export default function ProfilePage({ mode = 'details' }) {
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-text-secondary uppercase">Confirm New Password</label>
-                <Input 
+                <label htmlFor="confirm-new-password" className="text-xs font-bold text-text-secondary uppercase">Confirm New Password</label>
+                <Input id="confirm-new-password" 
                   type="password" 
                   placeholder="Repeat new password" 
                   value={passwordForm.confirmPassword} 

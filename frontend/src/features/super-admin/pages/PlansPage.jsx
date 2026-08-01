@@ -68,8 +68,8 @@ function PlanDialog({ plan, onClose, onSaved }) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-text-secondary uppercase">Plan Name</label>
-            <Input
+            <label htmlFor="plan-name" className="text-xs font-bold text-text-secondary uppercase">Plan Name</label>
+            <Input id="plan-name"
               placeholder="e.g. Starter, Professional, Unlimited"
               value={form.name}
               onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
@@ -80,8 +80,8 @@ function PlanDialog({ plan, onClose, onSaved }) {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">Amount (₹)</label>
-              <Input
+              <label htmlFor="amount" className="text-xs font-bold text-text-secondary uppercase">Amount (₹)</label>
+              <Input id="amount"
                 type="number"
                 min="0"
                 placeholder="0 = Free Plan"
@@ -91,8 +91,8 @@ function PlanDialog({ plan, onClose, onSaved }) {
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">Student Limit</label>
-              <Input
+              <label htmlFor="student-limit" className="text-xs font-bold text-text-secondary uppercase">Student Limit</label>
+              <Input id="student-limit"
                 type="number"
                 min="0"
                 placeholder="Blank = Unlimited"

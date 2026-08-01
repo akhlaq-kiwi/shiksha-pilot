@@ -72,10 +72,10 @@ export default function LoginForm({ onLoginSuccess }) {
 
           <form onSubmit={handlePasswordLogin} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">Mobile Phone Number</label>
+              <label htmlFor="mobile-phone-number" className="text-xs font-bold text-text-secondary uppercase">Mobile Phone Number</label>
               <div className="relative">
                 <Phone className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />
-                <Input 
+                <Input id="mobile-phone-number" 
                   placeholder="e.g. 9876543210" 
                   className={`pl-9 ${errors?.phone ? 'border-red-500 ring-1 ring-red-500' : ''}`}
                   value={phone}
@@ -91,10 +91,10 @@ export default function LoginForm({ onLoginSuccess }) {
               )}
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">Password</label>
+              <label htmlFor="password" className="text-xs font-bold text-text-secondary uppercase">Password</label>
               <div className="relative">
                 <Key className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />
-                <Input 
+                <Input id="password" 
                   type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••" 
                   className={`pl-9 pr-10 ${errors?.password ? 'border-red-500 ring-1 ring-red-500' : ''}`}

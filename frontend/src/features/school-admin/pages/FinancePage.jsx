@@ -338,7 +338,7 @@ export default function FinancePage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="relative">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-text-muted animate-pulse" />
-            <Input 
+            <Input aria-label="Search by Student Name..." 
               placeholder="Search by Student Name..." 
               value={searchTerm} 
               onChange={e => setSearchTerm(e.target.value)} 

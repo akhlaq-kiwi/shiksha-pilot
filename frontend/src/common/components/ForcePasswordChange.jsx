@@ -60,9 +60,9 @@ export default function ForcePasswordChange({ onDismiss }) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-text-secondary uppercase">New Password</label>
+            <label htmlFor="new-password" className="text-xs font-bold text-text-secondary uppercase">New Password</label>
             <div className="relative">
-              <Input
+              <Input id="new-password"
                 type={showPw ? 'text' : 'password'}
                 placeholder="Min. 6 characters"
                 value={password}
@@ -77,8 +77,8 @@ export default function ForcePasswordChange({ onDismiss }) {
             </div>
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-text-secondary uppercase">Confirm Password</label>
-            <Input
+            <label htmlFor="confirm-password" className="text-xs font-bold text-text-secondary uppercase">Confirm Password</label>
+            <Input id="confirm-password"
               type="password"
               placeholder="Repeat password"
               value={confirm}

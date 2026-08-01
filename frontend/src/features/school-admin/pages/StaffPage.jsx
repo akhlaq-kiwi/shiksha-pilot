@@ -1455,7 +1455,7 @@ export default function StaffPage() {
           <div className="bg-surface border border-border rounded-xl p-4 flex flex-col md:flex-row gap-4">
             <div className="relative w-full md:w-80">
               <Search className="absolute left-3 top-3 h-4 w-4 text-text-muted" />
-              <Input placeholder="Search teachers..." className="pl-9" value={staffSearch} onChange={e => setStaffSearch(e.target.value)} />
+              <Input aria-label="Search teachers..." placeholder="Search teachers..." className="pl-9" value={staffSearch} onChange={e => setStaffSearch(e.target.value)} />
             </div>
             <Select className="w-full md:w-48" value={selectedDeptFilter} onChange={e => setSelectedDeptFilter(e.target.value)}>
               <option value="">All Subjects</option>
@@ -1594,20 +1594,20 @@ export default function StaffPage() {
             {/* Row 1: Full Name, Father Name, Mother Name */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-text-secondary uppercase">Full Name <span className="text-red-500">*</span></label>
-                <Input name="name" value={newStaff.name} onChange={handleTextChange} placeholder="e.g. Ms. Anita Sharma" required />
+                <label htmlFor="name" className="text-xs font-bold text-text-secondary uppercase">Full Name <span className="text-red-500">*</span></label>
+                <Input id="name" name="name" value={newStaff.name} onChange={handleTextChange} placeholder="e.g. Ms. Anita Sharma" required />
                 {formErrors.name && <p className="text-[11px] text-red-500 font-semibold">{formErrors.name}</p>}
               </div>
               
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-text-secondary uppercase">Father Name <span className="text-red-500">*</span></label>
-                <Input name="father_name" value={newStaff.father_name} onChange={handleTextChange} placeholder="e.g. Shri Om Prakash Sharma" required />
+                <label htmlFor="father_name" className="text-xs font-bold text-text-secondary uppercase">Father Name <span className="text-red-500">*</span></label>
+                <Input id="father_name" name="father_name" value={newStaff.father_name} onChange={handleTextChange} placeholder="e.g. Shri Om Prakash Sharma" required />
                 {formErrors.father_name && <p className="text-[11px] text-red-500 font-semibold">{formErrors.father_name}</p>}
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-text-secondary uppercase">Mother Name <span className="text-red-500">*</span></label>
-                <Input name="mother_name" value={newStaff.mother_name} onChange={handleTextChange} placeholder="e.g. Shabana Begum" required />
+                <label htmlFor="mother_name" className="text-xs font-bold text-text-secondary uppercase">Mother Name <span className="text-red-500">*</span></label>
+                <Input id="mother_name" name="mother_name" value={newStaff.mother_name} onChange={handleTextChange} placeholder="e.g. Shabana Begum" required />
                 {formErrors.mother_name && <p className="text-[11px] text-red-500 font-semibold">{formErrors.mother_name}</p>}
               </div>
             </div>
@@ -1615,20 +1615,20 @@ export default function StaffPage() {
             {/* Row 2: Contact Number, Emergency Contact Number, Email */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-text-secondary uppercase">Contact Number <span className="text-red-500">*</span></label>
-                <Input name="phone" value={newStaff.phone} onChange={handleTextChange} placeholder="10-digit mobile number" required />
+                <label htmlFor="phone" className="text-xs font-bold text-text-secondary uppercase">Contact Number <span className="text-red-500">*</span></label>
+                <Input id="phone" name="phone" value={newStaff.phone} onChange={handleTextChange} placeholder="10-digit mobile number" required />
                 {formErrors.phone && <p className="text-[11px] text-red-500 font-semibold">{formErrors.phone}</p>}
               </div>
               
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-text-secondary uppercase">Emergency Contact Number <span className="text-red-500">*</span></label>
-                <Input name="emergency_phone" value={newStaff.emergency_phone} onChange={handleTextChange} placeholder="Emergency number" required />
+                <label htmlFor="emergency_phone" className="text-xs font-bold text-text-secondary uppercase">Emergency Contact Number <span className="text-red-500">*</span></label>
+                <Input id="emergency_phone" name="emergency_phone" value={newStaff.emergency_phone} onChange={handleTextChange} placeholder="Emergency number" required />
                 {formErrors.emergency_phone && <p className="text-[11px] text-red-500 font-semibold">{formErrors.emergency_phone}</p>}
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-text-secondary uppercase">Email Address <span className="text-red-500">*</span></label>
-                <Input name="email" type="email" value={newStaff.email} onChange={handleTextChange} placeholder="anita@school.com" required />
+                <label htmlFor="email" className="text-xs font-bold text-text-secondary uppercase">Email Address <span className="text-red-500">*</span></label>
+                <Input id="email" name="email" type="email" value={newStaff.email} onChange={handleTextChange} placeholder="anita@school.com" required />
                 {formErrors.email && <p className="text-[11px] text-red-500 font-semibold">{formErrors.email}</p>}
               </div>
             </div>
@@ -1639,8 +1639,8 @@ export default function StaffPage() {
                 {/* Edit Mode: Row 3 (Joining Date, Exit Date, Parent Occupation) */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-text-secondary uppercase">Joining Date <span className="text-red-500">*</span></label>
-                    <Input 
+                    <label htmlFor="joining_date" className="text-xs font-bold text-text-secondary uppercase">Joining Date <span className="text-red-500">*</span></label>
+                    <Input id="joining_date" 
                       type="date" 
                       name="joining_date"
                       value={newStaff.joining_date} 
@@ -1653,8 +1653,8 @@ export default function StaffPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-text-secondary uppercase">Exit Date</label>
-                    <Input 
+                    <label htmlFor="exit_date" className="text-xs font-bold text-text-secondary uppercase">Exit Date</label>
+                    <Input id="exit_date" 
                       type="date" 
                       name="exit_date"
                       value={newStaff.exit_date} 
@@ -1666,8 +1666,8 @@ export default function StaffPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-text-secondary uppercase">Salary <span className="text-red-500">*</span></label>
-                    <Input 
+                    <label htmlFor="salary" className="text-xs font-bold text-text-secondary uppercase">Salary <span className="text-red-500">*</span></label>
+                    <Input id="salary" 
                       type="number" 
                       name="salary" 
                       value={newStaff.salary} 
@@ -1682,8 +1682,8 @@ export default function StaffPage() {
                 {/* Edit Mode: Row 4 (Subject, spacer, spacer) */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-text-secondary uppercase font-display">Subject <span className="text-red-500">*</span></label>
-                    <Input 
+                    <label htmlFor="subject" className="text-xs font-bold text-text-secondary uppercase font-display">Subject</label>
+                    <Input id="subject" 
                       placeholder="e.g. English"
                       value={newStaff.department || ''} 
                       onChange={e => {
@@ -1705,8 +1705,8 @@ export default function StaffPage() {
                 {/* Add Mode: Row 3 (Joining Date, Parent Occupation, Department) */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-text-secondary uppercase">Joining Date <span className="text-red-500">*</span></label>
-                    <Input 
+                    <label htmlFor="joining_date" className="text-xs font-bold text-text-secondary uppercase">Joining Date <span className="text-red-500">*</span></label>
+                    <Input id="joining_date" 
                       type="date" 
                       name="joining_date"
                       value={newStaff.joining_date} 
@@ -1719,8 +1719,8 @@ export default function StaffPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-text-secondary uppercase">Salary <span className="text-red-500">*</span></label>
-                    <Input 
+                    <label htmlFor="salary" className="text-xs font-bold text-text-secondary uppercase">Salary <span className="text-red-500">*</span></label>
+                    <Input id="salary" 
                       type="number" 
                       name="salary" 
                       value={newStaff.salary} 
@@ -1732,8 +1732,8 @@ export default function StaffPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-text-secondary uppercase font-display">Subject <span className="text-red-500">*</span></label>
-                    <Input 
+                    <label htmlFor="subject-2" className="text-xs font-bold text-text-secondary uppercase font-display">Subject</label>
+                    <Input id="subject-2" 
                       placeholder="e.g. English"
                       value={newStaff.department || ''} 
                       onChange={e => {
@@ -1757,8 +1757,8 @@ export default function StaffPage() {
             
             <div className="space-y-4">
               <div className="space-y-1.5 w-full p-px">
-                <label className="text-xs font-bold text-text-secondary uppercase">Address Line <span className="text-red-500">*</span></label>
-                <Input name="current_address_line" value={newStaff.current_address_line} onChange={handleTextChange} placeholder="House no, street, locality..." required />
+                <label htmlFor="current_address_line" className="text-xs font-bold text-text-secondary uppercase">Address Line <span className="text-red-500">*</span></label>
+                <Input id="current_address_line" name="current_address_line" value={newStaff.current_address_line} onChange={handleTextChange} placeholder="House no, street, locality..." required />
                 {formErrors.current_address_line && <p className="text-[11px] text-red-500 font-semibold">{formErrors.current_address_line}</p>}
               </div>
 
@@ -1782,12 +1782,12 @@ export default function StaffPage() {
                   error={formErrors.current_city}
                 />
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-text-secondary uppercase">Country</label>
-                  <Input name="current_country" value={newStaff.current_country} readOnly />
+                  <label htmlFor="current_country" className="text-xs font-bold text-text-secondary uppercase">Country</label>
+                  <Input id="current_country" name="current_country" value={newStaff.current_country} readOnly />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-text-secondary uppercase">PIN Code <span className="text-red-500">*</span></label>
-                  <Input name="current_pin_code" value={newStaff.current_pin_code} onChange={handleTextChange} placeholder="PIN Code" required />
+                  <label htmlFor="current_pin_code" className="text-xs font-bold text-text-secondary uppercase">PIN Code <span className="text-red-500">*</span></label>
+                  <Input id="current_pin_code" name="current_pin_code" value={newStaff.current_pin_code} onChange={handleTextChange} placeholder="PIN Code" required />
                   {formErrors.current_pin_code && <p className="text-[11px] text-red-500 font-semibold">{formErrors.current_pin_code}</p>}
                 </div>
               </div>
@@ -1810,8 +1810,8 @@ export default function StaffPage() {
                 <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
                   <h4 className="text-[11px] font-bold text-text-secondary uppercase tracking-tight">Permanent Address</h4>
                   <div className="space-y-1.5 w-full p-px">
-                    <label className="text-xs font-bold text-text-secondary uppercase">Address Line <span className="text-red-500">*</span></label>
-                    <Input name="permanent_address_line" value={newStaff.permanent_address_line} onChange={handleTextChange} placeholder="House no, street, locality..." required />
+                    <label htmlFor="permanent_address_line" className="text-xs font-bold text-text-secondary uppercase">Address Line <span className="text-red-500">*</span></label>
+                    <Input id="permanent_address_line" name="permanent_address_line" value={newStaff.permanent_address_line} onChange={handleTextChange} placeholder="House no, street, locality..." required />
                     {formErrors.permanent_address_line && <p className="text-[11px] text-red-500 font-semibold">{formErrors.permanent_address_line}</p>}
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -1834,12 +1834,12 @@ export default function StaffPage() {
                       error={formErrors.permanent_city}
                     />
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-text-secondary uppercase">Country</label>
-                      <Input name="permanent_country" value={newStaff.permanent_country} readOnly />
+                      <label htmlFor="permanent_country" className="text-xs font-bold text-text-secondary uppercase">Country</label>
+                      <Input id="permanent_country" name="permanent_country" value={newStaff.permanent_country} readOnly />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-text-secondary uppercase">PIN Code <span className="text-red-500">*</span></label>
-                      <Input name="permanent_pin_code" value={newStaff.permanent_pin_code} onChange={handleTextChange} placeholder="PIN Code" required />
+                      <label htmlFor="permanent_pin_code" className="text-xs font-bold text-text-secondary uppercase">PIN Code <span className="text-red-500">*</span></label>
+                      <Input id="permanent_pin_code" name="permanent_pin_code" value={newStaff.permanent_pin_code} onChange={handleTextChange} placeholder="PIN Code" required />
                       {formErrors.permanent_pin_code && <p className="text-[11px] text-red-500 font-semibold">{formErrors.permanent_pin_code}</p>}
                     </div>
                   </div>

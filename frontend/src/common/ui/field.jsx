@@ -9,14 +9,14 @@ import { AlertCircle } from 'lucide-react';
  * primitive owned no label/error/description slots and every call site invented
  * its own. Field owns them once:
  *
- *   - <label> wired to the control via a generated id
+ *   - <label htmlFor="student_name"> wired to the control via a generated id
  *   - required indicator
  *   - description text, linked with aria-describedby
  *   - error message, linked with aria-describedby + aria-invalid
  *
  * Usage:
  *   <Field label="Student name" required error={errors.student_name}>
- *     <Input name="student_name" value={...} onChange={...} />
+ *     <Input id="student_name" name="student_name" value={...} onChange={...} />
  *   </Field>
  *
  * Children that are Input/Select/Textarea pick up the id and ARIA wiring

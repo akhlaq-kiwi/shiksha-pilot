@@ -960,28 +960,28 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                   {/* Unified 4-Column Grid for Basic Details */}
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-text-secondary uppercase">Student Name <span className="text-red-500">*</span></label>
-                      <Input name="student_name" value={formData.student_name} onChange={handleTextChange} placeholder="Student Name" required />
+                      <label htmlFor="student_name" className="text-xs font-bold text-text-secondary uppercase">Student Name <span className="text-red-500">*</span></label>
+                      <Input id="student_name" name="student_name" value={formData.student_name} onChange={handleTextChange} placeholder="Student Name" required />
                       {errors.student_name && <p className="text-[11px] text-red-500 font-semibold">{errors.student_name}</p>}
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-text-secondary uppercase">Father Name <span className="text-red-500">*</span></label>
-                      <Input name="father_name" value={formData.father_name} onChange={handleTextChange} placeholder="Father Name" required />
+                      <label htmlFor="father_name" className="text-xs font-bold text-text-secondary uppercase">Father Name <span className="text-red-500">*</span></label>
+                      <Input id="father_name" name="father_name" value={formData.father_name} onChange={handleTextChange} placeholder="Father Name" required />
                       {errors.father_name && <p className="text-[11px] text-red-500 font-semibold">{errors.father_name}</p>}
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-text-secondary uppercase">Mother Name <span className="text-red-500">*</span></label>
-                      <Input name="mother_name" value={formData.mother_name} onChange={handleTextChange} placeholder="Mother Name" required />
+                      <label htmlFor="mother_name" className="text-xs font-bold text-text-secondary uppercase">Mother Name <span className="text-red-500">*</span></label>
+                      <Input id="mother_name" name="mother_name" value={formData.mother_name} onChange={handleTextChange} placeholder="Mother Name" required />
                       {errors.mother_name && <p className="text-[11px] text-red-500 font-semibold">{errors.mother_name}</p>}
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-text-secondary uppercase">Parent Occupation</label>
-                      <Input name="parent_occupation" value={formData.parent_occupation} onChange={handleTextChange} placeholder="e.g. Government Employee" />
+                      <label htmlFor="parent_occupation" className="text-xs font-bold text-text-secondary uppercase">Parent Occupation</label>
+                      <Input id="parent_occupation" name="parent_occupation" value={formData.parent_occupation} onChange={handleTextChange} placeholder="e.g. Government Employee" />
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-text-secondary uppercase">Gender <span className="text-red-500">*</span></label>
-                      <select 
+                      <label htmlFor="gender" className="text-xs font-bold text-text-secondary uppercase">Gender <span className="text-red-500">*</span></label>
+                      <select id="gender" 
                         name="gender" 
                         value={formData.gender} 
                         onChange={handleTextChange} 
@@ -998,7 +998,7 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-text-secondary uppercase">Date of Birth <span className="text-red-500">*</span></label>
                       <div className="relative">
-                        <Input 
+                        <Input id="dob" 
                           type="date" 
                           name="dob" 
                           value={formData.dob} 
@@ -1013,7 +1013,7 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-text-secondary uppercase">Admission Date <span className="text-red-500">*</span></label>
                       <div className="relative">
-                        <Input
+                        <Input id="admission_date"
                           type="date"
                           name="admission_date"
                           value={formData.admission_date}
@@ -1026,10 +1026,10 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                       {errors.admission_date && <p className="text-[11px] text-red-500 font-semibold">{errors.admission_date}</p>}
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-text-secondary uppercase">Admission Fee</label>
+                      <label htmlFor="admission_fee" className="text-xs font-bold text-text-secondary uppercase">Admission Fee</label>
                       <div className="relative">
                         <span className="absolute left-3 top-2 text-xs font-bold text-text-muted">₹</span>
-                        <Input
+                        <Input id="admission_fee"
                           type="number"
                           name="admission_fee"
                           placeholder="0.00"
@@ -1045,10 +1045,10 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
 
                     {(((academicYears || []).length <= 1 || (formData.academic_year_id && String(formData.academic_year_id) === String(academicYears[0]?.id))) || formData.student_category) && (
                       <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-text-secondary uppercase">
+                        <label htmlFor="student_category" className="text-xs font-bold text-text-secondary uppercase">
                           Student Category <span className="text-red-500">*</span>
                         </label>
-                        <select
+                        <select id="student_category"
                           name="student_category"
                           value={formData.student_category}
                           onChange={handleTextChange}
@@ -1063,8 +1063,8 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                       </div>
                     )}
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-text-secondary uppercase">Blood Group</label>
-                      <select 
+                      <label htmlFor="blood_group" className="text-xs font-bold text-text-secondary uppercase">Blood Group</label>
+                      <select id="blood_group" 
                         name="blood_group" 
                         value={formData.blood_group} 
                         onChange={handleTextChange}
@@ -1079,8 +1079,8 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-text-secondary uppercase">Category</label>
-                      <select 
+                      <label htmlFor="category" className="text-xs font-bold text-text-secondary uppercase">Category</label>
+                      <select id="category" 
                         name="category" 
                         value={formData.category} 
                         onChange={handleTextChange}
@@ -1094,29 +1094,29 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                       </select>
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-text-secondary uppercase">Religion</label>
-                      <Input name="religion" value={formData.religion} onChange={handleTextChange} placeholder="e.g. Hinduism" />
+                      <label htmlFor="religion" className="text-xs font-bold text-text-secondary uppercase">Religion</label>
+                      <Input id="religion" name="religion" value={formData.religion} onChange={handleTextChange} placeholder="e.g. Hinduism" />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-text-secondary uppercase">Aadhaar Number</label>
-                      <Input name="aadhaar_no" value={formData.aadhaar_no} onChange={handleNumericChange} placeholder="12 digit Aadhaar" />
+                      <label htmlFor="aadhaar_no" className="text-xs font-bold text-text-secondary uppercase">Aadhaar Number</label>
+                      <Input id="aadhaar_no" name="aadhaar_no" value={formData.aadhaar_no} onChange={handleNumericChange} placeholder="12 digit Aadhaar" />
                       {errors.aadhaar_no && <p className="text-[11px] text-red-500 font-semibold">{errors.aadhaar_no}</p>}
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-text-secondary uppercase">Contact Number <span className="text-red-500">*</span></label>
-                      <Input name="student_mobile" value={formData.student_mobile} onChange={handleNumericChange} placeholder="Contact number" required />
+                      <label htmlFor="student_mobile" className="text-xs font-bold text-text-secondary uppercase">Contact Number <span className="text-red-500">*</span></label>
+                      <Input id="student_mobile" name="student_mobile" value={formData.student_mobile} onChange={handleNumericChange} placeholder="Contact number" required />
                       {errors.student_mobile && <p className="text-[11px] text-red-500 font-semibold">{errors.student_mobile}</p>}
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-text-secondary uppercase">Student Email</label>
-                      <Input type="email" name="student_email" value={formData.student_email} onChange={handleTextChange} placeholder="student@domain.com" />
+                      <label htmlFor="student_email" className="text-xs font-bold text-text-secondary uppercase">Student Email</label>
+                      <Input id="student_email" type="email" name="student_email" value={formData.student_email} onChange={handleTextChange} placeholder="student@domain.com" />
                       {errors.student_email && <p className="text-[11px] text-red-500 font-semibold">{errors.student_email}</p>}
                     </div>
                     {isFirstYear && (
                       <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-text-secondary uppercase">SR Number <span className="text-red-500">*</span></label>
-                        <Input 
+                        <label htmlFor="sr_no" className="text-xs font-bold text-text-secondary uppercase">SR Number <span className="text-red-500">*</span></label>
+                        <Input id="sr_no" 
                           name="sr_no" 
                           value={formData.sr_no || ''} 
                           onChange={handleNumericChange} 
@@ -1130,8 +1130,8 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
 
                     {availableSections.length > 0 && (
                       <div className="space-y-1.5 animate-in fade-in duration-200">
-                        <label className="text-xs font-bold text-text-secondary uppercase">Select Section <span className="text-red-500">*</span></label>
-                        <select
+                        <label htmlFor="section_name" className="text-xs font-bold text-text-secondary uppercase">Select Section <span className="text-red-500">*</span></label>
+                        <select id="section_name"
                           name="section_name"
                           value={selectedSectionName}
                           onChange={handleSectionChange}
@@ -1150,8 +1150,8 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                     )}
 
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-text-secondary uppercase">Roll Number</label>
-                      <Input
+                      <label htmlFor="roll_no" className="text-xs font-bold text-text-secondary uppercase">Roll Number</label>
+                      <Input id="roll_no"
                         name="roll_no"
                         value={formData.roll_no || ''}
                         onChange={handleTextChange}
@@ -1163,9 +1163,9 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                   {studentId && (
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
                       <div className="space-y-1.5 animate-in slide-in-from-left-1 duration-150">
-                        <label className="text-xs font-bold text-text-secondary uppercase">Exit Date</label>
+                        <label htmlFor="exit_date" className="text-xs font-bold text-text-secondary uppercase">Exit Date</label>
                         <div className="relative">
-                          <Input 
+                          <Input id="exit_date" 
                             type="date" 
                             name="exit_date" 
                             value={formData.exit_date} 
@@ -1196,13 +1196,13 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                   <h3 className="text-sm font-bold text-text-primary uppercase tracking-wide border-b border-border pb-2 mb-4">Current Address</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-text-secondary uppercase">Address Line 1 <span className="text-red-500">*</span></label>
-                      <Input name="current_address_line_1" value={formData.current_address_line_1} onChange={handleTextChange} placeholder="House no, street, locality..." required />
+                      <label htmlFor="current_address_line_1" className="text-xs font-bold text-text-secondary uppercase">Address Line 1 <span className="text-red-500">*</span></label>
+                      <Input id="current_address_line_1" name="current_address_line_1" value={formData.current_address_line_1} onChange={handleTextChange} placeholder="House no, street, locality..." required />
                       {errors.current_address_line_1 && <p className="text-[11px] text-red-500 font-semibold">{errors.current_address_line_1}</p>}
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-text-secondary uppercase">Address Line 2</label>
-                      <Input name="current_address_line_2" value={formData.current_address_line_2} onChange={handleTextChange} placeholder="Apartment, suite, unit, etc. (optional)" />
+                      <label htmlFor="current_address_line_2" className="text-xs font-bold text-text-secondary uppercase">Address Line 2</label>
+                      <Input id="current_address_line_2" name="current_address_line_2" value={formData.current_address_line_2} onChange={handleTextChange} placeholder="Apartment, suite, unit, etc. (optional)" />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-3">
@@ -1225,12 +1225,12 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                       error={errors.current_city}
                     />
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-text-secondary uppercase">Country</label>
-                      <Input name="current_country" value={formData.current_country || 'India'} onChange={handleTextChange} placeholder="Country" />
+                      <label htmlFor="current_country" className="text-xs font-bold text-text-secondary uppercase">Country</label>
+                      <Input id="current_country" name="current_country" value={formData.current_country || 'India'} onChange={handleTextChange} placeholder="Country" />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-text-secondary uppercase">PIN Code <span className="text-red-500">*</span></label>
-                      <Input name="current_pin_code" value={formData.current_pin_code} onChange={handleNumericChange} placeholder="ZIP/PIN Code" required />
+                      <label htmlFor="current_pin_code" className="text-xs font-bold text-text-secondary uppercase">PIN Code <span className="text-red-500">*</span></label>
+                      <Input id="current_pin_code" name="current_pin_code" value={formData.current_pin_code} onChange={handleNumericChange} placeholder="ZIP/PIN Code" required />
                       {errors.current_pin_code && <p className="text-[11px] text-red-500 font-semibold">{errors.current_pin_code}</p>}
                     </div>
                   </div>
@@ -1253,13 +1253,13 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                     <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1.5">
-                          <label className="text-xs font-bold text-text-secondary uppercase">Permanent Address Line 1 <span className="text-red-500">*</span></label>
-                          <Input name="permanent_address_line_1" value={formData.permanent_address_line_1} onChange={handleTextChange} placeholder="House no, street, locality..." required />
+                          <label htmlFor="permanent_address_line_1" className="text-xs font-bold text-text-secondary uppercase">Permanent Address Line 1 <span className="text-red-500">*</span></label>
+                          <Input id="permanent_address_line_1" name="permanent_address_line_1" value={formData.permanent_address_line_1} onChange={handleTextChange} placeholder="House no, street, locality..." required />
                           {errors.permanent_address_line_1 && <p className="text-[11px] text-red-500 font-semibold">{errors.permanent_address_line_1}</p>}
                         </div>
                         <div className="space-y-1.5">
-                          <label className="text-xs font-bold text-text-secondary uppercase">Permanent Address Line 2</label>
-                          <Input name="permanent_address_line_2" value={formData.permanent_address_line_2} onChange={handleTextChange} placeholder="Apartment, suite, unit, etc. (optional)" />
+                          <label htmlFor="permanent_address_line_2" className="text-xs font-bold text-text-secondary uppercase">Permanent Address Line 2</label>
+                          <Input id="permanent_address_line_2" name="permanent_address_line_2" value={formData.permanent_address_line_2} onChange={handleTextChange} placeholder="Apartment, suite, unit, etc. (optional)" />
                         </div>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -1282,12 +1282,12 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                           error={errors.permanent_city}
                         />
                         <div className="space-y-1.5">
-                          <label className="text-xs font-bold text-text-secondary uppercase">Country</label>
-                          <Input name="permanent_country" value={formData.permanent_country || 'India'} onChange={handleTextChange} placeholder="Country" />
+                          <label htmlFor="permanent_country" className="text-xs font-bold text-text-secondary uppercase">Country</label>
+                          <Input id="permanent_country" name="permanent_country" value={formData.permanent_country || 'India'} onChange={handleTextChange} placeholder="Country" />
                         </div>
                         <div className="space-y-1.5">
-                          <label className="text-xs font-bold text-text-secondary uppercase">PIN Code <span className="text-red-500">*</span></label>
-                          <Input name="permanent_pin_code" value={formData.permanent_pin_code} onChange={handleNumericChange} placeholder="ZIP/PIN Code" required />
+                          <label htmlFor="permanent_pin_code" className="text-xs font-bold text-text-secondary uppercase">PIN Code <span className="text-red-500">*</span></label>
+                          <Input id="permanent_pin_code" name="permanent_pin_code" value={formData.permanent_pin_code} onChange={handleNumericChange} placeholder="ZIP/PIN Code" required />
                           {errors.permanent_pin_code && <p className="text-[11px] text-red-500 font-semibold">{errors.permanent_pin_code}</p>}
                         </div>
                       </div>

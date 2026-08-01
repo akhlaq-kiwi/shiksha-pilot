@@ -84,14 +84,14 @@ export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* School details */}
         <div className="space-y-1.5">
-          <label className="text-xs font-bold text-text-secondary uppercase">School Name</label>
-          <Input placeholder="e.g. Cambridge Academy" value={form.name} onChange={set('name')} required />
+          <label htmlFor="school-name" className="text-xs font-bold text-text-secondary uppercase">School Name</label>
+          <Input id="school-name" placeholder="e.g. Cambridge Academy" value={form.name} onChange={set('name')} required />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-text-secondary uppercase">Contact Phone</label>
-            <Input
+            <label htmlFor="contact-phone" className="text-xs font-bold text-text-secondary uppercase">Contact Phone</label>
+            <Input id="contact-phone"
               placeholder="e.g. 9900000001"
               value={form.contact_phone}
               onChange={set('contact_phone')}
@@ -102,8 +102,8 @@ export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating
             )}
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-text-secondary uppercase">School Owner Email Address *</label>
-            <Input
+            <label htmlFor="school-owner-email-address" className="text-xs font-bold text-text-secondary uppercase">School Owner Email Address *</label>
+            <Input id="school-owner-email-address"
               type="email"
               placeholder="e.g. owner@school.com"
               value={form.contact_email}
@@ -122,8 +122,8 @@ export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating
           <p className="text-xs font-bold text-text-secondary uppercase mb-3">School Admin Account</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">Admin Phone</label>
-              <Input
+              <label htmlFor="admin-phone" className="text-xs font-bold text-text-secondary uppercase">Admin Phone</label>
+              <Input id="admin-phone"
                 placeholder="e.g. 9800000001"
                 value={form.admin_phone}
                 onChange={set('admin_phone')}
@@ -135,9 +135,9 @@ export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating
               )}
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">Password</label>
+              <label htmlFor="password" className="text-xs font-bold text-text-secondary uppercase">Password</label>
               <div className="flex items-center gap-1.5">
-                <Input
+                <Input id="password"
                   placeholder="Password"
                   value={form.admin_password}
                   onChange={set('admin_password')}

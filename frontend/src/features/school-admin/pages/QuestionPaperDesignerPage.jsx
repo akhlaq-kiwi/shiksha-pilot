@@ -2153,8 +2153,8 @@ export default function QuestionPaperDesignerPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Duration */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-text-secondary uppercase">Duration</label>
-                  <Input 
+                  <label htmlFor="duration" className="text-xs font-bold text-text-secondary uppercase">Duration</label>
+                  <Input id="duration" 
                     placeholder="3 Hours" 
                     value={duration} 
                     onChange={(e) => setDuration(e.target.value)} 
@@ -2163,8 +2163,8 @@ export default function QuestionPaperDesignerPage() {
 
                 {/* Max Marks */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-text-secondary uppercase">Maximum Marks</label>
-                  <Input 
+                  <label htmlFor="maximum-marks" className="text-xs font-bold text-text-secondary uppercase">Maximum Marks</label>
+                  <Input id="maximum-marks" 
                     type="number"
                     placeholder="100" 
                     value={maxMarks} 

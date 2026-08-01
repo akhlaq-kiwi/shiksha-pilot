@@ -149,7 +149,7 @@ export default function SecurityPage() {
             {/* Search Input */}
             <div className="relative col-span-1 sm:col-span-2">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />
-              <Input
+              <Input aria-label="Search action, description, or performer..."
                 type="text"
                 placeholder="Search action, description, or performer..."
                 value={search}
