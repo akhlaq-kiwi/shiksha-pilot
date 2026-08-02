@@ -1517,15 +1517,18 @@ export default function StaffPage() {
                           console.error(`[Validation Error] Teacher ${t.name} has assigned periods (${rawAssigned}) exceeding max allowed (${max}).`);
                           assigned = max;
                         }
+                        const isInactive = String(t.status || '').toUpperCase() === 'INACTIVE';
                         const isOccupied = assigned === max;
                         return (
                           <>
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold uppercase border ${
-                              isOccupied 
-                                ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
-                                : 'bg-green-500/10 text-green-600 border-green-500/20'
+                              isInactive
+                                ? 'bg-red-500/10 text-red-600 border-red-500/20'
+                                : isOccupied 
+                                  ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+                                  : 'bg-green-500/10 text-green-600 border-green-500/20'
                             }`}>
-                              {isOccupied ? 'Occupied' : 'Available'}
+                              {isInactive ? 'Inactive' : isOccupied ? 'Occupied' : 'Available'}
                             </span>
                             
                             <span className="text-[11px] text-text-muted font-bold font-sans">

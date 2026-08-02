@@ -28,9 +28,12 @@ const ROLE_LABELS = {
   PARENT: 'Parent',
 };
 
+import { useConfirm } from '../common/components/ConfirmDialog';
+
 const AppLayout = ({ children }) => {
   const { theme, resolvedTheme, toggleTheme, applySchoolTheme } = useTheme();
   const navigate = useNavigate();
+  const confirm = useConfirm();
 
   const user = authService.getCurrentUser();
   const role = authService.getUserRole();
@@ -195,16 +198,17 @@ const AppLayout = ({ children }) => {
                           <select
                             id="academic-year-switcher"
                             value={currentYear.id}
-                            onChange={(e) => {
+                            onChange={async (e) => {
                               const nextId = e.target.value;
                               const next = academicYears.find((y) => String(y.id) === String(nextId));
                               const leavingActive = currentYear.status === 'ACTIVE' && next?.status !== 'ACTIVE';
                               if (leavingActive) {
-                                const ok = window.confirm(
-                                  `Switch from the active year to ${next?.name}?\n\n` +
-                                  'All dashboards, fees, attendance and exam figures will show ' +
-                                  `${next?.name} data until you switch back.`
-                                );
+                                const ok = await confirm({
+                                  title: `Switch from active year to ${next?.name}?`,
+                                  message: `All dashboards, fees, attendance and exam figures will show ${next?.name} data until you switch back.`,
+                                  confirmLabel: 'Switch Year',
+                                  danger: false,
+                                });
                                 if (!ok) return;
                               }
                               selectYear(nextId);

@@ -611,6 +611,10 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
 
   // Open modal to create a Draft Academic Year
   const openCreateModal = () => {
+    if (academicYears.some(y => y.status === 'Draft')) {
+      setError('A Draft academic year already exists. Promote or delete it first.');
+      return;
+    }
     setFormError('');
     // Calculate prefilled next session
     let nextSessionName = '';
@@ -975,7 +979,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
       <Card className="shadow-sm">
         <CardHeader className="py-3 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-bold text-text-primary">Academic Years</CardTitle>
-          {!isReadOnly && (
+          {!isReadOnly && !academicYears.some(y => y.status === 'Draft') && (
             <Button onClick={openCreateModal} className="h-8 text-xs font-bold bg-primary text-white">
               Create Academic Year
             </Button>

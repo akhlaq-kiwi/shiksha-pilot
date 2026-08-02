@@ -4909,14 +4909,43 @@ class SchoolAdminService extends BaseService
         $pdo  = $this->classRepo->getPdo();
         $schoolId = $this->getSchoolId($user);
 
-        $stmt = $pdo->prepare("
-            SELECT s.*, st.name AS teacher_name
-            FROM subjects s
-            LEFT JOIN staff   st ON s.teacher_id = st.id
-            WHERE s.school_id = :sid
-            ORDER BY s.id DESC
-        ");
-        $stmt->execute([':sid' => $schoolId]);
+        // Retrieve working academic year
+        $requestYearId = $_SERVER['HTTP_X_ACADEMIC_YEAR_ID'] ?? $_SERVER['X_ACADEMIC_YEAR_ID'] ?? null;
+        $workingYear = null;
+        if ($requestYearId !== null && is_numeric($requestYearId)) {
+            $stmt = $pdo->prepare("SELECT * FROM academic_years WHERE id = :id AND school_id = :sid LIMIT 1");
+            $stmt->execute([':id' => (int)$requestYearId, ':sid' => $schoolId]);
+            $workingYear = $stmt->fetch(\PDO::FETCH_ASSOC);
+        }
+        if (!$workingYear) {
+            $stmt = $pdo->prepare("SELECT * FROM academic_years WHERE school_id = :sid AND is_current = 1 LIMIT 1");
+            $stmt->execute([':sid' => $schoolId]);
+            $workingYear = $stmt->fetch(\PDO::FETCH_ASSOC);
+        }
+        $academicYearId = $workingYear ? (int)$workingYear['id'] : 0;
+
+        if ($academicYearId > 0) {
+            $stmt = $pdo->prepare("
+                SELECT s.*, st.name AS teacher_name
+                FROM subjects s
+                LEFT JOIN staff st ON s.teacher_id = st.id
+                WHERE s.school_id = :sid
+                  AND s.id NOT IN (
+                      SELECT subject_id FROM academic_year_disabled_subjects WHERE academic_year_id = :ayid
+                  )
+                ORDER BY s.id DESC
+            ");
+            $stmt->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+        } else {
+            $stmt = $pdo->prepare("
+                SELECT s.*, st.name AS teacher_name
+                FROM subjects s
+                LEFT JOIN staff st ON s.teacher_id = st.id
+                WHERE s.school_id = :sid
+                ORDER BY s.id DESC
+            ");
+            $stmt->execute([':sid' => $schoolId]);
+        }
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
@@ -4931,14 +4960,47 @@ class SchoolAdminService extends BaseService
         $pdo = $this->classRepo->getPdo();
         $schoolId = $this->getSchoolId($user);
 
-        // Case-insensitive duplicate check within the school
-        $stmtCheck = $pdo->prepare("
-            SELECT COUNT(*) FROM subjects 
-            WHERE school_id = :sid AND LOWER(name) = LOWER(:name)
-        ");
-        $stmtCheck->execute([':sid' => $schoolId, ':name' => $name]);
+        // Retrieve working academic year
+        $requestYearId = $_SERVER['HTTP_X_ACADEMIC_YEAR_ID'] ?? $_SERVER['X_ACADEMIC_YEAR_ID'] ?? null;
+        $workingYear = null;
+        if ($requestYearId !== null && is_numeric($requestYearId)) {
+            $stmt = $pdo->prepare("SELECT * FROM academic_years WHERE id = :id AND school_id = :sid LIMIT 1");
+            $stmt->execute([':id' => (int)$requestYearId, ':sid' => $schoolId]);
+            $workingYear = $stmt->fetch(\PDO::FETCH_ASSOC);
+        }
+        if (!$workingYear) {
+            $stmt = $pdo->prepare("SELECT * FROM academic_years WHERE school_id = :sid AND is_current = 1 LIMIT 1");
+            $stmt->execute([':sid' => $schoolId]);
+            $workingYear = $stmt->fetch(\PDO::FETCH_ASSOC);
+        }
+        $academicYearId = $workingYear ? (int)$workingYear['id'] : 0;
 
-        if ((int)$stmtCheck->fetchColumn() > 0) {
+        // Check if existing subject with this name exists for school
+        $stmtExisting = $pdo->prepare("
+            SELECT id FROM subjects 
+            WHERE school_id = :sid AND LOWER(name) = LOWER(:name)
+            LIMIT 1
+        ");
+        $stmtExisting->execute([':sid' => $schoolId, ':name' => $name]);
+        $existingId = $stmtExisting->fetchColumn();
+
+        if ($existingId !== false) {
+            // Check if disabled in current academic year
+            if ($academicYearId > 0) {
+                $stmtDisabledCheck = $pdo->prepare("
+                    SELECT COUNT(*) FROM academic_year_disabled_subjects 
+                    WHERE academic_year_id = :ayid AND subject_id = :subid
+                ");
+                $stmtDisabledCheck->execute([':ayid' => $academicYearId, ':subid' => $existingId]);
+                if ((int)$stmtDisabledCheck->fetchColumn() > 0) {
+                    // Re-enable subject for this academic year
+                    $pdo->prepare("
+                        DELETE FROM academic_year_disabled_subjects 
+                        WHERE academic_year_id = :ayid AND subject_id = :subid
+                    ")->execute([':ayid' => $academicYearId, ':subid' => $existingId]);
+                    return ['id' => (int)$existingId];
+                }
+            }
             throw new ValidationException(['name' => 'This subject already exists.']);
         }
         
@@ -4992,20 +5054,83 @@ class SchoolAdminService extends BaseService
         $pdo = $this->classRepo->getPdo();
         $schoolId = $this->getSchoolId($user);
 
-        // Existing timetable safety check
-        $stmtCheck = $pdo->prepare("
-            SELECT COUNT(*) FROM timetable 
-            WHERE subject_id = :id AND school_id = :sid
-        ");
-        $stmtCheck->execute([':id' => $id, ':sid' => $schoolId]);
-        if ((int)$stmtCheck->fetchColumn() > 0) {
+        // Retrieve working academic year
+        $requestYearId = $_SERVER['HTTP_X_ACADEMIC_YEAR_ID'] ?? $_SERVER['X_ACADEMIC_YEAR_ID'] ?? null;
+        $workingYear = null;
+        if ($requestYearId !== null && is_numeric($requestYearId)) {
+            $stmt = $pdo->prepare("SELECT * FROM academic_years WHERE id = :id AND school_id = :sid LIMIT 1");
+            $stmt->execute([':id' => (int)$requestYearId, ':sid' => $schoolId]);
+            $workingYear = $stmt->fetch(\PDO::FETCH_ASSOC);
+        }
+        if (!$workingYear) {
+            $stmt = $pdo->prepare("SELECT * FROM academic_years WHERE school_id = :sid AND is_current = 1 LIMIT 1");
+            $stmt->execute([':sid' => $schoolId]);
+            $workingYear = $stmt->fetch(\PDO::FETCH_ASSOC);
+        }
+        $academicYearId = $workingYear ? (int)$workingYear['id'] : 0;
+
+        // 1. Report card marks safety check: Only block if actual marks have been entered for this subject in the working academic year
+        if ($academicYearId > 0) {
+            $stmtMarks = $pdo->prepare("
+                SELECT COUNT(*) FROM examination_marks em
+                JOIN examination_papers ep ON em.paper_id = ep.id
+                JOIN classes c ON ep.class_id = c.id
+                WHERE ep.subject_id = :id AND c.academic_year_id = :ayid AND (em.marks_obtained IS NOT NULL OR em.is_absent = 1)
+            ");
+            $stmtMarks->execute([':id' => $id, ':ayid' => $academicYearId]);
+        } else {
+            $stmtMarks = $pdo->prepare("
+                SELECT COUNT(*) FROM examination_marks em
+                JOIN examination_papers ep ON em.paper_id = ep.id
+                WHERE ep.subject_id = :id AND (em.marks_obtained IS NOT NULL OR em.is_absent = 1)
+            ");
+            $stmtMarks->execute([':id' => $id]);
+        }
+
+        if ((int)$stmtMarks->fetchColumn() > 0) {
             throw new ValidationException([
-                'subject' => 'This subject is currently assigned in one or more timetable periods. Please remove those assignments before deleting the subject.'
+                'subject' => 'This subject has recorded examination marks in report cards for the current academic year. It cannot be deleted as it would alter report card records.'
             ]);
         }
 
-        $stmt = $pdo->prepare("DELETE FROM subjects WHERE id = :id AND school_id = :sid");
-        $stmt->execute([':id' => $id, ':sid' => $schoolId]);
+        // Clean up un-entered examination_papers and timetable entries linked to this subject in the working academic year
+        if ($academicYearId > 0) {
+            $pdo->prepare("
+                DELETE ep FROM examination_papers ep
+                JOIN classes c ON ep.class_id = c.id
+                WHERE ep.subject_id = :id AND c.academic_year_id = :ayid
+            ")->execute([':id' => $id, ':ayid' => $academicYearId]);
+
+            $pdo->prepare("
+                DELETE t FROM timetable t
+                JOIN classes c ON t.class_id = c.id
+                WHERE t.subject_id = :id AND t.school_id = :sid AND c.academic_year_id = :ayid
+            ")->execute([':id' => $id, ':sid' => $schoolId, ':ayid' => $academicYearId]);
+
+            // Disable subject for working academic year so previous academic year retains its subjects intact
+            $stmtDisable = $pdo->prepare("
+                INSERT IGNORE INTO academic_year_disabled_subjects (school_id, academic_year_id, subject_id)
+                VALUES (:sid, :ayid, :subid)
+            ");
+            $stmtDisable->execute([':sid' => $schoolId, ':ayid' => $academicYearId, ':subid' => $id]);
+        }
+
+        // Check if subject is used in ANY other academic year (timetable, papers, or marks)
+        $stmtOtherUsed = $pdo->prepare("
+            SELECT (
+                (SELECT COUNT(*) FROM timetable WHERE subject_id = :id1 AND school_id = :sid1) +
+                (SELECT COUNT(*) FROM examination_papers WHERE subject_id = :id2) +
+                (SELECT COUNT(*) FROM examination_marks em JOIN examination_papers ep ON em.paper_id = ep.id WHERE ep.subject_id = :id3)
+            ) AS total_count
+        ");
+        $stmtOtherUsed->execute([':id1' => $id, ':sid1' => $schoolId, ':id2' => $id, ':id3' => $id]);
+        $totalCount = (int)$stmtOtherUsed->fetchColumn();
+
+        // If not used anywhere else in the school, clean up and delete master record
+        if ($totalCount === 0) {
+            $pdo->prepare("DELETE FROM academic_year_disabled_subjects WHERE subject_id = :id")->execute([':id' => $id]);
+            $pdo->prepare("DELETE FROM subjects WHERE id = :id AND school_id = :sid")->execute([':id' => $id, ':sid' => $schoolId]);
+        }
     }
 
     public function getPeriodConfigurations(array $user, ?string $date = null): array
@@ -13713,15 +13838,30 @@ Only approve the settlement after reviewing all financial records.
         }
         $academicYearId = $workingYear ? (int)$workingYear['id'] : 0;
 
-        // Get all active teachers
+        // Get all active/available teachers for the school
         $stmt = $pdo->prepare("
-            SELECT id, name, employee_id, phone, role, department
+            SELECT id, name, employee_id, phone, role, department, status
             FROM staff 
-            WHERE school_id = :sid AND academic_year_id = :ayid AND (role = 'TEACHER' OR role = 'Teacher') AND status = 'ACTIVE'
+            WHERE school_id = :sid 
+              AND (academic_year_id = :ayid OR academic_year_id IS NULL OR academic_year_id = 0)
+              AND (UPPER(status) = 'ACTIVE' OR UPPER(status) = 'AVAILABLE' OR status IS NULL OR status = '')
             ORDER BY name ASC
         ");
         $stmt->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
         $teachers = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        // Fallback: If no teacher matches strict academic_year_id, get all non-inactive teachers in the school
+        if (empty($teachers)) {
+            $stmtFallback = $pdo->prepare("
+                SELECT id, name, employee_id, phone, role, department, status
+                FROM staff 
+                WHERE school_id = :sid 
+                  AND (UPPER(status) != 'INACTIVE' AND UPPER(status) != 'DELETED' OR status IS NULL OR status = '')
+                ORDER BY name ASC
+            ");
+            $stmtFallback->execute([':sid' => $schoolId]);
+            $teachers = $stmtFallback->fetchAll(\PDO::FETCH_ASSOC);
+        }
 
         // Fetch permissions for each teacher
         foreach ($teachers as &$t) {
