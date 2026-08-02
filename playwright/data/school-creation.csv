@@ -1,0 +1,8 @@
+# CreateSchoolDialog.jsx real fields: School Name, Contact Phone, School Owner
+# Email Address (required), Admin Phone, Password (auto-generated). There is
+# no "subdomain" field on this dialog.
+scenario,schoolName,ownerEmail,contactPhone,expectValid
+valid school,Greenwood High,admin@greenwoodhigh.example.com,9876500001,true
+missing name (invalid),,admin@greenwoodhigh.example.com,9876500001,false
+missing owner email (invalid),Greenwood High,,9876500001,false
+invalid owner email format (invalid),Greenwood High,not-an-email,9876500001,false

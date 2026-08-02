@@ -1,0 +1,12 @@
+# Backend saveExamMark: marks_obtained must be 0 <= x <= paper's max_marks
+# (client-side ExaminationPage.jsx additionally blocks save if any score is
+# out of range or left blank). "Published" exams reject any further edits —
+# not exercised here since it needs a seeded exam already in Published state.
+scenario,studentName,marks,expectValid
+valid mark within range,Aarav Sharma,78,true
+mark at zero boundary,Aarav Sharma,0,true
+mark at max boundary,Aarav Sharma,100,true
+mark above total (invalid),Aarav Sharma,150,false
+negative mark (invalid),Aarav Sharma,-5,false
+non-numeric mark (invalid),Aarav Sharma,abc,false
+decimal mark,Aarav Sharma,78.5,true

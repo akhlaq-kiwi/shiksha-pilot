@@ -1,0 +1,11 @@
+# TeacherLeavePage.jsx client validation: leaveType/startDate/endDate/reason
+# required, endDate >= startDate, reason capped at 100 words (client-enforced).
+# Backend LeaveRequestService additionally requires from_date <= to_date in
+# YYYY-MM-DD format and an active academic year to exist.
+scenario,leaveType,startDate,endDate,reason,expectValid
+valid single-day leave,Sick,2026-08-10,2026-08-10,Feeling unwell and need rest,true
+valid multi-day leave,Personal,2026-08-10,2026-08-12,Family function out of town,true
+end date before start date (invalid),Sick,2026-08-12,2026-08-10,End date is before start date,false
+missing reason (invalid),Sick,2026-08-10,2026-08-10,,false
+missing start date (invalid),Sick,,2026-08-10,Missing the start date,false
+reason exceeds 100 words (invalid),Other,2026-08-10,2026-08-10,"word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word",false

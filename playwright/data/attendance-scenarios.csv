@@ -1,0 +1,8 @@
+# Backend markAttendance validation: date must be >= active academic year's
+# start_date and <= today; blocks marking on Sundays; blocks marking on any
+# date already in the `holidays` table. `date` is left blank for the "today"
+# rows so the spec fills in the current date at runtime (see attendance.spec.js).
+scenario,className,date,action,expectValid
+mark all present (today),Class 5 - A,,all-present,true
+mark all absent (today),Class 5 - A,,all-absent,true
+future date is blocked,Class 5 - A,2099-01-01,all-present,false

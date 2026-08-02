@@ -1,0 +1,7 @@
+# Both inputs carry the native HTML5 `required` attribute, so an empty field
+# blocks form submission entirely (the browser's constraint validation UI,
+# not the app's own React error state) — asserted separately from
+# login-invalid-attempts.csv, which covers server-driven field errors.
+case,phone,password,emptyFieldTestid
+empty phone,,SomePassword123,login-phone-input
+empty password,9876543210,,login-password-input

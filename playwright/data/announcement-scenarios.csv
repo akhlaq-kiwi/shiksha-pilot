@@ -1,0 +1,5 @@
+# AnnouncementsPage.jsx: title required, maxLength 100.
+scenario,title,expectValid
+valid announcement,School Reopens from 15 July,true
+missing title (invalid),,false
+title exceeds 100 chars (invalid),"This is a deliberately very long announcement title that goes far beyond the one hundred character limit imposed by the form validation rules",false

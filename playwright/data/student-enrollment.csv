@@ -1,0 +1,18 @@
+# StudentEnrollmentForm.jsx is a 4-step wizard (Basic Details / Address /
+# Documents / Review). Step 1 fields: Student Name (single combined field,
+# split server-side), Date of Birth (id=dob, no htmlFor), Student Email,
+# Contact Number, Aadhaar Number. There is no "Class" field on this form —
+# the class comes from whichever class card you enrolled from.
+# Backend createStudent additionally validates: student_email must pass
+# FILTER_VALIDATE_EMAIL; student_mobile/aadhaar_no must be digits-only,
+# aadhaar exactly 12 digits.
+scenario,studentName,dob,email,mobile,aadhaar,expectValid
+valid enrollment,Ishaan Verma,2015-04-12,ishaan.verma@example.com,9876543210,123456789012,true
+missing student name (invalid),,2015-04-12,ishaan.verma@example.com,9876543210,123456789012,false
+missing date of birth (invalid),Ishaan Verma,,ishaan.verma@example.com,9876543210,123456789012,false
+invalid email format (invalid),Ishaan Verma,2015-04-12,not-an-email,9876543210,123456789012,false
+mobile with letters (invalid),Ishaan Verma,2015-04-12,ishaan.verma@example.com,98ABC43210,123456789012,false
+mobile with symbols (invalid),Ishaan Verma,2015-04-12,ishaan.verma@example.com,9876-543210,123456789012,false
+aadhaar too short (invalid),Ishaan Verma,2015-04-12,ishaan.verma@example.com,9876543210,1234567890,false
+aadhaar too long (invalid),Ishaan Verma,2015-04-12,ishaan.verma@example.com,9876543210,1234567890123,false
+aadhaar with letters (invalid),Ishaan Verma,2015-04-12,ishaan.verma@example.com,9876543210,12345678901A,false
