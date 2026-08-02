@@ -52,6 +52,10 @@ define('DB_NAME', getenv('DB_NAME') ?: 'shiksha_pilot');
 define('DB_USER', getenv('DB_USER') ?: 'root');
 define('DB_PASS', getenv('DB_PASS') ?: 'admin123');
 
+// Empty by default — local/Docker dev never sends analytics traffic.
+// Production gets a real value from the .env file above once one exists.
+define('GA_MEASUREMENT_ID', getenv('GA_MEASUREMENT_ID') ?: '');
+
 require_once __DIR__ . '/db.php';
 
 /**

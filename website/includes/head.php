@@ -83,6 +83,19 @@ if (!empty($pageJsonLd)) {
         echo '<script type="application/ld+json">' . json_encode($schema, JSON_UNESCAPED_SLASHES) . '</script>' . "\n";
     }
 }
+
+// Google Analytics (GA4) — only loads when GA_MEASUREMENT_ID is actually
+// set (production, once configured). Local/Docker dev never sends traffic.
+if (GA_MEASUREMENT_ID !== ''):
+    $gaId = htmlspecialchars(GA_MEASUREMENT_ID, ENT_QUOTES);
 ?>
+<script async src="https://www.googletagmanager.com/gtag/js?id=<?php echo $gaId; ?>"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){ dataLayer.push(arguments); }
+  gtag('js', new Date());
+  gtag('config', '<?php echo $gaId; ?>');
+</script>
+<?php endif; ?>
 </head>
 <body>

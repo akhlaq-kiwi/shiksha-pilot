@@ -87,18 +87,20 @@ scoped to a `qa`/`production` environment for extra protection — see below).
 
 ### Website secrets (`deploy-website.yml`)
 
-The marketing site has no database, no build step, and no secrets of its
-own — `website/includes/config.php` hardcodes `SITE_DOMAIN`. It targets the
+The marketing site has no build step and no secrets baked into code —
+`website/includes/config.php` hardcodes `SITE_DOMAIN`, and DB/analytics
+config comes from a `.env` file this workflow generates. It targets the
 same `production` GitHub Environment as `deploy-production.yml` (same
-server, same `PROD_SSH_*` secrets — **not** a separate `website`
-environment, since environment secrets are strictly scoped per environment
-name and won't be visible to a job declaring a different one) and needs
-exactly one additional secret, added under that same `production`
-environment:
+server, same `PROD_SSH_*`/`PROD_DB_*` secrets — **not** a separate
+`website` environment, since environment secrets are strictly scoped per
+environment name and won't be visible to a job declaring a different one)
+and needs exactly two additional secrets, added under that same
+`production` environment:
 
 | Secret | Example / notes |
 |---|---|
 | `WEBSITE_REMOTE_PATH` | `/home/u554613359/domains/shikshapilot.com/public_html` |
+| `WEBSITE_GA_MEASUREMENT_ID` | GA4 Measurement ID, e.g. `G-XXXXXXXXXX` — not sensitive (it's visible in every page's source anyway), but kept as a secret for consistency with everything else this workflow writes into `.env`. Leave empty/unset until you have a real GA4 property; the site simply won't load the Analytics script until this is set. |
 
 ### Recommended: gate behind GitHub Environments
 
