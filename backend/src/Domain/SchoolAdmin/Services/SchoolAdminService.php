@@ -475,7 +475,7 @@ class SchoolAdminService extends BaseService
                     WHERE afp.school_id = :sid
                       AND afp.status = 'Pending'
                       AND aft.academic_year_id = :ayid_fee
-                      AND (aft.due_date <= :today OR aft.name = 'Previous Year Dues')
+                      AND (aft.due_date <= :today OR aft.due_date IS NULL OR aft.name = 'Previous Year Dues')
                 ");
                 $stmtAddPending->execute([
                     ':sid' => $schoolId,
@@ -500,7 +500,7 @@ class SchoolAdminService extends BaseService
                       AND s.status = 'ACTIVE'
                       AND s.academic_year_id = :ayid_stu
                       AND aft.academic_year_id = :ayid_fee
-                      AND (aft.due_date <= :today OR aft.name = 'Previous Year Dues')
+                      AND (aft.due_date <= :today OR aft.due_date IS NULL OR aft.name = 'Previous Year Dues')
                 ");
                 $stmtAddPending->execute([
                     ':sid' => $schoolId,
