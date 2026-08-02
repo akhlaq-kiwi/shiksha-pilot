@@ -26,6 +26,13 @@ jobs:
             exit 1
           fi
 
+      - name: Verify triggered from master branch
+        run: |
+          if [ "${{ github.ref }}" != "refs/heads/master" ]; then
+            echo "::error::This workflow must be run from the 'master' branch (use the 'Use workflow from' branch picker). Current ref: ${{ github.ref }}"
+            exit 1
+          fi
+
       - name: Checkout
         uses: actions/checkout@v4
 
