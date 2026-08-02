@@ -88,9 +88,13 @@ scoped to a `qa`/`production` environment for extra protection — see below).
 ### Website secrets (`deploy-website.yml`)
 
 The marketing site has no database, no build step, and no secrets of its
-own — `website/includes/config.php` hardcodes `SITE_DOMAIN`. It reuses the
-same server as the app (`PROD_SSH_HOST`/`PORT`/`USER`/`PASSWORD` above) and
-needs exactly one additional secret:
+own — `website/includes/config.php` hardcodes `SITE_DOMAIN`. It targets the
+same `production` GitHub Environment as `deploy-production.yml` (same
+server, same `PROD_SSH_*` secrets — **not** a separate `website`
+environment, since environment secrets are strictly scoped per environment
+name and won't be visible to a job declaring a different one) and needs
+exactly one additional secret, added under that same `production`
+environment:
 
 | Secret | Example / notes |
 |---|---|
@@ -98,11 +102,12 @@ needs exactly one additional secret:
 
 ### Recommended: gate behind GitHub Environments
 
-All three workflows target an `environment:` (`qa` / `production` /
-`website`). Create these under **Settings → Environments → New
-environment**, then optionally add **required reviewers** so someone has to
-approve the run before it touches that environment, and/or restrict which
-branches can trigger it. If you skip this, the environment falls back to
+All three workflows target an `environment:` (`qa` / `production` — the
+website deploy shares `production`). Create these under **Settings →
+Environments → New environment**, then optionally add **required
+reviewers** so someone has to approve the run before it touches that
+environment, and/or restrict which branches can trigger it. If you skip
+this, the environment falls back to
 repo defaults with no extra gate — the workflows still work, just without
 the approval step.
 

@@ -17,7 +17,11 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: website
+    # Same server/credentials as the app's production deploy — targeting
+    # the same environment means it reads the PROD_SSH_* secrets already
+    # set there instead of needing them duplicated under a separate
+    # "website" environment.
+    environment: production
     steps:
       - name: Verify confirmation input
         run: |
