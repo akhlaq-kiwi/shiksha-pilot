@@ -8536,6 +8536,12 @@ Only approve the settlement after reviewing all financial records.
         $fatherName = $stu['father_name'] ?? '';
         $startDate = $stu['start_date'];
 
+        // If the student belongs to the current active/working academic year, they are NOT a promoted past record
+        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+        if ($workingYear && (int)$stu['academic_year_id'] === (int)$workingYear['id']) {
+            return false;
+        }
+
         // 2. Check if there is a student in a newer academic year matching this student
         if (!empty($admissionNo)) {
             $stmtCheck = $pdo->prepare("

@@ -254,7 +254,7 @@ export default function FinanceManagementPage() {
         schoolService.getClasses(),
         schoolService.getAcademicYears(),
         schoolService.getAdditionalFeeTypes(),
-        Promise.resolve([]),
+        schoolService.getTransportFees(),
         schoolService.getStudents({ limit: 1000 })
       ]);
       setClasses(clsList || []);
