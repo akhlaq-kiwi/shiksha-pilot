@@ -295,7 +295,11 @@ export default function WordBuilderGame() {
           setTotalPlayTime(prog.total_play_time || 0);
           setLastClaimedDate(prog.last_login_reward_date);
           
-          const today = new Date().toISOString().split('T')[0];
+          const getLocalDate = () => {
+            const d = new Date();
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+          };
+          const today = getLocalDate();
           setDailyClaimedToday(prog.last_login_reward_date === today);
           
           setLearnedWords(apiData.learned_words || []);
@@ -334,7 +338,8 @@ export default function WordBuilderGame() {
       setLearnedWords(data.learnedWords || []);
       setLastClaimedDate(data.lastClaimedDate);
       
-      const today = new Date().toISOString().split('T')[0];
+      const dLocal = new Date();
+      const today = `${dLocal.getFullYear()}-${String(dLocal.getMonth() + 1).padStart(2, '0')}-${String(dLocal.getDate()).padStart(2, '0')}`;
       setDailyClaimedToday(data.lastClaimedDate === today);
       
       // Fallback: use previously loaded wordsList from local cache if offline
@@ -439,7 +444,8 @@ export default function WordBuilderGame() {
         if (res?.success) {
           toast.success(res.message);
           setDailyClaimedToday(true);
-          const today = new Date().toISOString().split('T')[0];
+          const dClaim = new Date();
+          const today = `${dClaim.getFullYear()}-${String(dClaim.getMonth() + 1).padStart(2, '0')}-${String(dClaim.getDate()).padStart(2, '0')}`;
           setLastClaimedDate(today);
           setCoins(prev => prev + 20);
           return;
@@ -452,7 +458,8 @@ export default function WordBuilderGame() {
     // Offline claim fallback
     setCoins(prev => prev + 20);
     setDailyClaimedToday(true);
-    const today = new Date().toISOString().split('T')[0];
+    const dClaimOff = new Date();
+    const today = `${dClaimOff.getFullYear()}-${String(dClaimOff.getMonth() + 1).padStart(2, '0')}-${String(dClaimOff.getDate()).padStart(2, '0')}`;
     setLastClaimedDate(today);
     toast.success('Daily login claimed! +20 Coins saved locally.');
   };

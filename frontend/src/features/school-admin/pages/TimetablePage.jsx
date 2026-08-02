@@ -245,13 +245,19 @@ export default function TimetablePage() {
   const handlePrevWeek = () => {
     const d = new Date(currentDate);
     d.setDate(d.getDate() - 7);
-    setCurrentDate(d.toISOString().substring(0, 10));
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    setCurrentDate(`${y}-${m}-${day}`);
   };
 
   const handleNextWeek = () => {
     const d = new Date(currentDate);
     d.setDate(d.getDate() + 7);
-    setCurrentDate(d.toISOString().substring(0, 10));
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    setCurrentDate(`${y}-${m}-${day}`);
   };
 
   // Check if a resolved Sunday is in the past

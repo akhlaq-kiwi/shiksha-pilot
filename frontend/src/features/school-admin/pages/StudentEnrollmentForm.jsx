@@ -366,7 +366,10 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
           setFormData(prev => ({
             ...prev,
             academic_year_id: currentYear ? currentYear.id : (years[0]?.id || ''),
-            admission_date: new Date().toISOString().split('T')[0]
+            admission_date: (() => {
+              const d = new Date();
+              return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            })()
           }));
         }
       } catch (err) {

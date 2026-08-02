@@ -353,7 +353,8 @@ export default function LeaveRequestsPage() {
   };
 
   // Holidays dates sort
-  const todayStr = new Date().toISOString().split('T')[0];
+  const dToday = new Date();
+  const todayStr = `${dToday.getFullYear()}-${String(dToday.getMonth() + 1).padStart(2, '0')}-${String(dToday.getDate()).padStart(2, '0')}`;
   const sortedHolidays = [...holidays].sort((a, b) => a.date.localeCompare(b.date));
 
   return (

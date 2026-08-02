@@ -7,7 +7,11 @@ import { teacherService } from '../../../common/services/teacherService';
 import { SectionHeader, Modal, Label, FormSelect, formatDate } from '../shared';
 
 function today() {
-  return new Date().toISOString().split('T')[0];
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 export default function MaterialsPage({ classes, materials: initMaterials }) {

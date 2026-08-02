@@ -109,9 +109,17 @@ const getDynamicScalingStyles = (numSubjects, numInstructions) => {
   };
 };
 
+const getTodayLocalDateString = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const suggestNextExamDate = (exam, papers, holidays) => {
   if (!exam) return '';
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getTodayLocalDateString();
   let baseDateStr = exam.start_date > todayStr ? exam.start_date : todayStr;
   const parts = baseDateStr.split('-');
   if (parts.length !== 3) return baseDateStr;
@@ -153,7 +161,7 @@ const CalendarDatePicker = ({ value, onChange, min, max, required, className, on
   const [isFocused, setIsFocused] = useState(false);
   const [inputValue, setInputValue] = useState('');
   
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getTodayLocalDateString();
   
   const parseLocalDate = (dateStr) => {
     if (!dateStr) return new Date();
@@ -747,11 +755,11 @@ export default function ExamsPage() {
   // Quick Action counts
   const totalCount = exams.length;
   const upcomingCount = exams.filter(e => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayLocalDateString();
     return e.start_date > today;
   }).length;
   const ongoingCount = exams.filter(e => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayLocalDateString();
     return e.start_date <= today && e.end_date >= today;
   }).length;
   const publishedCount = exams.filter(e => e.status === 'Published').length;
@@ -949,7 +957,7 @@ export default function ExamsPage() {
       return;
     }
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getTodayLocalDateString();
     if (newPaper.exam_date < todayStr) {
       setError('Exam date cannot be in the past.');
       return;
@@ -1815,7 +1823,7 @@ export default function ExamsPage() {
     );
   }
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = getTodayLocalDateString();
   const filteredExams = exams.filter(e => {
     if (activeFilter === 'total') return true;
     if (activeFilter === 'upcoming') return e.start_date > today;
@@ -2606,7 +2614,7 @@ export default function ExamsPage() {
                         <label className="text-xs font-bold text-text-secondary uppercase">Exam Date</label>
                         <CalendarDatePicker
                           min={(() => {
-                            const todayStr = new Date().toISOString().split('T')[0];
+                            const todayStr = getTodayLocalDateString();
                             return selectedExam.start_date > todayStr ? selectedExam.start_date : todayStr;
                           })()}
                           max={selectedExam.end_date}
