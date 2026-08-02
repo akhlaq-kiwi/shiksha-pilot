@@ -2,68 +2,274 @@
 @tailwind components;
 @tailwind utilities;
 
-/* LeadKeep Layered SaaS Palette (Paper-on-Stone Warm Neutrals) */
+/* ============================================================================
+   Shiksha Pilot — "Scholar" design tokens
+   ----------------------------------------------------------------------------
+   Structure:
+     1. Brand ramp        — Scholar Indigo, the product's identity
+     2. Semantic ramps    — meaning-bearing colour (success/danger/warning/info)
+     3. Domain accents    — academics / finance, used to orient across modules
+     4. Surfaces & text   — warm "paper-on-stone" neutrals + elevation
+     5. Chart sequence    — one categorical palette, colour-blind separable
+   Every value is a variable so per-school theming and dark mode work without
+   touching a single component.
+   ========================================================================= */
+
 :root {
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-display: 'Outfit', var(--font-sans);
 
-  /* Layered Structural Surfaces & Palette Tokens */
-  --bg-app: #FAF9F6;        /* Soft Stone main page background (eliminates pure white) */
-  --bg-sidebar: #F4F3F1;    /* Ivory Tint for sidebar & navigation */
-  --bg-surface: #ffffff;    /* Pure White ONLY for inner card surfaces ("paper-on-stone") */
-  --bg-card: #ffffff;       /* Pure White inner card background */
-  --border-color: #EBEAE8;   /* Subtle Warm Gray border for cards */
-  --border-sidebar: #E5E5E1; /* Soft Gray border for sidebar */
-  --border-divider: #E5E5E1; /* Soft Stone global dividers */
+  /* ---- 1. Brand: Scholar Indigo -------------------------------------- */
+  /* brand-600 on white = 6.29:1 → WCAG AA for body text, AAA for large.   */
+  --brand-50:  #EEF2FF;
+  --brand-100: #E0E7FF;
+  --brand-200: #C7D2FE;
+  --brand-300: #A5B4FC;
+  --brand-400: #818CF8;
+  --brand-500: #6366F1;
+  --brand-600: #4F46E5;
+  --brand-700: #4338CA;
+  --brand-800: #3730A3;
+  --brand-900: #312E81;
+
+  /* Primary is an alias of the brand ramp so school themes can remap it. */
+  --color-primary: var(--brand-600);
+  --color-primary-hover: var(--brand-700);
+  --color-primary-active: var(--brand-800);
+  --color-primary-subtle: var(--brand-50);
+  --color-primary-rgb: 79, 70, 229;
+
+  /* Text/icon colour that sits ON a primary fill. */
+  --color-on-primary: #ffffff;
+
+  /* ---- 2. Semantic ramps --------------------------------------------- */
+  /* Each has a -500 fill (bars, dots, icons) and a -700 text-safe step.   */
+  --success-50:  #ECFDF5;
+  --success-200: #A7F3D0;
+  --success-500: #10B981;
+  --success-600: #059669;
+  --success-700: #047857;
+
+  --danger-50:  #FFF1F2;
+  --danger-200: #FECDD3;
+  --danger-500: #F43F5E;
+  --danger-600: #E11D48;
+  --danger-700: #BE123C;
+
+  --warning-50:  #FFFBEB;
+  --warning-200: #FDE68A;
+  --warning-500: #F59E0B;
+  --warning-600: #D97706;
+  --warning-700: #B45309;
+
+  --info-50:  #F0F9FF;
+  --info-200: #BAE6FD;
+  --info-500: #0EA5E9;
+  --info-600: #0284C7;
+  --info-700: #0369A1;
+
+  /* ---- 3. Domain accents -------------------------------------------- */
+  --academics-500: #14B8A6;   /* teal — classes, subjects, timetable          */
+  --academics-600: #0D9488;
+  --academics-700: #0F766E;   /* text-safe (teal-500 on white is only 3.7:1)  */
+  --finance-500: #8B5CF6;     /* violet — fees, salary, collections           */
+  --finance-600: #7C3AED;
+  --finance-700: #6D28D9;
+
+  /* Secondary/accent kept as aliases for backwards compatibility. */
+  --color-secondary: #EFEEEB;
+  --color-accent: var(--brand-600);
+
+  /* ---- 4. Surfaces, borders, text ----------------------------------- */
+  /* Warm paper-on-stone neutrals — deliberately not pure white.          */
+  --surface-canvas: #FAF9F6;   /* app background — Soft Stone               */
+  --surface-sunken: #F4F3F1;   /* sidebar, table headers                    */
+  --surface-raised: #FFFFFF;   /* cards                                     */
+  --surface-overlay: #FFFFFF;  /* dialogs, dropdowns                        */
+
+  --bg-app: var(--surface-canvas);
+  --bg-sidebar: var(--surface-sunken);
+  --bg-surface: var(--surface-raised);
+  --bg-card: var(--surface-raised);
+
+  --border-subtle: #EBEAE8;
+  --border-strong: #D6D4D0;    /* input borders — subtle fails AA on canvas  */
+  --border-color: var(--border-subtle);
+  --border-sidebar: #E5E5E1;
+  --border-divider: #E5E5E1;
   --border-glow: rgba(17, 24, 39, 0.02);
 
-  --color-primary: #111827;  /* Deep Charcoal active menu items & primary buttons */
-  --color-primary-hover: #1f2937;
-  --color-primary-rgb: 17, 24, 39;
-  --color-secondary: #EFEEEB; /* Neutral Wash for headers & secondary elements */
-  --color-accent: #0f172a;    /* Onyx Navy */
+  --text-primary: #0F172A;     /* Onyx Navy headings                         */
+  --text-secondary: #4B5563;   /* body text                                  */
+  --text-muted: #6B7280;       /* 5.0:1 on canvas (was #9ca3af at ~2.5:1)    */
+  --text-on-fill: #ffffff;
 
-  --text-primary: #0F172A;   /* Onyx Navy headings & page titles */
-  --text-secondary: #4b5563; /* Neutral charcoal body text */
-  --text-muted: #9ca3af;     /* Soft neutral gray placeholder & muted text */
-  
   --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.02), 0 1px 2px -1px rgba(0, 0, 0, 0.02);
   --shadow-md: 0 4px 12px -1px rgba(0, 0, 0, 0.03), 0 2px 4px -2px rgba(0, 0, 0, 0.02);
   --shadow-lg: 0 12px 24px -4px rgba(0, 0, 0, 0.04), 0 4px 12px -2px rgba(0, 0, 0, 0.02);
-  
+
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
 
   --transition-fast: 0.15s cubic-bezier(0.16, 1, 0.3, 1);
   --transition-normal: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* ---- 5. Chart sequence -------------------------------------------- */
+  --chart-1: #4F46E5;
+  --chart-2: #0D9488;
+  --chart-3: #F59E0B;
+  --chart-4: #E11D48;
+  --chart-5: #0284C7;
+  --chart-6: #7C3AED;
+  --chart-7: #65A30D;
+  --chart-8: #DB2777;
 }
 
-/* Dark Mode Variables Override */
+/* ---- Dark mode ------------------------------------------------------ */
 .dark {
-  --bg-app: #0f172a;        /* Deep navy obsidian space */
-  --bg-sidebar: #090d16;
-  --bg-surface: #1e293b;    /* Slate-800 surface */
-  --bg-card: #1e293b;
-  --border-color: #334155;   /* Slate-700 border */
-  --border-sidebar: #1e293b;
+  /* Three distinguishable layers, not two. */
+  --surface-canvas: #0F172A;
+  --surface-sunken: #0B1120;
+  --surface-raised: #1E293B;
+  --surface-overlay: #1E293B;
+
+  --bg-app: var(--surface-canvas);
+  --bg-sidebar: var(--surface-sunken);
+  --bg-surface: var(--surface-raised);
+  --bg-card: var(--surface-raised);
+
+  --border-subtle: #334155;
+  --border-strong: #475569;
+  --border-color: var(--border-subtle);
+  --border-sidebar: #1E293B;
   --border-divider: #334155;
   --border-glow: rgba(248, 250, 252, 0.02);
 
-  --color-primary: #f8fafc;  /* Crisp light primary */
-  --color-primary-hover: #e2e8f0;
-  --color-primary-rgb: 248, 250, 252;
-  --color-secondary: #334155;
-  --color-accent: #f8fafc;
+  /*
+   * Primary stays INDIGO in dark mode. It used to invert to #f8fafc, which
+   * turned every primary CTA into a white block and silently disabled
+   * per-school theming on primary surfaces.
+   */
+  --color-primary: var(--brand-500);
+  --color-primary-hover: var(--brand-400);
+  --color-primary-active: var(--brand-300);
+  --color-primary-subtle: rgba(99, 102, 241, 0.15);
+  --color-primary-rgb: 99, 102, 241;
+  --color-on-primary: #0B1120;
 
-  --text-primary: #f8fafc;   /* White text */
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  
+  --color-secondary: #334155;
+  --color-accent: var(--brand-400);
+
+  /* Semantic ramps lift for legibility against navy. */
+  --success-50: rgba(16, 185, 129, 0.12);
+  --success-200: #065F46;
+  --success-500: #34D399;
+  --success-600: #10B981;
+  --success-700: #6EE7B7;
+
+  --danger-50: rgba(244, 63, 94, 0.12);
+  --danger-200: #9F1239;
+  --danger-500: #FB7185;
+  --danger-600: #F43F5E;
+  --danger-700: #FDA4AF;
+
+  --warning-50: rgba(245, 158, 11, 0.12);
+  --warning-200: #92400E;
+  --warning-500: #FBBF24;
+  --warning-600: #F59E0B;
+  --warning-700: #FCD34D;
+
+  --info-50: rgba(14, 165, 233, 0.12);
+  --info-200: #075985;
+  --info-500: #38BDF8;
+  --info-600: #0EA5E9;
+  --info-700: #7DD3FC;
+
+  --academics-500: #2DD4BF;
+  --academics-600: #14B8A6;
+  --academics-700: #5EEAD4;
+  --finance-500: #A78BFA;
+  --finance-600: #8B5CF6;
+  --finance-700: #C4B5FD;
+
+  --text-primary: #F8FAFC;
+  --text-secondary: #CBD5E1;
+  --text-muted: #94A3B8;
+  --text-on-fill: #0B1120;
+
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 12px -1px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 12px 24px -4px rgba(0, 0, 0, 0.5);
+
+  --chart-1: #818CF8;
+  --chart-2: #2DD4BF;
+  --chart-3: #FBBF24;
+  --chart-4: #FB7185;
+  --chart-5: #38BDF8;
+  --chart-6: #A78BFA;
+  --chart-7: #A3E635;
+  --chart-8: #F472B6;
 }
+
+/* ---- Per-portal accent ---------------------------------------------
+   One attribute on the layout root gives each audience an identity while
+   the chrome stays shared. Reduces "wrong portal" confusion at a glance.
+   A school-specific theme (set via ThemeContext) still wins, because it
+   writes inline custom properties onto <html>.
+   ------------------------------------------------------------------- */
+[data-portal='teacher'] {
+  --color-primary: var(--academics-600);
+  --color-primary-hover: var(--academics-700);
+  --color-primary-subtle: #F0FDFA;
+  --color-primary-rgb: 13, 148, 136;
+}
+.dark [data-portal='teacher'] {
+  --color-primary: var(--academics-500);
+  --color-primary-hover: var(--academics-600);
+  --color-primary-subtle: rgba(45, 212, 191, 0.15);
+  --color-primary-rgb: 45, 212, 191;
+}
+
+[data-portal='student'] {
+  --color-primary: var(--info-600);
+  --color-primary-hover: var(--info-700);
+  --color-primary-subtle: var(--info-50);
+  --color-primary-rgb: 2, 132, 199;
+}
+.dark [data-portal='student'] {
+  --color-primary: var(--info-500);
+  --color-primary-hover: var(--info-600);
+  --color-primary-rgb: 56, 189, 248;
+}
+
+[data-portal='parent'] {
+  --color-primary: var(--finance-600);
+  --color-primary-hover: var(--finance-700);
+  --color-primary-subtle: #F5F3FF;
+  --color-primary-rgb: 124, 58, 237;
+}
+.dark [data-portal='parent'] {
+  --color-primary: var(--finance-500);
+  --color-primary-hover: var(--finance-600);
+  --color-primary-rgb: 167, 139, 250;
+}
+
+[data-portal='super-admin'] {
+  --color-primary: #334155;
+  --color-primary-hover: #1E293B;
+  --color-primary-subtle: #F1F5F9;
+  --color-primary-rgb: 51, 65, 85;
+}
+.dark [data-portal='super-admin'] {
+  --color-primary: var(--brand-500);
+  --color-primary-hover: var(--brand-400);
+  --color-primary-rgb: 99, 102, 241;
+}
+
+/* ============================================================================
+   Base elements
+   ========================================================================= */
 
 *, *::before, *::after {
   box-sizing: border-box;
@@ -75,16 +281,56 @@ body {
   font-family: var(--font-sans);
   background-color: var(--bg-app);
   color: var(--text-primary);
-  line-height: 1.5;
+  font-size: 14px;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
   transition: background-color var(--transition-normal), color var(--transition-normal);
 }
 
+/*
+ * Headings cap at 700. The app previously used font-black (900) in 700+ places
+ * while only Inter<=700 / Outfit<=800 were ever loaded, so browsers synthesised
+ * the weight and smeared every glyph.
+ */
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display);
   font-weight: 700;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+kbd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Consistent, visible focus for anything keyboard-reachable. */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Skip link — first tab stop, visible only when focused. */
+.skip-link {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translate(-50%, -120%);
+  z-index: 10000;
+  padding: 0.625rem 1rem;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: transform var(--transition-fast);
+}
+.skip-link:focus {
+  transform: translate(-50%, 0);
 }
 
 /* Thinner, elegant, rounded scrollbars */
@@ -96,15 +342,24 @@ h1, h2, h3, h4, h5, h6 {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--border-color);
+  background: var(--border-strong);
   border-radius: 9999px;
   transition: background var(--transition-fast);
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
 }
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
 
-/* Premium Card & Panel classes */
+/* ============================================================================
+   Panels & cards
+   ========================================================================= */
+
 .glass-panel {
   background-color: var(--bg-surface);
   border: 1px solid var(--border-color);
@@ -124,14 +379,20 @@ h1, h2, h3, h4, h5, h6 {
   border-color: rgba(var(--color-primary-rgb), 0.25);
 }
 
-/* Skeleton Loading Shimmer */
+/* Sticky table headers — required for long class and fee lists. */
+.table-sticky-head thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+/* ============================================================================
+   Loading & motion
+   ========================================================================= */
+
 @keyframes skeleton-shimmer {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 .skeleton-loader {
@@ -140,33 +401,42 @@ h1, h2, h3, h4, h5, h6 {
   animation: skeleton-shimmer 1.5s infinite linear;
 }
 
-/* Accent pulse for key indicators */
 @keyframes border-glow-pulse {
-  0%, 100% {
-    border-color: var(--border-color);
-  }
-  50% {
-    border-color: var(--text-secondary);
-  }
+  0%, 100% { border-color: var(--border-color); }
+  50% { border-color: var(--text-secondary); }
 }
 
 .animate-glow {
   animation: border-glow-pulse 3s infinite ease-in-out;
 }
 
-/* Page Entry Transitions */
 .page-fade-in {
   animation: pageFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes pageFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/*
+ * Respect a user's reduced-motion preference. The shimmer, glow pulse, page
+ * fade and card hover-lift all previously ignored it.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+  .glass-card:hover {
+    transform: none;
+  }
+  .skeleton-loader {
+    background: var(--color-secondary);
   }
 }
 
@@ -178,4 +448,67 @@ input::-webkit-inner-spin-button {
 }
 input[type=number] {
   -moz-appearance: textfield;
+}
+
+/* ============================================================================
+   Print — report cards, receipts and salary slips are the most-kept artefacts
+   of the product, so they get real print rules rather than screen styling.
+   ========================================================================= */
+
+@media print {
+  :root {
+    /* Force the light token set: printers don't have a dark mode. */
+    --bg-app: #ffffff;
+    --bg-surface: #ffffff;
+    --surface-sunken: #F4F4F5;
+    --text-primary: #000000;
+    --text-secondary: #262626;
+    --text-muted: #52525B;
+    --border-color: #A1A1AA;
+    --border-strong: #71717A;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /* Shadows and lift are meaningless on paper and cost toner. */
+  .glass-card,
+  .glass-panel,
+  [class*='shadow-'] {
+    box-shadow: none !important;
+  }
+  .glass-card:hover {
+    transform: none !important;
+  }
+
+  /* Chrome that must never print. */
+  .no-print,
+  [data-print='hide'] {
+    display: none !important;
+  }
+
+  /* Keep a record on one page where possible. */
+  .print-page {
+    page-break-after: always;
+    break-after: page;
+  }
+  .print-avoid-break,
+  tr, img {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  a[href]::after {
+    content: '';
+  }
+
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
 }

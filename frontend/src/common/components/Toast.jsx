@@ -1,14 +1,46 @@
-import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
-import { CheckCircle2, XCircle, AlertTriangle, Info, X } from 'lucide-react';
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
+import { CheckCircle2, XCircle, AlertTriangle, Info, X, WifiOff } from 'lucide-react';
 
 const ToastContext = createContext(null);
 
 const ICONS = {
-  success: { icon: CheckCircle2, bg: 'bg-emerald-50 dark:bg-emerald-950/60', border: 'border-emerald-200 dark:border-emerald-800', iconColor: 'text-emerald-500', titleColor: 'text-emerald-900 dark:text-emerald-100', msgColor: 'text-emerald-700 dark:text-emerald-300' },
-  error:   { icon: XCircle,       bg: 'bg-red-50 dark:bg-red-950/60',     border: 'border-red-200 dark:border-red-800',     iconColor: 'text-red-500',     titleColor: 'text-red-900 dark:text-red-100',     msgColor: 'text-red-700 dark:text-red-300'     },
-  warning: { icon: AlertTriangle, bg: 'bg-amber-50 dark:bg-amber-950/60', border: 'border-amber-200 dark:border-amber-800', iconColor: 'text-amber-500', titleColor: 'text-amber-900 dark:text-amber-100', msgColor: 'text-amber-700 dark:text-amber-300' },
-  info:    { icon: Info,          bg: 'bg-blue-50 dark:bg-blue-950/60',   border: 'border-blue-200 dark:border-blue-800',   iconColor: 'text-blue-500',   titleColor: 'text-blue-900 dark:text-blue-100',   msgColor: 'text-blue-700 dark:text-blue-300'   },
+  success: { icon: CheckCircle2, bg: 'bg-success-50 dark:bg-success-500/10', border: 'border-success-200 dark:border-success-500/30', iconColor: 'text-success-600', titleColor: 'text-success-700 dark:text-success-300', msgColor: 'text-success-700 dark:text-success-300' },
+  error:   { icon: XCircle,       bg: 'bg-danger-50 dark:bg-danger-500/10',   border: 'border-danger-200 dark:border-danger-500/30',   iconColor: 'text-danger-600',   titleColor: 'text-danger-700 dark:text-danger-300',   msgColor: 'text-danger-700 dark:text-danger-300'   },
+  warning: { icon: AlertTriangle, bg: 'bg-warning-50 dark:bg-warning-500/10', border: 'border-warning-200 dark:border-warning-500/30', iconColor: 'text-warning-600', titleColor: 'text-warning-700 dark:text-warning-300', msgColor: 'text-warning-700 dark:text-warning-300' },
+  info:    { icon: Info,          bg: 'bg-info-50 dark:bg-info-500/10',       border: 'border-info-200 dark:border-info-500/30',       iconColor: 'text-info-600',       titleColor: 'text-info-700 dark:text-info-300',       msgColor: 'text-info-700 dark:text-info-300'       },
 };
+
+/**
+ * Persistent connectivity indicator. Replaces the old behaviour of silently
+ * dropping all toasts while offline.
+ */
+function OfflineBanner() {
+  const [offline, setOffline] = useState(() => typeof navigator !== 'undefined' && !navigator.onLine);
+
+  useEffect(() => {
+    const goOffline = () => setOffline(true);
+    const goOnline = () => setOffline(false);
+    window.addEventListener('offline', goOffline);
+    window.addEventListener('online', goOnline);
+    return () => {
+      window.removeEventListener('offline', goOffline);
+      window.removeEventListener('online', goOnline);
+    };
+  }, []);
+
+  if (!offline) return null;
+
+  return (
+    <div
+      role="alert"
+      aria-live="assertive"
+      className="fixed bottom-0 left-0 right-0 z-[9998] flex items-center justify-center gap-2 bg-warning-600 px-4 py-2 text-center text-sm font-medium text-white"
+    >
+      <WifiOff className="h-4 w-4 flex-shrink-0" />
+      You are offline. Changes you make may not be saved until the connection returns.
+    </div>
+  );
+}
 
 function ToastItem({ toast, onRemove }) {
   const style = ICONS[toast.type] || ICONS.info;
@@ -29,6 +61,14 @@ function ToastItem({ toast, onRemove }) {
           <p className={`text-sm font-bold leading-tight ${style.titleColor}`}>{toast.title}</p>
         )}
         <p className={`text-sm leading-snug ${toast.title ? 'mt-0.5' : ''} ${style.msgColor}`}>{toast.message}</p>
+        {toast.action && (
+          <button
+            onClick={() => { toast.action.onClick(); onRemove(toast.id); }}
+            className={`mt-1.5 text-xs font-semibold underline underline-offset-2 ${style.titleColor}`}
+          >
+            {toast.action.label}
+          </button>
+        )}
       </div>
       <button
         onClick={() => onRemove(toast.id)}
@@ -50,10 +90,17 @@ export function ToastProvider({ children }) {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
-  const toast = useCallback(({ type = 'info', title, message, duration = 4000 }) => {
-    if (!navigator.onLine) return null;
+  const toast = useCallback(({ type = 'info', title, message, duration = 4000, action } = {}) => {
+    // Feedback must NEVER be suppressed when offline — that is precisely when
+    // the user most needs to know a save failed. An offline banner communicates
+    // connectivity; swallowing toasts communicated nothing.
     const id = Date.now() + Math.random();
-    setToasts(prev => [...prev, { id, type, title, message }]);
+    setToasts(prev => {
+      // Dedupe identical consecutive messages so repeated failures don't stack.
+      const last = prev[prev.length - 1];
+      if (last && last.type === type && last.message === message && last.title === title) return prev;
+      return [...prev, { id, type, title, message, action }];
+    });
     if (duration > 0) {
       timers.current[id] = setTimeout(() => remove(id), duration);
     }
@@ -69,8 +116,14 @@ export function ToastProvider({ children }) {
   return (
     <ToastContext.Provider value={toast}>
       {children}
-      {/* Toast container — top-right */}
-      <div className="fixed top-5 right-5 z-[9999] flex flex-col gap-2.5 pointer-events-none">
+      <OfflineBanner />
+      {/* Toast container — top-right. role/aria-live so screen readers announce. */}
+      <div
+        className="fixed top-5 right-5 z-[9999] flex flex-col gap-2.5 pointer-events-none"
+        role="status"
+        aria-live="polite"
+        aria-atomic="false"
+      >
         {toasts.map(t => (
           <ToastItem key={t.id} toast={t} onRemove={remove} />
         ))}

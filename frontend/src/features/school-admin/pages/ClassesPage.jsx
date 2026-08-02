@@ -585,7 +585,7 @@ export default function ClassesPage() {
               >
                 Back
               </button>
-              <h2 className="text-2xl font-black text-text-primary tracking-tight font-display">{selectedClassName} ({rosterStudents.length})</h2>
+              <h2 className="text-2xl font-bold text-text-primary tracking-tight font-display">{selectedClassName} ({rosterStudents.length})</h2>
             </div>
             {!isReadOnly && (
               <div className="flex items-center gap-2">
@@ -619,7 +619,7 @@ export default function ClassesPage() {
           <div className="bg-surface border border-border rounded-xl p-4 shadow-xs flex flex-col md:flex-row gap-4 items-center justify-between">
             <div className="relative w-full md:max-w-xs">
               <Search className="absolute left-3 top-3 h-4 w-4 text-text-muted" />
-              <Input 
+              <Input aria-label="Search roster by name or roll number..." 
                 placeholder="Search roster by name or roll number..." 
                 className="pl-9" 
                 value={rosterSearch} 
@@ -709,13 +709,13 @@ export default function ClassesPage() {
                   </div>
                   
                   {/* Name */}
-                  <h3 className="font-extrabold text-text-primary text-base hover:text-primary transition-colors leading-tight truncate w-full px-1">
+                  <h3 className="font-bold text-text-primary text-base hover:text-primary transition-colors leading-tight truncate w-full px-1">
                     {s.name}
                   </h3>
                   
                   {/* Roll Number */}
                   <p className="text-xs text-text-muted mt-2 font-bold uppercase tracking-wider">
-                    Roll No: <span className="font-mono text-text-primary font-extrabold">{s.roll_no || s.roll || '-'}</span>
+                    Roll No: <span className="font-mono text-text-primary font-bold">{s.roll_no || s.roll || '-'}</span>
                   </p>
                 </div>
               ))}
@@ -734,7 +734,7 @@ export default function ClassesPage() {
               
               {/* Modal Header */}
               <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-zinc-50 dark:bg-zinc-900/50">
-                <h3 className="font-extrabold text-text-primary text-base tracking-tight font-display">
+                <h3 className="font-bold text-text-primary text-base tracking-tight font-display">
                   Advance Student
                 </h3>
                 <button 
@@ -783,7 +783,7 @@ export default function ClassesPage() {
 
                 {/* Selection dropdown */}
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-text-muted uppercase tracking-wider block">
+                  <label className="text-[11px] font-bold text-text-muted uppercase tracking-wider block">
                     Advance To <span className="text-red-500">*</span>
                   </label>
                   <select
@@ -865,7 +865,7 @@ export default function ClassesPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-text-muted uppercase tracking-wider block">Source Section *</label>
+                  <label className="text-[11px] font-bold text-text-muted uppercase tracking-wider block">Source Section *</label>
                   <select
                     value={transferSourceSec}
                     onChange={(e) => {
@@ -882,7 +882,7 @@ export default function ClassesPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-text-muted uppercase tracking-wider block">Destination Section *</label>
+                  <label className="text-[11px] font-bold text-text-muted uppercase tracking-wider block">Destination Section *</label>
                   <select
                     value={transferDestSec}
                     onChange={(e) => setTransferDestSec(e.target.value)}
@@ -899,7 +899,7 @@ export default function ClassesPage() {
               {transferSourceSec && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between border-b border-border pb-1.5">
-                    <span className="text-[10px] font-black text-text-muted uppercase tracking-wider">Select Students</span>
+                    <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Select Students</span>
                     {students.filter(s => s.class_name === selectedClassName && s.section === transferSourceSec && s.status === 'ACTIVE').length > 0 && (
                       <label className="flex items-center gap-2 cursor-pointer select-none">
                         <input
@@ -915,7 +915,7 @@ export default function ClassesPage() {
                           }}
                           className="rounded border-zinc-300 text-primary focus:ring-primary h-3.5 w-3.5"
                         />
-                        <span className="text-[10px] text-text-muted">Select All</span>
+                        <span className="text-[11px] text-text-muted">Select All</span>
                       </label>
                     )}
                   </div>
@@ -1023,7 +1023,7 @@ export default function ClassesPage() {
       {/* Page Header */}
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">Classes</h2>
+          <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Classes</h2>
         </div>
         {!isReadOnly && (
           <Button className="flex items-center gap-2 font-bold" onClick={() => setShowCreateForm(true)}>
@@ -1051,7 +1051,7 @@ export default function ClassesPage() {
               onClick={() => { setSelectedClassName(gc.name); setRosterSearch(''); setView('roster'); }}
               className="relative flex items-center justify-center p-6 bg-surface border border-border hover:border-primary/50 hover:shadow-md rounded-2xl cursor-pointer transition-all duration-200 select-none h-28 md:h-32 text-center"
             >
-              <h3 className="font-extrabold text-text-primary text-xl tracking-tight font-display px-6 text-center truncate">
+              <h3 className="font-bold text-text-primary text-xl tracking-tight font-display px-6 text-center truncate">
                 {getShortClassName(gc.name)}
               </h3>
 
@@ -1088,7 +1088,7 @@ export default function ClassesPage() {
             
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-zinc-50 dark:bg-zinc-900/50">
-              <h3 className="font-extrabold text-text-primary text-base tracking-tight font-display">
+              <h3 className="font-bold text-text-primary text-base tracking-tight font-display">
                 {isEditing ? 'Manage Class Sections' : 'Add Class'}
               </h3>
               <button 
@@ -1150,7 +1150,7 @@ export default function ClassesPage() {
                   <option value={SECTION_TYPES.COLOR}>Color Sections (Red, Blue, Green, Yellow)</option>
                 </select>
                 {isEditing && editingStudentCount > 0 && sectionTypeInput !== '' && (
-                  <p className="text-[10px] text-amber-600 font-bold mt-1">
+                  <p className="text-[11px] text-amber-600 font-bold mt-1">
                     Section type cannot be changed because students are already assigned to this class.
                   </p>
                 )}
@@ -1166,7 +1166,7 @@ export default function ClassesPage() {
                     <label className="text-xs font-bold text-text-secondary uppercase">
                       Select Sections (Optional)
                     </label>
-                    <span className="text-[10px] font-bold text-text-muted">Max 4</span>
+                    <span className="text-[11px] font-bold text-text-muted">Max 4</span>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 p-3 bg-zinc-50 dark:bg-zinc-900/50 border border-border rounded-xl">
@@ -1213,7 +1213,7 @@ export default function ClassesPage() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-surface border border-border rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col">
             <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-amber-500/10">
-              <h3 className="font-extrabold text-amber-600 text-base tracking-tight font-display">
+              <h3 className="font-bold text-amber-600 text-base tracking-tight font-display">
                 Confirm Section Type Change
               </h3>
               <button 
@@ -1249,7 +1249,7 @@ export default function ClassesPage() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-surface border border-border rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col">
             <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-amber-500/10">
-              <h3 className="font-extrabold text-amber-600 text-base tracking-tight font-display">
+              <h3 className="font-bold text-amber-600 text-base tracking-tight font-display">
                 Cannot Delete Class
               </h3>
               <button 
@@ -1262,7 +1262,7 @@ export default function ClassesPage() {
             </div>
             <div className="p-6 space-y-4">
               <div className="p-4 bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 rounded-xl text-xs leading-relaxed space-y-2">
-                <p className="font-extrabold text-sm">Action Blocked</p>
+                <p className="font-bold text-sm">Action Blocked</p>
                 <p>Students are currently enrolled in this class.</p>
                 <p>Please transfer or remove all students before deleting it.</p>
               </div>
@@ -1279,7 +1279,7 @@ export default function ClassesPage() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-surface border border-border rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col">
             <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-red-500/10">
-              <h3 className="font-extrabold text-red-600 text-base tracking-tight font-display">
+              <h3 className="font-bold text-red-600 text-base tracking-tight font-display">
                 Delete Class
               </h3>
               <button 
@@ -1328,7 +1328,7 @@ export default function ClassesPage() {
             
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-zinc-50 dark:bg-zinc-900/50">
-              <h3 className="font-extrabold text-text-primary text-base tracking-tight font-display">
+              <h3 className="font-bold text-text-primary text-base tracking-tight font-display">
                 Advance Student
               </h3>
               <button 
@@ -1377,7 +1377,7 @@ export default function ClassesPage() {
 
               {/* Selection dropdown */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-text-muted uppercase tracking-wider block">
+                <label className="text-[11px] font-bold text-text-muted uppercase tracking-wider block">
                   Advance To <span className="text-red-500">*</span>
                 </label>
                 <select

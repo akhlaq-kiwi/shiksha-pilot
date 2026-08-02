@@ -38,7 +38,7 @@ const TeacherAvatar = ({ src, name, updatedAt }) => {
     : 'T';
     
   return (
-    <div className="w-full h-full bg-teal-500/10 text-teal-600 dark:bg-teal-500/20 dark:text-teal-400 flex items-center justify-center text-xl font-black">
+    <div className="w-full h-full bg-teal-500/10 text-teal-600 dark:bg-teal-500/20 dark:text-teal-400 flex items-center justify-center text-xl font-bold">
       {initials}
     </div>
   );
@@ -983,7 +983,7 @@ export default function StaffPage() {
                 >
                   Back
                 </button>
-                <h2 className="text-2xl font-black text-text-primary tracking-tight font-display">Teacher Profile</h2>
+                <h2 className="text-2xl font-bold text-text-primary tracking-tight font-display">Teacher Profile</h2>
               </div>
               <div className="flex items-center gap-3">
                 {isInactiveTeacher && (
@@ -993,7 +993,7 @@ export default function StaffPage() {
                       setCustomJoiningDate(t?.joining_date || '');
                       setIsExpOptionDialogOpen(true);
                     }}
-                    className="flex items-center gap-2 font-black bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
+                    className="flex items-center gap-2 font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
                   >
                     <FileText className="h-4 w-4" /> Experience Letter
                   </Button>
@@ -1016,18 +1016,18 @@ export default function StaffPage() {
                     <TeacherAvatar src={t.photo_path} name={t.name} updatedAt={t.updated_at} />
                   </div>
                   
-                  <h3 className="text-xl font-black text-text-primary tracking-tight font-display mt-4">{t.name}</h3>
-                  <p className="text-xs text-text-muted mt-1.5 font-bold uppercase tracking-wider">Employee ID: <span className="font-mono text-text-primary font-extrabold">{t.employee_id || '-'}</span></p>
+                  <h3 className="text-xl font-bold text-text-primary tracking-tight font-display mt-4">{t.name}</h3>
+                  <p className="text-xs text-text-muted mt-1.5 font-bold uppercase tracking-wider">Employee ID: <span className="font-mono text-text-primary font-bold">{t.employee_id || '-'}</span></p>
 
                   <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase border ${
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase border ${
                       t.status === 'ACTIVE'
                         ? 'bg-green-500/10 text-green-600 border-green-500/20'
                         : 'bg-red-500/10 text-red-600 border-red-500/20'
                     }`}>
                       {t.status}
                     </span>
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-zinc-100 text-text-secondary dark:bg-zinc-800 uppercase">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-zinc-100 text-text-secondary dark:bg-zinc-800 uppercase">
                       {t.department || 'General'}
                     </span>
                   </div>
@@ -1037,33 +1037,33 @@ export default function StaffPage() {
 
                 <div className="space-y-4 text-xs">
                   <div>
-                    <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Father's Name</p>
+                    <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Father's Name</p>
                     <p className="text-sm font-semibold text-text-primary mt-0.5">{t.father_name || '—'}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Mother's Name</p>
+                    <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Mother's Name</p>
                     <p className="text-sm font-semibold text-text-primary mt-0.5">{t.mother_name || '—'}</p>
                   </div>
 
                   <div>
-                    <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Contact Phone</p>
+                    <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Contact Phone</p>
                     <p className="text-sm font-semibold text-text-primary mt-0.5">{t.phone || '—'}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Emergency Contact</p>
+                    <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Emergency Contact</p>
                     <p className="text-sm font-semibold text-text-primary mt-0.5">{t.emergency_phone || '—'}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Email Address</p>
+                    <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Email Address</p>
                     <p className="text-sm font-semibold text-text-primary mt-0.5 break-all">{t.email || '—'}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Joining Date</p>
+                    <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Joining Date</p>
                     <p className="text-sm font-semibold text-text-primary mt-0.5">{formatDate(t.joining_date)}</p>
                   </div>
                   {t.exit_date && (
                     <div>
-                      <p className="text-[10px] font-black text-red-500 uppercase tracking-wider">Exit Date</p>
+                      <p className="text-[11px] font-bold text-red-500 uppercase tracking-wider">Exit Date</p>
                       <p className="text-sm font-semibold text-text-primary mt-0.5">{formatDate(t.exit_date)}</p>
                     </div>
                   )}
@@ -1075,10 +1075,10 @@ export default function StaffPage() {
                 
                 {/* Address details */}
                 <Card className="p-6 bg-surface border border-border rounded-2xl shadow-xs">
-                  <h3 className="text-sm font-extrabold text-text-primary uppercase tracking-wider mb-4 border-b border-border pb-2">Address Details</h3>
+                  <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider mb-4 border-b border-border pb-2">Address Details</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
                     <div className="space-y-2">
-                      <h4 className="font-bold text-text-secondary uppercase text-[10px] tracking-wider">Current Address</h4>
+                      <h4 className="font-bold text-text-secondary uppercase text-[11px] tracking-wider">Current Address</h4>
                       <p className="text-sm text-text-primary leading-relaxed">
                         {t.current_address_line || '—'}<br />
                         {t.current_city ? `${t.current_city}, ` : ''}{t.current_state || ''}<br />
@@ -1086,7 +1086,7 @@ export default function StaffPage() {
                       </p>
                     </div>
                     <div className="space-y-2">
-                      <h4 className="font-bold text-text-secondary uppercase text-[10px] tracking-wider">Permanent Address</h4>
+                      <h4 className="font-bold text-text-secondary uppercase text-[11px] tracking-wider">Permanent Address</h4>
                       {t.same_as_current === 1 ? (
                         <p className="text-xs text-text-muted italic">Same as Current Address</p>
                       ) : (
@@ -1128,8 +1128,8 @@ export default function StaffPage() {
                             return (
                               <div key={doc.id || idx} className="flex items-center justify-between p-3 border border-border rounded-xl bg-zinc-50/50 dark:bg-zinc-900/10">
                                 <div className="min-w-0 pr-2">
-                                  <p className="font-bold text-text-primary uppercase text-[10px] tracking-wider truncate">{doc.category || doc.file_name || 'Document'}</p>
-                                  <p className="text-[10px] text-text-muted truncate mt-0.5">{doc.file_name || 'File attachment'}</p>
+                                  <p className="font-bold text-text-primary uppercase text-[11px] tracking-wider truncate">{doc.category || doc.file_name || 'Document'}</p>
+                                  <p className="text-[11px] text-text-muted truncate mt-0.5">{doc.file_name || 'File attachment'}</p>
                                 </div>
                                 {rawPath ? (
                                   <a
@@ -1143,7 +1143,7 @@ export default function StaffPage() {
                                     <span>Download</span>
                                   </a>
                                 ) : (
-                                  <span className="text-[10px] text-text-muted font-bold uppercase tracking-wider flex-shrink-0">Missing</span>
+                                  <span className="text-[11px] text-text-muted font-bold uppercase tracking-wider flex-shrink-0">Missing</span>
                                 )}
                               </div>
                             );
@@ -1156,7 +1156,7 @@ export default function StaffPage() {
                    {/* Salary Card panel */}
                 <Card className="p-6 bg-surface border border-border rounded-2xl shadow-xs animate-in fade-in duration-200">
                   <div className="flex items-center justify-between border-b border-border pb-4 mb-4">
-                    <h3 className="text-sm font-extrabold text-text-primary uppercase tracking-wider">Salary Card</h3>
+                    <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider">Salary Card</h3>
                     <span className="text-xs text-text-secondary font-bold">
                       Academic Year: {academicYears.find(y => y.is_current)?.name || academicYears.find(y => y.status === 'Draft')?.name || '—'}
                     </span>
@@ -1193,8 +1193,8 @@ export default function StaffPage() {
                           {/* Top row: Month name and dropdown menu (if paid and not locked) */}
                           <div className="flex justify-between items-start">
                             <div>
-                              <h4 className="text-sm font-extrabold text-text-primary">{month}</h4>
-                              <p className="text-[10px] text-text-secondary font-bold uppercase mt-0.5">
+                              <h4 className="text-sm font-bold text-text-primary">{month}</h4>
+                              <p className="text-[11px] text-text-secondary font-bold uppercase mt-0.5">
                                 {isPaid ? (
                                   <span className="inline-flex items-center gap-1 text-green-600">
                                     <CheckCircle className="h-3 w-3" /> Paid {isProrated && '(Prorated)'}
@@ -1231,7 +1231,7 @@ export default function StaffPage() {
 
                           {/* Middle row: salary amount */}
                           <div className="my-4">
-                            <p className="text-lg font-black text-text-primary">
+                            <p className="text-lg font-bold text-text-primary">
                               ₹{parseFloat(salaryAmount).toLocaleString('en-IN')}
                             </p>
                           </div>
@@ -1272,7 +1272,7 @@ export default function StaffPage() {
                     <div className="flex items-center justify-between border-b border-border pb-4 mb-4">
                       <div className="flex items-center gap-2">
                         <AlertTriangle className="h-4 w-4 text-amber-500" />
-                        <h3 className="text-sm font-extrabold text-text-primary uppercase tracking-wider">Previous Year Salary Card</h3>
+                        <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider">Previous Year Salary Card</h3>
                       </div>
                       <span className="text-xs text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full font-bold">
                         AY: {t.previous_year_pending.academic_year_name}
@@ -1302,8 +1302,8 @@ export default function StaffPage() {
                             {/* Top row: Month name and dropdown menu (if paid and not locked) */}
                             <div className="flex justify-between items-start">
                               <div>
-                                <h4 className="text-sm font-extrabold text-text-primary">{month}</h4>
-                                <p className="text-[10px] text-text-secondary font-bold uppercase mt-0.5">
+                                <h4 className="text-sm font-bold text-text-primary">{month}</h4>
+                                <p className="text-[11px] text-text-secondary font-bold uppercase mt-0.5">
                                   {isPaid ? (
                                     <span className="inline-flex items-center gap-1 text-green-600">
                                       <CheckCircle className="h-3 w-3" /> Paid
@@ -1340,7 +1340,7 @@ export default function StaffPage() {
 
                             {/* Middle row: salary amount */}
                             <div className="my-4">
-                              <p className="text-lg font-black text-text-primary">
+                              <p className="text-lg font-bold text-text-primary">
                                 ₹{parseFloat(salaryAmount).toLocaleString('en-IN')}
                               </p>
                             </div>
@@ -1398,7 +1398,7 @@ export default function StaffPage() {
         <>
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
             <div>
-              <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">Teachers</h2>
+              <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Teachers</h2>
               <p className="text-text-secondary text-sm mt-1">{totalTeachers} teachers · {activeTeachersCount} active</p>
             </div>
             {!isReadOnly && (
@@ -1455,7 +1455,7 @@ export default function StaffPage() {
           <div className="bg-surface border border-border rounded-xl p-4 flex flex-col md:flex-row gap-4">
             <div className="relative w-full md:w-80">
               <Search className="absolute left-3 top-3 h-4 w-4 text-text-muted" />
-              <Input placeholder="Search teachers..." className="pl-9" value={staffSearch} onChange={e => setStaffSearch(e.target.value)} />
+              <Input aria-label="Search teachers..." placeholder="Search teachers..." className="pl-9" value={staffSearch} onChange={e => setStaffSearch(e.target.value)} />
             </div>
             <Select className="w-full md:w-48" value={selectedDeptFilter} onChange={e => setSelectedDeptFilter(e.target.value)}>
               <option value="">All Subjects</option>
@@ -1502,10 +1502,10 @@ export default function StaffPage() {
                       </div>
                       
                       {/* Name */}
-                      <h3 className="font-extrabold text-text-primary text-base hover:text-primary transition-colors leading-tight truncate w-full px-1">
+                      <h3 className="font-bold text-text-primary text-base hover:text-primary transition-colors leading-tight truncate w-full px-1">
                         {t.name}
                       </h3>
-                      <p className="text-[10px] text-text-muted font-bold tracking-tight uppercase mt-1">{t.department || 'General'}</p>
+                      <p className="text-[11px] text-text-muted font-bold tracking-tight uppercase mt-1">{t.department || 'General'}</p>
                     </div>
                     
                     <div className="flex items-center justify-between w-full mt-4 text-xs">
@@ -1520,7 +1520,7 @@ export default function StaffPage() {
                         const isOccupied = assigned === max;
                         return (
                           <>
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[9px] font-black uppercase border ${
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold uppercase border ${
                               isOccupied 
                                 ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
                                 : 'bg-green-500/10 text-green-600 border-green-500/20'
@@ -1528,7 +1528,7 @@ export default function StaffPage() {
                               {isOccupied ? 'Occupied' : 'Available'}
                             </span>
                             
-                            <span className="text-[10px] text-text-muted font-bold font-sans">
+                            <span className="text-[11px] text-text-muted font-bold font-sans">
                               Assigned {assigned}/{max}
                             </span>
                           </>
@@ -1582,54 +1582,54 @@ export default function StaffPage() {
                     </Button>
                   )}
                 </div>
-                {formErrors.photo && <p className="text-[10px] text-red-500 font-semibold">{formErrors.photo}</p>}
+                {formErrors.photo && <p className="text-[11px] text-red-500 font-semibold">{formErrors.photo}</p>}
               </div>
             </div>
           </div>
 
           {/* Basic Details */}
           <div className="space-y-4 border-b border-border pb-4">
-            <h3 className="text-sm font-black text-text-primary tracking-tight font-display">Basic Details</h3>
+            <h3 className="text-sm font-bold text-text-primary tracking-tight font-display">Basic Details</h3>
             
             {/* Row 1: Full Name, Father Name, Mother Name */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-text-secondary uppercase">Full Name <span className="text-red-500">*</span></label>
-                <Input name="name" value={newStaff.name} onChange={handleTextChange} placeholder="e.g. Ms. Anita Sharma" required />
-                {formErrors.name && <p className="text-[10px] text-red-500 font-semibold">{formErrors.name}</p>}
+                <label htmlFor="name" className="text-xs font-bold text-text-secondary uppercase">Full Name <span className="text-red-500">*</span></label>
+                <Input id="name" name="name" value={newStaff.name} onChange={handleTextChange} placeholder="e.g. Ms. Anita Sharma" required />
+                {formErrors.name && <p className="text-[11px] text-red-500 font-semibold">{formErrors.name}</p>}
               </div>
               
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-text-secondary uppercase">Father Name <span className="text-red-500">*</span></label>
-                <Input name="father_name" value={newStaff.father_name} onChange={handleTextChange} placeholder="e.g. Shri Om Prakash Sharma" required />
-                {formErrors.father_name && <p className="text-[10px] text-red-500 font-semibold">{formErrors.father_name}</p>}
+                <label htmlFor="father_name" className="text-xs font-bold text-text-secondary uppercase">Father Name <span className="text-red-500">*</span></label>
+                <Input id="father_name" name="father_name" value={newStaff.father_name} onChange={handleTextChange} placeholder="e.g. Shri Om Prakash Sharma" required />
+                {formErrors.father_name && <p className="text-[11px] text-red-500 font-semibold">{formErrors.father_name}</p>}
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-text-secondary uppercase">Mother Name <span className="text-red-500">*</span></label>
-                <Input name="mother_name" value={newStaff.mother_name} onChange={handleTextChange} placeholder="e.g. Shabana Begum" required />
-                {formErrors.mother_name && <p className="text-[10px] text-red-500 font-semibold">{formErrors.mother_name}</p>}
+                <label htmlFor="mother_name" className="text-xs font-bold text-text-secondary uppercase">Mother Name <span className="text-red-500">*</span></label>
+                <Input id="mother_name" name="mother_name" value={newStaff.mother_name} onChange={handleTextChange} placeholder="e.g. Shabana Begum" required />
+                {formErrors.mother_name && <p className="text-[11px] text-red-500 font-semibold">{formErrors.mother_name}</p>}
               </div>
             </div>
 
             {/* Row 2: Contact Number, Emergency Contact Number, Email */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-text-secondary uppercase">Contact Number <span className="text-red-500">*</span></label>
-                <Input name="phone" value={newStaff.phone} onChange={handleTextChange} placeholder="10-digit mobile number" required />
-                {formErrors.phone && <p className="text-[10px] text-red-500 font-semibold">{formErrors.phone}</p>}
+                <label htmlFor="phone" className="text-xs font-bold text-text-secondary uppercase">Contact Number <span className="text-red-500">*</span></label>
+                <Input id="phone" name="phone" value={newStaff.phone} onChange={handleTextChange} placeholder="10-digit mobile number" required />
+                {formErrors.phone && <p className="text-[11px] text-red-500 font-semibold">{formErrors.phone}</p>}
               </div>
               
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-text-secondary uppercase">Emergency Contact Number <span className="text-red-500">*</span></label>
-                <Input name="emergency_phone" value={newStaff.emergency_phone} onChange={handleTextChange} placeholder="Emergency number" required />
-                {formErrors.emergency_phone && <p className="text-[10px] text-red-500 font-semibold">{formErrors.emergency_phone}</p>}
+                <label htmlFor="emergency_phone" className="text-xs font-bold text-text-secondary uppercase">Emergency Contact Number <span className="text-red-500">*</span></label>
+                <Input id="emergency_phone" name="emergency_phone" value={newStaff.emergency_phone} onChange={handleTextChange} placeholder="Emergency number" required />
+                {formErrors.emergency_phone && <p className="text-[11px] text-red-500 font-semibold">{formErrors.emergency_phone}</p>}
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-text-secondary uppercase">Email Address <span className="text-red-500">*</span></label>
-                <Input name="email" type="email" value={newStaff.email} onChange={handleTextChange} placeholder="anita@school.com" required />
-                {formErrors.email && <p className="text-[10px] text-red-500 font-semibold">{formErrors.email}</p>}
+                <label htmlFor="email" className="text-xs font-bold text-text-secondary uppercase">Email Address <span className="text-red-500">*</span></label>
+                <Input id="email" name="email" type="email" value={newStaff.email} onChange={handleTextChange} placeholder="anita@school.com" required />
+                {formErrors.email && <p className="text-[11px] text-red-500 font-semibold">{formErrors.email}</p>}
               </div>
             </div>
 
@@ -1639,8 +1639,8 @@ export default function StaffPage() {
                 {/* Edit Mode: Row 3 (Joining Date, Exit Date, Parent Occupation) */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-text-secondary uppercase">Joining Date <span className="text-red-500">*</span></label>
-                    <Input 
+                    <label htmlFor="joining_date" className="text-xs font-bold text-text-secondary uppercase">Joining Date <span className="text-red-500">*</span></label>
+                    <Input id="joining_date" 
                       type="date" 
                       name="joining_date"
                       value={newStaff.joining_date} 
@@ -1649,12 +1649,12 @@ export default function StaffPage() {
                       className="cursor-pointer w-full" 
                       required 
                     />
-                    {formErrors.joining_date && <p className="text-[10px] text-red-500 font-semibold">{formErrors.joining_date}</p>}
+                    {formErrors.joining_date && <p className="text-[11px] text-red-500 font-semibold">{formErrors.joining_date}</p>}
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-text-secondary uppercase">Exit Date</label>
-                    <Input 
+                    <label htmlFor="exit_date" className="text-xs font-bold text-text-secondary uppercase">Exit Date</label>
+                    <Input id="exit_date" 
                       type="date" 
                       name="exit_date"
                       value={newStaff.exit_date} 
@@ -1662,12 +1662,12 @@ export default function StaffPage() {
                       onKeyDown={e => e.preventDefault()}
                       className="cursor-pointer w-full text-red-500 font-bold" 
                     />
-                    {formErrors.exit_date && <p className="text-[10px] text-red-500 font-semibold">{formErrors.exit_date}</p>}
+                    {formErrors.exit_date && <p className="text-[11px] text-red-500 font-semibold">{formErrors.exit_date}</p>}
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-text-secondary uppercase">Salary <span className="text-red-500">*</span></label>
-                    <Input 
+                    <label htmlFor="salary" className="text-xs font-bold text-text-secondary uppercase">Salary <span className="text-red-500">*</span></label>
+                    <Input id="salary" 
                       type="number" 
                       name="salary" 
                       value={newStaff.salary} 
@@ -1675,15 +1675,15 @@ export default function StaffPage() {
                       placeholder="e.g. 25000" 
                       required 
                     />
-                    {formErrors.salary && <p className="text-[10px] text-red-500 font-semibold">{formErrors.salary}</p>}
+                    {formErrors.salary && <p className="text-[11px] text-red-500 font-semibold">{formErrors.salary}</p>}
                   </div>
                 </div>
 
                 {/* Edit Mode: Row 4 (Subject, spacer, spacer) */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-text-secondary uppercase font-display">Subject <span className="text-red-500">*</span></label>
-                    <Input 
+                    <label htmlFor="subject" className="text-xs font-bold text-text-secondary uppercase font-display">Subject</label>
+                    <Input id="subject" 
                       placeholder="e.g. English"
                       value={newStaff.department || ''} 
                       onChange={e => {
@@ -1694,7 +1694,7 @@ export default function StaffPage() {
                       className={formErrors.department ? 'border-red-500 ring-1 ring-red-500' : ''}
                       required 
                     />
-                    {formErrors.department && <p className="text-[10px] text-red-500 font-semibold">{formErrors.department}</p>}
+                    {formErrors.department && <p className="text-[11px] text-red-500 font-semibold">{formErrors.department}</p>}
                   </div>
                   <div></div>
                   <div></div>
@@ -1705,8 +1705,8 @@ export default function StaffPage() {
                 {/* Add Mode: Row 3 (Joining Date, Parent Occupation, Department) */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-text-secondary uppercase">Joining Date <span className="text-red-500">*</span></label>
-                    <Input 
+                    <label htmlFor="joining_date" className="text-xs font-bold text-text-secondary uppercase">Joining Date <span className="text-red-500">*</span></label>
+                    <Input id="joining_date" 
                       type="date" 
                       name="joining_date"
                       value={newStaff.joining_date} 
@@ -1715,12 +1715,12 @@ export default function StaffPage() {
                       className="cursor-pointer w-full" 
                       required 
                     />
-                    {formErrors.joining_date && <p className="text-[10px] text-red-500 font-semibold">{formErrors.joining_date}</p>}
+                    {formErrors.joining_date && <p className="text-[11px] text-red-500 font-semibold">{formErrors.joining_date}</p>}
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-text-secondary uppercase">Salary <span className="text-red-500">*</span></label>
-                    <Input 
+                    <label htmlFor="salary" className="text-xs font-bold text-text-secondary uppercase">Salary <span className="text-red-500">*</span></label>
+                    <Input id="salary" 
                       type="number" 
                       name="salary" 
                       value={newStaff.salary} 
@@ -1728,12 +1728,12 @@ export default function StaffPage() {
                       placeholder="e.g. 25000" 
                       required 
                     />
-                    {formErrors.salary && <p className="text-[10px] text-red-500 font-semibold">{formErrors.salary}</p>}
+                    {formErrors.salary && <p className="text-[11px] text-red-500 font-semibold">{formErrors.salary}</p>}
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-text-secondary uppercase font-display">Subject <span className="text-red-500">*</span></label>
-                    <Input 
+                    <label htmlFor="subject-2" className="text-xs font-bold text-text-secondary uppercase font-display">Subject</label>
+                    <Input id="subject-2" 
                       placeholder="e.g. English"
                       value={newStaff.department || ''} 
                       onChange={e => {
@@ -1744,7 +1744,7 @@ export default function StaffPage() {
                       className={formErrors.department ? 'border-red-500 ring-1 ring-red-500' : ''}
                       required 
                     />
-                    {formErrors.department && <p className="text-[10px] text-red-500 font-semibold">{formErrors.department}</p>}
+                    {formErrors.department && <p className="text-[11px] text-red-500 font-semibold">{formErrors.department}</p>}
                   </div>
                 </div>
               </>
@@ -1753,13 +1753,13 @@ export default function StaffPage() {
 
           {/* Current Address */}
           <div className="space-y-4 border-b border-border pb-4">
-            <h3 className="text-sm font-black text-text-primary tracking-tight font-display">Current Address</h3>
+            <h3 className="text-sm font-bold text-text-primary tracking-tight font-display">Current Address</h3>
             
             <div className="space-y-4">
               <div className="space-y-1.5 w-full p-px">
-                <label className="text-xs font-bold text-text-secondary uppercase">Address Line <span className="text-red-500">*</span></label>
-                <Input name="current_address_line" value={newStaff.current_address_line} onChange={handleTextChange} placeholder="House no, street, locality..." required />
-                {formErrors.current_address_line && <p className="text-[10px] text-red-500 font-semibold">{formErrors.current_address_line}</p>}
+                <label htmlFor="current_address_line" className="text-xs font-bold text-text-secondary uppercase">Address Line <span className="text-red-500">*</span></label>
+                <Input id="current_address_line" name="current_address_line" value={newStaff.current_address_line} onChange={handleTextChange} placeholder="House no, street, locality..." required />
+                {formErrors.current_address_line && <p className="text-[11px] text-red-500 font-semibold">{formErrors.current_address_line}</p>}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -1782,13 +1782,13 @@ export default function StaffPage() {
                   error={formErrors.current_city}
                 />
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-text-secondary uppercase">Country</label>
-                  <Input name="current_country" value={newStaff.current_country} readOnly />
+                  <label htmlFor="current_country" className="text-xs font-bold text-text-secondary uppercase">Country</label>
+                  <Input id="current_country" name="current_country" value={newStaff.current_country} readOnly />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-text-secondary uppercase">PIN Code <span className="text-red-500">*</span></label>
-                  <Input name="current_pin_code" value={newStaff.current_pin_code} onChange={handleTextChange} placeholder="PIN Code" required />
-                  {formErrors.current_pin_code && <p className="text-[10px] text-red-500 font-semibold">{formErrors.current_pin_code}</p>}
+                  <label htmlFor="current_pin_code" className="text-xs font-bold text-text-secondary uppercase">PIN Code <span className="text-red-500">*</span></label>
+                  <Input id="current_pin_code" name="current_pin_code" value={newStaff.current_pin_code} onChange={handleTextChange} placeholder="PIN Code" required />
+                  {formErrors.current_pin_code && <p className="text-[11px] text-red-500 font-semibold">{formErrors.current_pin_code}</p>}
                 </div>
               </div>
             </div>
@@ -1808,11 +1808,11 @@ export default function StaffPage() {
 
               {newStaff.same_as_current === 0 && (
                 <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
-                  <h4 className="text-[11px] font-extrabold text-text-secondary uppercase tracking-tight">Permanent Address</h4>
+                  <h4 className="text-[11px] font-bold text-text-secondary uppercase tracking-tight">Permanent Address</h4>
                   <div className="space-y-1.5 w-full p-px">
-                    <label className="text-xs font-bold text-text-secondary uppercase">Address Line <span className="text-red-500">*</span></label>
-                    <Input name="permanent_address_line" value={newStaff.permanent_address_line} onChange={handleTextChange} placeholder="House no, street, locality..." required />
-                    {formErrors.permanent_address_line && <p className="text-[10px] text-red-500 font-semibold">{formErrors.permanent_address_line}</p>}
+                    <label htmlFor="permanent_address_line" className="text-xs font-bold text-text-secondary uppercase">Address Line <span className="text-red-500">*</span></label>
+                    <Input id="permanent_address_line" name="permanent_address_line" value={newStaff.permanent_address_line} onChange={handleTextChange} placeholder="House no, street, locality..." required />
+                    {formErrors.permanent_address_line && <p className="text-[11px] text-red-500 font-semibold">{formErrors.permanent_address_line}</p>}
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <SearchableSelect
@@ -1834,13 +1834,13 @@ export default function StaffPage() {
                       error={formErrors.permanent_city}
                     />
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-text-secondary uppercase">Country</label>
-                      <Input name="permanent_country" value={newStaff.permanent_country} readOnly />
+                      <label htmlFor="permanent_country" className="text-xs font-bold text-text-secondary uppercase">Country</label>
+                      <Input id="permanent_country" name="permanent_country" value={newStaff.permanent_country} readOnly />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-text-secondary uppercase">PIN Code <span className="text-red-500">*</span></label>
-                      <Input name="permanent_pin_code" value={newStaff.permanent_pin_code} onChange={handleTextChange} placeholder="PIN Code" required />
-                      {formErrors.permanent_pin_code && <p className="text-[10px] text-red-500 font-semibold">{formErrors.permanent_pin_code}</p>}
+                      <label htmlFor="permanent_pin_code" className="text-xs font-bold text-text-secondary uppercase">PIN Code <span className="text-red-500">*</span></label>
+                      <Input id="permanent_pin_code" name="permanent_pin_code" value={newStaff.permanent_pin_code} onChange={handleTextChange} placeholder="PIN Code" required />
+                      {formErrors.permanent_pin_code && <p className="text-[11px] text-red-500 font-semibold">{formErrors.permanent_pin_code}</p>}
                     </div>
                   </div>
                 </div>
@@ -1850,7 +1850,7 @@ export default function StaffPage() {
 
           {/* Upload Documents */}
           <div className="space-y-4 pb-4">
-            <h3 className="text-sm font-black text-text-primary tracking-tight font-display">Upload Documents</h3>
+            <h3 className="text-sm font-bold text-text-primary tracking-tight font-display">Upload Documents</h3>
             
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end bg-zinc-50 dark:bg-zinc-900/20 p-4 rounded-xl border border-border">
               <div className="space-y-1.5 col-span-1">
@@ -1899,11 +1899,11 @@ export default function StaffPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="text-xs uppercase font-extrabold text-text-secondary">Document</TableHead>
-                      <TableHead className="text-xs uppercase font-extrabold text-text-secondary">Upload Date</TableHead>
-                      <TableHead className="text-xs uppercase font-extrabold text-text-secondary">Size</TableHead>
-                      <TableHead className="text-xs uppercase font-extrabold text-text-secondary">View</TableHead>
-                      <TableHead className="text-right text-xs uppercase font-extrabold text-text-secondary">Action</TableHead>
+                      <TableHead className="text-xs uppercase font-bold text-text-secondary">Document</TableHead>
+                      <TableHead className="text-xs uppercase font-bold text-text-secondary">Upload Date</TableHead>
+                      <TableHead className="text-xs uppercase font-bold text-text-secondary">Size</TableHead>
+                      <TableHead className="text-xs uppercase font-bold text-text-secondary">View</TableHead>
+                      <TableHead className="text-right text-xs uppercase font-bold text-text-secondary">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1917,7 +1917,7 @@ export default function StaffPage() {
                             href={doc.file_path.startsWith('http') ? doc.file_path : doc.file_path} 
                             target="_blank" 
                             rel="noopener noreferrer"
-                            className="inline-flex items-center text-[10px] font-black text-indigo-600 hover:text-indigo-700 bg-indigo-50 dark:bg-indigo-900/10 px-2 py-1 rounded"
+                            className="inline-flex items-center text-[11px] font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 dark:bg-indigo-900/10 px-2 py-1 rounded"
                           >
                             View
                           </a>
@@ -1995,7 +1995,7 @@ export default function StaffPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-zinc-500">Amount:</span>
-                <span className="text-green-600 font-extrabold">
+                <span className="text-green-600 font-bold">
                   ₹{(() => {
                     const isJoiningMonth = teacherDetails?.joining_month_proration && teacherDetails?.joining_month_proration.month === disburseMonth;
                     const amount = isJoiningMonth ? teacherDetails.joining_month_proration.payable_salary : (teacherDetails?.salary || 0);
@@ -2066,7 +2066,7 @@ export default function StaffPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-zinc-500">Total Amount:</span>
-                <span className="text-amber-600 font-extrabold">₹{parseFloat(prevYearDisburseTotal).toLocaleString('en-IN')}</span>
+                <span className="text-amber-600 font-bold">₹{parseFloat(prevYearDisburseTotal).toLocaleString('en-IN')}</span>
               </div>
             </div>
             <p className="text-xs text-zinc-500 leading-normal">This action will record the salary payment inside the current academic year as an expense.</p>
@@ -2127,7 +2127,7 @@ export default function StaffPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-zinc-500">Amount:</span>
-                <span className="text-red-600 font-extrabold">₹{parseFloat(revertPayment?.amount_paid || 0).toLocaleString('en-IN')}</span>
+                <span className="text-red-600 font-bold">₹{parseFloat(revertPayment?.amount_paid || 0).toLocaleString('en-IN')}</span>
               </div>
             </div>
             <p className="text-xs text-zinc-500 leading-normal">This will remove the salary payment record and return the month to Pending status.</p>
@@ -2167,11 +2167,11 @@ export default function StaffPage() {
                       {schoolProfile?.name ? schoolProfile.name.charAt(0).toUpperCase() : 'S'}
                     </div>
                     <div>
-                      <h1 className="text-lg font-black text-zinc-950 tracking-tight leading-none uppercase">{schoolProfile?.name || 'ABC Public School'}</h1>
-                      <p className="text-[10px] text-zinc-500 mt-1 uppercase tracking-wider font-extrabold">Teacher Payout Payslip</p>
+                      <h1 className="text-lg font-bold text-zinc-950 tracking-tight leading-none uppercase">{schoolProfile?.name || 'ABC Public School'}</h1>
+                      <p className="text-[11px] text-zinc-500 mt-1 uppercase tracking-wider font-bold">Teacher Payout Payslip</p>
                     </div>
                   </div>
-                  <div className="text-right text-[10px] text-zinc-600 leading-normal">
+                  <div className="text-right text-[11px] text-zinc-600 leading-normal">
                     <p className="font-bold text-zinc-950">{schoolProfile?.street_address || '123 Main Street'}</p>
                     <p>{schoolProfile?.city || 'City'}, {schoolProfile?.state || 'State'} - {schoolProfile?.pin_code || ''}</p>
                     <p>Phone: {schoolProfile?.contact_phone || '—'}</p>
@@ -2208,7 +2208,7 @@ export default function StaffPage() {
                 <div className="border border-zinc-200 rounded-lg overflow-hidden">
                   <table className="w-full text-xs text-left border-collapse">
                     <thead>
-                      <tr className="bg-zinc-100 border-b border-zinc-200 font-extrabold text-zinc-700">
+                      <tr className="bg-zinc-100 border-b border-zinc-200 font-bold text-zinc-700">
                         <th className="p-3">Description</th>
                         <th className="p-3 text-right">Amount</th>
                       </tr>
@@ -2230,7 +2230,7 @@ export default function StaffPage() {
                           </tr>
                           <tr className="border-b border-zinc-100 text-zinc-800 font-medium bg-amber-50/50">
                             <td className="p-3 font-bold text-amber-800">Prorated Salary (Payable Amount)</td>
-                            <td className="p-3 text-right font-extrabold text-amber-800">₹{parseFloat(selectedSlipPayment.amount_paid).toLocaleString('en-IN')}</td>
+                            <td className="p-3 text-right font-bold text-amber-800">₹{parseFloat(selectedSlipPayment.amount_paid).toLocaleString('en-IN')}</td>
                           </tr>
                         </>
                       ) : (
@@ -2241,20 +2241,20 @@ export default function StaffPage() {
                       )}
                       <tr className="bg-zinc-50 font-bold text-zinc-950 border-t-2 border-zinc-200 text-sm">
                         <td className="p-3">Net Disbursed Amount</td>
-                        <td className="p-3 text-right text-green-700 font-extrabold">₹{parseFloat(selectedSlipPayment.amount_paid).toLocaleString('en-IN')}</td>
+                        <td className="p-3 text-right text-green-700 font-bold">₹{parseFloat(selectedSlipPayment.amount_paid).toLocaleString('en-IN')}</td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 text-[10px] text-zinc-500 pt-4 border-t border-dashed border-zinc-200 font-medium">
+                <div className="grid grid-cols-2 gap-4 text-[11px] text-zinc-500 pt-4 border-t border-dashed border-zinc-200 font-medium">
                   <div>
                     <p>Payment Date: <span className="text-zinc-800 font-bold">{formatDate(selectedSlipPayment.payment_date)}</span></p>
                     <p>Payment Transaction ID: <span className="text-zinc-800 font-mono font-bold">TXN-SL-{String(selectedSlipPayment.id).padStart(5, '0')}</span></p>
                   </div>
                   <div className="text-right">
                     <p>Slip Generated Date: <span className="text-zinc-800 font-bold">{formatDate(new Date().toISOString().split('T')[0])}</span></p>
-                    <p>Payment Status: <span className="text-green-600 font-black uppercase">PAID</span></p>
+                    <p>Payment Status: <span className="text-green-600 font-bold uppercase">PAID</span></p>
                   </div>
                 </div>
               </div>
@@ -2264,7 +2264,7 @@ export default function StaffPage() {
                 <div className="text-center w-40 text-xs text-zinc-700">
                   <div className="border-b border-zinc-400 h-10 w-full mb-2"></div>
                   <p className="font-bold text-zinc-900">Principal Signature</p>
-                  <p className="text-[10px] text-zinc-500">School Administration</p>
+                  <p className="text-[11px] text-zinc-500">School Administration</p>
                 </div>
               </div>
             </div>
@@ -2316,7 +2316,7 @@ export default function StaffPage() {
                   className="mt-0.5 text-indigo-600 focus:ring-indigo-500"
                 />
                 <div>
-                  <p className="font-extrabold text-text-primary text-xs">Auto Generate (Portal Joining Date)</p>
+                  <p className="font-bold text-text-primary text-xs">Auto Generate (Portal Joining Date)</p>
                   <p className="text-[11px] text-text-muted mt-0.5">
                     Uses system record joining date: <span className="font-bold text-text-primary">{formatDate(teacherDetails?.joining_date)}</span>
                   </p>
@@ -2339,14 +2339,14 @@ export default function StaffPage() {
                   className="mt-0.5 text-indigo-600 focus:ring-indigo-500"
                 />
                 <div className="w-full">
-                  <p className="font-extrabold text-text-primary text-xs">Customize Joining Date</p>
+                  <p className="font-bold text-text-primary text-xs">Customize Joining Date</p>
                   <p className="text-[11px] text-text-muted mt-0.5">
                     Specify actual original joining date if teacher joined prior to portal setup.
                   </p>
 
                   {expLetterMode === 'custom' && (
                     <div className="mt-3 space-y-1.5" onClick={(e) => e.stopPropagation()}>
-                      <label className="text-[10px] font-bold uppercase text-text-secondary">Original Joining Date</label>
+                      <label className="text-[11px] font-bold uppercase text-text-secondary">Original Joining Date</label>
                       <Input
                         type="date"
                         value={customJoiningDate}
@@ -2361,11 +2361,11 @@ export default function StaffPage() {
 
             {/* Calculated Experience Tenure Live Summary */}
             <div className="p-3.5 bg-zinc-50 dark:bg-zinc-900 border border-border rounded-xl space-y-1">
-              <p className="text-[10px] font-extrabold uppercase text-text-muted tracking-wider">Calculated Experience Tenure</p>
-              <p className="text-sm font-extrabold text-indigo-600 dark:text-indigo-400">
+              <p className="text-[11px] font-bold uppercase text-text-muted tracking-wider">Calculated Experience Tenure</p>
+              <p className="text-sm font-bold text-indigo-600 dark:text-indigo-400">
                 {calculateExperience(effectiveJoiningDate, teacherDetails?.exit_date || new Date().toISOString().split('T')[0]) || '0 Days'}
               </p>
-              <p className="text-[10px] text-text-muted italic">
+              <p className="text-[11px] text-text-muted italic">
                 From {formatDate(effectiveJoiningDate)} to {formatDate(teacherDetails?.exit_date || new Date().toISOString().split('T')[0])}
               </p>
             </div>
@@ -2421,8 +2421,8 @@ export default function StaffPage() {
 
                   {/* Center aligned School Name & Subtitle */}
                   <div className="text-center px-16">
-                    <h1 className="text-2xl font-black font-display text-zinc-950 tracking-tight leading-none uppercase">{schoolProfile?.name || 'ABC Public School'}</h1>
-                    <p className="text-[10px] font-sans font-extrabold text-zinc-500 mt-1 uppercase tracking-wider">Official Certificate of Service</p>
+                    <h1 className="text-2xl font-bold font-display text-zinc-950 tracking-tight leading-none uppercase">{schoolProfile?.name || 'ABC Public School'}</h1>
+                    <p className="text-[11px] font-sans font-bold text-zinc-500 mt-1 uppercase tracking-wider">Official Certificate of Service</p>
                   </div>
                 </div>
               </div>
@@ -2460,18 +2460,18 @@ export default function StaffPage() {
                 <div className="text-center w-40">
                   <div className="border-b border-zinc-400 h-10 w-full mb-2"></div>
                   <p className="font-bold text-zinc-900">Principal Signature</p>
-                  <p className="text-[10px] text-zinc-500">Authorized Official</p>
+                  <p className="text-[11px] text-zinc-500">Authorized Official</p>
                 </div>
                 
                 {/* Visual Seal stamp */}
-                <div className="w-20 h-20 rounded-full border-2 border-dashed border-zinc-400 flex items-center justify-center text-[10px] font-bold text-zinc-400 uppercase tracking-widest text-center rotate-12 select-none pointer-events-none">
+                <div className="w-20 h-20 rounded-full border-2 border-dashed border-zinc-400 flex items-center justify-center text-[11px] font-bold text-zinc-400 uppercase tracking-widest text-center rotate-12 select-none pointer-events-none">
                   School Seal
                 </div>
 
                 <div className="text-center w-40">
                   <div className="border-b border-zinc-400 h-10 w-full mb-2"></div>
                   <p className="font-bold text-zinc-900">Authorized Signatory</p>
-                  <p className="text-[10px] text-zinc-500">School Administration</p>
+                  <p className="text-[11px] text-zinc-500">School Administration</p>
                 </div>
               </div>
             </div>

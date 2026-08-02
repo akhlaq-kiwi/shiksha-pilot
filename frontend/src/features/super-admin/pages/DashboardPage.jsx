@@ -1,95 +1,129 @@
 import React from 'react';
 import { Building2, Users, GraduationCap, Landmark, Sparkles } from 'lucide-react';
-import { Card, CardContent } from '../../../common/ui/card';
+import { Card } from '../../../common/ui/card';
+import { SkeletonStatGrid } from '../../../common/ui/skeleton';
+import { formatCurrency, formatNumber } from '../../../common/utils/format';
 
-export default function DashboardPage({ stats }) {
+/**
+ * Platform dashboard.
+ *
+ * The four KPIs here (active schools, teachers, students, revenue) are real
+ * counts from platformService.getStats() - no trend/delta is fabricated,
+ * because the backend has no MRR-over-time, last-login, or failed-payment
+ * data to back one. Inventing a trend arrow with nothing behind it would be
+ * worse than showing none (see the phase-0 principle on this).
+ *
+ * Fixes over the previous version:
+ *  - Raw Tailwind palette gradients (blue/violet/emerald/amber) replaced with
+ *    the --chart-N tokens, so this follows dark mode and stays visually
+ *    consistent with every other chart in the app.
+ *  - Revenue was interpolated as a raw `₹${n}` string; now goes through the
+ *    tenant-aware formatCurrency, matching the fix applied to the school-admin
+ *    dashboard which had the same shadowing bug.
+ *  - `loading` renders a skeleton grid instead of a silent wall of zeroes -
+ *    previously a failed stats fetch (which was swallowed with a bare
+ *    `catch {}` upstream) looked identical to "0 schools", now fixed at the
+ *    fetch call site with a toast, and here with a real loading state.
+ */
+export default function DashboardPage({ stats = {}, loading = false }) {
   const cards = [
     {
-      title: 'Total Schools',
-      value: stats.active_schools != null ? stats.active_schools : 0,
+      title: 'Total schools',
+      value: formatNumber(stats.active_schools ?? 0),
       description: 'Active schools',
       icon: Building2,
-      gradient: 'from-blue-600 to-indigo-600',
-      iconBg: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+      accent: 'chart-1',
     },
     {
-      title: 'Total Teachers',
-      value: stats.total_teachers != null ? stats.total_teachers : 0,
+      title: 'Total teachers',
+      value: formatNumber(stats.total_teachers ?? 0),
       description: 'Active teachers across active schools',
       icon: Users,
-      gradient: 'from-violet-600 to-purple-600',
-      iconBg: 'bg-violet-500/10 text-violet-600 dark:text-violet-400',
+      accent: 'chart-6',
     },
     {
-      title: 'Total Students',
-      value: stats.total_students != null ? stats.total_students : 0,
+      title: 'Total students',
+      value: formatNumber(stats.total_students ?? 0),
       description: 'Active students across active schools',
       icon: GraduationCap,
-      gradient: 'from-emerald-600 to-teal-600',
-      iconBg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+      accent: 'chart-2',
     },
     {
-      title: 'Total Revenue',
-      value: stats.total_revenue != null ? `₹${Number(stats.total_revenue).toLocaleString()}` : '₹0',
-      description: 'Total Revenue Generated',
+      title: 'Total revenue',
+      value: stats.total_revenue != null ? formatCurrency(stats.total_revenue) : formatCurrency(0),
+      description: 'Total revenue generated',
       icon: Landmark,
-      gradient: 'from-amber-600 to-orange-600',
-      iconBg: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+      accent: 'chart-3',
     },
   ];
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
-      
-      {/* Premium Executive Header */}
+      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-border/60 pb-6">
         <div>
-          <div className="flex items-center gap-2 text-primary font-bold text-xs uppercase tracking-wider mb-1.5">
-            <Sparkles className="h-3.5 w-3.5" />
-            Super Admin Console
+          <div className="mb-1.5 flex items-center gap-2 text-overline text-primary">
+            <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+            Super admin console
           </div>
-          <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">System Overview</h2>
-          <p className="text-text-secondary text-sm mt-1 max-w-xl">
-            Real-time administrative snapshot across all active subdomains and subscription tiers.
+          <h2 className="text-display-lg font-display text-text-primary">Platform overview</h2>
+          <p className="mt-1 max-w-xl text-body-md text-text-secondary">
+            Administrative snapshot across all active schools and subscription tiers.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-xl px-4 py-2.5 flex items-center gap-2">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
-            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-bold">Platform Status: Active</span>
-          </div>
+        <div className="flex items-center gap-2 rounded-xl border border-success-200 bg-success-50 px-4 py-2.5">
+          <span className="relative flex h-2 w-2" aria-hidden="true">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success-400 opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-success-500" />
+          </span>
+          <span className="text-body-sm font-semibold text-success-700">Platform status: Active</span>
         </div>
       </div>
 
-      {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {cards.map((card, idx) => {
-          const Icon = card.icon;
-          return (
-            <Card key={idx} className="relative overflow-hidden border border-border bg-surface shadow-md hover:shadow-lg transition-all group rounded-2xl p-6 sm:p-8 flex flex-col justify-between h-48">
-              {/* Subtle top decoration bar with plan colors */}
-              <div className={`absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r ${card.gradient}`} />
-              
-              <div className="flex justify-between items-start">
-                <div className="space-y-1">
-                  <p className="text-text-muted text-xs uppercase tracking-wider font-extrabold">{card.title}</p>
-                  <p className="text-4xl font-black text-text-primary font-display tracking-tight mt-2">{card.value}</p>
+      {/* KPI Cards */}
+      {loading ? (
+        <SkeletonStatGrid count={4} />
+      ) : (
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          {cards.map((card) => {
+            const Icon = card.icon;
+            return (
+              <Card
+                key={card.title}
+                className="group relative flex h-48 flex-col justify-between overflow-hidden rounded-2xl border border-border bg-surface p-6 shadow-sm transition-shadow hover:shadow-md sm:p-8"
+              >
+                <div
+                  className="absolute inset-x-0 top-0 h-1.5"
+                  style={{ backgroundColor: `var(--${card.accent})` }}
+                  aria-hidden="true"
+                />
+
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <p className="text-overline text-text-muted">{card.title}</p>
+                    <p className="mt-2 text-4xl font-display font-bold tabular-nums text-text-primary">
+                      {card.value}
+                    </p>
+                  </div>
+                  <div
+                    className="rounded-xl p-3 transition-transform group-hover:scale-105"
+                    style={{
+                      backgroundColor: `color-mix(in srgb, var(--${card.accent}) 12%, transparent)`,
+                      color: `var(--${card.accent})`,
+                    }}
+                  >
+                    <Icon className="h-6 w-6" aria-hidden="true" />
+                  </div>
                 </div>
-                <div className={`p-3 rounded-xl ${card.iconBg} group-hover:scale-105 transition-transform`}>
-                  <Icon className="h-6 w-6" />
+
+                <div className="mt-4 border-t border-border/50 pt-4">
+                  <p className="text-body-sm font-medium text-text-secondary">{card.description}</p>
                 </div>
-              </div>
-              
-              <div className="border-t border-border/50 pt-4 mt-4">
-                <p className="text-text-secondary text-xs font-semibold">{card.description}</p>
-              </div>
-            </Card>
-          );
-        })}
-      </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

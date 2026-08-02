@@ -61,7 +61,7 @@ export default function SettingsPage() {
       
       {/* Title */}
       <div>
-        <h2 className="text-xl font-black text-text-primary tracking-tight font-display">Settings</h2>
+        <h2 className="text-xl font-bold text-text-primary tracking-tight font-display">Settings</h2>
         <p className="text-xs text-text-muted">Manage settings, application theme, and notification preferences.</p>
       </div>
 
@@ -87,7 +87,7 @@ export default function SettingsPage() {
             <School className="h-4 w-4" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Associated School</p>
+            <p className="text-[11px] text-text-muted font-bold uppercase tracking-wider">Associated School</p>
             <p className="text-xs font-bold text-text-primary truncate">{schoolProfile?.name || 'Shiksha Pilot Academy'}</p>
           </div>
         </CardContent>
@@ -95,7 +95,7 @@ export default function SettingsPage() {
 
       {/* Settings Options List */}
       <div className="space-y-1.5">
-        <p className="text-[10px] font-black text-text-muted uppercase tracking-wider px-3 mb-2">Preferences & Details</p>
+        <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider px-3 mb-2">Preferences & Details</p>
         
         {/* Profile */}
         <button
@@ -231,7 +231,7 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between py-2">
               <div>
                 <p className="text-xs font-bold text-text-primary">Enable Push Notifications</p>
-                <p className="text-[10px] text-text-muted mt-0.5">Receive alerts when school announcements or holidays occur.</p>
+                <p className="text-[11px] text-text-muted mt-0.5">Receive alerts when school announcements or holidays occur.</p>
               </div>
               <input 
                 type="checkbox" 
@@ -341,8 +341,8 @@ export default function SettingsPage() {
               <Settings className="h-5 w-5" />
             </div>
             <h4 className="text-xs font-bold text-text-primary">Shiksha Pilot Portal</h4>
-            <p className="text-[10px] text-text-muted">Version 1.0.0 (Build 449)</p>
-            <p className="text-[10px] text-text-muted">© 2026 Shiksha Pilot Inc. All rights reserved.</p>
+            <p className="text-[11px] text-text-muted">Version 1.0.0 (Build 449)</p>
+            <p className="text-[11px] text-text-muted">© 2026 Shiksha Pilot Inc. All rights reserved.</p>
             <div className="flex justify-end pt-3 border-t border-border mt-4">
               <Button onClick={() => setActiveModal(null)} variant="outline" className="mx-auto">Close</Button>
             </div>

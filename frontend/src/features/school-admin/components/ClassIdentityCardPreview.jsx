@@ -32,7 +32,7 @@ const IdCardAvatar = ({ src, name, updatedAt }) => {
   return (
     <div className="w-full h-full bg-gradient-to-br from-zinc-100 to-zinc-200 dark:from-zinc-800 dark:to-zinc-900 text-zinc-700 dark:text-zinc-300 flex flex-col items-center justify-center rounded-xl border border-zinc-200 dark:border-zinc-700 select-none">
       <User className="h-8 w-8 opacity-60 mb-0.5" />
-      <span className="text-[10px] font-black uppercase tracking-wider">{initials}</span>
+      <span className="text-[11px] font-bold uppercase tracking-wider">{initials}</span>
     </div>
   );
 };
@@ -408,7 +408,7 @@ export default function ClassIdentityCardPreview({
             Back
           </Button>
           <div>
-            <h2 className="text-2xl font-black text-text-primary tracking-tight font-display">
+            <h2 className="text-2xl font-bold text-text-primary tracking-tight font-display">
               {classNameProp} — Identity Cards
             </h2>
             <p className="text-xs text-text-secondary font-medium mt-0.5">
@@ -515,10 +515,10 @@ export default function ClassIdentityCardPreview({
 
                       {/* Text Column: School Name (line 1) + Subtitle (line 2) */}
                       <div className="min-w-0 flex-1 flex flex-col justify-center gap-0.5">
-                        <h4 className="text-xs font-black uppercase tracking-wider font-display text-amber-300 leading-snug">
+                        <h4 className="text-xs font-bold uppercase tracking-wider font-display text-amber-300 leading-snug">
                           {schoolName}
                         </h4>
-                        <p className="text-[8.5px] font-extrabold uppercase tracking-widest text-emerald-100 opacity-95 leading-tight">
+                        <p className="text-[8.5px] font-bold uppercase tracking-widest text-emerald-100 opacity-95 leading-tight">
                           Student Identity Card
                         </p>
                       </div>
@@ -526,7 +526,7 @@ export default function ClassIdentityCardPreview({
 
                     {/* Right Container: Plain Yellow Bold Academic Year Text */}
                     <div className="shrink-0 flex items-center justify-end">
-                      <span className="text-xs font-black uppercase tracking-wider font-mono text-amber-300 leading-snug">
+                      <span className="text-xs font-bold uppercase tracking-wider font-mono text-amber-300 leading-snug">
                         {academicYearName}
                       </span>
                     </div>
@@ -549,7 +549,7 @@ export default function ClassIdentityCardPreview({
                           Student Name
                         </span>
                         <h3
-                          className="text-xs font-black text-zinc-900 uppercase font-display pb-0.5 leading-normal"
+                          className="text-xs font-bold text-zinc-900 uppercase font-display pb-0.5 leading-normal"
                           style={{ lineHeight: '1.25', paddingBottom: '2px' }}
                         >
                           {s.name}
@@ -565,7 +565,7 @@ export default function ClassIdentityCardPreview({
                             Roll No.
                           </span>
                           <span
-                            className="font-extrabold text-zinc-900 font-mono block"
+                            className="font-bold text-zinc-900 font-mono block"
                             style={{ lineHeight: '1.3' }}
                           >
                             {studentRoll}
@@ -632,7 +632,7 @@ export default function ClassIdentityCardPreview({
                         <div className="w-16 border-b border-dashed border-zinc-400 mb-1" />
                       )}
                       <span
-                        className="text-[7.5px] font-black text-zinc-700 uppercase tracking-wider block"
+                        className="text-[7.5px] font-bold text-zinc-700 uppercase tracking-wider block"
                         style={{ lineHeight: '1.25' }}
                       >
                         Principal Signature

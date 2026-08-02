@@ -16,7 +16,7 @@ const statusBadge = (status) => {
     Inactive: 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800',
   };
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${map[status] || 'bg-zinc-100 text-zinc-500'}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold uppercase ${map[status] || 'bg-zinc-100 text-zinc-500'}`}>
       {status}
     </span>
   );
@@ -89,7 +89,7 @@ export default function AcademicPage() {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       <div>
-        <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">Academic Management</h2>
+        <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Academic Management</h2>
         <p className="text-text-secondary text-sm mt-1">Configure academic years, classes, sections, and subjects.</p>
       </div>
 
@@ -170,7 +170,7 @@ export default function AcademicPage() {
                   <TableCell className="font-mono text-xs text-text-muted">{r.code}</TableCell>
                   <TableCell className="text-text-secondary text-xs">{r.dept}</TableCell>
                   <TableCell className="text-text-secondary text-xs">{r.cl}</TableCell>
-                  <TableCell><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${r.type === 'Core' ? 'bg-primary/10 text-primary' : 'bg-amber-500/10 text-amber-600'}`}>{r.type}</span></TableCell>
+                  <TableCell><span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${r.type === 'Core' ? 'bg-primary/10 text-primary' : 'bg-amber-500/10 text-amber-600'}`}>{r.type}</span></TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -187,17 +187,17 @@ export default function AcademicPage() {
         </>}>
         <form onSubmit={handleAddClass} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-text-secondary uppercase">Class Name</label>
-            <Input placeholder="e.g. Class 10" value={newClass.name} onChange={e => setNewClass(p => ({ ...p, name: e.target.value }))} required />
+            <label htmlFor="class-name" className="text-xs font-bold text-text-secondary uppercase">Class Name</label>
+            <Input id="class-name" placeholder="e.g. Class 10" value={newClass.name} onChange={e => setNewClass(p => ({ ...p, name: e.target.value }))} required />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">Section</label>
-              <Input placeholder="e.g. A" value={newClass.section} onChange={e => setNewClass(p => ({ ...p, section: e.target.value }))} />
+              <label htmlFor="section" className="text-xs font-bold text-text-secondary uppercase">Section</label>
+              <Input id="section" placeholder="e.g. A" value={newClass.section} onChange={e => setNewClass(p => ({ ...p, section: e.target.value }))} />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">Stream / Specialization</label>
-              <Input placeholder="e.g. Science" value={newClass.stream} onChange={e => setNewClass(p => ({ ...p, stream: e.target.value }))} />
+              <label htmlFor="stream-specialization" className="text-xs font-bold text-text-secondary uppercase">Stream / Specialization</label>
+              <Input id="stream-specialization" placeholder="e.g. Science" value={newClass.stream} onChange={e => setNewClass(p => ({ ...p, stream: e.target.value }))} />
             </div>
           </div>
         </form>

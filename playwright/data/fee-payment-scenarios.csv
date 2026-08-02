@@ -1,0 +1,13 @@
+# FeesPage.jsx client-side validation (validate() function): amount must be
+# >0, warns at >1.5x outstanding ("fat-finger" guard) but does not hard-block it.
+# Backend createFeePayment additionally blocks payment entirely for a student
+# already promoted/migrated to a new academic year — not exercised here since
+# it needs specific seeded student state (see README "known gaps").
+scenario,amount,expectValid
+valid partial payment,500,true
+valid full payment,2000,true
+zero amount (invalid),0,false
+negative amount (invalid),-100,false
+decimal amount,499.50,true
+fat-finger amount (1.5x+ outstanding),50000,true
+non-numeric amount (invalid),abc,false

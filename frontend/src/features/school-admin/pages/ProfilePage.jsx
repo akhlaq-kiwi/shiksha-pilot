@@ -458,7 +458,7 @@ export default function ProfilePage({ mode = 'details' }) {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       <div>
-        <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">{title}</h2>
+        <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">{title}</h2>
         <p className="text-text-secondary text-sm mt-1">{desc}</p>
       </div>
 
@@ -492,7 +492,7 @@ export default function ProfilePage({ mode = 'details' }) {
               
               {/* School Logo / Profile Image Upload Section */}
               <div className="flex flex-col sm:flex-row items-center gap-6 p-4 bg-zinc-50/50 dark:bg-zinc-900/50 border border-border rounded-xl mb-4">
-                <div className="w-20 h-20 rounded-full border border-border flex items-center justify-center overflow-hidden bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100 text-xl font-black uppercase flex-shrink-0">
+                <div className="w-20 h-20 rounded-full border border-border flex items-center justify-center overflow-hidden bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100 text-xl font-bold uppercase flex-shrink-0">
                   {!logoError && profile?.logo_path ? (
                     <img 
                       src={profile.logo_path} 
@@ -507,7 +507,7 @@ export default function ProfilePage({ mode = 'details' }) {
 
                 <div className="space-y-2 text-center sm:text-left flex-1">
                   <h4 className="text-xs font-bold text-text-primary uppercase tracking-wide">Logo / Profile Image</h4>
-                  <p className="text-[10px] text-text-muted">PNG, JPG, JPEG. Max file size: 5MB.</p>
+                  <p className="text-[11px] text-text-muted">PNG, JPG, JPEG. Max file size: 5MB.</p>
                   
                   <div className="flex flex-wrap gap-2 justify-center sm:justify-start items-center">
                     <label className="cursor-pointer inline-flex items-center justify-center rounded-md text-xs font-bold transition-colors border border-input bg-background hover:bg-zinc-50 dark:hover:bg-zinc-900 h-8 px-3">
@@ -545,13 +545,13 @@ export default function ProfilePage({ mode = 'details' }) {
                       onError={() => setSignatureError(true)}
                     />
                   ) : (
-                    <span className="text-[10px] font-bold text-text-muted italic">No Signature</span>
+                    <span className="text-[11px] font-bold text-text-muted italic">No Signature</span>
                   )}
                 </div>
 
                 <div className="space-y-2 text-center sm:text-left flex-1">
                   <h4 className="text-xs font-bold text-text-primary uppercase tracking-wide">Principal Signature</h4>
-                  <p className="text-[10px] text-text-muted">PNG, JPG, JPEG. White background paper will be automatically made transparent.</p>
+                  <p className="text-[11px] text-text-muted">PNG, JPG, JPEG. White background paper will be automatically made transparent.</p>
                   
                   <div className="flex flex-wrap gap-2 justify-center sm:justify-start items-center">
                     <label className="cursor-pointer inline-flex items-center justify-center rounded-md text-xs font-bold transition-colors border border-input bg-background hover:bg-zinc-50 dark:hover:bg-zinc-900 h-8 px-3">
@@ -580,10 +580,10 @@ export default function ProfilePage({ mode = 'details' }) {
 
               {/* School Information */}
               <div>
-                <h4 className="text-xs font-extrabold text-primary mb-3 uppercase tracking-wider">School Information</h4>
+                <h4 className="text-xs font-bold text-primary mb-3 uppercase tracking-wider">School Information</h4>
                 <div className="grid grid-cols-1 gap-6 text-xs">
                   <div>
-                    <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">School Name</p>
+                    <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">School Name</p>
                     <p className="text-sm font-semibold text-text-primary mt-0.5">{schoolName}</p>
                   </div>
                 </div>
@@ -593,22 +593,22 @@ export default function ProfilePage({ mode = 'details' }) {
 
               {/* Address & Location */}
               <div>
-                <h4 className="text-xs font-extrabold text-primary mb-3 uppercase tracking-wider">Address & Location</h4>
+                <h4 className="text-xs font-bold text-primary mb-3 uppercase tracking-wider">Address & Location</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 text-xs">
                   <div className="sm:col-span-2">
-                    <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Street Address</p>
+                    <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Street Address</p>
                     <p className="text-sm font-semibold text-text-primary mt-0.5">{street}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">City</p>
+                    <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">City</p>
                     <p className="text-sm font-semibold text-text-primary mt-0.5">{city}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">State</p>
+                    <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">State</p>
                     <p className="text-sm font-semibold text-text-primary mt-0.5">{state}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">PIN Code</p>
+                    <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">PIN Code</p>
                     <p className="text-sm font-semibold text-text-primary mt-0.5">{pin}</p>
                   </div>
                 </div>
@@ -618,14 +618,14 @@ export default function ProfilePage({ mode = 'details' }) {
 
               {/* Contact Information */}
               <div>
-                <h4 className="text-xs font-extrabold text-primary mb-3 uppercase tracking-wider">Contact Information</h4>
+                <h4 className="text-xs font-bold text-primary mb-3 uppercase tracking-wider">Contact Information</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-xs mb-3">
                   <div>
-                    <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Contact Email</p>
+                    <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Contact Email</p>
                     <p className="text-sm font-semibold text-text-primary mt-0.5">{email}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Contact Phone</p>
+                    <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Contact Phone</p>
                     <p className="text-sm font-semibold text-text-primary mt-0.5">{phone}</p>
                   </div>
                 </div>
@@ -650,8 +650,8 @@ export default function ProfilePage({ mode = 'details' }) {
           <CardContent className="p-6">
             <form onSubmit={handlePasswordChange} className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-text-secondary uppercase">New Password</label>
-                <Input 
+                <label htmlFor="new-password" className="text-xs font-bold text-text-secondary uppercase">New Password</label>
+                <Input id="new-password" 
                   type="password" 
                   placeholder="Minimum 6 characters" 
                   value={passwordForm.newPassword} 
@@ -661,8 +661,8 @@ export default function ProfilePage({ mode = 'details' }) {
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-text-secondary uppercase">Confirm New Password</label>
-                <Input 
+                <label htmlFor="confirm-new-password" className="text-xs font-bold text-text-secondary uppercase">Confirm New Password</label>
+                <Input id="confirm-new-password" 
                   type="password" 
                   placeholder="Repeat new password" 
                   value={passwordForm.confirmPassword} 
@@ -671,7 +671,7 @@ export default function ProfilePage({ mode = 'details' }) {
                   className={passwordMismatch ? 'border-red-400 focus:ring-red-400' : ''} 
                 />
                 {passwordMismatch && (
-                  <p className="text-[10px] text-red-500 font-semibold mt-1">Passwords do not match</p>
+                  <p className="text-[11px] text-red-500 font-semibold mt-1">Passwords do not match</p>
                 )}
               </div>
               <Button type="submit" disabled={submittingPassword || passwordMismatch || passwordForm.newPassword.length < 6} className="w-full font-bold">
@@ -689,14 +689,14 @@ export default function ProfilePage({ mode = 'details' }) {
           <Card className="shadow-xs border-border bg-surface">
             <CardContent className="p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div className="space-y-1">
-                <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Current Subscription Plan</p>
+                <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Current Subscription Plan</p>
                 <div className="flex items-center gap-2">
-                  <span className="text-xl font-black text-text-primary tracking-tight">{profile?.plan || 'Premium'}</span>
+                  <span className="text-xl font-bold text-text-primary tracking-tight">{profile?.plan || 'Premium'}</span>
                   {(() => {
                     const daysText = calculateDaysLeftText(profile?.subscription_expiry);
                     const isExpired = daysText === 'Expired';
                     return (
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${isExpired ? 'bg-red-500/10 text-red-600 border border-red-500/20' : 'bg-blue-500/10 text-blue-600 border border-blue-500/20'}`}>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${isExpired ? 'bg-red-500/10 text-red-600 border border-red-500/20' : 'bg-blue-500/10 text-blue-600 border border-blue-500/20'}`}>
                         {daysText}
                       </span>
                     );
@@ -723,17 +723,17 @@ export default function ProfilePage({ mode = 'details' }) {
                     <div className="space-y-4">
                       <div className="flex justify-between items-start border-b border-border/60 pb-4">
                         <div>
-                          <h4 className="text-base font-black text-text-primary tracking-tight font-display">{plan.name}</h4>
+                          <h4 className="text-base font-bold text-text-primary tracking-tight font-display">{plan.name}</h4>
                         </div>
                         {isCurrent && (
-                          <span className="text-[9px] font-black bg-primary text-zinc-50 px-2.5 py-1 rounded-full uppercase tracking-wider">Current</span>
+                          <span className="text-[11px] font-bold bg-primary text-zinc-50 px-2.5 py-1 rounded-full uppercase tracking-wider">Current</span>
                         )}
                       </div>
                       
                       <div className="flex justify-between items-center py-1">
                         <div className="flex items-baseline gap-1">
-                          <span className="text-2xl font-black text-text-primary">₹{parseFloat(plan.price).toLocaleString('en-IN')}</span>
-                          <span className="text-[10px] text-text-muted">
+                          <span className="text-2xl font-bold text-text-primary">₹{parseFloat(plan.price).toLocaleString('en-IN')}</span>
+                          <span className="text-[11px] text-text-muted">
                             /{plan.duration_value || 1}{plan.duration_unit || 'month'}{(plan.duration_value || 1) > 1 ? 's' : ''}
                           </span>
                         </div>
@@ -775,7 +775,7 @@ export default function ProfilePage({ mode = 'details' }) {
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
-                      <tr className="border-b border-border bg-zinc-50 dark:bg-zinc-900/50 text-text-secondary font-bold uppercase tracking-wider text-[10px]">
+                      <tr className="border-b border-border bg-zinc-50 dark:bg-zinc-900/50 text-text-secondary font-bold uppercase tracking-wider text-[11px]">
                         <th className="p-4">Plan Name</th>
                         <th className="p-4">Purchase Date</th>
                         <th className="p-4">Expiry Date</th>
@@ -798,7 +798,7 @@ export default function ProfilePage({ mode = 'details' }) {
                           today.setHours(0, 0, 0, 0);
                           return (
                             <tr key={idx} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20 transition-colors">
-                              <td className="p-4 font-extrabold text-text-primary">{sub.plan_name}</td>
+                              <td className="p-4 font-bold text-text-primary">{sub.plan_name}</td>
                               <td className="p-4 text-text-secondary font-medium">
                                 {new Date(sub.created_at).toLocaleDateString('en-IN', {
                                   day: '2-digit',
@@ -820,7 +820,7 @@ export default function ProfilePage({ mode = 'details' }) {
                                 ₹{parseFloat(sub.amount).toLocaleString('en-IN')}
                               </td>
                               <td className="p-4">
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${sub.status === 'PAID' ? 'bg-green-500/10 text-green-600 border border-green-500/20' : 'bg-red-500/10 text-red-600 border border-red-500/20'}`}>
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${sub.status === 'PAID' ? 'bg-green-500/10 text-green-600 border border-green-500/20' : 'bg-red-500/10 text-red-600 border border-red-500/20'}`}>
                                   {sub.status}
                                 </span>
                               </td>
@@ -876,7 +876,7 @@ export default function ProfilePage({ mode = 'details' }) {
               }} 
               required 
             />
-            {formErrors.name && <p className="text-[10px] text-red-500 font-semibold">{formErrors.name}</p>}
+            {formErrors.name && <p className="text-[11px] text-red-500 font-semibold">{formErrors.name}</p>}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -900,7 +900,7 @@ export default function ProfilePage({ mode = 'details' }) {
               }} 
               required
             />
-            {formErrors.street_address && <p className="text-[10px] text-red-500 font-semibold">{formErrors.street_address}</p>}
+            {formErrors.street_address && <p className="text-[11px] text-red-500 font-semibold">{formErrors.street_address}</p>}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -934,7 +934,7 @@ export default function ProfilePage({ mode = 'details' }) {
                 placeholder="6-digit ZIP/PIN code"
                 required 
               />
-              {formErrors.pin_code && <p className="text-[10px] text-red-500 font-semibold">{formErrors.pin_code}</p>}
+              {formErrors.pin_code && <p className="text-[11px] text-red-500 font-semibold">{formErrors.pin_code}</p>}
             </div>
           </div>
         </div>
@@ -1007,7 +1007,7 @@ function ContactSuperAdminDialog({ isOpen, onClose }) {
             <Button 
               size="xs" 
               variant="outline" 
-              className="flex items-center gap-1 font-bold text-[10px] py-1 px-2.5 h-7 rounded-lg"
+              className="flex items-center gap-1 font-bold text-[11px] py-1 px-2.5 h-7 rounded-lg"
               onClick={() => handleCopy('8650302499', 'Phone number')}
             >
               <Copy className="h-3 w-3" /> Copy
@@ -1022,7 +1022,7 @@ function ContactSuperAdminDialog({ isOpen, onClose }) {
             <Button 
               size="xs" 
               variant="outline" 
-              className="flex items-center gap-1 font-bold text-[10px] py-1 px-2.5 h-7 rounded-lg"
+              className="flex items-center gap-1 font-bold text-[11px] py-1 px-2.5 h-7 rounded-lg"
               onClick={() => handleCopy('Shikshapilot@gmail.com', 'Email address')}
             >
               <Copy className="h-3 w-3" /> Copy

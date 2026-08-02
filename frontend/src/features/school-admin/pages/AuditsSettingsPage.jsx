@@ -954,7 +954,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
     <div className="space-y-6 animate-in fade-in duration-300">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border pb-4">
         <div>
-          <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">Audits & Settings</h2>
+          <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Audits & Settings</h2>
           <p className="text-text-secondary text-sm mt-1">Manage school academic sessions, audit logs, and promotions.</p>
         </div>
       </div>
@@ -1015,15 +1015,15 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                     <TableCell className="text-text-secondary text-xs">{year.end_date}</TableCell>
                     <TableCell>
                       {year.status === 'ACTIVE' || year.is_current ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-green-500/10 text-green-600 border border-green-500/20">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-green-500/10 text-green-600 border border-green-500/20">
                           Active
                         </span>
                       ) : year.status === 'Draft' ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-amber-500/10 text-amber-600 border border-amber-500/20">
                           Draft
                         </span>
                       ) : (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 border border-border">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 border border-border">
                           Archived
                         </span>
                       )}
@@ -1032,7 +1032,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                       {!isReadOnly && !!(year.status === 'ACTIVE' || year.is_current) && (
                         <Button 
                           onClick={() => handleMigrateClick(year)}
-                          className="h-7 px-3 text-[10px] font-bold bg-primary hover:bg-primary/95 text-white"
+                          className="h-7 px-3 text-[11px] font-bold bg-primary hover:bg-primary/95 text-white"
                         >
                           Migrate
                         </Button>
@@ -1091,7 +1091,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
             </div>
 
             <div className="flex-1 flex flex-col justify-end min-w-[280px]">
-              <label className="text-xs font-bold text-text-secondary uppercase mb-2">Fee Mode</label>
+              <label htmlFor="fee-mode" className="text-xs font-bold text-text-secondary uppercase mb-2">Fee Mode</label>
               <div className="flex items-center gap-6 h-10">
                 <label className="flex items-center gap-2 text-xs font-bold uppercase cursor-pointer select-none">
                   <input
@@ -1127,7 +1127,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                 <label className="text-xs font-bold text-text-secondary uppercase">Fee Amount</label>
                 <div className="relative">
                   <span className="absolute left-3 top-2.5 text-xs text-text-muted">₹</span>
-                  <Input
+                  <Input id="fee-mode"
                     type="number"
                     placeholder="e.g. 1500"
                     value={sameFeeAmount}
@@ -1136,18 +1136,18 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                     className="pl-7 text-xs font-semibold w-full"
                   />
                 </div>
-                <p className="text-[10px] text-text-muted">This amount will be applied to all 12 academic months automatically.</p>
+                <p className="text-[11px] text-text-muted">This amount will be applied to all 12 academic months automatically.</p>
               </div>
             ) : (
               <div className="space-y-4">
-                <p className="text-[10px] text-text-muted font-bold uppercase">Monthly Fees Grid</p>
+                <p className="text-[11px] text-text-muted font-bold uppercase">Monthly Fees Grid</p>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   {['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'].map(m => (
                     <div key={m} className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-text-secondary uppercase">{m}</label>
+                      <label className="text-[11px] font-bold text-text-secondary uppercase">{m}</label>
                       <div className="relative">
                         <span className="absolute left-3 top-2.5 text-xs text-text-muted">₹</span>
-                        <Input
+                        <Input aria-label="0"
                           type="number"
                           placeholder="0"
                           value={monthlyFeesMap[m] || ''}
@@ -1170,10 +1170,10 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                   </div>
                   <div>
                     <p className="text-xs font-bold text-text-primary font-display">Fee Configuration Locked</p>
-                    <p className="text-[10px] text-text-muted mt-0.5">{isReadOnly ? 'Fee configuration cannot be modified in an archived academic year.' : 'This configuration is permanently locked for the active year.'}</p>
+                    <p className="text-[11px] text-text-muted mt-0.5">{isReadOnly ? 'Fee configuration cannot be modified in an archived academic year.' : 'This configuration is permanently locked for the active year.'}</p>
                   </div>
                 </div>
-                <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-zinc-200 text-zinc-600 border border-zinc-300">
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-zinc-200 text-zinc-600 border border-zinc-300">
                   LOCKED
                 </span>
               </div>
@@ -1223,7 +1223,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                   onChange={e => setSchoolStartTime(e.target.value)}
                   className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs"
                 />
-                <p className="text-[10px] text-text-muted mt-1">Selected: {formatTime12h(schoolStartTime + ':00')}</p>
+                <p className="text-[11px] text-text-muted mt-1">Selected: {formatTime12h(schoolStartTime + ':00')}</p>
               </div>
 
               <div className="space-y-1.5">
@@ -1290,7 +1290,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
           {/* Generated Timetable Preview */}
           {showPreview && periods.length > 0 && (
             <div className="border border-border/80 p-5 rounded-2xl bg-zinc-950/5 dark:bg-black/5 space-y-4 pt-4 mt-6">
-              <h4 className="text-xs font-black text-text-secondary uppercase tracking-wider">Generated Timetable Preview</h4>
+              <h4 className="text-xs font-bold text-text-secondary uppercase tracking-wider">Generated Timetable Preview</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 {periods.map((p) => {
                   const isAfterPeriod = p.period_number === parseInt(intervalAfterPeriod);
@@ -1298,7 +1298,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                     <React.Fragment key={p.period_number}>
                       <div className="flex items-center justify-between px-4 py-3 bg-zinc-50 dark:bg-zinc-900/30 border border-border/60 rounded-xl">
                         <span className="text-xs font-bold text-text-secondary">Period {p.period_number}</span>
-                        <span className="text-xs font-black text-text-primary font-mono ml-4 whitespace-nowrap">
+                        <span className="text-xs font-bold text-text-primary font-mono ml-4 whitespace-nowrap">
                           {formatTime12h(p.start_time)} – {formatTime12h(p.end_time)}
                         </span>
                       </div>
@@ -1306,7 +1306,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                       {isAfterPeriod && parseInt(intervalDuration) > 0 && (
                         <div className="flex items-center justify-between px-4 py-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
                           <span className="text-xs font-bold text-amber-600 dark:text-amber-400">Interval Break</span>
-                          <span className="text-xs font-black text-amber-600 dark:text-amber-400 font-mono ml-4 whitespace-nowrap">
+                          <span className="text-xs font-bold text-amber-600 dark:text-amber-400 font-mono ml-4 whitespace-nowrap">
                             {getBreakTimingStr()}
                           </span>
                         </div>
@@ -1326,7 +1326,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
       {showLockConfirm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-surface border border-border rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col p-6 space-y-4">
-            <h3 className="font-extrabold text-text-primary text-base tracking-tight text-center font-display">
+            <h3 className="font-bold text-text-primary text-base tracking-tight text-center font-display">
               Confirm Save
             </h3>
             <p className="text-xs text-text-secondary text-center leading-relaxed">
@@ -1392,7 +1392,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                     </option>
                   ))}
                 </select>
-                <p className="text-[10px] text-text-muted">Choose an active teacher to assign their School Admin Portal permissions.</p>
+                <p className="text-[11px] text-text-muted">Choose an active teacher to assign their School Admin Portal permissions.</p>
               </div>
 
               <div className="space-y-1.5 md:col-span-2">
@@ -1411,7 +1411,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                             savingPermissions ? 'opacity-70 cursor-not-allowed' : ''
                           } ${
                             isChecked
-                              ? 'bg-primary/5 border-primary text-primary font-black shadow-3xs'
+                              ? 'bg-primary/5 border-primary text-primary font-bold shadow-3xs'
                               : 'bg-surface border-border text-text-secondary hover:border-text-secondary/35'
                           }`}
                         >
@@ -1472,7 +1472,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                       const val = localAssignments[c.id] || '';
                       return (
                         <TableRow key={c.id}>
-                          <TableCell className="font-extrabold text-text-primary text-xs tracking-tight">
+                          <TableCell className="font-bold text-text-primary text-xs tracking-tight">
                             {classLabel}
                           </TableCell>
                           <TableCell>
@@ -1522,11 +1522,11 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
           <div className="bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-xl border border-border space-y-3">
             <div className="flex justify-between text-xs font-bold">
               <span className="text-text-secondary">Previous Teacher:</span>
-              <span className="text-red-500 font-extrabold">{replacePrevTeacherName}</span>
+              <span className="text-red-500 font-bold">{replacePrevTeacherName}</span>
             </div>
             <div className="flex justify-between text-xs font-bold">
               <span className="text-text-secondary">New Teacher:</span>
-              <span className="text-primary font-extrabold">{replaceNewTeacherName}</span>
+              <span className="text-primary font-bold">{replaceNewTeacherName}</span>
             </div>
           </div>
 
@@ -1559,14 +1559,14 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
           )}
 
           <div className="space-y-2">
-            <label className="text-xs font-bold text-text-secondary uppercase">Academic Year</label>
-            <Input 
+            <label htmlFor="academic-year" className="text-xs font-bold text-text-secondary uppercase">Academic Year</label>
+            <Input id="academic-year" 
               placeholder="e.g. 2027–2028" 
               value={createYearName} 
               onChange={e => setCreateYearName(e.target.value)} 
               className="font-semibold text-sm"
             />
-            <p className="text-[10px] text-text-muted">Enter the academic year name.</p>
+            <p className="text-[11px] text-text-muted">Enter the academic year name.</p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -1642,14 +1642,14 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
               <div className="space-y-4 animate-in fade-in duration-200">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h4 className="text-xs font-black uppercase text-text-secondary tracking-wider">Active Teachers Migration</h4>
-                    <span className="text-[10px] text-text-muted font-bold mt-0.5 block">{Object.values(selectedTeachers).filter(Boolean).length} Selected</span>
+                    <h4 className="text-xs font-bold uppercase text-text-secondary tracking-wider">Active Teachers Migration</h4>
+                    <span className="text-[11px] text-text-muted font-bold mt-0.5 block">{Object.values(selectedTeachers).filter(Boolean).length} Selected</span>
                   </div>
                   {inactiveTeachers.length > 0 && (
                     <button
                       type="button"
                       onClick={() => setShowInactiveTeachers(true)}
-                      className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 text-text-muted border border-border rounded-full transition-colors shadow-3xs"
+                      className="px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 text-text-muted border border-border rounded-full transition-colors shadow-3xs"
                     >
                       Inactive Teachers ({inactiveTeachers.length})
                     </button>
@@ -1677,10 +1677,10 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                             />
                             <div>
                               <p className="font-bold text-text-primary text-xs">{t.name}</p>
-                              <p className="text-[10px] text-text-muted font-medium mt-0.5">{subjectDisplay}</p>
+                              <p className="text-[11px] text-text-muted font-medium mt-0.5">{subjectDisplay}</p>
                             </div>
                           </label>
-                          <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-green-500/10 text-green-600 border border-green-500/20">Active</span>
+                          <span className="text-[11px] font-bold uppercase px-2 py-0.5 rounded bg-green-500/10 text-green-600 border border-green-500/20">Active</span>
                         </div>
                       );
                     })
@@ -1706,12 +1706,12 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
             return (
               <div className="space-y-4 animate-in fade-in duration-200">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-black uppercase text-text-secondary tracking-wider">Class-wise Student Promotions</h4>
+                  <h4 className="text-xs font-bold uppercase text-text-secondary tracking-wider">Class-wise Student Promotions</h4>
                   {inactiveStudents.length > 0 && (
                     <button
                       type="button"
                       onClick={() => setShowInactiveStudents(true)}
-                      className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 text-text-muted border border-border rounded-full transition-colors shadow-3xs"
+                      className="px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 text-text-muted border border-border rounded-full transition-colors shadow-3xs"
                     >
                       Inactive Students ({inactiveStudents.length})
                     </button>
@@ -1734,7 +1734,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                         <div key={c.id} className="space-y-2 border-b border-border/40 pb-3 last:border-b-0">
                           <div className="flex items-center justify-between border-b border-border pb-1">
                             <span className="font-bold text-text-primary text-xs">{c.name} {c.section ? ` - ${c.section}` : ''}</span>
-                            <span className="text-[10px] text-text-muted font-semibold">{classStudents.length} Students</span>
+                            <span className="text-[11px] text-text-muted font-semibold">{classStudents.length} Students</span>
                           </div>
                           
                           <div className="space-y-2 pl-2">
@@ -1749,7 +1749,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                                   <span className="font-semibold text-text-secondary">{student.name}</span>
                                   
                                   <div className="flex items-center gap-6">
-                                    <label className="flex items-center gap-1.5 font-bold uppercase text-[10px] tracking-wide cursor-pointer select-none">
+                                    <label className="flex items-center gap-1.5 font-bold uppercase text-[11px] tracking-wide cursor-pointer select-none">
                                       <input
                                         type="radio"
                                         name={`student-action-${student.id}`}
@@ -1760,7 +1760,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                                       />
                                       {promoteText}
                                     </label>
-                                    <label className="flex items-center gap-1.5 font-bold uppercase text-[10px] tracking-wide cursor-pointer select-none">
+                                    <label className="flex items-center gap-1.5 font-bold uppercase text-[11px] tracking-wide cursor-pointer select-none">
                                       <input
                                         type="radio"
                                         name={`student-action-${student.id}`}
@@ -1788,50 +1788,50 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
           {/* STEP 3: Review */}
           {wizardStep === 3 && (
             <div className="space-y-5 animate-in fade-in duration-200">
-              <h4 className="text-xs font-black uppercase text-text-secondary tracking-wider">Final Migration Review</h4>
+              <h4 className="text-xs font-bold uppercase text-text-secondary tracking-wider">Final Migration Review</h4>
               
               <div className="grid grid-cols-2 gap-4 text-xs font-semibold text-text-secondary">
                 <Card className="p-4 shadow-2xs">
-                  <p className="text-text-muted uppercase text-[9px] font-bold tracking-wider">Target Session</p>
-                  <p className="text-lg font-black text-primary mt-1 font-display">{targetYear?.name}</p>
+                  <p className="text-text-muted uppercase text-[11px] font-bold tracking-wider">Target Session</p>
+                  <p className="text-lg font-bold text-primary mt-1 font-display">{targetYear?.name}</p>
                 </Card>
                 <Card className="p-4 shadow-2xs">
-                  <p className="text-text-muted uppercase text-[9px] font-bold tracking-wider">Migrated Teachers</p>
-                  <p className="text-lg font-black text-text-primary mt-1 font-display">
+                  <p className="text-text-muted uppercase text-[11px] font-bold tracking-wider">Migrated Teachers</p>
+                  <p className="text-lg font-bold text-text-primary mt-1 font-display">
                     {reviewCounts.activeTeachers}
                   </p>
                 </Card>
                 <Card className="p-4 shadow-2xs">
-                  <p className="text-text-muted uppercase text-[9px] font-bold tracking-wider">Inactive Teachers Skipped</p>
-                  <p className="text-lg font-black text-red-500 mt-1 font-display font-display">
+                  <p className="text-text-muted uppercase text-[11px] font-bold tracking-wider">Inactive Teachers Skipped</p>
+                  <p className="text-lg font-bold text-red-500 mt-1 font-display font-display">
                     {staff.filter(s => (s.role === 'TEACHER' || s.role === 'Teacher') && s.status !== 'ACTIVE').length}
                   </p>
                 </Card>
                 <Card className="p-4 shadow-2xs">
-                  <p className="text-text-muted uppercase text-[9px] font-bold tracking-wider">Students Promoted</p>
-                  <p className="text-lg font-black text-teal-600 mt-1 font-display">
+                  <p className="text-text-muted uppercase text-[11px] font-bold tracking-wider">Students Promoted</p>
+                  <p className="text-lg font-bold text-teal-600 mt-1 font-display">
                     {reviewCounts.promoted}
                   </p>
                 </Card>
                 <Card className="p-4 shadow-2xs">
-                  <p className="text-text-muted uppercase text-[9px] font-bold tracking-wider">Students Repeating</p>
-                  <p className="text-lg font-black text-amber-600 mt-1 font-display">
+                  <p className="text-text-muted uppercase text-[11px] font-bold tracking-wider">Students Repeating</p>
+                  <p className="text-lg font-bold text-amber-600 mt-1 font-display">
                     {reviewCounts.repeating}
                   </p>
                 </Card>
                 <Card className="p-4 shadow-2xs">
-                  <p className="text-text-muted uppercase text-[9px] font-bold tracking-wider">Inactive Students Skipped</p>
-                  <p className="text-lg font-black text-red-500 mt-1 font-display font-display">
+                  <p className="text-text-muted uppercase text-[11px] font-bold tracking-wider">Inactive Students Skipped</p>
+                  <p className="text-lg font-bold text-red-500 mt-1 font-display font-display">
                     {students.filter(s => s.status !== 'ACTIVE').length}
                   </p>
                 </Card>
                 <Card className="p-4 shadow-2xs col-span-2">
-                  <p className="text-text-muted uppercase text-[9px] font-bold tracking-wider">Graduated / Alumni</p>
-                  <p className="text-lg font-black text-indigo-600 mt-1 font-display">{reviewCounts.graduated}</p>
+                  <p className="text-text-muted uppercase text-[11px] font-bold tracking-wider">Graduated / Alumni</p>
+                  <p className="text-lg font-bold text-indigo-600 mt-1 font-display">{reviewCounts.graduated}</p>
                 </Card>
               </div>
 
-              <div className="p-3 bg-zinc-50 border border-border rounded-xl text-[10px] text-text-muted flex items-start gap-2">
+              <div className="p-3 bg-zinc-50 border border-border rounded-xl text-[11px] text-text-muted flex items-start gap-2">
                 <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
                 <span>
                   All existing academic data (fee payments, grades, attendance, logs) for the previous sessions will remain permanently preserved and locked.
@@ -1891,7 +1891,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                         <TableCell className="font-mono text-xs text-text-secondary">{t.employee_id || '—'}</TableCell>
                         <TableCell className="text-xs text-text-muted">{t.department || '—'}</TableCell>
                         <TableCell>
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-red-500/10 text-red-600 border border-red-500/20">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-red-500/10 text-red-600 border border-red-500/20">
                             {t.status}
                           </span>
                         </TableCell>
@@ -1941,7 +1941,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                             {sClass ? `${sClass.name}${sClass.section ? ` - ${sClass.section}` : ''}` : '—'}
                           </TableCell>
                           <TableCell>
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-red-500/10 text-red-600 border border-red-500/20">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-red-500/10 text-red-600 border border-red-500/20">
                               {s.status}
                             </span>
                           </TableCell>
@@ -1962,7 +1962,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
       {showConfirmExecute && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-surface border border-border rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col p-6 space-y-4">
-            <h3 className="font-extrabold text-text-primary text-base tracking-tight text-center font-display">
+            <h3 className="font-bold text-text-primary text-base tracking-tight text-center font-display">
               Confirm Migration
             </h3>
             <p className="text-xs text-text-secondary text-center leading-relaxed">
@@ -2019,7 +2019,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
       {showActivateConfirm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-surface border border-border rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col p-6 space-y-4">
-            <h3 className="font-extrabold text-text-primary text-base tracking-tight text-center font-display">
+            <h3 className="font-bold text-text-primary text-base tracking-tight text-center font-display">
               Confirm Activation
             </h3>
             <p className="text-xs text-text-secondary text-center leading-relaxed">
@@ -2121,7 +2121,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
               <div className="p-3 bg-amber-500/10 rounded-full border border-amber-500/20 text-amber-500">
                 <AlertTriangle className="h-8 w-8" />
               </div>
-              <h3 className="font-black text-text-primary text-base tracking-tight uppercase">
+              <h3 className="font-bold text-text-primary text-base tracking-tight uppercase">
                 Late Payment Penalty Not Configured
               </h3>
               <p className="text-xs text-text-secondary leading-relaxed max-w-sm">

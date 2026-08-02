@@ -1,0 +1,11 @@
+# NOTE: "zero student limit" is marked expectValid=true not because it SHOULD
+# be accepted, but because it currently IS — Student Limit has no min="0" (or
+# any other) constraint, only Plan Name/Description are `required` and Amount
+# has min="0". Flip back to false once that gap is fixed; until then this
+# documents real, current behavior rather than asserting an unenforced rule.
+# Negative price IS correctly blocked (Amount has a native min="0").
+scenario,planName,studentLimit,price,expectValid
+valid plan,Starter,100,999,true
+missing plan name (invalid),,100,999,false
+zero student limit (accepted — validation gap),Starter Zero Limit,0,999,true
+negative price (invalid),Starter Negative Price,100,-500,false

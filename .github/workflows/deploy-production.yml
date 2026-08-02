@@ -1,0 +1,149 @@
+name: Deploy to Production (Hostinger)
+
+# Manual-only: this deploys to the live production environment and must
+# never be wired to push/PR triggers. Trigger from the Actions tab ("Run
+# workflow") or `gh workflow run deploy-production.yml`.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "deploy" to confirm you want to deploy to PRODUCTION'
+        required: true
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Verify confirmation input
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "deploy" ]; then
+            echo "::error::Confirmation input must be exactly 'deploy'. Aborting."
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Write frontend production env
+        run: |
+          cat > frontend/.env.production <<EOF
+          VITE_API_URL=${{ secrets.PROD_VITE_API_URL }}
+          VITE_APP_NAME=${{ secrets.PROD_VITE_APP_NAME }}
+          VITE_APP_VERSION=${{ secrets.PROD_VITE_APP_VERSION }}
+          EOF
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build -- --mode production
+
+      - name: Create deployment package
+        run: |
+          set -e
+          BUILD_DIR=".builds"
+          TEMP_DIR="$BUILD_DIR/deploy_temp"
+          TAR_FILE="$BUILD_DIR/deploy.tar.gz"
+          mkdir -p "$BUILD_DIR"
+          rm -rf "$TEMP_DIR" "$TAR_FILE"
+          mkdir -p "$TEMP_DIR"
+
+          # Frontend build
+          cp -r frontend/dist/* "$TEMP_DIR/"
+
+          # Backend files into api/
+          mkdir -p "$TEMP_DIR/api"
+          cp -r backend/src "$TEMP_DIR/api/"
+          cp -r backend/public "$TEMP_DIR/api/"
+          cp backend/composer.json "$TEMP_DIR/api/"
+          cp backend/composer.lock "$TEMP_DIR/api/"
+
+          # Backend .env assembled entirely from secrets — nothing sensitive
+          # ever touches the repo or the workflow file itself.
+          cat > "$TEMP_DIR/api/.env" <<EOF
+          APP_ENV=production
+          APP_DEBUG=false
+          APP_NAME=${{ secrets.PROD_APP_NAME }}
+          DB_HOST=${{ secrets.PROD_DB_HOST }}
+          DB_PORT=${{ secrets.PROD_DB_PORT }}
+          DB_NAME=${{ secrets.PROD_DB_NAME }}
+          DB_USER=${{ secrets.PROD_DB_USER }}
+          DB_PASS=${{ secrets.PROD_DB_PASS }}
+
+          JWT_SECRET=${{ secrets.PROD_JWT_SECRET }}
+
+          SMTP_HOST=${{ secrets.PROD_SMTP_HOST }}
+          SMTP_PORT=${{ secrets.PROD_SMTP_PORT }}
+          SMTP_USER=${{ secrets.PROD_SMTP_USER }}
+          SMTP_PASS=${{ secrets.PROD_SMTP_PASS }}
+          SMTP_FROM_NAME=${{ secrets.PROD_SMTP_FROM_NAME }}
+          EOF
+
+          # Root .htaccess for frontend client-side routing
+          cat > "$TEMP_DIR/.htaccess" <<'EOF'
+          <IfModule mod_headers.c>
+              <FilesMatch "\.(html)$">
+                  Header set Cache-Control "no-cache, no-store, must-revalidate"
+                  Header set Pragma "no-cache"
+                  Header set Expires 0
+              </FilesMatch>
+          </IfModule>
+
+          <IfModule mod_rewrite.c>
+              RewriteEngine On
+              RewriteBase /
+
+              RewriteCond %{REQUEST_FILENAME} -f [OR]
+              RewriteCond %{REQUEST_FILENAME} -d
+              RewriteRule ^ - [L]
+
+              RewriteRule ^ index.html [L]
+          </IfModule>
+          EOF
+
+          # api/.htaccess routes API sub-requests to public/index.php
+          cat > "$TEMP_DIR/api/.htaccess" <<'EOF'
+          <IfModule mod_rewrite.c>
+              RewriteEngine On
+              RewriteCond %{REQUEST_FILENAME} !-f
+              RewriteRule ^(.*)$ public/index.php [QSA,L]
+          </IfModule>
+          EOF
+
+          COPYFILE_DISABLE=1 tar -czf "$TAR_FILE" -C "$TEMP_DIR" .
+          rm -rf "$TEMP_DIR"
+
+      - name: Upload package via SSH
+        env:
+          SSHPASS: ${{ secrets.PROD_SSH_PASSWORD }}
+        run: |
+          set -e
+          sudo apt-get update -qq && sudo apt-get install -y -qq sshpass
+          sshpass -e scp -o StrictHostKeyChecking=no -P "${{ secrets.PROD_SSH_PORT }}" \
+            .builds/deploy.tar.gz \
+            "${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }}:${{ secrets.PROD_REMOTE_PATH }}/"
+
+      - name: Extract package and run migrations on remote
+        env:
+          SSHPASS: ${{ secrets.PROD_SSH_PASSWORD }}
+        run: |
+          set -e
+          REMOTE_PATH="${{ secrets.PROD_REMOTE_PATH }}"
+          EXTRACT_CMD="cd $REMOTE_PATH && rm -rf assets api index.html && tar --warning=no-unknown-keyword -xzf deploy.tar.gz && rm deploy.tar.gz && echo 'Running composer install...' && composer install --no-dev --optimize-autoloader --working-dir=$REMOTE_PATH/api && echo 'Running migrations...' && php api/src/Database/migrate.php"
+          sshpass -e ssh -o StrictHostKeyChecking=no -p "${{ secrets.PROD_SSH_PORT }}" \
+            "${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }}" "$EXTRACT_CMD"
+
+      - name: Done
+        run: echo "Production deployment completed successfully."

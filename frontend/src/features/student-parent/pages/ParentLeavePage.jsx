@@ -283,7 +283,7 @@ export default function ParentLeavePage() {
       {/* Header section */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-black text-text-primary tracking-tight font-display">
+          <h2 className="text-xl font-bold text-text-primary tracking-tight font-display">
             {isParent ? 'Student Leaves' : 'Leaves'}
           </h2>
           <p className="text-xs text-text-muted">
@@ -325,7 +325,7 @@ export default function ParentLeavePage() {
           onClick={() => setActiveTab('holidays')}
           className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${
             activeTab === 'holidays'
-              ? 'bg-primary text-surface dark:bg-primary dark:text-background font-extrabold shadow-2xs'
+              ? 'bg-primary text-primary-fg font-bold shadow-2xs'
               : 'text-text-secondary hover:text-text-primary hover:bg-secondary/40'
           }`}
         >
@@ -335,7 +335,7 @@ export default function ParentLeavePage() {
           onClick={() => setActiveTab('requests')}
           className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${
             activeTab === 'requests'
-              ? 'bg-primary text-surface dark:bg-primary dark:text-background font-extrabold shadow-2xs'
+              ? 'bg-primary text-primary-fg font-bold shadow-2xs'
               : 'text-text-secondary hover:text-text-primary hover:bg-secondary/40'
           }`}
         >
@@ -375,7 +375,7 @@ export default function ParentLeavePage() {
                       cardBorderClass = 'border-emerald-500 ring-1 ring-emerald-500/20';
                       cardBgClass = 'bg-emerald-500/5 dark:bg-emerald-950/10';
                       badgeLabel = 'Today';
-                      badgeStyles = 'bg-emerald-500 text-white font-extrabold';
+                      badgeStyles = 'bg-emerald-500 text-white font-bold';
                     } else if (isUpcoming) {
                       cardBorderClass = 'border-blue-500/30';
                       cardBgClass = 'bg-blue-500/5 dark:bg-blue-950/5';
@@ -395,19 +395,19 @@ export default function ParentLeavePage() {
                             <div className="flex items-center gap-2 flex-wrap">
                               <h4 className="text-xs font-bold text-text-primary truncate">{h.name}</h4>
                               {badgeLabel && (
-                                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${badgeStyles}`}>
+                                <span className={`text-[11px] font-bold uppercase px-2 py-0.5 rounded-full ${badgeStyles}`}>
                                   {badgeLabel}
                                 </span>
                               )}
                             </div>
                             <div className="flex items-center gap-2 mt-1">
-                              <span className="text-[10px] text-text-secondary font-semibold">{formatDate(h.date)}</span>
+                              <span className="text-[11px] text-text-secondary font-semibold">{formatDate(h.date)}</span>
                               <span className="h-1 w-1 bg-border rounded-full"></span>
-                              <span className="text-[10px] text-text-muted font-medium">{getHolidayDay(h.date)}</span>
+                              <span className="text-[11px] text-text-muted font-medium">{getHolidayDay(h.date)}</span>
                             </div>
                           </div>
                           <div className="shrink-0 text-right">
-                            <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                            <span className="text-[11px] font-bold uppercase px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
                               {getHolidayType(h.name)}
                             </span>
                           </div>
@@ -441,24 +441,24 @@ export default function ParentLeavePage() {
                         <div className="flex items-start justify-between gap-4">
                           <div>
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-xs font-extrabold text-text-primary">{lr.leave_type}</span>
+                              <span className="text-xs font-bold text-text-primary">{lr.leave_type}</span>
                               {isParent && lr.student_name && (
-                                <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-text-secondary border border-border">
+                                <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-text-secondary border border-border">
                                   <Users className="h-2 w-2" /> {lr.student_name}
                                 </span>
                               )}
                             </div>
-                            <div className="flex items-center gap-1.5 text-[10px] text-text-secondary mt-0.5 font-bold">
+                            <div className="flex items-center gap-1.5 text-[11px] text-text-secondary mt-0.5 font-bold">
                               <span>{formatDate(lr.from_date)}</span>
                               <span>to</span>
                               <span>{formatDate(lr.to_date)}</span>
-                              <span className="text-[9px] font-semibold text-text-muted">
+                              <span className="text-[11px] font-semibold text-text-muted">
                                 ({Math.ceil((new Date(lr.to_date) - new Date(lr.from_date)) / (1000 * 60 * 60 * 24)) + 1} Days)
                               </span>
                             </div>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase border ${getStatusBadgeStyles(lr.status)}`}>
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold uppercase border ${getStatusBadgeStyles(lr.status)}`}>
                               {lr.status === 'PENDING' && <Clock className="h-2 w-2" />}
                               {lr.status === 'APPROVED' && <CheckCircle className="h-2 w-2" />}
                               {lr.status === 'REJECTED' && <XCircle className="h-2 w-2" />}
@@ -473,7 +473,7 @@ export default function ParentLeavePage() {
                         </p>
 
                         <div className="flex justify-between items-center pt-1.5 border-t border-border/50">
-                          <span className="text-[9px] text-text-muted font-bold font-mono">
+                          <span className="text-[11px] text-text-muted font-bold font-mono">
                             Applied: {new Date(lr.created_at).toLocaleDateString(undefined, {month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'})}
                           </span>
 
@@ -494,7 +494,7 @@ export default function ParentLeavePage() {
                               onClick={() => { setSelectedLeave(lr); setShowDetailsModal(true); }}
                               size="xs"
                               variant="outline"
-                              className="text-[10px] font-bold h-7 gap-1 px-2 flex items-center"
+                              className="text-[11px] font-bold h-7 gap-1 px-2 flex items-center"
                             >
                               <Eye className="h-3 w-3" /> Details
                             </Button>
@@ -555,7 +555,7 @@ export default function ParentLeavePage() {
             <div className="grid grid-cols-3 border-b border-border/50 py-2">
               <span className="font-bold text-text-muted uppercase">Status</span>
               <span className="col-span-2">
-                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase border ${getStatusBadgeStyles(selectedLeave.status)}`}>
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold uppercase border ${getStatusBadgeStyles(selectedLeave.status)}`}>
                   {selectedLeave.status}
                 </span>
               </span>
@@ -604,7 +604,7 @@ export default function ParentLeavePage() {
                     <option key={c.id} value={c.id}>{c.name} ({c.grade})</option>
                   ))}
                 </Select>
-                {formErrors.student_id && <p className="text-[10px] font-bold text-red-500 mt-0.5">{formErrors.student_id}</p>}
+                {formErrors.student_id && <p className="text-[11px] font-bold text-red-500 mt-0.5">{formErrors.student_id}</p>}
               </div>
             )}
 
@@ -633,7 +633,7 @@ export default function ParentLeavePage() {
                     if (formErrors.from_date) setFormErrors(prev => ({ ...prev, from_date: '' }));
                   }}
                 />
-                {formErrors.from_date && <p className="text-[10px] font-bold text-red-500 mt-0.5">{formErrors.from_date}</p>}
+                {formErrors.from_date && <p className="text-[11px] font-bold text-red-500 mt-0.5">{formErrors.from_date}</p>}
               </div>
 
               <div className="space-y-1.5">
@@ -647,18 +647,18 @@ export default function ParentLeavePage() {
                     if (formErrors.to_date) setFormErrors(prev => ({ ...prev, to_date: '' }));
                   }}
                 />
-                {formErrors.to_date && <p className="text-[10px] font-bold text-red-500 mt-0.5">{formErrors.to_date}</p>}
+                {formErrors.to_date && <p className="text-[11px] font-bold text-red-500 mt-0.5">{formErrors.to_date}</p>}
               </div>
             </div>
 
             <div className="space-y-1.5">
               <div className="flex justify-between items-center">
-                <label className="text-xs font-bold text-text-secondary uppercase">Reason for Leave</label>
-                <span className={`text-[10px] font-bold ${wordCount > 100 ? 'text-red-500' : 'text-text-muted'}`}>
+                <label htmlFor="reason-for-leave" className="text-xs font-bold text-text-secondary uppercase">Reason for Leave</label>
+                <span className={`text-[11px] font-bold ${wordCount > 100 ? 'text-red-500' : 'text-text-muted'}`}>
                   {wordCount}/100 Words
                 </span>
               </div>
-              <textarea
+              <textarea id="reason-for-leave"
                 placeholder="Type the reason for the leave request here (max 100 words)..."
                 rows={4}
                 value={form.reason}
@@ -667,7 +667,7 @@ export default function ParentLeavePage() {
                   formErrors.reason ? 'border-red-500 focus:ring-red-500' : 'border-border'
                 }`}
               />
-              {formErrors.reason && <p className="text-[10px] font-bold text-red-500 mt-0.5">{formErrors.reason}</p>}
+              {formErrors.reason && <p className="text-[11px] font-bold text-red-500 mt-0.5">{formErrors.reason}</p>}
             </div>
 
             <div className="space-y-1.5">
@@ -683,7 +683,7 @@ export default function ParentLeavePage() {
                 <span className="text-xs font-bold text-text-primary">
                   {attachment ? attachment.name : 'Click to Upload Document'}
                 </span>
-                <span className="text-[10px] text-text-muted mt-1">Accepts PDF, Word, JPEG, PNG (max 5MB)</span>
+                <span className="text-[11px] text-text-muted mt-1">Accepts PDF, Word, JPEG, PNG (max 5MB)</span>
               </div>
             </div>
 

@@ -26,7 +26,7 @@ const TeacherAvatar = ({ src, name }) => {
     : 'T';
     
   return (
-    <div className="w-full h-full bg-teal-500/10 text-teal-600 dark:bg-teal-500/20 dark:text-teal-400 flex items-center justify-center text-lg font-black">
+    <div className="w-full h-full bg-teal-500/10 text-teal-600 dark:bg-teal-500/20 dark:text-teal-400 flex items-center justify-center text-lg font-bold">
       {initials}
     </div>
   );
@@ -76,7 +76,7 @@ export default function SchoolTeachersPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">Teacher Profile</h2>
+            <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Teacher Profile</h2>
             <p className="text-text-secondary text-sm mt-1">{t.name} · Complete details</p>
           </div>
         </div>
@@ -90,14 +90,14 @@ export default function SchoolTeachersPage() {
               <div className="w-24 h-24 rounded-full border-2 border-primary/20 bg-zinc-50 dark:bg-zinc-900/55 overflow-hidden shadow-sm relative">
                 <TeacherAvatar src={t.photo_path} name={t.name} />
               </div>
-              <h3 className="text-xl font-black text-text-primary tracking-tight font-display mt-4">{t.name}</h3>
-              <p className="text-xs text-text-muted mt-1.5 font-bold uppercase tracking-wider">Employee ID: <span className="font-mono text-text-primary font-extrabold">{t.employee_id || '—'}</span></p>
+              <h3 className="text-xl font-bold text-text-primary tracking-tight font-display mt-4">{t.name}</h3>
+              <p className="text-xs text-text-muted mt-1.5 font-bold uppercase tracking-wider">Employee ID: <span className="font-mono text-text-primary font-bold">{t.employee_id || '—'}</span></p>
 
               <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase border ${t.status === 'ACTIVE' ? 'bg-green-500/10 text-green-600 border-green-500/20' : 'bg-red-500/10 text-red-600 border-red-500/20'}`}>
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase border ${t.status === 'ACTIVE' ? 'bg-green-500/10 text-green-600 border-green-500/20' : 'bg-red-500/10 text-red-600 border-red-500/20'}`}>
                   {t.status}
                 </span>
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-zinc-100 text-text-secondary dark:bg-zinc-800 uppercase">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-zinc-100 text-text-secondary dark:bg-zinc-800 uppercase">
                   {t.department || 'General'}
                 </span>
               </div>
@@ -107,23 +107,23 @@ export default function SchoolTeachersPage() {
 
             <div className="space-y-4 text-xs font-semibold text-text-secondary">
               <div>
-                <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Father's Name</p>
+                <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Father's Name</p>
                 <p className="text-sm font-bold text-text-primary mt-0.5">{t.father_name || '—'}</p>
               </div>
               <div>
-                <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Mother's Name</p>
+                <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Mother's Name</p>
                 <p className="text-sm font-bold text-text-primary mt-0.5">{t.mother_name || '—'}</p>
               </div>
               <div>
-                <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Contact Phone</p>
+                <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Contact Phone</p>
                 <p className="text-sm font-bold text-text-primary mt-0.5">{t.phone || '—'}</p>
               </div>
               <div>
-                <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Emergency Contact</p>
+                <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Emergency Contact</p>
                 <p className="text-sm font-bold text-text-primary mt-0.5">{t.emergency_phone || '—'}</p>
               </div>
               <div>
-                <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Email Address</p>
+                <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Email Address</p>
                 <p className="text-sm font-bold text-text-primary mt-0.5 break-all">{t.email || '—'}</p>
               </div>
             </div>
@@ -134,23 +134,23 @@ export default function SchoolTeachersPage() {
             
             {/* Professional Info */}
             <Card className="p-6 bg-surface border border-border rounded-2xl shadow-xs">
-              <h3 className="text-sm font-extrabold text-text-primary uppercase tracking-wider mb-4 border-b border-border/60 pb-2">Employment Information</h3>
+              <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider mb-4 border-b border-border/60 pb-2">Employment Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-semibold text-text-secondary">
                 <div>
-                  <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Role / Designation</p>
+                  <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Role / Designation</p>
                   <p className="text-sm font-bold text-text-primary mt-0.5">{t.role || 'Teacher'}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Monthly Salary</p>
-                  <p className="text-sm font-extrabold text-primary mt-0.5">₹{t.salary ? Number(t.salary).toLocaleString('en-IN') : '0'}</p>
+                  <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Monthly Salary</p>
+                  <p className="text-sm font-bold text-primary mt-0.5">₹{t.salary ? Number(t.salary).toLocaleString('en-IN') : '0'}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Joining Date</p>
+                  <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Joining Date</p>
                   <p className="text-sm font-bold text-text-primary mt-0.5">{formatDate(t.joining_date)}</p>
                 </div>
                 {t.exit_date && (
                   <div>
-                    <p className="text-[10px] font-black text-red-500 uppercase tracking-wider">Exit Date</p>
+                    <p className="text-[11px] font-bold text-red-500 uppercase tracking-wider">Exit Date</p>
                     <p className="text-sm font-bold text-text-primary mt-0.5">{formatDate(t.exit_date)}</p>
                   </div>
                 )}
@@ -159,10 +159,10 @@ export default function SchoolTeachersPage() {
 
             {/* Address */}
             <Card className="p-6 bg-surface border border-border rounded-2xl shadow-xs">
-              <h3 className="text-sm font-extrabold text-text-primary uppercase tracking-wider mb-4 border-b border-border/60 pb-2">Address Details</h3>
+              <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider mb-4 border-b border-border/60 pb-2">Address Details</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
                 <div className="space-y-2">
-                  <h4 className="font-bold text-text-secondary uppercase text-[10px] tracking-wider">Current Address</h4>
+                  <h4 className="font-bold text-text-secondary uppercase text-[11px] tracking-wider">Current Address</h4>
                   <p className="text-sm text-text-primary leading-relaxed font-semibold">
                     {t.current_address_line || '—'}<br />
                     {t.current_city ? `${t.current_city}, ` : ''}{t.current_state || ''}<br />
@@ -170,7 +170,7 @@ export default function SchoolTeachersPage() {
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <h4 className="font-bold text-text-secondary uppercase text-[10px] tracking-wider">Permanent Address</h4>
+                  <h4 className="font-bold text-text-secondary uppercase text-[11px] tracking-wider">Permanent Address</h4>
                   {t.same_as_current === 1 ? (
                     <p className="text-xs text-text-muted italic">Same as Current Address</p>
                   ) : (
@@ -186,7 +186,7 @@ export default function SchoolTeachersPage() {
 
             {/* Documents - read-only list */}
             <Card className="p-6 bg-surface border border-border rounded-2xl shadow-xs">
-              <h3 className="text-sm font-extrabold text-text-primary uppercase tracking-wider mb-4 border-b border-border/60 pb-2">Registered Documents</h3>
+              <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider mb-4 border-b border-border/60 pb-2">Registered Documents</h3>
               {(!t.documents || t.documents.length === 0) ? (
                 <p className="text-xs text-text-muted italic">No documents uploaded for this profile.</p>
               ) : (
@@ -202,7 +202,7 @@ export default function SchoolTeachersPage() {
                           href={doc.file_path} 
                           target="_blank" 
                           rel="noopener noreferrer"
-                          className="inline-flex items-center text-[10px] font-black text-primary hover:underline bg-primary/5 px-2.5 py-1 rounded"
+                          className="inline-flex items-center text-[11px] font-bold text-primary hover:underline bg-primary/5 px-2.5 py-1 rounded"
                         >
                           View Document
                         </a>
@@ -227,7 +227,7 @@ export default function SchoolTeachersPage() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">{schoolName} — Staff Directory</h2>
+          <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">{schoolName} — Staff Directory</h2>
           <p className="text-text-secondary text-sm mt-1">Platform-wide overview of registered teachers and academic administrators.</p>
         </div>
       </div>
@@ -240,8 +240,8 @@ export default function SchoolTeachersPage() {
               <Users className="h-6 w-6" />
             </div>
             <div>
-              <p className="text-text-muted text-[10px] font-black uppercase tracking-wider">Active Teachers</p>
-              <p className="text-3xl font-black text-text-primary mt-1 font-display">{activeCount} Active Teacher{activeCount !== 1 ? 's' : ''}</p>
+              <p className="text-text-muted text-[11px] font-bold uppercase tracking-wider">Active Teachers</p>
+              <p className="text-3xl font-bold text-text-primary mt-1 font-display">{activeCount} Active Teacher{activeCount !== 1 ? 's' : ''}</p>
             </div>
           </CardContent>
         </Card>
@@ -267,7 +267,7 @@ export default function SchoolTeachersPage() {
                 <TeacherAvatar src={t.photo_path} name={t.name} />
               </div>
               <h3 className="font-bold text-text-primary text-base truncate w-full group-hover:text-primary transition-colors">{t.name}</h3>
-              <p className="text-[10px] text-text-muted font-bold tracking-tight uppercase mt-1.5">{t.department || 'General'}</p>
+              <p className="text-[11px] text-text-muted font-bold tracking-tight uppercase mt-1.5">{t.department || 'General'}</p>
             </div>
           ))}
         </div>

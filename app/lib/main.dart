@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
+import 'constants/app_colors.dart';
 import 'package:http/http.dart' as http;
 import 'screens/leave_list_screen.dart';
 import 'screens/home_screen.dart';
@@ -99,17 +100,22 @@ class MyApp extends StatelessWidget {
       navigatorKey: navigatorKey,
       title: 'Shiksha Pilot School Hub',
       debugShowCheckedModeBanner: false,
+      // Scholar Indigo — the same brand values as the web app's --brand-*
+      // tokens, not Flutter's generic Colors.indigo swatch, so the two
+      // clients render the same primary colour rather than two similar ones.
       theme: ThemeData(
-        primarySwatch: Colors.indigo,
         useMaterial3: true,
         fontFamily: 'Roboto',
-        scaffoldBackgroundColor: Colors.grey[50],
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.indigo,
-          primary: Colors.indigo,
-          secondary: Colors.deepPurple,
-        ),
+        scaffoldBackgroundColor: AppColors.surfaceCanvas,
+        colorScheme: AppColors.lightColorScheme,
       ),
+      darkTheme: ThemeData(
+        useMaterial3: true,
+        fontFamily: 'Roboto',
+        scaffoldBackgroundColor: AppColors.darkSurfaceCanvas,
+        colorScheme: AppColors.darkColorScheme,
+      ),
+      themeMode: ThemeMode.light,
       home: const SplashScreen(),
     );
   }

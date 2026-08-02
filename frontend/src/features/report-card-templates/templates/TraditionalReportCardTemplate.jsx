@@ -43,7 +43,7 @@ export default function TraditionalReportCardTemplate({ data, config = {} }) {
                 </div>
               )}
             </div>
-            <h1 className="text-2xl font-black uppercase tracking-tight text-blue-950 font-display">
+            <h1 className="text-2xl font-bold uppercase tracking-tight text-blue-950 font-display">
               {school.name}
             </h1>
             <p className="text-xs text-zinc-700 italic mt-0.5">
@@ -60,27 +60,27 @@ export default function TraditionalReportCardTemplate({ data, config = {} }) {
           {/* Student Info Box */}
           <div className="border border-blue-900 bg-white p-4 mb-6 text-xs font-sans grid grid-cols-3 gap-y-3 gap-x-4">
             <div>
-              <span className="text-[10px] font-bold text-zinc-500 uppercase block">Student Name</span>
+              <span className="text-[11px] font-bold text-zinc-500 uppercase block">Student Name</span>
               <strong className="text-blue-950 font-bold text-sm uppercase">{student.name}</strong>
             </div>
             <div>
-              <span className="text-[10px] font-bold text-zinc-500 uppercase block">Class & Section</span>
+              <span className="text-[11px] font-bold text-zinc-500 uppercase block">Class & Section</span>
               <strong className="text-zinc-900 text-sm font-bold">{student.class_name} {student.section ? `(${student.section})` : ''}</strong>
             </div>
             <div>
-              <span className="text-[10px] font-bold text-zinc-500 uppercase block">Roll Number</span>
+              <span className="text-[11px] font-bold text-zinc-500 uppercase block">Roll Number</span>
               <strong className="text-zinc-900 text-sm font-mono font-bold">{student.roll_no}</strong>
             </div>
             <div>
-              <span className="text-[10px] font-bold text-zinc-500 uppercase block">Father's Name</span>
+              <span className="text-[11px] font-bold text-zinc-500 uppercase block">Father's Name</span>
               <span className="text-zinc-800">{student.father_name}</span>
             </div>
             <div>
-              <span className="text-[10px] font-bold text-zinc-500 uppercase block">Mother's Name</span>
+              <span className="text-[11px] font-bold text-zinc-500 uppercase block">Mother's Name</span>
               <span className="text-zinc-800">{student.mother_name}</span>
             </div>
             <div>
-              <span className="text-[10px] font-bold text-zinc-500 uppercase block">Admission / SR No</span>
+              <span className="text-[11px] font-bold text-zinc-500 uppercase block">Admission / SR No</span>
               <span className="text-zinc-800 font-mono">{student.admission_no}</span>
             </div>
           </div>
@@ -120,8 +120,8 @@ export default function TraditionalReportCardTemplate({ data, config = {} }) {
                         </React.Fragment>
                       ))}
                       <td className="p-2 text-center border-r border-blue-900 font-mono font-bold text-zinc-700 text-[11px]">{sub.grand_total_max || sub.max_marks}</td>
-                      <td className="p-2 text-center border-r border-blue-900 font-mono font-black text-blue-950 text-[11px]">{sub.grand_total_obtained || sub.marks_obtained}</td>
-                      <td className="p-2 text-center font-black text-xs">{sub.grade}</td>
+                      <td className="p-2 text-center border-r border-blue-900 font-mono font-bold text-blue-950 text-[11px]">{sub.grand_total_obtained || sub.marks_obtained}</td>
+                      <td className="p-2 text-center font-bold text-xs">{sub.grade}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -131,19 +131,19 @@ export default function TraditionalReportCardTemplate({ data, config = {} }) {
                     {(data.session_exams || ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam']).map(exName => (
                       <React.Fragment key={exName}>
                         <td className="p-2 text-center border-r border-blue-900 font-mono">{data.exam_totals?.[exName]?.max_marks || 700}</td>
-                        <td className="p-2 text-center border-r border-blue-900 font-mono font-black">{data.exam_totals?.[exName]?.marks_obtained || 500}</td>
+                        <td className="p-2 text-center border-r border-blue-900 font-mono font-bold">{data.exam_totals?.[exName]?.marks_obtained || 500}</td>
                       </React.Fragment>
                     ))}
                     <td className="p-2 text-center border-r border-blue-900 font-mono font-bold">{summary.total_max}</td>
-                    <td className="p-2 text-center border-r border-blue-900 font-mono font-black text-sm text-blue-950">{summary.total_obtained}</td>
-                    <td className="p-2 text-center font-black text-sm">{summary.grade}</td>
+                    <td className="p-2 text-center border-r border-blue-900 font-mono font-bold text-sm text-blue-950">{summary.total_obtained}</td>
+                    <td className="p-2 text-center font-bold text-sm">{summary.grade}</td>
                   </tr>
                 </tfoot>
               </table>
             ) : (
               <table className="w-full text-xs border border-blue-900 border-collapse text-zinc-900">
                 <thead>
-                  <tr className="bg-blue-950 text-white font-bold uppercase text-[10px] tracking-wide">
+                  <tr className="bg-blue-950 text-white font-bold uppercase text-[11px] tracking-wide">
                     <th className="p-2.5 text-left border-r border-blue-800">Subject</th>
                     <th className="p-2.5 text-center border-r border-blue-800 w-24">Max Marks</th>
                     <th className="p-2.5 text-center border-r border-blue-800 w-24">Min Pass</th>
@@ -160,8 +160,8 @@ export default function TraditionalReportCardTemplate({ data, config = {} }) {
                       <td className="p-2.5 text-center border-r border-blue-900 font-mono text-zinc-600">{sub.passing_marks}</td>
                       <td className="p-2.5 text-center border-r border-blue-900 font-mono font-bold text-blue-950">{sub.marks_obtained}</td>
                       <td className="p-2.5 text-center border-r border-blue-900 font-bold">{sub.grade}</td>
-                      <td className="p-2.5 text-center font-bold text-[10px] uppercase">
-                        <span className={sub.result === 'PASS' ? 'text-blue-900 font-black' : 'text-red-700 font-black'}>
+                      <td className="p-2.5 text-center font-bold text-[11px] uppercase">
+                        <span className={sub.result === 'PASS' ? 'text-blue-900 font-bold' : 'text-red-700 font-bold'}>
                           {sub.result}
                         </span>
                       </td>
@@ -173,9 +173,9 @@ export default function TraditionalReportCardTemplate({ data, config = {} }) {
                     <td className="p-3 border-r border-blue-900">Grand Total</td>
                     <td className="p-3 text-center border-r border-blue-900 font-mono">{summary.total_max}</td>
                     <td className="p-3 text-center border-r border-blue-900 font-mono text-zinc-600">—</td>
-                    <td className="p-3 text-center border-r border-blue-900 font-mono font-black text-sm text-blue-950">{summary.total_obtained}</td>
-                    <td className="p-3 text-center border-r border-blue-900 font-black text-sm">{summary.grade}</td>
-                    <td className="p-3 text-center font-black text-xs">{summary.result}</td>
+                    <td className="p-3 text-center border-r border-blue-900 font-mono font-bold text-sm text-blue-950">{summary.total_obtained}</td>
+                    <td className="p-3 text-center border-r border-blue-900 font-bold text-sm">{summary.grade}</td>
+                    <td className="p-3 text-center font-bold text-xs">{summary.result}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -199,28 +199,28 @@ export default function TraditionalReportCardTemplate({ data, config = {} }) {
           {/* Performance Summary Cards (5 columns) */}
           <div className="grid grid-cols-5 gap-2 font-sans">
             <div className="bg-emerald-50 border border-emerald-200 p-2 rounded text-center flex flex-col justify-center">
-              <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-800 block">Total Marks</span>
-              <span className="text-xs font-black font-mono text-emerald-950 mt-0.5">{summary.total_obtained} / {summary.total_max}</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 block">Total Marks</span>
+              <span className="text-xs font-bold font-mono text-emerald-950 mt-0.5">{summary.total_obtained} / {summary.total_max}</span>
             </div>
 
             <div className="bg-amber-50 border border-amber-200 p-2 rounded text-center flex flex-col justify-center">
-              <span className="text-[9px] font-bold uppercase tracking-wider text-amber-800 block">Percentage</span>
-              <span className="text-xs font-black font-mono text-amber-950 mt-0.5">{summary.percentage}%</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 block">Percentage</span>
+              <span className="text-xs font-bold font-mono text-amber-950 mt-0.5">{summary.percentage}%</span>
             </div>
 
             <div className="bg-emerald-50 border border-emerald-200 p-2 rounded text-center flex flex-col justify-center">
-              <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-800 block">Overall Grade</span>
-              <span className="text-xs font-black text-emerald-950 mt-0.5">Grade {summary.grade}</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 block">Overall Grade</span>
+              <span className="text-xs font-bold text-emerald-950 mt-0.5">Grade {summary.grade}</span>
             </div>
 
             <div className="bg-amber-50 border border-amber-200 p-2 rounded text-center flex flex-col justify-center">
-              <span className="text-[9px] font-bold uppercase tracking-wider text-amber-800 block">Attendance</span>
-              <span className="text-xs font-black font-mono text-amber-950 mt-0.5">{summary.attendance?.attendance_rate ?? 90.3}%</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 block">Attendance</span>
+              <span className="text-xs font-bold font-mono text-amber-950 mt-0.5">{summary.attendance?.attendance_rate ?? 90.3}%</span>
             </div>
 
             <div className="bg-emerald-50 border border-emerald-200 p-2 rounded text-center flex flex-col justify-center">
-              <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-800 block">Class Rank</span>
-              <span className="text-xs font-black font-mono text-emerald-950 mt-0.5">{summary.class_rank || '1st'}</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 block">Class Rank</span>
+              <span className="text-xs font-bold font-mono text-emerald-950 mt-0.5">{summary.class_rank || '1st'}</span>
             </div>
           </div>
 
@@ -232,12 +232,12 @@ export default function TraditionalReportCardTemplate({ data, config = {} }) {
             <div className="flex flex-col items-center">
               <div style={{ height: STAMP_SPACE }} aria-hidden="true" />
               <div className="w-40 border-b border-blue-900 mb-2" />
-              <span className="uppercase text-[10px] font-black tracking-wider text-blue-950">Class Teacher Signature</span>
+              <span className="uppercase text-[11px] font-bold tracking-wider text-blue-950">Class Teacher Signature</span>
             </div>
             <div className="flex flex-col items-center">
               <div style={{ height: STAMP_SPACE }} aria-hidden="true" />
               <div className="w-40 border-b border-blue-900 mb-2" />
-              <span className="uppercase text-[10px] font-black tracking-wider text-blue-950">Principal Signature & Stamp</span>
+              <span className="uppercase text-[11px] font-bold tracking-wider text-blue-950">Principal Signature & Stamp</span>
             </div>
           </div>
         </div>

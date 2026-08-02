@@ -8,10 +8,16 @@
     
     <title>Shiksha Pilot</title>
     
-    <!-- Google Fonts: Inter and Outfit -->
+    <!--
+      Google Fonts: Inter (body) + Outfit (display).
+      Only 400-700 are loaded, and the app no longer uses anything heavier —
+      previously 700+ usages of font-black (900) forced browsers to synthesise
+      the weight, which smeared glyphs on every screen. Dropping 300 and 800
+      also trims two files off the critical path.
+    -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
   </head>
   <body>
     <div id="root"></div>

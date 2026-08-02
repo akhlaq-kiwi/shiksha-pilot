@@ -33,12 +33,12 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
           {school.logo_path ? (
             <img src={school.logo_path} alt="Logo" className="h-14 w-14 object-contain" />
           ) : (
-            <div className="h-12 w-12 rounded-full bg-amber-500 text-white flex items-center justify-center font-black text-xl">
+            <div className="h-12 w-12 rounded-full bg-amber-500 text-white flex items-center justify-center font-bold text-xl">
               {school.name.charAt(0)}
             </div>
           )}
           <div>
-            <h1 className="text-lg font-black uppercase text-amber-600 tracking-tight font-display">
+            <h1 className="text-lg font-bold uppercase text-amber-600 tracking-tight font-display">
               {school.name}
             </h1>
             <p className="text-[11px] font-bold text-zinc-500 uppercase">
@@ -47,7 +47,7 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
           </div>
         </div>
         <div className="text-right">
-          <span className="px-3 py-1 bg-amber-100 text-amber-900 border border-amber-300 font-black text-xs rounded-full uppercase">
+          <span className="px-3 py-1 bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs rounded-full uppercase">
             Session: {academic_year.name}
           </span>
         </div>
@@ -56,19 +56,19 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
       {/* Student Profile Info */}
       <div className="bg-amber-50/60 border border-amber-200 rounded-lg p-3 mb-4 grid grid-cols-4 gap-3 text-xs">
         <div>
-          <span className="text-[9px] font-bold text-amber-800 uppercase block">Student Name</span>
+          <span className="text-[11px] font-bold text-amber-800 uppercase block">Student Name</span>
           <strong className="text-zinc-900 font-bold uppercase">{student.name}</strong>
         </div>
         <div>
-          <span className="text-[9px] font-bold text-amber-800 uppercase block">Class & Sec</span>
+          <span className="text-[11px] font-bold text-amber-800 uppercase block">Class & Sec</span>
           <strong className="text-zinc-900">{student.class_name} {student.section ? `(${student.section})` : ''}</strong>
         </div>
         <div>
-          <span className="text-[9px] font-bold text-amber-800 uppercase block">Roll No</span>
+          <span className="text-[11px] font-bold text-amber-800 uppercase block">Roll No</span>
           <strong className="text-zinc-900 font-mono">{student.roll_no}</strong>
         </div>
         <div>
-          <span className="text-[9px] font-bold text-amber-800 uppercase block">Adm No</span>
+          <span className="text-[11px] font-bold text-amber-800 uppercase block">Adm No</span>
           <strong className="text-zinc-900 font-mono">{student.admission_no}</strong>
         </div>
       </div>
@@ -108,8 +108,8 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
                     </React.Fragment>
                   ))}
                   <td className="p-2 text-center border-r border-zinc-200 font-mono font-bold text-zinc-700">{sub.grand_total_max || sub.max_marks}</td>
-                  <td className="p-2 text-center border-r border-zinc-200 font-mono font-black text-amber-900">{sub.grand_total_obtained || sub.marks_obtained}</td>
-                  <td className="p-2 text-center font-black text-amber-900">{sub.grade}</td>
+                  <td className="p-2 text-center border-r border-zinc-200 font-mono font-bold text-amber-900">{sub.grand_total_obtained || sub.marks_obtained}</td>
+                  <td className="p-2 text-center font-bold text-amber-900">{sub.grade}</td>
                 </tr>
               ))}
             </tbody>
@@ -119,19 +119,19 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
                 {(data.session_exams || ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam']).map(exName => (
                   <React.Fragment key={exName}>
                     <td className="p-2 text-center border-r border-amber-200 font-mono">{data.exam_totals?.[exName]?.max_marks || 700}</td>
-                    <td className="p-2 text-center border-r border-amber-200 font-mono font-black text-amber-900">{data.exam_totals?.[exName]?.marks_obtained || 500}</td>
+                    <td className="p-2 text-center border-r border-amber-200 font-mono font-bold text-amber-900">{data.exam_totals?.[exName]?.marks_obtained || 500}</td>
                   </React.Fragment>
                 ))}
                 <td className="p-2 text-center border-r border-amber-200 font-mono font-bold">{summary.total_max}</td>
-                <td className="p-2 text-center border-r border-amber-200 font-mono font-black text-sm text-amber-950">{summary.total_obtained}</td>
-                <td className="p-2 text-center font-black text-sm">{summary.grade}</td>
+                <td className="p-2 text-center border-r border-amber-200 font-mono font-bold text-sm text-amber-950">{summary.total_obtained}</td>
+                <td className="p-2 text-center font-bold text-sm">{summary.grade}</td>
               </tr>
             </tfoot>
           </table>
         ) : (
           <table className="w-full text-xs text-left border-collapse">
             <thead>
-              <tr className="bg-amber-500 text-white font-bold uppercase text-[10px]">
+              <tr className="bg-amber-500 text-white font-bold uppercase text-[11px]">
                 <th className="p-2.5">Subject</th>
                 <th className="p-2.5 text-center w-24">Marks Obtained</th>
                 <th className="p-2.5 text-center w-20">Max Marks</th>
@@ -145,9 +145,9 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
                   <td className="p-2.5 font-bold text-zinc-900">{sub.subject_name}</td>
                   <td className="p-2.5 text-center font-mono font-bold text-amber-700">{sub.marks_obtained}</td>
                   <td className="p-2.5 text-center font-mono text-zinc-500">{sub.max_marks}</td>
-                  <td className="p-2.5 text-center font-black text-amber-900">{sub.grade}</td>
+                  <td className="p-2.5 text-center font-bold text-amber-900">{sub.grade}</td>
                   <td className="p-2.5 text-center">
-                    <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${
+                    <span className={`px-2 py-0.5 rounded text-[11px] font-bold uppercase ${
                       sub.result === 'PASS' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                     }`}>
                       {sub.result}
@@ -177,28 +177,28 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
         {/* Performance Summary Cards (5 columns) */}
         <div className="grid grid-cols-5 gap-2 font-sans">
           <div className="bg-emerald-50 border border-emerald-200 p-2.5 rounded-lg text-center flex flex-col justify-center">
-            <span className="text-[9px] font-bold text-emerald-800 uppercase block">Total Marks</span>
-            <span className="text-xs font-black font-mono text-emerald-950 mt-0.5">{summary.total_obtained} / {summary.total_max}</span>
+            <span className="text-[11px] font-bold text-emerald-800 uppercase block">Total Marks</span>
+            <span className="text-xs font-bold font-mono text-emerald-950 mt-0.5">{summary.total_obtained} / {summary.total_max}</span>
           </div>
 
           <div className="bg-amber-50 border border-amber-200 p-2.5 rounded-lg text-center flex flex-col justify-center">
-            <span className="text-[9px] font-bold text-amber-800 uppercase block">Percentage</span>
-            <span className="text-xs font-black font-mono text-amber-950 mt-0.5">{summary.percentage}%</span>
+            <span className="text-[11px] font-bold text-amber-800 uppercase block">Percentage</span>
+            <span className="text-xs font-bold font-mono text-amber-950 mt-0.5">{summary.percentage}%</span>
           </div>
 
           <div className="bg-emerald-50 border border-emerald-200 p-2.5 rounded-lg text-center flex flex-col justify-center">
-            <span className="text-[9px] font-bold text-emerald-800 uppercase block">Overall Grade</span>
-            <span className="text-xs font-black text-emerald-950 mt-0.5">Grade {summary.grade}</span>
+            <span className="text-[11px] font-bold text-emerald-800 uppercase block">Overall Grade</span>
+            <span className="text-xs font-bold text-emerald-950 mt-0.5">Grade {summary.grade}</span>
           </div>
 
           <div className="bg-amber-50 border border-amber-200 p-2.5 rounded-lg text-center flex flex-col justify-center">
-            <span className="text-[9px] font-bold text-amber-800 uppercase block">Attendance</span>
-            <span className="text-xs font-black font-mono text-amber-950 mt-0.5">{summary.attendance?.attendance_rate ?? 90.3}%</span>
+            <span className="text-[11px] font-bold text-amber-800 uppercase block">Attendance</span>
+            <span className="text-xs font-bold font-mono text-amber-950 mt-0.5">{summary.attendance?.attendance_rate ?? 90.3}%</span>
           </div>
 
           <div className="bg-emerald-50 border border-emerald-200 p-2.5 rounded-lg text-center flex flex-col justify-center">
-            <span className="text-[9px] font-bold text-emerald-800 uppercase block">Class Rank</span>
-            <span className="text-xs font-black font-mono text-emerald-950 mt-0.5">{summary.class_rank || '1st'}</span>
+            <span className="text-[11px] font-bold text-emerald-800 uppercase block">Class Rank</span>
+            <span className="text-xs font-bold font-mono text-emerald-950 mt-0.5">{summary.class_rank || '1st'}</span>
           </div>
         </div>
 
@@ -210,12 +210,12 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
           <div className="flex flex-col items-center">
             <div style={{ height: STAMP_SPACE }} aria-hidden="true" />
             <div className="w-40 border-b border-zinc-400 mb-2" />
-            <span className="uppercase text-[10px] font-black tracking-wider text-zinc-800">Class Teacher Signature</span>
+            <span className="uppercase text-[11px] font-bold tracking-wider text-zinc-800">Class Teacher Signature</span>
           </div>
           <div className="flex flex-col items-center">
             <div style={{ height: STAMP_SPACE }} aria-hidden="true" />
             <div className="w-40 border-b border-zinc-400 mb-2" />
-            <span className="uppercase text-[10px] font-black tracking-wider text-zinc-800">Principal Signature & Stamp</span>
+            <span className="uppercase text-[11px] font-bold tracking-wider text-zinc-800">Principal Signature & Stamp</span>
           </div>
         </div>
       </div>

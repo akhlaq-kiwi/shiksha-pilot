@@ -525,7 +525,7 @@ export default function SeatingPlanPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-5 no-print">
         <div>
-          <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">Examination Seating Plan</h2>
+          <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Examination Seating Plan</h2>
           <p className="text-text-secondary text-sm mt-1">Automatically assign student seating layouts and generate invigilator sheets or cut-out seating slips.</p>
         </div>
       </div>
@@ -568,7 +568,7 @@ export default function SeatingPlanPage() {
             </CardHeader>
             <CardContent className="p-6 space-y-4">
               <div>
-                <label className="text-xs font-extrabold uppercase text-text-secondary tracking-wider mb-2 block">Classes to Include</label>
+                <label className="text-xs font-bold uppercase text-text-secondary tracking-wider mb-2 block">Classes to Include</label>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-zinc-50 dark:bg-zinc-900/40 p-4 rounded-xl border border-border">
                   {classes.map(c => {
                     const isSelected = selectedClassIds.includes(c.id);
@@ -590,14 +590,14 @@ export default function SeatingPlanPage() {
                         />
                         <div className="flex flex-col">
                           <span>{c.name} {c.section ? `- ${c.section}` : ''}</span>
-                          <span className="text-[10px] text-text-muted font-medium">{stuCount} students</span>
+                          <span className="text-[11px] text-text-muted font-medium">{stuCount} students</span>
                         </div>
                       </label>
                     );
                   })}
                 </div>
                 {selectedClassIds.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-6 text-xs font-black text-text-primary bg-zinc-100/60 dark:bg-zinc-800/40 p-3 rounded-lg border border-border/50">
+                  <div className="mt-3 flex flex-wrap gap-6 text-xs font-bold text-text-primary bg-zinc-100/60 dark:bg-zinc-800/40 p-3 rounded-lg border border-border/50">
                     <div>Total Calculated Students: {totalSelectedStudents}</div>
                     <div>Required Benches: {requiredBenches}</div>
                   </div>
@@ -614,7 +614,7 @@ export default function SeatingPlanPage() {
             <CardContent className="p-6 space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-extrabold uppercase text-text-secondary tracking-wider">Students Per Bench</label>
+                  <label className="text-xs font-bold uppercase text-text-secondary tracking-wider">Students Per Bench</label>
                   <Select
                     value={studentsPerBench}
                     disabled={selectedClassIds.length === 0}
@@ -630,7 +630,7 @@ export default function SeatingPlanPage() {
                   </Select>
                 </div>
                 <div>
-                  <label className="text-xs font-extrabold uppercase text-text-secondary tracking-wider">Number of Rooms</label>
+                  <label className="text-xs font-bold uppercase text-text-secondary tracking-wider">Number of Rooms</label>
                   <Input 
                     type="number"
                     min="1"
@@ -648,20 +648,20 @@ export default function SeatingPlanPage() {
                   {/* Dynamic Instructional Message */}
                   <div className="bg-primary/5 p-4 rounded-xl border border-primary/20 text-xs text-text-primary">
                     <p className="leading-relaxed font-semibold">
-                      You need a total of <strong className="text-primary font-black">{requiredBenches} benches</strong> for the selected students.
-                      Please distribute these <strong className="text-primary font-black">{requiredBenches} benches</strong> across the <strong className="text-primary font-black">{roomConfigs.length} examination rooms</strong> below based on the actual benches available in each room. 
-                      The total benches entered must be at least <strong className="text-primary font-black">{requiredBenches}</strong>.
+                      You need a total of <strong className="text-primary font-bold">{requiredBenches} benches</strong> for the selected students.
+                      Please distribute these <strong className="text-primary font-bold">{requiredBenches} benches</strong> across the <strong className="text-primary font-bold">{roomConfigs.length} examination rooms</strong> below based on the actual benches available in each room. 
+                      The total benches entered must be at least <strong className="text-primary font-bold">{requiredBenches}</strong>.
                     </p>
                   </div>
 
                   {/* Room Configurations Input List */}
                   <div className="space-y-3">
-                    <label className="text-xs font-extrabold uppercase text-text-secondary tracking-wider block">Configure Rooms Available Benches</label>
+                    <label className="text-xs font-bold uppercase text-text-secondary tracking-wider block">Configure Rooms Available Benches</label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {roomConfigs.map((rc, idx) => (
                         <div key={idx} className="flex items-center gap-3 p-3 bg-zinc-50 dark:bg-zinc-900/40 rounded-xl border border-border">
                           <div className="flex-1">
-                            <label className="text-[10px] font-bold text-text-muted">Room Name</label>
+                            <label className="text-[11px] font-bold text-text-muted">Room Name</label>
                             <Input 
                               value={rc.room_name}
                               onChange={(e) => handleRoomConfigChange(idx, 'room_name', e.target.value)}
@@ -669,8 +669,8 @@ export default function SeatingPlanPage() {
                             />
                           </div>
                           <div className="w-28">
-                            <label className="text-[10px] font-bold text-text-muted">Bench Count</label>
-                            <Input 
+                            <label htmlFor="bench-count" className="text-[11px] font-bold text-text-muted">Bench Count</label>
+                            <Input id="bench-count" 
                               type="number"
                               min="1"
                               placeholder="Count"
@@ -686,10 +686,10 @@ export default function SeatingPlanPage() {
 
                   {/* Live Bench Distribution Status Counter */}
                   <div className="flex justify-between items-center bg-zinc-50 dark:bg-zinc-900/60 p-3 rounded-lg border border-border mt-3 text-xs">
-                    <div className="font-extrabold">
-                      Distributed: <span className="text-primary font-black">{totalEnteredBenches} / {requiredBenches}</span>
+                    <div className="font-bold">
+                      Distributed: <span className="text-primary font-bold">{totalEnteredBenches} / {requiredBenches}</span>
                     </div>
-                    <div className="font-extrabold">
+                    <div className="font-bold">
                       {remainingBenches > 0 ? (
                         <span className="text-amber-600">Remaining: {remainingBenches} Benches</span>
                       ) : (
@@ -736,33 +736,33 @@ export default function SeatingPlanPage() {
             <CardContent className="p-6 space-y-6">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="bg-zinc-50 dark:bg-zinc-900 p-3 rounded-lg border text-center">
-                  <p className="text-[10px] font-bold text-text-muted uppercase">Total Students</p>
-                  <p className="text-lg font-black text-text-primary mt-0.5">{previewData.total_students}</p>
+                  <p className="text-[11px] font-bold text-text-muted uppercase">Total Students</p>
+                  <p className="text-lg font-bold text-text-primary mt-0.5">{previewData.total_students}</p>
                 </div>
                 <div className="bg-zinc-50 dark:bg-zinc-900 p-3 rounded-lg border text-center">
-                  <p className="text-[10px] font-bold text-text-muted uppercase">Bench Capacity</p>
-                  <p className="text-lg font-black text-text-primary mt-0.5">{previewData.students_per_bench} / Bench</p>
+                  <p className="text-[11px] font-bold text-text-muted uppercase">Bench Capacity</p>
+                  <p className="text-lg font-bold text-text-primary mt-0.5">{previewData.students_per_bench} / Bench</p>
                 </div>
                 <div className="bg-zinc-50 dark:bg-zinc-900 p-3 rounded-lg border text-center">
-                  <p className="text-[10px] font-bold text-text-muted uppercase">Required Benches</p>
-                  <p className="text-lg font-black text-text-primary mt-0.5">{previewData.required_benches}</p>
+                  <p className="text-[11px] font-bold text-text-muted uppercase">Required Benches</p>
+                  <p className="text-lg font-bold text-text-primary mt-0.5">{previewData.required_benches}</p>
                 </div>
                 <div className="bg-zinc-50 dark:bg-zinc-900 p-3 rounded-lg border text-center">
-                  <p className="text-[10px] font-bold text-text-muted uppercase">Available Benches</p>
-                  <p className="text-lg font-black text-text-primary mt-0.5">{previewData.available_benches}</p>
+                  <p className="text-[11px] font-bold text-text-muted uppercase">Available Benches</p>
+                  <p className="text-lg font-bold text-text-primary mt-0.5">{previewData.available_benches}</p>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <p className="text-xs font-extrabold uppercase text-text-secondary tracking-wider">Room Allocation Details</p>
+                <p className="text-xs font-bold uppercase text-text-secondary tracking-wider">Room Allocation Details</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {previewData.room_details.map((room, rIdx) => (
                     <div key={rIdx} className="bg-surface p-3.5 rounded-lg border text-xs flex justify-between items-center">
                       <div>
-                        <p className="font-extrabold text-text-primary">{room.room_name}</p>
+                        <p className="font-bold text-text-primary">{room.room_name}</p>
                       </div>
                       <div className="text-right">
-                        <p className="font-black text-primary">Allocated Students: {room.allocated}</p>
+                        <p className="font-bold text-primary">Allocated Students: {room.allocated}</p>
                       </div>
                     </div>
                   ))}
@@ -784,7 +784,7 @@ export default function SeatingPlanPage() {
                 <Button 
                   onClick={handleGenerate}
                   disabled={!confirmed || previewLoading}
-                  className="font-black py-3 px-8 shadow-md"
+                  className="font-bold py-3 px-8 shadow-md"
                 >
                   {previewLoading ? 'Generating Plan...' : 'Generate Seating Plan'}
                 </Button>
@@ -817,7 +817,7 @@ export default function SeatingPlanPage() {
                   <Check className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-black text-text-primary font-display font-black">Student Slips Generated</h3>
+                  <h3 className="text-base font-bold text-text-primary font-display font-bold">Student Slips Generated</h3>
                 </div>
               </div>
               <div className="flex gap-2">
@@ -872,7 +872,7 @@ export default function SeatingPlanPage() {
 
           {/* Room Filter Tool */}
           <div className="flex items-center gap-3 bg-zinc-50 dark:bg-zinc-900/60 p-4 rounded-xl border border-border no-print">
-            <label className="text-xs font-black uppercase text-text-primary tracking-wider flex-shrink-0">Room Filter:</label>
+            <label className="text-xs font-bold uppercase text-text-primary tracking-wider flex-shrink-0">Room Filter:</label>
             <Select 
               value={selectedRoomFilter}
               onChange={(e) => setSelectedRoomFilter(e.target.value)}
@@ -939,7 +939,7 @@ export default function SeatingPlanPage() {
                         {/* Top Header Section (Swapped flexbox for block & table alignment) */}
                         <div className="border-b-2 border-zinc-800 pb-1.5 text-center">
                           <h4 
-                            className="text-[12px] font-black uppercase text-zinc-900 truncate tracking-tight animate-none" 
+                            className="text-[12px] font-bold uppercase text-zinc-900 truncate tracking-tight animate-none" 
                             style={{ lineHeight: '18px', marginBottom: '3px', fontFamily: 'Arial, Helvetica, sans-serif' }}
                           >
                             {generatedPlan.school_name}
@@ -948,13 +948,13 @@ export default function SeatingPlanPage() {
                             <tbody>
                               <tr>
                                 <td 
-                                  className="text-[8px] font-black text-zinc-600 uppercase text-left" 
+                                  className="text-[8px] font-bold text-zinc-600 uppercase text-left" 
                                   style={{ lineHeight: '12px', fontFamily: 'Arial, Helvetica, sans-serif', padding: 0 }}
                                 >
                                   {generatedPlan.exam_name}
                                 </td>
                                 <td 
-                                  className="text-[8px] font-black text-zinc-600 uppercase text-right" 
+                                  className="text-[8px] font-bold text-zinc-600 uppercase text-right" 
                                   style={{ lineHeight: '12px', fontFamily: 'Arial, Helvetica, sans-serif', padding: 0 }}
                                 >
                                   AY {currentYear?.name || '—'}
@@ -968,8 +968,8 @@ export default function SeatingPlanPage() {
                         <div className="flex flex-col justify-center py-1 flex-1 min-h-0">
                           {/* Candidate Name block */}
                           <div className="w-full" style={{ marginBottom: '6px' }}>
-                            <p className="text-[7px] font-black text-zinc-400 uppercase tracking-wider" style={{ lineHeight: '10px', fontFamily: 'Arial, Helvetica, sans-serif' }}>Candidate Name</p>
-                            <p className="text-[12px] font-black text-zinc-955 truncate uppercase" style={{ lineHeight: '16px', marginTop: '2px', fontFamily: 'Arial, Helvetica, sans-serif' }}>
+                            <p className="text-[7px] font-bold text-zinc-400 uppercase tracking-wider" style={{ lineHeight: '10px', fontFamily: 'Arial, Helvetica, sans-serif' }}>Candidate Name</p>
+                            <p className="text-[12px] font-bold text-zinc-955 truncate uppercase" style={{ lineHeight: '16px', marginTop: '2px', fontFamily: 'Arial, Helvetica, sans-serif' }}>
                               {alloc.student_name}
                             </p>
                           </div>
@@ -979,14 +979,14 @@ export default function SeatingPlanPage() {
                             <tbody>
                               <tr>
                                 <td style={{ width: '50%', padding: 0, verticalAlign: 'top' }}>
-                                  <p className="text-[7px] font-black text-zinc-400 uppercase tracking-wider" style={{ lineHeight: '10px', fontFamily: 'Arial, Helvetica, sans-serif' }}>Class</p>
-                                  <p className="text-[10px] font-black text-zinc-855 uppercase truncate" style={{ lineHeight: '14px', marginTop: '2px', fontFamily: 'Arial, Helvetica, sans-serif' }}>
+                                  <p className="text-[7px] font-bold text-zinc-400 uppercase tracking-wider" style={{ lineHeight: '10px', fontFamily: 'Arial, Helvetica, sans-serif' }}>Class</p>
+                                  <p className="text-[11px] font-bold text-zinc-855 uppercase truncate" style={{ lineHeight: '14px', marginTop: '2px', fontFamily: 'Arial, Helvetica, sans-serif' }}>
                                     {alloc.class_name}
                                   </p>
                                 </td>
                                 <td style={{ width: '50%', padding: 0, verticalAlign: 'top' }}>
-                                  <p className="text-[7px] font-black text-zinc-400 uppercase tracking-wider" style={{ lineHeight: '10px', fontFamily: 'Arial, Helvetica, sans-serif' }}>Roll Number</p>
-                                  <p className="text-[10px] font-black text-zinc-855 font-mono truncate" style={{ lineHeight: '14px', marginTop: '2px', fontFamily: 'Arial, Helvetica, sans-serif' }}>
+                                  <p className="text-[7px] font-bold text-zinc-400 uppercase tracking-wider" style={{ lineHeight: '10px', fontFamily: 'Arial, Helvetica, sans-serif' }}>Roll Number</p>
+                                  <p className="text-[11px] font-bold text-zinc-855 font-mono truncate" style={{ lineHeight: '14px', marginTop: '2px', fontFamily: 'Arial, Helvetica, sans-serif' }}>
                                     {alloc.roll_no || '—'}
                                   </p>
                                 </td>
@@ -999,20 +999,20 @@ export default function SeatingPlanPage() {
                             <tbody>
                               <tr>
                                 <td style={{ width: '35%', padding: 0, verticalAlign: 'top' }}>
-                                  <p className="text-[6px] font-black text-zinc-400 uppercase tracking-widest" style={{ lineHeight: '10px', fontFamily: 'Arial, Helvetica, sans-serif' }}>Exam Room</p>
-                                  <p className="text-[10px] font-black text-zinc-955 uppercase truncate" style={{ lineHeight: '14px', marginTop: '2px', fontFamily: 'Arial, Helvetica, sans-serif' }}>
+                                  <p className="text-[6px] font-bold text-zinc-400 uppercase tracking-widest" style={{ lineHeight: '10px', fontFamily: 'Arial, Helvetica, sans-serif' }}>Exam Room</p>
+                                  <p className="text-[11px] font-bold text-zinc-955 uppercase truncate" style={{ lineHeight: '14px', marginTop: '2px', fontFamily: 'Arial, Helvetica, sans-serif' }}>
                                     {alloc.room_name}
                                   </p>
                                 </td>
                                 <td style={{ width: '35%', padding: 0, verticalAlign: 'top' }}>
-                                  <p className="text-[6px] font-black text-zinc-400 uppercase tracking-widest" style={{ lineHeight: '10px', fontFamily: 'Arial, Helvetica, sans-serif' }}>Bench</p>
-                                  <p className="text-[10px] font-black text-zinc-955 uppercase truncate" style={{ lineHeight: '14px', marginTop: '2px', fontFamily: 'Arial, Helvetica, sans-serif' }}>
+                                  <p className="text-[6px] font-bold text-zinc-400 uppercase tracking-widest" style={{ lineHeight: '10px', fontFamily: 'Arial, Helvetica, sans-serif' }}>Bench</p>
+                                  <p className="text-[11px] font-bold text-zinc-955 uppercase truncate" style={{ lineHeight: '14px', marginTop: '2px', fontFamily: 'Arial, Helvetica, sans-serif' }}>
                                     Bench {alloc.bench_number}
                                   </p>
                                 </td>
                                 <td style={{ width: '30%', padding: 0, verticalAlign: 'top', textAlign: 'right' }}>
-                                  <p className="text-[6px] font-black text-zinc-400 uppercase tracking-widest" style={{ lineHeight: '10px', fontFamily: 'Arial, Helvetica, sans-serif' }}>Position</p>
-                                  <p className="text-[10px] font-black text-primary uppercase truncate" style={{ lineHeight: '14px', marginTop: '2px', fontFamily: 'Arial, Helvetica, sans-serif' }}>
+                                  <p className="text-[6px] font-bold text-zinc-400 uppercase tracking-widest" style={{ lineHeight: '10px', fontFamily: 'Arial, Helvetica, sans-serif' }}>Position</p>
+                                  <p className="text-[11px] font-bold text-primary uppercase truncate" style={{ lineHeight: '14px', marginTop: '2px', fontFamily: 'Arial, Helvetica, sans-serif' }}>
                                     {getFullPositionName(alloc.seat_position)}
                                   </p>
                                 </td>
@@ -1023,7 +1023,7 @@ export default function SeatingPlanPage() {
 
                         {/* Bottom Section */}
                         <div className="border-t border-zinc-200 pt-1 text-center mt-auto">
-                          <span className="text-[7px] font-black text-zinc-500 uppercase tracking-wider block" style={{ lineHeight: '1.45', fontFamily: 'Arial, Helvetica, sans-serif' }}>
+                          <span className="text-[7px] font-bold text-zinc-500 uppercase tracking-wider block" style={{ lineHeight: '1.45', fontFamily: 'Arial, Helvetica, sans-serif' }}>
                             Official Admit Card
                           </span>
                         </div>
@@ -1055,7 +1055,7 @@ export default function SeatingPlanPage() {
             <Button 
               onClick={handleRegenerateConfirm}
               disabled={regenerateLoading}
-              className="font-black bg-red-600 hover:bg-red-700 text-white"
+              className="font-bold bg-red-600 hover:bg-red-700 text-white"
             >
               {regenerateLoading ? 'Regenerating...' : 'Yes, Regenerate'}
             </Button>
@@ -1097,7 +1097,7 @@ export default function SeatingPlanPage() {
             <Button 
               onClick={confirmPublishAdmitCards}
               disabled={submittingPublishAdmit}
-              className="font-black bg-green-600 hover:bg-green-700 text-white"
+              className="font-bold bg-green-600 hover:bg-green-700 text-white"
             >
               {submittingPublishAdmit ? 'Publishing...' : 'Publish'}
             </Button>
@@ -1130,7 +1130,7 @@ export default function SeatingPlanPage() {
             <Button 
               onClick={confirmUnpublishAdmitCards}
               disabled={submittingUnpublishAdmit}
-              className="font-black bg-rose-600 hover:bg-rose-700 text-white"
+              className="font-bold bg-rose-600 hover:bg-rose-700 text-white"
             >
               {submittingUnpublishAdmit ? 'Reverting...' : 'Confirm Revert'}
             </Button>

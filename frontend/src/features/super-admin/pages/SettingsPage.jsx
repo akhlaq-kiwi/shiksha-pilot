@@ -50,17 +50,17 @@ function AddAdminDialog({ onClose, onAdd }) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-text-secondary uppercase">Full Name</label>
-            <Input placeholder="e.g. John Smith" value={form.name} onChange={set('name')} required />
+            <label htmlFor="full-name" className="text-xs font-bold text-text-secondary uppercase">Full Name</label>
+            <Input id="full-name" placeholder="e.g. John Smith" value={form.name} onChange={set('name')} required />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">Phone</label>
-              <Input placeholder="e.g. 1000000004" value={form.phone} onChange={set('phone')} required />
+              <label htmlFor="phone" className="text-xs font-bold text-text-secondary uppercase">Phone</label>
+              <Input id="phone" placeholder="e.g. 1000000004" value={form.phone} onChange={set('phone')} required />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">Password</label>
-              <Input type="password" placeholder="Min. 6 chars" value={form.password} onChange={set('password')} required minLength={6} />
+              <label htmlFor="password" className="text-xs font-bold text-text-secondary uppercase">Password</label>
+              <Input id="password" type="password" placeholder="Min. 6 chars" value={form.password} onChange={set('password')} required minLength={6} />
             </div>
           </div>
           <div className="flex gap-3 pt-2">
@@ -97,7 +97,7 @@ export default function SettingsPage({ auditLogs }) {
     <div className="space-y-8 animate-in fade-in duration-300">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">System Settings</h2>
+          <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">System Settings</h2>
           <p className="text-text-secondary text-sm mt-1">Manage platform administrators and global security parameters.</p>
         </div>
         <Button className="flex items-center gap-2 justify-center" onClick={() => setShowAdd(true)}>
@@ -111,7 +111,7 @@ export default function SettingsPage({ auditLogs }) {
           <Card className="overflow-hidden">
             <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-bold text-text-primary">Administrator Directory</CardTitle>
-              <span className="text-[10px] font-black text-green-600 flex items-center gap-1 uppercase bg-green-500/10 px-2 py-0.5 rounded-full">
+              <span className="text-[11px] font-bold text-green-600 flex items-center gap-1 uppercase bg-green-500/10 px-2 py-0.5 rounded-full">
                 <span className="h-1.5 w-1.5 rounded-full bg-green-500"></span> Active Session
               </span>
             </CardHeader>
@@ -142,13 +142,13 @@ export default function SettingsPage({ auditLogs }) {
                           </div>
                           <div>
                             <p className="font-bold text-text-primary">{admin.name}</p>
-                            <p className="text-[10px] text-text-muted font-semibold">{admin.phone}</p>
+                            <p className="text-[11px] text-text-muted font-semibold">{admin.phone}</p>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell className="font-semibold text-xs text-text-secondary">{admin.role}</TableCell>
                       <TableCell>
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${admin.status === 'ACTIVE' ? 'bg-green-500/10 text-green-600' : 'bg-amber-500/10 text-amber-600'}`}>
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold uppercase ${admin.status === 'ACTIVE' ? 'bg-green-500/10 text-green-600' : 'bg-amber-500/10 text-amber-600'}`}>
                           {admin.status}
                         </span>
                       </TableCell>
@@ -224,7 +224,7 @@ export default function SettingsPage({ auditLogs }) {
                   </TableCell>
                   <TableCell className="font-mono text-xs text-text-muted">{log.created_at || log.date}</TableCell>
                   <TableCell>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-green-500/10 text-green-600">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-green-500/10 text-green-600">
                       Success
                     </span>
                   </TableCell>

@@ -25,7 +25,7 @@ export default function AttendancePage({ attendance }) {
     <div className="space-y-8 animate-in fade-in duration-300">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">Attendance</h2>
+          <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Attendance</h2>
           <p className="text-text-secondary text-sm mt-1">Daily records, monthly calendar, and attendance reports.</p>
         </div>
         <Select value={attendanceMonth} onChange={e => setAttendanceMonth(e.target.value)} className="w-40">
@@ -45,8 +45,8 @@ export default function AttendancePage({ attendance }) {
         ].map(s => (
           <Card key={s.label} className="shadow-sm">
             <CardContent className="p-4 text-center">
-              <p className="text-[10px] font-black text-text-muted uppercase tracking-wider mb-1">{s.label}</p>
-              <p className={`text-2xl font-black tabular-nums ${s.color}`}>{s.value}</p>
+              <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-1">{s.label}</p>
+              <p className={`text-2xl font-bold tabular-nums ${s.color}`}>{s.value}</p>
             </CardContent>
           </Card>
         ))}
@@ -57,7 +57,7 @@ export default function AttendancePage({ attendance }) {
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-bold text-text-primary">Attendance Rate — {attendanceMonth}</h3>
-            <span className="text-2xl font-black text-text-primary tabular-nums">{attendance.percentage}%</span>
+            <span className="text-2xl font-bold text-text-primary tabular-nums">{attendance.percentage}%</span>
           </div>
           <div className="h-3 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
             <div
@@ -65,9 +65,9 @@ export default function AttendancePage({ attendance }) {
               style={{ width: `${attendance.percentage}%` }}
             />
           </div>
-          <div className="flex justify-between text-[10px] text-text-muted mt-2 font-semibold">
+          <div className="flex justify-between text-[11px] text-text-muted mt-2 font-semibold">
             <span>0%</span>
-            <span className="text-amber-600 font-black">75% Minimum</span>
+            <span className="text-amber-600 font-bold">75% Minimum</span>
             <span>100%</span>
           </div>
         </CardContent>
@@ -80,7 +80,7 @@ export default function AttendancePage({ attendance }) {
           <CardContent className="p-6">
             <div className="grid grid-cols-7 gap-2 mb-3">
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-                <div key={d} className="text-center text-[10px] font-black text-text-muted uppercase">{d}</div>
+                <div key={d} className="text-center text-[11px] font-bold text-text-muted uppercase">{d}</div>
               ))}
             </div>
             <div className="grid grid-cols-7 gap-2">
@@ -90,7 +90,7 @@ export default function AttendancePage({ attendance }) {
                 const isWeekend = [6, 7, 13, 14, 20, 21, 27, 28].includes(day);
                 return (
                   <div key={day} className="flex flex-col items-center gap-1">
-                    <span className={`text-[10px] font-semibold ${isWeekend ? 'text-text-muted' : 'text-text-secondary'}`}>{day}</span>
+                    <span className={`text-[11px] font-semibold ${isWeekend ? 'text-text-muted' : 'text-text-secondary'}`}>{day}</span>
                     {isWeekend ? (
                       <span className="h-6 w-6 rounded-full bg-zinc-100 dark:bg-zinc-800 inline-block" title="Weekend" />
                     ) : (
@@ -143,7 +143,7 @@ export default function AttendancePage({ attendance }) {
                         <div className="w-20 h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
                           <div className={`h-full rounded-full ${rate >= 85 ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: `${rate}%` }} />
                         </div>
-                        <span className={`text-xs font-black tabular-nums ${rate >= 85 ? 'text-emerald-600' : 'text-amber-600'}`}>{rate}%</span>
+                        <span className={`text-xs font-bold tabular-nums ${rate >= 85 ? 'text-emerald-600' : 'text-amber-600'}`}>{rate}%</span>
                       </div>
                     </TableCell>
                   </TableRow>

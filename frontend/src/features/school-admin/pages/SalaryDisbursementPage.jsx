@@ -112,7 +112,7 @@ export default function SalaryDisbursementPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">Salary Disbursement</h2>
+            <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Salary Disbursement</h2>
             <p className="text-xs text-text-secondary font-semibold uppercase mt-0.5 tracking-wider">
               Month: {selectedMonth} 2026 · Academic Year: {currentYear?.name || '—'}
             </p>
@@ -139,8 +139,8 @@ export default function SalaryDisbursementPage() {
         <Card className="bg-surface border border-border rounded-2xl shadow-xs">
           <CardContent className="p-6 flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Total Salary</p>
-              <h3 className="text-2xl font-black text-text-primary mt-1 font-display">
+              <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Total Salary</p>
+              <h3 className="text-2xl font-bold text-text-primary mt-1 font-display">
                 ₹{totalSalary.toLocaleString('en-IN')}
               </h3>
             </div>
@@ -153,8 +153,8 @@ export default function SalaryDisbursementPage() {
         <Card className="bg-surface border border-border rounded-2xl shadow-xs">
           <CardContent className="p-6 flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Salary Disbursed</p>
-              <h3 className="text-2xl font-black text-green-600 mt-1 font-display">
+              <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Salary Disbursed</p>
+              <h3 className="text-2xl font-bold text-green-600 mt-1 font-display">
                 ₹{disbursedSalary.toLocaleString('en-IN')}
               </h3>
             </div>
@@ -167,8 +167,8 @@ export default function SalaryDisbursementPage() {
         <Card className="bg-surface border border-border rounded-2xl shadow-xs">
           <CardContent className="p-6 flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Salary Pending</p>
-              <h3 className="text-2xl font-black text-amber-500 mt-1 font-display">
+              <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Salary Pending</p>
+              <h3 className="text-2xl font-bold text-amber-500 mt-1 font-display">
                 ₹{pendingSalary.toLocaleString('en-IN')}
               </h3>
             </div>
@@ -183,10 +183,10 @@ export default function SalaryDisbursementPage() {
       <Card className="bg-surface border border-border rounded-2xl shadow-xs overflow-hidden">
         {/* Search Header */}
         <div className="p-5 border-b border-border flex flex-col sm:flex-row items-center gap-4 justify-between">
-          <h3 className="text-sm font-extrabold text-text-primary uppercase tracking-wider">Staff Payroll Status</h3>
+          <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider">Staff Payroll Status</h3>
           <div className="relative w-full sm:w-72">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
-            <Input 
+            <Input aria-label="Search teacher name or role..." 
               type="text" 
               placeholder="Search teacher name or role..." 
               value={searchTerm}
@@ -217,7 +217,7 @@ export default function SalaryDisbursementPage() {
                 <div className="flex items-center gap-4">
                   <TeacherAvatar src={teacher.photo_path} name={teacher.name} updatedAt={teacher.updated_at} />
                   <div>
-                    <h4 className="text-sm font-extrabold text-text-primary group-hover:text-primary">{teacher.name}</h4>
+                    <h4 className="text-sm font-bold text-text-primary group-hover:text-primary">{teacher.name}</h4>
                     <p className="text-xs text-text-muted font-bold uppercase mt-0.5">{teacher.designation}</p>
                   </div>
                 </div>
@@ -227,7 +227,7 @@ export default function SalaryDisbursementPage() {
                     <p className="text-xs font-bold text-text-muted uppercase">Salary Amount</p>
                     <div className="flex items-center justify-end gap-1.5 mt-0.5">
                       {teacher.proration_details && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold uppercase bg-amber-500/10 text-amber-600 border border-amber-500/20">
                           Prorated
                         </span>
                       )}
@@ -243,7 +243,7 @@ export default function SalaryDisbursementPage() {
                   </div>
 
                   <div className="w-24 flex justify-end">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase border ${
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase border ${
                       teacher.status === 'Paid'
                         ? 'bg-green-500/10 text-green-600 border-green-500/20'
                         : 'bg-amber-500/10 text-amber-600 border-amber-500/20'

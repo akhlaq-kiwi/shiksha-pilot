@@ -72,11 +72,12 @@ export default function LoginForm({ onLoginSuccess }) {
 
           <form onSubmit={handlePasswordLogin} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">Mobile Phone Number</label>
+              <label htmlFor="mobile-phone-number" className="text-xs font-bold text-text-secondary uppercase">Mobile Phone Number</label>
               <div className="relative">
                 <Phone className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />
-                <Input 
-                  placeholder="e.g. 9876543210" 
+                <Input id="mobile-phone-number"
+                  data-testid="login-phone-input"
+                  placeholder="e.g. 9876543210"
                   className={`pl-9 ${errors?.phone ? 'border-red-500 ring-1 ring-red-500' : ''}`}
                   value={phone}
                   onChange={e => {
@@ -87,16 +88,17 @@ export default function LoginForm({ onLoginSuccess }) {
                 />
               </div>
               {errors?.phone && errors.phone.trim() !== '' && (
-                <p className="text-[10px] font-bold text-red-500 mt-0.5">{errors.phone}</p>
+                <p data-testid="login-phone-error" className="text-[11px] font-bold text-red-500 mt-0.5">{errors.phone}</p>
               )}
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">Password</label>
+              <label htmlFor="password" className="text-xs font-bold text-text-secondary uppercase">Password</label>
               <div className="relative">
                 <Key className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />
-                <Input 
+                <Input id="password"
+                  data-testid="login-password-input"
                   type={showPassword ? 'text' : 'password'}
-                  placeholder="••••••••" 
+                  placeholder="••••••••"
                   className={`pl-9 pr-10 ${errors?.password ? 'border-red-500 ring-1 ring-red-500' : ''}`}
                   value={password}
                   onChange={e => {
@@ -115,10 +117,10 @@ export default function LoginForm({ onLoginSuccess }) {
                 </button>
               </div>
               {errors?.password && (
-                <p className="text-[10px] font-bold text-red-500 mt-0.5">{errors.password}</p>
+                <p data-testid="login-password-error" className="text-[11px] font-bold text-red-500 mt-0.5">{errors.password}</p>
               )}
             </div>
-            <Button type="submit" className="w-full flex justify-center items-center gap-2 py-2.5" disabled={loading}>
+            <Button type="submit" data-testid="login-submit-button" className="w-full flex justify-center items-center gap-2 py-2.5" disabled={loading}>
               {loading ? <RefreshCw className="h-4 w-4 animate-spin" /> : 'Login'}
             </Button>
           </form>

@@ -321,13 +321,13 @@ export default function AttendancePage() {
       {/* Title section */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">Attendance</h2>
+          <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Attendance</h2>
           <p className="text-text-secondary text-sm mt-1">Mark student daily attendance and review reports.</p>
         </div>
         {isReadOnly && (
           <Button
             onClick={() => navigate('/school-admin/attendance/leaderboard')}
-            className="h-10 px-5 font-black text-xs bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white rounded-xl shadow-lg shadow-amber-500/25 border-0 hover:scale-[1.03] active:scale-[0.98] transition-all flex items-center gap-2 tracking-wide uppercase"
+            className="h-10 px-5 font-bold text-xs bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white rounded-xl shadow-lg shadow-amber-500/25 border-0 hover:scale-[1.03] active:scale-[0.98] transition-all flex items-center gap-2 tracking-wide uppercase"
           >
             🏆 Attendance Leaderboard
           </Button>
@@ -436,7 +436,7 @@ export default function AttendancePage() {
           <Card className="border-dashed border-2 py-16 text-center text-text-muted max-w-lg mx-auto mt-6">
             <CardContent className="flex flex-col items-center justify-center gap-3">
               <Calendar className="h-10 w-10 text-text-muted mb-2 animate-bounce" />
-              <h3 className="text-lg font-black text-text-primary">No Attendance Required</h3>
+              <h3 className="text-lg font-bold text-text-primary">No Attendance Required</h3>
               <p className="text-sm text-text-secondary max-w-sm">
                 Attendance is not required for the selected date because it is a scheduled holiday or weekend.
               </p>
@@ -455,7 +455,7 @@ export default function AttendancePage() {
             {isCompletedMode && !isEditing ? (
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-zinc-50 border border-border dark:bg-zinc-900/60 rounded-xl">
                 <div className="flex items-center gap-3">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-500/20">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-500/20">
                     <CheckCircle2 className="h-3.5 w-3.5" /> Attendance Completed
                   </span>
                   {!isReadOnly && (
@@ -465,7 +465,7 @@ export default function AttendancePage() {
                   )}
                 </div>
                 <div className="flex items-center gap-4 flex-wrap text-sm">
-                  <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black border ${
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border ${
                     dailyAttendanceRate >= 75
                       ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-500/20'
                       : dailyAttendanceRate >= 50
@@ -495,7 +495,7 @@ export default function AttendancePage() {
             ) : (
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-zinc-50 border border-border dark:bg-zinc-900/60 rounded-xl">
                 <div>
-                  <span className="text-sm font-bold text-text-primary">Total Students: <strong className="text-base font-black">{sortedStudents.length}</strong></span>
+                  <span className="text-sm font-bold text-text-primary">Total Students: <strong className="text-base font-bold">{sortedStudents.length}</strong></span>
                 </div>
               </div>
             )}
@@ -524,10 +524,10 @@ export default function AttendancePage() {
                       <CardContent className="p-4 flex flex-col justify-between h-full gap-3">
                         <div>
                           <h4 className="font-bold text-text-primary text-sm tracking-tight">{s.name}</h4>
-                          <p className="text-[10px] font-bold text-text-secondary uppercase mt-0.5">Roll No: {s.roll_no || 'N/A'}</p>
+                          <p className="text-[11px] font-bold text-text-secondary uppercase mt-0.5">Roll No: {s.roll_no || 'N/A'}</p>
                         </div>
                         <div className="flex justify-end">
-                          <span className={`px-2.5 py-1 rounded-full text-xs font-black uppercase tracking-wider ${badgeStyle}`}>
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${badgeStyle}`}>
                             {status}
                           </span>
                         </div>
@@ -545,7 +545,7 @@ export default function AttendancePage() {
                       <CardContent className="p-4 flex flex-col justify-between h-full gap-4">
                         <div>
                           <h4 className="font-bold text-text-primary text-sm tracking-tight">{s.name}</h4>
-                          <p className="text-[10px] font-bold text-text-secondary uppercase mt-0.5">Roll No: {s.roll_no || 'N/A'}</p>
+                          <p className="text-[11px] font-bold text-text-secondary uppercase mt-0.5">Roll No: {s.roll_no || 'N/A'}</p>
                         </div>
                         
                         <div className="grid grid-cols-3 gap-1">
@@ -619,7 +619,7 @@ export default function AttendancePage() {
             <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-bold text-text-primary">Attendance Summary</CardTitle>
               {totalReportRecords > 0 && (
-                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black border ${
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border ${
                   monthlyAttendanceRate >= 75
                     ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-500/20'
                     : monthlyAttendanceRate >= 50
@@ -659,7 +659,7 @@ export default function AttendancePage() {
                     <TableCell className="text-center font-semibold text-red-500 font-mono text-xs">{row.absent}</TableCell>
                     <TableCell className="text-center font-semibold text-amber-500 font-mono text-xs">{row.leave}</TableCell>
                     <TableCell className="text-right">
-                      <span className={`font-black text-xs ${
+                      <span className={`font-bold text-xs ${
                         row.percentage >= 75
                           ? 'text-emerald-600 dark:text-emerald-400'
                           : row.percentage >= 50

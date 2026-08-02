@@ -53,16 +53,16 @@ export default function ForcePasswordChange({ onDismiss }) {
           <KeyRound className="h-6 w-6 text-primary" />
         </div>
 
-        <h3 className="text-lg font-black text-text-primary">Set Your Password</h3>
+        <h3 className="text-lg font-bold text-text-primary">Set Your Password</h3>
         <p className="text-sm text-text-secondary mt-1 mb-5">
           Your account was created with a temporary password. Set a new one to secure your account.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-text-secondary uppercase">New Password</label>
+            <label htmlFor="new-password" className="text-xs font-bold text-text-secondary uppercase">New Password</label>
             <div className="relative">
-              <Input
+              <Input id="new-password"
                 type={showPw ? 'text' : 'password'}
                 placeholder="Min. 6 characters"
                 value={password}
@@ -77,8 +77,8 @@ export default function ForcePasswordChange({ onDismiss }) {
             </div>
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-text-secondary uppercase">Confirm Password</label>
-            <Input
+            <label htmlFor="confirm-password" className="text-xs font-bold text-text-secondary uppercase">Confirm Password</label>
+            <Input id="confirm-password"
               type="password"
               placeholder="Repeat password"
               value={confirm}

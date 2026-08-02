@@ -38,7 +38,7 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
             </div>
           )}
         </div>
-        <h1 className="text-2xl font-black uppercase tracking-tight font-display text-zinc-900 leading-tight">
+        <h1 className="text-2xl font-bold uppercase tracking-tight font-display text-zinc-900 leading-tight">
           {school.name}
         </h1>
         <p className="text-xs font-sans text-zinc-600 mt-0.5">
@@ -82,7 +82,7 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
         {exam.is_final_session_report ? (
           <table className="w-full text-xs border border-zinc-800 border-collapse">
             <thead>
-              <tr className="bg-zinc-800 text-white font-bold uppercase text-[9px]">
+              <tr className="bg-zinc-800 text-white font-bold uppercase text-[11px]">
                 <th rowSpan={2} className="p-2 text-left border-r border-zinc-700">Subject</th>
                 {(data.session_exams || ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam']).map(exName => (
                   <th key={exName} colSpan={2} className="p-1 text-center border-r border-zinc-700">{exName}</th>
@@ -112,8 +112,8 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
                     </React.Fragment>
                   ))}
                   <td className="p-1.5 text-center border-r border-zinc-300 font-mono font-bold text-zinc-700 text-[11px]">{s.grand_total_max || s.max_marks}</td>
-                  <td className="p-1.5 text-center border-r border-zinc-300 font-mono font-black text-zinc-900 text-[11px]">{s.grand_total_obtained || s.marks_obtained}</td>
-                  <td className="p-1.5 text-center font-black text-xs">{s.grade}</td>
+                  <td className="p-1.5 text-center border-r border-zinc-300 font-mono font-bold text-zinc-900 text-[11px]">{s.grand_total_obtained || s.marks_obtained}</td>
+                  <td className="p-1.5 text-center font-bold text-xs">{s.grade}</td>
                 </tr>
               ))}
             </tbody>
@@ -123,19 +123,19 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
                 {(data.session_exams || ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam']).map(exName => (
                   <React.Fragment key={exName}>
                     <td className="p-2 text-center border-r border-zinc-300 font-mono">{data.exam_totals?.[exName]?.max_marks || 700}</td>
-                    <td className="p-2 text-center border-r border-zinc-300 font-mono font-black">{data.exam_totals?.[exName]?.marks_obtained || 500}</td>
+                    <td className="p-2 text-center border-r border-zinc-300 font-mono font-bold">{data.exam_totals?.[exName]?.marks_obtained || 500}</td>
                   </React.Fragment>
                 ))}
                 <td className="p-2 text-center border-r border-zinc-300 font-mono font-bold">{summary.total_max}</td>
-                <td className="p-2 text-center border-r border-zinc-300 font-mono font-black text-sm">{summary.total_obtained}</td>
-                <td className="p-2 text-center font-black text-sm">{summary.grade}</td>
+                <td className="p-2 text-center border-r border-zinc-300 font-mono font-bold text-sm">{summary.total_obtained}</td>
+                <td className="p-2 text-center font-bold text-sm">{summary.grade}</td>
               </tr>
             </tfoot>
           </table>
         ) : (
           <table className="w-full text-xs border border-zinc-800 border-collapse">
             <thead>
-              <tr className="bg-zinc-800 text-white font-bold uppercase text-[10px]">
+              <tr className="bg-zinc-800 text-white font-bold uppercase text-[11px]">
                 <th className="p-2 text-left border-r border-zinc-700">Subject</th>
                 <th className="p-2 text-center border-r border-zinc-700 w-24">Max Marks</th>
                 <th className="p-2 text-center border-r border-zinc-700 w-24">Pass Marks</th>
@@ -152,7 +152,7 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
                   <td className="p-2 text-center border-r border-zinc-300 font-mono text-zinc-600">{s.passing_marks}</td>
                   <td className="p-2 text-center border-r border-zinc-300 font-mono font-bold text-zinc-900">{s.marks_obtained}</td>
                   <td className="p-2 text-center border-r border-zinc-300 font-bold">{s.grade}</td>
-                  <td className="p-2 text-center font-bold text-[10px] uppercase">{s.result}</td>
+                  <td className="p-2 text-center font-bold text-[11px] uppercase">{s.result}</td>
                 </tr>
               ))}
             </tbody>
@@ -161,9 +161,9 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
                 <td className="p-2.5 border-r border-zinc-300">Grand Total</td>
                 <td className="p-2.5 text-center border-r border-zinc-300 font-mono">{summary.total_max}</td>
                 <td className="p-2.5 text-center border-r border-zinc-300">—</td>
-                <td className="p-2.5 text-center border-r border-zinc-300 font-mono font-black text-sm">{summary.total_obtained}</td>
-                <td className="p-2.5 text-center border-r border-zinc-300 font-black text-sm">{summary.grade}</td>
-                <td className="p-2.5 text-center font-black text-xs">{summary.result}</td>
+                <td className="p-2.5 text-center border-r border-zinc-300 font-mono font-bold text-sm">{summary.total_obtained}</td>
+                <td className="p-2.5 text-center border-r border-zinc-300 font-bold text-sm">{summary.grade}</td>
+                <td className="p-2.5 text-center font-bold text-xs">{summary.result}</td>
               </tr>
             </tfoot>
           </table>
@@ -187,28 +187,28 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
         {/* Performance Summary Cards (5 columns) */}
         <div className="grid grid-cols-5 gap-2 font-sans">
           <div className="bg-emerald-50 border border-emerald-200 p-2 rounded text-center flex flex-col justify-center">
-            <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-800 block">Total Marks</span>
-            <span className="text-xs font-black text-emerald-950 font-mono mt-0.5">{summary.total_obtained} / {summary.total_max}</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 block">Total Marks</span>
+            <span className="text-xs font-bold text-emerald-950 font-mono mt-0.5">{summary.total_obtained} / {summary.total_max}</span>
           </div>
 
           <div className="bg-amber-50 border border-amber-200 p-2 rounded text-center flex flex-col justify-center">
-            <span className="text-[9px] font-bold uppercase tracking-wider text-amber-800 block">Percentage</span>
-            <span className="text-xs font-black text-amber-950 font-mono mt-0.5">{summary.percentage}%</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 block">Percentage</span>
+            <span className="text-xs font-bold text-amber-950 font-mono mt-0.5">{summary.percentage}%</span>
           </div>
 
           <div className="bg-emerald-50 border border-emerald-200 p-2 rounded text-center flex flex-col justify-center">
-            <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-800 block">Overall Grade</span>
-            <span className="text-xs font-black text-emerald-950 font-mono mt-0.5">Grade {summary.grade}</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 block">Overall Grade</span>
+            <span className="text-xs font-bold text-emerald-950 font-mono mt-0.5">Grade {summary.grade}</span>
           </div>
 
           <div className="bg-amber-50 border border-amber-200 p-2 rounded text-center flex flex-col justify-center">
-            <span className="text-[9px] font-bold uppercase tracking-wider text-amber-800 block">Attendance</span>
-            <span className="text-xs font-black text-amber-950 font-mono mt-0.5">{summary.attendance?.attendance_rate ?? 90.3}%</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 block">Attendance</span>
+            <span className="text-xs font-bold text-amber-950 font-mono mt-0.5">{summary.attendance?.attendance_rate ?? 90.3}%</span>
           </div>
 
           <div className="bg-emerald-50 border border-emerald-200 p-2 rounded text-center flex flex-col justify-center">
-            <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-800 block">Class Rank</span>
-            <span className="text-xs font-black text-emerald-950 font-mono mt-0.5">{summary.class_rank}</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 block">Class Rank</span>
+            <span className="text-xs font-bold text-emerald-950 font-mono mt-0.5">{summary.class_rank}</span>
           </div>
         </div>
 
@@ -220,12 +220,12 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
           <div className="flex flex-col items-center">
             <div style={{ height: STAMP_SPACE }} aria-hidden="true" />
             <div className="w-40 border-b border-zinc-800 mb-2" />
-            <span className="uppercase text-[10px] font-black tracking-wider text-zinc-800">Class Teacher Signature</span>
+            <span className="uppercase text-[11px] font-bold tracking-wider text-zinc-800">Class Teacher Signature</span>
           </div>
           <div className="flex flex-col items-center">
             <div style={{ height: STAMP_SPACE }} aria-hidden="true" />
             <div className="w-40 border-b border-zinc-800 mb-2" />
-            <span className="uppercase text-[10px] font-black tracking-wider text-zinc-800">Principal Signature & Stamp</span>
+            <span className="uppercase text-[11px] font-bold tracking-wider text-zinc-800">Principal Signature & Stamp</span>
           </div>
         </div>
       </div>

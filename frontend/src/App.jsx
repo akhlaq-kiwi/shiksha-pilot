@@ -97,7 +97,7 @@ export default function App() {
               <WifiOff className="h-8 w-8" />
             </div>
             <div className="space-y-2">
-              <h3 className="font-extrabold text-text-primary text-xl tracking-tight font-display">
+              <h3 className="font-bold text-text-primary text-xl tracking-tight font-display">
                 No Internet Connection
               </h3>
               <p className="text-sm text-text-secondary leading-relaxed">

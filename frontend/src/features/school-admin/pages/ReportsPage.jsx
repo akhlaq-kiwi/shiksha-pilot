@@ -59,7 +59,7 @@ export default function ReportsPage() {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       <div>
-        <h2 className="text-3xl font-black text-text-primary tracking-tight font-display">Reports</h2>
+        <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Reports</h2>
         <p className="text-text-secondary text-sm mt-1">Student, attendance, examination, financial, and staff reports.</p>
       </div>
 
@@ -101,8 +101,8 @@ export default function ReportsPage() {
             { k: 'Fee Collection Rate', v: feeCollectionRate ?? '—' },
           ].map(item => (
             <div key={item.k}>
-              <p className="text-[10px] font-black uppercase tracking-wider text-text-muted">{item.k}</p>
-              <p className="text-2xl font-black text-text-primary mt-1 font-display">{item.v}</p>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-text-muted">{item.k}</p>
+              <p className="text-2xl font-bold text-text-primary mt-1 font-display">{item.v}</p>
             </div>
           ))}
         </CardContent>
@@ -122,25 +122,25 @@ function VocabularyAnalyticsReport({ analytics }) {
     <div className="space-y-6">
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-[#FAF9F6] dark:bg-zinc-900 border border-border p-5 rounded-xl shadow-2xs">
-          <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Total Vocabulary Words Played</p>
-          <p className="text-3xl font-black text-text-primary mt-1.5 tabular-nums">{total_words_played.toLocaleString()}</p>
+        <div className="bg-background dark:bg-zinc-900 border border-border p-5 rounded-xl shadow-2xs">
+          <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Total Vocabulary Words Played</p>
+          <p className="text-3xl font-bold text-text-primary mt-1.5 tabular-nums">{total_words_played.toLocaleString()}</p>
         </div>
-        <div className="bg-[#FAF9F6] dark:bg-zinc-900 border border-border p-5 rounded-xl shadow-2xs">
-          <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Daily Active Players (DAU)</p>
-          <p className="text-3xl font-black text-emerald-600 mt-1.5 tabular-nums">{dau}</p>
+        <div className="bg-background dark:bg-zinc-900 border border-border p-5 rounded-xl shadow-2xs">
+          <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Daily Active Players (DAU)</p>
+          <p className="text-3xl font-bold text-emerald-600 mt-1.5 tabular-nums">{dau}</p>
         </div>
-        <div className="bg-[#FAF9F6] dark:bg-zinc-900 border border-border p-5 rounded-xl shadow-2xs">
-          <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Monthly Active Players (MAU)</p>
-          <p className="text-3xl font-black text-blue-600 mt-1.5 tabular-nums">{mau}</p>
+        <div className="bg-background dark:bg-zinc-900 border border-border p-5 rounded-xl shadow-2xs">
+          <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Monthly Active Players (MAU)</p>
+          <p className="text-3xl font-bold text-blue-600 mt-1.5 tabular-nums">{mau}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Grade performance */}
         <Card className="border border-border bg-white rounded-2xl shadow-2xs">
-          <CardHeader className="py-3.5 border-b border-border bg-[#FAF9F6] dark:bg-zinc-900/50">
-            <CardTitle className="text-xs font-black text-text-primary uppercase tracking-wider">Accuracy by Grade Level</CardTitle>
+          <CardHeader className="py-3.5 border-b border-border bg-background dark:bg-zinc-900/50">
+            <CardTitle className="text-xs font-bold text-text-primary uppercase tracking-wider">Accuracy by Grade Level</CardTitle>
           </CardHeader>
           <CardContent className="p-4 space-y-3.5">
             {grade_performance.map((gp, idx) => {
@@ -150,7 +150,7 @@ function VocabularyAnalyticsReport({ analytics }) {
                 <div key={idx} className="space-y-1 text-xs">
                   <div className="flex justify-between font-semibold">
                     <span className="text-text-primary">{gp.academic_level}</span>
-                    <span className="text-text-secondary font-black">{rate}%</span>
+                    <span className="text-text-secondary font-bold">{rate}%</span>
                   </div>
                   <div className="h-2 bg-zinc-100 rounded-full overflow-hidden">
                     <div className="h-full bg-primary rounded-full" style={{ width: `${rate}%` }} />
@@ -166,8 +166,8 @@ function VocabularyAnalyticsReport({ analytics }) {
 
         {/* Category performance */}
         <Card className="border border-border bg-white rounded-2xl shadow-2xs">
-          <CardHeader className="py-3.5 border-b border-border bg-[#FAF9F6] dark:bg-zinc-900/50">
-            <CardTitle className="text-xs font-black text-text-primary uppercase tracking-wider">Accuracy by Word Category</CardTitle>
+          <CardHeader className="py-3.5 border-b border-border bg-background dark:bg-zinc-900/50">
+            <CardTitle className="text-xs font-bold text-text-primary uppercase tracking-wider">Accuracy by Word Category</CardTitle>
           </CardHeader>
           <CardContent className="p-4 space-y-3.5">
             {category_performance.map((cp, idx) => {
@@ -177,7 +177,7 @@ function VocabularyAnalyticsReport({ analytics }) {
                 <div key={idx} className="space-y-1 text-xs">
                   <div className="flex justify-between font-semibold">
                     <span className="text-text-primary">{cp.category}</span>
-                    <span className="text-text-secondary font-black">{rate}%</span>
+                    <span className="text-text-secondary font-bold">{rate}%</span>
                   </div>
                   <div className="h-2 bg-zinc-100 rounded-full overflow-hidden">
                     <div className="h-full bg-[#3B82F6] rounded-full" style={{ width: `${rate}%` }} />

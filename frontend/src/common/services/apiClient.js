@@ -49,6 +49,7 @@ async function request(endpoint, options = {}) {
 
   if (!response.ok) {
     const err = new Error(data.message || data.error || 'API Request failed');
+    err.status = response.status;
     err.data = data.data;
     throw err;
   }

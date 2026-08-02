@@ -7,6 +7,8 @@ import {
 import { Select } from '../../common/ui/select';
 import { Button } from '../../common/ui/button';
 import { authService } from '../../common/services/authService';
+import AppSidebar from '../../common/components/AppSidebar';
+import MobileTabBar from '../../common/components/MobileTabBar';
 
 import DashboardPage from './pages/DashboardPage';
 import AcademicsPage from './pages/AcademicsPage';
@@ -151,91 +153,88 @@ const MOCK_DATA = {
 
 // ─── Sidebar ────────────────────────────────────────────────────────────────────
 
-function AppSidebar({ currentPage, onNavigate, isParent, user, selectedChild, onSelectChild, feeStatus, onPayNow }) {
-  const displayName = isParent ? (user?.name || 'PARENT') : (user?.name || 'STUDENT');
-
-  const navItems = [
-    { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { id: 'academics', icon: BookOpen, label: 'Academics' },
-    { id: 'assignments', icon: ClipboardList, label: 'Assignments' },
+/**
+ * Student/Parent navigation.
+ *
+ * Built on the shared AppSidebar so this portal matches the others, with two
+ * portal-specific slots:
+ *  - header: identity card + child switcher. The child switcher was previously
+ *    buried mid-sidebar; it now sits at the top and also appears in the mobile
+ *    drawer, because showing a parent the wrong child's data destroys trust.
+ *  - footer: the outstanding-fee widget.
+ *
+ * NAV_ITEMS is exported so the mobile bottom tab bar shows the same
+ * destinations in the same order.
+ */
+export function getStudentNavItems(isParent) {
+  return [
+    { id: 'dashboard', icon: LayoutDashboard, label: 'Home' },
     { id: 'attendance', icon: CalendarCheck, label: 'Attendance' },
-    { id: 'leaves', icon: FileText, label: 'Leaves' },
     { id: 'fees', icon: CreditCard, label: 'Fees' },
+    { id: 'academics', icon: BookOpen, label: 'Results' },
+    { id: 'assignments', icon: ClipboardList, label: 'Assignments' },
+    { id: 'leaves', icon: FileText, label: 'Leave' },
     { id: 'resources', icon: Library, label: 'Resources' },
     { id: 'achievements', icon: Trophy, label: 'Achievements' },
-    ...(isParent ? [{ id: 'parent', icon: Users, label: 'My Children' }] : []),
+    ...(isParent ? [{ id: 'parent', icon: Users, label: 'My children' }] : []),
   ];
+}
 
+function StudentIdentityHeader({ isParent, user, selectedChild, onSelectChild }) {
+  const displayName = isParent ? (user?.name || 'Parent') : (user?.name || 'Student');
   return (
-    <aside className="w-full md:w-[240px] flex-shrink-0 flex flex-col justify-between border-r border-border pl-6 pr-4 py-6 bg-surface md:sticky md:top-14 md:h-[calc(100vh-56px)] md:overflow-y-auto scrollbar-none">
-      <div>
-        {/* Identity card */}
-        <div className="mb-5 p-4 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-border">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
-              {isParent ? 'P' : (user?.name?.charAt(0) || 'S')}
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-bold text-text-primary truncate">{displayName}</p>
-              <p className="text-[10px] text-text-muted font-semibold">{isParent ? 'Parent Account' : 'Grade 9-A · Roll 14'}</p>
-            </div>
-          </div>
-
-          {isParent && (
-            <div className="mt-3 pt-3 border-t border-border">
-              <p className="text-[10px] font-black text-text-muted uppercase tracking-wider mb-2">Viewing child</p>
-              <Select
-                value={selectedChild.id}
-                onChange={e => onSelectChild(MOCK_CHILDREN.find(c => c.id === e.target.value))}
-                className="text-xs"
-              >
-                {MOCK_CHILDREN.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </Select>
-              <p className="text-[10px] text-text-muted mt-1.5 font-semibold">{selectedChild.grade} · Roll {selectedChild.rollNo.split('-')[2]}</p>
-            </div>
-          )}
+    <div className="mb-5 flex-shrink-0 rounded-xl border border-border bg-surface p-4">
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary text-primary-fg font-semibold">
+          {isParent ? 'P' : (user?.name?.charAt(0) || 'S')}
         </div>
-
-        <p className="text-[10px] font-black text-text-muted uppercase tracking-wider mb-4 px-3">Portal</p>
-        <nav className="flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 scrollbar-none">
-          {navItems.map(({ id, icon: Icon, label }) => (
-            <button
-              key={id}
-              onClick={() => onNavigate(id)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all flex-shrink-0 focus-visible:outline-none ${
-                currentPage === id
-                  ? 'bg-primary text-surface dark:bg-primary dark:text-background font-extrabold shadow-xs'
-                  : 'text-text-secondary hover:bg-secondary/70 hover:text-text-primary'
-              }`}
-            >
-              <Icon className="h-3.5 w-3.5 flex-shrink-0" />
-              <span>{label}</span>
-            </button>
-          ))}
-        </nav>
+        <div className="min-w-0">
+          <p className="truncate text-body-md font-semibold text-text-primary">{displayName}</p>
+          <p className="text-body-sm text-text-muted">
+            {isParent ? 'Parent account' : selectedChild?.grade || 'Student'}
+          </p>
+        </div>
       </div>
 
-      {/* Fee alert widget */}
-      <div className="hidden md:block">
-        {feeStatus.outstanding > 0 && (
-          <div className="bg-amber-500/8 border border-amber-500/20 rounded-xl p-4">
-            <p className="text-xs font-black text-amber-700 dark:text-amber-400 mb-1">Fee Due</p>
-            <p className="text-lg font-black text-text-primary tabular-nums">
-              ₹{feeStatus.outstanding.toLocaleString()}
-            </p>
-            <p className="text-[10px] text-text-muted mt-0.5">Due {feeStatus.dueDate}</p>
-            <Button
-              onClick={onPayNow}
-              className="mt-3 w-full text-xs py-1.5 justify-center bg-amber-600 hover:bg-amber-700 border-none text-white"
-            >
-              Pay Now
-            </Button>
-          </div>
-        )}
-      </div>
-    </aside>
+      {isParent && (
+        <div className="mt-3 border-t border-border pt-3">
+          <label
+            htmlFor="child-switcher"
+            className="mb-1.5 block text-overline text-text-muted"
+          >
+            Viewing child
+          </label>
+          <Select
+            id="child-switcher"
+            value={selectedChild.id}
+            onChange={e => onSelectChild(MOCK_CHILDREN.find(c => c.id === e.target.value))}
+          >
+            {MOCK_CHILDREN.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </Select>
+          <p className="mt-1.5 text-body-sm text-text-muted">
+            {selectedChild.grade} · Roll {selectedChild.rollNo.split('-')[2]}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FeeDueWidget({ feeStatus, onPayNow, currency }) {
+  if (!feeStatus?.outstanding) return null;
+  return (
+    <div className="rounded-xl border border-warning-200 bg-warning-50 p-4">
+      <p className="mb-1 text-body-sm font-semibold text-warning-700">Fee due</p>
+      <p className="text-display-sm text-text-primary tabular-nums">
+        {currency ? currency(feeStatus.outstanding) : `₹${feeStatus.outstanding.toLocaleString()}`}
+      </p>
+      <p className="mt-0.5 text-body-sm text-text-muted">Due {feeStatus.dueDate}</p>
+      <Button onClick={onPayNow} size="touch" className="mt-3 w-full justify-center">
+        Pay now
+      </Button>
+    </div>
   );
 }
 
@@ -281,17 +280,24 @@ export default function StudentParentPortal() {
 
   const handlePayNow = () => handleNavigate('fees');
 
+  const navItems = getStudentNavItems(isParent);
+
   return (
     <div className="flex flex-col md:flex-row w-full min-h-[calc(100vh-56px)] bg-background">
       <AppSidebar
+        items={navItems}
         currentPage={currentPage}
         onNavigate={handleNavigate}
-        isParent={isParent}
-        user={user}
-        selectedChild={selectedChild}
-        onSelectChild={setSelectedChild}
-        feeStatus={data.feeStatus}
-        onPayNow={handlePayNow}
+        title={isParent ? 'Parent menu' : 'Student menu'}
+        header={
+          <StudentIdentityHeader
+            isParent={isParent}
+            user={user}
+            selectedChild={selectedChild}
+            onSelectChild={setSelectedChild}
+          />
+        }
+        footer={<FeeDueWidget feeStatus={data.feeStatus} onPayNow={handlePayNow} />}
       />
 
       <div className="flex-1 min-w-0 p-6 md:p-8 max-w-7xl mx-auto w-full">
@@ -345,6 +351,18 @@ export default function StudentParentPortal() {
             data={data}
           />
         )}
+
+        {/*
+          Bottom tab bar for phones. These users are mobile-first and infrequent;
+          a thumb-reachable bar beats a horizontally scrolling strip with no
+          scroll affordance.
+        */}
+        <MobileTabBar
+          items={navItems}
+          currentPage={currentPage}
+          onNavigate={handleNavigate}
+          primaryCount={4}
+        />
       </div>
     </div>
   );

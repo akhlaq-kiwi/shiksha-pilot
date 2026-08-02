@@ -62,7 +62,9 @@ export function DropdownMenu({ trigger, children, align = 'right' }) {
       <button
         type="button"
         onClick={toggle}
-        className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-text-muted hover:text-text-primary transition-colors focus:outline-none flex items-center justify-center"
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        className="flex items-center justify-center rounded-lg p-1.5 text-text-muted transition-colors hover:bg-secondary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
       >
         {trigger || <MoreVertical className="h-4 w-4" />}
       </button>
@@ -78,7 +80,7 @@ export function DropdownMenu({ trigger, children, align = 'right' }) {
           }}
           className={twMerge(
             clsx(
-              "bg-surface border border-border rounded-xl shadow-lg py-1 z-[9999] animate-in fade-in slide-in-from-top-1 duration-150 min-w-[120px] text-xs"
+              "bg-surface-overlay border border-border rounded-xl shadow-lg py-1 z-[9999] animate-slide-in-top min-w-[140px] text-body-sm"
             )
           )}
         >
@@ -111,9 +113,9 @@ export function DropdownItem({ children, className, onClick, destructive = false
       onClick={onClick}
       className={twMerge(
         clsx(
-          "block w-full text-left px-4 py-2 font-semibold transition-all text-xs whitespace-nowrap rounded-md",
+          "block w-full text-left px-4 py-2 font-medium transition-colors text-body-md whitespace-nowrap rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/50",
           destructive 
-            ? "text-red-600 hover:bg-red-500/10" 
+            ? "text-danger-700 hover:bg-danger-50" 
             : "text-text-primary hover:bg-secondary/80",
           className
         )
