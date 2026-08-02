@@ -1,10 +1,12 @@
 <?php
 /**
- * PDO connection + website_leads storage. The table is created lazily
- * (CREATE TABLE IF NOT EXISTS) on first connection rather than via a
- * separate migration step — this site has no migration runner of its own,
- * and the cost of one idempotent DDL check per request is negligible for
- * a low-traffic contact form.
+ * PDO connection + website_leads storage. The table itself is created by
+ * backend/src/Database/Migrations/005_create_website_leads.sql, run via
+ * the backend's own migration runner (php api/src/Database/migrate.php,
+ * invoked automatically by deploy-production.yml/deploy-qa.yml) — NOT by
+ * this file. Keeping schema creation there means the website's DB user
+ * only ever needs INSERT/SELECT/DELETE, never CREATE TABLE, and schema
+ * changes go through one migration path instead of two.
  */
 
 function get_db_connection() {
@@ -18,18 +20,6 @@ function get_db_connection() {
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
     ]);
-
-    $pdo->exec("CREATE TABLE IF NOT EXISTS website_leads (
-        id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(150) NOT NULL,
-        email VARCHAR(190) NOT NULL,
-        school VARCHAR(190) NOT NULL,
-        phone VARCHAR(30) NULL,
-        message TEXT NULL,
-        ip_address VARCHAR(45) NULL,
-        user_agent VARCHAR(255) NULL,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
     return $pdo;
 }
