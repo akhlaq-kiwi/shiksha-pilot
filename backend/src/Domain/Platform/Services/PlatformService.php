@@ -283,6 +283,27 @@ class PlatformService extends BaseService
             ':end_date' => $endDate
         ]);
 
+        // Create initial School Administrator user account
+        $adminPhone = !empty($data['admin_phone']) ? trim((string)$data['admin_phone']) : trim((string)($data['contact_phone'] ?? ''));
+        $rawPassword = !empty($data['admin_password']) ? (string)$data['admin_password'] : 'changeme123';
+        $adminName = trim((string)($data['name'] ?? 'School')) . ' Admin';
+        $adminEmail = !empty($data['contact_email']) ? trim((string)$data['contact_email']) : null;
+
+        if (!empty($adminPhone)) {
+            $stmtAdmin = $pdo->prepare("
+                INSERT INTO users (phone, password, role, name, status, school_id, force_password_change, email, plain_password)
+                VALUES (:phone, :password, 'SCHOOL_ADMIN', :name, 'ACTIVE', :school_id, 0, :email, :plain_password)
+            ");
+            $stmtAdmin->execute([
+                ':phone' => $adminPhone,
+                ':password' => password_hash($rawPassword, PASSWORD_BCRYPT),
+                ':name' => $adminName,
+                ':school_id' => $schoolId,
+                ':email' => $adminEmail,
+                ':plain_password' => $rawPassword,
+            ]);
+        }
+
         $actorInfo = $this->actorInfo($actor);
         $this->auditLogs->log(
             'Create school',
