@@ -45,11 +45,25 @@ $ogImage     = isset($pageOgImage) ? $pageOgImage : ASSET_BASE . '/images/og-ima
 <link rel="icon" href="<?php echo ASSET_BASE; ?>/images/favicon.svg" type="image/svg+xml">
 <link rel="alternate icon" href="<?php echo ASSET_BASE; ?>/images/favicon.svg">
 
-<!-- Self-hosted fonts, preloaded so headline text doesn't flash unstyled -->
-<link rel="preload" href="<?php echo ASSET_BASE; ?>/fonts/baloo2-700.woff2" as="font" type="font/woff2" crossorigin>
+<!--
+  Self-hosted fonts, preloaded for the three faces actually used above the
+  fold on every page: Baloo 800 (the h1/logo — the LCP text on most pages),
+  Kalam 700 (the ".tag" eyebrow line every hero opens with), Nunito 400
+  (hero-sub body copy). Other weights load on demand once the CSS below
+  requests them — no need to front-load ones that aren't in the first paint.
+-->
+<link rel="preload" href="<?php echo ASSET_BASE; ?>/fonts/baloo2-800.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="<?php echo ASSET_BASE; ?>/fonts/kalam-700.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="<?php echo ASSET_BASE; ?>/fonts/nunito-400.woff2" as="font" type="font/woff2" crossorigin>
 
-<link rel="stylesheet" href="<?php echo ASSET_BASE; ?>/css/style.css?v=1">
+<!--
+  Inlined rather than linked: the whole stylesheet is ~4.6KB, and as an
+  external <link> it was a render-blocking request sitting in front of the
+  font requests in the critical path. Inlining removes that hop entirely —
+  worth more here than the cross-page caching an external file would give,
+  given the file is this small.
+-->
+<style><?php echo file_get_contents(__DIR__ . '/../assets/css/style.css'); ?></style>
 
 <?php
 // Organization schema is site-wide; emitted on every page so any page can
