@@ -155,7 +155,7 @@ const AppSidebar = ({
   return (
     <>
       {/* ---- Mobile: trigger labelled with where you currently are ---- */}
-      <div className="sticky top-14 z-30 flex items-center gap-3 border-b border-border bg-surface px-4 py-2 md:hidden">
+      <div className="sticky top-14 z-30 flex items-center gap-3 border-b border-border bg-surface px-4 py-2 md:hidden no-print">
         <button
           ref={triggerRef}
           type="button"
@@ -211,7 +211,7 @@ const AppSidebar = ({
       {/* ---- Desktop ---- */}
       <aside
         className={twMerge(
-          'hidden w-[240px] flex-shrink-0 flex-col border-r border-border bg-sidebar px-3 py-6',
+          'hidden w-[240px] flex-shrink-0 flex-col border-r border-border bg-sidebar px-3 py-6 no-print',
           'md:sticky md:top-14 md:flex md:h-[calc(100vh-56px)]',
           className
         )}

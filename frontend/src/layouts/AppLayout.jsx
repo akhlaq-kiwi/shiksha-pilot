@@ -172,7 +172,7 @@ const AppLayout = ({ children }) => {
       {/* First tab stop: lets keyboard users bypass the header nav. */}
       <a href="#main-content" className="skip-link">Skip to main content</a>
       {/* Sticky header */}
-      <header className="sticky top-0 z-50 border-b border-border bg-surface">
+      <header className="sticky top-0 z-50 border-b border-border bg-surface no-print">
         <div className="w-full px-6">
           <div className="flex items-center justify-between h-14 gap-4">
             
@@ -467,7 +467,7 @@ const AppLayout = ({ children }) => {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-border bg-surface py-4">
+      <footer className="border-t border-border bg-surface py-4 no-print">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
           <p className="text-[11px] text-text-muted text-center">
             &copy; 2026 Shiksha Pilot. Cloud-Native School Management Platform.

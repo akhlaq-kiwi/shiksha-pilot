@@ -4,8 +4,9 @@ import { Dialog } from '../../../common/ui/dialog';
 import { Button } from '../../../common/ui/button';
 import { Input } from '../../../common/ui/input';
 import { Card, CardContent } from '../../../common/ui/card';
+import { FormErrorSummary } from '../../../common/ui/field';
 import { schoolService } from '../../../common/services/schoolService';
-import { ArrowLeft, Upload, Check, AlertCircle, Calendar } from 'lucide-react';
+import { ArrowLeft, Upload, Check, Calendar } from 'lucide-react';
 import { getClassIndex } from '../../../common/constants/predefinedClasses';
 
 const INDIAN_STATES_AND_CITIES = {
@@ -921,12 +922,13 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
         </button>
       </div>
 
-      {errors.form && (
-        <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl text-xs font-semibold flex items-center gap-2">
-          <AlertCircle className="h-4 w-4" />
-          <span>{errors.form}</span>
-        </div>
-      )}
+      {/*
+        Top-of-form summary with jump links. On a 4-tab, 1400+ line form a
+        field-level message can be scrolled hundreds of pixels out of view -
+        this makes every current error visible and actionable from one place,
+        whether it came from client validation or the server on submit.
+      */}
+      <FormErrorSummary errors={errors} title="Please fix the following before continuing" />
 
       {/* Tabs list (4 steps sequence) */}
       <div className="flex border-b border-border text-sm overflow-x-auto whitespace-nowrap scrollbar-none gap-4">
