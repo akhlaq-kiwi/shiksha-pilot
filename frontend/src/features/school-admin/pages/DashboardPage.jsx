@@ -3,7 +3,6 @@ import {
   Users, UserCog, Banknote, FileText, UserPlus, ClipboardCheck,
   CreditCard, BookMarked, PieChart
 } from 'lucide-react';
-import { Card, CardContent } from '../../../common/ui/card';
 import { Button } from '../../../common/ui/button';
 import { schoolService } from '../../../common/services/schoolService';
 import { schoolAdminService } from '../../../common/services/schoolAdminService';
@@ -12,7 +11,8 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '.
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 import { LineChart } from '../../../common/ui/charts/LineChart';
 import { ChartCard } from '../../../common/ui/charts/ChartCard';
-import { SkeletonStatGrid } from '../../../common/ui/skeleton';
+import { SkeletonStatGrid, SkeletonChart } from '../../../common/ui/skeleton';
+import { StatCard } from '../../../common/components/StatCard';
 import { formatCurrency } from '../../../common/utils/format';
 
 export default function DashboardPage({ onNavigate }) {
@@ -262,19 +262,15 @@ export default function DashboardPage({ onNavigate }) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px] w-full">
-        <div className="flex flex-col items-center gap-3">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          <p className="text-xs font-bold text-text-muted uppercase tracking-wider">Loading Dashboard...</p>
+      <div className="space-y-8">
+        <SkeletonStatGrid count={4} />
+        <div className="grid grid-cols-1 gap-6">
+          <SkeletonChart />
+          <SkeletonChart />
         </div>
       </div>
     );
   }
-
-  const formatCurrency = (val) => {
-    const num = Math.round(parseFloat(val || 0));
-    return `₹${num.toLocaleString('en-IN')}`;
-  };
 
   const totalStudents = students.length;
   const activeStudents = students.filter(s => s.status === 'ACTIVE').length;
@@ -294,25 +290,28 @@ export default function DashboardPage({ onNavigate }) {
     <div className="space-y-8 animate-in fade-in duration-300">
       {/* Stat Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {[
-          { label: 'Total Students', value: totalStudents },
-          { label: 'Total Teachers', value: totalStaff },
-          { label: 'Fee Collected', value: formatCurrency(totalFeeCollected), clickPath: currentYear?.status === 'ACTIVE' ? 'collection-history' : null },
-          { label: 'Dues Pending', value: formatCurrency(pendingFees) },
-        ].map(card => {
-          return (
-            <Card 
-              key={card.label} 
-              className={`shadow-sm ${card.clickPath ? 'cursor-pointer hover:border-primary/50 transition-all duration-200 hover:shadow-md' : ''}`}
-              onClick={card.clickPath && onNavigate ? () => onNavigate(card.clickPath) : undefined}
-            >
-              <CardContent className="p-5">
-                <p className="text-text-muted text-[11px] font-bold uppercase tracking-wider">{card.label}</p>
-                <p className="text-2xl font-bold text-text-primary mt-0.5 font-display">{card.value}</p>
-              </CardContent>
-            </Card>
-          );
-        })}
+        {/*
+          Real StatCard: consistent tokenised styling, an icon anchor per
+          metric, and click-through to the filtered view where one exists.
+          No delta/trend is shown - the backend does not yet return a prior-
+          period comparison, and a fabricated trend arrow would be worse than
+          none (see phase-0 principle: never invent data the source can't back).
+        */}
+        <StatCard label="Total students" value={totalStudents} icon={Users} />
+        <StatCard label="Total teachers" value={totalStaff} icon={UserCog} />
+        <StatCard
+          label="Fee collected"
+          value={formatCurrency(totalFeeCollected)}
+          icon={Banknote}
+          color="bg-chart-2/10 text-chart-2"
+          onClick={currentYear?.status === 'ACTIVE' && onNavigate ? () => onNavigate('collection-history') : undefined}
+        />
+        <StatCard
+          label="Dues pending"
+          value={formatCurrency(pendingFees)}
+          icon={CreditCard}
+          color="bg-warning-50 text-warning-600"
+        />
       </div>
 
       {/* Charts Row */}
