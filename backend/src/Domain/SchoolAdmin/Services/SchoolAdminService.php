@@ -524,9 +524,9 @@ class SchoolAdminService extends BaseService
                 $feeMap[$m] = ['amount' => 0.0, 'transactions' => 0];
             }
             
-            // Query 1: Regular monthly fee payments for this academic year (only confirmed PAID transactions)
+            // Query 1: Regular monthly fee payments for this academic year (grouped by deposit payment_date)
             $stmtFeeChart = $pdo->prepare("
-                SELECT fp.fee_month, fp.payment_date, fp.amount_paid
+                SELECT fp.payment_date, fp.created_at, fp.amount_paid
                 FROM fee_payments fp
                 WHERE fp.school_id = :school_id 
                   AND fp.academic_year_id = :academic_year_id 
@@ -534,21 +534,12 @@ class SchoolAdminService extends BaseService
             ");
             $stmtFeeChart->execute([':school_id' => $schoolId, ':academic_year_id' => $activeYear['id']]);
             while ($row = $stmtFeeChart->fetch(\PDO::FETCH_ASSOC)) {
-                $rawMonths = trim($row['fee_month'] ?? '');
                 $amt = (float)($row['amount_paid'] ?? 0);
                 if ($amt <= 0) continue;
 
-                $monthsList = array_map('trim', explode(',', $rawMonths));
-                $validMonths = array_intersect($monthsList, $academicMonths);
-
-                if (!empty($validMonths)) {
-                    $portion = $amt / count($validMonths);
-                    foreach ($validMonths as $vMonth) {
-                        $feeMap[$vMonth]['amount'] += $portion;
-                        $feeMap[$vMonth]['transactions'] += 1;
-                    }
-                } else if (!empty($row['payment_date'])) {
-                    $mName = date('F', strtotime($row['payment_date']));
+                $dateStr = !empty($row['payment_date']) ? $row['payment_date'] : ($row['created_at'] ?? '');
+                if (!empty($dateStr)) {
+                    $mName = date('F', strtotime($dateStr));
                     if (isset($feeMap[$mName])) {
                         $feeMap[$mName]['amount'] += $amt;
                         $feeMap[$mName]['transactions'] += 1;
@@ -556,9 +547,9 @@ class SchoolAdminService extends BaseService
                 }
             }
 
-            // Query 2: Additional fee payments for this academic year (only confirmed Paid transactions)
+            // Query 2: Additional fee payments for this academic year (grouped by deposit payment_date)
             $stmtAddFeeChart = $pdo->prepare("
-                SELECT afp.fee_month, afp.payment_date, afp.amount
+                SELECT afp.payment_date, afp.created_at, afp.amount
                 FROM additional_fee_payments afp
                 JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
                 WHERE afp.school_id = :school_id 
@@ -567,21 +558,12 @@ class SchoolAdminService extends BaseService
             ");
             $stmtAddFeeChart->execute([':school_id' => $schoolId, ':academic_year_id' => $activeYear['id']]);
             while ($row = $stmtAddFeeChart->fetch(\PDO::FETCH_ASSOC)) {
-                $rawMonths = trim($row['fee_month'] ?? '');
                 $amt = (float)($row['amount'] ?? 0);
                 if ($amt <= 0) continue;
 
-                $monthsList = array_map('trim', explode(',', $rawMonths));
-                $validMonths = array_intersect($monthsList, $academicMonths);
-
-                if (!empty($validMonths)) {
-                    $portion = $amt / count($validMonths);
-                    foreach ($validMonths as $vMonth) {
-                        $feeMap[$vMonth]['amount'] += $portion;
-                        $feeMap[$vMonth]['transactions'] += 1;
-                    }
-                } else if (!empty($row['payment_date'])) {
-                    $mName = date('F', strtotime($row['payment_date']));
+                $dateStr = !empty($row['payment_date']) ? $row['payment_date'] : ($row['created_at'] ?? '');
+                if (!empty($dateStr)) {
+                    $mName = date('F', strtotime($dateStr));
                     if (isset($feeMap[$mName])) {
                         $feeMap[$mName]['amount'] += $amt;
                         $feeMap[$mName]['transactions'] += 1;
@@ -1278,6 +1260,8 @@ class SchoolAdminService extends BaseService
             $this->sendStudentNotification($pdo, $schoolId, $id, "Admission Fee Added", "Your admission fee has been added to your fee account. Please check your Fees section.");
         }
 
+        $this->syncExistingAnnualFeePayment($pdo, $schoolId, $id, (int)$classId, $academicYearId, $studentCategory);
+
         $this->log('Student created', ['id' => $id, 'school_id' => $schoolId]);
         return $student;
     }
@@ -1510,6 +1494,10 @@ class SchoolAdminService extends BaseService
             $this->syncAdmissionFeePayment($pdo, $schoolId, $id, $academicYearId, $admFee);
         }
 
+        $updatedClassId = !empty($data['class_name']) ? (int)$data['class_name'] : (int)$student['class_id'];
+        $updatedCategory = array_key_exists('student_category', $data) ? $data['student_category'] : ($student['student_category'] ?? null);
+        $this->syncExistingAnnualFeePayment($pdo, $schoolId, $id, $updatedClassId, $academicYearId, $updatedCategory);
+
         return $this->studentRepo->findDetailById($schoolId, $id);
     }
 
@@ -1579,6 +1567,89 @@ class SchoolAdminService extends BaseService
                 $stmtDel = $pdo->prepare("DELETE FROM additional_fee_payments WHERE id = :pid");
                 $stmtDel->execute([':pid' => $existingPay['id']]);
             }
+        }
+    }
+
+    private function syncExistingAnnualFeePayment(PDO $pdo, int $schoolId, int $studentId, int $classId, ?int $academicYearId, ?string $studentCategory): void
+    {
+        if ($studentCategory === 'New Admission') {
+            return;
+        }
+
+        if ($academicYearId === null || $academicYearId <= 0) {
+            $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+            $academicYearId = $workingYear ? (int)$workingYear['id'] : null;
+        }
+        if ($academicYearId === null || $academicYearId <= 0) {
+            return;
+        }
+
+        // Fetch all Annual Fee types for this school & academic year
+        $stmtTypes = $pdo->prepare("
+            SELECT id, amount 
+            FROM additional_fee_types 
+            WHERE school_id = :sid AND academic_year_id = :ayid AND (name = 'Annual Fee' OR category = 'Annual Fee')
+        ");
+        $stmtTypes->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+        $types = $stmtTypes->fetchAll(PDO::FETCH_ASSOC);
+
+        if (empty($types)) {
+            return;
+        }
+
+        $targetTypeId = null;
+        $targetAmount = 0.0;
+
+        if (count($types) === 1) {
+            $targetTypeId = (int)$types[0]['id'];
+            $targetAmount = (float)$types[0]['amount'];
+        } else {
+            $typeIds = array_column($types, 'id');
+            $inParams = implode(',', array_map('intval', $typeIds));
+            $stmtClassType = $pdo->prepare("
+                SELECT afp.fee_type_id, afp.amount 
+                FROM additional_fee_payments afp
+                JOIN students s ON afp.student_id = s.id
+                WHERE afp.school_id = :sid 
+                  AND s.class_id = :cid 
+                  AND afp.fee_type_id IN ($inParams)
+                LIMIT 1
+            ");
+            $stmtClassType->execute([':sid' => $schoolId, ':cid' => $classId]);
+            $classMatch = $stmtClassType->fetch(PDO::FETCH_ASSOC);
+
+            if ($classMatch) {
+                $targetTypeId = (int)$classMatch['fee_type_id'];
+                $targetAmount = (float)$classMatch['amount'];
+            } else {
+                $targetTypeId = (int)$types[0]['id'];
+                $targetAmount = (float)$types[0]['amount'];
+            }
+        }
+
+        if ($targetTypeId === null || $targetAmount <= 0) {
+            return;
+        }
+
+        $stmtCheck = $pdo->prepare("
+            SELECT id FROM additional_fee_payments 
+            WHERE school_id = :sid AND student_id = :stid AND fee_type_id = :ftid LIMIT 1
+        ");
+        $stmtCheck->execute([':sid' => $schoolId, ':stid' => $studentId, ':ftid' => $targetTypeId]);
+        $existing = $stmtCheck->fetchColumn();
+
+        if ($existing === false) {
+            $stmtIns = $pdo->prepare("
+                INSERT INTO additional_fee_payments (school_id, student_id, fee_type_id, amount, status)
+                VALUES (:sid, :stid, :ftid, :amt, 'Pending')
+            ");
+            $stmtIns->execute([
+                ':sid' => $schoolId,
+                ':stid' => $studentId,
+                ':ftid' => $targetTypeId,
+                ':amt' => $targetAmount
+            ]);
+            $this->sendStudentNotification($pdo, $schoolId, $studentId, "Annual Fee Added", "An annual fee of Rs. {$targetAmount} has been added to your fee account.");
         }
     }
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, ChevronLeft, ChevronRight, Plus, Edit, Trash2, ShieldAlert, CheckCircle2, Lock, MoreVertical, RefreshCw, UserPlus, Users, FileText, Download, Printer } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
@@ -81,6 +81,7 @@ export default function TimetablePage() {
   const [subjectToDelete, setSubjectToDelete] = useState(null);
 
   // Form states
+  const subjectInputRef = useRef(null);
   const [newSubject, setNewSubject] = useState({ id: '', name: '' });
   const [subjectError, setSubjectError] = useState('');
   const [deleteError, setDeleteError] = useState('');
@@ -589,6 +590,9 @@ export default function TimetablePage() {
       console.error(err);
     }
     setIsSubjectModalOpen(true);
+    setTimeout(() => {
+      subjectInputRef.current?.focus();
+    }, 100);
   };
 
   // Subject Management Dialog Action
@@ -628,6 +632,9 @@ export default function TimetablePage() {
       setSubjectError(err.response?.data?.message || err.message || 'Failed to save subject.');
     } finally {
       setActionLoading(null);
+      setTimeout(() => {
+        subjectInputRef.current?.focus();
+      }, 50);
     }
   };
 
@@ -1173,9 +1180,15 @@ export default function TimetablePage() {
 
 
           {/* Subject Add form */}
-          <div className="p-4 border border-border bg-zinc-50/50 dark:bg-zinc-950/20 rounded-xl space-y-4">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSaveSubject();
+            }}
+            className="p-4 border border-border bg-zinc-50/50 dark:bg-zinc-950/20 rounded-xl space-y-4"
+          >
             <h4 className="text-xs font-bold text-text-primary uppercase tracking-wide">
-              Add Subject
+              {newSubject.id ? 'Edit Subject' : 'Add Subject'}
             </h4>
             {subjectError && (
               <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl text-xs font-semibold">
@@ -1185,23 +1198,31 @@ export default function TimetablePage() {
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="flex-1 space-y-1.5">
                 <label htmlFor="subject-name" className="text-[11px] font-bold text-text-secondary uppercase">Subject Name *</label>
-                <Input id="subject-name"
+                <Input
+                  ref={subjectInputRef}
+                  id="subject-name"
                   placeholder="e.g. English Literature"
                   value={newSubject.name}
                   onChange={e => {
                     setNewSubject(p => ({ ...p, name: e.target.value }));
                     setSubjectError('');
                   }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleSaveSubject();
+                    }
+                  }}
                   className="h-10"
                 />
               </div>
               <div className="sm:self-end">
-                <Button onClick={handleSaveSubject} disabled={actionLoading} className="h-10 w-full font-bold">
-                  {actionLoading ? 'Adding...' : 'Add Subject'}
+                <Button type="submit" disabled={actionLoading === 'modal'} className="h-10 w-full font-bold">
+                  {actionLoading === 'modal' ? (newSubject.id ? 'Updating...' : 'Adding...') : (newSubject.id ? 'Update Subject' : 'Add Subject')}
                 </Button>
               </div>
             </div>
-          </div>
+          </form>
 
           {/* Subjects List */}
           <div className="space-y-3">
