@@ -1,27 +1,58 @@
-# GitHub Actions — Production Deploy
+# GitHub Actions — Deploy Workflows
 
-`deploy-production.yml` deploys to Hostinger production
-(`app.shikshapilot.com`). It is **manual-only** — no push/PR trigger — run it
-from the Actions tab ("Run workflow") or:
+Two manual-only workflows deploy to Hostinger — no push/PR trigger for
+either. These replace the old `deploy.sh` / `deploy.ps1` / `deploy_qa.py`
+scripts, which have been removed from the repo.
+
+- `deploy-qa.yml` → `qa.shikshapilot.com`
+- `deploy-production.yml` → `app.shikshapilot.com`, gated behind a typed
+  `confirm=deploy` input
+
+Run either from the Actions tab ("Run workflow") or:
 
 ```bash
+gh workflow run deploy-qa.yml
 gh workflow run deploy-production.yml -f confirm=deploy
 ```
 
-You must type `deploy` in the confirmation input or the run aborts
-immediately, before touching anything.
-
 ## One-time setup: GitHub Secrets
 
-Unlike `deploy.sh` (which hardcodes credentials in the script), this workflow
-builds every `.env` file entirely from GitHub encrypted secrets — nothing
-sensitive lives in the repo or the workflow file. Add these under
-**Settings → Secrets and variables → Actions** (repo-level, or scoped to a
-`production` environment for extra protection — see below):
+Every `.env` file is assembled entirely from GitHub encrypted secrets at
+build time — nothing sensitive lives in the repo or the workflow files. Add
+these under **Settings → Secrets and variables → Actions** (repo-level, or
+scoped to a `qa`/`production` environment for extra protection — see below).
+
+### QA secrets (`deploy-qa.yml`)
 
 | Secret | Example / notes |
 |---|---|
-| `PROD_SSH_HOST` | `92.249.46.170` (same server as QA, per deploy.sh) |
+| `QA_SSH_HOST` | `92.249.46.170` |
+| `QA_SSH_PORT` | `65002` |
+| `QA_SSH_USER` | `u554613359` |
+| `QA_SSH_PASSWORD` | QA SSH password |
+| `QA_REMOTE_PATH` | `/home/u554613359/domains/qa.shikshapilot.com/public_html` |
+| `QA_VITE_API_URL` | QA API URL the frontend calls |
+| `QA_VITE_APP_NAME` | e.g. `Shiksha Pilot` |
+| `QA_VITE_APP_VERSION` | e.g. `1.0.0` |
+| `QA_APP_NAME` | backend `APP_NAME` |
+| `QA_APP_DEBUG` | `true` or `false` |
+| `QA_DB_HOST` | QA DB host |
+| `QA_DB_PORT` | usually `3306` |
+| `QA_DB_NAME` | QA DB name |
+| `QA_DB_USER` | QA DB user |
+| `QA_DB_PASS` | QA DB password |
+| `QA_JWT_SECRET` | JWT secret for QA |
+| `QA_SMTP_HOST` | e.g. `smtp.gmail.com` |
+| `QA_SMTP_PORT` | e.g. `587` |
+| `QA_SMTP_USER` | SMTP account |
+| `QA_SMTP_PASS` | SMTP app password |
+| `QA_SMTP_FROM_NAME` | display name on outgoing mail |
+
+### Production secrets (`deploy-production.yml`)
+
+| Secret | Example / notes |
+|---|---|
+| `PROD_SSH_HOST` | `92.249.46.170` (same server as QA) |
 | `PROD_SSH_PORT` | `65002` |
 | `PROD_SSH_USER` | `u554613359` |
 | `PROD_SSH_PASSWORD` | production SSH password |
@@ -35,43 +66,42 @@ sensitive lives in the repo or the workflow file. Add these under
 | `PROD_DB_NAME` | production DB name |
 | `PROD_DB_USER` | production DB user |
 | `PROD_DB_PASS` | production DB password |
-| `PROD_JWT_SECRET` | a strong, unique secret — **do not reuse the QA value** (`super_secret_erp_key_2026` in deploy.sh) |
+| `PROD_JWT_SECRET` | a strong, unique secret — **do not reuse the QA value** |
 | `PROD_SMTP_HOST` | e.g. `smtp.gmail.com` |
 | `PROD_SMTP_PORT` | e.g. `587` |
 | `PROD_SMTP_USER` | SMTP account |
 | `PROD_SMTP_PASS` | SMTP app password |
 | `PROD_SMTP_FROM_NAME` | display name on outgoing mail |
 
-`APP_ENV`/`APP_DEBUG` are hardcoded in the workflow to `production`/`false` —
-not secrets, since they should never vary per environment.
+`APP_ENV`/`APP_DEBUG` are hardcoded in `deploy-production.yml` to
+`production`/`false` — not secrets, since they should never vary. QA keeps
+`APP_DEBUG` as a secret since the old `.qa.env` treated it as configurable.
 
-### Recommended: gate behind a GitHub Environment
+### Recommended: gate behind GitHub Environments
 
-The workflow already targets `environment: production`. Create that
-environment under **Settings → Environments → New environment** named
-`production`, then optionally add **required reviewers** so someone has to
-approve the run before it touches the live site, and/or restrict which
-branches can trigger it. If you skip this, the environment falls back to repo
-defaults with no extra gate — the workflow still works, just without the
-approval step.
+Both workflows target an `environment:` (`qa` / `production`). Create these
+under **Settings → Environments → New environment**, then optionally add
+**required reviewers** so someone has to approve the run before it touches
+that environment, and/or restrict which branches can trigger it. If you skip
+this, the environment falls back to repo defaults with no extra gate — the
+workflows still work, just without the approval step.
 
-## What it does (mirrors `deploy.sh`)
+## What they do (mirrors the old `deploy.sh`)
 
-1. Builds the frontend with Vite in `production` mode, using an
-   `.env.production` file assembled from the `PROD_VITE_*` secrets.
-2. Packages the frontend build + backend `src`/`public`/composer files into
-   one tarball, with a backend `.env` assembled from the `PROD_DB_*`/
-   `PROD_JWT_SECRET`/`PROD_SMTP_*` secrets and the root/`api/` `.htaccess`
-   files `deploy.sh` also generates.
-3. `scp`s the tarball to `PROD_REMOTE_PATH` and, over SSH, extracts it,
-   removes the previous `assets`/`api`/`index.html`, runs
-   `composer install --no-dev --optimize-autoloader`, then runs
+1. Build the frontend with Vite in `qa`/`production` mode, using an
+   `.env.qa`/`.env.production` file assembled from the `*_VITE_*` secrets.
+2. Package the frontend build + backend `src`/`public`/composer files into
+   one tarball, with a backend `.env` assembled from the `*_DB_*`/
+   `*_JWT_SECRET`/`*_SMTP_*` secrets and the root/`api/` `.htaccess` files
+   the old script also generated.
+3. `scp` the tarball to the remote path and, over SSH, extract it, remove
+   the previous `assets`/`api`/`index.html`, run
+   `composer install --no-dev --optimize-autoloader`, then run
    `php api/src/Database/migrate.php`.
 
-## Known gap carried over from deploy.sh
+## Known gap carried over from the old scripts
 
 Migrations run unconditionally and there's no rollback step if a migration
-or `composer install` fails partway — same behavior as the existing QA
-script. If you want a safer production rollout (e.g. a pre-deploy DB backup,
-or a dry-run migration check), that would need to be added on top of this;
-flag it if you'd like that as a follow-up.
+or `composer install` fails partway. If you want a safer rollout (e.g. a
+pre-deploy DB backup, or a dry-run migration check), that would need to be
+added on top of this; flag it if you'd like that as a follow-up.
