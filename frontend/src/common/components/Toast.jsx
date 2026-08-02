@@ -1,13 +1,13 @@
-import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { CheckCircle2, XCircle, AlertTriangle, Info, X, WifiOff } from 'lucide-react';
 
 const ToastContext = createContext(null);
 
 const ICONS = {
-  success: { icon: CheckCircle2, bg: 'bg-emerald-50 dark:bg-emerald-950/60', border: 'border-emerald-200 dark:border-emerald-800', iconColor: 'text-emerald-500', titleColor: 'text-emerald-900 dark:text-emerald-100', msgColor: 'text-emerald-700 dark:text-emerald-300' },
-  error:   { icon: XCircle,       bg: 'bg-red-50 dark:bg-red-950/60',     border: 'border-red-200 dark:border-red-800',     iconColor: 'text-red-500',     titleColor: 'text-red-900 dark:text-red-100',     msgColor: 'text-red-700 dark:text-red-300'     },
-  warning: { icon: AlertTriangle, bg: 'bg-amber-50 dark:bg-amber-950/60', border: 'border-amber-200 dark:border-amber-800', iconColor: 'text-amber-500', titleColor: 'text-amber-900 dark:text-amber-100', msgColor: 'text-amber-700 dark:text-amber-300' },
-  info:    { icon: Info,          bg: 'bg-blue-50 dark:bg-blue-950/60',   border: 'border-blue-200 dark:border-blue-800',   iconColor: 'text-blue-500',   titleColor: 'text-blue-900 dark:text-blue-100',   msgColor: 'text-blue-700 dark:text-blue-300'   },
+  success: { icon: CheckCircle2, bg: 'bg-success-50 dark:bg-success-500/10', border: 'border-success-200 dark:border-success-500/30', iconColor: 'text-success-600', titleColor: 'text-success-700 dark:text-success-300', msgColor: 'text-success-700 dark:text-success-300' },
+  error:   { icon: XCircle,       bg: 'bg-danger-50 dark:bg-danger-500/10',   border: 'border-danger-200 dark:border-danger-500/30',   iconColor: 'text-danger-600',   titleColor: 'text-danger-700 dark:text-danger-300',   msgColor: 'text-danger-700 dark:text-danger-300'   },
+  warning: { icon: AlertTriangle, bg: 'bg-warning-50 dark:bg-warning-500/10', border: 'border-warning-200 dark:border-warning-500/30', iconColor: 'text-warning-600', titleColor: 'text-warning-700 dark:text-warning-300', msgColor: 'text-warning-700 dark:text-warning-300' },
+  info:    { icon: Info,          bg: 'bg-info-50 dark:bg-info-500/10',       border: 'border-info-200 dark:border-info-500/30',       iconColor: 'text-info-600',       titleColor: 'text-info-700 dark:text-info-300',       msgColor: 'text-info-700 dark:text-info-300'       },
 };
 
 /**
