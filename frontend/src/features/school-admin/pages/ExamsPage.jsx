@@ -2026,7 +2026,7 @@ export default function ExamsPage() {
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             {[
               { id: 'total', label: 'Total Exams', value: totalCount, color: 'text-zinc-800 dark:text-zinc-200' },
-              { id: 'upcoming', label: 'Upcoming', value: upcomingCount, color: 'text-blue-600' },
+              { id: 'upcoming', label: 'Upcoming', value: upcomingCount, color: 'text-primary' },
               { id: 'ongoing', label: 'Ongoing', value: ongoingCount, color: 'text-amber-600' },
               { id: 'draft', label: 'Draft Mode', value: draftCount, color: 'text-zinc-500' },
               { id: 'published', label: 'Published Results', value: publishedCount, color: 'text-green-600' },

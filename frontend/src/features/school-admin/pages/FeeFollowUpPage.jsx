@@ -383,7 +383,7 @@ export default function FeeFollowUpPage() {
     let classes = "";
     switch(status) {
       case 'PENDING':
-        classes = "bg-blue-500/10 text-blue-600";
+        classes = "bg-primary/10 text-primary";
         break;
       case 'DUE_TODAY':
         classes = "bg-orange-500/10 text-orange-600";
@@ -435,7 +435,7 @@ export default function FeeFollowUpPage() {
       {/* Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {[
-          { label: 'Pending Follow-ups', count: stats.pending, color: 'text-blue-600 bg-blue-500/10', icon: Clock },
+          { label: 'Pending Follow-ups', count: stats.pending, color: 'text-primary bg-primary/10', icon: Clock },
           { label: 'Due Today', count: stats.due_today, color: 'text-orange-600 bg-orange-500/10', icon: AlertCircle },
           { label: 'Upcoming', count: stats.upcoming, color: 'text-purple-600 bg-purple-500/10', icon: Calendar },
           { label: 'Overdue', count: stats.overdue, color: 'text-red-600 bg-red-500/10 animate-pulse', icon: AlertTriangle },

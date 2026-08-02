@@ -120,8 +120,8 @@ function ManageSubscriptionDialog({ school, onClose, onSaved }) {
           )}
 
           {isCustom && (
-            <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl p-4 space-y-3">
-              <p className="text-xs font-bold text-blue-700 dark:text-blue-400 uppercase tracking-wider">Custom Plan Details</p>
+            <div className="bg-primary/5 dark:bg-primary/10 border border-primary/20 rounded-xl p-4 space-y-3">
+              <p className="text-xs font-bold text-primary dark:text-primary-fg uppercase tracking-wider">Custom Plan Details</p>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label htmlFor="plan-name" className="text-xs text-text-secondary font-semibold">Plan Name</label>
@@ -161,15 +161,15 @@ function ManageSubscriptionDialog({ school, onClose, onSaved }) {
  * school's portal renders.
  */
 const THEME_PRESETS = [
-  { id: 'default', label: 'Scholar Indigo (Default)', swatch: '#4F46E5' },
+  { id: 'default', label: 'Scholar Emerald (Default)', swatch: '#059669' },
   ...Object.entries(THEME_PRESET_COLORS)
-    .filter(([id]) => id !== 'indigo')
+    .filter(([id]) => id !== 'emerald')
     .map(([id, { label, primary }]) => ({ id, label, swatch: primary })),
 ];
 
 const getSchoolColor = (name) => {
   const colors = [
-    'bg-blue-500 text-white', 'bg-emerald-500 text-white', 'bg-amber-500 text-white',
+    'bg-primary text-primary-fg', 'bg-emerald-500 text-white', 'bg-amber-500 text-white',
     'bg-indigo-500 text-white', 'bg-teal-500 text-white', 'bg-purple-500 text-white', 'bg-rose-500 text-white',
   ];
   let sum = 0;
@@ -508,7 +508,7 @@ export default function SchoolDetailPage({ schools, onToggleStatus, onDeleteScho
 
       {/* School Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <StatBox icon={GraduationCap} label="Students"     value={schoolStats ? schoolStats.students.toLocaleString()     : '—'} color="bg-blue-500/10 text-blue-600" />
+        <StatBox icon={GraduationCap} label="Students"     value={schoolStats ? schoolStats.students.toLocaleString()     : '—'} color="bg-primary/10 text-primary" />
         <StatBox icon={BookOpen}      label="Teachers"     value={schoolStats ? schoolStats.teachers.toLocaleString()     : '—'} color="bg-emerald-500/10 text-emerald-600" />
         <StatBox icon={ShieldCheck}   label="School Admins" value={schoolStats ? schoolStats.school_admins.toLocaleString() : '—'} color="bg-violet-500/10 text-violet-600" />
         <StatBox icon={Users}         label="Total Staff"  value={schoolStats ? schoolStats.total_staff.toLocaleString()  : '—'} color="bg-amber-500/10 text-amber-600" />

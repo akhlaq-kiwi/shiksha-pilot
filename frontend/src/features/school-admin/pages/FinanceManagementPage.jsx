@@ -2382,15 +2382,15 @@ export default function FinanceManagementPage() {
       >
         <div className="space-y-4">
           {/* Information Message Box */}
-          <div className="p-3.5 bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 rounded-xl space-y-1 text-xs">
-            <div className="flex items-center gap-2 text-blue-800 dark:text-blue-300 font-bold">
+          <div className="p-3.5 bg-primary/5 dark:bg-primary/10 border border-primary/20 rounded-xl space-y-1 text-xs">
+            <div className="flex items-center gap-2 text-primary font-bold">
               <Info className="h-4 w-4 shrink-0" />
               <span>Important</span>
             </div>
-            <p className="text-blue-700 dark:text-blue-400 text-xs leading-relaxed pl-6">
+            <p className="text-text-secondary text-xs leading-relaxed pl-6">
               Annual Fee will <strong>not</strong> be applied to students who were admitted during the current academic year.
             </p>
-            <p className="text-blue-700 dark:text-blue-400 text-xs leading-relaxed pl-6">
+            <p className="text-text-secondary text-xs leading-relaxed pl-6">
               Only students who were already enrolled before the beginning of the current academic session are eligible.
             </p>
           </div>

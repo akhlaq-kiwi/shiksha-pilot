@@ -2476,27 +2476,6 @@ class SchoolAdminService extends BaseService
         $pdo  = $this->classRepo->getPdo();
         $schoolId = $this->getSchoolId($user);
 
-        // Check if any academic years exist for this school
-        $stmtCheck = $pdo->prepare("SELECT id FROM academic_years WHERE school_id = :sid LIMIT 1");
-        $stmtCheck->execute([':sid' => $schoolId]);
-        $hasYears = $stmtCheck->fetchColumn() !== false;
-
-        if (!$hasYears) {
-            // Automatically initialize the school's first academic year
-            $pdo->beginTransaction();
-            try {
-                $this->initializeNewSchool($pdo, $schoolId, $user['email'] ?? 'admin');
-                $pdo->commit();
-            } catch (\Exception $e) {
-                $pdo->rollBack();
-                $this->log('Failed to automatically initialize school first academic year', [
-                    'error' => $e->getMessage(),
-                    'school_id' => $schoolId
-                ]);
-                throw $e;
-            }
-        }
-
         $stmt = $pdo->prepare(
             "SELECT * FROM academic_years WHERE school_id = :sid ORDER BY id DESC"
         );
@@ -7542,11 +7521,137 @@ class SchoolAdminService extends BaseService
         ];
     }
 
+    private function autoGenerateCompletedMonthlyReports(\PDO $pdo, int $schoolId, ?array $workingYear): void
+    {
+        if (!$workingYear) return;
+
+        $ayStart = $workingYear['start_date'];
+        $ayEnd = $workingYear['end_date'];
+        $today = date('Y-m-d');
+
+        $currentMonthStart = date('Y-m-01', strtotime($ayStart));
+        
+        while ($currentMonthStart <= $ayEnd) {
+            $monthEnd = date('Y-m-t', strtotime($currentMonthStart));
+            
+            if ($today <= $monthEnd) {
+                break;
+            }
+
+            $stmtCheck = $pdo->prepare("
+                SELECT id FROM financial_reports 
+                WHERE school_id = :sid AND (
+                    (`from_date` = :fdate1 AND `to_date` = :tdate1)
+                    OR (`from_date` <= :fdate2 AND `to_date` >= :tdate2)
+                )
+                LIMIT 1
+            ");
+            $stmtCheck->execute([
+                ':sid' => $schoolId,
+                ':fdate1' => $currentMonthStart,
+                ':tdate1' => $monthEnd,
+                ':fdate2' => $currentMonthStart,
+                ':tdate2' => $monthEnd
+            ]);
+            $exists = $stmtCheck->fetchColumn() !== false;
+
+            if (!$exists) {
+                $stmtFees = $pdo->prepare("
+                    SELECT COALESCE(SUM(amount_paid), 0) 
+                    FROM fee_payments 
+                    WHERE school_id = :sid AND status = 'PAID'
+                      AND academic_year_id = :ayid
+                      AND payment_date >= :fdate AND payment_date <= :tdate
+                ");
+                $stmtFees->execute([
+                    ':sid' => $schoolId,
+                    ':ayid' => $workingYear['id'],
+                    ':fdate' => $currentMonthStart,
+                    ':tdate' => $monthEnd
+                ]);
+                $tuition = (float)$stmtFees->fetchColumn();
+
+                $stmtAddFees = $pdo->prepare("
+                    SELECT COALESCE(SUM(afp.amount), 0) 
+                    FROM additional_fee_payments afp
+                    JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+                    WHERE afp.school_id = :sid AND afp.status = 'Paid'
+                      AND aft.academic_year_id = :ayid
+                      AND DATE(afp.updated_at) >= :fdate AND DATE(afp.updated_at) <= :tdate
+                ");
+                $stmtAddFees->execute([
+                    ':sid' => $schoolId,
+                    ':ayid' => $workingYear['id'],
+                    ':fdate' => $currentMonthStart,
+                    ':tdate' => $monthEnd
+                ]);
+                $addFees = (float)$stmtAddFees->fetchColumn();
+                $totalRevenue = $tuition + $addFees;
+
+                $stmtSal = $pdo->prepare("
+                    SELECT COALESCE(SUM(amount_paid), 0) 
+                    FROM staff_payments 
+                    WHERE school_id = :sid AND academic_year_id = :ayid
+                      AND payment_date >= :fdate AND payment_date <= :tdate
+                ");
+                $stmtSal->execute([
+                    ':sid' => $schoolId,
+                    ':ayid' => $workingYear['id'],
+                    ':fdate' => $currentMonthStart,
+                    ':tdate' => $monthEnd
+                ]);
+                $salaries = (float)$stmtSal->fetchColumn();
+
+                $stmtExp = $pdo->prepare("
+                    SELECT COALESCE(SUM(amount), 0) 
+                    FROM school_expenses 
+                    WHERE school_id = :sid AND academic_year_id = :ayid
+                      AND expense_date >= :fdate AND expense_date <= :tdate
+                ");
+                $stmtExp->execute([
+                    ':sid' => $schoolId,
+                    ':ayid' => $workingYear['id'],
+                    ':fdate' => $currentMonthStart,
+                    ':tdate' => $monthEnd
+                ]);
+                $expenses = (float)$stmtExp->fetchColumn();
+                $totalExpenses = $salaries + $expenses;
+
+                $profitLoss = $totalRevenue - $totalExpenses;
+
+                $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM financial_reports WHERE school_id = :sid");
+                $stmtCount->execute([':sid' => $schoolId]);
+                $count = (int)$stmtCount->fetchColumn();
+                $reportId = 'REP-' . str_pad((string)($count + 1), 3, '0', STR_PAD_LEFT);
+
+                $nextMonthFirst = date('Y-m-d 00:00:00', strtotime($monthEnd . ' +1 day'));
+                $stmtIns = $pdo->prepare("
+                    INSERT INTO financial_reports (school_id, report_id, `from_date`, `to_date`, fees_collected, salary_paid, profit_loss, status, created_at)
+                    VALUES (:sid, :rid, :fdate, :tdate, :fees, :sal, :pl, 'Pending', :created_at)
+                ");
+                $stmtIns->execute([
+                    ':sid' => $schoolId,
+                    ':rid' => $reportId,
+                    ':fdate' => $currentMonthStart,
+                    ':tdate' => $monthEnd,
+                    ':fees' => $totalRevenue,
+                    ':sal' => $totalExpenses,
+                    ':pl' => $profitLoss,
+                    ':created_at' => $nextMonthFirst
+                ]);
+            }
+
+            $currentMonthStart = date('Y-m-d', strtotime($currentMonthStart . ' +1 month'));
+        }
+    }
+
     public function getFinancialReports(array $user): array
     {
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->financialReportRepo->getPdo();
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+
+        $this->autoGenerateCompletedMonthlyReports($pdo, $schoolId, $workingYear);
 
         // 1. Fetch generated reports (filtered by selected Academic Year)
         if ($workingYear) {

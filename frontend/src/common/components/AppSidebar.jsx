@@ -63,30 +63,13 @@ const NavButton = ({ item, isActive, onSelect }) => {
   );
 };
 
-const NavContents = ({ groups, items, isItemActive, onSelect, footer }) => (
-  <>
-    <div className="min-h-0 flex-1 overflow-y-auto scrollbar-none">
-      {groups ? (
-        <div className="space-y-5">
-          {groups.map((group) => (
-            <div key={group.label}>
-              <p className="mb-1.5 px-3 text-overline text-text-muted">{group.label}</p>
-              <nav className="flex flex-col gap-0.5" aria-label={group.label}>
-                {group.items.map((item) => (
-                  <NavButton
-                    key={item.id ?? item.path}
-                    item={item}
-                    isActive={isItemActive(item)}
-                    onSelect={onSelect}
-                  />
-                ))}
-              </nav>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <nav className="flex flex-col gap-0.5" aria-label="Sections">
-          {(items ?? []).map((item) => (
+const NavContents = ({ groups, items, isItemActive, onSelect, footer }) => {
+  const allItems = groups ? groups.flatMap((g) => g.items) : (items ?? []);
+  return (
+    <>
+      <div className="min-h-0 flex-1 overflow-y-auto scrollbar-none">
+        <nav className="flex flex-col gap-1" aria-label="Navigation">
+          {allItems.map((item) => (
             <NavButton
               key={item.id ?? item.path}
               item={item}
@@ -95,11 +78,11 @@ const NavContents = ({ groups, items, isItemActive, onSelect, footer }) => (
             />
           ))}
         </nav>
-      )}
-    </div>
-    {footer && <div className="mt-4 flex-shrink-0">{footer}</div>}
-  </>
-);
+      </div>
+      {footer && <div className="mt-4 flex-shrink-0">{footer}</div>}
+    </>
+  );
+};
 
 const AppSidebar = ({
   items,

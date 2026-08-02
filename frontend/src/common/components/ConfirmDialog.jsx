@@ -24,7 +24,7 @@ export function ConfirmProvider({ children }) {
       {state && (
         <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => handleChoice(false)} />
-          <div className="relative bg-surface border border-border rounded-2xl shadow-2xl w-full max-w-sm p-6 animate-in zoom-in-95 fade-in duration-200">
+          <div className="relative bg-white dark:bg-zinc-900 bg-surface border border-border rounded-2xl shadow-2xl w-full max-w-sm p-6 animate-in zoom-in-95 fade-in duration-200">
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 ${state.danger ? 'bg-red-500/10' : 'bg-amber-500/10'}`}>
               <AlertTriangle className={`h-5 w-5 ${state.danger ? 'text-red-500' : 'text-amber-500'}`} />
             </div>

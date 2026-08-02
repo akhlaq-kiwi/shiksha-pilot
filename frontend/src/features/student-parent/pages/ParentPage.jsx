@@ -66,7 +66,7 @@ export default function ParentPage({ children, isParent, selectedChild, onSelect
         <Card className="shadow-sm">
           <CardContent className="p-4 text-center">
             <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Avg Score</p>
-            <p className="text-2xl font-bold text-blue-600 mt-1">84</p>
+            <p className="text-2xl font-bold text-primary mt-1">84</p>
             <p className="text-[11px] text-text-muted mt-0.5">out of 100</p>
           </CardContent>
         </Card>
@@ -129,7 +129,7 @@ export default function ParentPage({ children, isParent, selectedChild, onSelect
                 <span className="text-xs font-semibold text-text-secondary w-24 flex-shrink-0 truncate">{sub.name}</span>
                 <div className="flex-1 h-5 bg-zinc-100 dark:bg-zinc-800 rounded overflow-hidden">
                   <div
-                    className={`h-full rounded flex items-center justify-end pr-2 ${sub.score >= 90 ? 'bg-emerald-500' : sub.score >= 75 ? 'bg-blue-500' : 'bg-amber-500'}`}
+                    className={`h-full rounded flex items-center justify-end pr-2 ${sub.score >= 90 ? 'bg-emerald-500' : sub.score >= 75 ? 'bg-primary' : 'bg-amber-500'}`}
                     style={{ width: `${sub.score}%` }}
                   >
                     <span className="text-[11px] font-bold text-white">{sub.score}</span>
@@ -346,7 +346,7 @@ function ParentVocabReport({ studentId }) {
         </div>
         <div className="bg-background dark:bg-zinc-900 border border-border p-4 rounded-xl text-center shadow-2xs">
           <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Words Mastered</p>
-          <p className="text-2xl font-bold text-blue-600 mt-1 tabular-nums">{stats.total_words_mastered}</p>
+          <p className="text-2xl font-bold text-primary mt-1 tabular-nums">{stats.total_words_mastered}</p>
         </div>
         <div className="bg-background dark:bg-zinc-900 border border-border p-4 rounded-xl text-center shadow-2xs">
           <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Avg Accuracy</p>

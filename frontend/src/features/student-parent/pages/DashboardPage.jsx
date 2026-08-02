@@ -7,7 +7,7 @@ import { Button } from '../../../common/ui/button';
 import { Card, CardContent } from '../../../common/ui/card';
 
 const subjectColors = {
-  'Mathematics': 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
+  'Mathematics': 'bg-primary/10 text-primary dark:text-primary-fg',
   'Physics': 'bg-purple-500/10 text-purple-700 dark:text-purple-400',
   'Chemistry': 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
   'English': 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
@@ -22,7 +22,7 @@ const getSubjectColor = (subject) =>
 
 const statusConfig = {
   pending: { label: 'PENDING', cls: 'bg-amber-500/10 text-amber-700 dark:text-amber-400' },
-  submitted: { label: 'Submitted', cls: 'bg-blue-500/10 text-blue-700 dark:text-blue-400' },
+  submitted: { label: 'Submitted', cls: 'bg-primary/10 text-primary dark:text-primary-fg' },
   graded: { label: 'Graded', cls: 'bg-green-500/10 text-green-700 dark:text-green-400' },
   overdue: { label: 'Overdue', cls: 'bg-red-500/10 text-red-600 dark:text-red-400' },
 };
@@ -97,7 +97,7 @@ export default function DashboardPage({ homework, upcomingExams, attendance, fee
         <Card className="shadow-sm">
           <CardContent className="p-5">
             <div className="flex justify-between items-start mb-3">
-              <div className="p-2 bg-blue-500/10 rounded-lg text-blue-600"><BookOpen className="h-4 w-4" /></div>
+              <div className="p-2 bg-primary/10 rounded-lg text-primary"><BookOpen className="h-4 w-4" /></div>
             </div>
             <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Upcoming Exams</p>
             <p className="text-2xl font-bold text-text-primary mt-1 font-display">{upcomingExams.length}</p>
@@ -184,8 +184,8 @@ export default function DashboardPage({ homework, upcomingExams, attendance, fee
           <div className="space-y-3">
             {upcomingExams.map(exam => (
               <div key={exam.id} className="flex items-center gap-4 p-4 bg-surface border border-border rounded-xl shadow-xs">
-                <div className="flex-shrink-0 text-center bg-blue-500/8 border border-blue-500/15 rounded-lg px-3 py-2 min-w-[58px]">
-                  <p className="text-[11px] font-bold text-blue-600 uppercase">{exam.date.split('-')[1] === '07' ? 'Jul' : 'Jun'}</p>
+                <div className="flex-shrink-0 text-center bg-primary/10 border border-primary/20 rounded-lg px-3 py-2 min-w-[58px]">
+                  <p className="text-[11px] font-bold text-primary uppercase">{exam.date.split('-')[1] === '07' ? 'Jul' : 'Jun'}</p>
                   <p className="text-lg font-bold text-text-primary tabular-nums leading-none">{exam.date.split('-')[2]}</p>
                 </div>
                 <div className="flex-1 min-w-0">

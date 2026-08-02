@@ -75,8 +75,8 @@ export const LineChart = ({
   }
 
   return (
-    <div className={twMerge('w-full overflow-x-auto scrollbar-none', className)}>
-      <div className="relative min-w-[600px]" style={{ height }}>
+    <div className={twMerge('w-full overflow-hidden', className)}>
+      <div className="relative w-full" style={{ height }}>
         {/* Value never conveyed by the drawing alone. */}
         <table className="sr-only">
           <caption>{ariaLabel}</caption>
