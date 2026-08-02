@@ -20,6 +20,34 @@ import { schoolAdminService } from '../../../common/services/schoolAdminService'
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 import html2pdf from 'html2pdf.js';
 
+const getClassOrderIndex = (className) => {
+  if (!className) return 999;
+  const str = String(className).toLowerCase().trim();
+
+  if (str.includes('playgroup') || str.includes('pg')) return 1;
+  if (str.includes('nursery')) return 2;
+  if (str.includes('lkg') || str.includes('lower kg')) return 3;
+  if (str.includes('ukg') || str.includes('upper kg') || str.includes('kg')) return 4;
+
+  const numMatch = str.match(/\d+/);
+  if (numMatch) {
+    return 10 + parseInt(numMatch[0], 10);
+  }
+
+  return 900;
+};
+
+const sortClassNames = (classList) => {
+  return [...classList].sort((a, b) => {
+    const orderA = getClassOrderIndex(a);
+    const orderB = getClassOrderIndex(b);
+    if (orderA !== orderB) {
+      return orderA - orderB;
+    }
+    return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
+  });
+};
+
 // Predefined Exam Templates
 const PAPER_TEMPLATES = {
   blank: {
@@ -2125,9 +2153,12 @@ export default function QuestionPaperDesignerPage() {
                     className="w-full h-10 px-3 border border-border bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   >
                     <option value="">-- Choose Class --</option>
-                    {classes.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
+                    {classes
+                      .slice()
+                      .sort((a, b) => getClassOrderIndex(a.name) - getClassOrderIndex(b.name) || String(a.name).localeCompare(String(b.name), undefined, { numeric: true }))
+                      .map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
                   </select>
                 </div>
 
@@ -3641,23 +3672,25 @@ export default function QuestionPaperDesignerPage() {
 
       {/* MODAL 7: SAVED PAPERS LIBRARY */}
       <Dialog isOpen={isLibraryOpen} onClose={() => setIsLibraryOpen(false)} className="w-[95vw] md:max-w-4xl">
-        <div className="p-6 space-y-4 bg-card rounded-2xl border border-border shadow-xl w-full">
-          <h2 className="text-lg font-bold flex items-center gap-2">
-            <FileText className="h-5 w-5 text-primary" /> Saved Papers Library
-          </h2>
-          <p className="text-xs text-text-secondary">
-            {librarySelectedClass ? `Viewing saved papers for ${librarySelectedClass}:` : 'Select a class below to view its saved question papers:'}
-          </p>
+        <div className="p-6 space-y-4 bg-card rounded-2xl border border-border shadow-xl w-full min-h-[480px] flex flex-col">
+          <div>
+            <h2 className="text-lg font-bold flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" /> Saved Papers Library
+            </h2>
+            <p className="text-xs text-text-secondary mt-1">
+              {librarySelectedClass ? `Viewing saved papers for ${librarySelectedClass}:` : 'Select a class below to view its saved question papers:'}
+            </p>
+          </div>
           
-          <div className="max-h-[550px] overflow-y-auto space-y-2 pr-1 pt-1">
+          <div className="flex-1 max-h-[480px] overflow-y-auto space-y-2 pr-1 pt-1">
             {savedPapersList.length === 0 ? (
-              <div className="text-center text-xs text-text-muted py-12 font-medium">
+              <div className="text-center text-xs text-text-muted py-16 font-medium">
                 No saved papers found in your library.
               </div>
             ) : !librarySelectedClass ? (
               /* Class Cards Grid View */
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 pt-2">
-                {[...new Set(savedPapersList.map(p => p.className || 'Unassigned Class'))].map((clsName) => {
+                {sortClassNames([...new Set(savedPapersList.map(p => p.className || 'Unassigned Class'))]).map((clsName) => {
                   const classPapers = savedPapersList.filter(p => (p.className || 'Unassigned Class') === clsName);
                   return (
                     <Button
@@ -3691,7 +3724,7 @@ export default function QuestionPaperDesignerPage() {
                   </Button>
                 </div>
 
-                <div className="space-y-2 max-h-[450px] overflow-y-auto pr-1">
+                <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
                   {savedPapersList
                     .filter(p => (p.className || 'Unassigned Class') === librarySelectedClass)
                     .map((paper) => (
@@ -3735,16 +3768,17 @@ export default function QuestionPaperDesignerPage() {
               </div>
             )}
           </div>
-
-          <div className="flex justify-end pt-2 border-t border-border">
-            <Button type="button" variant="outline" size="sm" onClick={() => setIsLibraryOpen(false)}>Close</Button>
-          </div>
         </div>
       </Dialog>
 
       {/* CUSTOM CONFIRMATION DIALOG */}
-      <Dialog isOpen={confirmDialog.isOpen} onClose={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}>
-        <div className="p-6 space-y-4 max-w-sm bg-card rounded-lg border border-border shadow-xl w-full">
+      <Dialog 
+        isOpen={confirmDialog.isOpen} 
+        onClose={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        hideHeader={true}
+        className="max-w-md"
+      >
+        <div className="space-y-4">
           <h2 className="text-base font-bold flex items-center gap-2 text-text-primary">
             <Info className="h-5 w-5 text-amber-500" /> {confirmDialog.title}
           </h2>
@@ -3752,7 +3786,7 @@ export default function QuestionPaperDesignerPage() {
             {confirmDialog.message}
           </p>
           
-          <div className="flex justify-end gap-2 pt-2 border-t border-border">
+          <div className="flex justify-end gap-2 pt-3 border-t border-border">
             <Button 
               type="button" 
               variant="outline" 
