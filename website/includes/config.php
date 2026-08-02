@@ -52,9 +52,12 @@ define('DB_NAME', getenv('DB_NAME') ?: 'shiksha_pilot');
 define('DB_USER', getenv('DB_USER') ?: 'root');
 define('DB_PASS', getenv('DB_PASS') ?: 'admin123');
 
-// Empty by default — local/Docker dev never sends analytics traffic.
-// Production gets a real value from the .env file above once one exists.
-define('GA_MEASUREMENT_ID', getenv('GA_MEASUREMENT_ID') ?: '');
+// Google Tag Manager container ID (e.g. GTM-XXXXXXX). Empty by default —
+// local/Docker dev never sends analytics traffic. Production gets a real
+// value from the .env file above once one exists. GA4 itself is
+// configured as a tag inside the GTM container (Tag Manager UI), not
+// embedded directly here — GTM is just the delivery mechanism.
+define('GTM_CONTAINER_ID', getenv('GTM_CONTAINER_ID') ?: '');
 
 require_once __DIR__ . '/db.php';
 

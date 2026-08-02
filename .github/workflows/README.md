@@ -100,7 +100,7 @@ and needs exactly two additional secrets, added under that same
 | Secret | Example / notes |
 |---|---|
 | `WEBSITE_REMOTE_PATH` | `/home/u554613359/domains/shikshapilot.com/public_html` |
-| `WEBSITE_GA_MEASUREMENT_ID` | GA4 Measurement ID, e.g. `G-XXXXXXXXXX` — not sensitive (it's visible in every page's source anyway), but kept as a secret for consistency with everything else this workflow writes into `.env`. Leave empty/unset until you have a real GA4 property; the site simply won't load the Analytics script until this is set. |
+| `WEBSITE_GTM_CONTAINER_ID` | Google Tag Manager container ID, e.g. `GTM-PLKJTXPC` — not sensitive (it's visible in every page's source anyway), but kept as a secret for consistency with everything else this workflow writes into `.env`. GA4 itself is then configured as a tag inside that GTM container (via the Tag Manager UI, not this repo) — leave this secret empty/unset until the container exists; the site simply won't load the GTM script until it's set. |
 
 ### Recommended: gate behind GitHub Environments
 

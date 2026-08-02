@@ -16,6 +16,15 @@ $ogImage     = isset($pageOgImage) ? $pageOgImage : ASSET_BASE . '/images/og-ima
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<?php if (GTM_CONTAINER_ID !== ''): $gtmId = htmlspecialchars(GTM_CONTAINER_ID, ENT_QUOTES); ?>
+<!-- Google Tag Manager: placed as high in <head> as possible per Google's own guidance -->
+<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','<?php echo $gtmId; ?>');</script>
+<!-- End Google Tag Manager -->
+<?php endif; ?>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?php echo htmlspecialchars($fullTitle, ENT_QUOTES); ?></title>
@@ -84,18 +93,12 @@ if (!empty($pageJsonLd)) {
     }
 }
 
-// Google Analytics (GA4) — only loads when GA_MEASUREMENT_ID is actually
-// set (production, once configured). Local/Docker dev never sends traffic.
-if (GA_MEASUREMENT_ID !== ''):
-    $gaId = htmlspecialchars(GA_MEASUREMENT_ID, ENT_QUOTES);
 ?>
-<script async src="https://www.googletagmanager.com/gtag/js?id=<?php echo $gaId; ?>"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){ dataLayer.push(arguments); }
-  gtag('js', new Date());
-  gtag('config', '<?php echo $gaId; ?>');
-</script>
-<?php endif; ?>
 </head>
 <body>
+<?php if (GTM_CONTAINER_ID !== ''): ?>
+<!-- Google Tag Manager (noscript): must be the very first thing after <body> -->
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=<?php echo $gtmId; ?>"
+height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<!-- End Google Tag Manager (noscript) -->
+<?php endif; ?>

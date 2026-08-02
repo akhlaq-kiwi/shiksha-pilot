@@ -50,7 +50,7 @@ jobs:
           DB_NAME=${{ secrets.PROD_DB_NAME }}
           DB_USER=${{ secrets.PROD_DB_USER }}
           DB_PASS=${{ secrets.PROD_DB_PASS }}
-          GA_MEASUREMENT_ID=${{ secrets.WEBSITE_GA_MEASUREMENT_ID }}
+          GTM_CONTAINER_ID=${{ secrets.WEBSITE_GTM_CONTAINER_ID }}
           EOF
 
       - name: Create deployment package
