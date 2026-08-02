@@ -841,6 +841,14 @@ class PlatformService extends BaseService
                 $actionStr
             );
 
+            // Ensure columns exist on target database safely
+            try {
+                $pdo->exec("ALTER TABLE dashboard_notifications ADD COLUMN user_role VARCHAR(50) DEFAULT 'SCHOOL_ADMIN'");
+            } catch (\Throwable $ex) {}
+            try {
+                $pdo->exec("ALTER TABLE dashboard_notifications ADD COLUMN user_id INT DEFAULT NULL");
+            } catch (\Throwable $ex) {}
+
             // Send School Admin Notification
             $stmtAdmins = $pdo->prepare("SELECT id FROM users WHERE school_id = :school_id AND role = 'SCHOOL_ADMIN'");
             $stmtAdmins->execute([':school_id' => $schoolId]);
@@ -849,14 +857,26 @@ class PlatformService extends BaseService
             $notifTitle = "Subscription Upgraded Successfully";
             $notifMsg = "Your school's subscription has been upgraded to **{$newPlan['name']}**. Your new subscription benefits are now active.";
 
-            $stmtNotif = $pdo->prepare("
-                INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, is_read)
-                VALUES (:school_id, 'SCHOOL_ADMIN', :user_id, :title, :message, '/school-admin/profile/subscription', 0)
-            ");
-            foreach ($adminIds as $adminId) {
+            if (!empty($adminIds)) {
+                $stmtNotif = $pdo->prepare("
+                    INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, is_read)
+                    VALUES (:school_id, 'SCHOOL_ADMIN', :user_id, :title, :message, '/school-admin/profile/subscription', 0)
+                ");
+                foreach ($adminIds as $adminId) {
+                    $stmtNotif->execute([
+                        ':school_id' => $schoolId,
+                        ':user_id' => $adminId,
+                        ':title' => $notifTitle,
+                        ':message' => $notifMsg
+                    ]);
+                }
+            } else {
+                $stmtNotif = $pdo->prepare("
+                    INSERT INTO dashboard_notifications (school_id, user_role, title, message, link, is_read)
+                    VALUES (:school_id, 'SCHOOL_ADMIN', :title, :message, '/school-admin/profile/subscription', 0)
+                ");
                 $stmtNotif->execute([
                     ':school_id' => $schoolId,
-                    ':user_id' => $adminId,
                     ':title' => $notifTitle,
                     ':message' => $notifMsg
                 ]);
