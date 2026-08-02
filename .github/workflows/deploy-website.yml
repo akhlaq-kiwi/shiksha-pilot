@@ -40,6 +40,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      - name: Write production .env
+        run: |
+          # Same shiksha_pilot database the app already uses — no new DB
+          # secrets needed, just reusing PROD_DB_* from the app's deploy.
+          # config.php loads this file if present; it's gitignored.
+          cat > website/.env <<EOF
+          DB_HOST=${{ secrets.PROD_DB_HOST }}
+          DB_NAME=${{ secrets.PROD_DB_NAME }}
+          DB_USER=${{ secrets.PROD_DB_USER }}
+          DB_PASS=${{ secrets.PROD_DB_PASS }}
+          EOF
+
       - name: Create deployment package
         run: |
           set -e
@@ -53,6 +65,8 @@ jobs:
           # has no purpose on shared hosting, where Apache is already set up.
           COPYFILE_DISABLE=1 tar -czf "$TAR_FILE" -C website \
             --exclude='Dockerfile' \
+            --exclude='.env.example' \
+            --exclude='.gitignore' \
             .
 
       - name: Upload package via SSH

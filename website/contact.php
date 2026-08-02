@@ -36,22 +36,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($values['school'] === '') { $errors['school'] = 'Please tell us your school\'s name.'; }
 
         if (empty($errors)) {
-            $to = CONTACT_EMAIL;
-            $subject = 'Demo request from ' . $values['school'];
-            $body = "New demo request from the website:\n\n"
-                  . "Name: {$values['name']}\n"
-                  . "Email: {$values['email']}\n"
-                  . "School: {$values['school']}\n"
-                  . "Phone: {$values['phone']}\n\n"
-                  . "Message:\n{$values['message']}\n";
-            $headers = 'From: no-reply@' . SITE_DOMAIN . "\r\n"
-                     . 'Reply-To: ' . $values['email'] . "\r\n";
-
-            // Best-effort: mail() requires a configured MTA to actually deliver.
-            // In production, swap this for a transactional email API/SMTP library.
-            $sent = @mail($to, $subject, $body, $headers);
-            $success = true; // Show success regardless — don't leak delivery internals to the visitor.
-            unset($_SESSION['csrf_token']);
+            try {
+                save_website_lead($values);
+                $success = true;
+                unset($_SESSION['csrf_token']);
+            } catch (PDOException $e) {
+                // Never surface DB internals to the visitor — log server-side
+                // and give them an actionable fallback instead.
+                error_log('website_leads insert failed: ' . $e->getMessage());
+                $errors['form'] = 'Something went wrong saving your request — please try again, or email us directly at ' . CONTACT_EMAIL . '.';
+            }
         }
     }
 }

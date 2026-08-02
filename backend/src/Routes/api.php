@@ -42,6 +42,8 @@ return function (App $app) {
     $app->get('/api/platform/schools/{id}/stats', [PlatformController::class, 'getSchoolStats']);
     $app->delete('/api/platform/plans/{id}', [PlatformController::class, 'deletePlan']);
     $app->get('/api/platform/schools/{id}/teachers', [PlatformController::class, 'getSchoolTeachers']);
+    $app->get('/api/platform/website-leads', [PlatformController::class, 'getWebsiteLeads']);
+    $app->delete('/api/platform/website-leads/{id}', [PlatformController::class, 'deleteWebsiteLead']);
     $app->get('/api/platform/schools/{id}/students', [PlatformController::class, 'getSchoolStudents']);
     $app->get('/api/platform/schools/{id}/subscriptions', [PlatformController::class, 'getSchoolSubscriptions']);
     $app->get('/api/platform/schools/{id}/academic-years', [PlatformController::class, 'getSchoolAcademicYears']);

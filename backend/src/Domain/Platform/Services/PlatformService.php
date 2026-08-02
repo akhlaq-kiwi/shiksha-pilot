@@ -8,6 +8,7 @@ use App\Domain\Auth\Repositories\AuthRepository;
 use App\Domain\Platform\Repositories\AuditLogRepository;
 use App\Domain\Platform\Repositories\PlansRepository;
 use App\Domain\Platform\Repositories\SchoolRepository;
+use App\Domain\Platform\Repositories\WebsiteLeadRepository;
 use App\Shared\BaseService;
 use App\Shared\Exceptions\NotFoundException;
 use App\Shared\Validation\Validator;
@@ -17,13 +18,33 @@ use Psr\Log\LoggerInterface;
 class PlatformService extends BaseService
 {
     public function __construct(
-        private SchoolRepository   $schools,
-        private AuditLogRepository $auditLogs,
-        private AuthRepository     $users,
-        private PlansRepository    $plans,
+        private SchoolRepository      $schools,
+        private AuditLogRepository    $auditLogs,
+        private AuthRepository        $users,
+        private PlansRepository       $plans,
+        private WebsiteLeadRepository $websiteLeads,
         ?LoggerInterface $logger = null,
     ) {
         parent::__construct($logger);
+    }
+
+    // -------------------------------------------------------------------------
+    // Website leads (demo requests from the public marketing site)
+    // -------------------------------------------------------------------------
+
+    public function getWebsiteLeads(): array
+    {
+        return $this->websiteLeads->findAll([], 'created_at DESC');
+    }
+
+    public function deleteWebsiteLead(int $id): void
+    {
+        $lead = $this->websiteLeads->findById($id);
+        if (!$lead) {
+            throw new NotFoundException('Website lead not found.');
+        }
+
+        $this->websiteLeads->delete($id);
     }
 
     private function actorInfo(array $actor): array

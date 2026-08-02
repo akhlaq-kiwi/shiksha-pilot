@@ -58,6 +58,13 @@ services:
       - "2005:80"
     volumes:
       - ./website:/var/www/html
+    environment:
+      - DB_HOST=db
+      - DB_USER=root
+      - DB_PASS=admin123
+      - DB_NAME=shiksha_pilot
+    depends_on:
+      - db
 
   phpmyadmin:
     image: phpmyadmin:latest

@@ -291,4 +291,27 @@ class PlatformController extends BaseController
         $school = $this->service->upgradePlan($id, $planId, $actor);
         return $this->success($response, $school, 'Subscription upgraded successfully.');
     }
+
+    // -------------------------------------------------------------------------
+    // Website leads (demo requests from the public marketing site)
+    // -------------------------------------------------------------------------
+
+    public function getWebsiteLeads(Request $request, Response $response): Response
+    {
+        $actor = $this->authenticate($request);
+        $this->requireRole($actor, ['SUPER_ADMIN']);
+
+        return $this->success($response, $this->service->getWebsiteLeads());
+    }
+
+    public function deleteWebsiteLead(Request $request, Response $response, array $args): Response
+    {
+        $actor = $this->authenticate($request);
+        $this->requireRole($actor, ['SUPER_ADMIN']);
+
+        $id = (int) ($args['id'] ?? 0);
+        $this->service->deleteWebsiteLead($id);
+
+        return $this->success($response, null, 'Lead deleted successfully.');
+    }
 }
