@@ -1,14 +1,14 @@
 /* Shiksha Pilot — shared stylesheet. Cartoon/sticker visual language,
    single deliberate light theme (see marketing mockup for rationale). */
 
-@font-face{ font-family:'Baloo'; src:url('../fonts/baloo2-500.woff2') format('woff2'); font-weight:500; font-display:swap; }
-@font-face{ font-family:'Baloo'; src:url('../fonts/baloo2-700.woff2') format('woff2'); font-weight:700; font-display:swap; }
-@font-face{ font-family:'Baloo'; src:url('../fonts/baloo2-800.woff2') format('woff2'); font-weight:800; font-display:swap; }
-@font-face{ font-family:'Nunito'; src:url('../fonts/nunito-400.woff2') format('woff2'); font-weight:400; font-display:swap; }
-@font-face{ font-family:'Nunito'; src:url('../fonts/nunito-700.woff2') format('woff2'); font-weight:700; font-display:swap; }
-@font-face{ font-family:'Nunito'; src:url('../fonts/nunito-800.woff2') format('woff2'); font-weight:800; font-display:swap; }
-@font-face{ font-family:'Kalam'; src:url('../fonts/kalam-400.woff2') format('woff2'); font-weight:400; font-display:swap; }
-@font-face{ font-family:'Kalam'; src:url('../fonts/kalam-700.woff2') format('woff2'); font-weight:700; font-display:swap; }
+@font-face{ font-family:'Baloo'; src:url('/assets/fonts/baloo2-500.woff2') format('woff2'); font-weight:500; font-display:swap; }
+@font-face{ font-family:'Baloo'; src:url('/assets/fonts/baloo2-700.woff2') format('woff2'); font-weight:700; font-display:swap; }
+@font-face{ font-family:'Baloo'; src:url('/assets/fonts/baloo2-800.woff2') format('woff2'); font-weight:800; font-display:swap; }
+@font-face{ font-family:'Nunito'; src:url('/assets/fonts/nunito-400.woff2') format('woff2'); font-weight:400; font-display:swap; }
+@font-face{ font-family:'Nunito'; src:url('/assets/fonts/nunito-700.woff2') format('woff2'); font-weight:700; font-display:swap; }
+@font-face{ font-family:'Nunito'; src:url('/assets/fonts/nunito-800.woff2') format('woff2'); font-weight:800; font-display:swap; }
+@font-face{ font-family:'Kalam'; src:url('/assets/fonts/kalam-400.woff2') format('woff2'); font-weight:400; font-display:swap; }
+@font-face{ font-family:'Kalam'; src:url('/assets/fonts/kalam-700.woff2') format('woff2'); font-weight:700; font-display:swap; }
 
 :root{
   --paper: #fff8ea;
