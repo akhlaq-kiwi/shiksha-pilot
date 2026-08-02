@@ -11,13 +11,31 @@ const generatePassword = () => {
   return Array.from({ length: 10 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 };
 
+const getCurrentAcademicYearDefaults = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  const startYear = month >= 4 ? year : year - 1;
+  const endYear = startYear + 1;
+  return {
+    ay_name: `${startYear}–${endYear}`,
+    ay_start_date: `${startYear}-04-01`,
+    ay_end_date: `${endYear}-03-31`,
+  };
+};
+
 const EMPTY = {
   name: '',
   contact_phone: '', contact_email: '', admin_phone: '', admin_password: '',
+  ay_name: '', ay_start_date: '', ay_end_date: '',
 };
 
 export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating, validationErrors = {} }) {
-  const [form, setForm] = useState({ ...EMPTY, admin_password: generatePassword() });
+  const [form, setForm] = useState({ 
+    ...EMPTY, 
+    admin_password: generatePassword(),
+    ...getCurrentAcademicYearDefaults()
+  });
   const [localErrors, setLocalErrors] = useState({});
 
   useEffect(() => {
@@ -27,7 +45,11 @@ export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating
   useEffect(() => {
     if (isOpen) {
       setLocalErrors({});
-      setForm({ ...EMPTY, admin_password: generatePassword() });
+      setForm({ 
+        ...EMPTY, 
+        admin_password: generatePassword(),
+        ...getCurrentAcademicYearDefaults()
+      });
     }
   }, [isOpen]);
 
@@ -63,7 +85,11 @@ export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSubmit(form, () => setForm({ ...EMPTY, admin_password: generatePassword() }));
+    onSubmit(form, () => setForm({ 
+      ...EMPTY, 
+      admin_password: generatePassword(),
+      ...getCurrentAcademicYearDefaults()
+    }));
   };
 
   return (
@@ -71,7 +97,7 @@ export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating
       isOpen={isOpen}
       onClose={onClose}
       title="Add New School"
-      description="Provision a school and set up the administrator account."
+      description="Provision a school, set up initial Academic Year, and configure the administrator account."
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
@@ -84,7 +110,7 @@ export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* School details */}
         <div className="space-y-1.5">
-          <label htmlFor="school-name" className="text-xs font-bold text-text-secondary uppercase">School Name</label>
+          <label htmlFor="school-name" className="text-xs font-bold text-text-secondary uppercase">School Name *</label>
           <Input id="school-name" placeholder="e.g. Cambridge Academy" value={form.name} onChange={set('name')} required />
         </div>
 
@@ -117,12 +143,58 @@ export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating
           </div>
         </div>
 
+        {/* Initial Academic Year Setup */}
+        <div className="border-t border-border pt-4">
+          <p className="text-xs font-bold text-text-secondary uppercase mb-3">Initial Academic Year Setup *</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <label htmlFor="ay-name" className="text-xs font-bold text-text-secondary uppercase">Year Title *</label>
+              <Input id="ay-name"
+                placeholder="e.g. 2026–2027"
+                value={form.ay_name}
+                onChange={set('ay_name')}
+                required
+                className={localErrors?.ay_name ? 'border-red-500 ring-1 ring-red-500' : ''}
+              />
+              {localErrors?.ay_name && (
+                <p className="text-[11px] font-bold text-red-500 mt-0.5">{localErrors.ay_name}</p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="ay-start-date" className="text-xs font-bold text-text-secondary uppercase">Start Date *</label>
+              <Input id="ay-start-date"
+                type="date"
+                value={form.ay_start_date}
+                onChange={set('ay_start_date')}
+                required
+                className={localErrors?.ay_start_date ? 'border-red-500 ring-1 ring-red-500' : ''}
+              />
+              {localErrors?.ay_start_date && (
+                <p className="text-[11px] font-bold text-red-500 mt-0.5">{localErrors.ay_start_date}</p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="ay-end-date" className="text-xs font-bold text-text-secondary uppercase">End Date *</label>
+              <Input id="ay-end-date"
+                type="date"
+                value={form.ay_end_date}
+                onChange={set('ay_end_date')}
+                required
+                className={localErrors?.ay_end_date ? 'border-red-500 ring-1 ring-red-500' : ''}
+              />
+              {localErrors?.ay_end_date && (
+                <p className="text-[11px] font-bold text-red-500 mt-0.5">{localErrors.ay_end_date}</p>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* Admin credentials */}
         <div className="border-t border-border pt-4">
-          <p className="text-xs font-bold text-text-secondary uppercase mb-3">School Admin Account</p>
+          <p className="text-xs font-bold text-text-secondary uppercase mb-3">School Admin Account *</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label htmlFor="admin-phone" className="text-xs font-bold text-text-secondary uppercase">Admin Phone</label>
+              <label htmlFor="admin-phone" className="text-xs font-bold text-text-secondary uppercase">Admin Phone *</label>
               <Input id="admin-phone"
                 placeholder="e.g. 9800000001"
                 value={form.admin_phone}
@@ -135,7 +207,7 @@ export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating
               )}
             </div>
             <div className="space-y-1.5">
-              <label htmlFor="password" className="text-xs font-bold text-text-secondary uppercase">Password</label>
+              <label htmlFor="password" className="text-xs font-bold text-text-secondary uppercase">Password *</label>
               <div className="flex items-center gap-1.5">
                 <Input id="password"
                   placeholder="Password"

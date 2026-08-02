@@ -464,7 +464,7 @@ export default function AnnouncementsPage() {
                               onClick={() => handleEdit(ann)}
                               className="w-full text-left px-4 py-2 text-xs text-text-primary hover:bg-zinc-50 flex items-center gap-2 font-bold uppercase tracking-wider"
                             >
-                              <Edit className="h-3.5 w-3.5 text-blue-600" />
+                              <Edit className="h-3.5 w-3.5 text-primary" />
                               Edit
                             </button>
 

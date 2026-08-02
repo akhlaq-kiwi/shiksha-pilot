@@ -256,20 +256,32 @@ class PlatformService extends BaseService
             $this->addSubscriptionForSchool($pdo, $schoolId, $data['plan'], 'new');
         }
 
-        // Create school admin user if credentials provided
-        if (!empty($data['admin_phone'])) {
-            $this->users->createUser([
-                'phone'                 => (string) $data['admin_phone'],
-                'password'              => (string) ($data['admin_password'] ?? 'changeme123'),
-                'name'                  => (string) ($data['name'] . ' Admin'),
-                'role'                  => 'SCHOOL_ADMIN',
-                'status'                => 'ACTIVE',
-                'school_id'             => $schoolId,
-                'force_password_change' => 1,
-                'email'                 => (string) $data['contact_email'],
-                'plain_password'        => (string) ($data['admin_password'] ?? 'changeme123'),
-            ]);
+        // Create initial Academic Year explicitly specified by Super Admin
+        $ayName = trim((string)($data['ay_name'] ?? ''));
+        $startDate = trim((string)($data['ay_start_date'] ?? ''));
+        $endDate = trim((string)($data['ay_end_date'] ?? ''));
+
+        if (empty($ayName) || empty($startDate) || empty($endDate)) {
+            $now = new \DateTime();
+            $month = (int)$now->format('n');
+            $year = (int)$now->format('Y');
+            $startYear = ($month >= 4) ? $year : ($year - 1);
+            $endYear = $startYear + 1;
+            $ayName = $ayName ?: "{$startYear}–{$endYear}";
+            $startDate = $startDate ?: "{$startYear}-04-01";
+            $endDate = $endDate ?: "{$endYear}-03-31";
         }
+
+        $stmtAY = $pdo->prepare("
+            INSERT INTO academic_years (school_id, name, start_date, end_date, is_current, status) 
+            VALUES (:school_id, :name, :start_date, :end_date, 1, 'ACTIVE')
+        ");
+        $stmtAY->execute([
+            ':school_id' => $schoolId,
+            ':name' => $ayName,
+            ':start_date' => $startDate,
+            ':end_date' => $endDate
+        ]);
 
         $actorInfo = $this->actorInfo($actor);
         $this->auditLogs->log(

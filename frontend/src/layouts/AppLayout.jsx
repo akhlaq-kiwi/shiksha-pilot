@@ -180,7 +180,7 @@ const AppLayout = ({ children }) => {
             <div className="flex items-center gap-3 min-w-0">
               {role !== 'SUPER_ADMIN' ? (
                 schoolProfile ? (
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
                     <span 
                       className="text-sm font-bold text-text-primary font-display tracking-tight leading-none truncate uppercase"
                       style={{ fontWeight: 700 }}
@@ -190,22 +190,8 @@ const AppLayout = ({ children }) => {
                     
                     {isSchoolAdmin && currentYear && (
                       <>
-                        <div className="h-4 w-px bg-border" aria-hidden="true"></div>
-                        {/*
-                          Academic year is a SCOPE control: changing it changes
-                          every figure on every downstream screen. It was
-                          previously an unlabelled native select sitting next to
-                          the school name. It now carries a visible label, a
-                          distinct bordered treatment, and a confirmation when
-                          moving away from the active year.
-                        */}
-                        <div className="flex items-center gap-2 rounded-lg border border-border-strong bg-surface-sunken px-2 py-1">
-                          <label
-                            htmlFor="academic-year-switcher"
-                            className="hidden text-overline text-text-muted sm:block"
-                          >
-                            Academic year
-                          </label>
+                        <div className="h-4 w-px bg-border flex-shrink-0" aria-hidden="true"></div>
+                        <div className="flex items-center gap-2 rounded-lg border border-border-strong bg-surface-sunken px-2 py-1 flex-shrink-0">
                           <select
                             id="academic-year-switcher"
                             value={currentYear.id}
@@ -253,11 +239,6 @@ const AppLayout = ({ children }) => {
 
             {/* Right controls */}
             <div className="flex items-center gap-1.5">
-
-              {/* Global search (Cmd/Ctrl-K) */}
-              {searchEnabled && (
-                <GlobalSearch destinations={destinations} onSearchRecords={searchRecords} />
-              )}
 
               {/* Notification Bell */}
               {isSchoolAdmin && (
@@ -355,17 +336,6 @@ const AppLayout = ({ children }) => {
                 logo where the USER's identity belongs, so on a shared staff-room
                 device there was no way to tell whose account was active.
               */}
-              {role !== 'SUPER_ADMIN' && (
-                <div className="mr-1 hidden flex-col items-end sm:flex">
-                  <span className="text-body-sm font-semibold leading-none text-text-primary">
-                    {displayName}
-                  </span>
-                  <span className="mt-0.5 text-[11px] leading-none text-text-muted">
-                    {roleLabel}
-                  </span>
-                </div>
-              )}
-
               {/* User profile dropdown avatar controls */}
               {role !== 'SUPER_ADMIN' ? (
                 <div className="relative" ref={dropdownRef}>
@@ -431,14 +401,6 @@ const AppLayout = ({ children }) => {
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
-                  <div className="hidden sm:flex flex-col items-end mr-2">
-                    <span className="font-semibold text-text-primary leading-none text-xs">
-                      {displayName}
-                    </span>
-                    <span className="text-[11px] text-text-muted leading-none mt-0.5 uppercase tracking-wide">
-                      {roleLabel}
-                    </span>
-                  </div>
                   <Button
                     variant="ghost"
                     size="icon"

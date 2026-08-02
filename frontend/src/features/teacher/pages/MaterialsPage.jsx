@@ -19,7 +19,7 @@ export default function MaterialsPage({ classes, materials: initMaterials }) {
   const typeIcon = (type) => {
     if (type === 'video') return <Video className="h-4 w-4 text-violet-500" />;
     if (type === 'notes') return <StickyNote className="h-4 w-4 text-amber-500" />;
-    return <File className="h-4 w-4 text-blue-500" />;
+    return <File className="h-4 w-4 text-primary" />;
   };
 
   const filtered = materials.filter((m) =>

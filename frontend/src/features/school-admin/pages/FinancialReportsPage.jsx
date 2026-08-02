@@ -109,9 +109,25 @@ export default function FinancialReportsPage() {
   const [hasPreviousReport, setHasPreviousReport] = useState(false);
   const [loading, setLoading] = useState(true);
   
-  // Date params
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
+  // Helper functions for ISO YYYY-MM-DD
+  const getISOFirstDayOfMonth = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    return `${year}-${month}-01`;
+  };
+
+  const getISOToday = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Date params pre-filled by default
+  const [fromDate, setFromDate] = useState(getISOFirstDayOfMonth());
+  const [toDate, setToDate] = useState(getISOToday());
   
   // Preview states
   const [previewData, setPreviewData] = useState(null);
@@ -122,29 +138,45 @@ export default function FinancialReportsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [showGenerateConfirm, setShowGenerateConfirm] = useState(false);
   const [showSettlementConfirm, setShowSettlementConfirm] = useState(false);
   const [settlementTarget, setSettlementTarget] = useState(null);
 
+  const fetchPreview = async (fDate = fromDate, tDate = toDate) => {
+    const start = fDate || getISOFirstDayOfMonth();
+    const end = tDate || getISOToday();
+    setPreviewError('');
+    setPreviewLoading(true);
+    try {
+      const data = await schoolService.getFinancialPreview({
+        from_date: start,
+        to_date: end
+      });
+      setPreviewData(data);
+    } catch (err) {
+      console.error(err);
+      setPreviewError(err.message || 'Failed to fetch financial preview.');
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
   const loadReports = async (selectedYear = currentYear) => {
     setLoading(true);
+    const initialFrom = getISOFirstDayOfMonth();
+    const initialTo = getISOToday();
+    setFromDate(initialFrom);
+    setToDate(initialTo);
+
     try {
       const res = await schoolService.getFinancialReports();
       setReports(res.reports || []);
       
       const suggestedStart = res.next_suggested_start_date || '';
       setNextSuggestedStartDate(suggestedStart);
-      setFromDate(suggestedStart);
       setHasPreviousReport(!!res.has_previous_report);
-      
-      // Default toDate to today (current date)
-      const today = new Date().toLocaleDateString('en-CA');
-      const finalToDate = today < suggestedStart ? suggestedStart : today;
-      setToDate(finalToDate);
 
-      // Reset any errors from previous preview attempts
-      setPreviewError('');
-      setPreviewData(null);
+      // Auto load preview for current ongoing month
+      fetchPreview(initialFrom, initialTo);
     } catch (err) {
       console.error(err);
       setError('Failed to load financial reports history.');
@@ -165,27 +197,14 @@ export default function FinancialReportsPage() {
   }, [currentYear]);
 
   const handlePreview = async () => {
-    setPreviewError('');
-    setPreviewLoading(true);
-    setPreviewData(null);
+    const fDate = fromDate || getISOFirstDayOfMonth();
+    const tDate = toDate || getISOToday();
     
-    try {
-      const data = await schoolService.getFinancialPreview({
-        from_date: '',
-        to_date: ''
-      });
-      setPreviewData(data);
-      schoolAdminService.logClientAudit({
-        module: 'Financial Reports',
-        action: 'Report Previewed',
-        description: 'Financial report previewed dynamically for pending period'
-      }).catch(console.error);
-    } catch (err) {
-      console.error(err);
-      setPreviewError(err.message || 'Failed to fetch financial preview.');
-    } finally {
-      setPreviewLoading(false);
+    if (tDate < fDate) {
+      setPreviewError('To Date cannot be earlier than From Date.');
+      return;
     }
+    fetchPreview(fDate, tDate);
   };
 
   const handleSendSettlementRequest = (report) => {
@@ -252,7 +271,7 @@ export default function FinancialReportsPage() {
           </div>
           <div>
             <h2 className="text-2xl font-bold text-text-primary tracking-tight font-display">Financial Reports</h2>
-            <p className="text-text-secondary text-xs mt-1">Preview current profit/loss statement and generate official accounts reports for the school owner.</p>
+            <p className="text-text-secondary text-xs mt-1">Automatic monthly accounting reports for school owners and live profit/loss preview for ongoing month.</p>
           </div>
         </div>
       </div>
@@ -264,14 +283,36 @@ export default function FinancialReportsPage() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           
-          {/* Left Panel: Pending Report Info */}
+          {/* Left Panel: Ongoing Month Inspection */}
           <Card className="bg-surface border border-border p-6 rounded-2xl shadow-2xs space-y-4">
             <CardHeader className="p-0 pb-2 border-b border-border">
-              <CardTitle className="text-sm font-bold text-text-primary uppercase tracking-wider">Pending Report Info</CardTitle>
+              <CardTitle className="text-sm font-bold text-text-primary uppercase tracking-wider">Ongoing Month Inspection</CardTitle>
             </CardHeader>
             <div className="space-y-4">
               <div className="text-xs text-text-secondary leading-relaxed bg-zinc-50/50 dark:bg-zinc-900/10 p-3.5 rounded-xl border border-border border-dashed">
-                Financial reports are now generated automatically by the system on the <strong>1st day of every month at 12:00 AM</strong>. Use this preview to inspect current month transactions.
+                Completed monthly financial reports are generated <strong>automatically by the system on the 1st day of every month at 12:00 AM</strong> (covering all 28, 30, or 31 days of the month). Use this preview to inspect live transactions for the current month.
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label htmlFor="from_date" className="text-xs font-bold text-text-secondary uppercase">From Date</label>
+                  <Input 
+                    id="from_date" 
+                    type="date" 
+                    value={fromDate} 
+                    onChange={(e) => setFromDate(e.target.value)} 
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label htmlFor="to_date" className="text-xs font-bold text-text-secondary uppercase">To Date</label>
+                  <Input 
+                    id="to_date" 
+                    type="date" 
+                    value={toDate} 
+                    onChange={(e) => setToDate(e.target.value)} 
+                  />
+                </div>
               </div>
 
               {previewError && (
@@ -407,7 +448,7 @@ export default function FinancialReportsPage() {
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-bold text-text-primary font-mono">{r.report_id}</span>
                       {r.status === 'Request Sent' && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase border bg-blue-500/10 text-blue-600 border-blue-500/20">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase border bg-primary/10 text-primary border-primary/20">
                           Request Sent
                         </span>
                       )}

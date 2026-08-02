@@ -2053,7 +2053,7 @@ export default function QuestionPaperDesignerPage() {
             type="button"
             variant="outline" 
             size="sm"
-            className="flex items-center gap-1.5 font-bold text-xs text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100 whitespace-nowrap"
+            className="flex items-center gap-1.5 font-bold text-xs text-primary border-primary/20 bg-primary/5 hover:bg-primary/10 whitespace-nowrap"
             onClick={handleNewPaper}
           >
             <Plus className="h-4 w-4" /> New Paper
@@ -3714,7 +3714,7 @@ export default function QuestionPaperDesignerPage() {
                             type="button" 
                             size="sm" 
                             variant="ghost" 
-                            className="h-8 text-xs font-bold text-primary hover:bg-blue-50"
+                            className="h-8 text-xs font-bold text-primary hover:bg-primary/10"
                             onClick={() => handleLoadSavedPaper(paper)}
                           >
                             Load

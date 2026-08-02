@@ -41,7 +41,7 @@ export default function AttendancePage({ attendance }) {
           { label: 'Present', value: attendance.present, color: 'text-emerald-600' },
           { label: 'Absent', value: attendance.absent, color: 'text-red-600' },
           { label: 'Leave', value: 3, color: 'text-amber-600' },
-          { label: 'Percentage', value: `${attendance.percentage}%`, color: 'text-blue-600' },
+          { label: 'Percentage', value: `${attendance.percentage}%`, color: 'text-primary' },
         ].map(s => (
           <Card key={s.label} className="shadow-sm">
             <CardContent className="p-4 text-center">

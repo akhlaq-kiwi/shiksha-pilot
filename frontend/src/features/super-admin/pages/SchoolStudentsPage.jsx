@@ -26,7 +26,7 @@ const StudentAvatar = ({ src, name }) => {
     : 'S';
     
   return (
-    <div className="w-full h-full bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400 flex items-center justify-center text-lg font-bold">
+    <div className="w-full h-full bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-fg flex items-center justify-center text-lg font-bold">
       {initials}
     </div>
   );

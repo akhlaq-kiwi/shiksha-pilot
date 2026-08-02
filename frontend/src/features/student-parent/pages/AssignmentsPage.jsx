@@ -6,7 +6,7 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '.
 import { Dialog } from '../../../common/ui/dialog';
 
 const subjectColors = {
-  'Mathematics': 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
+  'Mathematics': 'bg-primary/10 text-primary dark:text-primary-fg',
   'Physics': 'bg-purple-500/10 text-purple-700 dark:text-purple-400',
   'Chemistry': 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
   'English': 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
@@ -18,7 +18,7 @@ const getSubjectColor = (subject) =>
 
 const statusConfig = {
   pending: { label: 'PENDING', cls: 'bg-amber-500/10 text-amber-700 dark:text-amber-400' },
-  submitted: { label: 'Submitted', cls: 'bg-blue-500/10 text-blue-700 dark:text-blue-400' },
+  submitted: { label: 'Submitted', cls: 'bg-primary/10 text-primary dark:text-primary-fg' },
   graded: { label: 'Graded', cls: 'bg-green-500/10 text-green-700 dark:text-green-400' },
   overdue: { label: 'Overdue', cls: 'bg-red-500/10 text-red-600 dark:text-red-400' },
 };
@@ -108,7 +108,7 @@ export default function AssignmentsPage({ assignments }) {
                     </Button>
                   )}
                   {hw.status === 'submitted' && (
-                    <span className="text-xs text-blue-600 font-bold flex items-center gap-1">
+                    <span className="text-xs text-primary font-bold flex items-center gap-1">
                       <CheckCircle2 className="h-3.5 w-3.5" /> Awaiting review
                     </span>
                   )}
@@ -146,7 +146,7 @@ export default function AssignmentsPage({ assignments }) {
                 <TableCell className="text-xs text-text-secondary">Physics</TableCell>
                 <TableCell className="text-xs text-text-muted">2026-06-10</TableCell>
                 <TableCell><span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-green-500/10 text-green-600">Graded</span></TableCell>
-                <TableCell className="font-bold text-blue-600">B+</TableCell>
+                <TableCell className="font-bold text-primary">B+</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell className="font-semibold text-text-primary py-3.5">Algebra Problem Set 2</TableCell>
@@ -181,8 +181,8 @@ export default function AssignmentsPage({ assignments }) {
       >
         {submitDone ? (
           <div className="py-6 flex flex-col items-center text-center gap-3">
-            <div className="h-14 w-14 rounded-full bg-blue-500/10 flex items-center justify-center">
-              <CheckCircle2 className="h-7 w-7 text-blue-600" />
+            <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center">
+              <CheckCircle2 className="h-7 w-7 text-primary" />
             </div>
             <h3 className="text-lg font-bold text-text-primary">Assignment Submitted</h3>
             <p className="text-sm text-text-secondary">Your submission has been recorded and sent to the teacher for review.</p>

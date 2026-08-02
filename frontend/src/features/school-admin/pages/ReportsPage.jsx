@@ -132,7 +132,7 @@ function VocabularyAnalyticsReport({ analytics }) {
         </div>
         <div className="bg-background dark:bg-zinc-900 border border-border p-5 rounded-xl shadow-2xs">
           <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Monthly Active Players (MAU)</p>
-          <p className="text-3xl font-bold text-blue-600 mt-1.5 tabular-nums">{mau}</p>
+          <p className="text-3xl font-bold text-primary mt-1.5 tabular-nums">{mau}</p>
         </div>
       </div>
 

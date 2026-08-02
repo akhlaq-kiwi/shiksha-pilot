@@ -39,7 +39,7 @@ export default function SchoolHistoryPage() {
   const getTransactionLabel = (type) => {
     switch (type) {
       case 'new':
-        return { label: 'New Subscription', color: 'bg-blue-500/10 text-blue-600 border-blue-500/20' };
+        return { label: 'New Subscription', color: 'bg-primary/10 text-primary border-primary/20' };
       case 'renewal':
         return { label: 'Renewal', color: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' };
       case 'upgrade':

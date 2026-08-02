@@ -696,7 +696,7 @@ export default function ProfilePage({ mode = 'details' }) {
                     const daysText = calculateDaysLeftText(profile?.subscription_expiry);
                     const isExpired = daysText === 'Expired';
                     return (
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${isExpired ? 'bg-red-500/10 text-red-600 border border-red-500/20' : 'bg-blue-500/10 text-blue-600 border border-blue-500/20'}`}>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${isExpired ? 'bg-red-500/10 text-red-600 border border-red-500/20' : 'bg-primary/10 text-primary border border-primary/20'}`}>
                         {daysText}
                       </span>
                     );

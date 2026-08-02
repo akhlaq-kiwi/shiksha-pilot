@@ -2,7 +2,7 @@ import React from 'react';
 import { Download, Play, FileText, Folder, ChevronRight } from 'lucide-react';
 
 const subjectColors = {
-  'Mathematics': 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
+  'Mathematics': 'bg-primary/10 text-primary dark:text-primary-fg',
   'Physics': 'bg-purple-500/10 text-purple-700 dark:text-purple-400',
   'Chemistry': 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
   'English': 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',

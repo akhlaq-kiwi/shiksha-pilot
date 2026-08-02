@@ -1259,7 +1259,7 @@ export default function TimetablePage() {
             <Button 
               onClick={handlePasteSchedule} 
               disabled={actionLoading === 'paste'}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-bold"
+              className="bg-primary hover:bg-primary-hover text-primary-fg font-bold"
             >
               {actionLoading === 'paste' ? 'Pasting...' : 'Paste Schedule'}
             </Button>
@@ -1453,7 +1453,7 @@ export default function TimetablePage() {
           <div className="h-4 w-px bg-border" />
           <Button 
             onClick={handleDownloadPDF}
-            className="font-bold flex items-center gap-1.5 px-4 h-9 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-md"
+            className="font-bold flex items-center gap-1.5 px-4 h-9 bg-primary hover:bg-primary-hover text-primary-fg rounded-full shadow-md"
           >
             <Download className="h-3.5 w-3.5" /> Download PDF
           </Button>

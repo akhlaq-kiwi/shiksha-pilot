@@ -241,7 +241,7 @@ export default function CollectionHistoryPage() {
         {[
           { label: 'Total Fee Collected', value: `₹${parseFloat(stats.total_collected).toLocaleString('en-IN')}`, icon: Banknote, color: 'text-primary bg-primary/5 border-primary/10' },
           { label: "Today's Collection", value: `₹${parseFloat(stats.today_collection).toLocaleString('en-IN')}`, icon: CheckCircle2, color: 'text-emerald-600 bg-emerald-50 border-emerald-100 dark:bg-emerald-950/20 dark:border-emerald-500/20' },
-          { label: getDynamicMonthCardTitle(), value: `₹${parseFloat(stats.this_month_collection).toLocaleString('en-IN')}`, icon: Calendar, color: 'text-blue-600 bg-blue-50 border-blue-100 dark:bg-blue-950/20 dark:border-blue-500/20' },
+          { label: getDynamicMonthCardTitle(), value: `₹${parseFloat(stats.this_month_collection).toLocaleString('en-IN')}`, icon: Calendar, color: 'text-primary bg-primary/10 border-primary/20' },
           { label: 'Total Transactions', value: stats.total_transactions.toString(), icon: FileText, color: 'text-purple-600 bg-purple-50 border-purple-100 dark:bg-purple-950/20 dark:border-purple-500/20' },
         ].map((c, i) => {
           const Icon = c.icon;

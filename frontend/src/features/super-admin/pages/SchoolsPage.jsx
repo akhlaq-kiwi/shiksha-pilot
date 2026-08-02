@@ -10,7 +10,7 @@ import { useConfirm } from '../../../common/components/ConfirmDialog';
 
 const getSchoolColor = (name) => {
   const colors = [
-    'bg-blue-500/10 text-blue-600',
+    'bg-primary/10 text-primary',
     'bg-emerald-500/10 text-emerald-600',
     'bg-amber-500/10 text-amber-600',
     'bg-indigo-500/10 text-indigo-600',

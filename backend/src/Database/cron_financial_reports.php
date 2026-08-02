@@ -61,79 +61,64 @@ try {
         foreach ($years as $year) {
             $yearId = (int)$year['id'];
             $yearName = $year['name'];
+            $ayStart = $year['start_date'];
+            $ayEnd = $year['end_date'];
+            $today = date('Y-m-d');
 
-            // 3. Find the latest generated report in this academic year
-            $stmtLatest = $pdo->prepare("
-                SELECT * FROM financial_reports 
-                WHERE school_id = :sid 
-                  AND `from_date` >= :start_date 
-                  AND `to_date` <= :end_date
-                ORDER BY id DESC LIMIT 1
-            ");
-            $stmtLatest->execute([
-                ':sid' => $schoolId,
-                ':start_date' => $year['start_date'],
-                ':end_date' => $year['end_date']
-            ]);
-            $latestReport = $stmtLatest->fetch();
+            $currentMonthStart = date('Y-m-01', strtotime($ayStart));
 
-            $latestReportCreatedAt = $latestReport ? $latestReport['created_at'] : null;
+            while ($currentMonthStart <= $ayEnd) {
+                $monthEnd = date('Y-m-t', strtotime($currentMonthStart));
 
-            $from = $latestReport ? $latestReport['to_date'] : $year['start_date'];
-            $to = date('Y-m-d', strtotime('yesterday'));
-            $toTimestamp = $to . ' 23:59:59';
+                // If current month is not completed yet, stop
+                if ($today <= $monthEnd) {
+                    break;
+                }
 
-            if (strtotime($to) < strtotime($from)) {
-                // If today is earlier than the academic year start or last report, skip
-                continue;
-            }
-
-            // 5. Prevent duplicate report generation if the scheduler runs more than once
-            $stmtCheckDup = $pdo->prepare("
-                SELECT COUNT(*) FROM financial_reports 
-                WHERE school_id = :sid AND `to_date` = :to
-            ");
-            $stmtCheckDup->execute([':sid' => $schoolId, ':to' => $to]);
-            if ((int)$stmtCheckDup->fetchColumn() > 0) {
-                cron_log("Skipping school ID {$schoolId} ({$schoolName}) year {$yearName}: Report ending on {$to} already exists.");
-                continue;
-            }
-
-            // 6. Compute financial metrics for the period using Academic Year ownership
-            // Fees collected
-            if ($latestReportCreatedAt) {
-                $stmtFees = $pdo->prepare("
-                    SELECT COALESCE(SUM(amount_paid), 0) 
-                    FROM fee_payments 
-                    WHERE school_id = :sid 
-                      AND academic_year_id = :ayid 
-                      AND created_at > :latest_rep_ts
-                      AND created_at <= :to_ts
+                $stmtCheckDup = $pdo->prepare("
+                    SELECT COUNT(*) FROM financial_reports 
+                    WHERE school_id = :sid AND (
+                        (`from_date` = :f1 AND `to_date` = :t1)
+                        OR (`from_date` <= :f2 AND `to_date` >= :t2)
+                    )
                 ");
-                $stmtFees->execute([
+                $stmtCheckDup->execute([
                     ':sid' => $schoolId,
-                    ':ayid' => $yearId,
-                    ':latest_rep_ts' => $latestReportCreatedAt,
-                    ':to_ts' => $toTimestamp
+                    ':f1' => $currentMonthStart,
+                    ':t1' => $monthEnd,
+                    ':f2' => $currentMonthStart,
+                    ':t2' => $monthEnd
                 ]);
-            } else {
+
+                if ((int)$stmtCheckDup->fetchColumn() > 0) {
+                    $currentMonthStart = date('Y-m-d', strtotime($currentMonthStart . ' +1 month'));
+                    continue;
+                }
+
+                $from = $currentMonthStart;
+                $to = $monthEnd;
+                $fromTs = $from . ' 00:00:00';
+                $toTs = $to . ' 23:59:59';
+
+                // 6. Compute financial metrics for the period using Academic Year ownership
+                // Fees collected
                 $stmtFees = $pdo->prepare("
                     SELECT COALESCE(SUM(amount_paid), 0) 
                     FROM fee_payments 
                     WHERE school_id = :sid 
                       AND academic_year_id = :ayid
-                      AND created_at <= :to_ts
+                      AND status = 'PAID'
+                      AND created_at >= :from_ts AND created_at <= :to_ts
                 ");
                 $stmtFees->execute([
                     ':sid' => $schoolId,
                     ':ayid' => $yearId,
-                    ':to_ts' => $toTimestamp
+                    ':from_ts' => $fromTs,
+                    ':to_ts' => $toTs
                 ]);
-            }
-            $tuitionCollected = (float)$stmtFees->fetchColumn();
+                $tuitionCollected = (float)$stmtFees->fetchColumn();
 
-            // Additional fees
-            if ($latestReportCreatedAt) {
+                // Additional fees
                 $stmtAddFees = $pdo->prepare("
                     SELECT COALESCE(SUM(afp.amount), 0) 
                     FROM additional_fee_payments afp
@@ -141,97 +126,48 @@ try {
                     WHERE afp.school_id = :sid 
                       AND afp.status = 'Paid' 
                       AND aft.academic_year_id = :ayid 
-                      AND afp.updated_at > :latest_rep_ts
-                      AND afp.updated_at <= :to_ts
+                      AND afp.updated_at >= :from_ts AND afp.updated_at <= :to_ts
                 ");
                 $stmtAddFees->execute([
                     ':sid' => $schoolId,
                     ':ayid' => $yearId,
-                    ':latest_rep_ts' => $latestReportCreatedAt,
-                    ':to_ts' => $toTimestamp
+                    ':from_ts' => $fromTs,
+                    ':to_ts' => $toTs
                 ]);
-            } else {
-                $stmtAddFees = $pdo->prepare("
-                    SELECT COALESCE(SUM(afp.amount), 0) 
-                    FROM additional_fee_payments afp
-                    JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
-                    WHERE afp.school_id = :sid 
-                      AND afp.status = 'Paid' 
-                      AND aft.academic_year_id = :ayid
-                      AND afp.updated_at <= :to_ts
-                ");
-                $stmtAddFees->execute([
-                    ':sid' => $schoolId,
-                    ':ayid' => $yearId,
-                    ':to_ts' => $toTimestamp
-                ]);
-            }
-            $addFeesCollected = (float)$stmtAddFees->fetchColumn();
+                $addFeesCollected = (float)$stmtAddFees->fetchColumn();
 
-            $totalFees = $tuitionCollected + $addFeesCollected;
+                $totalFees = $tuitionCollected + $addFeesCollected;
 
-            // Salaries paid
-            if ($latestReportCreatedAt) {
+                // Salaries paid
                 $stmtSalaries = $pdo->prepare("
                     SELECT COALESCE(SUM(amount_paid), 0) 
                     FROM staff_payments 
                     WHERE school_id = :sid 
                       AND academic_year_id = :ayid 
-                      AND created_at > :latest_rep_ts
-                      AND created_at <= :to_ts
+                      AND created_at >= :from_ts AND created_at <= :to_ts
                 ");
                 $stmtSalaries->execute([
                     ':sid' => $schoolId,
                     ':ayid' => $yearId,
-                    ':latest_rep_ts' => $latestReportCreatedAt,
-                    ':to_ts' => $toTimestamp
+                    ':from_ts' => $fromTs,
+                    ':to_ts' => $toTs
                 ]);
-            } else {
-                $stmtSalaries = $pdo->prepare("
-                    SELECT COALESCE(SUM(amount_paid), 0) 
-                    FROM staff_payments 
-                    WHERE school_id = :sid 
-                      AND academic_year_id = :ayid
-                      AND created_at <= :to_ts
-                ");
-                $stmtSalaries->execute([
-                    ':sid' => $schoolId,
-                    ':ayid' => $yearId,
-                    ':to_ts' => $toTimestamp
-                ]);
-            }
-            $salariesPaid = (float)$stmtSalaries->fetchColumn();
+                $salariesPaid = (float)$stmtSalaries->fetchColumn();
 
             // Expenses paid
-            if ($latestReportCreatedAt) {
-                $stmtExpenses = $pdo->prepare("
-                    SELECT COALESCE(SUM(amount), 0) 
-                    FROM school_expenses 
-                    WHERE school_id = :sid 
-                      AND academic_year_id = :ayid 
-                      AND created_at > :latest_rep_ts
-                      AND created_at <= :to_ts
-                ");
-                $stmtExpenses->execute([
-                    ':sid' => $schoolId,
-                    ':ayid' => $yearId,
-                    ':latest_rep_ts' => $latestReportCreatedAt,
-                    ':to_ts' => $toTimestamp
-                ]);
-            } else {
-                $stmtExpenses = $pdo->prepare("
-                    SELECT COALESCE(SUM(amount), 0) 
-                    FROM school_expenses 
-                    WHERE school_id = :sid 
-                      AND academic_year_id = :ayid
-                      AND created_at <= :to_ts
-                ");
-                $stmtExpenses->execute([
-                    ':sid' => $schoolId,
-                    ':ayid' => $yearId,
-                    ':to_ts' => $toTimestamp
-                ]);
-            }
+            $stmtExpenses = $pdo->prepare("
+                SELECT COALESCE(SUM(amount), 0) 
+                FROM school_expenses 
+                WHERE school_id = :sid 
+                  AND academic_year_id = :ayid 
+                  AND created_at >= :from_ts AND created_at <= :to_ts
+            ");
+            $stmtExpenses->execute([
+                ':sid' => $schoolId,
+                ':ayid' => $yearId,
+                ':from_ts' => $fromTs,
+                ':to_ts' => $toTs
+            ]);
             $expensesPaid = (float)$stmtExpenses->fetchColumn();
 
             $totalExpenses = $salariesPaid + $expensesPaid;
@@ -427,8 +363,10 @@ try {
             }
 
             cron_log("Successfully generated Financial Report {$reportId} for school ID {$schoolId} ({$schoolName}) year {$yearName} for period {$from} to {$to}.");
+            $currentMonthStart = date('Y-m-d', strtotime($currentMonthStart . ' +1 month'));
         }
     }
+}
     cron_log("Automatic monthly financial report scheduler execution finished successfully.");
 } catch (Exception $e) {
     cron_log("Error during automatic financial report generation: " . $e->getMessage());

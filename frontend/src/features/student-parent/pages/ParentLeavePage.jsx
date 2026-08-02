@@ -377,10 +377,10 @@ export default function ParentLeavePage() {
                       badgeLabel = 'Today';
                       badgeStyles = 'bg-emerald-500 text-white font-bold';
                     } else if (isUpcoming) {
-                      cardBorderClass = 'border-blue-500/30';
-                      cardBgClass = 'bg-blue-500/5 dark:bg-blue-950/5';
+                      cardBorderClass = 'border-primary/30';
+                      cardBgClass = 'bg-primary/5 dark:bg-primary/10';
                       badgeLabel = 'Upcoming';
-                      badgeStyles = 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20';
+                      badgeStyles = 'bg-primary/10 text-primary dark:text-primary-fg border border-primary/20';
                     } else {
                       cardBgClass = 'bg-zinc-50/50 dark:bg-zinc-900/10 opacity-70';
                     }

@@ -7,7 +7,7 @@ import { Button } from '../../../common/ui/button';
 import { studentService } from '../../../common/services/studentService';
 
 const subjectColors = {
-  'Mathematics': 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
+  'Mathematics': 'bg-primary/10 text-primary dark:text-primary-fg',
   'Physics': 'bg-purple-500/10 text-purple-700 dark:text-purple-400',
   'Chemistry': 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
   'English': 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
@@ -25,7 +25,7 @@ const getSubjectColor = (subject) =>
 
 const ScoreBar = ({ score, max = 100 }) => {
   const pct = Math.round((score / max) * 100);
-  const color = pct >= 90 ? 'bg-emerald-500' : pct >= 75 ? 'bg-blue-500' : pct >= 60 ? 'bg-amber-500' : 'bg-red-500';
+  const color = pct >= 90 ? 'bg-emerald-500' : pct >= 75 ? 'bg-primary' : pct >= 60 ? 'bg-amber-500' : 'bg-red-500';
   return (
     <div className="flex items-center gap-3">
       <div className="flex-1 h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
@@ -133,7 +133,7 @@ export default function AcademicsPage({ timetable, subjects, results }) {
                     <ScoreBar score={sub.score} max={sub.maxScore} />
                   </TableCell>
                   <TableCell>
-                    <span className={`font-bold text-sm ${sub.score >= 90 ? 'text-emerald-600' : sub.score >= 75 ? 'text-blue-600' : sub.score >= 60 ? 'text-amber-600' : 'text-red-600'}`}>
+                    <span className={`font-bold text-sm ${sub.score >= 90 ? 'text-emerald-600' : sub.score >= 75 ? 'text-primary' : sub.score >= 60 ? 'text-amber-600' : 'text-red-600'}`}>
                       {sub.grade}
                     </span>
                   </TableCell>
@@ -152,7 +152,7 @@ export default function AcademicsPage({ timetable, subjects, results }) {
             <div className="space-y-3">
               {subjects.map(sub => {
                 const pct = Math.round((sub.score / sub.maxScore) * 100);
-                const barColor = pct >= 90 ? 'bg-emerald-500' : pct >= 75 ? 'bg-blue-500' : pct >= 60 ? 'bg-amber-500' : 'bg-red-500';
+                const barColor = pct >= 90 ? 'bg-emerald-500' : pct >= 75 ? 'bg-primary' : pct >= 60 ? 'bg-amber-500' : 'bg-red-500';
                 return (
                   <div key={sub.code} className="flex items-center gap-4">
                     <span className="text-xs font-semibold text-text-secondary w-32 flex-shrink-0 truncate">{sub.name}</span>
@@ -164,7 +164,7 @@ export default function AcademicsPage({ timetable, subjects, results }) {
                         <span className="text-[11px] font-bold text-white tabular-nums">{pct}%</span>
                       </div>
                     </div>
-                    <span className={`w-10 text-right text-xs font-bold tabular-nums ${pct >= 90 ? 'text-emerald-600' : pct >= 75 ? 'text-blue-600' : pct >= 60 ? 'text-amber-600' : 'text-red-600'}`}>
+                    <span className={`w-10 text-right text-xs font-bold tabular-nums ${pct >= 90 ? 'text-emerald-600' : pct >= 75 ? 'text-primary' : pct >= 60 ? 'text-amber-600' : 'text-red-600'}`}>
                       {sub.grade}
                     </span>
                   </div>

@@ -105,7 +105,7 @@ export const Dialog = ({
         aria-labelledby={title ? titleId : undefined}
         aria-describedby={descriptionId}
         tabIndex={-1}
-        className={`relative z-10 flex w-full max-w-lg max-h-[90vh] flex-col rounded-2xl border border-border bg-surface-overlay text-text-primary shadow-lg animate-zoom-in focus:outline-none ${className}`}
+        className={`relative z-10 flex w-full max-w-lg max-h-[90vh] flex-col rounded-2xl border border-border bg-white dark:bg-zinc-900 bg-surface text-text-primary shadow-2xl animate-zoom-in focus:outline-none ${className}`}
       >
         <div className="flex items-start justify-between gap-4 border-b border-border/60 p-5">
           <div className="min-w-0">
@@ -130,7 +130,7 @@ export const Dialog = ({
         <div className="flex-1 overflow-y-auto p-6 text-body-md">{children}</div>
 
         {footer && (
-          <div className="flex items-center justify-end gap-3 rounded-b-2xl border-t border-border/60 bg-secondary/30 p-4">
+          <div className="flex items-center justify-end gap-3 rounded-b-2xl border-t border-border/60 bg-zinc-50 dark:bg-zinc-900/90 p-4">
             {footer}
           </div>
         )}

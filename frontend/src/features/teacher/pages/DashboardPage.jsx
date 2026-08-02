@@ -23,7 +23,7 @@ export default function DashboardPage({ schedule, tasks, upcomingExams, classes 
 
       {/* Stat row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard icon={BookOpen}    label="Classes"       value={classes.length}                                          sub="Assigned this term"        accent="bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400" />
+        <StatCard icon={BookOpen}    label="Classes"       value={classes.length}                                          sub="Assigned this term"        accent="bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-fg" />
         <StatCard icon={Users}       label="Students"      value={classes.reduce((a, c) => a + (c.students || 0), 0)}      sub="Total enrolled"            accent="bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400" />
         <StatCard icon={CheckSquare} label="Pending Tasks" value={tasks.length}                                            sub="Require attention"         accent="bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400" />
         <StatCard icon={Calendar}    label="Exam Days"     value={upcomingExams.length}                                    sub="Upcoming examinations"     accent="bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400" />
@@ -177,7 +177,7 @@ function TeacherVocabReport({ classId }) {
         </div>
         <div className="bg-background border border-border p-4 rounded-xl text-center shadow-2xs">
           <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider font-sans">Words Mastered</p>
-          <p className="text-2xl font-bold text-blue-600 mt-1 tabular-nums">{summary.total_words_mastered}</p>
+          <p className="text-2xl font-bold text-primary mt-1 tabular-nums">{summary.total_words_mastered}</p>
         </div>
       </div>
 
