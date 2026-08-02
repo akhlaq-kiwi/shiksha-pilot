@@ -303,24 +303,24 @@ class SchoolAdminController extends BaseController
         return $this->success($response, $result, 'Holiday created successfully');
     }
 
-    public function updateHoliday(Request $request, Response $response): Response
+    public function updateHoliday(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
         $this->requireRole($user, ['SCHOOL_ADMIN']);
 
-        $id = (int)$request->getAttribute('id');
+        $id = (int)($args['id'] ?? 0);
         $body = RequestParser::body($request);
         $result = $this->service->updateHoliday($user, $id, $body);
 
         return $this->success($response, $result, 'Holiday updated successfully');
     }
 
-    public function deleteHoliday(Request $request, Response $response): Response
+    public function deleteHoliday(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
         $this->requireRole($user, ['SCHOOL_ADMIN']);
 
-        $id = (int)$request->getAttribute('id');
+        $id = (int)($args['id'] ?? 0);
         $result = $this->service->deleteHoliday($user, $id);
 
         return $this->success($response, $result, 'Holiday deleted successfully');
