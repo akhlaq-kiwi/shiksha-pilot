@@ -25,6 +25,36 @@ define('PAGE_BASE', $currentHost);
 define('CONTACT_EMAIL', 'hello@shikshapilot.com');
 
 /**
+ * Database credentials. Local/Docker gets DB_HOST etc. directly from
+ * docker-compose environment variables. Production has no equivalent
+ * mechanism on shared hosting, so deploy-website.yml writes a real .env
+ * file (gitignored, never committed) from GitHub Secrets at deploy time —
+ * loaded here if present, same shiksha_pilot DB the backend app uses.
+ */
+$envFile = __DIR__ . '/../.env';
+if (file_exists($envFile)) {
+    foreach (file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+        $line = trim($line);
+        if ($line === '' || $line[0] === '#' || strpos($line, '=') === false) {
+            continue;
+        }
+        [$key, $value] = explode('=', $line, 2);
+        $key = trim($key);
+        $value = trim($value, " \t\n\r\0\x0B\"'");
+        if ($key !== '' && getenv($key) === false) {
+            putenv("$key=$value");
+        }
+    }
+}
+
+define('DB_HOST', getenv('DB_HOST') ?: 'db');
+define('DB_NAME', getenv('DB_NAME') ?: 'shiksha_pilot');
+define('DB_USER', getenv('DB_USER') ?: 'root');
+define('DB_PASS', getenv('DB_PASS') ?: 'admin123');
+
+require_once __DIR__ . '/db.php';
+
+/**
  * Central nav/sitemap model — one array both header.php and sitemap.php
  * read from, so adding a page never means updating two files.
  */
