@@ -17,12 +17,35 @@ $ogImage     = isset($pageOgImage) ? $pageOgImage : ASSET_BASE . '/images/og-ima
 <html lang="en">
 <head>
 <?php if (GTM_CONTAINER_ID !== ''): $gtmId = htmlspecialchars(GTM_CONTAINER_ID, ENT_QUOTES); ?>
-<!-- Google Tag Manager: placed as high in <head> as possible per Google's own guidance -->
-<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-})(window,document,'script','dataLayer','<?php echo $gtmId; ?>');</script>
+<!--
+  Google Tag Manager, loaded on first interaction (or a 5s fallback)
+  instead of immediately. GTM + GA4 pull down ~400KB of mostly-unused JS
+  for a simple marketing site, sitting in the critical path if loaded
+  eagerly (confirmed by a real PageSpeed Insights run). Deferring to
+  interaction costs analytics on the rare <5s bounce-before-any-interaction
+  visit, in exchange for keeping the page itself fast for everyone —
+  worth it, since Core Web Vitals are themselves an SEO/ranking signal.
+-->
+<script>
+window.dataLayer = window.dataLayer || [];
+(function(w,d,s,l,i){
+  var loaded = false;
+  function loadGTM(){
+    if (loaded) return;
+    loaded = true;
+    w[l].push({'gtm.start': new Date().getTime(), event: 'gtm.js'});
+    var f = d.getElementsByTagName(s)[0], j = d.createElement(s),
+        dl = l != 'dataLayer' ? '&l=' + l : '';
+    j.async = true;
+    j.src = 'https://www.googletagmanager.com/gtm.js?id=' + i + dl;
+    f.parentNode.insertBefore(j, f);
+  }
+  ['scroll', 'mousemove', 'touchstart', 'keydown', 'click'].forEach(function(evt){
+    w.addEventListener(evt, loadGTM, { once: true, passive: true });
+  });
+  w.setTimeout(loadGTM, 5000);
+})(window, document, 'script', 'dataLayer', '<?php echo $gtmId; ?>');
+</script>
 <!-- End Google Tag Manager -->
 <?php endif; ?>
 <meta charset="UTF-8">
