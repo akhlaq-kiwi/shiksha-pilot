@@ -2166,6 +2166,13 @@ export default function ExamsPage() {
             const currentClass = examClassStatuses.find(c => c.id === parseInt(selectedClassId));
             if (!currentClass) return null;
 
+            const isAnnualExam = !!(selectedExam?.name && (
+              selectedExam.name.toLowerCase().includes('annual') ||
+              selectedExam.name.toLowerCase().includes('final') ||
+              selectedExam.type === 'ANNUAL' ||
+              selectedExam.exam_type === 'ANNUAL'
+            ));
+
             return (
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
                 {/* Pending Subjects Alert Panel */}
@@ -2408,32 +2415,34 @@ export default function ExamsPage() {
                       </p>
                     </div>
                     <div className="pt-2">
-                      <Button className="w-full flex items-center justify-center gap-2 text-xs font-bold text-primary border-primary/20 bg-primary/5 hover:bg-primary/10" onClick={() => handleOpenReportCards(selectedExam, currentClass.id)}>
+                      <Button className="w-full flex items-center justify-center gap-2 text-xs font-bold" onClick={() => handleOpenReportCards(selectedExam, currentClass.id)}>
                         <Award className="h-4 w-4" /> Open {selectedExam?.name || 'Exam'} Report Cards
                       </Button>
                     </div>
                   </CardContent>
                 </Card>
 
-                {/* CARD 5: Final Academic Report Cards (Annual Session Summary) */}
-                <Card className="hover:border-amber-500/40 transition-all shadow-xs flex flex-col justify-between border-amber-500/30 bg-amber-500/5">
-                  <CardContent className="p-6 space-y-4 flex-1 flex flex-col justify-between">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-amber-600">
-                        <Award className="h-5 w-5" />
-                        <h4 className="text-base font-bold text-text-primary">Final Academic Report Card</h4>
+                {/* CARD 5: Final Academic Report Cards (Annual Session Summary - Only for Annual Exam) */}
+                {isAnnualExam && (
+                  <Card className="hover:border-primary/20 transition-all shadow-xs flex flex-col justify-between">
+                    <CardContent className="p-6 space-y-4 flex-1 flex flex-col justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-primary">
+                          <Award className="h-5 w-5" />
+                          <h4 className="text-base font-bold text-text-primary">Final Academic Report Card</h4>
+                        </div>
+                        <p className="text-xs text-text-secondary leading-relaxed">
+                          Generate consolidated annual session report cards combining marks from all session exams based on configurable calculation policies.
+                        </p>
                       </div>
-                      <p className="text-xs text-text-secondary leading-relaxed">
-                        Generate consolidated annual session report cards combining marks from all session exams based on configurable calculation policies.
-                      </p>
-                    </div>
-                    <div className="pt-2">
-                      <Button className="w-full flex items-center justify-center gap-2 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white" onClick={() => handleOpenFinalSessionReportCards(currentClass.id)}>
-                        <Award className="h-4 w-4" /> Open Final Session Reports
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                      <div className="pt-2">
+                        <Button className="w-full flex items-center justify-center gap-2 text-xs font-bold" onClick={() => handleOpenFinalSessionReportCards(currentClass.id)}>
+                          <Award className="h-4 w-4" /> Open Final Session Reports
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* CARD 4: Result Status / Publish */}
                 <Card className="hover:border-primary/20 transition-all shadow-xs flex flex-col justify-between">

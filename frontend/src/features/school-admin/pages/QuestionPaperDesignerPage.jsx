@@ -3640,23 +3640,23 @@ export default function QuestionPaperDesignerPage() {
       </Dialog>
 
       {/* MODAL 7: SAVED PAPERS LIBRARY */}
-      <Dialog isOpen={isLibraryOpen} onClose={() => setIsLibraryOpen(false)}>
-        <div className="p-6 space-y-4 max-w-lg bg-card rounded-lg border border-border shadow-xl w-full">
-          <h2 className="text-base font-bold flex items-center gap-2">
+      <Dialog isOpen={isLibraryOpen} onClose={() => setIsLibraryOpen(false)} className="w-[95vw] md:max-w-4xl">
+        <div className="p-6 space-y-4 bg-card rounded-2xl border border-border shadow-xl w-full">
+          <h2 className="text-lg font-bold flex items-center gap-2">
             <FileText className="h-5 w-5 text-primary" /> Saved Papers Library
           </h2>
           <p className="text-xs text-text-secondary">
             {librarySelectedClass ? `Viewing saved papers for ${librarySelectedClass}:` : 'Select a class below to view its saved question papers:'}
           </p>
           
-          <div className="max-h-[350px] overflow-y-auto space-y-2 pr-1 pt-1">
+          <div className="max-h-[550px] overflow-y-auto space-y-2 pr-1 pt-1">
             {savedPapersList.length === 0 ? (
-              <div className="text-center text-xs text-text-muted py-8 font-medium">
+              <div className="text-center text-xs text-text-muted py-12 font-medium">
                 No saved papers found in your library.
               </div>
             ) : !librarySelectedClass ? (
               /* Class Cards Grid View */
-              <div className="grid grid-cols-2 gap-3 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 pt-2">
                 {[...new Set(savedPapersList.map(p => p.className || 'Unassigned Class'))].map((clsName) => {
                   const classPapers = savedPapersList.filter(p => (p.className || 'Unassigned Class') === clsName);
                   return (
@@ -3691,7 +3691,7 @@ export default function QuestionPaperDesignerPage() {
                   </Button>
                 </div>
 
-                <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                <div className="space-y-2 max-h-[450px] overflow-y-auto pr-1">
                   {savedPapersList
                     .filter(p => (p.className || 'Unassigned Class') === librarySelectedClass)
                     .map((paper) => (
