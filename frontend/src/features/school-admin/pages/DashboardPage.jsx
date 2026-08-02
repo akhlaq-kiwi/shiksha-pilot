@@ -14,6 +14,7 @@ import { ChartCard } from '../../../common/ui/charts/ChartCard';
 import { SkeletonStatGrid, SkeletonChart } from '../../../common/ui/skeleton';
 import { StatCard } from '../../../common/components/StatCard';
 import { formatCurrency } from '../../../common/utils/format';
+import { OnboardingChecklist } from '../../../common/components/OnboardingChecklist';
 
 export default function DashboardPage({ onNavigate }) {
   const { currentYear } = useAcademicYear();
@@ -39,11 +40,12 @@ export default function DashboardPage({ onNavigate }) {
   const [timetableSettings, setTimetableSettings] = useState(null);
   const [timetableLoading, setTimetableLoading] = useState(false);
   const [timetableError, setTimetableError] = useState('');
+  const [feeStructures, setFeeStructures] = useState([]);
 
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      const [stuData, stfData, exData, fpData, statsData, classesList, settings] = await Promise.all([
+      const [stuData, stfData, exData, fpData, statsData, classesList, settings, feeStructData] = await Promise.all([
         schoolService.getStudents().catch(() => []),
         schoolService.getStaff().catch(() => []),
         schoolService.getExams().catch(() => []),
@@ -58,7 +60,8 @@ export default function DashboardPage({ onNavigate }) {
           salary_disbursement_chart: []
         })),
         schoolService.getClasses().catch(() => []),
-        schoolAdminService.getTimetableSettings().catch(() => null)
+        schoolAdminService.getTimetableSettings().catch(() => null),
+        schoolService.getFeeStructures().catch(() => [])
       ]);
       setStudents(stuData || []);
       setStaff(stfData || []);
@@ -78,6 +81,7 @@ export default function DashboardPage({ onNavigate }) {
         setSelectedClassId(String(classesList[0].id));
       }
       setTimetableSettings(settings || null);
+      setFeeStructures(feeStructData || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -288,6 +292,24 @@ export default function DashboardPage({ onNavigate }) {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
+      {/*
+        Persists until every step is complete or the admin dismisses it.
+        A new school admin previously had to infer setup order by hitting
+        errors (e.g. adding a class before an academic year exists).
+      */}
+      <OnboardingChecklist
+        scopeKey={currentYear?.school_id ?? currentYear?.id ?? 'default'}
+        items={[
+          { id: 'academic-year', label: 'Create an academic year', done: !!currentYear, onClick: () => onNavigate?.('audits-settings') },
+          { id: 'classes', label: 'Add classes & sections', done: classes.length > 0, onClick: () => onNavigate?.('classes') },
+          { id: 'fee-structure', label: 'Set up a fee structure', done: feeStructures.length > 0, onClick: () => onNavigate?.('finance') },
+          { id: 'teachers', label: 'Add teachers', done: staff.length > 0, onClick: () => onNavigate?.('staff') },
+          { id: 'students', label: 'Enrol students', done: students.length > 0, onClick: () => onNavigate?.('classes') },
+          { id: 'timetable', label: 'Build the timetable', done: !!timetableSettings, onClick: () => onNavigate?.('timetable') },
+          { id: 'exams', label: 'Create an examination', done: exams.length > 0, onClick: () => onNavigate?.('exams') },
+        ]}
+      />
+
       {/* Stat Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {/*
