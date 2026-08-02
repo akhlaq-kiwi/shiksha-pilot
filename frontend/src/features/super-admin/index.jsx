@@ -36,6 +36,7 @@ export default function SuperAdminPortal() {
     billing_mrr: 0, total_students: 0, total_teachers: 0, total_users: 0,
   });
   const [error,   setError]   = useState('');
+  const [statsLoading, setStatsLoading] = useState(true);
   const [isCreateSchoolOpen, setIsCreateSchoolOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createErrors, setCreateErrors] = useState({});
@@ -44,14 +45,40 @@ export default function SuperAdminPortal() {
 
   const fetchInitialData = async () => {
     setError('');
+    setStatsLoading(true);
     try {
       const schoolsData = await platformService.getSchools();
       setSchools(schoolsData || []);
-      try { const d = await platformService.getStats();   if (d) setStats(p => ({ ...p, ...d })); } catch {}
-      try { const d = await platformService.getPlans();   setPlans(d || []); } catch {}
-      try { const d = await platformService.getAuditLogs(); setAuditLogs(d || []); } catch {}
     } catch (err) {
       setError('Failed to sync data. Check backend status.');
+      setStatsLoading(false);
+      return;
+    }
+
+    // Platform stats, plans and audit logs fail independently of the schools
+    // list. Previously each of these swallowed its error entirely (bare
+    // `catch {}`), so a failed stats call silently left every dashboard
+    // number at its zeroed default with nothing telling the admin it wasn't
+    // real data - indistinguishable from "0 schools" being the actual truth.
+    try {
+      const d = await platformService.getStats();
+      if (d) setStats(p => ({ ...p, ...d }));
+    } catch (err) {
+      toast.error(err?.message || 'Could not load platform statistics.', 'Stats unavailable');
+    } finally {
+      setStatsLoading(false);
+    }
+    try {
+      const d = await platformService.getPlans();
+      setPlans(d || []);
+    } catch (err) {
+      toast.error(err?.message || 'Could not load subscription plans.', 'Plans unavailable');
+    }
+    try {
+      const d = await platformService.getAuditLogs();
+      setAuditLogs(d || []);
+    } catch (err) {
+      toast.error(err?.message || 'Could not load audit logs.', 'Audit log unavailable');
     }
   };
 
@@ -103,9 +130,21 @@ export default function SuperAdminPortal() {
     try {
       const d = await platformService.getSchools();
       setSchools(d || []);
-    } catch {}
-    try { const d = await platformService.getStats();     if (d) setStats(p => ({ ...p, ...d })); } catch {}
-    try { const d = await platformService.getAuditLogs(); setAuditLogs(d || []); } catch {}
+    } catch (err) {
+      toast.error(err?.message || 'Could not refresh the school list.', 'Refresh failed');
+    }
+    try {
+      const d = await platformService.getStats();
+      if (d) setStats(p => ({ ...p, ...d }));
+    } catch (err) {
+      toast.error(err?.message || 'Could not refresh platform statistics.', 'Stats unavailable');
+    }
+    try {
+      const d = await platformService.getAuditLogs();
+      setAuditLogs(d || []);
+    } catch (err) {
+      toast.error(err?.message || 'Could not refresh audit logs.', 'Audit log unavailable');
+    }
   };
 
   const handleCreateSchool = async (newSchool, onSuccess) => {
@@ -171,7 +210,7 @@ export default function SuperAdminPortal() {
 
         <Routes>
           <Route index element={
-            <DashboardPage schools={schools} stats={stats} />
+            <DashboardPage schools={schools} stats={stats} loading={statsLoading} />
           } />
           <Route path="schools" element={
             <SchoolsPage
