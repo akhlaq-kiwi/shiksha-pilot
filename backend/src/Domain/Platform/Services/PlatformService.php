@@ -441,7 +441,61 @@ class PlatformService extends BaseService
             ]);
         }
 
-        $this->schools->delete($id);
+        $pdo->beginTransaction();
+        try {
+            // Delete all related tenant records across child tables to prevent FK constraint failures
+            $childTables = [
+                'academic_year_disabled_subjects',
+                'timetable',
+                'period_configurations',
+                'examination_seating_plans',
+                'examination_marks',
+                'examination_papers',
+                'examinations',
+                'final_academic_reports',
+                'academic_achievement_snapshots',
+                'student_transport_fees',
+                'late_payment_penalty_history',
+                'late_payment_penalty_applications',
+                'late_payment_penalty_configs',
+                'fee_payments',
+                'class_fee_configurations',
+                'additional_fee_types',
+                'fee_follow_ups',
+                'school_expenses',
+                'school_finance_settings',
+                'leave_requests',
+                'holidays',
+                'staff_payments',
+                'staff',
+                'students',
+                'subjects',
+                'classes',
+                'academic_years',
+                'subscriptions',
+                'users'
+            ];
+
+            foreach ($childTables as $table) {
+                $stmtCheck = $pdo->prepare("SHOW TABLES LIKE :table");
+                $stmtCheck->execute([':table' => $table]);
+                if ($stmtCheck->fetchColumn() !== false) {
+                    $stmtCol = $pdo->prepare("SHOW COLUMNS FROM `{$table}` LIKE 'school_id'");
+                    $stmtCol->execute();
+                    if ($stmtCol->fetchColumn() !== false) {
+                        $pdo->prepare("DELETE FROM `{$table}` WHERE school_id = :sid")->execute([':sid' => $id]);
+                    }
+                }
+            }
+
+            $this->schools->delete($id);
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
 
         $actorInfo = $this->actorInfo($actor);
         $this->auditLogs->log(
