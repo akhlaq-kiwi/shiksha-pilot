@@ -48,6 +48,17 @@ services:
     depends_on:
       - backend
 
+  website:
+    build:
+      context: ./website
+      dockerfile: Dockerfile
+    container_name: sp-website
+    restart: always
+    ports:
+      - "2005:80"
+    volumes:
+      - ./website:/var/www/html
+
   phpmyadmin:
     image: phpmyadmin:latest
     container_name: sp-phpmyadmin
