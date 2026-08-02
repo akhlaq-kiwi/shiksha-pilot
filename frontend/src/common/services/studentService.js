@@ -51,6 +51,12 @@ export const studentService = {
   async getReceipts() {
     return apiClient.get('/api/student/fees/receipts');
   },
+  /** Returns a PDF Blob for one receipt — apiClient auto-detects the content-type. */
+  async downloadReceipt(receiptId, { isAdditional = false } = {}) {
+    return apiClient.get(
+      `/api/student/fees/receipt?id=${encodeURIComponent(receiptId)}&additional=${isAdditional ? 1 : 0}`
+    );
+  },
 
   // Learning Resources
   async getNotes() {
