@@ -104,4 +104,12 @@ export const platformService = {
   async upgradeSchool(id, planId) {
     return apiClient.post(`/api/platform/schools/${id}/upgrade`, { plan_id: planId });
   },
+
+  async getWebsiteLeads() {
+    return apiClient.get('/api/platform/website-leads');
+  },
+
+  async deleteWebsiteLead(id) {
+    return apiClient.delete(`/api/platform/website-leads/${id}`);
+  },
 };

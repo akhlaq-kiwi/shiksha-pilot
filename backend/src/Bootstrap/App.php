@@ -20,6 +20,7 @@ use App\Domain\Auth\Controllers\AuthController;
 use App\Domain\Platform\Repositories\SchoolRepository;
 use App\Domain\Platform\Repositories\AuditLogRepository;
 use App\Domain\Platform\Repositories\PlansRepository;
+use App\Domain\Platform\Repositories\WebsiteLeadRepository;
 use App\Domain\Platform\Services\PlatformService;
 use App\Domain\Platform\Controllers\PlatformController;
 use App\Domain\Platform\Controllers\ReportCardTemplateController;
@@ -172,12 +173,17 @@ class App
                 return new PlansRepository($c->get(Connection::class)->getPdo());
             },
 
+            WebsiteLeadRepository::class => function ($c) {
+                return new WebsiteLeadRepository($c->get(Connection::class)->getPdo());
+            },
+
             PlatformService::class => function ($c) {
                 return new PlatformService(
                     $c->get(SchoolRepository::class),
                     $c->get(AuditLogRepository::class),
                     $c->get(AuthRepository::class),
                     $c->get(PlansRepository::class),
+                    $c->get(WebsiteLeadRepository::class),
                 );
             },
 
