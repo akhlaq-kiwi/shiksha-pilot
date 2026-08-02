@@ -1,0 +1,75 @@
+name: Deploy Website (Hostinger)
+
+# Manual-only: this deploys the public marketing site at shikshapilot.com
+# and must never be wired to push/PR triggers. Trigger from the Actions tab
+# ("Run workflow") or `gh workflow run deploy-website.yml -f confirm=deploy`.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "deploy" to confirm you want to deploy the website'
+        required: true
+
+concurrency:
+  group: deploy-website
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: website
+    steps:
+      - name: Verify confirmation input
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "deploy" ]; then
+            echo "::error::Confirmation input must be exactly 'deploy'. Aborting."
+            exit 1
+          fi
+
+      - name: Verify triggered from master branch
+        run: |
+          if [ "${{ github.ref }}" != "refs/heads/master" ]; then
+            echo "::error::This workflow must be run from the 'master' branch (use the 'Use workflow from' branch picker). Current ref: ${{ github.ref }}"
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Create deployment package
+        run: |
+          set -e
+          BUILD_DIR=".builds"
+          TAR_FILE="$BUILD_DIR/website.tar.gz"
+          mkdir -p "$BUILD_DIR"
+          rm -f "$TAR_FILE"
+
+          # The site is plain PHP with no build step — package it as-is.
+          # Dockerfile is for local/dev only (php:apache image config) and
+          # has no purpose on shared hosting, where Apache is already set up.
+          COPYFILE_DISABLE=1 tar -czf "$TAR_FILE" -C website \
+            --exclude='Dockerfile' \
+            .
+
+      - name: Upload package via SSH
+        env:
+          SSHPASS: ${{ secrets.PROD_SSH_PASSWORD }}
+        run: |
+          set -e
+          sudo apt-get update -qq && sudo apt-get install -y -qq sshpass
+          sshpass -e scp -o StrictHostKeyChecking=no -P "${{ secrets.PROD_SSH_PORT }}" \
+            .builds/website.tar.gz \
+            "${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }}:${{ secrets.WEBSITE_REMOTE_PATH }}/"
+
+      - name: Extract package on remote
+        env:
+          SSHPASS: ${{ secrets.PROD_SSH_PASSWORD }}
+        run: |
+          set -e
+          REMOTE_PATH="${{ secrets.WEBSITE_REMOTE_PATH }}"
+          EXTRACT_CMD="cd $REMOTE_PATH && tar --warning=no-unknown-keyword -xzf website.tar.gz && rm website.tar.gz"
+          sshpass -e ssh -o StrictHostKeyChecking=no -p "${{ secrets.PROD_SSH_PORT }}" \
+            "${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }}" "$EXTRACT_CMD"
+
+      - name: Done
+        run: echo "Website deployment completed successfully."

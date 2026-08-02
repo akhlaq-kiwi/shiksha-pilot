@@ -1,18 +1,26 @@
 # GitHub Actions — Deploy Workflows
 
-Two manual-only workflows deploy to Hostinger — no push/PR trigger for
-either. These replace the old `deploy.sh` / `deploy.ps1` / `deploy_qa.py`
-scripts, which have been removed from the repo.
+Three manual-only workflows deploy to Hostinger — no push/PR trigger for
+any of them. `deploy-qa.yml` and `deploy-production.yml` replace the old
+`deploy.sh` / `deploy.ps1` / `deploy_qa.py` scripts, which have been removed
+from the repo.
 
-- `deploy-qa.yml` → `qa.shikshapilot.com`
-- `deploy-production.yml` → `app.shikshapilot.com`, gated behind a typed
-  `confirm=deploy` input
+- `deploy-qa.yml` → `qa.shikshapilot.com` (the React/PHP app)
+- `deploy-production.yml` → `app.shikshapilot.com` (the React/PHP app),
+  gated behind a typed `confirm=deploy` input
+- `deploy-website.yml` → `shikshapilot.com` (the plain-PHP marketing site in
+  `website/`), also gated behind `confirm=deploy`
 
-Run either from the Actions tab ("Run workflow") or:
+All three are also gated to a specific branch (`deploy-qa.yml` → `qa`,
+the other two → `master`) — see each workflow's "Verify triggered from
+branch" step.
+
+Run any of them from the Actions tab ("Run workflow") or:
 
 ```bash
 gh workflow run deploy-qa.yml
 gh workflow run deploy-production.yml -f confirm=deploy
+gh workflow run deploy-website.yml -f confirm=deploy
 ```
 
 ## One-time setup: GitHub Secrets
@@ -77,16 +85,30 @@ scoped to a `qa`/`production` environment for extra protection — see below).
 `production`/`false` — not secrets, since they should never vary. QA keeps
 `APP_DEBUG` as a secret since the old `.qa.env` treated it as configurable.
 
+### Website secrets (`deploy-website.yml`)
+
+The marketing site has no database, no build step, and no secrets of its
+own — `website/includes/config.php` hardcodes `SITE_DOMAIN`. It reuses the
+same server as the app (`PROD_SSH_HOST`/`PORT`/`USER`/`PASSWORD` above) and
+needs exactly one additional secret:
+
+| Secret | Example / notes |
+|---|---|
+| `WEBSITE_REMOTE_PATH` | `/home/u554613359/domains/shikshapilot.com/public_html` |
+
 ### Recommended: gate behind GitHub Environments
 
-Both workflows target an `environment:` (`qa` / `production`). Create these
-under **Settings → Environments → New environment**, then optionally add
-**required reviewers** so someone has to approve the run before it touches
-that environment, and/or restrict which branches can trigger it. If you skip
-this, the environment falls back to repo defaults with no extra gate — the
-workflows still work, just without the approval step.
+All three workflows target an `environment:` (`qa` / `production` /
+`website`). Create these under **Settings → Environments → New
+environment**, then optionally add **required reviewers** so someone has to
+approve the run before it touches that environment, and/or restrict which
+branches can trigger it. If you skip this, the environment falls back to
+repo defaults with no extra gate — the workflows still work, just without
+the approval step.
 
-## What they do (mirrors the old `deploy.sh`)
+## What they do
+
+**`deploy-qa.yml` / `deploy-production.yml`** (mirrors the old `deploy.sh`):
 
 1. Build the frontend with Vite in `qa`/`production` mode, using an
    `.env.qa`/`.env.production` file assembled from the `*_VITE_*` secrets.
@@ -99,9 +121,23 @@ workflows still work, just without the approval step.
    `composer install --no-dev --optimize-autoloader`, then run
    `php api/src/Database/migrate.php`.
 
-## Known gap carried over from the old scripts
+**`deploy-website.yml`** — much simpler, since `website/` is plain PHP with
+no build step and no dependencies:
 
-Migrations run unconditionally and there's no rollback step if a migration
-or `composer install` fails partway. If you want a safer rollout (e.g. a
-pre-deploy DB backup, or a dry-run migration check), that would need to be
-added on top of this; flag it if you'd like that as a follow-up.
+1. Tar up `website/` as-is (excluding `Dockerfile`, which only exists for
+   local Docker Compose dev — Hostinger's Apache is already configured).
+2. `scp` the tarball to `WEBSITE_REMOTE_PATH` and extract it over SSH. No
+   composer, no migrations — there's nothing to run.
+
+## Known gaps carried over from the old scripts
+
+- `deploy-qa.yml`/`deploy-production.yml`: migrations run unconditionally
+  and there's no rollback step if a migration or `composer install` fails
+  partway. If you want a safer rollout (e.g. a pre-deploy DB backup, or a
+  dry-run migration check), that would need to be added on top of this;
+  flag it if you'd like that as a follow-up.
+- `deploy-website.yml`: extracting the tarball doesn't remove old files
+  first (unlike the app deploys, which `rm -rf assets api index.html`
+  before extracting) — a file removed from `website/` won't be removed on
+  the server by a redeploy. Fine for now since the site is small and
+  hand-reviewed; worth revisiting if the page count grows.
