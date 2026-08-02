@@ -1,55 +1,275 @@
-/* Professional ERP Theme Variables */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================================
+   Shiksha Pilot — "Scholar" design tokens
+   ----------------------------------------------------------------------------
+   Structure:
+     1. Brand ramp        — Scholar Indigo, the product's identity
+     2. Semantic ramps    — meaning-bearing colour (success/danger/warning/info)
+     3. Domain accents    — academics / finance, used to orient across modules
+     4. Surfaces & text   — warm "paper-on-stone" neutrals + elevation
+     5. Chart sequence    — one categorical palette, colour-blind separable
+   Every value is a variable so per-school theming and dark mode work without
+   touching a single component.
+   ========================================================================= */
+
 :root {
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-display: 'Outfit', var(--font-sans);
 
-  /* Light Theme Variables */
-  --bg-app: #f8fafc;
-  --bg-surface: #ffffff;
-  --bg-card: #ffffff;
-  --border-color: #e2e8f0;
-  --border-glow: rgba(59, 130, 246, 0.1);
+  /* ---- 1. Brand: Scholar Indigo -------------------------------------- */
+  /* brand-600 on white = 6.29:1 → WCAG AA for body text, AAA for large.   */
+  --brand-50:  #EEF2FF;
+  --brand-100: #E0E7FF;
+  --brand-200: #C7D2FE;
+  --brand-300: #A5B4FC;
+  --brand-400: #818CF8;
+  --brand-500: #6366F1;
+  --brand-600: #4F46E5;
+  --brand-700: #4338CA;
+  --brand-800: #3730A3;
+  --brand-900: #312E81;
 
-  --color-primary: #3b82f6;
-  --color-primary-hover: #2563eb;
-  --color-primary-rgb: 59, 130, 246;
-  --color-secondary: #8b5cf6;
-  --color-secondary-rgb: 139, 92, 246;
-  --color-accent: #06b6d4;
-  --color-accent-rgb: 6, 182, 212;
+  /* Primary is an alias of the brand ramp so school themes can remap it. */
+  --color-primary: var(--brand-600);
+  --color-primary-hover: var(--brand-700);
+  --color-primary-active: var(--brand-800);
+  --color-primary-subtle: var(--brand-50);
+  --color-primary-rgb: 79, 70, 229;
 
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #94a3b8;
-  
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1);
-  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.06);
-  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.05), 0 4px 6px -2px rgba(0,0,0,0.05);
-  
-  --radius-sm: 6px;
+  /* Text/icon colour that sits ON a primary fill. */
+  --color-on-primary: #ffffff;
+
+  /* ---- 2. Semantic ramps --------------------------------------------- */
+  /* Each has a -500 fill (bars, dots, icons) and a -700 text-safe step.   */
+  --success-50:  #ECFDF5;
+  --success-200: #A7F3D0;
+  --success-500: #10B981;
+  --success-600: #059669;
+  --success-700: #047857;
+
+  --danger-50:  #FFF1F2;
+  --danger-200: #FECDD3;
+  --danger-500: #F43F5E;
+  --danger-600: #E11D48;
+  --danger-700: #BE123C;
+
+  --warning-50:  #FFFBEB;
+  --warning-200: #FDE68A;
+  --warning-500: #F59E0B;
+  --warning-600: #D97706;
+  --warning-700: #B45309;
+
+  --info-50:  #F0F9FF;
+  --info-200: #BAE6FD;
+  --info-500: #0EA5E9;
+  --info-600: #0284C7;
+  --info-700: #0369A1;
+
+  /* ---- 3. Domain accents -------------------------------------------- */
+  --academics-500: #14B8A6;   /* teal — classes, subjects, timetable          */
+  --academics-600: #0D9488;
+  --academics-700: #0F766E;   /* text-safe (teal-500 on white is only 3.7:1)  */
+  --finance-500: #8B5CF6;     /* violet — fees, salary, collections           */
+  --finance-600: #7C3AED;
+  --finance-700: #6D28D9;
+
+  /* Secondary/accent kept as aliases for backwards compatibility. */
+  --color-secondary: #EFEEEB;
+  --color-accent: var(--brand-600);
+
+  /* ---- 4. Surfaces, borders, text ----------------------------------- */
+  /* Warm paper-on-stone neutrals — deliberately not pure white.          */
+  --surface-canvas: #FAF9F6;   /* app background — Soft Stone               */
+  --surface-sunken: #F4F3F1;   /* sidebar, table headers                    */
+  --surface-raised: #FFFFFF;   /* cards                                     */
+  --surface-overlay: #FFFFFF;  /* dialogs, dropdowns                        */
+
+  --bg-app: var(--surface-canvas);
+  --bg-sidebar: var(--surface-sunken);
+  --bg-surface: var(--surface-raised);
+  --bg-card: var(--surface-raised);
+
+  --border-subtle: #EBEAE8;
+  --border-strong: #D6D4D0;    /* input borders — subtle fails AA on canvas  */
+  --border-color: var(--border-subtle);
+  --border-sidebar: #E5E5E1;
+  --border-divider: #E5E5E1;
+  --border-glow: rgba(17, 24, 39, 0.02);
+
+  --text-primary: #0F172A;     /* Onyx Navy headings                         */
+  --text-secondary: #4B5563;   /* body text                                  */
+  --text-muted: #6B7280;       /* 5.0:1 on canvas (was #9ca3af at ~2.5:1)    */
+  --text-on-fill: #ffffff;
+
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.02), 0 1px 2px -1px rgba(0, 0, 0, 0.02);
+  --shadow-md: 0 4px 12px -1px rgba(0, 0, 0, 0.03), 0 2px 4px -2px rgba(0, 0, 0, 0.02);
+  --shadow-lg: 0 12px 24px -4px rgba(0, 0, 0, 0.04), 0 4px 12px -2px rgba(0, 0, 0, 0.02);
+
+  --radius-sm: 8px;
   --radius-md: 12px;
-  --radius-lg: 18px;
+  --radius-lg: 16px;
 
   --transition-fast: 0.15s cubic-bezier(0.16, 1, 0.3, 1);
   --transition-normal: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* ---- 5. Chart sequence -------------------------------------------- */
+  --chart-1: #4F46E5;
+  --chart-2: #0D9488;
+  --chart-3: #F59E0B;
+  --chart-4: #E11D48;
+  --chart-5: #0284C7;
+  --chart-6: #7C3AED;
+  --chart-7: #65A30D;
+  --chart-8: #DB2777;
 }
 
-/* Dark Mode Variables Override */
-.dark-theme {
-  --bg-app: #090d16;
-  --bg-surface: #0f1524;
-  --bg-card: #131c30;
-  --border-color: #1e293b;
-  --border-glow: rgba(59, 130, 246, 0.15);
+/* ---- Dark mode ------------------------------------------------------ */
+.dark {
+  /* Three distinguishable layers, not two. */
+  --surface-canvas: #0F172A;
+  --surface-sunken: #0B1120;
+  --surface-raised: #1E293B;
+  --surface-overlay: #1E293B;
 
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  
-  --shadow-sm: 0 2px 8px -2px rgba(0, 0, 0, 0.5);
-  --shadow-md: 0 12px 20px -8px rgba(0, 0, 0, 0.7);
-  --shadow-lg: 0 20px 40px -15px rgba(0, 0, 0, 0.9);
+  --bg-app: var(--surface-canvas);
+  --bg-sidebar: var(--surface-sunken);
+  --bg-surface: var(--surface-raised);
+  --bg-card: var(--surface-raised);
+
+  --border-subtle: #334155;
+  --border-strong: #475569;
+  --border-color: var(--border-subtle);
+  --border-sidebar: #1E293B;
+  --border-divider: #334155;
+  --border-glow: rgba(248, 250, 252, 0.02);
+
+  /*
+   * Primary stays INDIGO in dark mode. It used to invert to #f8fafc, which
+   * turned every primary CTA into a white block and silently disabled
+   * per-school theming on primary surfaces.
+   */
+  --color-primary: var(--brand-500);
+  --color-primary-hover: var(--brand-400);
+  --color-primary-active: var(--brand-300);
+  --color-primary-subtle: rgba(99, 102, 241, 0.15);
+  --color-primary-rgb: 99, 102, 241;
+  --color-on-primary: #0B1120;
+
+  --color-secondary: #334155;
+  --color-accent: var(--brand-400);
+
+  /* Semantic ramps lift for legibility against navy. */
+  --success-50: rgba(16, 185, 129, 0.12);
+  --success-200: #065F46;
+  --success-500: #34D399;
+  --success-600: #10B981;
+  --success-700: #6EE7B7;
+
+  --danger-50: rgba(244, 63, 94, 0.12);
+  --danger-200: #9F1239;
+  --danger-500: #FB7185;
+  --danger-600: #F43F5E;
+  --danger-700: #FDA4AF;
+
+  --warning-50: rgba(245, 158, 11, 0.12);
+  --warning-200: #92400E;
+  --warning-500: #FBBF24;
+  --warning-600: #F59E0B;
+  --warning-700: #FCD34D;
+
+  --info-50: rgba(14, 165, 233, 0.12);
+  --info-200: #075985;
+  --info-500: #38BDF8;
+  --info-600: #0EA5E9;
+  --info-700: #7DD3FC;
+
+  --academics-500: #2DD4BF;
+  --academics-600: #14B8A6;
+  --academics-700: #5EEAD4;
+  --finance-500: #A78BFA;
+  --finance-600: #8B5CF6;
+  --finance-700: #C4B5FD;
+
+  --text-primary: #F8FAFC;
+  --text-secondary: #CBD5E1;
+  --text-muted: #94A3B8;
+  --text-on-fill: #0B1120;
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px -1px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 24px -4px rgba(0, 0, 0, 0.5);
+
+  --chart-1: #818CF8;
+  --chart-2: #2DD4BF;
+  --chart-3: #FBBF24;
+  --chart-4: #FB7185;
+  --chart-5: #38BDF8;
+  --chart-6: #A78BFA;
+  --chart-7: #A3E635;
+  --chart-8: #F472B6;
 }
+
+/* ---- Per-portal accent ---------------------------------------------
+   One attribute on the layout root gives each audience an identity while
+   the chrome stays shared. Reduces "wrong portal" confusion at a glance.
+   A school-specific theme (set via ThemeContext) still wins, because it
+   writes inline custom properties onto <html>.
+   ------------------------------------------------------------------- */
+[data-portal='teacher'] {
+  --color-primary: var(--academics-600);
+  --color-primary-hover: var(--academics-700);
+  --color-primary-subtle: #F0FDFA;
+  --color-primary-rgb: 13, 148, 136;
+}
+.dark [data-portal='teacher'] {
+  --color-primary: var(--academics-500);
+  --color-primary-hover: var(--academics-600);
+  --color-primary-subtle: rgba(45, 212, 191, 0.15);
+  --color-primary-rgb: 45, 212, 191;
+}
+
+[data-portal='student'] {
+  --color-primary: var(--info-600);
+  --color-primary-hover: var(--info-700);
+  --color-primary-subtle: var(--info-50);
+  --color-primary-rgb: 2, 132, 199;
+}
+.dark [data-portal='student'] {
+  --color-primary: var(--info-500);
+  --color-primary-hover: var(--info-600);
+  --color-primary-rgb: 56, 189, 248;
+}
+
+[data-portal='parent'] {
+  --color-primary: var(--finance-600);
+  --color-primary-hover: var(--finance-700);
+  --color-primary-subtle: #F5F3FF;
+  --color-primary-rgb: 124, 58, 237;
+}
+.dark [data-portal='parent'] {
+  --color-primary: var(--finance-500);
+  --color-primary-hover: var(--finance-600);
+  --color-primary-rgb: 167, 139, 250;
+}
+
+[data-portal='super-admin'] {
+  --color-primary: #334155;
+  --color-primary-hover: #1E293B;
+  --color-primary-subtle: #F1F5F9;
+  --color-primary-rgb: 51, 65, 85;
+}
+.dark [data-portal='super-admin'] {
+  --color-primary: var(--brand-500);
+  --color-primary-hover: var(--brand-400);
+  --color-primary-rgb: 99, 102, 241;
+}
+
+/* ============================================================================
+   Base elements
+   ========================================================================= */
 
 *, *::before, *::after {
   box-sizing: border-box;
@@ -61,12 +281,18 @@ body {
   font-family: var(--font-sans);
   background-color: var(--bg-app);
   color: var(--text-primary);
-  line-height: 1.5;
+  font-size: 14px;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
   transition: background-color var(--transition-normal), color var(--transition-normal);
 }
 
+/*
+ * Headings cap at 700. The app previously used font-black (900) in 700+ places
+ * while only Inter<=700 / Outfit<=800 were ever loaded, so browsers synthesised
+ * the weight and smeared every glyph.
+ */
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display);
   font-weight: 700;
@@ -74,13 +300,40 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text-primary);
 }
 
-.app-layout {
-  display: flex;
-  min-height: 100vh;
-  overflow: hidden;
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }
 
-/* Scrollbars */
+kbd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Consistent, visible focus for anything keyboard-reachable. */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Skip link — first tab stop, visible only when focused. */
+.skip-link {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translate(-50%, -120%);
+  z-index: 10000;
+  padding: 0.625rem 1rem;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: transform var(--transition-fast);
+}
+.skip-link:focus {
+  transform: translate(-50%, 0);
+}
+
+/* Thinner, elegant, rounded scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -89,883 +342,173 @@ h1, h2, h3, h4, h5, h6 {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-  border-radius: 3px;
+  background: var(--border-strong);
+  border-radius: 9999px;
+  transition: background var(--transition-fast);
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
 }
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
 
-/* Sidebar styling */
-.sidebar {
-  width: 260px;
+/* ============================================================================
+   Panels & cards
+   ========================================================================= */
+
+.glass-panel {
   background-color: var(--bg-surface);
-  border-right: 1px solid var(--border-color);
-  padding: 24px 16px;
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  position: sticky;
-  top: 0;
-  transition: background-color var(--transition-normal), border-color var(--transition-normal);
-}
-
-.sidebar-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex: 1;
-}
-
-.sidebar-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-secondary);
-  font-weight: 600;
-  font-size: 0.9rem;
-  cursor: pointer;
-  text-align: left;
-  transition: all var(--transition-fast);
-}
-
-.sidebar-item:hover {
-  background-color: var(--bg-app);
-  color: var(--text-primary);
-}
-
-.sidebar-item.active {
-  background-color: rgba(var(--color-primary-rgb), 0.1);
-  color: var(--color-primary);
-}
-
-/* Main Container */
-.main-wrapper {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  overflow-y: auto;
-  position: relative;
-  min-width: 0;
-}
-
-.header {
-  height: 70px;
-  background-color: var(--bg-surface);
-  border-bottom: 1px solid var(--border-color);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 32px;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  transition: background-color var(--transition-normal), border-color var(--transition-normal);
-  flex-shrink: 0;
-}
-
-.faculty-sticky-header {
-  height: auto !important;
-  min-height: 140px !important;
-  background-color: var(--bg-surface) !important;
-  border-bottom: 1px solid var(--border-color) !important;
-  display: flex !important;
-  flex-direction: column !important;
-  padding: 16px 32px !important;
-  position: sticky !important;
-  top: 0 !important;
-  z-index: 120 !important;
-  transition: background-color var(--transition-normal), border-color var(--transition-normal) !important;
-  gap: 16px !important;
-  flex-shrink: 0 !important;
-}
-
-.content-body {
-  padding: 32px;
-  max-width: 1600px;
-  width: 100%;
-  margin: 0 auto;
-}
-
-/* Cards */
-.erp-card {
-  background-color: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
+}
+
+.glass-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
   box-shadow: var(--shadow-sm);
-  padding: 24px;
-  transition: all var(--transition-normal);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
 }
 
-.erp-card:hover {
-  box-shadow: var(--shadow-md);
-  border-color: var(--text-muted);
-}
-
-.hoverable-card {
-  transition: all var(--transition-fast) !important;
-}
-.hoverable-card:hover {
+.glass-card:hover {
   transform: translateY(-2px);
-  border-color: var(--color-primary) !important;
-  box-shadow: var(--shadow-md) !important;
+  box-shadow: var(--shadow-md);
+  border-color: rgba(var(--color-primary-rgb), 0.25);
 }
 
-/* Stats panel */
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 20px;
-  margin-bottom: 24px;
-}
-
-/* Custom Table */
-.erp-table-container {
-  width: 100%;
-  overflow-x: auto;
-}
-
-.erp-table {
-  width: 100%;
-  border-collapse: collapse;
-  text-align: left;
-}
-
-.erp-table th {
+/* Sticky table headers — required for long class and fee lists. */
+.table-sticky-head thead th {
   position: sticky;
   top: 0;
   z-index: 2;
-  background-color: var(--bg-card);
-  color: var(--text-secondary);
-  font-weight: 600;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--border-color);
-  white-space: nowrap;
 }
 
-.erp-table td {
-  padding: 16px;
-  border-bottom: 1px solid var(--border-color);
-  font-size: 0.9rem;
-  color: var(--text-primary);
+/* ============================================================================
+   Loading & motion
+   ========================================================================= */
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
-.erp-table tr:hover {
-  background-color: rgba(var(--color-primary-rgb), 0.02);
+.skeleton-loader {
+  background: linear-gradient(90deg, var(--color-secondary) 25%, var(--border-color) 50%, var(--color-secondary) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s infinite linear;
 }
 
-/* Buttons */
-.btn-primary {
-  background-color: var(--color-primary);
-  color: #ffffff;
-  border: none;
-  font-weight: 600;
-  padding: 10px 20px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.9rem;
-  transition: background-color var(--transition-fast);
+@keyframes border-glow-pulse {
+  0%, 100% { border-color: var(--border-color); }
+  50% { border-color: var(--text-secondary); }
 }
 
-.btn-primary:hover {
-  background-color: var(--color-primary-hover);
+.animate-glow {
+  animation: border-glow-pulse 3s infinite ease-in-out;
 }
 
-.btn-outline {
-  background: transparent;
-  border: 1px solid var(--border-color);
-  color: var(--text-secondary);
-  font-weight: 600;
-  padding: 10px 20px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.9rem;
-  transition: all var(--transition-fast);
+.page-fade-in {
+  animation: pageFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.btn-outline:hover {
-  border-color: var(--text-primary);
-  color: var(--text-primary);
-  background-color: var(--bg-app);
+@keyframes pageFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-/* Dropdown 3-dot menu */
-.menu-dot-trigger {
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  color: var(--text-secondary);
-  padding: 4px;
-  border-radius: 50%;
-}
-
-.menu-dot-trigger:hover {
-  background-color: var(--border-color);
-  color: var(--text-primary);
-}
-
-.menu-dropdown {
-  position: absolute;
-  right: 0;
-  top: 100%;
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-md);
-  z-index: 50;
-  min-width: 150px;
-  overflow: hidden;
-}
-
-.menu-dropdown-item {
-  display: block;
-  width: 100%;
-  padding: 10px 16px;
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 0.85rem;
-  text-align: left;
-  cursor: pointer;
-}
-
-.menu-dropdown-item:hover {
-  background-color: var(--bg-app);
-  color: var(--text-primary);
-}
-
-/* Badges */
-.badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 12px;
-  border-radius: 9999px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.badge-success {
-  background-color: rgba(16, 185, 129, 0.1);
-  color: #10b981;
-}
-
-.badge-danger {
-  background-color: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
-}
-
-.badge-warning {
-  background-color: rgba(245, 158, 11, 0.1);
-  color: #f59e0b;
-}
-
-.badge-pending {
-  background-color: rgba(249, 115, 22, 0.15);
-  color: #f97316;
-  border: 1px solid rgba(249, 115, 22, 0.3);
-}
-
-.badge-overdue {
-  background-color: rgba(245, 158, 11, 0.15);
-  color: #f59e0b;
-  border: 1px solid rgba(245, 158, 11, 0.3);
-}
-
-.badge-critical {
-  background-color: rgba(239, 68, 68, 0.2);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.4);
-}
-
-.badge-default-alert {
-  background-color: #7f1d1d !important;
-  color: #fecaca !important;
-  border: 1px solid #b91c1c;
-  animation: pulse-alert 2s infinite;
-  box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
-}
-
-.badge-fixed {
-  width: 160px !important;
-  height: 36px !important;
-  padding: 0 !important;
-  justify-content: center !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  border-radius: 9999px !important;
-  font-weight: 600 !important;
-  text-align: center !important;
-}
-
-@keyframes pulse-alert {
-  0% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5);
+/*
+ * Respect a user's reduced-motion preference. The shimmer, glow pulse, page
+ * fade and card hover-lift all previously ignored it.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
-  70% {
-    box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);
+  .glass-card:hover {
+    transform: none;
   }
-  100% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  .skeleton-loader {
+    background: var(--color-secondary);
   }
 }
 
-/* Inputs */
-.erp-input {
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border-color);
-  color: var(--text-primary);
-  padding: 10px 14px;
-  border-radius: var(--radius-sm);
-  font-size: 0.9rem;
-  outline: none;
-  width: 100%;
-  transition: border-color var(--transition-fast);
-}
-
-.erp-input:focus {
-  border-color: var(--color-primary);
-}
-
-/* Grid systems */
-.class-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 20px;
-}
-
-.class-card {
-  background-color: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  padding: 24px;
-  cursor: pointer;
-  transition: all var(--transition-normal);
-  text-align: center;
-  position: relative;
-  overflow: hidden;
-}
-
-.class-card:hover {
-  border-color: var(--color-primary);
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-md);
-}
-
-.teacher-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 24px;
-}
-
-.teacher-card {
-  background-color: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  padding: 24px;
-  position: relative;
-  transition: all var(--transition-normal);
-  cursor: pointer;
-}
-
-.teacher-card:hover {
-  transform: translateY(-4px);
-  border-color: var(--color-secondary);
-  box-shadow: var(--shadow-lg);
-}
-
-/* Month List Item Grid */
-.salary-month-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  gap: 12px;
-}
-
-.salary-month-card {
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  padding: 12px;
-  text-align: center;
-  background-color: var(--bg-app);
-}
-
-.salary-month-card.pending {
-  border-color: #ef4444;
-  background-color: rgba(239, 68, 68, 0.05);
-}
-
-/* Receipt Print layout */
-.receipt-box {
-  border: 2px dashed #cbd5e1;
-  padding: 24px;
-  border-radius: var(--radius-sm);
-  background-color: #ffffff !important;
-  font-family: monospace;
-  color: #000000 !important;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-}
-.receipt-box * {
-  color: #000000 !important;
-}
-
-/* Spinner Animation */
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.animate-spin {
-  animation: spin 1s linear infinite;
-}
-
-/* Toast Animations */
-@keyframes slideInRight {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-@keyframes fadeOut {
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
-  }
-}
-
-.toast-in-out {
-  animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-/* Override Autofill Styling */
-input:-webkit-autofill,
-input:-webkit-autofill:hover, 
-input:-webkit-autofill:focus, 
-input:-webkit-autofill:active {
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: var(--text-primary) !important;
-  transition: background-color 5000s ease-in-out 0s;
-  box-shadow: inset 0 0 20px 20px var(--bg-surface) !important;
-}
-
-/* Centered Modals styling */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(15, 23, 42, 0.6);
-  backdrop-filter: blur(4px);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 9999;
-  padding: 16px;
-  animation: fadeIn var(--transition-fast) ease-out;
-}
-
-.modal-content {
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-lg);
-  width: 100%;
-  max-width: 640px;
-  max-height: 90vh;
-  overflow-y: auto;
-  padding: 28px;
-  position: relative;
-  animation: scaleUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-  color: var(--text-primary);
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes scaleUp {
-  from { transform: scale(0.95); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
-}
-
-/* Custom styles for select elements in the portal */
-select.erp-input {
-  cursor: pointer;
-  appearance: none;
+/* Remove default browser Number Input Spinner Controls */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
   -webkit-appearance: none;
-  -moz-appearance: none;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>");
-  background-repeat: no-repeat;
-  background-position: right 14px center;
-  background-size: 16px;
-  padding-right: 40px;
+  margin: 0;
+}
+input[type=number] {
+  -moz-appearance: textfield;
 }
 
-.dark-theme select.erp-input {
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>");
-}
+/* ============================================================================
+   Print — report cards, receipts and salary slips are the most-kept artefacts
+   of the product, so they get real print rules rather than screen styling.
+   ========================================================================= */
 
-/* White calendar indicator icon for dark theme date inputs */
-.dark-theme input[type="date"]::-webkit-calendar-picker-indicator {
-  filter: invert(1);
-  cursor: pointer;
-  opacity: 0.8;
-  transition: opacity var(--transition-fast);
-}
-
-.dark-theme input[type="date"]::-webkit-calendar-picker-indicator:hover {
-  opacity: 1;
-}
-
-/* Scrollable select lists */
-select.erp-input option {
-  background-color: var(--bg-surface);
-  color: var(--text-primary);
-  padding: 8px;
-}
-
-/* Padding to prevent modal content overflow clipping select dropdowns */
-.modal-content {
-  padding-bottom: 40px !important;
-}
-
-/* Form Label & Input Placeholder visibility across themes */
-.form-label {
-  display: block;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-  margin-bottom: 6px;
-  transition: color var(--transition-fast);
-}
-
-.erp-input::placeholder {
-  color: var(--text-muted);
-  opacity: 0.8;
-}
-
-/* Print Media Styles */
 @media print {
-  /* Hide sidebar, main content wrapper, and modal action buttons */
-  .sidebar, 
-  .main-wrapper, 
-  .modal-overlay button,
-  .modal-content button,
-  .modal-content .btn-primary, 
-  .modal-content .btn-outline {
+  :root {
+    /* Force the light token set: printers don't have a dark mode. */
+    --bg-app: #ffffff;
+    --bg-surface: #ffffff;
+    --surface-sunken: #F4F4F5;
+    --text-primary: #000000;
+    --text-secondary: #262626;
+    --text-muted: #52525B;
+    --border-color: #A1A1AA;
+    --border-strong: #71717A;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /* Shadows and lift are meaningless on paper and cost toner. */
+  .glass-card,
+  .glass-panel,
+  [class*='shadow-'] {
+    box-shadow: none !important;
+  }
+  .glass-card:hover {
+    transform: none !important;
+  }
+
+  /* Chrome that must never print. */
+  .no-print,
+  [data-print='hide'] {
     display: none !important;
   }
 
-  /* Reset modal overlay to act as a normal block container on the print page */
-  .modal-overlay {
-    position: relative !important;
-    background: transparent !important;
-    backdrop-filter: none !important;
-    padding: 0 !important;
-    display: block !important;
-    height: auto !important;
-    min-height: auto !important;
-    z-index: auto !important;
+  /* Keep a record on one page where possible. */
+  .print-page {
+    page-break-after: always;
+    break-after: page;
+  }
+  .print-avoid-break,
+  tr, img {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
   }
 
-  /* Reset modal content card container for borderless flat page printing */
-  .modal-content {
-    background: #ffffff !important;
-    border: none !important;
-    box-shadow: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    max-width: 100% !important;
-    max-height: none !important;
-    overflow: visible !important;
-    display: block !important;
+  a[href]::after {
+    content: '';
   }
 
-  /* Format receipt container to cover the full width print page */
-  .receipt-box {
-    border: none !important;
-    background-color: #ffffff !important;
-    color: #000000 !important;
-    padding: 24px !important;
-    margin: 0 !important;
-    width: 100% !important;
-    box-shadow: none !important;
-  }
-
-  .receipt-box * {
-    color: #000000 !important;
-  }
-}
-
-/* Admin Profile Sidebar Section */
-.sidebar-profile {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--border-color);
-  margin-top: auto;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.sidebar-profile:hover {
-  background: rgba(255, 255, 255, 0.06) !important;
-  border-color: var(--text-muted) !important;
-}
-
-.sidebar-profile.active {
-  background: rgba(var(--color-primary-rgb), 0.1) !important;
-  border-color: var(--color-primary) !important;
-}
-
-/* Profile view tab style buttons */
-.profile-tab {
-  padding: 10px 16px;
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--text-secondary);
-  font-weight: 600;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.profile-tab:hover {
-  color: var(--text-primary);
-}
-
-.profile-tab.active {
-  border-bottom-color: var(--color-primary);
-  color: var(--color-primary);
-}
-
-/* Detail info grid */
-.profile-detail-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 16px;
-}
-
-.profile-detail-item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.01);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-}
-
-.profile-detail-label {
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--text-muted);
-  font-weight: 600;
-}
-
-.profile-detail-value {
-  font-size: 0.95rem;
-  color: var(--text-primary);
-  font-weight: 500;
-}
-
-/* Today's Timetable Grid */
-.dashboard-timetable-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-}
-
-@media (min-width: 640px) {
-  .dashboard-timetable-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (min-width: 1024px) {
-  .dashboard-timetable-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-@media (min-width: 1200px) {
-  .dashboard-timetable-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-}.salary-bar-interactive:hover {
-  transform: scaleY(1.03);
-  filter: brightness(1.15);
-}
-.teacher-row-clickable:hover {
-  background-color: rgba(var(--color-primary-rgb), 0.08) !important;
-}
-
-/* ==========================================================================
-   MOBILE & TABLET RESPONSIVENESS AND PWA DESIGN REFINEMENTS
-   ========================================================================== */
-
-/* Target tablet and mobile devices */
-@media (max-width: 1024px) {
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
-  }
-}
-
-@media (max-width: 767px) {
-  /* Layout modifications */
-  .app-layout {
-    flex-direction: column !important;
-    overflow-x: hidden !important;
-  }
-  
-  .sidebar {
-    position: fixed !important;
-    left: -280px !important;
-    top: 0 !important;
-    bottom: 0 !important;
-    width: 260px !important;
-    z-index: 100000 !important;
-    transition: left 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
-    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15) !important;
-  }
-
-  .sidebar.open {
-    left: 0 !important;
-  }
-
-  .main-wrapper {
-    height: 100vh !important;
-    overflow-x: hidden !important;
-  }
-
-  .header {
-    padding: 0 16px !important;
-    height: 60px !important;
-  }
-
-  .content-body {
-    padding: 16px !important;
-  }
-
-  /* Force stack grids */
-  .stats-grid {
-    grid-template-columns: 1fr !important;
-    gap: 12px !important;
-  }
-
-  .class-grid, .teacher-grid, .profile-detail-grid {
-    grid-template-columns: 1fr !important;
-    gap: 16px !important;
-  }
-
-  /* Form layouts */
-  .modal-content {
-    padding: 20px !important;
-    max-height: 95vh !important;
-    width: 96% !important;
-    margin: 8px auto !important;
-  }
-
-  /* Enable table horizontal scroll wrap securely if conversion not requested */
-  .erp-table-container {
-    width: 100% !important;
-    overflow-x: auto !important;
-    -webkit-overflow-scrolling: touch !important;
-  }
-
-  /* Convert tables to cards for highly interactive lists (e.g. mobile portal dashboard, fees tables) */
-  .mobile-card-table tr {
-    display: flex !important;
-    flex-direction: column !important;
-    background: var(--bg-card) !important;
-    border: 1px solid var(--border-color) !important;
-    border-radius: var(--radius-md) !important;
-    margin-bottom: 12px !important;
-    padding: 12px !important;
-  }
-
-  .mobile-card-table thead {
-    display: none !important; /* Hide column headers on card layout */
-  }
-
-  .mobile-card-table td {
-    display: flex !important;
-    justify-content: space-between !important;
-    align-items: center !important;
-    padding: 8px 4px !important;
-    border-bottom: 1px solid var(--border-color) !important;
-    text-align: right !important;
-    font-size: 0.85rem !important;
-  }
-
-  .mobile-card-table td:last-child {
-    border-bottom: none !important;
-  }
-
-  .mobile-card-table td::before {
-    content: attr(data-label) !important;
-    font-weight: 700 !important;
-    text-align: left !important;
-    color: var(--text-secondary) !important;
-    margin-right: 16px !important;
-  }
-
-  /* Adjust typography for small screens */
-  h1, h2, h3 {
-    word-break: break-word !important;
-  }
-}
-
-/* Extra small mobile devices (320px, 375px, 414px widths) */
-@media (max-width: 480px) {
-  .header {
-    gap: 8px !important;
-  }
-  
-  #academic-year-select {
-    width: 120px !important;
-    font-size: 0.75rem !important;
-    padding: 4px 8px !important;
-  }
-
-  .btn-primary, .btn-outline {
-    padding: 8px 12px !important;
-    font-size: 0.8rem !important;
-  }
-  
-  .modal-content {
-    padding: 16px !important;
+  @page {
+    size: A4;
+    margin: 12mm;
   }
 }

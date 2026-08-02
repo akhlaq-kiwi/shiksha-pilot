@@ -1,0 +1,105 @@
+package com.shikshapilot.schoolhub.school_hub
+
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.os.PowerManager
+import android.provider.Settings
+import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodChannel
+import android.content.ContentValues
+import android.os.Environment
+import java.io.File
+
+class MainActivity : FlutterActivity() {
+    private val CHANNEL = "com.shikshapilot.schoolhub/battery"
+
+    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+        super.configureFlutterEngine(flutterEngine)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "isIgnoringBatteryOptimizations" -> {
+                    val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+                    val status = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        powerManager.isIgnoringBatteryOptimizations(packageName)
+                    } else {
+                        true
+                    }
+                    result.success(status)
+                }
+                "requestIgnoreBatteryOptimizations" -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        try {
+                            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                                data = Uri.parse("package:$packageName")
+                            }
+                            startActivity(intent)
+                            result.success(true)
+                        } catch (e: Exception) {
+                            val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                            startActivity(intent)
+                            result.success(false)
+                        }
+                    } else {
+                        result.success(true)
+                    }
+                }
+                "saveFileToDownloads" -> {
+                    val fileName = call.argument<String>("fileName")
+                    val rawBytes = call.argument<Any>("bytes")
+                    val bytes = when (rawBytes) {
+                        is ByteArray -> rawBytes
+                        is List<*> -> {
+                            val byteArray = ByteArray(rawBytes.size)
+                            for (i in rawBytes.indices) {
+                                val item = rawBytes[i]
+                                if (item is Number) {
+                                    byteArray[i] = item.toByte()
+                                }
+                            }
+                            byteArray
+                        }
+                        else -> null
+                    }
+
+                    if (fileName == null || bytes == null) {
+                        result.error("INVALID_ARGUMENTS", "File name or bytes is null", null)
+                        return@setMethodCallHandler
+                    }
+
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                            val resolver = contentResolver
+                            val contentValues = ContentValues().apply {
+                                put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                                put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "application/pdf")
+                                put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                            }
+
+                            val downloadsUri = Uri.parse("content://media/external/downloads")
+                            val uri = resolver.insert(downloadsUri, contentValues)
+                            if (uri != null) {
+                                resolver.openOutputStream(uri)?.use { outputStream ->
+                                    outputStream.write(bytes)
+                                }
+                                result.success(uri.toString())
+                            } else {
+                                result.error("INSERT_ERROR", "Failed to insert entry in downloads", null)
+                            }
+                        } else {
+                            val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                            val file = File(downloadDir, fileName)
+                            file.writeBytes(bytes)
+                            result.success(file.absolutePath)
+                        }
+                    } catch (t: Throwable) {
+                        result.error("WRITE_ERROR", t.message ?: t.toString(), null)
+                    }
+                }
+                else -> result.notImplemented()
+            }
+        }
+    }
+}

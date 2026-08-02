@@ -1,0 +1,26 @@
+{
+  "name": "sp-e2e-tests",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Playwright end-to-end test suite for the Shiksha Pilot frontend, with CSV-driven test data.",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "test:debug": "playwright test --debug",
+    "test:auth": "playwright test tests/auth",
+    "test:teacher": "playwright test tests/teacher",
+    "test:school-admin": "playwright test tests/school-admin",
+    "test:student-parent": "playwright test tests/student-parent",
+    "test:super-admin": "playwright test tests/super-admin",
+    "report": "playwright show-report",
+    "codegen": "playwright codegen http://localhost:3000",
+    "install:browsers": "playwright install --with-deps chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0",
+    "csv-parse": "^5.5.6",
+    "dotenv": "^16.4.5"
+  }
+}

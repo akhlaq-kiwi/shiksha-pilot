@@ -1,12 +1,13 @@
 {
-    "name": "bn-school/erp-backend",
-    "description": "Multi-Tenant School Management ERP Backend",
+    "name": "shiksha-pilot/backend",
+    "description": "Slim PHP backend for Shiksha Pilot School Management Platform",
     "type": "project",
     "require": {
+        "php": ">=8.0",
         "slim/slim": "^4.12",
         "slim/psr7": "^1.6",
-        "firebase/php-jwt": "^6.10",
-        "phpmailer/phpmailer": "^7.1"
+        "php-di/php-di": "^6.4",
+        "psr/http-message": "^1.0"
     },
     "autoload": {
         "psr-4": {
@@ -16,15 +17,7 @@
     "config": {
         "process-timeout": 0,
         "allow-plugins": {
-            "slim/installers": true
-        },
-        "audit": {
-            "ignore-security-advisories": true
-        },
-        "policy": {
-            "advisories": {
-                "block": false
-            }
+            "easy-dir/composer-plugin": true
         }
     }
 }

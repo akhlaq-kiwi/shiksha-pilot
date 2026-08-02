@@ -1,4 +1,4 @@
-# BN School - React Frontend & Slim PHP Backend Application
+# Shiksha Pilot - React Frontend & Slim PHP Backend Application
 
 This is a decoupled application featuring a modern React frontend (bootstrapped with Vite) and a Slim PHP 4 micro-framework backend. The frontend and backend are housed in separate directories (`frontend/` and `backend/`).
 

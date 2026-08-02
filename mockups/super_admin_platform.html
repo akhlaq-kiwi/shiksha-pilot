@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>EduCore Admin - Integrated Management Platform</title>
+    
+    <!-- Libraries -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/history@5/umd/history.development.js"></script>
+    <script src="https://unpkg.com/react-router@6.3.0/umd/react-router.development.js"></script>
+    <script src="https://unpkg.com/react-router-dom@6.3.0/umd/react-router-dom.development.js"></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+    
+    <!-- CSS & Fonts -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "border-low": "#E2E8F0",
+                    "on-surface": "#131b2e",
+                    "on-secondary-container": "#54647a",
+                    "surface-container-highest": "#dae2fd",
+                    "secondary-container": "#d0e1fb",
+                    "primary-fixed-dim": "#b0c6ff",
+                    "on-background": "#131b2e",
+                    "inverse-surface": "#283044",
+                    "tertiary": "#732900",
+                    "on-secondary-fixed": "#0b1c30",
+                    "on-tertiary-container": "#ffc0a7",
+                    "on-primary-container": "#bcceff",
+                    "on-primary": "#ffffff",
+                    "inverse-on-surface": "#eef0ff",
+                    "on-error-container": "#93000a",
+                    "surface-variant": "#dae2fd",
+                    "error-container": "#ffdad6",
+                    "tertiary-fixed-dim": "#ffb596",
+                    "surface-bright": "#faf8ff",
+                    "background": "#faf8ff",
+                    "on-primary-fixed-variant": "#00419c",
+                    "surface-container-low": "#f2f3ff",
+                    "secondary-fixed": "#d3e4fe",
+                    "outline": "#737784",
+                    "inverse-primary": "#b0c6ff",
+                    "primary-container": "#0f52ba",
+                    "on-primary": "#ffffff",
+                    "border-high": "#CBD5E1",
+                    "tertiary-fixed": "#ffdbcd",
+                    "surface": "#faf8ff",
+                    "warning": "#F59E0B",
+                    "surface-container-lowest": "#ffffff",
+                    "outline-variant": "#c3c6d5",
+                    "on-surface-variant": "#434653",
+                    "on-tertiary": "#ffffff",
+                    "on-tertiary-fixed": "#360f00",
+                    "primary": "#003c90",
+                    "info": "#3B82F6",
+                    "surface-container-high": "#e2e7ff",
+                    "tertiary-container": "#993900",
+                    "surface-tint": "#1d59c1",
+                    "surface-subtle": "#F8FAFC",
+                    "on-tertiary-fixed-variant": "#7d2d00",
+                    "secondary": "#505f76",
+                    "surface-container": "#eaedff",
+                    "on-primary-fixed": "#001945",
+                    "success": "#10B981",
+                    "secondary-fixed-dim": "#b7c8e1",
+                    "primary-fixed": "#d9e2ff",
+                    "surface-dim": "#d2d9f4",
+                    "error": "#EF4444",
+                    "on-secondary-fixed-variant": "#38485d",
+                    "on-error": "#ffffff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "unit": "8px",
+                    "sidebar-width": "260px",
+                    "container-max": "1440px",
+                    "topbar-height": "64px",
+                    "margin-mobile": "16px",
+                    "gutter": "24px",
+                    "margin-desktop": "32px"
+            },
+            "fontFamily": {
+                    "display": ["Inter", "sans-serif"],
+                    "body": ["Inter", "sans-serif"]
+            }
+          },
+        },
+      }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .chart-grid {
+            background-image: linear-gradient(to right, #E2E8F0 1px, transparent 1px),
+                              linear-gradient(to bottom, #E2E8F0 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const { createRoot } = ReactDOM;
+        const { MemoryRouter, Routes, Route, Link, useNavigate, useLocation } = ReactRouterDOM;
+
+        // --- Shared Components ---
+
+        const TopAppBar = () => {
+            const navigate = useNavigate();
+            return (
+                <header className="bg-surface-container-lowest dark:bg-inverse-surface w-full h-topbar-height border-b border-border-low dark:border-outline-variant flex items-center justify-between px-margin-desktop w-full max-w-container-max mx-auto sticky top-0 z-40">
+                    <div className="flex items-center gap-4 cursor-pointer" onClick={() => navigate('/')}>
+                        <span className="material-symbols-outlined text-primary dark:text-primary-fixed-dim text-[28px]">admin_panel_settings</span>
+                        <h1 className="font-display font-bold text-xl text-primary dark:text-primary-fixed-dim">EduCore Admin</h1>
+                    </div>
+                    <nav className="hidden md:flex items-center gap-8">
+                        <Link to="/" className="text-on-surface-variant dark:text-outline-variant hover:bg-surface-subtle transition-colors duration-150 px-3 py-2 rounded-lg">Dashboard</Link>
+                        <Link to="/schools" className="text-on-surface-variant dark:text-outline-variant hover:bg-surface-subtle transition-colors duration-150 px-3 py-2 rounded-lg">Schools</Link>
+                        <Link to="/billing" className="text-on-surface-variant dark:text-outline-variant hover:bg-surface-subtle transition-colors duration-150 px-3 py-2 rounded-lg">Billing</Link>
+                        <Link to="/settings" className="text-on-surface-variant dark:text-outline-variant hover:bg-surface-subtle transition-colors duration-150 px-3 py-2 rounded-lg">Settings</Link>
+                    </nav>
+                    <div className="flex items-center gap-4">
+                        <button className="p-2 rounded-full hover:bg-surface-container transition-colors active:scale-95">
+                            <span className="material-symbols-outlined">notifications</span>
+                        </button>
+                        <div className="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center text-on-primary text-xs font-bold">SA</div>
+                    </div>
+                </header>
+            );
+        };
+
+        const BottomNavBar = () => {
+            const location = useLocation();
+            const getActive = (path) => location.pathname === path ? "bg-secondary-container text-primary" : "text-on-secondary-container/60";
+            
+            return (
+                <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 py-2 md:hidden bg-surface-container-lowest border-t border-border-low shadow-sm z-50 rounded-t-xl">
+                    <Link to="/" className={`flex flex-col items-center justify-center px-4 py-1 rounded-xl active:scale-90 transition-all duration-200 ${getActive('/')}`}>
+                        <span className="material-symbols-outlined">dashboard</span>
+                        <span className="text-[10px] font-medium">Dashboard</span>
+                    </Link>
+                    <Link to="/schools" className={`flex flex-col items-center justify-center px-4 py-1 rounded-xl active:scale-90 transition-all duration-200 ${getActive('/schools')}`}>
+                        <span className="material-symbols-outlined">domain</span>
+                        <span className="text-[10px] font-medium">Schools</span>
+                    </Link>
+                    <Link to="/billing" className={`flex flex-col items-center justify-center px-4 py-1 rounded-xl active:scale-90 transition-all duration-200 ${getActive('/billing')}`}>
+                        <span className="material-symbols-outlined">payments</span>
+                        <span className="text-[10px] font-medium">Billing</span>
+                    </Link>
+                    <Link to="/settings" className={`flex flex-col items-center justify-center px-4 py-1 rounded-xl active:scale-90 transition-all duration-200 ${getActive('/settings')}`}>
+                        <span className="material-symbols-outlined">settings</span>
+                        <span className="text-[10px] font-medium">Settings</span>
+                    </Link>
+                </nav>
+            );
+        };
+
+        const Sidebar = () => {
+            const location = useLocation();
+            const getActive = (path) => location.pathname === path ? "bg-secondary-container text-primary font-bold" : "text-on-secondary-container hover:bg-surface-subtle";
+            
+            return (
+                <aside className="hidden md:flex flex-col w-[260px] bg-surface-container-lowest border-r border-border-low p-6 space-y-8 sticky top-topbar-height h-[calc(100vh-64px)]">
+                    <div>
+                        <p className="text-[11px] font-bold text-on-secondary-container uppercase mb-4 tracking-wider">Management</p>
+                        <nav className="flex flex-col gap-1">
+                            <Link to="/" className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors group ${getActive('/')}`}>
+                                <span className="material-symbols-outlined">dashboard</span>
+                                <span className="text-sm">Dashboard</span>
+                            </Link>
+                            <Link to="/schools" className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors group ${getActive('/schools')}`}>
+                                <span className="material-symbols-outlined">domain</span>
+                                <span className="text-sm">Schools</span>
+                            </Link>
+                            <Link to="/billing" className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors group ${getActive('/billing')}`}>
+                                <span className="material-symbols-outlined">payments</span>
+                                <span className="text-sm">Billing</span>
+                            </Link>
+                            <Link to="/settings" className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors group ${getActive('/settings')}`}>
+                                <span className="material-symbols-outlined">settings</span>
+                                <span className="text-sm">Settings</span>
+                            </Link>
+                        </nav>
+                    </div>
+                    <div className="pt-auto">
+                        <div className="bg-surface-container rounded-xl p-4">
+                            <p className="text-sm font-semibold text-primary mb-1">Infrastructure Health</p>
+                            <p className="text-xs text-on-secondary-container mb-3">All systems operational across 12 clusters.</p>
+                            <button className="text-xs font-bold text-primary flex items-center gap-1">
+                                Status Dashboard <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
+                            </button>
+                        </div>
+                    </div>
+                </aside>
+            );
+        };
+
+        // --- Screen Components ---
+
+        const DashboardPage = () => {
+            const navigate = useNavigate();
+            return (
+                <div className="flex-1 p-margin-mobile md:p-margin-desktop overflow-y-auto">
+                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
+                        <div>
+                            <h2 className="text-3xl font-bold text-on-surface mb-2">Super Admin Overview</h2>
+                            <p className="text-on-surface-variant max-w-2xl">Monitor system health, institutional growth, and platform-wide revenue metrics.</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <div className="bg-success/5 border border-success/20 rounded-xl px-4 py-2 flex items-center gap-3">
+                                <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-success"></span>
+                                </span>
+                                <span className="text-xs text-success font-semibold">Systems Normal</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                        <div className="bg-surface-container-lowest p-6 rounded-xl border border-border-low shadow-sm">
+                            <div className="flex justify-between items-start mb-4">
+                                <div className="p-2 bg-primary/10 rounded-lg text-primary"><span className="material-symbols-outlined">domain</span></div>
+                                <span className="text-success text-xs font-bold">+18 new</span>
+                            </div>
+                            <p className="text-secondary text-xs uppercase tracking-wider mb-1">Total Schools</p>
+                            <p className="text-4xl font-black text-on-surface">2,450</p>
+                        </div>
+                        <div className="bg-surface-container-lowest p-6 rounded-xl border border-border-low shadow-sm">
+                            <div className="flex justify-between items-start mb-4">
+                                <div className="p-2 bg-success/10 rounded-lg text-success"><span className="material-symbols-outlined">payments</span></div>
+                                <span className="text-success text-xs font-bold">+8.4%</span>
+                            </div>
+                            <p className="text-secondary text-xs uppercase tracking-wider mb-1">Monthly Revenue</p>
+                            <p className="text-4xl font-black text-on-surface">$425k</p>
+                        </div>
+                        <div className="bg-surface-container-lowest p-6 rounded-xl border border-border-low shadow-sm">
+                            <div className="flex justify-between items-start mb-4">
+                                <div className="p-2 bg-warning/10 rounded-lg text-warning"><span className="material-symbols-outlined">show_chart</span></div>
+                                <span className="text-success text-xs font-bold">On Track</span>
+                            </div>
+                            <p className="text-secondary text-xs uppercase tracking-wider mb-1">User Growth</p>
+                            <p className="text-4xl font-black text-on-surface">+12.5%</p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
+                        <div className="lg:col-span-8 bg-surface-container-lowest border border-border-low rounded-xl p-8">
+                            <h3 className="text-xl font-bold mb-6">Active Subscriptions</h3>
+                            <div className="h-64 relative chart-grid flex items-end justify-between px-4">
+                                {[30, 45, 55, 62, 78, 90].map((h, i) => (
+                                    <div key={i} className="flex-1 flex flex-col items-center group cursor-pointer">
+                                        <div className={`w-12 bg-primary/20 border-t-2 border-primary rounded-t group-hover:bg-primary/30 transition-all`} style={{height: `${h}%`}}></div>
+                                        <span className="mt-2 text-xs text-secondary">{['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'][i]}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="lg:col-span-4 space-y-4">
+                            <h3 className="text-xl font-bold px-1">Recent Sign-ups</h3>
+                            {[
+                                { name: 'Greenwood Academy', tier: 'Premium', img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBieAGhVFsaSHqc7wyNgJSQIJvC_e90xcxJ5Sm-uoujnje5zI5qbQRoB3U-0Zvh5nojeGtxCZWqgVeCIf1Mmvv4Ta20ehFLtfqWOeHUJZlkgL4pXiKEULOMxjR-zdzdm0Y8B0FTjQxXPRLxE28z1Sj4WL9ARbV97foi7ycM0GMdoTl8QJfu4SEkwodC_vOzQdoRmspjfLGM9uGyc7Ffat4nF3b7H2pHHYhnuvAc96XmeivLqc16OwASCMTTYWr2qMVeHcVK_qWOXzbN' },
+                                { name: "St. Mary's High", tier: 'Standard', img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuArh-E6u_9phbQ5q5W73Qx0pOX3imwuej2lJHGfnQUdfrXl7lM1eHfxVcKXk2MaWtonboPRlKSBxZ53un1Z2um1sGV9Du48dBSr5hByBAgc5MXn_gbalTXf2BaKQRScpL8VifcAmDKdmW8-YGXmVsFVd7nNWcx1Ho7Tss9SkuO-VcM_Zq77-RKeCqBIuDIP9tZkxiU5OTr2OuvQ3Oxg4ZS7Jl5SWfHzi83eE8G4EBN-QITHjylynf_ZJj6XzVer8vc0v4C0iwbEPvqD' }
+                            ].map((school, i) => (
+                                <div key={i} className="flex items-center justify-between p-4 bg-white border border-border-low rounded-xl hover:bg-surface-container-low transition-colors cursor-pointer" onClick={() => navigate('/school/greenwood')}>
+                                    <div className="flex items-center gap-3">
+                                        <img src={school.img} className="w-10 h-10 rounded-lg object-cover" />
+                                        <div>
+                                            <p className="text-sm font-bold">{school.name}</p>
+                                            <p className="text-xs text-secondary">{school.tier} • 2h ago</p>
+                                        </div>
+                                    </div>
+                                    <span className="material-symbols-outlined text-secondary">chevron_right</span>
+                                </div>
+                            ))}
+                            <button onClick={() => navigate('/schools')} className="w-full py-3 mt-2 text-primary font-bold text-sm bg-primary/5 rounded-xl border border-primary/20 hover:bg-primary/10 transition-colors">
+                                View All Institutions
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const SchoolsListPage = () => {
+            const navigate = useNavigate();
+            const schools = [
+                { id: 'SCH-001', name: 'Northwood Academy', domain: 'northwood.edu', status: 'Active', statusColor: 'bg-success', students: '2,450', img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDPRPt3xK8C4CW89hhlExsLzEFI115azoQ3v1aPqQhs3J0Hg4GqiBc_z2wDoRd6jlCsWdf1FBcn1MtLUM4t_fr0SM8neAe4bh5XotHVliDyhbntKNhrZmcGQO5vDH2CG3IYejp-SoCjkBVVdLaFGUuxnshd6XVZkE-UoiGQzkWzxK4f6hfBzJm_97_0JDzC_m0y8Sfca1ukeA4Lq0Ly3IT4ZPBwY1_pPfjU5ddq7qnNAoX1q2ZaO2RJh3bfhxN46Nb-QTmhFJIutPJx' },
+                { id: 'SCH-042', name: 'Horizon Tech Institute', domain: 'horizon.tech', status: 'Trial', statusColor: 'bg-warning', students: '842', img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBE-lBf0Fqdxbv_ci8YtDGvaADXpfYZC7uWpFBnxZXruh7022yf336ByP-lybIIuZ1BOHxHXMpQ8t1-zVpR3gRGJbL0huLKK57Dq-EuIvGI0slEHdAew-FzSQQrbo21jjLy20i4xD0eK_AALAbm_RE8XJSh9iwPNoY8sE4RO9m5tPbgrZUowRqpl4NCNDqAa6d0F9eAXRseGEKTZxoy5vxjPsQtE0nxlb3_ygOnZPoz5a75JS3LnePhO1_qv0iWvHbx48Hh8QJtWqe1' },
+                { id: 'SCH-118', name: 'Byte Academy', domain: 'byte.academy', status: 'Suspended', statusColor: 'bg-error', students: '5,200', img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCMBlhzmwkv6wNbGWyxF_m-F2dHlZ_yMVcHKC7FKJU-pAq_cDSpqwlT7x1vE4AUTUWRjXkCwKwbXfa2GIDqzrKnw1ZZFmmNT0wdxI2DH59irVFU_a5q4tJ-fTUzp0695gEa9PWwjeMKPM4Jt0ZIVr8kh8Vtl-Ckj58JnD7j1C__STSoL7YxY7y_hYV_AsH9niqXG5_i1S2qKMtr14T1QM2piZ1ip_Yii7CdEhRLn8lJ166QbKB-3N1LsM0E31e39B0n0p5zTm23Xvo6' },
+                { id: 'SCH-015', name: 'Greenwood Academy', domain: 'greenwood.edu', status: 'Active', statusColor: 'bg-success', students: '3,120', img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBTR4P_TH1gbRDSXFGCXbSP6sekqowJfxXVxTsv0fAuPpiLDylIX4zf8ZNPUcUqW9xtyD7u6QIiwzzeQ6ZYjxmjCtA4MS_4QRHr5-OTfCh7mErb88EwJo5Ggt-v2wSsQC361GeQb6VEWgKDUDK9HLzpDi2KzkYScJ1Fqn4BCUi4F2kYs8QzlYd5IOXv9kWlwK5wTmX5zdUDtt_stoQStrNmy2s57_XsEplx_nfY3lskAO90l6__uPOuz5wPvrxVVUAnNwVnU6QVcCOX' }
+            ];
+
+            return (
+                <div className="flex-1 p-margin-mobile md:p-margin-desktop overflow-y-auto">
+                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
+                        <div>
+                            <h2 className="text-3xl font-bold">Institutions Management</h2>
+                            <p className="text-on-surface-variant">Manage and monitor schools across the multi-tenant core.</p>
+                        </div>
+                        <button className="flex items-center gap-2 bg-primary text-white px-6 py-2.5 rounded-lg font-bold hover:opacity-90 transition-all">
+                            <span className="material-symbols-outlined text-lg">add_business</span> Create School
+                        </button>
+                    </div>
+
+                    <div className="bg-white border border-border-low rounded-xl p-4 mb-8 flex flex-col lg:flex-row gap-4 items-center">
+                        <div className="relative w-full lg:w-96">
+                            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-secondary">search</span>
+                            <input className="w-full h-10 pl-10 pr-4 bg-surface-subtle border border-border-low rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20" placeholder="Search schools..." type="text"/>
+                        </div>
+                        <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap">
+                            <button className="px-4 py-1.5 bg-primary-container text-white rounded-full text-xs font-bold">All</button>
+                            <button className="px-4 py-1.5 bg-surface-subtle text-on-surface-variant border border-border-low rounded-full text-xs font-bold">Active</button>
+                            <button className="px-4 py-1.5 bg-surface-subtle text-on-surface-variant border border-border-low rounded-full text-xs font-bold">Trial</button>
+                            <button className="px-4 py-1.5 bg-surface-subtle text-on-surface-variant border border-border-low rounded-full text-xs font-bold">Suspended</button>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                        {schools.map((school, i) => (
+                            <div key={i} onClick={() => navigate('/school/greenwood')} className="bg-white border border-border-low rounded-xl overflow-hidden hover:shadow-md hover:border-primary/30 transition-all group cursor-pointer p-5">
+                                <div className="flex items-start justify-between mb-4">
+                                    <img src={school.img} className="w-12 h-12 rounded-xl object-cover border border-border-low" />
+                                    <span className={`${school.statusColor}/10 text-${school.statusColor.replace('bg-', '')} px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase flex items-center gap-1`}>
+                                        <span className={`w-1.5 h-1.5 rounded-full ${school.statusColor}`}></span> {school.status}
+                                    </span>
+                                </div>
+                                <h3 className="font-bold text-lg group-hover:text-primary transition-colors">{school.name}</h3>
+                                <p className="text-secondary text-xs mt-0.5">{school.domain}</p>
+                                <div className="mt-6 flex items-center justify-between border-t border-border-low pt-4">
+                                    <p className="text-xs text-secondary font-medium">{school.students} Students</p>
+                                    <span className="material-symbols-outlined text-outline group-hover:text-primary transition-all">arrow_forward</span>
+                                </div>
+                            </div>
+                        ))}
+                        <div className="border-2 border-dashed border-border-high rounded-xl flex flex-col items-center justify-center p-8 text-center hover:bg-surface-subtle transition-all cursor-pointer group">
+                            <div className="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                                <span className="material-symbols-outlined text-primary text-2xl">add</span>
+                            </div>
+                            <h3 className="font-bold">Add New School</h3>
+                            <p className="text-xs text-on-secondary-container mt-1">Provision a new tenant.</p>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const SchoolDetailPage = () => {
+            return (
+                <div className="flex-1 p-margin-mobile md:p-margin-desktop overflow-y-auto">
+                    <nav className="flex items-center gap-2 mb-6 text-xs text-secondary font-semibold">
+                        <Link to="/schools" className="hover:text-primary">Schools</Link>
+                        <span className="material-symbols-outlined text-[14px]">chevron_right</span>
+                        <span className="text-on-surface">Greenwood Academy</span>
+                    </nav>
+
+                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
+                        <div className="flex items-center gap-6">
+                            <div className="h-20 w-20 rounded-xl bg-white shadow-sm border border-border-low p-2 flex items-center justify-center">
+                                <img className="w-full h-full object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCpireRI8qhXgXMjoM0ZouJK0URzIFtv-mg-07z0lmX2rN3_MABVUWpKPpWLvvcZtVHSTZNf0VxrzIOZr8NLwDyyN1xwu7Gu3stqzv1Ky1z5pGRI1hvcREzkDYch17Y668hQRSfx6YP31BYR4WEgyaNxxSTEirCbQDIu06_GOkWVjSQqYO3EFDeZ1wlSzmodFqTEc4H207EXN-gTts0pDJzf3Me8po-8sEXS2Aa-fXiIvSo40SpzbCBKF2p4llKsf-5WqMou78Vwhsz" />
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-3 mb-1">
+                                    <h1 className="text-4xl font-black text-on-surface">Greenwood Academy</h1>
+                                    <span className="bg-success/10 text-success text-[10px] px-2.5 py-0.5 rounded-full border border-success/20 font-black">ACTIVE</span>
+                                </div>
+                                <p className="text-primary text-sm flex items-center gap-1 font-semibold">
+                                    <span className="material-symbols-outlined text-[18px]">link</span> greenwood.edu
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <button className="px-4 py-2 bg-white border border-border-high rounded-lg text-sm font-bold hover:bg-surface-subtle transition-colors flex items-center gap-2">
+                                <span className="material-symbols-outlined text-[18px]">edit</span> Edit
+                            </button>
+                            <button className="px-4 py-2 bg-white border border-border-high text-error rounded-lg text-sm font-bold hover:bg-error/5">Suspend</button>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-12 gap-8">
+                        <div className="col-span-12 lg:col-span-7 space-y-8">
+                            <div className="bg-white border border-border-low rounded-xl shadow-sm overflow-hidden">
+                                <div className="px-6 py-4 border-b border-border-low bg-surface-subtle font-bold">School Profile</div>
+                                <div className="p-6 grid grid-cols-2 gap-8">
+                                    <div>
+                                        <p className="text-[10px] font-black text-outline uppercase tracking-widest mb-1">Tenant ID</p>
+                                        <p className="text-sm font-bold">T-992-GWA-2024</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-black text-outline uppercase tracking-widest mb-1">Region</p>
+                                        <p className="text-sm font-bold">North America East</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-black text-outline uppercase tracking-widest mb-1">Primary Admin</p>
+                                        <p className="text-sm font-bold">Dr. Elena Rodriguez</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-black text-outline uppercase tracking-widest mb-1">Contact</p>
+                                        <p className="text-sm font-bold">+1 (555) 234-8890</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="bg-white border border-border-low rounded-xl shadow-sm p-6">
+                                <h3 className="font-bold mb-4">Branding & Assets</h3>
+                                <div className="flex gap-8 items-center">
+                                    <div className="h-16 w-16 rounded-xl bg-[#2D5A27] shadow-inner"></div>
+                                    <div className="flex-1">
+                                        <p className="text-xs font-bold text-secondary uppercase tracking-widest">Primary Color</p>
+                                        <p className="text-sm font-mono font-bold">#2D5A27 (Forest Green)</p>
+                                    </div>
+                                    <button className="text-sm text-primary font-bold underline">Update Portal Theme</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="col-span-12 lg:col-span-5 space-y-6">
+                            <div className="bg-primary text-white rounded-xl p-6 shadow-lg relative overflow-hidden">
+                                <div className="relative z-10">
+                                    <p className="text-primary-fixed-dim text-[10px] font-black uppercase tracking-widest mb-1">Current Plan</p>
+                                    <h2 className="text-2xl font-bold mb-6">Enterprise Elite</h2>
+                                    <div className="space-y-3 mb-6">
+                                        <div className="flex justify-between text-xs font-bold">
+                                            <span>Next Billing</span>
+                                            <span>Jan 15, 2025</span>
+                                        </div>
+                                        <div className="flex justify-between text-xs font-bold">
+                                            <span>Student Count</span>
+                                            <span>2,480 / 5,000</span>
+                                        </div>
+                                    </div>
+                                    <button className="w-full bg-white text-primary py-3 rounded-lg text-sm font-black hover:bg-primary-fixed transition-colors">Manage Billing</button>
+                                </div>
+                            </div>
+                            <div className="bg-white border border-border-low rounded-xl p-6 shadow-sm">
+                                <h3 className="font-bold mb-4">Infrastructure Status</h3>
+                                <div className="space-y-4">
+                                    <div>
+                                        <div className="flex justify-between text-xs font-bold mb-1">
+                                            <span className="text-secondary">DB Health</span>
+                                            <span className="text-success">99.9%</span>
+                                        </div>
+                                        <div className="h-1.5 w-full bg-surface-container rounded-full overflow-hidden">
+                                            <div className="h-full bg-success w-[99%]"></div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="flex justify-between text-xs font-bold mb-1">
+                                            <span className="text-secondary">Storage</span>
+                                            <span className="text-primary">1.2 TB / 2.0 TB</span>
+                                        </div>
+                                        <div className="h-1.5 w-full bg-surface-container rounded-full overflow-hidden">
+                                            <div className="h-full bg-primary w-[60%]"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const BillingPage = () => {
+            return (
+                <div className="flex-1 p-margin-mobile md:p-margin-desktop overflow-y-auto">
+                    <div className="mb-8">
+                        <h2 className="text-3xl font-bold">Revenue & Subscriptions</h2>
+                        <p className="text-on-surface-variant">Global billing history and institution tier management.</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
+                        <div className="bg-white p-6 rounded-xl border border-border-low shadow-sm">
+                            <p className="text-xs font-bold text-secondary uppercase mb-1">Total ARR</p>
+                            <p className="text-3xl font-black text-primary">$1.24M</p>
+                        </div>
+                        <div className="bg-white p-6 rounded-xl border border-border-low shadow-sm">
+                            <p className="text-xs font-bold text-secondary uppercase mb-1">Pending Invoices</p>
+                            <p className="text-3xl font-black text-warning">42</p>
+                        </div>
+                        <div className="bg-white p-6 rounded-xl border border-border-low shadow-sm">
+                            <p className="text-xs font-bold text-secondary uppercase mb-1">Avg Ticket Size</p>
+                            <p className="text-3xl font-black text-on-surface">$884</p>
+                        </div>
+                        <div className="bg-white p-6 rounded-xl border border-border-low shadow-sm">
+                            <p className="text-xs font-bold text-secondary uppercase mb-1">Churn Rate</p>
+                            <p className="text-3xl font-black text-success">2.1%</p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+                        {['Basic', 'Professional', 'Enterprise'].map((tier, i) => (
+                            <div key={i} className={`p-8 rounded-xl border-2 flex flex-col ${tier === 'Professional' ? 'border-primary shadow-lg scale-105 bg-white' : 'border-border-low bg-white'}`}>
+                                {tier === 'Professional' && <span className="bg-primary text-white text-[10px] font-black py-1 px-3 rounded-full self-center mb-4 uppercase tracking-widest">Most Popular</span>}
+                                <h3 className="text-xl font-bold mb-2">{tier}</h3>
+                                <p className="text-xs text-secondary mb-6">Comprehensive management for {tier === 'Basic' ? 'single-campus' : tier === 'Professional' ? 'growing' : 'large multi-tenant'} institutions.</p>
+                                <div className="mb-6 flex items-baseline gap-1">
+                                    <span className="text-4xl font-black">{tier === 'Basic' ? '$299' : tier === 'Professional' ? '$899' : 'Custom'}</span>
+                                    {tier !== 'Enterprise' && <span className="text-secondary text-sm">/mo</span>}
+                                </div>
+                                <button className={`w-full py-3 rounded-lg text-sm font-black transition-colors ${tier === 'Professional' ? 'bg-primary text-white' : 'border border-border-low hover:bg-surface-subtle'}`}>Configure Tiers</button>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="bg-white border border-border-low rounded-xl overflow-hidden shadow-sm">
+                        <div className="px-6 py-4 border-b border-border-low font-bold">Billing History</div>
+                        <table className="w-full text-left">
+                            <thead className="bg-surface-subtle text-[10px] font-black uppercase text-secondary">
+                                <tr>
+                                    <th className="px-6 py-3">Institution</th>
+                                    <th className="px-6 py-3">Transaction ID</th>
+                                    <th className="px-6 py-3">Plan</th>
+                                    <th className="px-6 py-3">Amount</th>
+                                    <th className="px-6 py-3 text-right">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border-low text-sm">
+                                {[
+                                    { school: 'St. Jude Academy', id: '#TXN-882910', plan: 'Professional', amount: '$899.00', status: 'Paid', statusClass: 'bg-success/10 text-success' },
+                                    { school: 'Lincoln High', id: '#TXN-882909', plan: 'Enterprise', amount: '$4,250.00', status: 'Paid', statusClass: 'bg-success/10 text-success' },
+                                    { school: 'North Star Elem', id: '#TXN-882908', plan: 'Basic', amount: '$299.00', status: 'Pending', statusClass: 'bg-warning/10 text-warning' }
+                                ].map((txn, i) => (
+                                    <tr key={i} className="hover:bg-primary/5 cursor-pointer">
+                                        <td className="px-6 py-4 font-bold">{txn.school}</td>
+                                        <td className="px-6 py-4 text-secondary font-mono">{txn.id}</td>
+                                        <td className="px-6 py-4 font-semibold">{txn.plan}</td>
+                                        <td className="px-6 py-4 font-black">{txn.amount}</td>
+                                        <td className="px-6 py-4 text-right">
+                                            <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${txn.statusClass}`}>{txn.status}</span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        };
+
+        const SettingsPage = () => {
+            const admins = [
+                { name: 'Elena Rodriguez', role: 'Super Admin', email: 'elena.r@educore.io', lastLogin: '12 mins ago', status: 'Active', img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBJAn9EvKDKmTGVhx1RCT8DBVzRKcCSIqUSHR8nnmANMWuZI9rIaSoQcXfdxUrNqiLw48jF2I0ZTVI0Ckhvqzi1h8YY9EOLRgCeekaaQYnNr7QwzYZwN-vUngSwraw7XfzOVkXX6-ZU0QG6-qF44_7AxakZkuxWQh11-fn4gVvMkN2_kEr0UcbWQWmjXZRl6AHWHYBpqMJWBMTYeiR-hqJ-mi1DNaBMFYQZVLMway8Q0ynTtYSSHajo1Cx6HrWAZjzGYgwReFcC_R1x' },
+                { name: 'Marcus Chen', role: 'Infrastructure Lead', email: 'm.chen@educore.io', lastLogin: '4 hours ago', status: 'Active', img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCXd-TeU2ejmeAzgnoIinLyoXT-qsLY-LVP359Ns5LDerB7AFpmcsGWdQEqcmJd_OI3UFltkfWiIQkephY_Yx1uQiF5A29Pj3Q1Uxyup5AMh6V73E5wRJKpTXonHX5kJC6IsjVY6ZsocRpTEV0HuGXHZwLIo0ZKnwBZWyD9aBcGS_3tAbI3chg6Yvrdgf9pDeO6a53APOTVuTFv3TLAnRLilPRKE3MlMFvkBCrUE37-26THtaMETaVlTGR75THRxynRSQw0TKDrXUJS' },
+                { name: 'Sarah Jenkins', role: 'Security Officer', email: 's.jenkins@educore.io', lastLogin: 'Yesterday', status: 'Away', img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAoQqZ69Su97_S3fZ45oJRz0m_Kx0SoNDQ0kvJ69jAPDEFf22FyQ0t2jlYtA90jRkshqoMY0oVNLS0MIzHzM8LGrTNtg_Gh6mgpFFkGYCy-BWVQWccWrWStnFhn_3Qs0oi4zcmqQdkWgmNATUxuTkWqLb68jWt-PFlhwbPhk2LCzym7SjknNKlkfuf4uxKci1h5R98YMkBxt1Yz-aTEtrFXubGcOjXjBBdSf5tQgGjzlfG8QH5XEl_EQrkCfeLaMjAGwFRA7d4S5aoU' }
+            ];
+
+            return (
+                <div className="flex-1 p-margin-mobile md:p-margin-desktop overflow-y-auto">
+                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
+                        <div>
+                            <h2 className="text-3xl font-bold">System Settings</h2>
+                            <p className="text-on-surface-variant">Manage platform administrators and global security parameters.</p>
+                        </div>
+                        <button className="bg-primary text-white px-5 py-2.5 rounded-lg flex items-center gap-2 font-bold hover:opacity-90 shadow-md">
+                            <span className="material-symbols-outlined text-[20px]">person_add</span> Add Administrator
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                        <div className="lg:col-span-8 bg-white border border-border-low rounded-xl overflow-hidden shadow-sm">
+                            <div className="px-6 py-4 border-b border-border-low flex justify-between items-center bg-surface-subtle/50">
+                                <h3 className="font-bold">Administrator Directory</h3>
+                                <div className="text-[10px] font-black text-success flex items-center gap-1 uppercase">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-success"></span> All Systems Operational
+                                </div>
+                            </div>
+                            <table className="w-full text-left">
+                                <thead className="bg-surface-subtle text-[10px] font-black uppercase text-secondary">
+                                    <tr>
+                                        <th className="px-6 py-3">Admin</th>
+                                        <th className="px-6 py-3">Role</th>
+                                        <th className="px-6 py-3">Status</th>
+                                        <th className="px-6 py-3 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border-low text-sm">
+                                    {admins.map((admin, i) => (
+                                        <tr key={i} className="hover:bg-primary/5">
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-3">
+                                                    <img src={admin.img} className="w-10 h-10 rounded-full object-cover" />
+                                                    <div>
+                                                        <p className="font-bold">{admin.name}</p>
+                                                        <p className="text-xs text-secondary">{admin.email}</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-primary/10 text-primary">{admin.role}</span>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-1.5 text-xs font-bold text-secondary">
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${admin.status === 'Active' ? 'bg-success' : 'bg-warning'}`}></span> {admin.status}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <button className="p-1 hover:bg-surface-container rounded-full"><span className="material-symbols-outlined">more_vert</span></button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div className="lg:col-span-4 space-y-6">
+                            <div className="bg-white border border-border-low rounded-xl p-6 shadow-sm">
+                                <h3 className="font-bold mb-6 flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-error">security</span> Security Activity
+                                </h3>
+                                <div className="space-y-4">
+                                    <div className="p-3 border-l-4 border-error bg-error/5 rounded-r">
+                                        <p className="text-xs font-bold text-error">Failed Login Attempt</p>
+                                        <p className="text-[10px] text-secondary mt-1">IP 192.168.1.144 attempted access to 'Elena R.'</p>
+                                        <p className="text-[9px] font-black text-outline mt-1 uppercase tracking-widest">14 MINS AGO</p>
+                                    </div>
+                                    <div className="p-3 border-l-4 border-primary bg-primary/5 rounded-r">
+                                        <p className="text-xs font-bold text-primary">Global Config Updated</p>
+                                        <p className="text-[10px] text-secondary mt-1">Marcus Chen updated 'Tenant Isolation' parameters.</p>
+                                        <p className="text-[9px] font-black text-outline mt-1 uppercase tracking-widest">2 HOURS AGO</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="bg-primary-container text-white p-6 rounded-xl relative overflow-hidden group cursor-pointer shadow-md">
+                                <h4 className="text-lg font-bold mb-2">Audit Logs</h4>
+                                <p className="text-xs opacity-90 mb-4">Chronological history of all administrative modifications across the system.</p>
+                                <div className="flex items-center gap-2 text-xs font-bold group-hover:translate-x-1 transition-transform">
+                                    View Full Compliance Trail <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- Main App Component ---
+
+        const App = () => {
+            return (
+                <div className="bg-surface-subtle min-h-screen text-on-surface">
+                    <TopAppBar />
+                    <div className="flex max-w-container-max mx-auto h-[calc(100vh-64px)] relative">
+                        <Sidebar />
+                        <Routes>
+                            <Route path="/" element={<DashboardPage />} />
+                            <Route path="/schools" element={<SchoolsListPage />} />
+                            <Route path="/school/:id" element={<SchoolDetailPage />} />
+                            <Route path="/billing" element={<BillingPage />} />
+                            <Route path="/settings" element={<SettingsPage />} />
+                        </Routes>
+                    </div>
+                    <BottomNavBar />
+                </div>
+            );
+        };
+
+        // Root Rendering
+        const rootElement = document.getElementById("root");
+        const root = createRoot(rootElement);
+        root.render(
+            <MemoryRouter>
+                <App />
+            </MemoryRouter>
+        );
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+# Negative-path login attempts — none of these require a real seeded account,
+# so this file runs safely with no environment setup.
+# Note: the form uses native HTML5 `required` on both fields, so empty-field
+# cases are asserted as "browser blocks submission", not a server-driven
+# field error (see native-required.spec.js). Any non-existent phone number
+# gets an "account not found" error from the backend regardless of password.
+case,phone,password,expectedFieldError
+unknown phone,0000000000,SomePassword123,phone
+another unknown phone,9876543210,x,phone
+unknown phone with short password,1111111111,ab,phone
+unknown phone with special chars,2222222222,p@ssW0rd!,phone
+
