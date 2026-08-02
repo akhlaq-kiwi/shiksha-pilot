@@ -1126,6 +1126,16 @@ export default function FinanceManagementPage() {
           >
             ⏱️ Late Payment Penalty
           </button>
+          <button 
+            onClick={() => { setActiveTab('transport-fee'); setError(''); setSuccess(''); }}
+            className={`pb-3 text-xs font-bold uppercase tracking-wider border-b-2 px-4 transition-all ${
+              activeTab === 'transport-fee' 
+                ? 'border-primary text-primary' 
+                : 'border-transparent text-text-muted hover:text-text-primary'
+            }`}
+          >
+            🚌 Transport Fee
+          </button>
         </div>
       </div>
 
