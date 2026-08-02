@@ -12,6 +12,14 @@ import { useToast } from '../../../common/components/Toast';
 import { DropdownMenu, DropdownItem } from '../../../common/ui/DropdownMenu';
 import { Dialog } from '../../../common/ui/dialog';
 
+const getTodayLocalDateString = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export default function AttendancePage() {
   const { isReadOnly, currentYear } = useAcademicYear();
   const toast = useToast();
@@ -24,7 +32,7 @@ export default function AttendancePage() {
   const [loadingClasses, setLoadingClasses] = useState(true);
   const [selectedClassName, setSelectedClassName] = useState('');
   const [selectedSection, setSelectedSection] = useState('');
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(getTodayLocalDateString());
 
   // Daily state
   const [students, setStudents] = useState([]);
@@ -83,7 +91,7 @@ export default function AttendancePage() {
 
   const handleDateChange = (e) => {
     const val = e.target.value;
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getTodayLocalDateString();
     const minDate = currentYear?.start_date || '';
     
     if (minDate && val < minDate) {
@@ -317,7 +325,7 @@ export default function AttendancePage() {
   // Holidays list sorted chronologically
   const sortedHolidays = [...holidays].sort((a, b) => new Date(a.date) - new Date(b.date));
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getTodayLocalDateString();
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -402,7 +410,7 @@ export default function AttendancePage() {
                   value={selectedDate} 
                   onChange={handleDateChange} 
                   min={currentYear?.start_date || ''}
-                  max={new Date().toISOString().split('T')[0]}
+                  max={getTodayLocalDateString()}
                   className="h-9" 
                 />
               </div>
