@@ -10289,7 +10289,7 @@ Only approve the settlement after reviewing all financial records.
             $typeId = (int)$typeId;
         }
 
-        $stmtConfigs = $pdo->prepare("SELECT * FROM student_transport_fees WHERE school_id = :sid AND academic_year_id = :ayid AND status = 'Active'");
+        $stmtConfigs = $pdo->prepare("SELECT * FROM student_transport_fees WHERE school_id = :sid AND academic_year_id = :ayid");
         $stmtConfigs->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
         $configs = $stmtConfigs->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
@@ -10309,14 +10309,32 @@ Only approve the settlement after reviewing all financial records.
             VALUES (:sid, 'STUDENT', 'Transport Fee Generated', :msg)
         ");
 
+        $currentMonthStart = new \DateTime(date('Y-m-01'));
+
         foreach ($configs as $cfg) {
             $studentId = (int)$cfg['student_id'];
             $monthlyFee = (float)$cfg['monthly_fee'];
             $startDateStr = $cfg['start_date'];
             $startDate = new \DateTime($startDateStr);
+            $status = $cfg['status'];
 
             $temp = new \DateTime($startDate->format('Y-m-01'));
             $endTemp = new \DateTime($targetDate->format('Y-m-01'));
+
+            // If config is Inactive, limit generation to current month or month it became inactive (never generate future months)
+            if ($status === 'Inactive') {
+                $inactiveCap = $currentMonthStart;
+                if (!empty($cfg['updated_at'])) {
+                    $upDate = new \DateTime($cfg['updated_at']);
+                    $upMonth = new \DateTime($upDate->format('Y-m-01'));
+                    if ($upMonth < $inactiveCap) {
+                        $inactiveCap = $upMonth;
+                    }
+                }
+                if ($endTemp > $inactiveCap) {
+                    $endTemp = $inactiveCap;
+                }
+            }
 
             while ($temp <= $endTemp) {
                 $tempStart = new \DateTime($temp->format('Y-m-01'));

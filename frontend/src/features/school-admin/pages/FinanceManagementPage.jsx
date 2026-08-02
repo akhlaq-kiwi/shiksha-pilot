@@ -122,8 +122,10 @@ export default function FinanceManagementPage() {
   const [transportFormErrors, setTransportFormErrors] = useState({});
   const [viewingTransportDetails, setViewingTransportDetails] = useState(null);
 
-  // Delete Transport Confirmation
+  // Delete & Inactive Transport Confirmation
   const [deletingTransportId, setDeletingTransportId] = useState(null);
+  const [inactivatingTransportItem, setInactivatingTransportItem] = useState(null);
+  const [isTogglingStatus, setIsTogglingStatus] = useState(false);
   const [activeTransportDropdownId, setActiveTransportDropdownId] = useState(null);
   // Expenses Tab State & Filters
   const [expenseSearch, setExpenseSearch] = useState('');
@@ -737,16 +739,41 @@ export default function FinanceManagementPage() {
 
   const handleToggleTransportStatus = async (item) => {
     const nextStatus = item.status === 'Active' ? 'Inactive' : 'Active';
+    if (nextStatus === 'Inactive') {
+      setInactivatingTransportItem(item);
+      setActiveTransportDropdownId(null);
+      return;
+    }
+
     setError('');
     setSuccess('');
     try {
-      await schoolService.toggleTransportFeeStatus(item.id, nextStatus);
+      await schoolService.toggleTransportFeeStatus(item.id, { status: nextStatus });
       setSuccess(`Transport fee marked as ${nextStatus}.`);
       await loadTransportFeesList();
       setTimeout(() => setSuccess(''), 4000);
     } catch (err) {
       console.error(err);
       setError(err.message || 'Failed to update transport status.');
+    }
+  };
+
+  const confirmMarkInactive = async () => {
+    if (!inactivatingTransportItem) return;
+    setIsTogglingStatus(true);
+    setError('');
+    setSuccess('');
+    try {
+      await schoolService.toggleTransportFeeStatus(inactivatingTransportItem.id, { status: 'Inactive' });
+      setSuccess('Transport fee assignment marked as Inactive. Agle month se new fees add nahi hogi.');
+      setInactivatingTransportItem(null);
+      await loadTransportFeesList();
+      setTimeout(() => setSuccess(''), 4000);
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Failed to mark transport fee inactive.');
+    } finally {
+      setIsTogglingStatus(false);
     }
   };
 
@@ -2344,6 +2371,55 @@ export default function FinanceManagementPage() {
           );
         })()
       )}
+
+      {/* Mark Inactive Transport Confirmation Dialog */}
+      <Dialog
+        isOpen={inactivatingTransportItem !== null}
+        onClose={() => setInactivatingTransportItem(null)}
+        title="Mark Transport Assignment as Inactive?"
+        description="Verify transport fee status change."
+        footer={<>
+          <Button variant="secondary" onClick={() => setInactivatingTransportItem(null)} disabled={isTogglingStatus}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={confirmMarkInactive} 
+            disabled={isTogglingStatus} 
+            className="bg-amber-600 hover:bg-amber-700 text-white font-bold"
+          >
+            {isTogglingStatus ? 'Updating...' : 'Confirm Mark Inactive'}
+          </Button>
+        </>}
+      >
+        <div className="space-y-3.5 text-xs font-sans py-1">
+          {inactivatingTransportItem && (
+            <div className="bg-surface-subtle p-3 rounded-xl border border-border space-y-1">
+              <div className="flex justify-between">
+                <span className="text-text-secondary font-medium">Student Name:</span>
+                <span className="font-bold text-text-primary">{inactivatingTransportItem.student_name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-text-secondary font-medium">Class:</span>
+                <span className="font-bold text-text-primary">
+                  {inactivatingTransportItem.class_name ? `${inactivatingTransportItem.class_name}${inactivatingTransportItem.class_section ? ` - ${inactivatingTransportItem.class_section}` : ''}` : '—'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-text-secondary font-medium">Monthly Transport Fee:</span>
+                <span className="font-bold text-emerald-600">₹{inactivatingTransportItem.monthly_fee?.toLocaleString()}</span>
+              </div>
+            </div>
+          )}
+
+          <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 rounded-xl leading-relaxed flex items-start gap-2.5">
+            <AlertTriangle className="h-5 w-5 flex-shrink-0 text-amber-500 mt-0.5" />
+            <div>
+              <strong className="block font-bold text-amber-900 dark:text-amber-200 mb-0.5 uppercase tracking-wider text-[11px]">Fee Ledger Impact Notice:</strong>
+              Current month ki transport fees (jo due hai) fee card me rahegi, lekin agle month se is student ki transport fees fee card me add nahi hogi.
+            </div>
+          </div>
+        </div>
+      </Dialog>
 
       {/* Late Payment Penalty Remove Configuration Confirmation Dialog */}
       <Dialog
