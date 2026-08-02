@@ -346,6 +346,21 @@ export default function QuestionPaperDesignerPage() {
   const [resizeStartWidth, setResizeStartWidth] = useState(0);
   const [resizeStartHeight, setResizeStartHeight] = useState(0);
 
+  // Live A4 Page Count & Height measurement for Live Print Preview
+  const [docHeight, setDocHeight] = useState(1012);
+
+  useEffect(() => {
+    const updateDocHeight = () => {
+      const el = document.getElementById('printable-question-paper-doc');
+      if (el) {
+        setDocHeight(el.scrollHeight);
+      }
+    };
+    updateDocHeight();
+    const timer = setTimeout(updateDocHeight, 150);
+    return () => clearTimeout(timer);
+  }, [questions, instructions, paperTitle, floatingImages, maxMarks, duration]);
+
   // Refs for synchronous upload handling (prevents React state race condition)
   const activeQuestionIdRef = useRef(null);
   const activeSubQuestionIdRef = useRef(null);
@@ -2731,35 +2746,49 @@ export default function QuestionPaperDesignerPage() {
 
         {/* RIGHT WORKSPACE: LIVE PRINT PREVIEW */}
         <div className="sticky top-32 space-y-4 min-w-0">
-          <div className="flex justify-between items-center">
-            <h3 className="text-base font-bold text-text-primary flex items-center gap-1.5">
-              <Eye className="h-5 w-5 text-primary" /> Live Print Preview (A4 Dimensions)
-            </h3>
-            <div className="flex gap-2">
-              <Button type="button" size="sm" variant="outline" className="text-xs font-bold" onClick={handleDownloadPdf}>
-                <Download className="h-3.5 w-3.5 mr-1" /> PDF
-              </Button>
-              <Button type="button" size="sm" variant="outline" className="text-xs font-bold" onClick={handleExportDocx}>
-                <FileSpreadsheet className="h-3.5 w-3.5 mr-1" /> DOCX
-              </Button>
-            </div>
-          </div>
+          {(() => {
+            const PAGE_HEIGHT = 1012;
+            const totalPages = Math.max(1, Math.ceil((docHeight - 15) / PAGE_HEIGHT));
+            return (
+              <>
+                <div className="flex justify-between items-center flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-text-primary flex items-center gap-1.5">
+                      <Eye className="h-5 w-5 text-primary" /> Live Print Preview
+                    </h3>
+                    <span className={`px-2.5 py-0.5 text-[11px] font-bold rounded-full border transition-all ${
+                      totalPages === 1 
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-300' 
+                        : 'bg-amber-50 text-amber-800 border-amber-300 animate-pulse'
+                    }`}>
+                      📄 {totalPages} {totalPages === 1 ? 'Page (Single Page)' : `Pages (Spills to Page ${totalPages})`}
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button type="button" size="sm" variant="outline" className="text-xs font-bold" onClick={handleDownloadPdf}>
+                      <Download className="h-3.5 w-3.5 mr-1" /> PDF
+                    </Button>
+                    <Button type="button" size="sm" variant="outline" className="text-xs font-bold" onClick={handleExportDocx}>
+                      <FileSpreadsheet className="h-3.5 w-3.5 mr-1" /> DOCX
+                    </Button>
+                  </div>
+                </div>
 
-          {/* SIMULATED A4 PAPER WRAPPER */}
-          <div ref={wrapperRef} className="border border-border shadow-xl rounded-xl bg-white text-black p-2 md:p-4 max-h-[85vh] overflow-y-auto w-full select-text leading-normal no-print-scroll font-serif text-[13px]">
-            <div 
-              id="printable-question-paper-doc" 
-              className="p-14 space-y-2 bg-white min-h-[1012px] shadow-sm relative"
-              onClick={() => setActiveFloatingId(null)}
-              style={{
-                width: '720px',
-                zoom: zoomFactor,
-                transformOrigin: 'top center',
-                margin: '0 auto',
-                boxSizing: 'border-box',
-                position: 'relative'
-              }}
-            >
+                {/* SIMULATED A4 PAPER WRAPPER */}
+                <div ref={wrapperRef} className="border border-border shadow-xl rounded-xl bg-white text-black p-2 md:p-4 max-h-[85vh] overflow-y-auto w-full select-text leading-normal no-print-scroll font-serif text-[13px]">
+                  <div 
+                    id="printable-question-paper-doc" 
+                    className="p-14 space-y-2 bg-white min-h-[1012px] shadow-sm relative"
+                    onClick={() => setActiveFloatingId(null)}
+                    style={{
+                      width: '720px',
+                      zoom: zoomFactor,
+                      transformOrigin: 'top center',
+                      margin: '0 auto',
+                      boxSizing: 'border-box',
+                      position: 'relative'
+                    }}
+                  >
               <style>{`
                 .q-block {
                   page-break-inside: avoid !important;
@@ -3236,10 +3265,28 @@ export default function QuestionPaperDesignerPage() {
                     </div>
                   </div>
                 </div>
-              ))}
+              {/* VISUAL A4 PAGE BREAK GUIDES (Screen Mode Only - Hidden when printing) */}
+              {Array.from({ length: Math.max(0, totalPages - 1) }).map((_, pIdx) => {
+                const pageTop = (pIdx + 1) * PAGE_HEIGHT;
+                return (
+                  <div
+                    key={pIdx}
+                    className="absolute left-0 right-0 z-30 pointer-events-none print:hidden flex items-center justify-center no-print"
+                    style={{ top: `${pageTop}px`, transform: 'translateY(-50%)' }}
+                  >
+                    <div className="w-full border-b-2 border-dashed border-red-500/80 shadow-xs" />
+                    <span className="absolute px-3 py-1 bg-red-600 text-white font-sans text-[11px] font-bold rounded-full shadow-lg uppercase tracking-wider whitespace-nowrap flex items-center gap-1.5 border border-red-400">
+                      <span>✂</span> Page Break — Page {pIdx + 2} Starts Here (End of Page {pIdx + 1})
+                    </span>
+                  </div>
+                );
+              })}
 
             </div>
           </div>
+          </>
+            );
+          })()}
         </div>
 
       </div>
