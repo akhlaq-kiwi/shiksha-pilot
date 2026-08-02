@@ -430,14 +430,11 @@ class PlatformService extends BaseService
 
         $pdo = $this->schools->getPdo();
 
-        // Check subscriptions count
-        $stmtSub = $pdo->prepare("SELECT COUNT(*) FROM subscriptions WHERE school_id = :school_id");
-        $stmtSub->execute([':school_id' => $id]);
-        $subCount = (int)$stmtSub->fetchColumn();
-
-        if ($school['status'] === 'ACTIVE' && $subCount > 0) {
+        // Active status validation: Block deletion of active schools
+        $status = strtoupper((string)($school['status'] ?? ''));
+        if ($status === 'ACTIVE') {
             throw new \App\Shared\Exceptions\ValidationException([
-                'delete' => 'Cannot delete an active school that has subscription history. Please suspend the school first.'
+                'delete' => 'This school is currently Active. Active schools cannot be deleted. Please suspend/deactivate the school first before deleting.'
             ]);
         }
 
