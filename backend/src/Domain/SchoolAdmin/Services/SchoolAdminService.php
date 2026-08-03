@@ -11044,7 +11044,17 @@ Only approve the settlement after reviewing all financial records.
         // Validation for time overlaps
         for ($i = 0; $i < count($papers); $i++) {
             $p1 = $papers[$i];
-            if (empty($p1['subject_id']) || empty($p1['exam_date']) || empty($p1['start_time']) || empty($p1['end_time']) || empty($p1['max_marks']) || empty($p1['passing_marks'])) {
+            $isGrade = (isset($p1['evaluation_type']) && $p1['evaluation_type'] === 'grade') || 
+                       (isset($p1['max_marks']) && ((float)$p1['max_marks'] === 0.0 || $p1['max_marks'] === '0' || $p1['max_marks'] === 0));
+
+            if (
+                empty($p1['subject_id']) || 
+                empty($p1['exam_date']) || 
+                empty($p1['start_time']) || 
+                empty($p1['end_time']) || 
+                (!$isGrade && (!isset($p1['max_marks']) || $p1['max_marks'] === '' || $p1['max_marks'] === null)) ||
+                (!$isGrade && (!isset($p1['passing_marks']) || $p1['passing_marks'] === '' || $p1['passing_marks'] === null))
+            ) {
                 throw new ValidationException(['fields' => 'All fields for paper entries are required.']);
             }
             $t1_start = strtotime($p1['start_time']);
@@ -11152,11 +11162,18 @@ Only approve the settlement after reviewing all financial records.
         foreach ($students as $s) {
             $studentId = (int)$s['id'];
             $m = $marksMap[$studentId][$paper['id']] ?? ['marks_obtained' => null, 'is_absent' => 0, 'remarks' => ''];
+            $valObtained = $m['marks_obtained'];
+            if ($valObtained !== null && $valObtained !== '') {
+                $valObtained = is_numeric($valObtained) ? (float)$valObtained : (string)$valObtained;
+            } else {
+                $valObtained = null;
+            }
+
             $list[] = [
                 'student_id' => $studentId,
                 'student_name' => $s['name'],
                 'roll_no' => $s['roll_no'],
-                'marks_obtained' => $m['marks_obtained'] !== null ? (float)$m['marks_obtained'] : null,
+                'marks_obtained' => $valObtained,
                 'is_absent' => (int)$m['is_absent'],
                 'remarks' => $m['remarks'] ?: ''
             ];
@@ -11167,9 +11184,12 @@ Only approve the settlement after reviewing all financial records.
         $stmtStatus->execute([':exam_id' => $examId, ':class_id' => $classId]);
         $classStatus = $stmtStatus->fetchColumn() ?: 'Draft';
 
+        $isGradePaper = ((float)$paper['max_marks'] === 0.0);
+
         return [
             'exam_name' => $exam['name'],
             'status' => $classStatus,
+            'evaluation_type' => $isGradePaper ? 'grade' : 'marks',
             'max_marks' => (float)$paper['max_marks'],
             'passing_marks' => (float)$paper['passing_marks'],
             'students' => $list
@@ -11196,7 +11216,13 @@ Only approve the settlement after reviewing all financial records.
         $subjectId = (int)$data['subject_id'];
         $studentId = (int)$data['student_id'];
         $isAbsent = isset($data['is_absent']) ? (int)$data['is_absent'] : 0;
-        $marksObtained = isset($data['marks_obtained']) && $data['marks_obtained'] !== '' && !$isAbsent ? (float)$data['marks_obtained'] : null;
+        
+        $rawMarks = isset($data['marks_obtained']) && $data['marks_obtained'] !== '' && !$isAbsent ? $data['marks_obtained'] : null;
+        if ($rawMarks !== null) {
+            $marksObtained = is_numeric($rawMarks) ? (float)$rawMarks : (string)$rawMarks;
+        } else {
+            $marksObtained = null;
+        }
         $remarks = $data['remarks'] ?? null;
 
         // Fetch student's class to verify publish status
