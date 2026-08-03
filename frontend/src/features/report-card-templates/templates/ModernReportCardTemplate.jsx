@@ -11,12 +11,45 @@ export default function ModernReportCardTemplate({ data, config = {} }) {
 
   // Dynamic layout density scaling based on subject count
   const subCount = subjects?.length || 0;
-  const isCompact = subCount > 8;
-  const isExtraCompact = subCount > 11;
 
-  const containerPadding = isExtraCompact ? '5mm' : isCompact ? '7mm' : '9mm';
-  const sectionGap = isExtraCompact ? 'space-y-2.5' : isCompact ? 'space-y-3.5' : 'space-y-5';
-  const cellPy = isExtraCompact ? 'py-1' : isCompact ? 'py-1.5' : 'py-2.5';
+  let cellPy = 'py-2 px-4';
+  let headerPy = 'py-2 px-4';
+  let tableFontSize = 'text-xs';
+  let containerPadding = '8mm';
+  let sectionGap = 'space-y-4';
+
+  if (subCount <= 5) {
+    // 5 or fewer subjects: Taller table rows & vertical padding to fill printable area gracefully
+    cellPy = 'py-3.5 px-4';
+    headerPy = 'py-3.5 px-4';
+    containerPadding = '9mm';
+    sectionGap = 'space-y-5';
+  } else if (subCount <= 6) {
+    // 6 subjects: Taller table rows & padding
+    cellPy = 'py-3 px-4';
+    headerPy = 'py-3 px-4';
+    containerPadding = '8.5mm';
+    sectionGap = 'space-y-4.5';
+  } else if (subCount <= 9) {
+    // 7–9 subjects (Default 8): Standard table row height & padding
+    cellPy = 'py-2 px-4';
+    headerPy = 'py-2 px-4';
+    containerPadding = '8mm';
+    sectionGap = 'space-y-4';
+  } else if (subCount <= 11) {
+    // 10–11 subjects: Compact table row height & padding
+    cellPy = 'py-1.5 px-3';
+    headerPy = 'py-1.5 px-3';
+    containerPadding = '6.5mm';
+    sectionGap = 'space-y-3';
+  } else {
+    // 12+ subjects: Extra compact table row height & padding
+    cellPy = 'py-1 px-2.5';
+    headerPy = 'py-1 px-2.5';
+    tableFontSize = 'text-[11px]';
+    containerPadding = '5mm';
+    sectionGap = 'space-y-2.5';
+  }
 
   // Clean rank display (e.g. "13" instead of "13 of 34")
   const cleanRank = (summary?.class_rank || '1st').toString().split(' ')[0];
@@ -116,55 +149,55 @@ export default function ModernReportCardTemplate({ data, config = {} }) {
             <tbody className="divide-y divide-zinc-200 font-medium">
               {subjects.map((sub, idx) => (
                 <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-zinc-50/60'}>
-                  <td className={`${cellPy} px-3 text-left font-bold text-zinc-900 border-r border-zinc-200 whitespace-nowrap`}>{sub.subject_name}</td>
+                  <td className={`${cellPy} text-left font-bold text-zinc-900 border-r border-zinc-200 whitespace-nowrap`}>{sub.subject_name}</td>
                   {(data.session_exams || ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam']).map(exName => (
                     <React.Fragment key={exName}>
-                      <td className="p-2 text-center border-r border-zinc-200 font-mono text-zinc-600">{sub.exam_scores?.[exName]?.max_marks || 100}</td>
-                      <td className="p-2 text-center border-r border-zinc-200 font-mono font-bold text-emerald-700">{sub.exam_scores?.[exName]?.marks_obtained ?? '—'}</td>
+                      <td className={`${cellPy} text-center border-r border-zinc-200 font-mono text-zinc-600`}>{sub.exam_scores?.[exName]?.max_marks || 100}</td>
+                      <td className={`${cellPy} text-center border-r border-zinc-200 font-mono font-bold text-emerald-700`}>{sub.exam_scores?.[exName]?.marks_obtained ?? '—'}</td>
                     </React.Fragment>
                   ))}
-                  <td className="p-2 text-center border-r border-zinc-200 font-mono font-bold text-zinc-700">{sub.grand_total_max || sub.max_marks}</td>
-                  <td className="p-2 text-center border-r border-zinc-200 font-mono font-bold text-emerald-800">{sub.grand_total_obtained || sub.marks_obtained}</td>
-                  <td className="p-2 text-center font-bold text-emerald-800">{sub.grade}</td>
+                  <td className={`${cellPy} text-center border-r border-zinc-200 font-mono font-bold text-zinc-700`}>{sub.grand_total_max || sub.max_marks}</td>
+                  <td className={`${cellPy} text-center border-r border-zinc-200 font-mono font-bold text-emerald-800`}>{sub.grand_total_obtained || sub.marks_obtained}</td>
+                  <td className={`${cellPy} text-center font-bold text-emerald-800`}>{sub.grade}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
               <tr className="bg-emerald-50 border-t-2 border-emerald-950 font-bold text-xs text-emerald-950">
-                <td className="py-2.5 px-4 text-left border-r border-emerald-200 whitespace-nowrap">Total Marks</td>
+                <td className={`${cellPy} text-left border-r border-emerald-200 whitespace-nowrap`}>Total Marks</td>
                 {(data.session_exams || ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam']).map(exName => (
                   <React.Fragment key={exName}>
-                    <td className="p-2 text-center border-r border-emerald-200 font-mono">{data.exam_totals?.[exName]?.max_marks || 700}</td>
-                    <td className="p-2 text-center border-r border-emerald-200 font-mono font-bold text-emerald-900">{data.exam_totals?.[exName]?.marks_obtained || 500}</td>
+                    <td className={`${cellPy} text-center border-r border-emerald-200 font-mono`}>{data.exam_totals?.[exName]?.max_marks || 700}</td>
+                    <td className={`${cellPy} text-center border-r border-emerald-200 font-mono font-bold text-emerald-900`}>{data.exam_totals?.[exName]?.marks_obtained || 500}</td>
                   </React.Fragment>
                 ))}
-                <td className="p-2 text-center border-r border-emerald-200 font-mono font-bold">{summary.total_max}</td>
-                <td className="p-2 text-center border-r border-emerald-200 font-mono font-bold text-sm text-emerald-900">{summary.total_obtained}</td>
-                <td className="p-2 text-center font-bold text-sm">{summary.grade}</td>
+                <td className={`${cellPy} text-center border-r border-emerald-200 font-mono font-bold`}>{summary.total_max}</td>
+                <td className={`${cellPy} text-center border-r border-emerald-200 font-mono font-bold text-sm text-emerald-900`}>{summary.total_obtained}</td>
+                <td className={`${cellPy} text-center font-bold text-sm`}>{summary.grade}</td>
               </tr>
             </tfoot>
           </table>
         ) : (
-          <table className="w-full text-left text-xs border-collapse">
+          <table className={`w-full text-left ${tableFontSize} border-collapse`}>
             <thead>
               <tr className="bg-emerald-950 text-white font-bold uppercase text-[10.5px] tracking-wider">
-                <th className="py-2.5 px-4 text-left font-bold whitespace-nowrap min-w-[140px]">Subject</th>
-                <th className="p-3 text-center w-28">Obtained</th>
-                <th className="p-3 text-center w-24">Max</th>
-                <th className="p-3 text-center w-24">Pass</th>
-                <th className="p-3 text-center w-20">Grade</th>
-                <th className="p-3 text-center w-24">Verdict</th>
+                <th className={`${headerPy} text-left font-bold whitespace-nowrap min-w-[140px]`}>Subject</th>
+                <th className={`${headerPy} text-center w-28`}>Obtained</th>
+                <th className={`${headerPy} text-center w-24`}>Max</th>
+                <th className={`${headerPy} text-center w-24`}>Pass</th>
+                <th className={`${headerPy} text-center w-20`}>Grade</th>
+                <th className={`${headerPy} text-center w-24`}>Verdict</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 font-medium">
               {subjects.map((sub, idx) => (
                 <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-zinc-50/60'}>
-                  <td className="py-2.5 px-4 text-left font-bold text-zinc-900 whitespace-nowrap">{sub.subject_name}</td>
-                  <td className="p-3 text-center font-mono font-bold text-emerald-700">{sub.marks_obtained}</td>
-                  <td className="p-3 text-center font-mono text-zinc-600">{sub.max_marks}</td>
-                  <td className="p-3 text-center font-mono text-zinc-500">{sub.passing_marks}</td>
-                  <td className="p-3 text-center font-bold text-emerald-800">{sub.grade}</td>
-                  <td className="p-3 text-center">
+                  <td className={`${cellPy} text-left font-bold text-zinc-900 whitespace-nowrap`}>{sub.subject_name}</td>
+                  <td className={`${cellPy} text-center font-mono font-bold text-emerald-700`}>{sub.marks_obtained}</td>
+                  <td className={`${cellPy} text-center font-mono text-zinc-600`}>{sub.max_marks}</td>
+                  <td className={`${cellPy} text-center font-mono text-zinc-500`}>{sub.passing_marks}</td>
+                  <td className={`${cellPy} text-center font-bold text-emerald-800`}>{sub.grade}</td>
+                  <td className={`${cellPy} text-center`}>
                     <span className={`px-2 py-0.5 rounded text-[11px] font-bold uppercase ${
                       sub.result === 'PASS' ? 'bg-emerald-100 text-emerald-900' : 'bg-rose-100 text-rose-900'
                     }`}>
@@ -176,12 +209,12 @@ export default function ModernReportCardTemplate({ data, config = {} }) {
             </tbody>
             <tfoot>
               <tr className="bg-emerald-50 border-t-2 border-emerald-950 font-bold text-xs text-emerald-950">
-                <td className="py-2.5 px-4 text-left font-bold border-r border-emerald-200 whitespace-nowrap">Total Marks</td>
-                <td className="p-3 text-center border-r border-emerald-200 font-mono font-bold text-emerald-900">{summary.total_obtained}</td>
-                <td className="p-3 text-center border-r border-emerald-200 font-mono text-zinc-600">{summary.total_max}</td>
-                <td className="p-3 text-center border-r border-emerald-200 font-mono text-zinc-500">—</td>
-                <td className="p-3 text-center border-r border-emerald-200 font-bold text-emerald-900">{summary.grade}</td>
-                <td className="p-3 text-center font-bold text-xs uppercase">{summary.result}</td>
+                <td className={`${cellPy} text-left font-bold border-r border-emerald-200 whitespace-nowrap`}>Total Marks</td>
+                <td className={`${cellPy} text-center border-r border-emerald-200 font-mono font-bold text-emerald-900`}>{summary.total_obtained}</td>
+                <td className={`${cellPy} text-center border-r border-emerald-200 font-mono text-zinc-600`}>{summary.total_max}</td>
+                <td className={`${cellPy} text-center border-r border-emerald-200 font-mono text-zinc-500`}>—</td>
+                <td className={`${cellPy} text-center border-r border-emerald-200 font-bold text-emerald-900`}>{summary.grade}</td>
+                <td className={`${cellPy} text-center font-bold text-xs uppercase`}>{summary.result}</td>
               </tr>
             </tfoot>
           </table>

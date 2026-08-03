@@ -10,11 +10,45 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
   const signatures = config.signatures || ['Teacher Signature', 'Parent Signature'];
 
   const subCount = subjects?.length || 0;
-  const isCompact = subCount > 8;
-  const isExtraCompact = subCount > 11;
 
-  const containerPadding = isExtraCompact ? '5mm' : isCompact ? '6.5mm' : '8mm';
-  const sectionGap = isExtraCompact ? 'space-y-2' : isCompact ? 'space-y-3' : 'space-y-4';
+  let cellPy = 'p-2.5';
+  let headerPy = 'p-2.5';
+  let tableFontSize = 'text-xs';
+  let containerPadding = '8mm';
+  let sectionGap = 'space-y-4';
+
+  if (subCount <= 5) {
+    // 5 or fewer subjects: Taller table rows & padding to utilize page space
+    cellPy = 'p-3.5';
+    headerPy = 'p-3.5';
+    containerPadding = '9mm';
+    sectionGap = 'space-y-5';
+  } else if (subCount <= 6) {
+    // 6 subjects: Taller table rows & padding
+    cellPy = 'p-3';
+    headerPy = 'p-3';
+    containerPadding = '8.5mm';
+    sectionGap = 'space-y-4.5';
+  } else if (subCount <= 9) {
+    // 7–9 subjects (Default 8): Standard table padding
+    cellPy = 'p-2.5';
+    headerPy = 'p-2.5';
+    containerPadding = '8mm';
+    sectionGap = 'space-y-4';
+  } else if (subCount <= 11) {
+    // 10–11 subjects: Compact table padding
+    cellPy = 'p-1.5';
+    headerPy = 'p-1.5';
+    containerPadding = '6.5mm';
+    sectionGap = 'space-y-3';
+  } else {
+    // 12+ subjects: Extra compact table padding
+    cellPy = 'p-1';
+    headerPy = 'p-1';
+    tableFontSize = 'text-[11px]';
+    containerPadding = '5mm';
+    sectionGap = 'space-y-2';
+  }
 
   return (
     <div
@@ -129,24 +163,24 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
             </tfoot>
           </table>
         ) : (
-          <table className="w-full text-xs text-left border-collapse">
+          <table className={`w-full ${tableFontSize} text-left border-collapse`}>
             <thead>
               <tr className="bg-amber-500 text-white font-bold uppercase text-[11px]">
-                <th className="p-2.5">Subject</th>
-                <th className="p-2.5 text-center w-24">Marks Obtained</th>
-                <th className="p-2.5 text-center w-20">Max Marks</th>
-                <th className="p-2.5 text-center w-20">Grade</th>
-                <th className="p-2.5 text-center w-24">Verdict</th>
+                <th className={headerPy}>Subject</th>
+                <th className={`${headerPy} text-center w-24`}>Marks Obtained</th>
+                <th className={`${headerPy} text-center w-20`}>Max Marks</th>
+                <th className={`${headerPy} text-center w-20`}>Grade</th>
+                <th className={`${headerPy} text-center w-24`}>Verdict</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 font-medium">
               {subjects.map((sub, idx) => (
                 <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-amber-50/20'}>
-                  <td className="p-2.5 font-bold text-zinc-900">{sub.subject_name}</td>
-                  <td className="p-2.5 text-center font-mono font-bold text-amber-700">{sub.marks_obtained}</td>
-                  <td className="p-2.5 text-center font-mono text-zinc-500">{sub.max_marks}</td>
-                  <td className="p-2.5 text-center font-bold text-amber-900">{sub.grade}</td>
-                  <td className="p-2.5 text-center">
+                  <td className={`${cellPy} font-bold text-zinc-900`}>{sub.subject_name}</td>
+                  <td className={`${cellPy} text-center font-mono font-bold text-amber-700`}>{sub.marks_obtained}</td>
+                  <td className={`${cellPy} text-center font-mono text-zinc-500`}>{sub.max_marks}</td>
+                  <td className={`${cellPy} text-center font-bold text-amber-900`}>{sub.grade}</td>
+                  <td className={`${cellPy} text-center`}>
                     <span className={`px-2 py-0.5 rounded text-[11px] font-bold uppercase ${
                       sub.result === 'PASS' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                     }`}>
@@ -158,11 +192,11 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
             </tbody>
             <tfoot>
               <tr className="bg-amber-100 border-t-2 border-amber-500 font-bold text-xs text-amber-950">
-                <td className="p-2.5 font-bold">Total Marks</td>
-                <td className="p-2.5 text-center font-mono font-bold text-amber-900">{summary.total_obtained}</td>
-                <td className="p-2.5 text-center font-mono text-zinc-600">{summary.total_max}</td>
-                <td className="p-2.5 text-center font-bold text-amber-900">{summary.grade}</td>
-                <td className="p-2.5 text-center font-bold text-xs uppercase">{summary.result}</td>
+                <td className={`${cellPy} font-bold`}>Total Marks</td>
+                <td className={`${cellPy} text-center font-mono font-bold text-amber-900`}>{summary.total_obtained}</td>
+                <td className={`${cellPy} text-center font-mono text-zinc-600`}>{summary.total_max}</td>
+                <td className={`${cellPy} text-center font-bold text-amber-900`}>{summary.grade}</td>
+                <td className={`${cellPy} text-center font-bold text-xs uppercase`}>{summary.result}</td>
               </tr>
             </tfoot>
           </table>

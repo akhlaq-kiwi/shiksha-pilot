@@ -10,11 +10,45 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
   const signatures = config.signatures || ['Class Teacher', 'Principal'];
 
   const subCount = subjects?.length || 0;
-  const isCompact = subCount > 8;
-  const isExtraCompact = subCount > 11;
 
-  const containerPadding = isExtraCompact ? '5mm' : isCompact ? '6.5mm' : '8mm';
-  const sectionGap = isExtraCompact ? 'space-y-2' : isCompact ? 'space-y-3' : 'space-y-4';
+  let cellPy = 'p-2';
+  let headerPy = 'p-2';
+  let tableFontSize = 'text-xs';
+  let containerPadding = '8mm';
+  let sectionGap = 'space-y-4';
+
+  if (subCount <= 5) {
+    // 5 or fewer subjects: Taller table rows & padding to utilize page space
+    cellPy = 'p-3.5';
+    headerPy = 'p-3.5';
+    containerPadding = '9mm';
+    sectionGap = 'space-y-5';
+  } else if (subCount <= 6) {
+    // 6 subjects: Taller table rows & padding
+    cellPy = 'p-3';
+    headerPy = 'p-3';
+    containerPadding = '8.5mm';
+    sectionGap = 'space-y-4.5';
+  } else if (subCount <= 9) {
+    // 7–9 subjects (Default 8): Standard table padding
+    cellPy = 'p-2';
+    headerPy = 'p-2';
+    containerPadding = '8mm';
+    sectionGap = 'space-y-4';
+  } else if (subCount <= 11) {
+    // 10–11 subjects: Compact table padding
+    cellPy = 'p-1.5';
+    headerPy = 'p-1.5';
+    containerPadding = '6.5mm';
+    sectionGap = 'space-y-3';
+  } else {
+    // 12+ subjects: Extra compact table padding
+    cellPy = 'p-1';
+    headerPy = 'p-1';
+    tableFontSize = 'text-[11px]';
+    containerPadding = '5mm';
+    sectionGap = 'space-y-2';
+  }
 
   return (
     <div
@@ -133,37 +167,37 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
             </tfoot>
           </table>
         ) : (
-          <table className="w-full text-xs border border-zinc-800 border-collapse">
+          <table className={`w-full ${tableFontSize} border border-zinc-800 border-collapse`}>
             <thead>
               <tr className="bg-zinc-800 text-white font-bold uppercase text-[11px]">
-                <th className="p-2 text-left border-r border-zinc-700">Subject</th>
-                <th className="p-2 text-center border-r border-zinc-700 w-24">Max Marks</th>
-                <th className="p-2 text-center border-r border-zinc-700 w-24">Pass Marks</th>
-                <th className="p-2 text-center border-r border-zinc-700 w-28">Marks Obtained</th>
-                <th className="p-2 text-center border-r border-zinc-700 w-20">Grade</th>
-                <th className="p-2 text-center w-24">Result</th>
+                <th className={`${headerPy} text-left border-r border-zinc-700`}>Subject</th>
+                <th className={`${headerPy} text-center border-r border-zinc-700 w-24`}>Max Marks</th>
+                <th className={`${headerPy} text-center border-r border-zinc-700 w-24`}>Pass Marks</th>
+                <th className={`${headerPy} text-center border-r border-zinc-700 w-28`}>Marks Obtained</th>
+                <th className={`${headerPy} text-center border-r border-zinc-700 w-20`}>Grade</th>
+                <th className={`${headerPy} text-center w-24`}>Result</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-300">
               {subjects.map((s, idx) => (
                 <tr key={idx} className="border-b border-zinc-300">
-                  <td className="p-2 border-r border-zinc-300 font-bold text-zinc-900">{s.subject_name}</td>
-                  <td className="p-2 text-center border-r border-zinc-300 font-mono">{s.max_marks}</td>
-                  <td className="p-2 text-center border-r border-zinc-300 font-mono text-zinc-600">{s.passing_marks}</td>
-                  <td className="p-2 text-center border-r border-zinc-300 font-mono font-bold text-zinc-900">{s.marks_obtained}</td>
-                  <td className="p-2 text-center border-r border-zinc-300 font-bold">{s.grade}</td>
-                  <td className="p-2 text-center font-bold text-[11px] uppercase">{s.result}</td>
+                  <td className={`${cellPy} border-r border-zinc-300 font-bold text-zinc-900`}>{s.subject_name}</td>
+                  <td className={`${cellPy} text-center border-r border-zinc-300 font-mono`}>{s.max_marks}</td>
+                  <td className={`${cellPy} text-center border-r border-zinc-300 font-mono text-zinc-600`}>{s.passing_marks}</td>
+                  <td className={`${cellPy} text-center border-r border-zinc-300 font-mono font-bold text-zinc-900`}>{s.marks_obtained}</td>
+                  <td className={`${cellPy} text-center border-r border-zinc-300 font-bold`}>{s.grade}</td>
+                  <td className={`${cellPy} text-center font-bold text-[11px] uppercase`}>{s.result}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
               <tr className="bg-zinc-100 font-bold border-t-2 border-zinc-800 text-xs">
-                <td className="p-2.5 border-r border-zinc-300">Grand Total</td>
-                <td className="p-2.5 text-center border-r border-zinc-300 font-mono">{summary.total_max}</td>
-                <td className="p-2.5 text-center border-r border-zinc-300">—</td>
-                <td className="p-2.5 text-center border-r border-zinc-300 font-mono font-bold text-sm">{summary.total_obtained}</td>
-                <td className="p-2.5 text-center border-r border-zinc-300 font-bold text-sm">{summary.grade}</td>
-                <td className="p-2.5 text-center font-bold text-xs">{summary.result}</td>
+                <td className={`${cellPy} border-r border-zinc-300`}>Grand Total</td>
+                <td className={`${cellPy} text-center border-r border-zinc-300 font-mono`}>{summary.total_max}</td>
+                <td className={`${cellPy} text-center border-r border-zinc-300`}>—</td>
+                <td className={`${cellPy} text-center border-r border-zinc-300 font-mono font-bold text-sm`}>{summary.total_obtained}</td>
+                <td className={`${cellPy} text-center border-r border-zinc-300 font-bold text-sm`}>{summary.grade}</td>
+                <td className={`${cellPy} text-center font-bold text-xs`}>{summary.result}</td>
               </tr>
             </tfoot>
           </table>
