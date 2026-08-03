@@ -78,8 +78,8 @@ export function compileReportCardData(card = {}, schoolProfile = {}, currentYear
       const assignedGrade = rawVal && rawVal !== '—' ? rawVal : (s.grade || 'A');
       return {
         subject_name: s.subject_name || s.name || 'Subject',
-        marks_obtained: '—',
-        max_marks: '—',
+        marks_obtained: assignedGrade,
+        max_marks: 'GRADE',
         passing_marks: '—',
         grade: assignedGrade,
         result: 'PASS',
@@ -97,15 +97,15 @@ export function compileReportCardData(card = {}, schoolProfile = {}, currentYear
       marks_obtained: obtained,
       max_marks: max,
       passing_marks: pass,
-      grade: s.grade || calculateDefaultGrade(obtained, max),
+      grade: calculateDefaultGrade(obtained, max),
       result: s.result || result,
       is_grade_only: false
     };
   });
 
   const numericSubjects = subjects.filter(s => !s.is_grade_only);
-  const totalObtained = parseFloat(card.total_obtained) || numericSubjects.reduce((sum, s) => sum + (parseFloat(s.marks_obtained) || 0), 0);
-  const totalMax = parseFloat(card.total_max) || numericSubjects.reduce((sum, s) => sum + (parseFloat(s.max_marks) || 0), 0);
+  const totalObtained = numericSubjects.reduce((sum, s) => sum + (parseFloat(s.marks_obtained) || 0), 0);
+  const totalMax = numericSubjects.reduce((sum, s) => sum + (parseFloat(s.max_marks) || 0), 0);
   const percentage = card.percentage ? parseFloat(card.percentage) : (totalMax > 0 ? parseFloat(((totalObtained / totalMax) * 100).toFixed(2)) : 0);
   const overallGrade = card.grade || calculateDefaultGrade(totalObtained, totalMax);
   const gpa = (percentage / 10).toFixed(1);
@@ -345,13 +345,12 @@ export function compileFinalSessionReportCardData(
 function calculateDefaultGrade(obtained, max) {
   if (!max || max <= 0) return 'D';
   const pct = (obtained / max) * 100;
-  if (pct >= 91) return 'A1';
-  if (pct >= 81) return 'A2';
-  if (pct >= 71) return 'B1';
-  if (pct >= 61) return 'B2';
-  if (pct >= 51) return 'C1';
-  if (pct >= 41) return 'C2';
-  if (pct >= 33) return 'D';
+  if (pct >= 90) return 'A+';
+  if (pct >= 80) return 'A';
+  if (pct >= 70) return 'B+';
+  if (pct >= 60) return 'B';
+  if (pct >= 50) return 'C';
+  if (pct >= 40) return 'D';
   return 'E';
 }
 
