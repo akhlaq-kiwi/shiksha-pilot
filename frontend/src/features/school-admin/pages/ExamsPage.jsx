@@ -118,9 +118,9 @@ const getTodayLocalDateString = () => {
 };
 
 const suggestNextExamDate = (exam, papers, holidays) => {
-  if (!exam) return '';
+  if (!exam || !exam.start_date || !exam.end_date) return '';
   const todayStr = getTodayLocalDateString();
-  let baseDateStr = exam.start_date > todayStr ? exam.start_date : todayStr;
+  let baseDateStr = (exam.start_date && exam.start_date > todayStr) ? exam.start_date : todayStr;
   const parts = baseDateStr.split('-');
   if (parts.length !== 3) return baseDateStr;
   
@@ -130,6 +130,7 @@ const suggestNextExamDate = (exam, papers, holidays) => {
   let current = new Date(y, m, d);
 
   const endParts = exam.end_date.split('-');
+  if (endParts.length !== 3) return baseDateStr;
   const endYear = parseInt(endParts[0]);
   const endMonth = parseInt(endParts[1]) - 1;
   const endDay = parseInt(endParts[2]);
@@ -1023,10 +1024,16 @@ export default function ExamsPage() {
 
   // Timetable Handlers
   const handleOpenTimetable = async (exam, classId) => {
-    setSelectedExam(exam);
-    setSelectedClassId(classId.toString());
     setError('');
     setSuccess('');
+    if (!exam || !exam.start_date || !exam.end_date) {
+      setError('Please edit and configure the examination period (Start Date and End Date) before scheduling paper timetables.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    setSelectedExam(exam);
+    setSelectedClassId(classId.toString());
     setLoading(true);
     try {
       setEditingPaper(null);
