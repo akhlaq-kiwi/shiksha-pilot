@@ -10669,9 +10669,17 @@ Only approve the settlement after reviewing all financial records.
         }
 
         $stmt = $pdo->prepare("
-            SELECT * FROM examinations 
-            WHERE school_id = :sid AND academic_year_id = :ayid
-            ORDER BY start_date ASC
+            SELECT e.*,
+                   (SELECT COUNT(*) FROM examination_papers ep WHERE ep.exam_id = e.id) as papers_count
+            FROM examinations e 
+            WHERE e.school_id = :sid AND e.academic_year_id = :ayid
+            ORDER BY 
+              CASE 
+                WHEN LOWER(e.name) LIKE '%quarterly%' THEN 1 
+                WHEN LOWER(e.name) LIKE '%half%' THEN 2 
+                WHEN LOWER(e.name) LIKE '%annual%' THEN 3 
+                ELSE 4 
+              END ASC, e.id ASC
         ");
         $stmt->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
@@ -10925,6 +10933,18 @@ Only approve the settlement after reviewing all financial records.
             ':id' => $id,
             ':sid' => $schoolId
         ]);
+
+        $datesChanged = ($startDate !== $exam['start_date']) || ($endDate !== $exam['end_date']);
+        if ($datesChanged && !empty($data['reset_papers'])) {
+            $stmtDelMarks = $pdo->prepare("DELETE FROM examination_marks WHERE exam_id = :id");
+            $stmtDelMarks->execute([':id' => $id]);
+
+            $stmtDelStatus = $pdo->prepare("DELETE FROM examination_class_status WHERE exam_id = :id");
+            $stmtDelStatus->execute([':id' => $id]);
+
+            $stmtDelPapers = $pdo->prepare("DELETE FROM examination_papers WHERE exam_id = :id");
+            $stmtDelPapers->execute([':id' => $id]);
+        }
 
         if ($status === 'Draft' && $exam['status'] === 'Published') {
             $stmtClassReset = $pdo->prepare("

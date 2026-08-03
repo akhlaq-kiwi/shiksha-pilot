@@ -492,6 +492,8 @@ export default function ExamsPage() {
   const [isDeleteExamConfirmOpen, setIsDeleteExamConfirmOpen] = useState(false);
   const [deleteExamTarget, setDeleteExamTarget] = useState(null);
   const [isEditExamOpen, setIsEditExamOpen] = useState(false);
+  const [selectedExamToEdit, setSelectedExamToEdit] = useState(null);
+  const [isResetPapersConfirmOpen, setIsResetPapersConfirmOpen] = useState(false);
   const [editExamData, setEditExamData] = useState({
     id: '',
     name: '',
@@ -824,12 +826,13 @@ export default function ExamsPage() {
   };
 
   const handleEditExamClick = (exam) => {
+    setSelectedExamToEdit(exam);
     setEditExamData({
       id: exam.id,
       name: exam.name,
-      start_date: exam.start_date,
-      end_date: exam.end_date,
-      publish_date: exam.publish_date,
+      start_date: exam.start_date || '',
+      end_date: exam.end_date || '',
+      publish_date: exam.publish_date || '',
       description: exam.description || ''
     });
     setIsEditExamOpen(true);
@@ -862,13 +865,39 @@ export default function ExamsPage() {
       setError('Result Publish Date cannot be before End Date.');
       return;
     }
+
+    // Check if dates have changed AND papers exist for this examination
+    const datesChanged = selectedExamToEdit && (
+      (editExamData.start_date && editExamData.start_date !== selectedExamToEdit.start_date) ||
+      (editExamData.end_date && editExamData.end_date !== selectedExamToEdit.end_date)
+    );
+    const hasPapers = selectedExamToEdit && Number(selectedExamToEdit.papers_count || 0) > 0;
+
+    if (datesChanged && hasPapers) {
+      setIsEditExamOpen(false);
+      setIsResetPapersConfirmOpen(true);
+      return;
+    }
+
+    await executeExamUpdate(false);
+  };
+
+  const executeExamUpdate = async (shouldResetPapers = false) => {
     setSubmitting(true);
     setError('');
     setSuccess('');
     setIsEditExamOpen(false);
+    setIsResetPapersConfirmOpen(false);
     try {
-      await schoolService.updateExamination(editExamData.id, editExamData);
-      setSuccess('Examination updated successfully.');
+      await schoolService.updateExamination(editExamData.id, {
+        ...editExamData,
+        reset_papers: shouldResetPapers
+      });
+      setSuccess(
+        shouldResetPapers 
+          ? 'Examination dates updated successfully. Added papers and timetable scheme have been reset for new dates.' 
+          : 'Examination updated successfully.'
+      );
       await loadDashboard();
     } catch (err) {
       console.error(err);
@@ -1849,6 +1878,14 @@ export default function ExamsPage() {
   }
 
   const today = getTodayLocalDateString();
+  const getExamRank = (name = '') => {
+    const lower = name.toLowerCase();
+    if (lower.includes('quarterly')) return 1;
+    if (lower.includes('half')) return 2;
+    if (lower.includes('annual')) return 3;
+    return 4;
+  };
+
   const filteredExams = exams.filter(e => {
     if (activeFilter === 'total') return true;
     if (activeFilter === 'upcoming') return e.start_date && e.start_date > today;
@@ -1856,7 +1893,7 @@ export default function ExamsPage() {
     if (activeFilter === 'draft') return e.status === 'Draft';
     if (activeFilter === 'published') return e.status === 'Published';
     return true;
-  });
+  }).sort((a, b) => getExamRank(a.name) - getExamRank(b.name) || (a.id - b.id));
 
   const filteredClassSubjects = subjects;
 
@@ -3487,6 +3524,32 @@ export default function ExamsPage() {
             />
           </div>
         </form>
+      </Dialog>
+
+      {/* RESET PAPERS CONFIRMATION DIALOG */}
+      <Dialog isOpen={isResetPapersConfirmOpen} onClose={() => setIsResetPapersConfirmOpen(false)}
+        title="Modify Examination Dates & Reset Papers?"
+        footer={<>
+          <Button variant="secondary" onClick={() => { setIsResetPapersConfirmOpen(false); setIsEditExamOpen(true); }}>Cancel</Button>
+          <Button className="bg-amber-600 hover:bg-amber-700 text-white font-bold" onClick={() => executeExamUpdate(true)} disabled={submitting}>
+            {submitting ? 'Updating & Resetting...' : 'Yes, Update Dates & Reset Papers'}
+          </Button>
+        </>}>
+        <div className="space-y-3 p-1">
+          <div className="mx-auto w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 dark:text-amber-400">
+            <AlertCircle className="h-6 w-6" />
+          </div>
+          <h4 className="text-center font-bold text-text-primary text-sm mt-2">Pehle se added papers aur scheme reset ho jayenge!</h4>
+          <p className="text-xs text-text-secondary leading-relaxed text-center">
+            Aapne <strong>{selectedExamToEdit?.name}</strong> ki Start Date / End Date me badlav kiya hai. 
+            Kyunki is examination ke liye pehle se papers / subject timetable add ho chuke hain, dates change hone par <strong>pehle se added sabhi papers aur marks entry scheme reset (delete) ho jayenge</strong> aur aapko naye dates ke acccording fresh paper scheme schedule karni padegi.
+          </p>
+          <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 text-center">
+            <p className="text-xs font-bold text-amber-700 dark:text-amber-400">
+              Kya aap aage badhna chahte hain aur naye dates ke according papers reset karna chahte hain?
+            </p>
+          </div>
+        </div>
       </Dialog>
 
       {/* DELETE EXAM CONFIRM DIALOG */}
