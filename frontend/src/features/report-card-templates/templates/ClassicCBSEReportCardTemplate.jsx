@@ -9,67 +9,80 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
   const { student, school, academic_year, exam, subjects = [], summary } = data;
   const signatures = config.signatures || ['Class Teacher', 'Principal'];
 
+  // Dynamic layout density scaling based on subject count (inline styles for guaranteed rendering)
   const subCount = subjects?.length || 0;
 
-  let cellPy = 'p-2.5';
-  let headerPy = 'p-2.5';
-  let tableFontSize = 'text-xs';
+  let cellPadding = '10px 14px';
+  let headerPadding = '10px 14px';
+  let fontSizePx = '12px';
   let containerPadding = '8mm';
-  let sectionGap = 'space-y-4';
+  let sectionGapPx = '16px';
+  let metaPadding = '8px 12px';
 
   if (subCount <= 4) {
-    // 4 or fewer subjects: Generously expanded rows & vertical spacing
-    cellPy = 'p-5';
-    headerPy = 'p-4';
-    tableFontSize = 'text-sm';
+    // 4 or fewer subjects: Generously expanded rows, text & vertical spacing
+    cellPadding = '26px 14px';
+    headerPadding = '18px 14px';
+    fontSizePx = '14px';
     containerPadding = '9.5mm';
-    sectionGap = 'space-y-6';
+    sectionGapPx = '28px';
+    metaPadding = '14px 14px';
   } else if (subCount === 5) {
     // 5 subjects: Expanded rows & padding to fill vertical space
-    cellPy = 'p-4.5';
-    headerPy = 'p-3.5';
-    tableFontSize = 'text-xs font-semibold';
+    cellPadding = '22px 14px';
+    headerPadding = '16px 14px';
+    fontSizePx = '13.5px';
     containerPadding = '9mm';
-    sectionGap = 'space-y-5.5';
+    sectionGapPx = '24px';
+    metaPadding = '12px 14px';
   } else if (subCount === 6) {
-    // 6 subjects: Taller rows & padding to eliminate large blank gap
-    cellPy = 'p-4';
-    headerPy = 'p-3.5';
-    tableFontSize = 'text-xs font-semibold';
+    // 6 subjects: Taller rows & padding to eliminate large white space gap
+    cellPadding = '18px 14px';
+    headerPadding = '14px 14px';
+    fontSizePx = '13px';
     containerPadding = '8.5mm';
-    sectionGap = 'space-y-5';
+    sectionGapPx = '22px';
+    metaPadding = '10px 12px';
   } else if (subCount === 7) {
     // 7 subjects: Comfortably padded rows
-    cellPy = 'p-3';
-    headerPy = 'p-3';
+    cellPadding = '14px 14px';
+    headerPadding = '12px 14px';
+    fontSizePx = '12.5px';
     containerPadding = '8mm';
-    sectionGap = 'space-y-4.5';
+    sectionGapPx = '18px';
+    metaPadding = '10px 12px';
   } else if (subCount <= 9) {
     // 8–9 subjects (Default 8): Standard table padding
-    cellPy = 'p-2.5';
-    headerPy = 'p-2.5';
+    cellPadding = '10px 14px';
+    headerPadding = '10px 14px';
+    fontSizePx = '12px';
     containerPadding = '7.5mm';
-    sectionGap = 'space-y-4';
+    sectionGapPx = '16px';
+    metaPadding = '8px 12px';
   } else if (subCount <= 11) {
     // 10–11 subjects: Compact table padding
-    cellPy = 'p-1.5';
-    headerPy = 'p-1.5';
+    cellPadding = '6px 10px';
+    headerPadding = '6px 10px';
+    fontSizePx = '11.5px';
     containerPadding = '6mm';
-    sectionGap = 'space-y-3';
+    sectionGapPx = '12px';
+    metaPadding = '6px 10px';
   } else {
     // 12+ subjects: Extra compact table padding
-    cellPy = 'p-1';
-    headerPy = 'p-1';
-    tableFontSize = 'text-[11px]';
+    cellPadding = '4px 8px';
+    headerPadding = '4px 8px';
+    fontSizePx = '11px';
     containerPadding = '4.5mm';
-    sectionGap = 'space-y-2';
+    sectionGapPx = '8px';
+    metaPadding = '5px 8px';
   }
 
   return (
     <div
-      className={`w-full bg-white text-zinc-900 font-serif relative flex flex-col ${sectionGap}`}
+      className="w-full bg-white text-zinc-900 font-serif relative flex flex-col"
       style={{
         padding: containerPadding,
+        gap: sectionGapPx,
         boxSizing: 'border-box',
         border: '6px double #18181b',
         borderRadius: '4px',
@@ -77,7 +90,7 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
       }}
     >
       {/* Header Block */}
-      <div className="text-center border-b-2 border-zinc-900 pb-4 mb-6">
+      <div className="text-center border-b-2 border-zinc-900 pb-4 mb-2">
         <div className="flex justify-center mb-2">
           {school.logo_path ? (
             <img src={school.logo_path} alt="Logo" className="h-16 w-16 object-contain" />
@@ -99,120 +112,120 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
       </div>
 
       {/* Student Details Grid */}
-      <table className="w-full text-xs font-sans border border-zinc-400 border-collapse mb-6">
+      <table className="w-full text-xs font-sans border border-zinc-400 border-collapse">
         <tbody>
           <tr className="border-b border-zinc-300">
-            <td className="p-2 border-r border-zinc-300 font-bold bg-zinc-100 w-1/6">Student Name</td>
-            <td className="p-2 border-r border-zinc-300 font-bold uppercase text-zinc-900 w-2/6">{student.name}</td>
-            <td className="p-2 border-r border-zinc-300 font-bold bg-zinc-100 w-1/6">Roll No</td>
-            <td className="p-2 font-mono font-bold w-2/6">{student.roll_no}</td>
+            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold bg-zinc-100 w-1/6">Student Name</td>
+            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold uppercase text-zinc-900 w-2/6">{student.name}</td>
+            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold bg-zinc-100 w-1/6">Roll No</td>
+            <td style={{ padding: metaPadding }} className="font-mono font-bold w-2/6">{student.roll_no}</td>
           </tr>
           <tr className="border-b border-zinc-300">
-            <td className="p-2 border-r border-zinc-300 font-bold bg-zinc-100">Admission No</td>
-            <td className="p-2 border-r border-zinc-300 font-mono">{student.admission_no}</td>
-            <td className="p-2 border-r border-zinc-300 font-bold bg-zinc-100">Class & Sec</td>
-            <td className="p-2 font-bold">{student.class_name} {student.section ? `(${student.section})` : ''}</td>
+            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold bg-zinc-100">Admission No</td>
+            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-mono">{student.admission_no}</td>
+            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold bg-zinc-100">Class & Sec</td>
+            <td style={{ padding: metaPadding }} className="font-bold">{student.class_name} {student.section ? `(${student.section})` : ''}</td>
           </tr>
           <tr>
-            <td className="p-2 border-r border-zinc-300 font-bold bg-zinc-100">Father's Name</td>
-            <td className="p-2 border-r border-zinc-300">{student.father_name}</td>
-            <td className="p-2 border-r border-zinc-300 font-bold bg-zinc-100">Date of Birth</td>
-            <td className="p-2 font-mono">{student.dob}</td>
+            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold bg-zinc-100">Father's Name</td>
+            <td style={{ padding: metaPadding }} className="border-r border-zinc-300">{student.father_name}</td>
+            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold bg-zinc-100">Date of Birth</td>
+            <td style={{ padding: metaPadding }} className="font-mono">{student.dob}</td>
           </tr>
         </tbody>
       </table>
 
       {/* Scholastic Achievements Table */}
-      <div className="mb-6 font-sans">
+      <div className="font-sans">
         <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-900 border-b border-zinc-400 pb-1 mb-2">
           Part 1: Scholastic Performance ({exam.name})
         </h3>
         
         {exam.is_final_session_report ? (
-          <table className="w-full text-xs border border-zinc-800 border-collapse">
+          <table className="w-full border border-zinc-800 border-collapse" style={{ fontSize: fontSizePx }}>
             <thead>
               <tr className="bg-zinc-800 text-white font-bold uppercase text-[11px]">
-                <th rowSpan={2} className="p-2 text-left border-r border-zinc-700">Subject</th>
+                <th rowSpan={2} style={{ padding: headerPadding }} className="text-left border-r border-zinc-700">Subject</th>
                 {(data.session_exams || ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam']).map(exName => (
-                  <th key={exName} colSpan={2} className="p-1 text-center border-r border-zinc-700">{exName}</th>
+                  <th key={exName} colSpan={2} style={{ padding: headerPadding }} className="text-center border-r border-zinc-700">{exName}</th>
                 ))}
-                <th colSpan={2} className="p-1 text-center border-r border-zinc-700">Grand Total</th>
-                <th rowSpan={2} className="p-2 text-center">Grade</th>
+                <th colSpan={2} style={{ padding: headerPadding }} className="text-center border-r border-zinc-700">Grand Total</th>
+                <th rowSpan={2} style={{ padding: headerPadding }} className="text-center">Grade</th>
               </tr>
               <tr className="bg-zinc-700 text-white font-bold uppercase text-[8px]">
                 {(data.session_exams || ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam']).map(exName => (
                   <React.Fragment key={exName}>
-                    <th className="p-1 text-center border-r border-zinc-600">M.M.</th>
-                    <th className="p-1 text-center border-r border-zinc-600">Obt.</th>
+                    <th style={{ padding: headerPadding }} className="text-center border-r border-zinc-600">M.M.</th>
+                    <th style={{ padding: headerPadding }} className="text-center border-r border-zinc-600">Obt.</th>
                   </React.Fragment>
                 ))}
-                <th className="p-1 text-center border-r border-zinc-600">Max</th>
-                <th className="p-1 text-center border-r border-zinc-600">Obt.</th>
+                <th style={{ padding: headerPadding }} className="text-center border-r border-zinc-600">Max</th>
+                <th style={{ padding: headerPadding }} className="text-center border-r border-zinc-600">Obt.</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-300">
               {subjects.map((s, idx) => (
                 <tr key={idx} className="border-b border-zinc-300">
-                  <td className="p-1.5 border-r border-zinc-300 font-bold text-zinc-900">{s.subject_name}</td>
+                  <td style={{ padding: cellPadding }} className="border-r border-zinc-300 font-bold text-zinc-900">{s.subject_name}</td>
                   {(data.session_exams || ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam']).map(exName => (
                     <React.Fragment key={exName}>
-                      <td className="p-1.5 text-center border-r border-zinc-300 font-mono text-[11px]">{s.exam_scores?.[exName]?.max_marks || 100}</td>
-                      <td className="p-1.5 text-center border-r border-zinc-300 font-mono font-bold text-[11px]">{s.exam_scores?.[exName]?.marks_obtained ?? '—'}</td>
+                      <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono text-[11px]">{s.exam_scores?.[exName]?.max_marks || 100}</td>
+                      <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono font-bold text-[11px]">{s.exam_scores?.[exName]?.marks_obtained ?? '—'}</td>
                     </React.Fragment>
                   ))}
-                  <td className="p-1.5 text-center border-r border-zinc-300 font-mono font-bold text-zinc-700 text-[11px]">{s.grand_total_max || s.max_marks}</td>
-                  <td className="p-1.5 text-center border-r border-zinc-300 font-mono font-bold text-zinc-900 text-[11px]">{s.grand_total_obtained || s.marks_obtained}</td>
-                  <td className="p-1.5 text-center font-bold text-xs">{s.grade}</td>
+                  <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono font-bold text-zinc-700 text-[11px]">{s.grand_total_max || s.max_marks}</td>
+                  <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono font-bold text-zinc-900 text-[11px]">{s.grand_total_obtained || s.marks_obtained}</td>
+                  <td style={{ padding: cellPadding }} className="text-center font-bold text-xs">{s.grade}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
-              <tr className="bg-zinc-100 font-bold border-t-2 border-zinc-800 text-xs">
-                <td className="p-2 border-r border-zinc-300">Grand Total</td>
+              <tr className="bg-zinc-100 font-bold border-t-2 border-zinc-800">
+                <td style={{ padding: cellPadding }} className="border-r border-zinc-300">Grand Total</td>
                 {(data.session_exams || ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam']).map(exName => (
                   <React.Fragment key={exName}>
-                    <td className="p-2 text-center border-r border-zinc-300 font-mono">{data.exam_totals?.[exName]?.max_marks || 700}</td>
-                    <td className="p-2 text-center border-r border-zinc-300 font-mono font-bold">{data.exam_totals?.[exName]?.marks_obtained || 500}</td>
+                    <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono">{data.exam_totals?.[exName]?.max_marks || 700}</td>
+                    <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono font-bold">{data.exam_totals?.[exName]?.marks_obtained || 500}</td>
                   </React.Fragment>
                 ))}
-                <td className="p-2 text-center border-r border-zinc-300 font-mono font-bold">{summary.total_max}</td>
-                <td className="p-2 text-center border-r border-zinc-300 font-mono font-bold text-sm">{summary.total_obtained}</td>
-                <td className="p-2 text-center font-bold text-sm">{summary.grade}</td>
+                <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono font-bold">{summary.total_max}</td>
+                <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono font-bold text-sm">{summary.total_obtained}</td>
+                <td style={{ padding: cellPadding }} className="text-center font-bold text-sm">{summary.grade}</td>
               </tr>
             </tfoot>
           </table>
         ) : (
-          <table className={`w-full ${tableFontSize} border border-zinc-800 border-collapse`}>
+          <table className="w-full border border-zinc-800 border-collapse" style={{ fontSize: fontSizePx }}>
             <thead>
               <tr className="bg-zinc-800 text-white font-bold uppercase text-[11px]">
-                <th className={`${headerPy} text-left border-r border-zinc-700`}>Subject</th>
-                <th className={`${headerPy} text-center border-r border-zinc-700 w-24`}>Max Marks</th>
-                <th className={`${headerPy} text-center border-r border-zinc-700 w-24`}>Pass Marks</th>
-                <th className={`${headerPy} text-center border-r border-zinc-700 w-28`}>Marks Obtained</th>
-                <th className={`${headerPy} text-center border-r border-zinc-700 w-20`}>Grade</th>
-                <th className={`${headerPy} text-center w-24`}>Result</th>
+                <th style={{ padding: headerPadding }} className="text-left border-r border-zinc-700">Subject</th>
+                <th style={{ padding: headerPadding }} className="text-center border-r border-zinc-700 w-24">Max Marks</th>
+                <th style={{ padding: headerPadding }} className="text-center border-r border-zinc-700 w-24">Pass Marks</th>
+                <th style={{ padding: headerPadding }} className="text-center border-r border-zinc-700 w-28">Marks Obtained</th>
+                <th style={{ padding: headerPadding }} className="text-center border-r border-zinc-700 w-20">Grade</th>
+                <th style={{ padding: headerPadding }} className="text-center w-24">Result</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-300">
               {subjects.map((s, idx) => (
                 <tr key={idx} className="border-b border-zinc-300">
-                  <td className={`${cellPy} border-r border-zinc-300 font-bold text-zinc-900`}>{s.subject_name}</td>
-                  <td className={`${cellPy} text-center border-r border-zinc-300 font-mono`}>{s.max_marks}</td>
-                  <td className={`${cellPy} text-center border-r border-zinc-300 font-mono text-zinc-600`}>{s.passing_marks}</td>
-                  <td className={`${cellPy} text-center border-r border-zinc-300 font-mono font-bold text-zinc-900`}>{s.marks_obtained}</td>
-                  <td className={`${cellPy} text-center border-r border-zinc-300 font-bold`}>{s.grade}</td>
-                  <td className={`${cellPy} text-center font-bold text-[11px] uppercase`}>{s.result}</td>
+                  <td style={{ padding: cellPadding }} className="border-r border-zinc-300 font-bold text-zinc-900">{s.subject_name}</td>
+                  <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono">{s.max_marks}</td>
+                  <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono text-zinc-600">{s.passing_marks}</td>
+                  <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono font-bold text-zinc-900">{s.marks_obtained}</td>
+                  <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-bold">{s.grade}</td>
+                  <td style={{ padding: cellPadding }} className="text-center font-bold text-[11px] uppercase">{s.result}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
-              <tr className="bg-zinc-100 font-bold border-t-2 border-zinc-800 text-xs">
-                <td className={`${cellPy} border-r border-zinc-300`}>Grand Total</td>
-                <td className={`${cellPy} text-center border-r border-zinc-300 font-mono`}>{summary.total_max}</td>
-                <td className={`${cellPy} text-center border-r border-zinc-300`}>—</td>
-                <td className={`${cellPy} text-center border-r border-zinc-300 font-mono font-bold text-sm`}>{summary.total_obtained}</td>
-                <td className={`${cellPy} text-center border-r border-zinc-300 font-bold text-sm`}>{summary.grade}</td>
-                <td className={`${cellPy} text-center font-bold text-xs`}>{summary.result}</td>
+              <tr className="bg-zinc-100 font-bold border-t-2 border-zinc-800">
+                <td style={{ padding: cellPadding }} className="border-r border-zinc-300">Grand Total</td>
+                <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono">{summary.total_max}</td>
+                <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300">—</td>
+                <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono font-bold text-sm">{summary.total_obtained}</td>
+                <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-bold text-sm">{summary.grade}</td>
+                <td style={{ padding: cellPadding }} className="text-center font-bold text-xs">{summary.result}</td>
               </tr>
             </tfoot>
           </table>
