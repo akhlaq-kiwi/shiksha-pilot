@@ -10689,23 +10689,23 @@ Only approve the settlement after reviewing all financial records.
         $defaultExams = [
             [
                 'name' => 'Quarterly Examination',
-                'start_date' => sprintf('%04d-08-01', $startYear),
-                'end_date' => sprintf('%04d-08-10', $startYear),
-                'publish_date' => sprintf('%04d-08-15', $startYear),
+                'start_date' => null,
+                'end_date' => null,
+                'publish_date' => null,
                 'description' => 'First quarter evaluation of academic performance.'
             ],
             [
                 'name' => 'Half Yearly Examination',
-                'start_date' => sprintf('%04d-11-01', $startYear),
-                'end_date' => sprintf('%04d-11-12', $startYear),
-                'publish_date' => sprintf('%04d-11-18', $startYear),
+                'start_date' => null,
+                'end_date' => null,
+                'publish_date' => null,
                 'description' => 'Mid-term evaluation of academic performance.'
             ],
             [
                 'name' => 'Annual Examination',
-                'start_date' => sprintf('%04d-03-01', $endYear),
-                'end_date' => sprintf('%04d-03-15', $endYear),
-                'publish_date' => sprintf('%04d-03-22', $endYear),
+                'start_date' => null,
+                'end_date' => null,
+                'publish_date' => null,
                 'description' => 'Final cumulative examination of the academic session.'
             ]
         ];
@@ -10731,13 +10731,26 @@ Only approve the settlement after reviewing all financial records.
                     ':sid' => $schoolId,
                     ':ayid' => $academicYearId,
                     ':name' => $ex['name'],
-                    ':start_date' => $ex['start_date'],
-                    ':end_date' => $ex['end_date'],
-                    ':publish_date' => $ex['publish_date'],
+                    ':start_date' => null,
+                    ':end_date' => null,
+                    ':publish_date' => null,
                     ':description' => $ex['description']
                 ]);
             }
         }
+
+        // Reset old hardcoded default dates to NULL if unedited
+        $stmtReset = $pdo->prepare("
+            UPDATE examinations 
+            SET start_date = NULL, end_date = NULL, publish_date = NULL
+            WHERE school_id = :sid AND academic_year_id = :ayid 
+              AND (
+                (name = 'Quarterly Examination' AND start_date LIKE '%-08-01') OR
+                (name = 'Half Yearly Examination' AND start_date LIKE '%-11-01') OR
+                (name = 'Annual Examination' AND start_date LIKE '%-03-01')
+              )
+        ");
+        $stmtReset->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
     }
 
     public function createExamination(array $user, array $data): array
@@ -10844,20 +10857,20 @@ Only approve the settlement after reviewing all financial records.
         }
 
         $name = isset($data['name']) ? trim($data['name']) : $exam['name'];
-        $startDate = $data['start_date'] ?? $exam['start_date'];
-        $endDate = $data['end_date'] ?? $exam['end_date'];
-        $publishDate = $data['publish_date'] ?? $exam['publish_date'];
+        $startDate = !empty($data['start_date']) ? $data['start_date'] : (array_key_exists('start_date', $data) ? null : $exam['start_date']);
+        $endDate = !empty($data['end_date']) ? $data['end_date'] : (array_key_exists('end_date', $data) ? null : $exam['end_date']);
+        $publishDate = !empty($data['publish_date']) ? $data['publish_date'] : (array_key_exists('publish_date', $data) ? null : $exam['publish_date']);
         $description = array_key_exists('description', $data) ? $data['description'] : $exam['description'];
         $status = $data['status'] ?? $exam['status'];
 
-        if (empty($name) || empty($startDate) || empty($endDate) || empty($publishDate)) {
-            throw new ValidationException(['fields' => 'All fields (Exam Name, Start Date, End Date, Publish Date) are required.']);
+        if (empty($name)) {
+            throw new ValidationException(['name' => 'Examination Name is required.']);
         }
 
-        if ($endDate < $startDate) {
+        if (!empty($startDate) && !empty($endDate) && $endDate < $startDate) {
             throw new ValidationException(['end_date' => 'End Date cannot be before Start Date.']);
         }
-        if ($publishDate < $endDate) {
+        if (!empty($endDate) && !empty($publishDate) && $publishDate < $endDate) {
             throw new ValidationException(['publish_date' => 'Publish Date cannot be before End Date.']);
         }
 
@@ -10872,20 +10885,23 @@ Only approve the settlement after reviewing all financial records.
         }
 
         // Check exam date overlap school-wide (excluding current exam)
-        $stmtOverlap = $pdo->prepare("
-            SELECT COUNT(*) FROM examinations
-            WHERE school_id = :sid AND academic_year_id = :ayid AND id != :id
-              AND ((start_date <= :end_date AND end_date >= :start_date))
-        ");
-        $stmtOverlap->execute([
-            ':sid' => $schoolId,
-            ':ayid' => (int)$exam['academic_year_id'],
-            ':end_date' => $endDate,
-            ':start_date' => $startDate,
-            ':id' => $id
-        ]);
-        if ((int)$stmtOverlap->fetchColumn() > 0) {
-            throw new ValidationException(['start_date' => 'This examination dates overlap with an existing examination.']);
+        if (!empty($startDate) && !empty($endDate)) {
+            $stmtOverlap = $pdo->prepare("
+                SELECT COUNT(*) FROM examinations
+                WHERE school_id = :sid AND academic_year_id = :ayid AND id != :id
+                  AND start_date IS NOT NULL AND end_date IS NOT NULL
+                  AND ((start_date <= :end_date AND end_date >= :start_date))
+            ");
+            $stmtOverlap->execute([
+                ':sid' => $schoolId,
+                ':ayid' => (int)$exam['academic_year_id'],
+                ':end_date' => $endDate,
+                ':start_date' => $startDate,
+                ':id' => $id
+            ]);
+            if ((int)$stmtOverlap->fetchColumn() > 0) {
+                throw new ValidationException(['start_date' => 'This examination dates overlap with an existing examination.']);
+            }
         }
 
         // Update

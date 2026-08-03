@@ -756,11 +756,11 @@ export default function ExamsPage() {
   const totalCount = exams.length;
   const upcomingCount = exams.filter(e => {
     const today = getTodayLocalDateString();
-    return e.start_date > today;
+    return e.start_date && e.start_date > today;
   }).length;
   const ongoingCount = exams.filter(e => {
     const today = getTodayLocalDateString();
-    return e.start_date <= today && e.end_date >= today;
+    return e.start_date && e.end_date && e.start_date <= today && e.end_date >= today;
   }).length;
   const publishedCount = exams.filter(e => e.status === 'Published').length;
   const draftCount = exams.filter(e => e.status === 'Draft').length;
@@ -837,8 +837,8 @@ export default function ExamsPage() {
 
   const handleUpdateExam = async (e) => {
     if (e) e.preventDefault();
-    if (!editExamData.name || !editExamData.start_date || !editExamData.end_date || !editExamData.publish_date) {
-      setError('Please fill in all required fields.');
+    if (!editExamData.name) {
+      setError('Please enter examination name.');
       return;
     }
     setSubmitting(true);
@@ -1826,8 +1826,8 @@ export default function ExamsPage() {
   const today = getTodayLocalDateString();
   const filteredExams = exams.filter(e => {
     if (activeFilter === 'total') return true;
-    if (activeFilter === 'upcoming') return e.start_date > today;
-    if (activeFilter === 'ongoing') return e.start_date <= today && e.end_date >= today;
+    if (activeFilter === 'upcoming') return e.start_date && e.start_date > today;
+    if (activeFilter === 'ongoing') return e.start_date && e.end_date && e.start_date <= today && e.end_date >= today;
     if (activeFilter === 'draft') return e.status === 'Draft';
     if (activeFilter === 'published') return e.status === 'Published';
     return true;
@@ -2003,9 +2003,6 @@ export default function ExamsPage() {
           <div className="flex gap-2 sm:items-center">
             <Button className="flex items-center gap-2 font-bold" onClick={() => { setActiveView('grade_scale'); setGradeError(''); setGradeSuccess(''); }}>
               Grade Configuration Scale
-            </Button>
-            <Button className="flex items-center gap-2 font-bold" onClick={() => setIsCreateOpen(true)}>
-              <Plus className="h-4 w-4" /> Create Examination
             </Button>
           </div>
         )}
@@ -3436,17 +3433,17 @@ export default function ExamsPage() {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
                <label className="text-xs font-bold text-text-secondary uppercase">Start Date</label>
-               <Input type="date" value={editExamData.start_date} onChange={e => setEditExamData(p => ({ ...p, start_date: e.target.value }))} required />
+               <Input type="date" value={editExamData.start_date || ''} onChange={e => setEditExamData(p => ({ ...p, start_date: e.target.value }))} />
             </div>
             <div className="space-y-1.5">
                <label className="text-xs font-bold text-text-secondary uppercase">End Date</label>
-               <Input type="date" value={editExamData.end_date} onChange={e => setEditExamData(p => ({ ...p, end_date: e.target.value }))} required />
+               <Input type="date" value={editExamData.end_date || ''} onChange={e => setEditExamData(p => ({ ...p, end_date: e.target.value }))} />
             </div>
           </div>
 
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-text-secondary uppercase">Result Publish Date</label>
-            <Input type="date" value={editExamData.publish_date} onChange={e => setEditExamData(p => ({ ...p, publish_date: e.target.value }))} required />
+            <Input type="date" value={editExamData.publish_date || ''} onChange={e => setEditExamData(p => ({ ...p, publish_date: e.target.value }))} />
           </div>
 
           <div className="space-y-1.5">
