@@ -258,8 +258,8 @@ export default function ModernReportCardTemplate({ data, config = {} }) {
         </div>
       )}
 
-      {/* Performance Summary Cards (5 columns) - Locked at a CONSTANT 16px gap below table */}
-      <div className="grid grid-cols-5 gap-2 font-sans mt-4">
+      {/* Performance Summary Cards (5 columns) - Locked at a CONSTANT 10px gap below table */}
+      <div className="grid grid-cols-5 gap-2 font-sans" style={{ marginTop: '10px' }}>
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 text-center flex flex-col justify-center">
           <span className="text-[9.5px] font-bold uppercase tracking-wider text-emerald-800 block">Total Marks</span>
           <span className="text-sm font-bold text-emerald-950 font-mono mt-0.5">{summary.total_obtained} / {summary.total_max}</span>

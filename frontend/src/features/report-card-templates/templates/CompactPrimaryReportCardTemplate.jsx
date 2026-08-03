@@ -240,8 +240,8 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
         </div>
       )}
 
-      {/* Performance Summary Cards (5 columns) - Locked at a CONSTANT 16px gap below table */}
-      <div className="grid grid-cols-5 gap-2 font-sans mt-4">
+      {/* Performance Summary Cards (5 columns) - Locked at a CONSTANT 10px gap below table */}
+      <div className="grid grid-cols-5 gap-2 font-sans" style={{ marginTop: '10px' }}>
         <div className="bg-emerald-50 border border-emerald-200 p-2.5 rounded-lg text-center flex flex-col justify-center">
           <span className="text-[11px] font-bold text-emerald-800 uppercase block">Total Marks</span>
           <span className="text-xs font-bold font-mono text-emerald-950 mt-0.5">{summary.total_obtained} / {summary.total_max}</span>
