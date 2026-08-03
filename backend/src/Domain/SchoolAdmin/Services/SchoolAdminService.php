@@ -1185,12 +1185,15 @@ class SchoolAdminService extends BaseService
             throw new ValidationException(['student_category' => 'Student Category (Existing Student or New Admission) is required.']);
         }
 
+        $parentPhone = !empty($data['parent_phone']) ? trim((string)$data['parent_phone']) : (!empty($data['father_phone']) ? trim((string)$data['father_phone']) : (!empty($data['student_mobile']) ? trim((string)$data['student_mobile']) : null));
+        $fatherPhone = !empty($data['father_phone']) ? trim((string)$data['father_phone']) : $parentPhone;
+
         $id = $this->studentRepo->create([
             'school_id'    => $schoolId,
             'name'         => $name,
             'admission_no' => null,
             'class_id'     => $classId,
-            'parent_phone' => null,
+            'parent_phone' => $parentPhone,
             'email'        => $data['student_email'] ?? null,
             'status'       => $status,
             'dob'          => $data['dob'] ?? null,
@@ -1216,7 +1219,7 @@ class SchoolAdminService extends BaseService
             'house' => null,
             
             'father_name' => $data['father_name'] ?? null,
-            'father_phone' => null,
+            'father_phone' => $fatherPhone,
             'father_email' => null,
             'father_occupation' => $data['parent_occupation'] ?? null,
             'mother_name' => $data['mother_name'] ?? null,
@@ -1261,6 +1264,9 @@ class SchoolAdminService extends BaseService
             'exit_date' => $exitDate,
         ]);
 
+        // Auto-sync active user account for student/parent mobile login
+        $this->syncUserAccountForStudent($pdo, $schoolId, $name, $parentPhone, $data['student_email'] ?? null);
+
         $student = $this->studentRepo->findDetailById($schoolId, $id);
         if ($student === null) {
             throw new NotFoundException('Student not found after creation');
@@ -1270,6 +1276,11 @@ class SchoolAdminService extends BaseService
             $this->syncAdmissionFeePayment($pdo, $schoolId, $id, $academicYearId, $admissionFee);
             $this->sendStudentNotification($pdo, $schoolId, $id, "Admission Fee Added", "Your admission fee has been added to your fee account. Please check your Fees section.");
         }
+
+        $this->syncExistingAnnualFeePayment($pdo, $schoolId, $id, (int)$classId, $academicYearId, $studentCategory);
+
+        $this->log('Student created', ['id' => $id, 'school_id' => $schoolId]);
+        return $student;
 
         $this->syncExistingAnnualFeePayment($pdo, $schoolId, $id, (int)$classId, $academicYearId, $studentCategory);
 
@@ -1421,13 +1432,14 @@ class SchoolAdminService extends BaseService
 
         // Status based on Exit Date
         $exitDate = !empty($data['exit_date']) ? $data['exit_date'] : null;
-        $status = $exitDate !== null ? 'Inactive' : 'ACTIVE';
+        $parentPhone = !empty($data['parent_phone']) ? trim((string)$data['parent_phone']) : (!empty($data['father_phone']) ? trim((string)$data['father_phone']) : (!empty($data['student_mobile']) ? trim((string)$data['student_mobile']) : ($student['parent_phone'] ?? null)));
+        $fatherPhone = !empty($data['father_phone']) ? trim((string)$data['father_phone']) : $parentPhone;
 
         $this->studentRepo->update($id, [
             'name'         => $name,
             'admission_no' => null,
             'class_id'     => $classId,
-            'parent_phone' => null,
+            'parent_phone' => $parentPhone,
             'email'        => $data['student_email'] ?? null,
             'status'       => $status,
             'dob'          => $data['dob'] ?? null,
@@ -1451,7 +1463,7 @@ class SchoolAdminService extends BaseService
             'house' => null,
             
             'father_name' => $data['father_name'] ?? null,
-            'father_phone' => null,
+            'father_phone' => $fatherPhone,
             'father_email' => null,
             'father_occupation' => $data['parent_occupation'] ?? null,
             'mother_name' => $data['mother_name'] ?? null,
@@ -1507,7 +1519,8 @@ class SchoolAdminService extends BaseService
 
         $updatedClassId = !empty($data['class_name']) ? (int)$data['class_name'] : (int)$student['class_id'];
         $updatedCategory = array_key_exists('student_category', $data) ? $data['student_category'] : ($student['student_category'] ?? null);
-        $this->syncExistingAnnualFeePayment($pdo, $schoolId, $id, $updatedClassId, $academicYearId, $updatedCategory);
+        // Auto-sync active user account for student/parent mobile login
+        $this->syncUserAccountForStudent($pdo, $schoolId, $name, $parentPhone, $data['student_email'] ?? null);
 
         return $this->studentRepo->findDetailById($schoolId, $id);
     }
@@ -2351,6 +2364,40 @@ class SchoolAdminService extends BaseService
         return $this->getStaffDetails($user, $id);
     }
 
+    private function syncUserAccountForStudent(PDO $pdo, int $schoolId, string $name, ?string $phone, ?string $email = null): void
+    {
+        $phone = trim((string)$phone);
+        if (empty($phone) || strlen($phone) < 10) return;
+
+        $stmtCheck = $pdo->prepare("SELECT id FROM users WHERE phone = :phone LIMIT 1");
+        $stmtCheck->execute([':phone' => $phone]);
+        $existing = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+
+        if (!$existing) {
+            $defaultPassword = 'Test@123';
+            $hashedPassword = password_hash($defaultPassword, PASSWORD_BCRYPT);
+            $stmtInsert = $pdo->prepare("
+                INSERT INTO users (phone, email, password, plain_password, role, name, status, school_id, force_password_change)
+                VALUES (:phone, :email, :pwd, :plain, 'STUDENT', :name, 'ACTIVE', :sid, 0)
+            ");
+            $stmtInsert->execute([
+                ':phone' => $phone,
+                ':email' => !empty($email) ? trim($email) : null,
+                ':pwd'   => $hashedPassword,
+                ':plain' => $defaultPassword,
+                ':name'  => trim($name),
+                ':sid'   => $schoolId
+            ]);
+        } else {
+            $stmtUpdate = $pdo->prepare("
+                UPDATE users 
+                SET status = 'ACTIVE', school_id = COALESCE(school_id, :sid), name = :name
+                WHERE id = :id
+            ");
+            $stmtUpdate->execute([':sid' => $schoolId, ':name' => trim($name), ':id' => $existing['id']]);
+        }
+    }
+
     private function syncUserAccountForStaff(PDO $pdo, int $schoolId, string $name, string $phone, string $role = 'TEACHER'): void
     {
         $phone = trim($phone);
@@ -2377,10 +2424,10 @@ class SchoolAdminService extends BaseService
         } else {
             $stmtUpdate = $pdo->prepare("
                 UPDATE users 
-                SET status = 'ACTIVE', school_id = COALESCE(school_id, :sid)
+                SET status = 'ACTIVE', school_id = COALESCE(school_id, :sid), name = :name
                 WHERE id = :id
             ");
-            $stmtUpdate->execute([':sid' => $schoolId, ':id' => $existing['id']]);
+            $stmtUpdate->execute([':sid' => $schoolId, ':name' => trim($name), ':id' => $existing['id']]);
         }
     }
 
@@ -3091,6 +3138,8 @@ class SchoolAdminService extends BaseService
                                 $stmtIns = $pdo->prepare($sqlInsert);
                                 $stmtIns->execute($oldStu);
                                 $newStudentId = (int)$pdo->lastInsertId();
+                                $stuPhone = !empty($oldStu['parent_phone']) ? trim((string)$oldStu['parent_phone']) : (!empty($oldStu['father_phone']) ? trim((string)$oldStu['father_phone']) : (!empty($oldStu['student_mobile']) ? trim((string)$oldStu['student_mobile']) : null));
+                                $this->syncUserAccountForStudent($pdo, $schoolId, $oldStu['name'] ?? ($oldStu['first_name'] ?? 'Student'), $stuPhone, $oldStu['student_email'] ?? null);
                             }
                         }
 
