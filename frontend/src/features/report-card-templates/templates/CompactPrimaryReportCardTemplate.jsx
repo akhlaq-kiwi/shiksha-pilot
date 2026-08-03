@@ -91,26 +91,27 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
       }}
     >
       {/* Header */}
-      <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-center justify-between">
-        <div className="flex items-center space-x-4">
+      <div className="flex items-center justify-between border-b-2 border-amber-400 pb-4">
+        <div className="flex items-center gap-3">
           {school.logo_path ? (
             <img src={school.logo_path} alt="Logo" className="h-14 w-14 object-contain" />
           ) : (
-            <div className="h-14 w-14 rounded-xl bg-amber-400 text-amber-950 font-bold text-2xl flex items-center justify-center">
+            <div className="h-12 w-12 rounded-full bg-amber-500 text-white flex items-center justify-center font-bold text-xl">
               {school.name.charAt(0)}
             </div>
           )}
           <div>
-            <h1 className="text-xl font-bold text-zinc-900">{school.name}</h1>
-            <p className="text-xs text-zinc-600">{school.address}</p>
+            <h1 className="text-lg font-bold uppercase text-amber-600 tracking-tight font-display">
+              {school.name}
+            </h1>
+            <p className="text-[11px] font-bold text-zinc-500 uppercase">
+              {exam.is_final_session_report ? 'Final Academic Session Report' : `Primary Progress Card — ${exam.name}`}
+            </p>
           </div>
         </div>
         <div className="text-right">
-          <span className="px-3 py-1 bg-amber-400 text-amber-950 font-bold text-xs rounded-full uppercase tracking-wider block">
-            {exam.is_final_session_report ? 'FINAL REPORT CARD' : exam.name}
-          </span>
-          <span className="text-xs text-zinc-600 font-medium mt-1 block">
-            Academic Session: {academic_year.name}
+          <span className="px-3 py-1 bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs rounded-full uppercase">
+            Session: {academic_year.name}
           </span>
         </div>
       </div>

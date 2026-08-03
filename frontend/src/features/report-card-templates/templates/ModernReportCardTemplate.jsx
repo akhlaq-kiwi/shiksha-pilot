@@ -85,32 +85,36 @@ export default function ModernReportCardTemplate({ data, config = {} }) {
       className="w-full bg-white text-zinc-900 font-sans relative flex flex-col"
       style={{ padding: containerPadding, gap: sectionGapPx, boxSizing: 'border-box', minHeight: '100%' }}
     >
-      {/* Header Block */}
-      <div className="bg-gradient-to-r from-emerald-950 via-emerald-900 to-zinc-900 text-white p-6 rounded-2xl shadow-sm relative overflow-hidden flex items-center justify-between">
-        <div className="flex items-center space-x-5 z-10">
+      {/* Header Banner */}
+      <div className="bg-gradient-to-r from-emerald-800 via-teal-800 to-emerald-900 text-white p-6 rounded-xl relative overflow-hidden flex items-center justify-between border border-emerald-700/30">
+        {/* Subtle Inner Accent Line at Bottom */}
+        <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-amber-400" />
+
+        <div className="flex items-center gap-4 min-w-0 z-10">
           {school.logo_path ? (
-            <img src={school.logo_path} alt="Logo" className="h-16 w-16 object-contain bg-white/10 p-1.5 rounded-xl border border-white/20" />
+            <img src={school.logo_path} alt="Logo" className="h-16 w-16 object-contain shrink-0 bg-white/10 p-1.5 rounded-xl border border-white/20" />
           ) : (
-            <div className="h-16 w-16 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center font-bold text-2xl text-white">
-              {school.name.charAt(0)}
+            <div className="h-16 w-16 bg-amber-400 text-emerald-950 font-bold text-2xl rounded-xl flex items-center justify-center border border-amber-300 shadow-xs shrink-0 font-display">
+              {school.name ? school.name.charAt(0) : 'S'}
             </div>
           )}
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight leading-tight">{school.name}</h1>
-            <p className="text-xs text-emerald-200/80 font-normal mt-0.5">{school.address}</p>
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold uppercase tracking-tight font-display text-amber-300 leading-normal block">
+              {school.name}
+            </h1>
+            <p className="text-xs font-medium text-emerald-100 opacity-90 leading-normal mt-0.5 block">
+              {school.address || 'Civil Lines, Central Education Hub'} {school.phone ? `| Tel: ${school.phone}` : ''}
+            </p>
+            <div className="flex items-center gap-2 mt-2">
+              <span className="px-2.5 py-0.5 bg-amber-400 text-emerald-950 text-[11px] font-bold rounded-md uppercase tracking-wider">
+                {isFinalReport ? 'FINAL ACADEMIC REPORT CARD' : exam.name}
+              </span>
+              <span className="text-xs font-mono font-bold text-emerald-200">
+                Session: {academic_year.name}
+              </span>
+            </div>
           </div>
         </div>
-
-        <div className="text-right z-10">
-          <div className="inline-block bg-white/15 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 text-xs font-bold tracking-wider uppercase mb-1">
-            {exam.is_final_session_report ? 'FINAL ACADEMIC REPORT CARD' : 'ACADEMIC PERFORMANCE REPORT'}
-          </div>
-          <p className="text-xs text-emerald-100 font-medium">
-            Session: {academic_year.name} • {exam.name}
-          </p>
-        </div>
-
-        <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-emerald-500/10 rounded-full blur-2xl" />
       </div>
 
       {/* Student Meta Card (3 columns x 2 rows, center aligned) */}
