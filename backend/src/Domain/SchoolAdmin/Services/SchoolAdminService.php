@@ -10679,6 +10679,11 @@ Only approve the settlement after reviewing all financial records.
 
     public function autoSeedDefaultSessionExams(\PDO $pdo, int $schoolId, int $academicYearId): void
     {
+        try {
+            $pdo->exec("ALTER TABLE examinations MODIFY start_date DATE NULL, MODIFY end_date DATE NULL, MODIFY publish_date DATE NULL");
+        } catch (\Throwable $t) {
+            // Ignore if already nullable or structure modified
+        }
         $stmtYear = $pdo->prepare("SELECT start_date, end_date FROM academic_years WHERE id = :ayid LIMIT 1");
         $stmtYear->execute([':ayid' => $academicYearId]);
         $year = $stmtYear->fetch(\PDO::FETCH_ASSOC);
