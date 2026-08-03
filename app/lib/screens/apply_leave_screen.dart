@@ -33,6 +33,55 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
   String? _uploadedAttachmentPath;
   bool _isUploadingAttachment = false;
 
+  bool _isSubmitting = false;
+  int _charCount = 0;
+
+  final List<String> _leaveTypes = [
+    'Sick Leave',
+    'Personal Leave',
+    'Casual Leave',
+    'Emergency Leave',
+    'Other'
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _reasonController.addListener(_updateCharCount);
+  }
+
+  @override
+  void dispose() {
+    _reasonController.removeListener(_updateCharCount);
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  void _updateCharCount() {
+    final text = _reasonController.text;
+    setState(() {
+      _charCount = text.length;
+    });
+  }
+
+  Future<void> _selectDate(BuildContext context, bool isFromDate) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now().subtract(const Duration(days: 30)),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (picked != null) {
+      setState(() {
+        if (isFromDate) {
+          _fromDate = picked;
+        } else {
+          _toDate = picked;
+        }
+      });
+    }
+  }
+
   Future<void> _pickAttachment() async {
     if (_isUploadingAttachment) return;
 
