@@ -747,43 +747,54 @@ class StudentService extends BaseService
             $stmtGrp->execute([':receipt_no' => $receiptNo, ':sid' => $schoolId]);
             $groupPayments = $stmtGrp->fetchAll(PDO::FETCH_ASSOC) ?: [];
             
-            $academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
-            usort($groupPayments, function($a, $b) use ($academicMonths) {
-                $idxA = array_search($a['fee_month'], $academicMonths, true);
-                $idxB = array_search($b['fee_month'], $academicMonths, true);
-                return $idxA - $idxB;
-            });
-            
-            $rupee = "Rs";
-            $monthsList = array_column($groupPayments, 'fee_month');
-            $indices = [];
-            foreach ($monthsList as $m) {
-                $idx = array_search($m, $academicMonths, true);
-                if ($idx !== false) {
-                    $indices[] = $idx;
+            if (empty($groupPayments)) {
+                $feeMonthDisplay = !empty($payment['fee_month']) ? $payment['fee_month'] : 'April';
+                $totalAmountPaid = (float)($payment['amount_paid'] ?? 0.0);
+                $billingItemLabel = "Month: ";
+            } else {
+                $academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+                usort($groupPayments, function($a, $b) use ($academicMonths) {
+                    $idxA = array_search(trim($a['fee_month']), $academicMonths);
+                    $idxB = array_search(trim($b['fee_month']), $academicMonths);
+                    if ($idxA === false) $idxA = 99;
+                    if ($idxB === false) $idxB = 99;
+                    return $idxA - $idxB;
+                });
+                
+                $monthsList = array_values(array_filter(array_column($groupPayments, 'fee_month')));
+                if (empty($monthsList)) {
+                    $monthsList = [!empty($payment['fee_month']) ? $payment['fee_month'] : 'April'];
                 }
-            }
-            $isConsecutive = false;
-            if (count($indices) > 1) {
-                $isConsecutive = true;
-                for ($i = 1; $i < count($indices); $i++) {
-                    if ($indices[$i] !== $indices[$i - 1] + 1) {
-                        $isConsecutive = false;
-                        break;
+
+                $indices = [];
+                foreach ($monthsList as $m) {
+                    $idx = array_search(trim($m), $academicMonths);
+                    if ($idx !== false) {
+                        $indices[] = $idx;
                     }
                 }
+                $isConsecutive = false;
+                if (count($indices) > 1 && count($indices) === count($monthsList)) {
+                    $isConsecutive = true;
+                    for ($i = 1; $i < count($indices); $i++) {
+                        if ($indices[$i] !== $indices[$i - 1] + 1) {
+                            $isConsecutive = false;
+                            break;
+                        }
+                    }
+                }
+                if ($isConsecutive && count($monthsList) > 1) {
+                    $feeMonthDisplay = reset($monthsList) . " To " . end($monthsList);
+                } else {
+                    $feeMonthDisplay = implode(', ', $monthsList);
+                }
+                $totalAmountPaid = array_sum(array_column($groupPayments, 'amount_paid'));
+                $billingItemLabel = count($monthsList) > 1 ? "Months: " : "Month: ";
             }
-            if ($isConsecutive) {
-                $feeMonthDisplay = reset($monthsList) . " To " . end($monthsList);
-            } else {
-                $feeMonthDisplay = implode(', ', $monthsList);
-            }
-            $totalAmountPaid = array_sum(array_column($groupPayments, 'amount_paid'));
             $amountPaidFormatted = "Rs " . number_format((float)$totalAmountPaid, 0);
-            $billingItemLabel = count($groupPayments) > 1 ? "Months: " : "Month: ";
         } else {
-            $feeMonthDisplay = $payment['fee_name'];
-            $totalAmountPaid = (float)$payment['amount'];
+            $feeMonthDisplay = !empty($payment['fee_name']) ? $payment['fee_name'] : (!empty($payment['fee_month']) ? $payment['fee_month'] : 'Additional Fee');
+            $totalAmountPaid = (float)($payment['amount'] ?? 0.0);
             $amountPaidFormatted = "Rs " . number_format((float)$totalAmountPaid, 0);
             $billingItemLabel = "Description: ";
         }
