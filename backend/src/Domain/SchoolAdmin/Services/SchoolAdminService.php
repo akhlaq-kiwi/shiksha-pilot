@@ -11689,37 +11689,57 @@ Only approve the settlement after reviewing all financial records.
             $message = 'Your admit card has been reverted to draft. Please stay tuned for updates.';
         }
 
-        // Get student and parent user IDs in the class
+        // Get student and parent user IDs in the class (Deduplicated)
         $stmtUsers = $pdo->prepare("
             SELECT DISTINCT u.id AS user_id, u.role
             FROM users u
-            JOIN students s ON u.school_id = s.school_id
-            WHERE s.class_id = :class_id 
-              AND u.school_id = :school_id
+            JOIN students s ON s.class_id = :class_id AND s.school_id = u.school_id
+            WHERE u.school_id = :school_id
               AND (
-                (u.role = 'STUDENT' AND u.email = s.email)
+                (u.role = 'STUDENT' AND u.email = s.email AND s.email IS NOT NULL AND s.email != '')
                 OR 
-                (u.role = 'PARENT' AND (u.phone = s.parent_phone OR u.phone = s.father_phone OR u.phone = s.guardian_phone OR u.phone = s.student_mobile))
+                (u.role = 'PARENT' AND (
+                    (s.parent_phone IS NOT NULL AND s.parent_phone != '' AND u.phone = s.parent_phone) OR
+                    (s.father_phone IS NOT NULL AND s.father_phone != '' AND u.phone = s.father_phone) OR
+                    (s.guardian_phone IS NOT NULL AND s.guardian_phone != '' AND u.phone = s.guardian_phone) OR
+                    (s.student_mobile IS NOT NULL AND s.student_mobile != '' AND u.phone = s.student_mobile)
+                ))
               )
+            GROUP BY u.id
         ");
         $stmtUsers->execute([':class_id' => $classId, ':school_id' => $schoolId]);
         $studentParentUsers = $stmtUsers->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-        // Insert notifications for students/parents
+        // Insert notifications for students/parents with duplicate protection
+        $stmtCheckDup = $pdo->prepare("
+            SELECT COUNT(*) FROM dashboard_notifications 
+            WHERE school_id = :school_id AND user_id = :user_id AND title = :title AND message = :message 
+              AND created_at >= NOW() - INTERVAL 1 MINUTE
+        ");
+
         $stmtInsert = $pdo->prepare("
             INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, is_read)
             VALUES (:school_id, :role, :user_id, :title, :message, :link, 0)
         ");
 
         foreach ($studentParentUsers as $u) {
-            $stmtInsert->execute([
+            $userId = (int)$u['user_id'];
+            $stmtCheckDup->execute([
                 ':school_id' => $schoolId,
-                ':role' => $u['role'],
-                ':user_id' => (int)$u['user_id'],
-                ':title' => $title,
-                ':message' => $message,
-                ':link' => $link
+                ':user_id'   => $userId,
+                ':title'     => $title,
+                ':message'   => $message
             ]);
+            if ((int)$stmtCheckDup->fetchColumn() === 0) {
+                $stmtInsert->execute([
+                    ':school_id' => $schoolId,
+                    ':role'      => $u['role'],
+                    ':user_id'   => $userId,
+                    ':title'     => $title,
+                    ':message'   => $message,
+                    ':link'      => $link
+                ]);
+            }
         }
 
         // If not ADMIT_CARD, send to the class teacher as well
