@@ -258,57 +258,48 @@ export default function ModernReportCardTemplate({ data, config = {} }) {
         </div>
       )}
 
-      {/* Footer block: performance summary sits directly above the signatures,
-          both pinned to the bottom of the page. */}
-      {/* marginTop is inline, not the mt-auto utility: Tailwind's space-y-*
-          rule (.space-y-N > * ~ *) is more specific than .mt-auto and was
-          overriding it, which left the footer with no auto margin. */}
-      <div style={{ marginTop: 'auto' }}>
-        {/* Performance Summary Cards (5 columns) */}
-        <div className="grid grid-cols-5 gap-2 font-sans">
-          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 text-center flex flex-col justify-center">
-            <span className="text-[9.5px] font-bold uppercase tracking-wider text-emerald-800 block">Total Marks</span>
-            <span className="text-sm font-bold text-emerald-950 font-mono mt-0.5">{summary.total_obtained} / {summary.total_max}</span>
-          </div>
-
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-center flex flex-col justify-center">
-            <span className="text-[9.5px] font-bold uppercase tracking-wider text-amber-800 block">Percentage</span>
-            <span className="text-sm font-bold text-amber-950 font-mono mt-0.5">{summary.percentage}%</span>
-          </div>
-
-          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 text-center flex flex-col justify-center">
-            <span className="text-[9.5px] font-bold uppercase tracking-wider text-emerald-800 block">Overall Grade</span>
-            <span className="text-sm font-bold text-emerald-950 font-mono mt-0.5">Grade {summary.grade}</span>
-          </div>
-
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-center flex flex-col justify-center">
-            <span className="text-[9.5px] font-bold uppercase tracking-wider text-amber-800 block">Attendance</span>
-            <span className="text-sm font-bold text-amber-950 font-mono mt-0.5">{summary.attendance?.attendance_rate ?? 90.3}%</span>
-          </div>
-
-          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 text-center flex flex-col justify-center">
-            <span className="text-[9.5px] font-bold uppercase tracking-wider text-emerald-800 block">Class Rank</span>
-            <span className="text-sm font-bold text-emerald-950 font-mono mt-0.5">{cleanRank}</span>
-          </div>
+      {/* Performance Summary Cards (5 columns) - Locked at a CONSTANT 16px gap below table */}
+      <div className="grid grid-cols-5 gap-2 font-sans mt-4">
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 text-center flex flex-col justify-center">
+          <span className="text-[9.5px] font-bold uppercase tracking-wider text-emerald-800 block">Total Marks</span>
+          <span className="text-sm font-bold text-emerald-950 font-mono mt-0.5">{summary.total_obtained} / {summary.total_max}</span>
         </div>
 
-        {/* Signatures. Gaps are in mm so the clear area survives print scaling:
-            SIGNATURE_GAP below the summary cards, then STAMP_SPACE of blank room
-            above each signature line for a stamp and a handwritten signature. */}
-        <div
-          className="pb-1 flex justify-between items-end text-xs font-bold text-zinc-700 px-6 font-sans"
-          style={{ marginTop: SIGNATURE_GAP }}
-        >
-          <div className="flex flex-col items-center">
-            <div style={{ height: STAMP_SPACE }} aria-hidden="true" />
-            <div className="w-40 border-b border-dashed border-zinc-400 mb-2" />
-            <span className="uppercase text-[11px] font-bold tracking-wider text-zinc-800">Class Teacher Signature</span>
-          </div>
-          <div className="flex flex-col items-center">
-            <div style={{ height: STAMP_SPACE }} aria-hidden="true" />
-            <div className="w-40 border-b border-dashed border-zinc-400 mb-2" />
-            <span className="uppercase text-[11px] font-bold tracking-wider text-zinc-800">Principal Signature & Stamp</span>
-          </div>
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-center flex flex-col justify-center">
+          <span className="text-[9.5px] font-bold uppercase tracking-wider text-amber-800 block">Percentage</span>
+          <span className="text-sm font-bold text-amber-950 font-mono mt-0.5">{summary.percentage}%</span>
+        </div>
+
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 text-center flex flex-col justify-center">
+          <span className="text-[9.5px] font-bold uppercase tracking-wider text-emerald-800 block">Overall Grade</span>
+          <span className="text-sm font-bold text-emerald-950 font-mono mt-0.5">Grade {summary.grade}</span>
+        </div>
+
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-center flex flex-col justify-center">
+          <span className="text-[9.5px] font-bold uppercase tracking-wider text-amber-800 block">Attendance</span>
+          <span className="text-sm font-bold text-amber-950 font-mono mt-0.5">{summary.attendance?.attendance_rate ?? 90.3}%</span>
+        </div>
+
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 text-center flex flex-col justify-center">
+          <span className="text-[9.5px] font-bold uppercase tracking-wider text-emerald-800 block">Class Rank</span>
+          <span className="text-sm font-bold text-emerald-950 font-mono mt-0.5">{cleanRank}</span>
+        </div>
+      </div>
+
+      {/* Signatures pinned to the bottom of the page */}
+      <div
+        className="pb-1 flex justify-between items-end text-xs font-bold text-zinc-700 px-6 font-sans"
+        style={{ marginTop: 'auto' }}
+      >
+        <div className="flex flex-col items-center">
+          <div style={{ height: STAMP_SPACE }} aria-hidden="true" />
+          <div className="w-40 border-b border-dashed border-zinc-400 mb-2" />
+          <span className="uppercase text-[11px] font-bold tracking-wider text-zinc-800">Class Teacher Signature</span>
+        </div>
+        <div className="flex flex-col items-center">
+          <div style={{ height: STAMP_SPACE }} aria-hidden="true" />
+          <div className="w-40 border-b border-dashed border-zinc-400 mb-2" />
+          <span className="uppercase text-[11px] font-bold tracking-wider text-zinc-800">Principal Signature & Stamp</span>
         </div>
       </div>
     </div>
