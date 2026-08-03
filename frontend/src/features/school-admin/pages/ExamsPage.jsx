@@ -3873,16 +3873,21 @@ export default function ExamsPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {timetablePapers.map((paper, idx) => (
-                            <tr key={idx} className="border-b border-zinc-300 text-zinc-900">
-                              <td className={`border-r border-zinc-400 font-semibold whitespace-nowrap ${scaling.tableFontSize} ${scaling.tablePadding}`}>{paper.subject_name}</td>
-                              <td className={`border-r border-zinc-400 text-center font-mono whitespace-nowrap ${scaling.tableFontSize} ${scaling.tablePadding}`}>{formatDateString(paper.exam_date)}</td>
-                              <td className={`border-r border-zinc-400 text-center font-mono whitespace-nowrap ${scaling.tableFontSize} ${scaling.tablePadding}`}>
-                                {formatTimeString(paper.start_time)} – {formatTimeString(paper.end_time)}
-                              </td>
-                              <td className={`text-center font-mono whitespace-nowrap ${scaling.tableFontSize} ${scaling.tablePadding}`}>{paper.max_marks}</td>
-                            </tr>
-                          ))}
+                          {timetablePapers.map((paper, idx) => {
+                            const isGrade = paper.evaluation_type === 'grade' || parseFloat(paper.max_marks) === 0;
+                            return (
+                              <tr key={idx} className="border-b border-zinc-300 text-zinc-900">
+                                <td className={`border-r border-zinc-400 font-semibold whitespace-nowrap ${scaling.tableFontSize} ${scaling.tablePadding}`}>{paper.subject_name}</td>
+                                <td className={`border-r border-zinc-400 text-center font-mono whitespace-nowrap ${scaling.tableFontSize} ${scaling.tablePadding}`}>{formatDateString(paper.exam_date)}</td>
+                                <td className={`border-r border-zinc-400 text-center font-mono whitespace-nowrap ${scaling.tableFontSize} ${scaling.tablePadding}`}>
+                                  {formatTimeString(paper.start_time)} – {formatTimeString(paper.end_time)}
+                                </td>
+                                <td className={`text-center font-mono whitespace-nowrap font-bold ${isGrade ? 'text-amber-800 dark:text-amber-300' : ''} ${scaling.tableFontSize} ${scaling.tablePadding}`}>
+                                  {isGrade ? 'GRADE' : paper.max_marks}
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>

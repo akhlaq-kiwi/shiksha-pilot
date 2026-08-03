@@ -11244,11 +11244,14 @@ Only approve the settlement after reviewing all financial records.
             throw new ValidationException(['subject_id' => 'Subject is not scheduled in the exam timetable.']);
         }
 
-        if ($marksObtained !== null) {
-            if ($marksObtained < 0) {
+        $isGradePaper = (isset($paper['evaluation_type']) && $paper['evaluation_type'] === 'grade') || ((float)$paper['max_marks'] === 0.0);
+
+        if ($marksObtained !== null && !$isGradePaper && is_numeric($marksObtained)) {
+            $numVal = (float)$marksObtained;
+            if ($numVal < 0) {
                 throw new ValidationException(['marks_obtained' => 'Negative marks are not allowed.']);
             }
-            if ($marksObtained > (float)$paper['max_marks']) {
+            if ($numVal > (float)$paper['max_marks']) {
                 throw new ValidationException(['marks_obtained' => "Marks obtained cannot exceed maximum marks ({$paper['max_marks']})."]);
             }
         }
