@@ -1776,18 +1776,29 @@ class SchoolAdminService extends BaseService
     }
 
 
-    public function handleFileUpload($uploadedFile): string
+    private function getUploadsDirectory(): string
     {
-        // QA uses '/api' as the deployment folder, Local uses '/backend'
-        if (str_contains(__DIR__, DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR)) {
-            $directory = dirname(__DIR__, 5) . '/uploads';
-        } else {
-            $directory = dirname(__DIR__, 5) . '/backend/public/uploads';
+        $baseDir = dirname(__DIR__, 4);
+        $targetDir = $baseDir . '/public/uploads';
+
+        if (!is_dir($targetDir)) {
+            $alt1 = dirname(__DIR__, 5) . '/backend/public/uploads';
+            if (is_dir($alt1)) {
+                return $alt1;
+            }
+            $alt2 = dirname(__DIR__, 5) . '/public/uploads';
+            if (is_dir($alt2)) {
+                return $alt2;
+            }
+            @mkdir($targetDir, 0777, true);
         }
 
-        if (!is_dir($directory)) {
-            mkdir($directory, 0777, true);
-        }
+        return $targetDir;
+    }
+
+    public function handleFileUpload($uploadedFile): string
+    {
+        $directory = $this->getUploadsDirectory();
 
         $extension = pathinfo($uploadedFile->getClientFilename(), PATHINFO_EXTENSION);
         $filename = sprintf('%s.%0.8s', bin2hex(random_bytes(8)), $extension);
@@ -6297,11 +6308,7 @@ class SchoolAdminService extends BaseService
             return;
         }
 
-        if (str_contains(__DIR__, DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR)) {
-            $directory = dirname(__DIR__, 5) . '/uploads';
-        } else {
-            $directory = dirname(__DIR__, 5) . '/backend/public/uploads';
-        }
+        $directory = $this->getUploadsDirectory();
 
         $filename = ltrim(str_replace('/uploads/', '', $relativeUploadPath), '/\\');
         $filePath = $directory . DIRECTORY_SEPARATOR . $filename;
