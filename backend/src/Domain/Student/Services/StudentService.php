@@ -452,7 +452,6 @@ class StudentService extends BaseService
 
                 $subjectMarks[] = [
                     'subject_name' => $p['subject_name'],
-                    'paper_type' => $p['paper_type'] ?? 'Written',
                     'max_marks' => $maxM,
                     'passing_marks' => $passM,
                     'marks_obtained' => $absent ? 'ABSENT' : ($obtained !== null ? $obtained : '-'),

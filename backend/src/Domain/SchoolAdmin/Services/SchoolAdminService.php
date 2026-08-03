@@ -10983,12 +10983,6 @@ Only approve the settlement after reviewing all financial records.
             throw new NotFoundException('Examination not found.');
         }
 
-        try {
-            $pdo->exec("ALTER TABLE examination_papers ADD COLUMN paper_type VARCHAR(50) DEFAULT 'Written'");
-        } catch (\Throwable $t) {
-            // Ignore if column paper_type already exists
-        }
-
         $stmt = $pdo->prepare("
             SELECT 
                 ep.*, 
@@ -11062,12 +11056,6 @@ Only approve the settlement after reviewing all financial records.
             }
         }
 
-        try {
-            $pdo->exec("ALTER TABLE examination_papers ADD COLUMN paper_type VARCHAR(50) DEFAULT 'Written'");
-        } catch (\Throwable $t) {
-            // Ignore if column paper_type already exists
-        }
-
         $pdo->beginTransaction();
         try {
             // Delete old papers for this class
@@ -11076,8 +11064,8 @@ Only approve the settlement after reviewing all financial records.
 
             // Insert new papers
             $stmtIns = $pdo->prepare("
-                INSERT INTO examination_papers (exam_id, class_id, subject_id, exam_date, start_time, end_time, max_marks, passing_marks, room, paper_type)
-                VALUES (:exam_id, :class_id, :subid, :edate, :stime, :etime, :maxm, :passm, :room, :ptype)
+                INSERT INTO examination_papers (exam_id, class_id, subject_id, exam_date, start_time, end_time, max_marks, passing_marks, room)
+                VALUES (:exam_id, :class_id, :subid, :edate, :stime, :etime, :maxm, :passm, :room)
             ");
             foreach ($papers as $p) {
                 $stmtIns->execute([
@@ -11089,8 +11077,7 @@ Only approve the settlement after reviewing all financial records.
                     ':etime' => $p['end_time'],
                     ':maxm' => (float)$p['max_marks'],
                     ':passm' => (float)$p['passing_marks'],
-                    ':room' => !empty($p['room']) ? $p['room'] : null,
-                    ':ptype' => !empty($p['paper_type']) ? $p['paper_type'] : 'Written'
+                    ':room' => !empty($p['room']) ? $p['room'] : null
                 ]);
             }
 
@@ -12019,7 +12006,6 @@ Only approve the settlement after reviewing all financial records.
 
                 $subjectMarks[] = [
                     'subject_name' => $p['subject_name'],
-                    'paper_type' => $p['paper_type'] ?? 'Written',
                     'max_marks' => $maxM,
                     'passing_marks' => $passM,
                     'marks_obtained' => $absent ? 'ABSENT' : ($obtained !== null ? $obtained : '-'),

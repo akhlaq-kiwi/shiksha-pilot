@@ -517,7 +517,6 @@ export default function ExamsPage() {
   const [timetablePapers, setTimetablePapers] = useState([]);
   const [newPaper, setNewPaper] = useState({
     subject_id: '',
-    paper_type: 'Written',
     exam_date: '',
     start_time: '',
     end_time: '',
@@ -980,7 +979,6 @@ export default function ExamsPage() {
       setInstructions((insts || []).map(i => i.instruction) || []);
       setNewPaper({
         subject_id: '',
-        paper_type: 'Written',
         exam_date: suggestNextExamDate(exam, list || [], holidays),
         start_time: '',
         end_time: '',
@@ -1130,7 +1128,6 @@ export default function ExamsPage() {
       setEditingPaper(null);
       setNewPaper({
         subject_id: '',
-        paper_type: 'Written',
         exam_date: suggestNextExamDate(selectedExam, refreshedList || [], holidays),
         start_time: newPaper.start_time,
         end_time: newPaper.end_time,
@@ -2600,7 +2597,6 @@ export default function ExamsPage() {
                           setEditingPaper(null);
                           setNewPaper({
                             subject_id: '',
-                            paper_type: 'Written',
                             exam_date: suggestNextExamDate(selectedExam, timetablePapers, holidays),
                             start_time: '',
                             end_time: '',
@@ -2634,38 +2630,25 @@ export default function ExamsPage() {
                 <CardContent className="p-4">
                   <form id="add-paper-form" onSubmit={handleAddPaperLocal} className="space-y-4">
                     {/* Row 1 */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {/* Subject */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Subject Select */}
                       <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-text-secondary uppercase">Subject</label>
+                        <label className="text-xs font-bold text-text-secondary uppercase">Select Subject</label>
                         <Select 
                           value={newPaper.subject_id} 
-                          onChange={e => setNewPaper(p => ({ ...p, subject_id: e.target.value }))} 
-                          required 
-                          disabled={filteredClassSubjects.length === 0}
+                          onChange={e => setNewPaper(p => ({ ...p, subject_id: e.target.value }))}
+                          disabled={Boolean(editingPaper)}
+                          required
                         >
-                          <option value="">Select subject...</option>
-                          {filteredClassSubjects.map(s => {
-                            const isCreated = timetablePapers.some(p => parseInt(p.subject_id) === s.id && (!editingPaper || parseInt(editingPaper.subject_id) !== s.id));
+                          <option value="">-- Choose Subject --</option>
+                          {classSubjects.map(s => {
+                            const isCreated = timetablePapers.some(p => p.subject_id === s.id && (!editingPaper || editingPaper.subject_id !== s.id));
                             return (
                               <option key={s.id} value={s.id}>
                                 {s.name}{isCreated ? ' (Created)' : ''}
                               </option>
                             );
                           })}
-                        </Select>
-                      </div>
-
-                      {/* Paper Type */}
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-text-secondary uppercase">Paper Type</label>
-                        <Select 
-                          value={newPaper.paper_type} 
-                          onChange={e => setNewPaper(p => ({ ...p, paper_type: e.target.value }))} 
-                          required
-                        >
-                          <option value="Written">Written</option>
-                          <option value="Oral">Oral</option>
                         </Select>
                       </div>
 
@@ -2779,7 +2762,6 @@ export default function ExamsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Subject</TableHead>
-                    <TableHead>Paper Type</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Time</TableHead>
                     <TableHead>Max Marks</TableHead>
@@ -2790,14 +2772,13 @@ export default function ExamsPage() {
                 <TableBody>
                   {timetablePapers.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-text-muted">
+                      <TableCell colSpan={6} className="text-center py-8 text-text-muted">
                         No papers scheduled for this examination yet. Use the form above to add papers.
                       </TableCell>
                     </TableRow>
                   ) : timetablePapers.map((paper, idx) => (
                     <TableRow key={idx}>
                       <TableCell className="font-semibold text-text-primary">{paper.subject_name}</TableCell>
-                      <TableCell className="text-xs font-semibold">{paper.paper_type || 'Written'}</TableCell>
                       <TableCell className="text-xs font-mono">{formatDateString(paper.exam_date)}</TableCell>
                       <TableCell className="text-xs font-mono">{formatTimeString(paper.start_time)} – {formatTimeString(paper.end_time)}</TableCell>
                       <TableCell className="text-xs font-mono">{paper.max_marks}</TableCell>
@@ -2809,7 +2790,6 @@ export default function ExamsPage() {
                               setEditingPaper(paper);
                               setNewPaper({
                                 subject_id: paper.subject_id.toString(),
-                                paper_type: paper.paper_type || 'Written',
                                 exam_date: paper.exam_date,
                                 start_time: paper.start_time.slice(0, 5),
                                 end_time: paper.end_time.slice(0, 5),
@@ -3709,10 +3689,9 @@ export default function ExamsPage() {
                       <table className="w-full text-left border border-zinc-400 border-collapse text-zinc-900">
                         <thead>
                           <tr className="bg-zinc-100 border-b border-zinc-400 text-zinc-900">
-                            <th className={`border-r border-zinc-400 font-bold uppercase text-zinc-900 whitespace-nowrap w-[20%] ${scaling.tableFontSize} ${scaling.tablePadding}`}>Subject</th>
-                            <th className={`border-r border-zinc-400 font-bold uppercase text-center text-zinc-900 whitespace-nowrap w-[15%] ${scaling.tableFontSize} ${scaling.tablePadding}`}>Paper Type</th>
-                            <th className={`border-r border-zinc-400 font-bold uppercase text-center text-zinc-900 whitespace-nowrap w-[20%] ${scaling.tableFontSize} ${scaling.tablePadding}`}>Date</th>
-                            <th className={`border-r border-zinc-400 font-bold uppercase text-center text-zinc-900 whitespace-nowrap w-[30%] ${scaling.tableFontSize} ${scaling.tablePadding}`}>Time</th>
+                            <th className={`border-r border-zinc-400 font-bold uppercase text-zinc-900 whitespace-nowrap w-[25%] ${scaling.tableFontSize} ${scaling.tablePadding}`}>Subject</th>
+                            <th className={`border-r border-zinc-400 font-bold uppercase text-center text-zinc-900 whitespace-nowrap w-[25%] ${scaling.tableFontSize} ${scaling.tablePadding}`}>Date</th>
+                            <th className={`border-r border-zinc-400 font-bold uppercase text-center text-zinc-900 whitespace-nowrap w-[35%] ${scaling.tableFontSize} ${scaling.tablePadding}`}>Time</th>
                             <th className={`font-bold uppercase text-center text-zinc-900 whitespace-nowrap w-[15%] ${scaling.tableFontSize} ${scaling.tablePadding}`}>Max Marks</th>
                           </tr>
                         </thead>
@@ -3720,7 +3699,6 @@ export default function ExamsPage() {
                           {timetablePapers.map((paper, idx) => (
                             <tr key={idx} className="border-b border-zinc-300 text-zinc-900">
                               <td className={`border-r border-zinc-400 font-semibold whitespace-nowrap ${scaling.tableFontSize} ${scaling.tablePadding}`}>{paper.subject_name}</td>
-                              <td className={`border-r border-zinc-400 text-center whitespace-nowrap ${scaling.tableFontSize} ${scaling.tablePadding}`}>{paper.paper_type || 'Written'}</td>
                               <td className={`border-r border-zinc-400 text-center font-mono whitespace-nowrap ${scaling.tableFontSize} ${scaling.tablePadding}`}>{formatDateString(paper.exam_date)}</td>
                               <td className={`border-r border-zinc-400 text-center font-mono whitespace-nowrap ${scaling.tableFontSize} ${scaling.tablePadding}`}>
                                 {formatTimeString(paper.start_time)} – {formatTimeString(paper.end_time)}
