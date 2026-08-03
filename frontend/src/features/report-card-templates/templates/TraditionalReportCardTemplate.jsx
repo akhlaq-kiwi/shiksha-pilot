@@ -17,36 +17,51 @@ export default function TraditionalReportCardTemplate({ data, config = {} }) {
   let containerPadding = '8mm';
   let innerPadding = 'p-5';
 
-  if (subCount <= 5) {
-    // 5 or fewer subjects: Taller table rows & padding to utilize page space
-    cellPy = 'p-3.5';
-    headerPy = 'p-3.5';
-    containerPadding = '9mm';
+  if (subCount <= 4) {
+    // 4 or fewer subjects: Generously expanded rows & vertical spacing
+    cellPy = 'p-5';
+    headerPy = 'p-4';
+    tableFontSize = 'text-sm';
+    containerPadding = '9.5mm';
     innerPadding = 'p-6';
-  } else if (subCount <= 6) {
-    // 6 subjects: Taller table rows & padding
+  } else if (subCount === 5) {
+    // 5 subjects: Expanded rows & padding to fill vertical space
+    cellPy = 'p-4.5';
+    headerPy = 'p-3.5';
+    tableFontSize = 'text-xs font-semibold';
+    containerPadding = '9mm';
+    innerPadding = 'p-5.5';
+  } else if (subCount === 6) {
+    // 6 subjects: Taller rows & padding to eliminate large blank gap
+    cellPy = 'p-4';
+    headerPy = 'p-3.5';
+    tableFontSize = 'text-xs font-semibold';
+    containerPadding = '8.5mm';
+    innerPadding = 'p-5';
+  } else if (subCount === 7) {
+    // 7 subjects: Comfortably padded rows
     cellPy = 'p-3';
     headerPy = 'p-3';
-    containerPadding = '8.5mm';
-    innerPadding = 'p-5.5';
+    containerPadding = '8mm';
+    innerPadding = 'p-4.5';
   } else if (subCount <= 9) {
-    // 7–9 subjects (Default 8): Standard table padding
+    // 8–9 subjects (Default 8): Standard table padding
     cellPy = 'p-2.5';
     headerPy = 'p-2.5';
-    containerPadding = '8mm';
-    innerPadding = 'p-5';
+    containerPadding = '7.5mm';
+    innerPadding = 'p-4.5';
   } else if (subCount <= 11) {
     // 10–11 subjects: Compact table padding
     cellPy = 'p-1.5';
     headerPy = 'p-1.5';
-    containerPadding = '6.5mm';
+    containerPadding = '6mm';
     innerPadding = 'p-4';
   } else {
     // 12+ subjects: Extra compact table padding
     cellPy = 'p-1';
     headerPy = 'p-1';
     tableFontSize = 'text-[11px]';
-    containerPadding = '5mm';
+    containerPadding = '4.5mm';
     innerPadding = 'p-3';
   }
 
