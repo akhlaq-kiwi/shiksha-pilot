@@ -164,15 +164,22 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
               {subjects.map((sub, idx) => (
                 <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-amber-50/30'}>
                   <td style={{ padding: cellPadding }} className="text-left font-bold text-zinc-900 border-r border-amber-100 whitespace-nowrap">{sub.subject_name}</td>
-                  {(data.session_exams || ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam']).map(exName => (
-                    <React.Fragment key={exName}>
-                      <td style={{ padding: cellPadding }} className="text-center border-r border-amber-100 font-mono text-zinc-600">{sub.exam_scores?.[exName]?.max_marks || 100}</td>
-                      <td style={{ padding: cellPadding }} className="text-center border-r border-amber-100 font-mono font-bold text-amber-800">{sub.exam_scores?.[exName]?.marks_obtained ?? '—'}</td>
-                    </React.Fragment>
-                  ))}
-                  <td style={{ padding: cellPadding }} className="text-center border-r border-amber-100 font-mono font-bold text-zinc-700">{sub.grand_total_max || sub.max_marks}</td>
-                  <td style={{ padding: cellPadding }} className="text-center border-r border-amber-100 font-mono font-bold text-amber-900">{sub.grand_total_obtained || sub.marks_obtained}</td>
-                  <td style={{ padding: cellPadding }} className="text-center font-bold text-amber-900">{sub.grade}</td>
+                  {(data.session_exams || ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam']).map(exName => {
+                    const score = sub.exam_scores?.[exName];
+                    return (
+                      <React.Fragment key={exName}>
+                        <td style={{ padding: cellPadding }} className="text-center border-r border-amber-100 font-mono text-zinc-600">
+                          {score ? score.max_marks : '—'}
+                        </td>
+                        <td style={{ padding: cellPadding }} className="text-center border-r border-amber-100 font-mono font-bold text-amber-800">
+                          {score ? score.marks_obtained : '—'}
+                        </td>
+                      </React.Fragment>
+                    );
+                  })}
+                  <td style={{ padding: cellPadding }} className="text-center border-r border-amber-100 font-mono font-bold text-zinc-700">{sub.grand_total_max ?? sub.max_marks ?? '—'}</td>
+                  <td style={{ padding: cellPadding }} className="text-center border-r border-amber-100 font-mono font-bold text-amber-900">{sub.grand_total_obtained ?? sub.marks_obtained ?? '—'}</td>
+                  <td style={{ padding: cellPadding }} className="text-center font-bold text-amber-900">{sub.grade || '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -181,13 +188,13 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
                 <td style={{ padding: cellPadding }} className="text-left border-r border-amber-200 whitespace-nowrap font-bold">Total Marks</td>
                 {(data.session_exams || ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam']).map(exName => (
                   <React.Fragment key={exName}>
-                    <td style={{ padding: cellPadding }} className="text-center border-r border-amber-200 font-mono">{data.exam_totals?.[exName]?.max_marks || 700}</td>
-                    <td style={{ padding: cellPadding }} className="text-center border-r border-amber-200 font-mono font-bold text-amber-950">{data.exam_totals?.[exName]?.marks_obtained || 500}</td>
+                    <td style={{ padding: cellPadding }} className="text-center border-r border-amber-200 font-mono">{data.exam_totals?.[exName]?.max_marks ?? 0}</td>
+                    <td style={{ padding: cellPadding }} className="text-center border-r border-amber-200 font-mono font-bold text-amber-950">{data.exam_totals?.[exName]?.marks_obtained ?? 0}</td>
                   </React.Fragment>
                 ))}
-                <td style={{ padding: cellPadding }} className="text-center border-r border-amber-200 font-mono font-bold">{summary.total_max}</td>
-                <td style={{ padding: cellPadding }} className="text-center border-r border-amber-200 font-mono font-bold text-amber-950">{summary.total_obtained}</td>
-                <td style={{ padding: cellPadding }} className="text-center font-bold">{summary.grade}</td>
+                <td style={{ padding: cellPadding }} className="text-center border-r border-amber-200 font-mono font-bold">{summary.total_max ?? '—'}</td>
+                <td style={{ padding: cellPadding }} className="text-center border-r border-amber-200 font-mono font-bold text-amber-950">{summary.total_obtained ?? '—'}</td>
+                <td style={{ padding: cellPadding }} className="text-center font-bold">{summary.grade || '—'}</td>
               </tr>
             </tfoot>
           </table>

@@ -167,15 +167,22 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
               {subjects.map((s, idx) => (
                 <tr key={idx} className="border-b border-zinc-300">
                   <td style={{ padding: cellPadding }} className="border-r border-zinc-300 font-bold text-zinc-900">{s.subject_name}</td>
-                  {(data.session_exams || ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam']).map(exName => (
-                    <React.Fragment key={exName}>
-                      <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono text-[11px]">{s.exam_scores?.[exName]?.max_marks || 100}</td>
-                      <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono font-bold text-[11px]">{s.exam_scores?.[exName]?.marks_obtained ?? '—'}</td>
-                    </React.Fragment>
-                  ))}
-                  <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono font-bold text-zinc-700 text-[11px]">{s.grand_total_max || s.max_marks}</td>
-                  <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono font-bold text-zinc-900 text-[11px]">{s.grand_total_obtained || s.marks_obtained}</td>
-                  <td style={{ padding: cellPadding }} className="text-center font-bold text-xs">{s.grade}</td>
+                  {(data.session_exams || ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam']).map(exName => {
+                    const score = s.exam_scores?.[exName];
+                    return (
+                      <React.Fragment key={exName}>
+                        <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono text-[11px]">
+                          {score ? score.max_marks : '—'}
+                        </td>
+                        <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono font-bold text-[11px]">
+                          {score ? score.marks_obtained : '—'}
+                        </td>
+                      </React.Fragment>
+                    );
+                  })}
+                  <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono font-bold text-zinc-700 text-[11px]">{s.grand_total_max ?? s.max_marks ?? '—'}</td>
+                  <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono font-bold text-zinc-900 text-[11px]">{s.grand_total_obtained ?? s.marks_obtained ?? '—'}</td>
+                  <td style={{ padding: cellPadding }} className="text-center font-bold text-xs">{s.grade || '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -184,13 +191,13 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
                 <td style={{ padding: cellPadding }} className="border-r border-zinc-300">Grand Total</td>
                 {(data.session_exams || ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam']).map(exName => (
                   <React.Fragment key={exName}>
-                    <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono">{data.exam_totals?.[exName]?.max_marks || 700}</td>
-                    <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono font-bold">{data.exam_totals?.[exName]?.marks_obtained || 500}</td>
+                    <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono">{data.exam_totals?.[exName]?.max_marks ?? 0}</td>
+                    <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono font-bold">{data.exam_totals?.[exName]?.marks_obtained ?? 0}</td>
                   </React.Fragment>
                 ))}
-                <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono font-bold">{summary.total_max}</td>
-                <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono font-bold text-sm">{summary.total_obtained}</td>
-                <td style={{ padding: cellPadding }} className="text-center font-bold text-sm">{summary.grade}</td>
+                <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono font-bold">{summary.total_max ?? '—'}</td>
+                <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono font-bold text-sm">{summary.total_obtained ?? '—'}</td>
+                <td style={{ padding: cellPadding }} className="text-center font-bold text-sm">{summary.grade || '—'}</td>
               </tr>
             </tfoot>
           </table>

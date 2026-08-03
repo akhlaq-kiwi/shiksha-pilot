@@ -220,10 +220,17 @@ export function compileFinalSessionReportCardData(
       if (!subjectMap[name]) {
         subjectMap[name] = {};
       }
+      const rawVal = String(sub.marks_obtained ?? sub.marks ?? '').toUpperCase().trim();
+      const isGradeOnly = sub.is_grade_only || 
+                          sub.evaluation_type === 'grade' || 
+                          parseFloat(sub.max_marks) === 0 || 
+                          ['A+', 'A', 'B', 'C', 'D', 'E'].includes(rawVal);
       subjectMap[name][examName] = {
-        marks_obtained: parseFloat(sub.marks_obtained) || 0,
-        max_marks: parseFloat(sub.max_marks) || 100,
-        passing_marks: parseFloat(sub.passing_marks) || 33
+        marks_obtained: isGradeOnly ? '—' : (parseFloat(sub.marks_obtained) || 0),
+        max_marks: isGradeOnly ? '—' : (parseFloat(sub.max_marks) || 100),
+        passing_marks: isGradeOnly ? '—' : (parseFloat(sub.passing_marks) || 33),
+        grade: sub.grade || (rawVal && rawVal !== '—' ? rawVal : 'A'),
+        is_grade_only: isGradeOnly
       };
     });
   });
@@ -238,39 +245,48 @@ export function compileFinalSessionReportCardData(
     const examScoresMap = subjectMap[subjName];
     let grandTotalObtained = 0;
     let grandTotalMax = 0;
-    let passingMarks = 33;
+    let hasNumericScore = false;
+    let lastAssignedGrade = 'A';
 
     session_exams.forEach(exName => {
       const score = examScoresMap[exName];
       if (score) {
-        grandTotalObtained += score.marks_obtained;
-        grandTotalMax += score.max_marks;
-        passingMarks = score.passing_marks;
+        if (score.is_grade_only) {
+          lastAssignedGrade = score.grade || 'A';
+        } else {
+          const numObt = typeof score.marks_obtained === 'number' ? score.marks_obtained : 0;
+          const numMax = typeof score.max_marks === 'number' ? score.max_marks : 0;
+          grandTotalObtained += numObt;
+          grandTotalMax += numMax;
+          hasNumericScore = true;
 
-        examTotalsMap[exName].max_marks += score.max_marks;
-        examTotalsMap[exName].marks_obtained += score.marks_obtained;
+          examTotalsMap[exName].max_marks += numMax;
+          examTotalsMap[exName].marks_obtained += numObt;
+        }
       }
     });
 
-    const grade = calculateDefaultGrade(grandTotalObtained, grandTotalMax);
-    const result = grandTotalObtained >= (passingMarks * session_exams.length) ? 'PASS' : 'FAIL';
+    const grade = hasNumericScore 
+      ? calculateDefaultGrade(grandTotalObtained, grandTotalMax)
+      : lastAssignedGrade;
 
     return {
       subject_name: subjName,
       exam_scores: examScoresMap,
-      grand_total_max: grandTotalMax || 100,
-      grand_total_obtained: grandTotalObtained,
-      marks_obtained: grandTotalObtained, // fallback for single-table renderers
-      max_marks: grandTotalMax || 100,
-      passing_marks: passingMarks,
+      grand_total_max: hasNumericScore ? grandTotalMax : '—',
+      grand_total_obtained: hasNumericScore ? grandTotalObtained : '—',
+      marks_obtained: hasNumericScore ? grandTotalObtained : '—',
+      max_marks: hasNumericScore ? grandTotalMax : '—',
+      passing_marks: 33,
       grade,
-      result
+      result: hasNumericScore ? (grandTotalObtained >= (grandTotalMax * 0.33) ? 'PASS' : 'FAIL') : 'PASS'
     };
   });
 
   // Calculate grand session totals
-  const grandTotalObtained = finalSubjects.reduce((sum, s) => sum + s.grand_total_obtained, 0);
-  const grandTotalMax = finalSubjects.reduce((sum, s) => sum + s.grand_total_max, 0);
+  const numericSubjects = finalSubjects.filter(s => typeof s.grand_total_max === 'number' && typeof s.grand_total_obtained === 'number');
+  const grandTotalObtained = numericSubjects.reduce((sum, s) => sum + s.grand_total_obtained, 0);
+  const grandTotalMax = numericSubjects.reduce((sum, s) => sum + s.grand_total_max, 0);
   const percentage = grandTotalMax > 0 ? parseFloat(((grandTotalObtained / grandTotalMax) * 100).toFixed(2)) : 0;
   const overallGrade = calculateDefaultGrade(grandTotalObtained, grandTotalMax);
   const gpa = (percentage / 10).toFixed(1);
