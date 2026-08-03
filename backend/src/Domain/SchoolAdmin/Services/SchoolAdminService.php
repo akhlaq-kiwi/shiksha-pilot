@@ -10983,6 +10983,12 @@ Only approve the settlement after reviewing all financial records.
             throw new NotFoundException('Examination not found.');
         }
 
+        try {
+            $pdo->exec("ALTER TABLE examination_papers ADD COLUMN paper_type VARCHAR(50) DEFAULT 'Written'");
+        } catch (\Throwable $t) {
+            // Ignore if column paper_type already exists
+        }
+
         $stmt = $pdo->prepare("
             SELECT 
                 ep.*, 
@@ -11054,6 +11060,12 @@ Only approve the settlement after reviewing all financial records.
                     }
                 }
             }
+        }
+
+        try {
+            $pdo->exec("ALTER TABLE examination_papers ADD COLUMN paper_type VARCHAR(50) DEFAULT 'Written'");
+        } catch (\Throwable $t) {
+            // Ignore if column paper_type already exists
         }
 
         $pdo->beginTransaction();
