@@ -1105,7 +1105,7 @@ export default function FinanceManagementPage() {
   const filteredTotalExpensesAmount = expenses.reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-140px)] space-y-4 max-h-[82vh] md:max-h-[85vh] animate-in fade-in duration-300">
+    <div className="flex flex-col h-[calc(100vh-80px)] space-y-4 max-h-[calc(100vh-80px)] animate-in fade-in duration-300">
       
       {/* Page Header (Fixed) */}
       <div className="flex-shrink-0 bg-surface border border-border p-6 rounded-2xl shadow-2xs">
