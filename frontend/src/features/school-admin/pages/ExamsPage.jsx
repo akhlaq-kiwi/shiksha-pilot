@@ -841,6 +841,27 @@ export default function ExamsPage() {
       setError('Please enter examination name.');
       return;
     }
+    const todayStr = getTodayLocalDateString();
+    if (editExamData.start_date && editExamData.start_date < todayStr) {
+      setError('Start Date cannot be in the past.');
+      return;
+    }
+    if (editExamData.end_date && editExamData.end_date < todayStr) {
+      setError('End Date cannot be in the past.');
+      return;
+    }
+    if (editExamData.publish_date && editExamData.publish_date < todayStr) {
+      setError('Result Publish Date cannot be in the past.');
+      return;
+    }
+    if (editExamData.start_date && editExamData.end_date && editExamData.end_date < editExamData.start_date) {
+      setError('End Date cannot be before Start Date.');
+      return;
+    }
+    if (editExamData.end_date && editExamData.publish_date && editExamData.publish_date < editExamData.end_date) {
+      setError('Result Publish Date cannot be before End Date.');
+      return;
+    }
     setSubmitting(true);
     setError('');
     setSuccess('');
@@ -3438,22 +3459,32 @@ export default function ExamsPage() {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
                <label className="text-xs font-bold text-text-secondary uppercase">Start Date</label>
-               <Input type="date" value={editExamData.start_date || ''} onChange={e => setEditExamData(p => ({ ...p, start_date: e.target.value }))} />
+               <Input 
+                 type="date" 
+                 min={getTodayLocalDateString()} 
+                 value={editExamData.start_date || ''} 
+                 onChange={e => setEditExamData(p => ({ ...p, start_date: e.target.value }))} 
+               />
             </div>
             <div className="space-y-1.5">
                <label className="text-xs font-bold text-text-secondary uppercase">End Date</label>
-               <Input type="date" value={editExamData.end_date || ''} onChange={e => setEditExamData(p => ({ ...p, end_date: e.target.value }))} />
+               <Input 
+                 type="date" 
+                 min={editExamData.start_date || getTodayLocalDateString()} 
+                 value={editExamData.end_date || ''} 
+                 onChange={e => setEditExamData(p => ({ ...p, end_date: e.target.value }))} 
+               />
             </div>
           </div>
 
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-text-secondary uppercase">Result Publish Date</label>
-            <Input type="date" value={editExamData.publish_date || ''} onChange={e => setEditExamData(p => ({ ...p, publish_date: e.target.value }))} />
-          </div>
-
-          <div className="space-y-1.5">
-            <label htmlFor="description-optional-2" className="text-xs font-bold text-text-secondary uppercase">Description (Optional)</label>
-            <Input id="description-optional-2" placeholder="Brief details about terms or exam guidelines" value={editExamData.description || ''} onChange={e => setEditExamData(p => ({ ...p, description: e.target.value }))} />
+            <Input 
+              type="date" 
+              min={editExamData.end_date || editExamData.start_date || getTodayLocalDateString()} 
+              value={editExamData.publish_date || ''} 
+              onChange={e => setEditExamData(p => ({ ...p, publish_date: e.target.value }))} 
+            />
           </div>
         </form>
       </Dialog>
