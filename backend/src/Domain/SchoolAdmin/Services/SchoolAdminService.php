@@ -2200,6 +2200,9 @@ class SchoolAdminService extends BaseService
             }
         }
 
+        // Auto-sync active user account for mobile app login
+        $this->syncUserAccountForStaff($pdo, $schoolId, $data['name'], $data['phone'], $data['role'] ?? 'Teacher');
+
         $this->log('Staff member created', ['id' => $id, 'school_id' => $schoolId]);
         return $this->getStaffDetails($user, $id);
     }
@@ -2318,9 +2321,43 @@ class SchoolAdminService extends BaseService
                     ':file_size' => (int)$doc['file_size']
                 ]);
             }
-        }
+        // Auto-sync active user account for mobile app login
+        $this->syncUserAccountForStaff($pdo, $schoolId, $data['name'], $data['phone'], $data['role'] ?? 'Teacher');
 
         return $this->getStaffDetails($user, $id);
+    }
+
+    private function syncUserAccountForStaff(PDO $pdo, int $schoolId, string $name, string $phone, string $role = 'TEACHER'): void
+    {
+        $phone = trim($phone);
+        if (empty($phone) || strlen($phone) < 10) return;
+
+        $stmtCheck = $pdo->prepare("SELECT id FROM users WHERE phone = :phone LIMIT 1");
+        $stmtCheck->execute([':phone' => $phone]);
+        $existing = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+
+        if (!$existing) {
+            $defaultPassword = 'Test@123';
+            $hashedPassword = password_hash($defaultPassword, PASSWORD_BCRYPT);
+            $stmtInsert = $pdo->prepare("
+                INSERT INTO users (phone, password, plain_password, role, name, status, school_id, force_password_change)
+                VALUES (:phone, :pwd, :plain, 'TEACHER', :name, 'ACTIVE', :sid, 0)
+            ");
+            $stmtInsert->execute([
+                ':phone' => $phone,
+                ':pwd'   => $hashedPassword,
+                ':plain' => $defaultPassword,
+                ':name'  => trim($name),
+                ':sid'   => $schoolId
+            ]);
+        } else {
+            $stmtUpdate = $pdo->prepare("
+                UPDATE users 
+                SET status = 'ACTIVE', school_id = COALESCE(school_id, :sid)
+                WHERE id = :id
+            ");
+            $stmtUpdate->execute([':sid' => $schoolId, ':id' => $existing['id']]);
+        }
     }
 
     // -------------------------------------------------------------------------

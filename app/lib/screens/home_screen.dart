@@ -305,7 +305,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _syncProfileDetails(String token) async {
     try {
-      final authService = AuthService(baseUrl: 'http://10.55.253.71:8000');
+      final authService = AuthService(baseUrl: widget.leaveService.baseUrl);
       final profile = await authService.fetchProfile(token);
       
       final latestPhoto = (profile['photo_path'] as String?) ?? (profile['staff_photo_path'] as String?) ?? '';
@@ -747,7 +747,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             try {
                               final prefs = await SharedPreferences.getInstance();
                               final token = prefs.getString('auth_token') ?? '';
-                              final authService = AuthService(baseUrl: 'http://10.55.253.71:8000');
+                              final authService = AuthService(baseUrl: widget.leaveService.baseUrl);
                               await authService.changePassword(
                                 token,
                                 _currentPasswordController.text,
