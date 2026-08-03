@@ -11201,6 +11201,11 @@ Only approve the settlement after reviewing all financial records.
         $pdo = $this->classRepo->getPdo();
         $schoolId = $this->getSchoolId($user);
 
+        // Ensure database column supports string grades (e.g. 'A+', 'A')
+        try {
+            $pdo->exec("ALTER TABLE examination_marks MODIFY COLUMN marks_obtained VARCHAR(50) DEFAULT NULL");
+        } catch (\Throwable $t) {}
+
         // Fetch Exam
         $stmtCheck = $pdo->prepare("SELECT * FROM examinations WHERE id = :id AND school_id = :sid LIMIT 1");
         $stmtCheck->execute([':id' => $examId, ':sid' => $schoolId]);
@@ -12034,11 +12039,19 @@ Only approve the settlement after reviewing all financial records.
                     $anyData = true;
                     $absent = (int)$m['is_absent'] === 1;
                     if (!$absent) {
-                        $obtained = (float)$m['marks_obtained'];
-                        $totalObtained += $obtained;
-                        $passed = $obtained >= $passM;
-                        $subjectPct = ($maxM > 0) ? ($obtained / $maxM) * 100 : 0.0;
-                        $subjectGrade = $resolveGrade($subjectPct);
+                        $rawObtained = $m['marks_obtained'];
+                        $isGradePaper = ((float)$p['max_marks'] === 0.0) || (!is_null($rawObtained) && !is_numeric($rawObtained));
+                        if ($isGradePaper) {
+                            $obtained = (!is_null($rawObtained) && $rawObtained !== '') ? (string)$rawObtained : '—';
+                            $subjectGrade = $obtained !== '—' ? $obtained : 'A';
+                            $passed = true;
+                        } else {
+                            $obtained = (float)$rawObtained;
+                            $totalObtained += $obtained;
+                            $passed = $obtained >= $passM;
+                            $subjectPct = ($maxM > 0) ? ($obtained / $maxM) * 100 : 0.0;
+                            $subjectGrade = $resolveGrade($subjectPct);
+                        }
                     } else {
                         $subjectGrade = 'F';
                         $passed = false;
@@ -12049,16 +12062,18 @@ Only approve the settlement after reviewing all financial records.
                 if (!$passed) {
                     $allPassed = false;
                 }
-                $totalMax += $maxM;
+                if ((float)$p['max_marks'] > 0) {
+                    $totalMax += $maxM;
+                }
 
                 $subjectMarks[] = [
                     'subject_name' => $p['subject_name'],
-                    'max_marks' => $maxM,
-                    'passing_marks' => $passM,
-                    'marks_obtained' => $absent ? 'ABSENT' : ($obtained !== null ? $obtained : '-'),
-                    'grade' => $absent ? 'F' : ($obtained !== null ? $subjectGrade : '-'),
+                    'max_marks' => (float)$p['max_marks'] === 0.0 ? '—' : $maxM,
+                    'passing_marks' => (float)$p['max_marks'] === 0.0 ? '—' : $passM,
+                    'marks_obtained' => $absent ? 'ABSENT' : ($obtained !== null ? $obtained : '—'),
+                    'grade' => $absent ? 'F' : ($obtained !== null ? $subjectGrade : '—'),
                     'remarks' => $remarks,
-                    'result' => $absent ? 'FAIL' : ($obtained !== null ? ($passed ? 'PASS' : 'FAIL') : '-')
+                    'result' => $absent ? 'FAIL' : ($obtained !== null ? ($passed ? 'PASS' : 'FAIL') : '—')
                 ];
             }
 
