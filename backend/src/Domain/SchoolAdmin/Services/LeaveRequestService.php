@@ -449,7 +449,15 @@ class LeaveRequestService extends BaseService
             }
         }
 
-        throw new NotFoundException('Teacher profile record not found.');
+        // Return a virtual staff record fallback if no staff table row exists yet
+        return [
+            'id'        => (int)$user['id'],
+            'school_id' => $schoolId,
+            'name'      => $user['name'] ?? 'Teacher User',
+            'phone'     => $user['phone'] ?? '',
+            'email'     => $user['email'] ?? '',
+            'role'      => 'Teacher'
+        ];
     }
 
     private function resolveStudentsForUser(array $user): array

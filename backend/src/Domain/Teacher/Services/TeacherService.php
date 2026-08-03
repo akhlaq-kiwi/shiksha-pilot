@@ -498,31 +498,51 @@ class TeacherService extends BaseService
     {
         $pdo = $this->teacherRepo->getPdo();
 
+        $defaultSalaryResponse = [
+            'current_year' => [
+                'academic_year_name' => '2026–2027',
+                'salary' => 0.0,
+                'payments' => []
+            ],
+            'previous_year' => [
+                'academic_year_name' => '',
+                'salary' => 0.0,
+                'has_unpaid' => false,
+                'payments' => []
+            ]
+        ];
+
         // 1. Get user details (role and phone)
         $stmtUser = $pdo->prepare("SELECT phone, role FROM users WHERE id = :id LIMIT 1");
         $stmtUser->execute([':id' => $userId]);
         $userObj = $stmtUser->fetch();
         if (!$userObj || $userObj['role'] !== 'TEACHER') {
-            return [];
+            return $defaultSalaryResponse;
         }
         $phone = $userObj['phone'];
 
         // 2. Get working academic year
-        $stmtYear = $pdo->prepare("SELECT * FROM academic_years WHERE school_id = :sid AND (status = 'ACTIVE' OR is_current = 1) LIMIT 1");
+        $stmtYear = $pdo->prepare("SELECT * FROM academic_years WHERE school_id = :sid AND (status = 'ACTIVE' OR is_current = 1) ORDER BY is_current DESC, id DESC LIMIT 1");
         $stmtYear->execute([':sid' => $schoolId]);
         $workingYear = $stmtYear->fetch();
         if (!$workingYear) {
-            return [];
+            return $defaultSalaryResponse;
         }
         $currYearId = (int)$workingYear['id'];
         $currYearName = $workingYear['name'];
+        $defaultSalaryResponse['current_year']['academic_year_name'] = $currYearName;
 
-        // 3. Find active year staff record
-        $stmtStaff = $pdo->prepare("SELECT * FROM staff WHERE school_id = :sid AND academic_year_id = :ayid AND phone = :phone LIMIT 1");
-        $stmtStaff->execute([':sid' => $schoolId, ':ayid' => $currYearId, ':phone' => $phone]);
+        // 3. Find active year staff record (fallback to any staff record by phone if academic_year_id differs)
+        $stmtStaff = $pdo->prepare("SELECT * FROM staff WHERE school_id = :sid AND phone = :phone AND academic_year_id = :ayid LIMIT 1");
+        $stmtStaff->execute([':sid' => $schoolId, ':phone' => $phone, ':ayid' => $currYearId]);
         $currStaff = $stmtStaff->fetch();
         if (!$currStaff) {
-            return [];
+            $stmtStaff = $pdo->prepare("SELECT * FROM staff WHERE school_id = :sid AND phone = :phone ORDER BY id DESC LIMIT 1");
+            $stmtStaff->execute([':sid' => $schoolId, ':phone' => $phone]);
+            $currStaff = $stmtStaff->fetch();
+        }
+        if (!$currStaff) {
+            return $defaultSalaryResponse;
         }
         $currStaffId = (int)$currStaff['id'];
         $currSalary = (float)($currStaff['salary'] ?? 0.0);
