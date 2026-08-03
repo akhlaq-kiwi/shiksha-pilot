@@ -253,21 +253,23 @@ export function compileFinalSessionReportCardData(examCards = [], weightagePolic
       }
     });
 
-    const grade = hasNumericScore 
+    const isSubjectGradeOnly = Object.values(examScoresMap).some(s => s && s.is_grade_only) || !hasNumericScore;
+
+    const grade = !isSubjectGradeOnly 
       ? calculateDefaultGrade(grandTotalObtained, grandTotalMax)
       : lastAssignedGrade;
 
     return {
       subject_name: subjName,
       exam_scores: examScoresMap,
-      grand_total_max: hasNumericScore ? grandTotalMax : 'GRADE',
-      grand_total_obtained: hasNumericScore ? grandTotalObtained : lastAssignedGrade,
-      marks_obtained: hasNumericScore ? grandTotalObtained : lastAssignedGrade,
-      max_marks: hasNumericScore ? grandTotalMax : 'GRADE',
-      passing_marks: hasNumericScore ? 33 : 'C',
+      grand_total_max: !isSubjectGradeOnly ? grandTotalMax : 'GRADE',
+      grand_total_obtained: !isSubjectGradeOnly ? grandTotalObtained : lastAssignedGrade,
+      marks_obtained: !isSubjectGradeOnly ? grandTotalObtained : lastAssignedGrade,
+      max_marks: !isSubjectGradeOnly ? grandTotalMax : 'GRADE',
+      passing_marks: !isSubjectGradeOnly ? 33 : 'C',
       grade,
-      result: hasNumericScore ? (grandTotalObtained >= (grandTotalMax * 0.33) ? 'PASS' : 'FAIL') : 'PASS',
-      is_grade_only: !hasNumericScore
+      result: !isSubjectGradeOnly ? (grandTotalObtained >= (grandTotalMax * 0.33) ? 'PASS' : 'FAIL') : 'PASS',
+      is_grade_only: isSubjectGradeOnly
     };
   });
 
