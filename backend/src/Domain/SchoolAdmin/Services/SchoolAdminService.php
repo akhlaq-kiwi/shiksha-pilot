@@ -10666,6 +10666,17 @@ Only approve the settlement after reviewing all financial records.
 
         if ($academicYearId > 0) {
             $this->autoSeedDefaultSessionExams($pdo, $schoolId, $academicYearId);
+            
+            // Auto-sync status of examinations based on examination_class_status published records
+            $stmtSync = $pdo->prepare("
+                UPDATE examinations e
+                SET e.status = CASE 
+                    WHEN (SELECT COUNT(*) FROM examination_class_status ecs WHERE ecs.exam_id = e.id AND ecs.status = 'Published') > 0 THEN 'Published'
+                    ELSE 'Draft'
+                END
+                WHERE e.school_id = :sid AND e.academic_year_id = :ayid
+            ");
+            $stmtSync->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
         }
 
         $stmt = $pdo->prepare("
@@ -11305,8 +11316,15 @@ Only approve the settlement after reviewing all financial records.
             ]);
 
             if ($status === 'Published') {
-                $stmtUpd = $pdo->prepare("UPDATE examinations SET status = 'Published' WHERE id = :id AND status = 'Draft'");
+                $stmtUpd = $pdo->prepare("UPDATE examinations SET status = 'Published', publish_date = IF(publish_date IS NULL, CURRENT_DATE(), publish_date) WHERE id = :id");
                 $stmtUpd->execute([':id' => $examId]);
+            } else {
+                $stmtCheckPublished = $pdo->prepare("SELECT COUNT(*) FROM examination_class_status WHERE exam_id = :exam_id AND status = 'Published'");
+                $stmtCheckPublished->execute([':exam_id' => $examId]);
+                if ((int)$stmtCheckPublished->fetchColumn() === 0) {
+                    $stmtUpd = $pdo->prepare("UPDATE examinations SET status = 'Draft' WHERE id = :id");
+                    $stmtUpd->execute([':id' => $examId]);
+                }
             }
             
             // Audit Log & Notification for single class

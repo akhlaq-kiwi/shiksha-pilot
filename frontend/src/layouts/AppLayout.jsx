@@ -432,15 +432,6 @@ const AppLayout = ({ children }) => {
         {children}
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-border bg-surface py-4 no-print">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
-          <p className="text-[11px] text-text-muted text-center">
-            &copy; 2026 Shiksha Pilot. Cloud-Native School Management Platform.
-          </p>
-        </div>
-      </footer>
-
       <Dialog
         isOpen={showLogoutConfirm}
         onClose={() => setShowLogoutConfirm(false)}

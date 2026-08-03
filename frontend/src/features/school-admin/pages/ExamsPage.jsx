@@ -800,11 +800,60 @@ export default function ExamsPage() {
     setIsPublishConfirmOpen(true);
   };
 
+  // Date Helper Utilities
+  const addDays = (dateStr, days) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    d.setDate(d.getDate() + days);
+    return d.toISOString().split('T')[0];
+  };
+
+  const subDays = (dateStr, days) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    d.setDate(d.getDate() - days);
+    return d.toISOString().split('T')[0];
+  };
+
+  const getExamMinStartDate = (targetExamId, examsList = []) => {
+    const todayStr = getTodayLocalDateString();
+    const sorted = [...examsList].sort((a, b) => getExamRank(a.name) - getExamRank(b.name) || (a.id - b.id));
+    const targetIdx = targetExamId ? sorted.findIndex(e => e.id === targetExamId) : sorted.length;
+    
+    const preceding = sorted.filter((e, idx) => (targetIdx === -1 || idx < targetIdx) && e.id !== targetExamId && e.end_date);
+    if (preceding.length === 0) return todayStr;
+
+    const latestEndDate = preceding.reduce((max, e) => (e.end_date > max ? e.end_date : max), '');
+    if (!latestEndDate) return todayStr;
+
+    const dayAfter = addDays(latestEndDate, 1);
+    return dayAfter > todayStr ? dayAfter : todayStr;
+  };
+
+  const getExamMaxEndDate = (targetExamId, examsList = []) => {
+    const sorted = [...examsList].sort((a, b) => getExamRank(a.name) - getExamRank(b.name) || (a.id - b.id));
+    const targetIdx = targetExamId ? sorted.findIndex(e => e.id === targetExamId) : -1;
+    if (targetIdx === -1) return null;
+
+    const succeeding = sorted.filter((e, idx) => idx > targetIdx && e.id !== targetExamId && e.start_date);
+    if (succeeding.length === 0) return null;
+
+    const earliestNextStart = succeeding.reduce((min, e) => (!min || e.start_date < min ? e.start_date : min), '');
+    return earliestNextStart ? subDays(earliestNextStart, 1) : null;
+  };
+
   // Form Handlers
   const handleCreateExam = async (e) => {
     e.preventDefault();
     if (!newExam.name || !newExam.start_date || !newExam.end_date || !newExam.publish_date) {
       setError('Please fill in all required fields.');
+      return;
+    }
+    const minAllowedStart = getExamMinStartDate(null, exams);
+    if (newExam.start_date && newExam.start_date < minAllowedStart) {
+      setError(`Start Date cannot be before ${formatDateString(minAllowedStart)} because previous examinations are scheduled until then.`);
       return;
     }
     setSubmitting(true);
@@ -854,6 +903,16 @@ export default function ExamsPage() {
     }
     if (editExamData.publish_date && editExamData.publish_date < todayStr) {
       setError('Result Publish Date cannot be in the past.');
+      return;
+    }
+    const minAllowedStart = getExamMinStartDate(editExamData.id, exams);
+    if (editExamData.start_date && editExamData.start_date < minAllowedStart) {
+      setError(`Start Date cannot be before ${formatDateString(minAllowedStart)} because previous examinations are scheduled until then.`);
+      return;
+    }
+    const maxAllowedEnd = getExamMaxEndDate(editExamData.id, exams);
+    if (editExamData.end_date && maxAllowedEnd && editExamData.end_date > maxAllowedEnd) {
+      setError(`End Date cannot be after ${formatDateString(maxAllowedEnd)} because subsequent examination is scheduled to start on ${formatDateString(addDays(maxAllowedEnd, 1))}.`);
       return;
     }
     if (editExamData.start_date && editExamData.end_date && editExamData.end_date < editExamData.start_date) {
@@ -1821,8 +1880,14 @@ export default function ExamsPage() {
       await schoolService.publishExamResults(publishTarget.exam.id, publishTarget.classId);
       setIsPublishConfirmOpen(false);
       setSuccess('Examination results published to students and parents successfully.');
+      
+      const updatedExams = await schoolService.getExaminations();
+      if (updatedExams) setExams(updatedExams);
+      const freshExam = updatedExams?.find(e => e.id === publishTarget.exam.id);
+      if (freshExam) setSelectedExam(freshExam);
+
       if (activeView === 'classes') {
-        await handleOpenClassWorkspace(publishTarget.exam);
+        await handleOpenClassWorkspace(freshExam || publishTarget.exam);
       } else {
         loadDashboard();
       }
@@ -1849,8 +1914,14 @@ export default function ExamsPage() {
       await schoolService.publishExamResults(unpublishTarget.exam.id, unpublishTarget.classId, 'Draft');
       setIsUnpublishConfirmOpen(false);
       setSuccess('Examination results successfully marked as Draft.');
+
+      const updatedExams = await schoolService.getExaminations();
+      if (updatedExams) setExams(updatedExams);
+      const freshExam = updatedExams?.find(e => e.id === unpublishTarget.exam.id);
+      if (freshExam) setSelectedExam(freshExam);
+
       if (activeView === 'classes') {
-        await handleOpenClassWorkspace(unpublishTarget.exam);
+        await handleOpenClassWorkspace(freshExam || unpublishTarget.exam);
       } else {
         loadDashboard();
       }
@@ -2165,13 +2236,6 @@ export default function ExamsPage() {
                           <DropdownMenu>
                             <DropdownItem onClick={() => handleEditExamClick(e)}>
                               Edit Examination
-                            </DropdownItem>
-                            <DropdownItem 
-                              onClick={() => handleToggleExamPublishStatus(e)}
-                              disabled={e.status === 'Draft' && (!e.start_date || !e.end_date || !e.publish_date)}
-                              title={e.status === 'Draft' && (!e.start_date || !e.end_date || !e.publish_date) ? "Please configure exam dates before publishing." : ""}
-                            >
-                              {e.status === 'Draft' ? 'Publish Examination' : 'Move to Draft'}
                             </DropdownItem>
                           </DropdownMenu>
                         )}
@@ -3398,17 +3462,35 @@ export default function ExamsPage() {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-text-secondary uppercase">Start Date</label>
-              <Input type="date" value={newExam.start_date} onChange={e => setNewExam(p => ({ ...p, start_date: e.target.value }))} required />
+              <Input 
+                type="date" 
+                min={getExamMinStartDate(null, exams)} 
+                value={newExam.start_date} 
+                onChange={e => setNewExam(p => ({ ...p, start_date: e.target.value }))} 
+                required 
+              />
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-text-secondary uppercase">End Date</label>
-              <Input type="date" value={newExam.end_date} onChange={e => setNewExam(p => ({ ...p, end_date: e.target.value }))} required />
+              <Input 
+                type="date" 
+                min={newExam.start_date || getExamMinStartDate(null, exams)} 
+                value={newExam.end_date} 
+                onChange={e => setNewExam(p => ({ ...p, end_date: e.target.value }))} 
+                required 
+              />
             </div>
           </div>
 
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-text-secondary uppercase">Result Publish Date</label>
-            <Input type="date" value={newExam.publish_date} onChange={e => setNewExam(p => ({ ...p, publish_date: e.target.value }))} required />
+            <Input 
+              type="date" 
+              min={newExam.end_date || newExam.start_date || getExamMinStartDate(null, exams)} 
+              value={newExam.publish_date} 
+              onChange={e => setNewExam(p => ({ ...p, publish_date: e.target.value }))} 
+              required 
+            />
           </div>
 
           <div className="space-y-1.5">
@@ -3478,7 +3560,7 @@ export default function ExamsPage() {
                <label className="text-xs font-bold text-text-secondary uppercase">Start Date</label>
                <Input 
                  type="date" 
-                 min={getTodayLocalDateString()} 
+                 min={getExamMinStartDate(editExamData.id, exams)} 
                  value={editExamData.start_date || ''} 
                  onChange={e => setEditExamData(p => ({ ...p, start_date: e.target.value }))} 
                />
@@ -3487,7 +3569,8 @@ export default function ExamsPage() {
                <label className="text-xs font-bold text-text-secondary uppercase">End Date</label>
                <Input 
                  type="date" 
-                 min={editExamData.start_date || getTodayLocalDateString()} 
+                 min={editExamData.start_date || getExamMinStartDate(editExamData.id, exams)} 
+                 max={getExamMaxEndDate(editExamData.id, exams) || undefined}
                  value={editExamData.end_date || ''} 
                  onChange={e => setEditExamData(p => ({ ...p, end_date: e.target.value }))} 
                />
@@ -3498,7 +3581,7 @@ export default function ExamsPage() {
             <label className="text-xs font-bold text-text-secondary uppercase">Result Publish Date</label>
             <Input 
               type="date" 
-              min={editExamData.end_date || editExamData.start_date || getTodayLocalDateString()} 
+              min={editExamData.end_date || editExamData.start_date || getExamMinStartDate(editExamData.id, exams)} 
               value={editExamData.publish_date || ''} 
               onChange={e => setEditExamData(p => ({ ...p, publish_date: e.target.value }))} 
             />
@@ -3519,14 +3602,14 @@ export default function ExamsPage() {
           <div className="mx-auto w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 dark:text-amber-400">
             <AlertCircle className="h-6 w-6" />
           </div>
-          <h4 className="text-center font-bold text-text-primary text-sm mt-2">Pehle se added papers aur scheme reset ho jayenge!</h4>
+          <h4 className="text-center font-bold text-text-primary text-sm mt-2">Previously added exam papers & scheme will be reset!</h4>
           <p className="text-xs text-text-secondary leading-relaxed text-center">
-            Aapne <strong>{selectedExamToEdit?.name}</strong> ki Start Date / End Date me badlav kiya hai. 
-            Kyunki is examination ke liye pehle se papers / subject timetable add ho chuke hain, dates change hone par <strong>pehle se added sabhi papers aur marks entry scheme reset (delete) ho jayenge</strong> aur aapko naye dates ke acccording fresh paper scheme schedule karni padegi.
+            You modified the Start Date / End Date for <strong>{selectedExamToEdit?.name}</strong>. 
+            Since papers and timetable entries have already been configured for this examination, changing the dates will <strong>reset (delete) all previously added papers and marks schemes</strong>. You will need to schedule a fresh paper scheme according to the new examination dates.
           </p>
           <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 text-center">
             <p className="text-xs font-bold text-amber-700 dark:text-amber-400">
-              Kya aap aage badhna chahte hain aur naye dates ke according papers reset karna chahte hain?
+              Do you want to proceed and reset added papers for the new dates?
             </p>
           </div>
         </div>
