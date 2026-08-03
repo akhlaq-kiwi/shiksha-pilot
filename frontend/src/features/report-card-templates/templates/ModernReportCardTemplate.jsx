@@ -210,22 +210,22 @@ export default function ModernReportCardTemplate({ data, config = {} }) {
           <table className="w-full text-left border-collapse" style={{ fontSize: fontSizePx }}>
             <thead>
               <tr className="bg-emerald-950 text-white font-bold uppercase text-[10.5px] tracking-wider">
-                <th style={{ padding: headerPadding }} className="text-left font-bold whitespace-nowrap min-w-[140px]">Subject</th>
-                <th style={{ padding: headerPadding }} className="text-center w-28">Obtained</th>
-                <th style={{ padding: headerPadding }} className="text-center w-24">Max</th>
-                <th style={{ padding: headerPadding }} className="text-center w-24">Pass</th>
-                <th style={{ padding: headerPadding }} className="text-center w-20">Grade</th>
+                <th style={{ padding: headerPadding }} className="text-left font-bold border-r border-emerald-800 whitespace-nowrap min-w-[140px]">Subject</th>
+                <th style={{ padding: headerPadding }} className="text-center border-r border-emerald-800 w-28">Obtained</th>
+                <th style={{ padding: headerPadding }} className="text-center border-r border-emerald-800 w-24">Max</th>
+                <th style={{ padding: headerPadding }} className="text-center border-r border-emerald-800 w-24">Pass</th>
+                <th style={{ padding: headerPadding }} className="text-center border-r border-emerald-800 w-20">Grade</th>
                 <th style={{ padding: headerPadding }} className="text-center w-24">Verdict</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 font-medium">
               {subjects.map((sub, idx) => (
                 <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-zinc-50/60'}>
-                  <td style={{ padding: cellPadding }} className="text-left font-bold text-zinc-900 whitespace-nowrap">{sub.subject_name}</td>
-                  <td style={{ padding: cellPadding }} className="text-center font-mono font-bold text-emerald-700">{sub.marks_obtained}</td>
-                  <td style={{ padding: cellPadding }} className="text-center font-mono text-zinc-600">{sub.max_marks}</td>
-                  <td style={{ padding: cellPadding }} className="text-center font-mono text-zinc-500">{sub.passing_marks}</td>
-                  <td style={{ padding: cellPadding }} className="text-center font-bold text-emerald-800">{sub.grade}</td>
+                  <td style={{ padding: cellPadding }} className="text-left font-bold text-zinc-900 border-r border-zinc-200 whitespace-nowrap">{sub.subject_name}</td>
+                  <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-200 font-mono font-bold text-emerald-700">{sub.marks_obtained}</td>
+                  <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-200 font-mono text-zinc-600">{sub.max_marks}</td>
+                  <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-200 font-mono text-zinc-500">{sub.passing_marks}</td>
+                  <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-200 font-bold text-emerald-800">{sub.grade}</td>
                   <td style={{ padding: cellPadding }} className="text-center">
                     <span className={`px-2 py-0.5 rounded text-[11px] font-bold uppercase ${
                       sub.result === 'PASS' ? 'bg-emerald-100 text-emerald-900' : 'bg-rose-100 text-rose-900'

@@ -195,20 +195,20 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
           <table className="w-full text-left border-collapse" style={{ fontSize: fontSizePx }}>
             <thead>
               <tr className="bg-amber-500 text-white font-bold uppercase text-[11px]">
-                <th style={{ padding: headerPadding }}>Subject</th>
-                <th style={{ padding: headerPadding }} className="text-center w-24">Marks Obtained</th>
-                <th style={{ padding: headerPadding }} className="text-center w-20">Max Marks</th>
-                <th style={{ padding: headerPadding }} className="text-center w-20">Grade</th>
+                <th style={{ padding: headerPadding }} className="border-r border-amber-400">Subject</th>
+                <th style={{ padding: headerPadding }} className="text-center border-r border-amber-400 w-24">Marks Obtained</th>
+                <th style={{ padding: headerPadding }} className="text-center border-r border-amber-400 w-20">Max Marks</th>
+                <th style={{ padding: headerPadding }} className="text-center border-r border-amber-400 w-20">Grade</th>
                 <th style={{ padding: headerPadding }} className="text-center w-24">Verdict</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 font-medium">
               {subjects.map((sub, idx) => (
                 <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-amber-50/20'}>
-                  <td style={{ padding: cellPadding }} className="font-bold text-zinc-900">{sub.subject_name}</td>
-                  <td style={{ padding: cellPadding }} className="text-center font-mono font-bold text-amber-700">{sub.marks_obtained}</td>
-                  <td style={{ padding: cellPadding }} className="text-center font-mono text-zinc-500">{sub.max_marks}</td>
-                  <td style={{ padding: cellPadding }} className="text-center font-bold text-amber-900">{sub.grade}</td>
+                  <td style={{ padding: cellPadding }} className="font-bold text-zinc-900 border-r border-amber-100">{sub.subject_name}</td>
+                  <td style={{ padding: cellPadding }} className="text-center border-r border-amber-100 font-mono font-bold text-amber-700">{sub.marks_obtained}</td>
+                  <td style={{ padding: cellPadding }} className="text-center border-r border-amber-100 font-mono text-zinc-500">{sub.max_marks}</td>
+                  <td style={{ padding: cellPadding }} className="text-center border-r border-amber-100 font-bold text-amber-900">{sub.grade}</td>
                   <td style={{ padding: cellPadding }} className="text-center">
                     <span className={`px-2 py-0.5 rounded text-[11px] font-bold uppercase ${
                       sub.result === 'PASS' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
@@ -221,10 +221,10 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
             </tbody>
             <tfoot>
               <tr className="bg-amber-100 border-t-2 border-amber-500 font-bold text-amber-950">
-                <td style={{ padding: cellPadding }} className="font-bold">Total Marks</td>
-                <td style={{ padding: cellPadding }} className="text-center font-mono font-bold text-amber-900">{summary.total_obtained}</td>
-                <td style={{ padding: cellPadding }} className="text-center font-mono text-zinc-600">{summary.total_max}</td>
-                <td style={{ padding: cellPadding }} className="text-center font-bold text-amber-900">{summary.grade}</td>
+                <td style={{ padding: cellPadding }} className="font-bold border-r border-amber-200">Total Marks</td>
+                <td style={{ padding: cellPadding }} className="text-center border-r border-amber-200 font-mono font-bold text-amber-900">{summary.total_obtained}</td>
+                <td style={{ padding: cellPadding }} className="text-center border-r border-amber-200 font-mono text-zinc-600">{summary.total_max}</td>
+                <td style={{ padding: cellPadding }} className="text-center border-r border-amber-200 font-bold text-amber-900">{summary.grade}</td>
                 <td style={{ padding: cellPadding }} className="text-center font-bold uppercase">{summary.result}</td>
               </tr>
             </tfoot>

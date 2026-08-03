@@ -14,6 +14,19 @@ function formatSchoolAddress(schoolProfile = {}) {
   return 'Civil Lines, Central Education Hub';
 }
 
+export function formatDateOfBirth(dobStr) {
+  if (!dobStr || dobStr === '—') return '—';
+  const str = dobStr.toString().trim();
+  const parts = str.split(/[-/]/);
+  if (parts.length === 3) {
+    if (parts[0].length === 4) {
+      // YYYY-MM-DD -> DD/MM/YYYY
+      return `${parts[2].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[0]}`;
+    }
+  }
+  return str;
+}
+
 export function compileReportCardData(card = {}, schoolProfile = {}, currentYear = {}, exam = {}) {
   // If card is already marked as final session report
   if (card.is_final_session_report) {
@@ -29,7 +42,7 @@ export function compileReportCardData(card = {}, schoolProfile = {}, currentYear
     section: card.class_section || card.section || '',
     father_name: card.father_name || '—',
     mother_name: card.mother_name || '—',
-    dob: card.date_of_birth || card.dob || '—',
+    dob: formatDateOfBirth(card.date_of_birth || card.dob),
     photo_path: card.photo_path || card.avatar_url || null
   };
 
@@ -142,7 +155,7 @@ export function compileFinalSessionReportCardData(
     section: firstCard.class_section || firstCard.section || '',
     father_name: firstCard.father_name || '—',
     mother_name: firstCard.mother_name || '—',
-    dob: firstCard.date_of_birth || firstCard.dob || '—',
+    dob: formatDateOfBirth(firstCard.date_of_birth || firstCard.dob),
     photo_path: firstCard.photo_path || firstCard.avatar_url || null
   };
 
