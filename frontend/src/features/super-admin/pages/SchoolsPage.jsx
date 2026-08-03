@@ -859,7 +859,8 @@ export default function SchoolsPage({ schools, onCreateSchool, onToggleStatus, o
               <div className="border-t border-border/60 pt-4 mt-6 w-full flex items-center justify-between text-xs font-semibold">
                 <span className="text-text-muted">Subscription Plan</span>
                 {(() => {
-                  const todayStr = new Date().toISOString().split('T')[0];
+                  const d = new Date();
+                  const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
                   const isActiveSub = school.active_plan && school.subscription_expiry && todayStr <= school.subscription_expiry;
                   return isActiveSub ? (
                     <button

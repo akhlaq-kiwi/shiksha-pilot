@@ -49,7 +49,8 @@ export default function SchoolHistoryPage() {
     }
   };
 
-  const today = new Date().toISOString().split('T')[0];
+  const dNow = new Date();
+  const today = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">

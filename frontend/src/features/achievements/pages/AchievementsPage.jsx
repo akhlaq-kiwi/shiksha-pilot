@@ -655,7 +655,6 @@ export default function AchievementsPage() {
                 <thead className="bg-secondary/40 border-b border-border text-text-secondary uppercase text-[11px] font-bold">
                   <tr>
                     <th className="p-3">Subject</th>
-                    <th className="p-3">Paper Type</th>
                     <th className="p-3 text-right">Max Marks</th>
                     <th className="p-3 text-right">Pass Marks</th>
                     <th className="p-3 text-right">Obtained</th>
@@ -667,7 +666,6 @@ export default function AchievementsPage() {
                   {(activeReportCard.subjects || []).map((sub, idx) => (
                     <tr key={idx} className="hover:bg-secondary/20">
                       <td className="p-3 font-bold text-text-primary">{sub.subject_name}</td>
-                      <td className="p-3 text-text-muted">{sub.paper_type || 'Written'}</td>
                       <td className="p-3 text-right">{sub.max_marks}</td>
                       <td className="p-3 text-right">{sub.passing_marks}</td>
                       <td className="p-3 text-right font-bold text-text-primary">{sub.marks_obtained}</td>

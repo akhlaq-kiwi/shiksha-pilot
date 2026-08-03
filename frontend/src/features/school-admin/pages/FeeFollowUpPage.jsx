@@ -128,7 +128,8 @@ export default function FeeFollowUpPage() {
     const errors = {};
     if (!extendForm.promised_date) errors.promised_date = 'New promised date is required';
     
-    const today = new Date().toISOString().split('T')[0];
+    const dToday = new Date();
+    const today = `${dToday.getFullYear()}-${String(dToday.getMonth() + 1).padStart(2, '0')}-${String(dToday.getDate()).padStart(2, '0')}`;
     if (extendForm.promised_date && extendForm.promised_date <= today) {
       errors.promised_date = 'Date must be in the future';
     }
@@ -282,7 +283,8 @@ export default function FeeFollowUpPage() {
       errors.pending_amount = 'Pending Amount cannot be negative';
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    const dToday2 = new Date();
+    const today = `${dToday2.getFullYear()}-${String(dToday2.getMonth() + 1).padStart(2, '0')}-${String(dToday2.getDate()).padStart(2, '0')}`;
     if (form.promised_date && form.promised_date <= today) {
       errors.promised_date = 'Date must be in the future';
     }

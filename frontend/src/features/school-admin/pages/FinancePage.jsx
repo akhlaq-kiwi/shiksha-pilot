@@ -320,7 +320,7 @@ export default function FinancePage() {
   const paginatedStudents = filteredStudents.slice(0, visibleCount);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-140px)] space-y-4 max-h-[82vh] md:max-h-[85vh] animate-in fade-in duration-300">
+    <div className="flex flex-col h-[calc(100vh-80px)] space-y-4 max-h-[calc(100vh-80px)] animate-in fade-in duration-300">
       
       {/* Sticky Header Panel */}
       <div className="flex-shrink-0 bg-surface border border-border p-6 rounded-2xl shadow-2xs space-y-4">

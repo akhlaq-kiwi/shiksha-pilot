@@ -109,10 +109,18 @@ const getDynamicScalingStyles = (numSubjects, numInstructions) => {
   };
 };
 
+const getTodayLocalDateString = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const suggestNextExamDate = (exam, papers, holidays) => {
-  if (!exam) return '';
-  const todayStr = new Date().toISOString().split('T')[0];
-  let baseDateStr = exam.start_date > todayStr ? exam.start_date : todayStr;
+  if (!exam || !exam.start_date || !exam.end_date) return '';
+  const todayStr = getTodayLocalDateString();
+  let baseDateStr = (exam.start_date && exam.start_date > todayStr) ? exam.start_date : todayStr;
   const parts = baseDateStr.split('-');
   if (parts.length !== 3) return baseDateStr;
   
@@ -122,6 +130,7 @@ const suggestNextExamDate = (exam, papers, holidays) => {
   let current = new Date(y, m, d);
 
   const endParts = exam.end_date.split('-');
+  if (endParts.length !== 3) return baseDateStr;
   const endYear = parseInt(endParts[0]);
   const endMonth = parseInt(endParts[1]) - 1;
   const endDay = parseInt(endParts[2]);
@@ -153,7 +162,7 @@ const CalendarDatePicker = ({ value, onChange, min, max, required, className, on
   const [isFocused, setIsFocused] = useState(false);
   const [inputValue, setInputValue] = useState('');
   
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getTodayLocalDateString();
   
   const parseLocalDate = (dateStr) => {
     if (!dateStr) return new Date();
@@ -445,6 +454,7 @@ export default function ExamsPage() {
   const [holidays, setHolidays] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
   const [success, setSuccess] = useState('');
 
   // Selected Contexts
@@ -484,6 +494,8 @@ export default function ExamsPage() {
   const [isDeleteExamConfirmOpen, setIsDeleteExamConfirmOpen] = useState(false);
   const [deleteExamTarget, setDeleteExamTarget] = useState(null);
   const [isEditExamOpen, setIsEditExamOpen] = useState(false);
+  const [selectedExamToEdit, setSelectedExamToEdit] = useState(null);
+  const [isResetPapersConfirmOpen, setIsResetPapersConfirmOpen] = useState(false);
   const [editExamData, setEditExamData] = useState({
     id: '',
     name: '',
@@ -507,10 +519,9 @@ export default function ExamsPage() {
   const [timetablePapers, setTimetablePapers] = useState([]);
   const [newPaper, setNewPaper] = useState({
     subject_id: '',
-    paper_type: 'Written',
     exam_date: '',
-    start_time: '',
-    end_time: '',
+    start_time: '09:00',
+    end_time: '11:00',
     max_marks: '100',
     passing_marks: '40',
     room: ''
@@ -532,15 +543,9 @@ export default function ExamsPage() {
   // Final Session Report Cards State
   const [finalSessionReportCards, setFinalSessionReportCards] = useState([]);
   const [generatingClassPdf, setGeneratingClassPdf] = useState(false);
-  const [isWeightageModalOpen, setIsWeightageModalOpen] = useState(false);
-  const [weightagePolicy, setWeightagePolicy] = useState({
+  const [weightagePolicy] = useState({
     strategy: 'weighted_percentage',
     weights: { 'Quarterly': 20, 'Half Yearly': 30, 'Annual': 50 }
-  });
-  const [customWeightsInput, setCustomWeightsInput] = useState({
-    quarterly: 20,
-    halfYearly: 30,
-    annual: 50
   });
 
   // Grade Configuration Scale States
@@ -733,6 +738,13 @@ export default function ExamsPage() {
   }, [success]);
 
   useEffect(() => {
+    if (info) {
+      const timer = setTimeout(() => setInfo(''), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [info]);
+
+  useEffect(() => {
     loadDashboard();
     const handleYearSwitch = () => {
       loadDashboard();
@@ -744,15 +756,24 @@ export default function ExamsPage() {
     };
   }, []);
 
+  // Scroll to top when view changes
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    const mainEl = document.getElementById('main-content');
+    if (mainEl) {
+      mainEl.scrollTop = 0;
+    }
+  }, [activeView]);
+
   // Quick Action counts
   const totalCount = exams.length;
   const upcomingCount = exams.filter(e => {
-    const today = new Date().toISOString().split('T')[0];
-    return e.start_date > today;
+    const today = getTodayLocalDateString();
+    return e.start_date && e.start_date > today;
   }).length;
   const ongoingCount = exams.filter(e => {
-    const today = new Date().toISOString().split('T')[0];
-    return e.start_date <= today && e.end_date >= today;
+    const today = getTodayLocalDateString();
+    return e.start_date && e.end_date && e.start_date <= today && e.end_date >= today;
   }).length;
   const publishedCount = exams.filter(e => e.status === 'Published').length;
   const draftCount = exams.filter(e => e.status === 'Draft').length;
@@ -791,11 +812,60 @@ export default function ExamsPage() {
     setIsPublishConfirmOpen(true);
   };
 
+  // Date Helper Utilities
+  const addDays = (dateStr, days) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    d.setDate(d.getDate() + days);
+    return d.toISOString().split('T')[0];
+  };
+
+  const subDays = (dateStr, days) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    d.setDate(d.getDate() - days);
+    return d.toISOString().split('T')[0];
+  };
+
+  const getExamMinStartDate = (targetExamId, examsList = []) => {
+    const todayStr = getTodayLocalDateString();
+    const sorted = [...examsList].sort((a, b) => getExamRank(a.name) - getExamRank(b.name) || (a.id - b.id));
+    const targetIdx = targetExamId ? sorted.findIndex(e => e.id === targetExamId) : sorted.length;
+    
+    const preceding = sorted.filter((e, idx) => (targetIdx === -1 || idx < targetIdx) && e.id !== targetExamId && e.end_date);
+    if (preceding.length === 0) return todayStr;
+
+    const latestEndDate = preceding.reduce((max, e) => (e.end_date > max ? e.end_date : max), '');
+    if (!latestEndDate) return todayStr;
+
+    const dayAfter = addDays(latestEndDate, 1);
+    return dayAfter > todayStr ? dayAfter : todayStr;
+  };
+
+  const getExamMaxEndDate = (targetExamId, examsList = []) => {
+    const sorted = [...examsList].sort((a, b) => getExamRank(a.name) - getExamRank(b.name) || (a.id - b.id));
+    const targetIdx = targetExamId ? sorted.findIndex(e => e.id === targetExamId) : -1;
+    if (targetIdx === -1) return null;
+
+    const succeeding = sorted.filter((e, idx) => idx > targetIdx && e.id !== targetExamId && e.start_date);
+    if (succeeding.length === 0) return null;
+
+    const earliestNextStart = succeeding.reduce((min, e) => (!min || e.start_date < min ? e.start_date : min), '');
+    return earliestNextStart ? subDays(earliestNextStart, 1) : null;
+  };
+
   // Form Handlers
   const handleCreateExam = async (e) => {
     e.preventDefault();
     if (!newExam.name || !newExam.start_date || !newExam.end_date || !newExam.publish_date) {
       setError('Please fill in all required fields.');
+      return;
+    }
+    const minAllowedStart = getExamMinStartDate(null, exams);
+    if (newExam.start_date && newExam.start_date < minAllowedStart) {
+      setError(`Start Date cannot be before ${formatDateString(minAllowedStart)} because previous examinations are scheduled until then.`);
       return;
     }
     setSubmitting(true);
@@ -816,12 +886,13 @@ export default function ExamsPage() {
   };
 
   const handleEditExamClick = (exam) => {
+    setSelectedExamToEdit(exam);
     setEditExamData({
       id: exam.id,
       name: exam.name,
-      start_date: exam.start_date,
-      end_date: exam.end_date,
-      publish_date: exam.publish_date,
+      start_date: exam.start_date || '',
+      end_date: exam.end_date || '',
+      publish_date: exam.publish_date || '',
       description: exam.description || ''
     });
     setIsEditExamOpen(true);
@@ -829,17 +900,74 @@ export default function ExamsPage() {
 
   const handleUpdateExam = async (e) => {
     if (e) e.preventDefault();
-    if (!editExamData.name || !editExamData.start_date || !editExamData.end_date || !editExamData.publish_date) {
-      setError('Please fill in all required fields.');
+    if (!editExamData.name) {
+      setError('Please enter examination name.');
       return;
     }
+    const todayStr = getTodayLocalDateString();
+    if (editExamData.start_date && editExamData.start_date < todayStr) {
+      setError('Start Date cannot be in the past.');
+      return;
+    }
+    if (editExamData.end_date && editExamData.end_date < todayStr) {
+      setError('End Date cannot be in the past.');
+      return;
+    }
+    if (editExamData.publish_date && editExamData.publish_date < todayStr) {
+      setError('Result Publish Date cannot be in the past.');
+      return;
+    }
+    const minAllowedStart = getExamMinStartDate(editExamData.id, exams);
+    if (editExamData.start_date && editExamData.start_date < minAllowedStart) {
+      setError(`Start Date cannot be before ${formatDateString(minAllowedStart)} because previous examinations are scheduled until then.`);
+      return;
+    }
+    const maxAllowedEnd = getExamMaxEndDate(editExamData.id, exams);
+    if (editExamData.end_date && maxAllowedEnd && editExamData.end_date > maxAllowedEnd) {
+      setError(`End Date cannot be after ${formatDateString(maxAllowedEnd)} because subsequent examination is scheduled to start on ${formatDateString(addDays(maxAllowedEnd, 1))}.`);
+      return;
+    }
+    if (editExamData.start_date && editExamData.end_date && editExamData.end_date < editExamData.start_date) {
+      setError('End Date cannot be before Start Date.');
+      return;
+    }
+    if (editExamData.end_date && editExamData.publish_date && editExamData.publish_date < editExamData.end_date) {
+      setError('Result Publish Date cannot be before End Date.');
+      return;
+    }
+
+    // Check if dates have changed AND papers exist for this examination
+    const datesChanged = selectedExamToEdit && (
+      (editExamData.start_date && editExamData.start_date !== selectedExamToEdit.start_date) ||
+      (editExamData.end_date && editExamData.end_date !== selectedExamToEdit.end_date)
+    );
+    const hasPapers = selectedExamToEdit && Number(selectedExamToEdit.papers_count || 0) > 0;
+
+    if (datesChanged && hasPapers) {
+      setIsEditExamOpen(false);
+      setIsResetPapersConfirmOpen(true);
+      return;
+    }
+
+    await executeExamUpdate(false);
+  };
+
+  const executeExamUpdate = async (shouldResetPapers = false) => {
     setSubmitting(true);
     setError('');
     setSuccess('');
     setIsEditExamOpen(false);
+    setIsResetPapersConfirmOpen(false);
     try {
-      await schoolService.updateExamination(editExamData.id, editExamData);
-      setSuccess('Examination updated successfully.');
+      await schoolService.updateExamination(editExamData.id, {
+        ...editExamData,
+        reset_papers: shouldResetPapers
+      });
+      setSuccess(
+        shouldResetPapers 
+          ? 'Examination dates updated successfully. Added papers and timetable scheme have been reset for new dates.' 
+          : 'Examination updated successfully.'
+      );
       await loadDashboard();
     } catch (err) {
       console.error(err);
@@ -850,6 +978,10 @@ export default function ExamsPage() {
   };
 
   const handleToggleExamPublishStatus = (exam) => {
+    if (exam.status === 'Draft' && (!exam.start_date || !exam.end_date || !exam.publish_date)) {
+      setError('Please edit the examination and configure Start Date, End Date, and Publish Date before publishing.');
+      return;
+    }
     setTogglePublishTarget(exam);
     setShowTogglePublishModal(true);
   };
@@ -903,10 +1035,17 @@ export default function ExamsPage() {
 
   // Timetable Handlers
   const handleOpenTimetable = async (exam, classId) => {
+    setError('');
+    setInfo('');
+    setSuccess('');
+    if (!exam || !exam.start_date || !exam.end_date) {
+      setInfo('Please edit and configure the examination period (Start Date and End Date) before scheduling paper timetables.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
     setSelectedExam(exam);
     setSelectedClassId(classId.toString());
-    setError('');
-    setSuccess('');
     setLoading(true);
     try {
       setEditingPaper(null);
@@ -918,10 +1057,9 @@ export default function ExamsPage() {
       setInstructions((insts || []).map(i => i.instruction) || []);
       setNewPaper({
         subject_id: '',
-        paper_type: 'Written',
         exam_date: suggestNextExamDate(exam, list || [], holidays),
-        start_time: '',
-        end_time: '',
+        start_time: '09:00',
+        end_time: '11:00',
         max_marks: '100',
         passing_marks: '40',
         room: ''
@@ -949,7 +1087,7 @@ export default function ExamsPage() {
       return;
     }
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getTodayLocalDateString();
     if (newPaper.exam_date < todayStr) {
       setError('Exam date cannot be in the past.');
       return;
@@ -1068,10 +1206,9 @@ export default function ExamsPage() {
       setEditingPaper(null);
       setNewPaper({
         subject_id: '',
-        paper_type: 'Written',
         exam_date: suggestNextExamDate(selectedExam, refreshedList || [], holidays),
-        start_time: newPaper.start_time,
-        end_time: newPaper.end_time,
+        start_time: newPaper.start_time || '09:00',
+        end_time: newPaper.end_time || '11:00',
         max_marks: '100',
         passing_marks: '40',
         room: ''
@@ -1457,16 +1594,6 @@ export default function ExamsPage() {
         return;
       }
 
-      // Step 2: Check pending marks
-      const pending = papers.filter(p => !p.marks_completed);
-      if (pending.length > 0) {
-        setPendingSubjects(pending.map(p => p.subject_name));
-        setPendingValidationSource('reports_pending_marks');
-        setShowPendingAlert(true);
-        setLoading(false);
-        return;
-      }
-
       setSelectedExam(exam);
       setSelectedClassId(classId.toString());
       setPendingSubjects([]);
@@ -1762,8 +1889,14 @@ export default function ExamsPage() {
       await schoolService.publishExamResults(publishTarget.exam.id, publishTarget.classId);
       setIsPublishConfirmOpen(false);
       setSuccess('Examination results published to students and parents successfully.');
+      
+      const updatedExams = await schoolService.getExaminations();
+      if (updatedExams) setExams(updatedExams);
+      const freshExam = updatedExams?.find(e => e.id === publishTarget.exam.id);
+      if (freshExam) setSelectedExam(freshExam);
+
       if (activeView === 'classes') {
-        await handleOpenClassWorkspace(publishTarget.exam);
+        await handleOpenClassWorkspace(freshExam || publishTarget.exam);
       } else {
         loadDashboard();
       }
@@ -1790,8 +1923,14 @@ export default function ExamsPage() {
       await schoolService.publishExamResults(unpublishTarget.exam.id, unpublishTarget.classId, 'Draft');
       setIsUnpublishConfirmOpen(false);
       setSuccess('Examination results successfully marked as Draft.');
+
+      const updatedExams = await schoolService.getExaminations();
+      if (updatedExams) setExams(updatedExams);
+      const freshExam = updatedExams?.find(e => e.id === unpublishTarget.exam.id);
+      if (freshExam) setSelectedExam(freshExam);
+
       if (activeView === 'classes') {
-        await handleOpenClassWorkspace(unpublishTarget.exam);
+        await handleOpenClassWorkspace(freshExam || unpublishTarget.exam);
       } else {
         loadDashboard();
       }
@@ -1815,15 +1954,23 @@ export default function ExamsPage() {
     );
   }
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = getTodayLocalDateString();
+  const getExamRank = (name = '') => {
+    const lower = name.toLowerCase();
+    if (lower.includes('quarterly')) return 1;
+    if (lower.includes('half')) return 2;
+    if (lower.includes('annual')) return 3;
+    return 4;
+  };
+
   const filteredExams = exams.filter(e => {
     if (activeFilter === 'total') return true;
-    if (activeFilter === 'upcoming') return e.start_date > today;
-    if (activeFilter === 'ongoing') return e.start_date <= today && e.end_date >= today;
+    if (activeFilter === 'upcoming') return e.start_date && e.start_date > today;
+    if (activeFilter === 'ongoing') return e.start_date && e.end_date && e.start_date <= today && e.end_date >= today;
     if (activeFilter === 'draft') return e.status === 'Draft';
     if (activeFilter === 'published') return e.status === 'Published';
     return true;
-  });
+  }).sort((a, b) => getExamRank(a.name) - getExamRank(b.name) || (a.id - b.id));
 
   const filteredClassSubjects = subjects;
 
@@ -1996,24 +2143,26 @@ export default function ExamsPage() {
             <Button className="flex items-center gap-2 font-bold" onClick={() => { setActiveView('grade_scale'); setGradeError(''); setGradeSuccess(''); }}>
               Grade Configuration Scale
             </Button>
-            <Button className="flex items-center gap-2 font-bold" onClick={() => setIsCreateOpen(true)}>
-              <Plus className="h-4 w-4" /> Create Examination
-            </Button>
           </div>
         )}
       </div>
 
       {/* Global alert bar */}
-      {(error || success) && (
-        <div className="no-print">
+      {(error || info || success) && (
+        <div className="no-print space-y-2">
           {error && (
             <div className="p-3.5 bg-red-500/10 border border-red-500/20 text-red-600 rounded-lg text-xs font-semibold flex items-center gap-2">
-              <AlertCircle className="h-4 w-4" /> {error}
+              <AlertCircle className="h-4 w-4 shrink-0" /> {error}
+            </div>
+          )}
+          {info && (
+            <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 rounded-lg text-xs font-semibold flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" /> {info}
             </div>
           )}
           {success && (
-            <div className="p-3.5 bg-green-500/10 border border-green-500/20 text-green-600 rounded-lg text-xs font-semibold flex items-center gap-2 mt-2">
-              <CheckCircle className="h-4 w-4" /> {success}
+            <div className="p-3.5 bg-green-500/10 border border-green-500/20 text-green-600 rounded-lg text-xs font-semibold flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 shrink-0" /> {success}
             </div>
           )}
         </div>
@@ -2102,12 +2251,6 @@ export default function ExamsPage() {
                             <DropdownItem onClick={() => handleEditExamClick(e)}>
                               Edit Examination
                             </DropdownItem>
-                            <DropdownItem onClick={() => handleToggleExamPublishStatus(e)}>
-                              {e.status === 'Draft' ? 'Publish Examination' : 'Move to Draft'}
-                            </DropdownItem>
-                            <DropdownItem destructive onClick={() => handleDeleteExamClick(e)}>
-                              Delete Examination
-                            </DropdownItem>
                           </DropdownMenu>
                         )}
                       </div>
@@ -2165,6 +2308,13 @@ export default function ExamsPage() {
           {selectedClassId && (() => {
             const currentClass = examClassStatuses.find(c => c.id === parseInt(selectedClassId));
             if (!currentClass) return null;
+
+            const isAnnualExam = !!(selectedExam?.name && (
+              selectedExam.name.toLowerCase().includes('annual') ||
+              selectedExam.name.toLowerCase().includes('final') ||
+              selectedExam.type === 'ANNUAL' ||
+              selectedExam.exam_type === 'ANNUAL'
+            ));
 
             return (
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -2408,32 +2558,34 @@ export default function ExamsPage() {
                       </p>
                     </div>
                     <div className="pt-2">
-                      <Button className="w-full flex items-center justify-center gap-2 text-xs font-bold text-primary border-primary/20 bg-primary/5 hover:bg-primary/10" onClick={() => handleOpenReportCards(selectedExam, currentClass.id)}>
+                      <Button className="w-full flex items-center justify-center gap-2 text-xs font-bold" onClick={() => handleOpenReportCards(selectedExam, currentClass.id)}>
                         <Award className="h-4 w-4" /> Open {selectedExam?.name || 'Exam'} Report Cards
                       </Button>
                     </div>
                   </CardContent>
                 </Card>
 
-                {/* CARD 5: Final Academic Report Cards (Annual Session Summary) */}
-                <Card className="hover:border-amber-500/40 transition-all shadow-xs flex flex-col justify-between border-amber-500/30 bg-amber-500/5">
-                  <CardContent className="p-6 space-y-4 flex-1 flex flex-col justify-between">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-amber-600">
-                        <Award className="h-5 w-5" />
-                        <h4 className="text-base font-bold text-text-primary">Final Academic Report Card</h4>
+                {/* CARD 5: Final Academic Report Cards (Annual Session Summary - Only for Annual Exam) */}
+                {isAnnualExam && (
+                  <Card className="hover:border-primary/20 transition-all shadow-xs flex flex-col justify-between">
+                    <CardContent className="p-6 space-y-4 flex-1 flex flex-col justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-primary">
+                          <Award className="h-5 w-5" />
+                          <h4 className="text-base font-bold text-text-primary">Final Academic Report Card</h4>
+                        </div>
+                        <p className="text-xs text-text-secondary leading-relaxed">
+                          Generate consolidated annual session report cards combining marks from all session exams based on configurable calculation policies.
+                        </p>
                       </div>
-                      <p className="text-xs text-text-secondary leading-relaxed">
-                        Generate consolidated annual session report cards combining marks from all session exams based on configurable calculation policies.
-                      </p>
-                    </div>
-                    <div className="pt-2">
-                      <Button className="w-full flex items-center justify-center gap-2 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white" onClick={() => handleOpenFinalSessionReportCards(currentClass.id)}>
-                        <Award className="h-4 w-4" /> Open Final Session Reports
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                      <div className="pt-2">
+                        <Button className="w-full flex items-center justify-center gap-2 text-xs font-bold" onClick={() => handleOpenFinalSessionReportCards(currentClass.id)}>
+                          <Award className="h-4 w-4" /> Open Final Session Reports
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* CARD 4: Result Status / Publish */}
                 <Card className="hover:border-primary/20 transition-all shadow-xs flex flex-col justify-between">
@@ -2523,7 +2675,6 @@ export default function ExamsPage() {
                           setEditingPaper(null);
                           setNewPaper({
                             subject_id: '',
-                            paper_type: 'Written',
                             exam_date: suggestNextExamDate(selectedExam, timetablePapers, holidays),
                             start_time: '',
                             end_time: '',
@@ -2557,19 +2708,19 @@ export default function ExamsPage() {
                 <CardContent className="p-4">
                   <form id="add-paper-form" onSubmit={handleAddPaperLocal} className="space-y-4">
                     {/* Row 1 */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {/* Subject */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Subject Select */}
                       <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-text-secondary uppercase">Subject</label>
+                        <label className="text-xs font-bold text-text-secondary uppercase">Select Subject</label>
                         <Select 
                           value={newPaper.subject_id} 
-                          onChange={e => setNewPaper(p => ({ ...p, subject_id: e.target.value }))} 
-                          required 
-                          disabled={filteredClassSubjects.length === 0}
+                          onChange={e => setNewPaper(p => ({ ...p, subject_id: e.target.value }))}
+                          disabled={Boolean(editingPaper)}
+                          required
                         >
-                          <option value="">Select subject...</option>
-                          {filteredClassSubjects.map(s => {
-                            const isCreated = timetablePapers.some(p => parseInt(p.subject_id) === s.id && (!editingPaper || parseInt(editingPaper.subject_id) !== s.id));
+                          <option value="">-- Choose Subject --</option>
+                          {classSubjects.map(s => {
+                            const isCreated = timetablePapers.some(p => p.subject_id === s.id && (!editingPaper || editingPaper.subject_id !== s.id));
                             return (
                               <option key={s.id} value={s.id}>
                                 {s.name}{isCreated ? ' (Created)' : ''}
@@ -2579,25 +2730,12 @@ export default function ExamsPage() {
                         </Select>
                       </div>
 
-                      {/* Paper Type */}
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-text-secondary uppercase">Paper Type</label>
-                        <Select 
-                          value={newPaper.paper_type} 
-                          onChange={e => setNewPaper(p => ({ ...p, paper_type: e.target.value }))} 
-                          required
-                        >
-                          <option value="Written">Written</option>
-                          <option value="Oral">Oral</option>
-                        </Select>
-                      </div>
-
                       {/* Exam Date */}
                       <div className="space-y-1.5 font-sans">
                         <label className="text-xs font-bold text-text-secondary uppercase">Exam Date</label>
                         <CalendarDatePicker
                           min={(() => {
-                            const todayStr = new Date().toISOString().split('T')[0];
+                            const todayStr = getTodayLocalDateString();
                             return selectedExam.start_date > todayStr ? selectedExam.start_date : todayStr;
                           })()}
                           max={selectedExam.end_date}
@@ -2702,7 +2840,6 @@ export default function ExamsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Subject</TableHead>
-                    <TableHead>Paper Type</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Time</TableHead>
                     <TableHead>Max Marks</TableHead>
@@ -2713,14 +2850,13 @@ export default function ExamsPage() {
                 <TableBody>
                   {timetablePapers.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-text-muted">
+                      <TableCell colSpan={6} className="text-center py-8 text-text-muted">
                         No papers scheduled for this examination yet. Use the form above to add papers.
                       </TableCell>
                     </TableRow>
                   ) : timetablePapers.map((paper, idx) => (
                     <TableRow key={idx}>
                       <TableCell className="font-semibold text-text-primary">{paper.subject_name}</TableCell>
-                      <TableCell className="text-xs font-semibold">{paper.paper_type || 'Written'}</TableCell>
                       <TableCell className="text-xs font-mono">{formatDateString(paper.exam_date)}</TableCell>
                       <TableCell className="text-xs font-mono">{formatTimeString(paper.start_time)} – {formatTimeString(paper.end_time)}</TableCell>
                       <TableCell className="text-xs font-mono">{paper.max_marks}</TableCell>
@@ -2732,7 +2868,6 @@ export default function ExamsPage() {
                               setEditingPaper(paper);
                               setNewPaper({
                                 subject_id: paper.subject_id.toString(),
-                                paper_type: paper.paper_type || 'Written',
                                 exam_date: paper.exam_date,
                                 start_time: paper.start_time.slice(0, 5),
                                 end_time: paper.end_time.slice(0, 5),
@@ -3185,19 +3320,6 @@ export default function ExamsPage() {
                 <Download className="h-3.5 w-3.5" />
                 {generatingClassPdf ? 'Generating Class PDF...' : 'Download Entire Class (PDF)'}
               </Button>
-
-              <Button
-                type="button"
-                variant="outline"
-                className="h-8 text-xs font-bold flex items-center gap-2 border-amber-400 text-amber-700 bg-amber-50 dark:bg-amber-950/20"
-                onClick={() => setIsWeightageModalOpen(true)}
-              >
-                <Settings className="h-3.5 w-3.5" /> Strategy: {
-                  weightagePolicy.strategy === 'weighted_percentage' ? `Weighted (${weightagePolicy.weights['Quarterly']}/${weightagePolicy.weights['Half Yearly']}/${weightagePolicy.weights['Annual']})` :
-                  weightagePolicy.strategy === 'equal_average' ? 'Equal Average' :
-                  weightagePolicy.strategy === 'best_score' ? 'Best Exam Score' : 'Annual Exam Only'
-                }
-              </Button>
             </div>
           </div>
 
@@ -3213,14 +3335,13 @@ export default function ExamsPage() {
                   <TableHead className="whitespace-nowrap select-none">Overall Grade</TableHead>
                   <TableHead className="whitespace-nowrap select-none">Attendance</TableHead>
                   <TableHead className="whitespace-nowrap select-none">Final Verdict</TableHead>
-                  <TableHead className="whitespace-nowrap select-none">Promotion Status</TableHead>
                   <TableHead className="text-right whitespace-nowrap select-none">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {finalSessionReportCards.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-10 text-text-muted">
+                    <TableCell colSpan={9} className="text-center py-10 text-text-muted">
                       No final session report cards calculated. Ensure marks are entered for conducted session exams.
                     </TableCell>
                   </TableRow>
@@ -3240,11 +3361,8 @@ export default function ExamsPage() {
                         {card.summary.result}
                       </span>
                     </TableCell>
-                    <TableCell className="text-xs font-bold text-text-primary uppercase tracking-wide">
-                      {card.summary.promotion_status}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="outline" className="h-7 px-2 text-xs flex items-center gap-1 text-amber-700 border-amber-400/30 bg-amber-500/10 hover:bg-amber-500/20 ml-auto font-bold" onClick={() => handleOpenSingleReportCard(card)}>
+                    <TableCell className="text-right whitespace-nowrap">
+                      <Button variant="outline" className="h-8 px-3 text-xs inline-flex items-center gap-1.5 text-amber-700 border-amber-400/40 bg-amber-500/10 hover:bg-amber-500/20 font-bold whitespace-nowrap shrink-0 ml-auto" onClick={() => handleOpenSingleReportCard(card)}>
                         <FileText className="h-3.5 w-3.5" /> View Final Card
                       </Button>
                     </TableCell>
@@ -3341,17 +3459,35 @@ export default function ExamsPage() {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-text-secondary uppercase">Start Date</label>
-              <Input type="date" value={newExam.start_date} onChange={e => setNewExam(p => ({ ...p, start_date: e.target.value }))} required />
+              <Input 
+                type="date" 
+                min={getExamMinStartDate(null, exams)} 
+                value={newExam.start_date} 
+                onChange={e => setNewExam(p => ({ ...p, start_date: e.target.value }))} 
+                required 
+              />
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-text-secondary uppercase">End Date</label>
-              <Input type="date" value={newExam.end_date} onChange={e => setNewExam(p => ({ ...p, end_date: e.target.value }))} required />
+              <Input 
+                type="date" 
+                min={newExam.start_date || getExamMinStartDate(null, exams)} 
+                value={newExam.end_date} 
+                onChange={e => setNewExam(p => ({ ...p, end_date: e.target.value }))} 
+                required 
+              />
             </div>
           </div>
 
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-text-secondary uppercase">Result Publish Date</label>
-            <Input type="date" value={newExam.publish_date} onChange={e => setNewExam(p => ({ ...p, publish_date: e.target.value }))} required />
+            <Input 
+              type="date" 
+              min={newExam.end_date || newExam.start_date || getExamMinStartDate(null, exams)} 
+              value={newExam.publish_date} 
+              onChange={e => setNewExam(p => ({ ...p, publish_date: e.target.value }))} 
+              required 
+            />
           </div>
 
           <div className="space-y-1.5">
@@ -3419,24 +3555,61 @@ export default function ExamsPage() {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
                <label className="text-xs font-bold text-text-secondary uppercase">Start Date</label>
-               <Input type="date" value={editExamData.start_date} onChange={e => setEditExamData(p => ({ ...p, start_date: e.target.value }))} required />
+               <Input 
+                 type="date" 
+                 min={getExamMinStartDate(editExamData.id, exams)} 
+                 value={editExamData.start_date || ''} 
+                 onChange={e => setEditExamData(p => ({ ...p, start_date: e.target.value }))} 
+               />
             </div>
             <div className="space-y-1.5">
                <label className="text-xs font-bold text-text-secondary uppercase">End Date</label>
-               <Input type="date" value={editExamData.end_date} onChange={e => setEditExamData(p => ({ ...p, end_date: e.target.value }))} required />
+               <Input 
+                 type="date" 
+                 min={editExamData.start_date || getExamMinStartDate(editExamData.id, exams)} 
+                 max={getExamMaxEndDate(editExamData.id, exams) || undefined}
+                 value={editExamData.end_date || ''} 
+                 onChange={e => setEditExamData(p => ({ ...p, end_date: e.target.value }))} 
+               />
             </div>
           </div>
 
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-text-secondary uppercase">Result Publish Date</label>
-            <Input type="date" value={editExamData.publish_date} onChange={e => setEditExamData(p => ({ ...p, publish_date: e.target.value }))} required />
-          </div>
-
-          <div className="space-y-1.5">
-            <label htmlFor="description-optional-2" className="text-xs font-bold text-text-secondary uppercase">Description (Optional)</label>
-            <Input id="description-optional-2" placeholder="Brief details about terms or exam guidelines" value={editExamData.description || ''} onChange={e => setEditExamData(p => ({ ...p, description: e.target.value }))} />
+            <Input 
+              type="date" 
+              min={editExamData.end_date || editExamData.start_date || getExamMinStartDate(editExamData.id, exams)} 
+              value={editExamData.publish_date || ''} 
+              onChange={e => setEditExamData(p => ({ ...p, publish_date: e.target.value }))} 
+            />
           </div>
         </form>
+      </Dialog>
+
+      {/* RESET PAPERS CONFIRMATION DIALOG */}
+      <Dialog isOpen={isResetPapersConfirmOpen} onClose={() => setIsResetPapersConfirmOpen(false)}
+        title="Modify Examination Dates & Reset Papers?"
+        footer={<>
+          <Button variant="secondary" onClick={() => { setIsResetPapersConfirmOpen(false); setIsEditExamOpen(true); }}>Cancel</Button>
+          <Button className="bg-amber-600 hover:bg-amber-700 text-white font-bold" onClick={() => executeExamUpdate(true)} disabled={submitting}>
+            {submitting ? 'Updating & Resetting...' : 'Yes, Update Dates & Reset Papers'}
+          </Button>
+        </>}>
+        <div className="space-y-3 p-1">
+          <div className="mx-auto w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 dark:text-amber-400">
+            <AlertCircle className="h-6 w-6" />
+          </div>
+          <h4 className="text-center font-bold text-text-primary text-sm mt-2">Previously added exam papers & scheme will be reset!</h4>
+          <p className="text-xs text-text-secondary leading-relaxed text-center">
+            You modified the Start Date / End Date for <strong>{selectedExamToEdit?.name}</strong>. 
+            Since papers and timetable entries have already been configured for this examination, changing the dates will <strong>reset (delete) all previously added papers and marks schemes</strong>. You will need to schedule a fresh paper scheme according to the new examination dates.
+          </p>
+          <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 text-center">
+            <p className="text-xs font-bold text-amber-700 dark:text-amber-400">
+              Do you want to proceed and reset added papers for the new dates?
+            </p>
+          </div>
+        </div>
       </Dialog>
 
       {/* DELETE EXAM CONFIRM DIALOG */}
@@ -3596,10 +3769,9 @@ export default function ExamsPage() {
                       <table className="w-full text-left border border-zinc-400 border-collapse text-zinc-900">
                         <thead>
                           <tr className="bg-zinc-100 border-b border-zinc-400 text-zinc-900">
-                            <th className={`border-r border-zinc-400 font-bold uppercase text-zinc-900 whitespace-nowrap w-[20%] ${scaling.tableFontSize} ${scaling.tablePadding}`}>Subject</th>
-                            <th className={`border-r border-zinc-400 font-bold uppercase text-center text-zinc-900 whitespace-nowrap w-[15%] ${scaling.tableFontSize} ${scaling.tablePadding}`}>Paper Type</th>
-                            <th className={`border-r border-zinc-400 font-bold uppercase text-center text-zinc-900 whitespace-nowrap w-[20%] ${scaling.tableFontSize} ${scaling.tablePadding}`}>Date</th>
-                            <th className={`border-r border-zinc-400 font-bold uppercase text-center text-zinc-900 whitespace-nowrap w-[30%] ${scaling.tableFontSize} ${scaling.tablePadding}`}>Time</th>
+                            <th className={`border-r border-zinc-400 font-bold uppercase text-zinc-900 whitespace-nowrap w-[25%] ${scaling.tableFontSize} ${scaling.tablePadding}`}>Subject</th>
+                            <th className={`border-r border-zinc-400 font-bold uppercase text-center text-zinc-900 whitespace-nowrap w-[25%] ${scaling.tableFontSize} ${scaling.tablePadding}`}>Date</th>
+                            <th className={`border-r border-zinc-400 font-bold uppercase text-center text-zinc-900 whitespace-nowrap w-[35%] ${scaling.tableFontSize} ${scaling.tablePadding}`}>Time</th>
                             <th className={`font-bold uppercase text-center text-zinc-900 whitespace-nowrap w-[15%] ${scaling.tableFontSize} ${scaling.tablePadding}`}>Max Marks</th>
                           </tr>
                         </thead>
@@ -3607,7 +3779,6 @@ export default function ExamsPage() {
                           {timetablePapers.map((paper, idx) => (
                             <tr key={idx} className="border-b border-zinc-300 text-zinc-900">
                               <td className={`border-r border-zinc-400 font-semibold whitespace-nowrap ${scaling.tableFontSize} ${scaling.tablePadding}`}>{paper.subject_name}</td>
-                              <td className={`border-r border-zinc-400 text-center whitespace-nowrap ${scaling.tableFontSize} ${scaling.tablePadding}`}>{paper.paper_type || 'Written'}</td>
                               <td className={`border-r border-zinc-400 text-center font-mono whitespace-nowrap ${scaling.tableFontSize} ${scaling.tablePadding}`}>{formatDateString(paper.exam_date)}</td>
                               <td className={`border-r border-zinc-400 text-center font-mono whitespace-nowrap ${scaling.tableFontSize} ${scaling.tablePadding}`}>
                                 {formatTimeString(paper.start_time)} – {formatTimeString(paper.end_time)}
@@ -3723,140 +3894,6 @@ export default function ExamsPage() {
         </div>
       </Dialog>
 
-      {/* WEIGHTAGE POLICY CONFIGURATION DIALOG */}
-      <Dialog isOpen={isWeightageModalOpen} onClose={() => setIsWeightageModalOpen(false)} title="Configure Final Report Calculation Strategy">
-        <div className="space-y-4 pt-2">
-          <p className="text-xs text-text-secondary leading-relaxed">
-            Select how individual exam marks (Quarterly, Half Yearly, Annual) should be combined to calculate the student's Final Academic Report Card.
-          </p>
-
-          <div className="space-y-3">
-            <label className="text-xs font-bold text-text-secondary uppercase">Calculation Strategy</label>
-            
-            <div className="space-y-2">
-              <label className="flex items-center gap-2.5 p-3 border border-border rounded-xl cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-all">
-                <input
-                  type="radio"
-                  name="strategy"
-                  value="weighted_percentage"
-                  checked={weightagePolicy.strategy === 'weighted_percentage'}
-                  onChange={() => setWeightagePolicy(p => ({ ...p, strategy: 'weighted_percentage' }))}
-                  className="accent-primary"
-                />
-                <div>
-                  <span className="text-xs font-bold text-text-primary block">Weighted Ratio Strategy (Configurable Weights)</span>
-                  <span className="text-[11px] text-text-muted block">Apply specific percentage weights to Quarterly, Half Yearly, and Annual exams.</span>
-                </div>
-              </label>
-
-              {weightagePolicy.strategy === 'weighted_percentage' && (
-                <div className="p-3 bg-zinc-50 dark:bg-zinc-900/50 border border-border rounded-xl space-y-3 pl-8 text-xs">
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <span className="text-[11px] font-bold text-text-muted uppercase block">Quarterly (%)</span>
-                      <Input
-                        type="number"
-                        value={customWeightsInput.quarterly}
-                        onChange={e => setCustomWeightsInput(p => ({ ...p, quarterly: parseInt(e.target.value) || 0 }))}
-                        className="h-8 text-xs font-mono"
-                      />
-                    </div>
-                    <div>
-                      <span className="text-[11px] font-bold text-text-muted uppercase block">Half Yearly (%)</span>
-                      <Input
-                        type="number"
-                        value={customWeightsInput.halfYearly}
-                        onChange={e => setCustomWeightsInput(p => ({ ...p, halfYearly: parseInt(e.target.value) || 0 }))}
-                        className="h-8 text-xs font-mono"
-                      />
-                    </div>
-                    <div>
-                      <span className="text-[11px] font-bold text-text-muted uppercase block">Annual (%)</span>
-                      <Input
-                        type="number"
-                        value={customWeightsInput.annual}
-                        onChange={e => setCustomWeightsInput(p => ({ ...p, annual: parseInt(e.target.value) || 0 }))}
-                        className="h-8 text-xs font-mono"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <label className="flex items-center gap-2.5 p-3 border border-border rounded-xl cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-all">
-                <input
-                  type="radio"
-                  name="strategy"
-                  value="equal_average"
-                  checked={weightagePolicy.strategy === 'equal_average'}
-                  onChange={() => setWeightagePolicy(p => ({ ...p, strategy: 'equal_average' }))}
-                  className="accent-primary"
-                />
-                <div>
-                  <span className="text-xs font-bold text-text-primary block">Equal Average Strategy</span>
-                  <span className="text-[11px] text-text-muted block">Equal percentage weightage across all conducted session exams.</span>
-                </div>
-              </label>
-
-              <label className="flex items-center gap-2.5 p-3 border border-border rounded-xl cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-all">
-                <input
-                  type="radio"
-                  name="strategy"
-                  value="best_score"
-                  checked={weightagePolicy.strategy === 'best_score'}
-                  onChange={() => setWeightagePolicy(p => ({ ...p, strategy: 'best_score' }))}
-                  className="accent-primary"
-                />
-                <div>
-                  <span className="text-xs font-bold text-text-primary block">Best Examination Score Strategy</span>
-                  <span className="text-[11px] text-text-muted block">Takes highest subject percentage achieved across session exams.</span>
-                </div>
-              </label>
-
-              <label className="flex items-center gap-2.5 p-3 border border-border rounded-xl cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-all">
-                <input
-                  type="radio"
-                  name="strategy"
-                  value="annual_only"
-                  checked={weightagePolicy.strategy === 'annual_only'}
-                  onChange={() => setWeightagePolicy(p => ({ ...p, strategy: 'annual_only' }))}
-                  className="accent-primary"
-                />
-                <div>
-                  <span className="text-xs font-bold text-text-primary block">Annual Exam Only Strategy</span>
-                  <span className="text-[11px] text-text-muted block">100% weightage on final Annual Examination marks.</span>
-                </div>
-              </label>
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2 border-t border-border pt-4">
-            <Button type="button" variant="secondary" onClick={() => setIsWeightageModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={() => {
-                const updatedPolicy = {
-                  ...weightagePolicy,
-                  weights: {
-                    'Quarterly': customWeightsInput.quarterly,
-                    'Half Yearly': customWeightsInput.halfYearly,
-                    'Annual': customWeightsInput.annual
-                  }
-                };
-                setWeightagePolicy(updatedPolicy);
-                setIsWeightageModalOpen(false);
-                if (selectedClassId) {
-                  handleOpenFinalSessionReportCards(selectedClassId);
-                }
-              }}
-            >
-              Apply Calculation Strategy
-            </Button>
-          </div>
-        </div>
-      </Dialog>
 
     </div>
   );

@@ -283,6 +283,27 @@ class PlatformService extends BaseService
             ':end_date' => $endDate
         ]);
 
+        // Create initial School Administrator user account
+        $adminPhone = !empty($data['admin_phone']) ? trim((string)$data['admin_phone']) : trim((string)($data['contact_phone'] ?? ''));
+        $rawPassword = !empty($data['admin_password']) ? (string)$data['admin_password'] : 'changeme123';
+        $adminName = trim((string)($data['name'] ?? 'School')) . ' Admin';
+        $adminEmail = !empty($data['contact_email']) ? trim((string)$data['contact_email']) : null;
+
+        if (!empty($adminPhone)) {
+            $stmtAdmin = $pdo->prepare("
+                INSERT INTO users (phone, password, role, name, status, school_id, force_password_change, email, plain_password)
+                VALUES (:phone, :password, 'SCHOOL_ADMIN', :name, 'ACTIVE', :school_id, 0, :email, :plain_password)
+            ");
+            $stmtAdmin->execute([
+                ':phone' => $adminPhone,
+                ':password' => password_hash($rawPassword, PASSWORD_BCRYPT),
+                ':name' => $adminName,
+                ':school_id' => $schoolId,
+                ':email' => $adminEmail,
+                ':plain_password' => $rawPassword,
+            ]);
+        }
+
         $actorInfo = $this->actorInfo($actor);
         $this->auditLogs->log(
             'Create school',
@@ -409,18 +430,69 @@ class PlatformService extends BaseService
 
         $pdo = $this->schools->getPdo();
 
-        // Check subscriptions count
-        $stmtSub = $pdo->prepare("SELECT COUNT(*) FROM subscriptions WHERE school_id = :school_id");
-        $stmtSub->execute([':school_id' => $id]);
-        $subCount = (int)$stmtSub->fetchColumn();
-
-        if ($school['status'] === 'ACTIVE' && $subCount > 0) {
+        // Active status validation: Block deletion of active schools
+        $status = strtoupper((string)($school['status'] ?? ''));
+        if ($status === 'ACTIVE') {
             throw new \App\Shared\Exceptions\ValidationException([
-                'delete' => 'Cannot delete an active school that has subscription history. Please suspend the school first.'
+                'delete' => 'This school is currently Active. Active schools cannot be deleted. Please suspend/deactivate the school first before deleting.'
             ]);
         }
 
-        $this->schools->delete($id);
+        $pdo->beginTransaction();
+        try {
+            // Delete all related tenant records across child tables to prevent FK constraint failures
+            $childTables = [
+                'academic_year_disabled_subjects',
+                'timetable',
+                'period_configurations',
+                'examination_seating_plans',
+                'examination_marks',
+                'examination_papers',
+                'examinations',
+                'final_academic_reports',
+                'academic_achievement_snapshots',
+                'student_transport_fees',
+                'late_payment_penalty_history',
+                'late_payment_penalty_applications',
+                'late_payment_penalty_configs',
+                'fee_payments',
+                'class_fee_configurations',
+                'additional_fee_types',
+                'fee_follow_ups',
+                'school_expenses',
+                'school_finance_settings',
+                'leave_requests',
+                'holidays',
+                'staff_payments',
+                'staff',
+                'students',
+                'subjects',
+                'classes',
+                'academic_years',
+                'subscriptions',
+                'users'
+            ];
+
+            foreach ($childTables as $table) {
+                $stmtCheck = $pdo->prepare("SHOW TABLES LIKE :table");
+                $stmtCheck->execute([':table' => $table]);
+                if ($stmtCheck->fetchColumn() !== false) {
+                    $stmtCol = $pdo->prepare("SHOW COLUMNS FROM `{$table}` LIKE 'school_id'");
+                    $stmtCol->execute();
+                    if ($stmtCol->fetchColumn() !== false) {
+                        $pdo->prepare("DELETE FROM `{$table}` WHERE school_id = :sid")->execute([':sid' => $id]);
+                    }
+                }
+            }
+
+            $this->schools->delete($id);
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
 
         $actorInfo = $this->actorInfo($actor);
         $this->auditLogs->log(
@@ -769,6 +841,14 @@ class PlatformService extends BaseService
                 $actionStr
             );
 
+            // Ensure columns exist on target database safely
+            try {
+                $pdo->exec("ALTER TABLE dashboard_notifications ADD COLUMN user_role VARCHAR(50) DEFAULT 'SCHOOL_ADMIN'");
+            } catch (\Throwable $ex) {}
+            try {
+                $pdo->exec("ALTER TABLE dashboard_notifications ADD COLUMN user_id INT DEFAULT NULL");
+            } catch (\Throwable $ex) {}
+
             // Send School Admin Notification
             $stmtAdmins = $pdo->prepare("SELECT id FROM users WHERE school_id = :school_id AND role = 'SCHOOL_ADMIN'");
             $stmtAdmins->execute([':school_id' => $schoolId]);
@@ -777,14 +857,26 @@ class PlatformService extends BaseService
             $notifTitle = "Subscription Upgraded Successfully";
             $notifMsg = "Your school's subscription has been upgraded to **{$newPlan['name']}**. Your new subscription benefits are now active.";
 
-            $stmtNotif = $pdo->prepare("
-                INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, is_read)
-                VALUES (:school_id, 'SCHOOL_ADMIN', :user_id, :title, :message, '/school-admin/profile/subscription', 0)
-            ");
-            foreach ($adminIds as $adminId) {
+            if (!empty($adminIds)) {
+                $stmtNotif = $pdo->prepare("
+                    INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, is_read)
+                    VALUES (:school_id, 'SCHOOL_ADMIN', :user_id, :title, :message, '/school-admin/profile/subscription', 0)
+                ");
+                foreach ($adminIds as $adminId) {
+                    $stmtNotif->execute([
+                        ':school_id' => $schoolId,
+                        ':user_id' => $adminId,
+                        ':title' => $notifTitle,
+                        ':message' => $notifMsg
+                    ]);
+                }
+            } else {
+                $stmtNotif = $pdo->prepare("
+                    INSERT INTO dashboard_notifications (school_id, user_role, title, message, link, is_read)
+                    VALUES (:school_id, 'SCHOOL_ADMIN', :title, :message, '/school-admin/profile/subscription', 0)
+                ");
                 $stmtNotif->execute([
                     ':school_id' => $schoolId,
-                    ':user_id' => $adminId,
                     ':title' => $notifTitle,
                     ':message' => $notifMsg
                 ]);

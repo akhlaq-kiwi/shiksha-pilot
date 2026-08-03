@@ -300,7 +300,6 @@ export default function DashboardPage({ onNavigate }) {
       <OnboardingChecklist
         scopeKey={currentYear?.school_id ?? currentYear?.id ?? 'default'}
         items={[
-          { id: 'academic-year', label: 'Create an academic year', done: !!currentYear, onClick: () => onNavigate?.('audits-settings') },
           { id: 'classes', label: 'Add classes & sections', done: classes.length > 0, onClick: () => onNavigate?.('classes') },
           { id: 'fee-structure', label: 'Set up a fee structure', done: feeStructures.length > 0, onClick: () => onNavigate?.('finance') },
           { id: 'teachers', label: 'Add teachers', done: staff.length > 0, onClick: () => onNavigate?.('staff') },

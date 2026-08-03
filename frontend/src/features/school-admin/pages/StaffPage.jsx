@@ -1517,15 +1517,18 @@ export default function StaffPage() {
                           console.error(`[Validation Error] Teacher ${t.name} has assigned periods (${rawAssigned}) exceeding max allowed (${max}).`);
                           assigned = max;
                         }
+                        const isInactive = String(t.status || '').toUpperCase() === 'INACTIVE';
                         const isOccupied = assigned === max;
                         return (
                           <>
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold uppercase border ${
-                              isOccupied 
-                                ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
-                                : 'bg-green-500/10 text-green-600 border-green-500/20'
+                              isInactive
+                                ? 'bg-red-500/10 text-red-600 border-red-500/20'
+                                : isOccupied 
+                                  ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+                                  : 'bg-green-500/10 text-green-600 border-green-500/20'
                             }`}>
-                              {isOccupied ? 'Occupied' : 'Available'}
+                              {isInactive ? 'Inactive' : isOccupied ? 'Occupied' : 'Available'}
                             </span>
                             
                             <span className="text-[11px] text-text-muted font-bold font-sans">
@@ -2253,7 +2256,7 @@ export default function StaffPage() {
                     <p>Payment Transaction ID: <span className="text-zinc-800 font-mono font-bold">TXN-SL-{String(selectedSlipPayment.id).padStart(5, '0')}</span></p>
                   </div>
                   <div className="text-right">
-                    <p>Slip Generated Date: <span className="text-zinc-800 font-bold">{formatDate(new Date().toISOString().split('T')[0])}</span></p>
+                    <p>Slip Generated Date: <span className="text-zinc-800 font-bold">{formatDate((() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })())}</span></p>
                     <p>Payment Status: <span className="text-green-600 font-bold uppercase">PAID</span></p>
                   </div>
                 </div>
@@ -2363,10 +2366,10 @@ export default function StaffPage() {
             <div className="p-3.5 bg-zinc-50 dark:bg-zinc-900 border border-border rounded-xl space-y-1">
               <p className="text-[11px] font-bold uppercase text-text-muted tracking-wider">Calculated Experience Tenure</p>
               <p className="text-sm font-bold text-indigo-600 dark:text-indigo-400">
-                {calculateExperience(effectiveJoiningDate, teacherDetails?.exit_date || new Date().toISOString().split('T')[0]) || '0 Days'}
+                {calculateExperience(effectiveJoiningDate, teacherDetails?.exit_date || (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })()) || '0 Days'}
               </p>
               <p className="text-[11px] text-text-muted italic">
-                From {formatDate(effectiveJoiningDate)} to {formatDate(teacherDetails?.exit_date || new Date().toISOString().split('T')[0])}
+                From {formatDate(effectiveJoiningDate)} to {formatDate(teacherDetails?.exit_date || (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })())}
               </p>
             </div>
           </div>
@@ -2440,13 +2443,13 @@ export default function StaffPage() {
               {/* Letter Body */}
               <div className="text-sm text-zinc-800 leading-relaxed space-y-6 pt-6 text-justify">
                 <p>
-                  This is to certify that <strong>Mr./Ms. {teacherDetails?.name}</strong>, son/daughter of <strong>Mr. {teacherDetails?.father_name || '—'}</strong>, was employed with <strong>{schoolProfile?.name || 'ABC Public School'}</strong> as a <strong>Teacher</strong> teaching the subject of <strong>{teacherDetails?.department || 'General'}</strong> from <strong>{formatDateFull(effectiveJoiningDate)}</strong> to <strong>{formatDateFull(teacherDetails?.exit_date || new Date().toISOString().split('T')[0])}</strong>.
+                  This is to certify that <strong>Mr./Ms. {teacherDetails?.name}</strong>, son/daughter of <strong>Mr. {teacherDetails?.father_name || '—'}</strong>, was employed with <strong>{schoolProfile?.name || 'ABC Public School'}</strong> as a <strong>Teacher</strong> teaching the subject of <strong>{teacherDetails?.department || 'General'}</strong> from <strong>{formatDateFull(effectiveJoiningDate)}</strong> to <strong>{formatDateFull(teacherDetails?.exit_date || (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })())}</strong>.
                 </p>
                 <p>
                   During his/her tenure of service, he/she carried out the assigned responsibilities sincerely, maintained professional conduct, demonstrated dedication toward students, and contributed positively to the academic environment of the school.
                 </p>
                 <p>
-                  His/Her total experience with our institution is calculated as <strong>{calculateExperience(effectiveJoiningDate, teacherDetails?.exit_date || new Date().toISOString().split('T')[0])}</strong>.
+                  His/Her total experience with our institution is calculated as <strong>{calculateExperience(effectiveJoiningDate, teacherDetails?.exit_date || (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })())}</strong>.
                 </p>
                 <p>
                   We highly appreciate his/her valuable services and contribution during the tenure and wish him/her success in all future endeavors.
