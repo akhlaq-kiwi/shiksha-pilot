@@ -815,7 +815,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
         Widget avatarChild;
         if (photoUrl.isNotEmpty) {
-          final fullUrl = photoUrl.startsWith('http') ? photoUrl : 'http://10.55.253.71:8000' + photoUrl;
+          final fullUrl = photoUrl.startsWith('http') ? photoUrl : '${widget.leaveService.baseUrl}$photoUrl';
           avatarChild = ClipOval(
             child: Image.network(
               fullUrl,
@@ -1041,13 +1041,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
         ).then((_) => _fetchUnreadNotificationsCount());
-      } else if (feature.name == 'Salary') {
+      } else if (feature.name == 'Salary' || feature.name == 'Staff Salary' || feature.name == 'Salaries') {
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('auth_token') ?? widget.leaveService.token;
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => SalaryCardScreen(
               baseUrl: widget.leaveService.baseUrl,
-              token: widget.leaveService.token,
+              token: token,
             ),
           ),
         );
@@ -1181,7 +1183,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         }
 
                         if (photoUrl.isNotEmpty) {
-                          final fullUrl = photoUrl.startsWith('http') ? photoUrl : 'http://10.55.253.71:8000' + photoUrl;
+                          final fullUrl = photoUrl.startsWith('http') ? photoUrl : '${widget.leaveService.baseUrl}$photoUrl';
                           Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -1211,7 +1213,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                               }
 
                               if (photoUrl.isNotEmpty) {
-                                final fullUrl = photoUrl.startsWith('http') ? photoUrl : 'http://10.55.253.71:8000' + photoUrl;
+                                final fullUrl = photoUrl.startsWith('http') ? photoUrl : '${widget.leaveService.baseUrl}$photoUrl';
                                 return ClipOval(
                                   child: Image.network(
                                     fullUrl,

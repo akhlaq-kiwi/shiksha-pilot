@@ -52,7 +52,7 @@ class NotificationHelper {
               final token = prefs.getString('auth_token') ?? '';
               final userRole = prefs.getString('user_role') ?? '';
               final studentId = prefs.getInt('selected_student_id');
-              final baseUrl = prefs.getString('base_url') ?? 'http://10.55.253.71:8000';
+              final baseUrl = prefs.getString('base_url') ?? 'http://127.0.0.1:8000';
               if (token.isEmpty || userRole.isEmpty) return;
 
               final leaveService = LeaveService(baseUrl: baseUrl, token: token);

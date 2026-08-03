@@ -22,7 +22,7 @@ void callbackDispatcher() {
           final prefs = await SharedPreferences.getInstance();
           final token = prefs.getString('auth_token') ?? '';
           final userRole = prefs.getString('user_role') ?? '';
-          final baseUrl = prefs.getString('base_url') ?? 'http://10.55.253.71:8000';
+          final baseUrl = prefs.getString('base_url') ?? 'http://127.0.0.1:8000';
           if (token.isEmpty || userRole.isEmpty) return true;
 
           final isSchoolStaff = userRole.toUpperCase() == 'TEACHER' || 
@@ -169,9 +169,10 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
     final role = prefs.getString('user_role');
+    final baseUrl = prefs.getString('base_url') ?? 'http://127.0.0.1:8000';
 
     if (token != null && role != null) {
-      final leaveService = LeaveService(baseUrl: _baseUrl, token: token);
+      final leaveService = LeaveService(baseUrl: baseUrl, token: token);
       
       final roleUpper = role.toUpperCase();
       if (roleUpper == 'PARENT' || roleUpper == 'STUDENT') {
@@ -316,7 +317,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _serverUrlController = TextEditingController(text: 'http://10.55.253.71:8000');
+  final _serverUrlController = TextEditingController(text: 'http://127.0.0.1:8000');
   
   bool _obscurePassword = true;
   bool _isLoading = false;
