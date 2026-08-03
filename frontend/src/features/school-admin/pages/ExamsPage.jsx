@@ -454,6 +454,7 @@ export default function ExamsPage() {
   const [holidays, setHolidays] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
   const [success, setSuccess] = useState('');
 
   // Selected Contexts
@@ -1025,9 +1026,10 @@ export default function ExamsPage() {
   // Timetable Handlers
   const handleOpenTimetable = async (exam, classId) => {
     setError('');
+    setInfo('');
     setSuccess('');
     if (!exam || !exam.start_date || !exam.end_date) {
-      setError('Please edit and configure the examination period (Start Date and End Date) before scheduling paper timetables.');
+      setInfo('Please edit and configure the examination period (Start Date and End Date) before scheduling paper timetables.');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
@@ -2146,16 +2148,21 @@ export default function ExamsPage() {
       </div>
 
       {/* Global alert bar */}
-      {(error || success) && (
-        <div className="no-print">
+      {(error || info || success) && (
+        <div className="no-print space-y-2">
           {error && (
             <div className="p-3.5 bg-red-500/10 border border-red-500/20 text-red-600 rounded-lg text-xs font-semibold flex items-center gap-2">
-              <AlertCircle className="h-4 w-4" /> {error}
+              <AlertCircle className="h-4 w-4 shrink-0" /> {error}
+            </div>
+          )}
+          {info && (
+            <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 rounded-lg text-xs font-semibold flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" /> {info}
             </div>
           )}
           {success && (
-            <div className="p-3.5 bg-green-500/10 border border-green-500/20 text-green-600 rounded-lg text-xs font-semibold flex items-center gap-2 mt-2">
-              <CheckCircle className="h-4 w-4" /> {success}
+            <div className="p-3.5 bg-green-500/10 border border-green-500/20 text-green-600 rounded-lg text-xs font-semibold flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 shrink-0" /> {success}
             </div>
           )}
         </div>
@@ -3341,14 +3348,13 @@ export default function ExamsPage() {
                   <TableHead className="whitespace-nowrap select-none">Overall Grade</TableHead>
                   <TableHead className="whitespace-nowrap select-none">Attendance</TableHead>
                   <TableHead className="whitespace-nowrap select-none">Final Verdict</TableHead>
-                  <TableHead className="whitespace-nowrap select-none">Promotion Status</TableHead>
                   <TableHead className="text-right whitespace-nowrap select-none">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {finalSessionReportCards.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-10 text-text-muted">
+                    <TableCell colSpan={9} className="text-center py-10 text-text-muted">
                       No final session report cards calculated. Ensure marks are entered for conducted session exams.
                     </TableCell>
                   </TableRow>
@@ -3368,11 +3374,8 @@ export default function ExamsPage() {
                         {card.summary.result}
                       </span>
                     </TableCell>
-                    <TableCell className="text-xs font-bold text-text-primary uppercase tracking-wide">
-                      {card.summary.promotion_status}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="outline" className="h-7 px-2 text-xs flex items-center gap-1 text-amber-700 border-amber-400/30 bg-amber-500/10 hover:bg-amber-500/20 ml-auto font-bold" onClick={() => handleOpenSingleReportCard(card)}>
+                    <TableCell className="text-right whitespace-nowrap">
+                      <Button variant="outline" className="h-8 px-3 text-xs inline-flex items-center gap-1.5 text-amber-700 border-amber-400/40 bg-amber-500/10 hover:bg-amber-500/20 font-bold whitespace-nowrap shrink-0 ml-auto" onClick={() => handleOpenSingleReportCard(card)}>
                         <FileText className="h-3.5 w-3.5" /> View Final Card
                       </Button>
                     </TableCell>
