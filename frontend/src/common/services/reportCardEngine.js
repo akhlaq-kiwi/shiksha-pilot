@@ -80,7 +80,7 @@ export function compileReportCardData(card = {}, schoolProfile = {}, currentYear
         subject_name: s.subject_name || s.name || 'Subject',
         marks_obtained: assignedGrade,
         max_marks: 'GRADE',
-        passing_marks: '—',
+        passing_marks: 'C',
         grade: assignedGrade,
         result: 'PASS',
         is_grade_only: true
@@ -124,13 +124,9 @@ export function compileReportCardData(card = {}, schoolProfile = {}, currentYear
   const teacherRemark = card.report_card_remark || schoolProfile?.report_card_remark || '';
 
   const attendance = {
-    present_days: card.attendance?.present_days ?? card.present_days ?? 0,
-    working_days: card.attendance?.working_days ?? card.working_days ?? 0,
-    attendance_rate: card.attendance?.attendance_rate ?? (
-      (card.attendance?.working_days || 0) > 0 
-        ? parseFloat(((card.attendance.present_days / card.attendance.working_days) * 100).toFixed(1))
-        : 0
-    )
+    total_days: card.attendance_total || card.total_days || 220,
+    present_days: card.attendance_present || card.present_days || 210,
+    percentage: card.attendance_pct || card.attendance_percentage || 95.45
   };
 
   return {
@@ -145,13 +141,12 @@ export function compileReportCardData(card = {}, schoolProfile = {}, currentYear
       percentage,
       grade: overallGrade,
       gpa,
-      class_rank: card.class_rank || '1st',
-      section_rank: card.section_rank || '1st',
       result: resultStatus,
-      attendance,
-      promotion_status: promotionStatus,
-      teacher_remark: teacherRemark
-    }
+      promotion_status: promotionStatus
+    },
+    attendance,
+    teacher_remark: teacherRemark,
+    is_final_session_report: false
   };
 }
 
@@ -160,29 +155,20 @@ export function compileReportCardData(card = {}, schoolProfile = {}, currentYear
  * Combines multiple examination result cards for a student across an entire academic year
  * into a multi-exam breakdown table matching paper report card standards (Screenshot 2).
  */
-export function compileFinalSessionReportCardData(
-  examCards = [],
-  weightagePolicy = { strategy: 'weighted_percentage', weights: { 'Quarterly': 20, 'Half Yearly': 30, 'Annual': 50 } },
-  schoolProfile = {},
-  currentYear = {}
-) {
-  if (!examCards || examCards.length === 0) {
+export function compileFinalSessionReportCardData(examCards = [], weightagePolicy = {}, schoolProfile = {}, currentYear = {}) {
+  if (!Array.isArray(examCards) || examCards.length === 0) {
     return null;
   }
 
-  // Base student info from first available card
-  const firstCard = examCards[0];
+  const baseCard = examCards[0] || {};
   const student = {
-    id: firstCard.student_id || firstCard.id || null,
-    name: firstCard.student_name || firstCard.name || 'Student Name',
-    roll_no: firstCard.roll_no || firstCard.roll || '—',
-    admission_no: firstCard.admission_no || firstCard.sr_no || '—',
-    class_name: firstCard.class_name || '—',
-    section: firstCard.class_section || firstCard.section || '',
-    father_name: firstCard.father_name || '—',
-    mother_name: firstCard.mother_name || '—',
-    dob: formatDateOfBirth(firstCard.date_of_birth || firstCard.dob),
-    photo_path: firstCard.photo_path || firstCard.avatar_url || null
+    id: baseCard.student_id || baseCard.id || null,
+    name: baseCard.student_name || baseCard.name || 'Student Name',
+    roll_no: baseCard.roll_no || baseCard.roll || '—',
+    admission_no: baseCard.admission_no || baseCard.sr_no || '—',
+    class_name: baseCard.class_name || baseCard.class || 'Class 1',
+    section: baseCard.class_section || baseCard.section || '',
+    dob: formatDateOfBirth(baseCard.dob)
   };
 
   const school = {
@@ -197,13 +183,7 @@ export function compileFinalSessionReportCardData(
   };
 
   const academic_year = {
-    name: currentYear?.name || firstCard.academic_year_name || '2026–2027'
-  };
-
-  const exam_info = {
-    name: 'FINAL ACADEMIC REPORT CARD',
-    type: 'Annual Session Summary',
-    is_final_session_report: true
+    name: currentYear?.name || baseCard.academic_year_name || '2026–2027'
   };
 
   // Collect unique exam names in chronological order
@@ -231,11 +211,12 @@ export function compileFinalSessionReportCardData(
                           sub.evaluation_type === 'grade' || 
                           parseFloat(sub.max_marks) === 0 || 
                           ['A+', 'A', 'B', 'C', 'D', 'E'].includes(rawVal);
+      const assignedGrade = rawVal && rawVal !== '—' ? rawVal : (sub.grade || 'A');
       subjectMap[name][examName] = {
-        marks_obtained: isGradeOnly ? '—' : (parseFloat(sub.marks_obtained) || 0),
-        max_marks: isGradeOnly ? '—' : (parseFloat(sub.max_marks) || 100),
-        passing_marks: isGradeOnly ? '—' : (parseFloat(sub.passing_marks) || 33),
-        grade: sub.grade || (rawVal && rawVal !== '—' ? rawVal : 'A'),
+        marks_obtained: isGradeOnly ? assignedGrade : (parseFloat(sub.marks_obtained) || 0),
+        max_marks: isGradeOnly ? 'GRADE' : (parseFloat(sub.max_marks) || 100),
+        passing_marks: isGradeOnly ? 'C' : (parseFloat(sub.passing_marks) || 33),
+        grade: assignedGrade,
         is_grade_only: isGradeOnly
       };
     });
@@ -279,11 +260,11 @@ export function compileFinalSessionReportCardData(
     return {
       subject_name: subjName,
       exam_scores: examScoresMap,
-      grand_total_max: hasNumericScore ? grandTotalMax : '—',
-      grand_total_obtained: hasNumericScore ? grandTotalObtained : '—',
-      marks_obtained: hasNumericScore ? grandTotalObtained : '—',
-      max_marks: hasNumericScore ? grandTotalMax : '—',
-      passing_marks: 33,
+      grand_total_max: hasNumericScore ? grandTotalMax : 'GRADE',
+      grand_total_obtained: hasNumericScore ? grandTotalObtained : lastAssignedGrade,
+      marks_obtained: hasNumericScore ? grandTotalObtained : lastAssignedGrade,
+      max_marks: hasNumericScore ? grandTotalMax : 'GRADE',
+      passing_marks: hasNumericScore ? 33 : 'C',
       grade,
       result: hasNumericScore ? (grandTotalObtained >= (grandTotalMax * 0.33) ? 'PASS' : 'FAIL') : 'PASS',
       is_grade_only: !hasNumericScore
@@ -322,7 +303,7 @@ export function compileFinalSessionReportCardData(
 
   const attendanceRate = totalWorkingDays > 0 
     ? parseFloat(((totalPresentDays / totalWorkingDays) * 100).toFixed(1))
-    : (firstCard.attendance?.attendance_rate || 94.55);
+    : (baseCard.attendance?.attendance_rate || 94.55);
 
   const teacherRemark = schoolProfile?.report_card_remark || '';
 
@@ -331,7 +312,11 @@ export function compileFinalSessionReportCardData(
     student,
     school,
     academic_year,
-    exam: exam_info,
+    exam: {
+      name: 'FINAL ACADEMIC REPORT CARD',
+      type: 'Annual Session Summary',
+      is_final_session_report: true
+    },
     session_exams,
     subjects: finalSubjects,
     exam_totals: examTotalsMap,
@@ -341,8 +326,8 @@ export function compileFinalSessionReportCardData(
       percentage,
       grade: overallGrade,
       gpa,
-      class_rank: firstCard.class_rank || '1st',
-      section_rank: firstCard.section_rank || '1st',
+      class_rank: baseCard.class_rank || '1st',
+      section_rank: baseCard.section_rank || '1st',
       result: resultStatus,
       attendance: {
         present_days: totalPresentDays || 208,
