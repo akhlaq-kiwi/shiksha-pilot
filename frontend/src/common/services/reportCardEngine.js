@@ -69,6 +69,24 @@ export function compileReportCardData(card = {}, schoolProfile = {}, currentYear
 
   const rawSubjects = Array.isArray(card.subjects) ? card.subjects : [];
   const subjects = rawSubjects.map((s) => {
+    const rawVal = String(s.marks_obtained ?? s.marks ?? '').toUpperCase().trim();
+    const isGradeOnly = s.evaluation_type === 'grade' || 
+                        parseFloat(s.max_marks) === 0 || 
+                        ['A+', 'A', 'B', 'C', 'D', 'E'].includes(rawVal);
+
+    if (isGradeOnly) {
+      const assignedGrade = rawVal && rawVal !== '—' ? rawVal : (s.grade || 'A');
+      return {
+        subject_name: s.subject_name || s.name || 'Subject',
+        marks_obtained: '—',
+        max_marks: '—',
+        passing_marks: '—',
+        grade: assignedGrade,
+        result: 'PASS',
+        is_grade_only: true
+      };
+    }
+
     const obtained = parseFloat(s.marks_obtained) || 0;
     const max = parseFloat(s.max_marks) || 100;
     const pass = parseFloat(s.passing_marks) || 33;
@@ -80,12 +98,14 @@ export function compileReportCardData(card = {}, schoolProfile = {}, currentYear
       max_marks: max,
       passing_marks: pass,
       grade: s.grade || calculateDefaultGrade(obtained, max),
-      result: s.result || result
+      result: s.result || result,
+      is_grade_only: false
     };
   });
 
-  const totalObtained = parseFloat(card.total_obtained) || subjects.reduce((sum, s) => sum + s.marks_obtained, 0);
-  const totalMax = parseFloat(card.total_max) || subjects.reduce((sum, s) => sum + s.max_marks, 0);
+  const numericSubjects = subjects.filter(s => !s.is_grade_only);
+  const totalObtained = parseFloat(card.total_obtained) || numericSubjects.reduce((sum, s) => sum + (parseFloat(s.marks_obtained) || 0), 0);
+  const totalMax = parseFloat(card.total_max) || numericSubjects.reduce((sum, s) => sum + (parseFloat(s.max_marks) || 0), 0);
   const percentage = card.percentage ? parseFloat(card.percentage) : (totalMax > 0 ? parseFloat(((totalObtained / totalMax) * 100).toFixed(2)) : 0);
   const overallGrade = card.grade || calculateDefaultGrade(totalObtained, totalMax);
   const gpa = (percentage / 10).toFixed(1);

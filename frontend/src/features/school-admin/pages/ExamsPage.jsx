@@ -522,6 +522,8 @@ export default function ExamsPage() {
     exam_date: '',
     start_time: '09:00',
     end_time: '11:00',
+    evaluation_type: 'marks',
+    grading_scale: 'A,B,C,D,E',
     max_marks: '100',
     passing_marks: '40',
     room: ''
@@ -1166,6 +1168,10 @@ export default function ExamsPage() {
       return;
     }
 
+    const isGradeType = newPaper.evaluation_type === 'grade';
+    const finalMaxMarks = isGradeType ? 0 : maxMarksParsed;
+    const finalPassingMarks = isGradeType ? 0 : passingMarksParsed;
+
     let updatedPapers = [];
     if (editingPaper) {
       updatedPapers = timetablePapers.map(p => {
@@ -1174,8 +1180,10 @@ export default function ExamsPage() {
           return {
             ...p,
             ...newPaper,
-            max_marks: maxMarksParsed,
-            passing_marks: passingMarksParsed,
+            evaluation_type: newPaper.evaluation_type || 'marks',
+            grading_scale: newPaper.grading_scale || 'A,B,C,D,E',
+            max_marks: finalMaxMarks,
+            passing_marks: finalPassingMarks,
             subject_name: matchedSubject ? matchedSubject.name : 'Unknown Subject'
           };
         }
@@ -1185,8 +1193,10 @@ export default function ExamsPage() {
       const matchedSubject = subjects.find(s => s.id === parseInt(newPaper.subject_id));
       const paperObj = {
         ...newPaper,
-        max_marks: maxMarksParsed,
-        passing_marks: passingMarksParsed,
+        evaluation_type: newPaper.evaluation_type || 'marks',
+        grading_scale: newPaper.grading_scale || 'A,B,C,D,E',
+        max_marks: finalMaxMarks,
+        passing_marks: finalPassingMarks,
         subject_name: matchedSubject ? matchedSubject.name : 'Unknown Subject'
       };
       updatedPapers = [...timetablePapers, paperObj];
@@ -1209,6 +1219,8 @@ export default function ExamsPage() {
         exam_date: suggestNextExamDate(selectedExam, refreshedList || [], holidays),
         start_time: newPaper.start_time || '09:00',
         end_time: newPaper.end_time || '11:00',
+        evaluation_type: 'marks',
+        grading_scale: 'A,B,C,D,E',
         max_marks: '100',
         passing_marks: '40',
         room: ''
@@ -1511,20 +1523,39 @@ export default function ExamsPage() {
           }
         }
         if (field === 'marks_obtained') {
-          if (value === '') {
-            val = '';
+          const currentPaper = timetablePapers.find(p => p.subject_id.toString() === selectedSubjectId);
+          const isGradeSheet = marksSheet.evaluation_type === 'grade' || parseFloat(marksSheet.max_marks) === 0 || currentPaper?.evaluation_type === 'grade';
+
+          if (isGradeSheet) {
+            const rawVal = value ? value.toString().trim().toUpperCase() : '';
+            const validGrades = ['A+', 'A', 'B', 'C', 'D', 'E', 'ABSENT', ''];
+            if (!validGrades.includes(rawVal)) {
+              setError(`Invalid Grade entry. Please select a valid grade option (A+, A, B, C, D, E).`);
+              setTimeout(() => setError(''), 4000);
+              isInvalid = true;
+              return s;
+            }
+            val = rawVal;
           } else {
-            const sanitized = value.replace(/\D/g, '');
-            if (sanitized === '') {
-              isInvalid = true;
-              return s;
+            if (value === '') {
+              val = '';
+            } else {
+              const sanitized = value.replace(/\D/g, '');
+              if (sanitized === '') {
+                setError('Invalid entry. Only numerical marks are allowed for this subject.');
+                setTimeout(() => setError(''), 4000);
+                isInvalid = true;
+                return s;
+              }
+              const parsed = parseInt(sanitized, 10);
+              if (parsed > marksSheet.max_marks) {
+                setError(`Marks obtained cannot exceed maximum marks (${marksSheet.max_marks}).`);
+                setTimeout(() => setError(''), 4000);
+                isInvalid = true;
+                return s;
+              }
+              val = parsed.toString();
             }
-            const parsed = parseInt(sanitized, 10);
-            if (parsed > marksSheet.max_marks) {
-              isInvalid = true;
-              return s;
-            }
-            val = parsed.toString();
           }
         }
         if (s[field] === val) {
@@ -2752,7 +2783,27 @@ export default function ExamsPage() {
                     </div>
 
                     {/* Row 2 */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                      {/* Evaluation Type */}
+                      <div className="space-y-1.5 md:col-span-1">
+                        <label className="text-xs font-bold text-text-secondary uppercase">Evaluation Type</label>
+                        <Select 
+                          value={newPaper.evaluation_type || 'marks'} 
+                          onChange={e => {
+                            const evalType = e.target.value;
+                            setNewPaper(p => ({
+                              ...p,
+                              evaluation_type: evalType,
+                              max_marks: evalType === 'grade' ? '0' : (p.max_marks || '100'),
+                              passing_marks: evalType === 'grade' ? '0' : (p.passing_marks || '40')
+                            }));
+                          }}
+                        >
+                          <option value="marks">Marks Based (0-100)</option>
+                          <option value="grade">Grade Based (A, B, C, D)</option>
+                        </Select>
+                      </div>
+
                       {/* Start Time */}
                       <div className="space-y-1.5">
                         <label className="text-xs font-bold text-text-secondary uppercase">Start Time</label>
@@ -2765,17 +2816,32 @@ export default function ExamsPage() {
                         <Input type="time" value={newPaper.end_time} onChange={e => setNewPaper(p => ({ ...p, end_time: e.target.value }))} required />
                       </div>
 
-                      {/* Max Marks */}
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-text-secondary uppercase">Maximum Marks</label>
-                        <Input type="number" value={newPaper.max_marks} onChange={e => setNewPaper(p => ({ ...p, max_marks: e.target.value }))} required />
-                      </div>
+                      {newPaper.evaluation_type === 'grade' ? (
+                        <div className="space-y-1.5 md:col-span-2">
+                          <label className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase">Grading Scale (Direct Grade)</label>
+                          <Select 
+                            value={newPaper.grading_scale || 'A,B,C,D,E'} 
+                            onChange={e => setNewPaper(p => ({ ...p, grading_scale: e.target.value }))}
+                          >
+                            <option value="A+,A,B,C,D,E">5-Tier Scale (A+, A, B, C, D, E)</option>
+                            <option value="A,B,C,D">4-Tier Scale (A, B, C, D)</option>
+                          </Select>
+                        </div>
+                      ) : (
+                        <>
+                          {/* Max Marks */}
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-text-secondary uppercase">Maximum Marks</label>
+                            <Input type="number" value={newPaper.max_marks} onChange={e => setNewPaper(p => ({ ...p, max_marks: e.target.value }))} required />
+                          </div>
 
-                      {/* Passing Marks */}
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-text-secondary uppercase">Passing Marks</label>
-                        <Input type="number" value={newPaper.passing_marks} onChange={e => setNewPaper(p => ({ ...p, passing_marks: e.target.value }))} required />
-                      </div>
+                          {/* Passing Marks */}
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-text-secondary uppercase">Passing Marks</label>
+                            <Input type="number" value={newPaper.passing_marks} onChange={e => setNewPaper(p => ({ ...p, passing_marks: e.target.value }))} required />
+                          </div>
+                        </>
+                      )}
                     </div>
                   </form>
                 </CardContent>
@@ -2854,13 +2920,22 @@ export default function ExamsPage() {
                         No papers scheduled for this examination yet. Use the form above to add papers.
                       </TableCell>
                     </TableRow>
-                  ) : timetablePapers.map((paper, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell className="font-semibold text-text-primary">{paper.subject_name}</TableCell>
-                      <TableCell className="text-xs font-mono">{formatDateString(paper.exam_date)}</TableCell>
-                      <TableCell className="text-xs font-mono">{formatTimeString(paper.start_time)} – {formatTimeString(paper.end_time)}</TableCell>
-                      <TableCell className="text-xs font-mono">{paper.max_marks}</TableCell>
-                      <TableCell className="text-xs font-mono">{paper.passing_marks}</TableCell>
+                  ) : timetablePapers.map((paper, idx) => {
+                    const isGradePaper = paper.evaluation_type === 'grade' || parseFloat(paper.max_marks) === 0;
+                    return (
+                      <TableRow key={idx}>
+                        <TableCell className="font-semibold text-text-primary flex items-center gap-2">
+                          <span>{paper.subject_name}</span>
+                          {isGradePaper && (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 dark:bg-amber-950 dark:text-amber-300 uppercase">
+                              Grade Based
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs font-mono">{formatDateString(paper.exam_date)}</TableCell>
+                        <TableCell className="text-xs font-mono">{formatTimeString(paper.start_time)} – {formatTimeString(paper.end_time)}</TableCell>
+                        <TableCell className="text-xs font-mono">{isGradePaper ? '—' : paper.max_marks}</TableCell>
+                        <TableCell className="text-xs font-mono">{isGradePaper ? '—' : paper.passing_marks}</TableCell>
                       {!isReadOnly && (examClassStatuses.find(c => c.id === parseInt(selectedClassId))?.status || 'Draft') === 'Draft' && (
                         <TableCell className="text-right">
                           <DropdownMenu>
@@ -2953,6 +3028,9 @@ export default function ExamsPage() {
                 <TableBody>
                   {marksSheet.students.map(s => {
                     const isReadOnlyField = isReadOnly || selectedExam.status === 'Published';
+                    const currentPaper = timetablePapers.find(p => p.subject_id.toString() === selectedSubjectId);
+                    const isGradeSheet = marksSheet.evaluation_type === 'grade' || parseFloat(marksSheet.max_marks) === 0 || currentPaper?.evaluation_type === 'grade';
+
                     return (
                       <TableRow key={s.student_id}>
                         <TableCell className="font-mono font-semibold text-text-secondary">{s.roll_no || '-'}</TableCell>
@@ -2967,16 +3045,33 @@ export default function ExamsPage() {
                           />
                         </TableCell>
                         <TableCell>
-                          <Input 
-                            type="text"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            placeholder={s.is_absent === 1 ? 'ABSENT' : `Max: ${marksSheet.max_marks}`}
-                            className="h-8 text-xs font-mono w-full"
-                            disabled={s.is_absent === 1 || isReadOnlyField}
-                            value={s.is_absent === 1 ? '' : (s.marks_obtained !== null && s.marks_obtained !== undefined ? s.marks_obtained : '')}
-                            onChange={e => handleMarkCellChange(s.student_id, 'marks_obtained', e.target.value)}
-                          />
+                          {isGradeSheet ? (
+                            <Select
+                              className="h-8 text-xs font-bold w-full"
+                              disabled={s.is_absent === 1 || isReadOnlyField}
+                              value={s.is_absent === 1 ? '' : (s.marks_obtained || '')}
+                              onChange={e => handleMarkCellChange(s.student_id, 'marks_obtained', e.target.value)}
+                            >
+                              <option value="">-- Grade --</option>
+                              <option value="A+">Grade A+</option>
+                              <option value="A">Grade A</option>
+                              <option value="B">Grade B</option>
+                              <option value="C">Grade C</option>
+                              <option value="D">Grade D</option>
+                              <option value="E">Grade E</option>
+                            </Select>
+                          ) : (
+                            <Input 
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              placeholder={s.is_absent === 1 ? 'ABSENT' : `Max: ${marksSheet.max_marks}`}
+                              className="h-8 text-xs font-mono w-full"
+                              disabled={s.is_absent === 1 || isReadOnlyField}
+                              value={s.is_absent === 1 ? '' : (s.marks_obtained !== null && s.marks_obtained !== undefined ? s.marks_obtained : '')}
+                              onChange={e => handleMarkCellChange(s.student_id, 'marks_obtained', e.target.value)}
+                            />
+                          )}
                         </TableCell>
                         <TableCell>
                           <Input aria-label="Add remarks..." 
