@@ -156,6 +156,15 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
                 </tr>
               ))}
             </tbody>
+            <tfoot>
+              <tr className="bg-amber-100 border-t-2 border-amber-500 font-bold text-xs text-amber-950">
+                <td className="p-2.5 font-bold">Total Marks</td>
+                <td className="p-2.5 text-center font-mono font-bold text-amber-900">{summary.total_obtained}</td>
+                <td className="p-2.5 text-center font-mono text-zinc-600">{summary.total_max}</td>
+                <td className="p-2.5 text-center font-bold text-amber-900">{summary.grade}</td>
+                <td className="p-2.5 text-center font-bold text-xs uppercase">{summary.result}</td>
+              </tr>
+            </tfoot>
           </table>
         )}
       </div>

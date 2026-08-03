@@ -174,6 +174,16 @@ export default function ModernReportCardTemplate({ data, config = {} }) {
                 </tr>
               ))}
             </tbody>
+            <tfoot>
+              <tr className="bg-emerald-50 border-t-2 border-emerald-950 font-bold text-xs text-emerald-950">
+                <td className="py-2.5 px-4 text-left font-bold border-r border-emerald-200 whitespace-nowrap">Total Marks</td>
+                <td className="p-3 text-center border-r border-emerald-200 font-mono font-bold text-emerald-900">{summary.total_obtained}</td>
+                <td className="p-3 text-center border-r border-emerald-200 font-mono text-zinc-600">{summary.total_max}</td>
+                <td className="p-3 text-center border-r border-emerald-200 font-mono text-zinc-500">—</td>
+                <td className="p-3 text-center border-r border-emerald-200 font-bold text-emerald-900">{summary.grade}</td>
+                <td className="p-3 text-center font-bold text-xs uppercase">{summary.result}</td>
+              </tr>
+            </tfoot>
           </table>
         )}
       </div>
