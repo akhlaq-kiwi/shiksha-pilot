@@ -520,8 +520,8 @@ export default function ExamsPage() {
   const [newPaper, setNewPaper] = useState({
     subject_id: '',
     exam_date: '',
-    start_time: '',
-    end_time: '',
+    start_time: '09:00',
+    end_time: '11:00',
     max_marks: '100',
     passing_marks: '40',
     room: ''
@@ -543,15 +543,9 @@ export default function ExamsPage() {
   // Final Session Report Cards State
   const [finalSessionReportCards, setFinalSessionReportCards] = useState([]);
   const [generatingClassPdf, setGeneratingClassPdf] = useState(false);
-  const [isWeightageModalOpen, setIsWeightageModalOpen] = useState(false);
-  const [weightagePolicy, setWeightagePolicy] = useState({
+  const [weightagePolicy] = useState({
     strategy: 'weighted_percentage',
     weights: { 'Quarterly': 20, 'Half Yearly': 30, 'Annual': 50 }
-  });
-  const [customWeightsInput, setCustomWeightsInput] = useState({
-    quarterly: 20,
-    halfYearly: 30,
-    annual: 50
   });
 
   // Grade Configuration Scale States
@@ -754,6 +748,15 @@ export default function ExamsPage() {
       window.removeEventListener('academic-year-switched', handleYearSwitch);
     };
   }, []);
+
+  // Scroll to top when view changes
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    const mainEl = document.getElementById('main-content');
+    if (mainEl) {
+      mainEl.scrollTop = 0;
+    }
+  }, [activeView]);
 
   // Quick Action counts
   const totalCount = exams.length;
@@ -1048,8 +1051,8 @@ export default function ExamsPage() {
       setNewPaper({
         subject_id: '',
         exam_date: suggestNextExamDate(exam, list || [], holidays),
-        start_time: '',
-        end_time: '',
+        start_time: '09:00',
+        end_time: '11:00',
         max_marks: '100',
         passing_marks: '40',
         room: ''
@@ -1197,8 +1200,8 @@ export default function ExamsPage() {
       setNewPaper({
         subject_id: '',
         exam_date: suggestNextExamDate(selectedExam, refreshedList || [], holidays),
-        start_time: newPaper.start_time,
-        end_time: newPaper.end_time,
+        start_time: newPaper.start_time || '09:00',
+        end_time: newPaper.end_time || '11:00',
         max_marks: '100',
         passing_marks: '40',
         room: ''
@@ -1579,16 +1582,6 @@ export default function ExamsPage() {
       if (!papers || papers.length === 0) {
         setPendingSubjects(['timetable_missing']);
         setPendingValidationSource('reports_empty_timetable');
-        setShowPendingAlert(true);
-        setLoading(false);
-        return;
-      }
-
-      // Step 2: Check pending marks
-      const pending = papers.filter(p => !p.marks_completed);
-      if (pending.length > 0) {
-        setPendingSubjects(pending.map(p => p.subject_name));
-        setPendingValidationSource('reports_pending_marks');
         setShowPendingAlert(true);
         setLoading(false);
         return;
@@ -3320,19 +3313,6 @@ export default function ExamsPage() {
                 <Download className="h-3.5 w-3.5" />
                 {generatingClassPdf ? 'Generating Class PDF...' : 'Download Entire Class (PDF)'}
               </Button>
-
-              <Button
-                type="button"
-                variant="outline"
-                className="h-8 text-xs font-bold flex items-center gap-2 border-amber-400 text-amber-700 bg-amber-50 dark:bg-amber-950/20"
-                onClick={() => setIsWeightageModalOpen(true)}
-              >
-                <Settings className="h-3.5 w-3.5" /> Strategy: {
-                  weightagePolicy.strategy === 'weighted_percentage' ? `Weighted (${weightagePolicy.weights['Quarterly']}/${weightagePolicy.weights['Half Yearly']}/${weightagePolicy.weights['Annual']})` :
-                  weightagePolicy.strategy === 'equal_average' ? 'Equal Average' :
-                  weightagePolicy.strategy === 'best_score' ? 'Best Exam Score' : 'Annual Exam Only'
-                }
-              </Button>
             </div>
           </div>
 
@@ -3907,140 +3887,6 @@ export default function ExamsPage() {
         </div>
       </Dialog>
 
-      {/* WEIGHTAGE POLICY CONFIGURATION DIALOG */}
-      <Dialog isOpen={isWeightageModalOpen} onClose={() => setIsWeightageModalOpen(false)} title="Configure Final Report Calculation Strategy">
-        <div className="space-y-4 pt-2">
-          <p className="text-xs text-text-secondary leading-relaxed">
-            Select how individual exam marks (Quarterly, Half Yearly, Annual) should be combined to calculate the student's Final Academic Report Card.
-          </p>
-
-          <div className="space-y-3">
-            <label className="text-xs font-bold text-text-secondary uppercase">Calculation Strategy</label>
-            
-            <div className="space-y-2">
-              <label className="flex items-center gap-2.5 p-3 border border-border rounded-xl cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-all">
-                <input
-                  type="radio"
-                  name="strategy"
-                  value="weighted_percentage"
-                  checked={weightagePolicy.strategy === 'weighted_percentage'}
-                  onChange={() => setWeightagePolicy(p => ({ ...p, strategy: 'weighted_percentage' }))}
-                  className="accent-primary"
-                />
-                <div>
-                  <span className="text-xs font-bold text-text-primary block">Weighted Ratio Strategy (Configurable Weights)</span>
-                  <span className="text-[11px] text-text-muted block">Apply specific percentage weights to Quarterly, Half Yearly, and Annual exams.</span>
-                </div>
-              </label>
-
-              {weightagePolicy.strategy === 'weighted_percentage' && (
-                <div className="p-3 bg-zinc-50 dark:bg-zinc-900/50 border border-border rounded-xl space-y-3 pl-8 text-xs">
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <span className="text-[11px] font-bold text-text-muted uppercase block">Quarterly (%)</span>
-                      <Input
-                        type="number"
-                        value={customWeightsInput.quarterly}
-                        onChange={e => setCustomWeightsInput(p => ({ ...p, quarterly: parseInt(e.target.value) || 0 }))}
-                        className="h-8 text-xs font-mono"
-                      />
-                    </div>
-                    <div>
-                      <span className="text-[11px] font-bold text-text-muted uppercase block">Half Yearly (%)</span>
-                      <Input
-                        type="number"
-                        value={customWeightsInput.halfYearly}
-                        onChange={e => setCustomWeightsInput(p => ({ ...p, halfYearly: parseInt(e.target.value) || 0 }))}
-                        className="h-8 text-xs font-mono"
-                      />
-                    </div>
-                    <div>
-                      <span className="text-[11px] font-bold text-text-muted uppercase block">Annual (%)</span>
-                      <Input
-                        type="number"
-                        value={customWeightsInput.annual}
-                        onChange={e => setCustomWeightsInput(p => ({ ...p, annual: parseInt(e.target.value) || 0 }))}
-                        className="h-8 text-xs font-mono"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <label className="flex items-center gap-2.5 p-3 border border-border rounded-xl cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-all">
-                <input
-                  type="radio"
-                  name="strategy"
-                  value="equal_average"
-                  checked={weightagePolicy.strategy === 'equal_average'}
-                  onChange={() => setWeightagePolicy(p => ({ ...p, strategy: 'equal_average' }))}
-                  className="accent-primary"
-                />
-                <div>
-                  <span className="text-xs font-bold text-text-primary block">Equal Average Strategy</span>
-                  <span className="text-[11px] text-text-muted block">Equal percentage weightage across all conducted session exams.</span>
-                </div>
-              </label>
-
-              <label className="flex items-center gap-2.5 p-3 border border-border rounded-xl cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-all">
-                <input
-                  type="radio"
-                  name="strategy"
-                  value="best_score"
-                  checked={weightagePolicy.strategy === 'best_score'}
-                  onChange={() => setWeightagePolicy(p => ({ ...p, strategy: 'best_score' }))}
-                  className="accent-primary"
-                />
-                <div>
-                  <span className="text-xs font-bold text-text-primary block">Best Examination Score Strategy</span>
-                  <span className="text-[11px] text-text-muted block">Takes highest subject percentage achieved across session exams.</span>
-                </div>
-              </label>
-
-              <label className="flex items-center gap-2.5 p-3 border border-border rounded-xl cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-all">
-                <input
-                  type="radio"
-                  name="strategy"
-                  value="annual_only"
-                  checked={weightagePolicy.strategy === 'annual_only'}
-                  onChange={() => setWeightagePolicy(p => ({ ...p, strategy: 'annual_only' }))}
-                  className="accent-primary"
-                />
-                <div>
-                  <span className="text-xs font-bold text-text-primary block">Annual Exam Only Strategy</span>
-                  <span className="text-[11px] text-text-muted block">100% weightage on final Annual Examination marks.</span>
-                </div>
-              </label>
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2 border-t border-border pt-4">
-            <Button type="button" variant="secondary" onClick={() => setIsWeightageModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={() => {
-                const updatedPolicy = {
-                  ...weightagePolicy,
-                  weights: {
-                    'Quarterly': customWeightsInput.quarterly,
-                    'Half Yearly': customWeightsInput.halfYearly,
-                    'Annual': customWeightsInput.annual
-                  }
-                };
-                setWeightagePolicy(updatedPolicy);
-                setIsWeightageModalOpen(false);
-                if (selectedClassId) {
-                  handleOpenFinalSessionReportCards(selectedClassId);
-                }
-              }}
-            >
-              Apply Calculation Strategy
-            </Button>
-          </div>
-        </div>
-      </Dialog>
 
     </div>
   );
