@@ -829,7 +829,31 @@ class StudentService extends BaseService
         ];
     }
 
-    public function getNotifications(array $user): array
+    public function getNotifications(array $user, array $params = []): array
+    {
+        $schoolId = (int)($user['school_id'] ?? 0);
+        $userId = (int)($user['id'] ?? 0);
+        $role = strtoupper($user['role'] ?? '');
+        $limit = isset($params['limit']) ? max(1, (int)$params['limit']) : 10;
+        $offset = isset($params['offset']) ? max(0, (int)$params['offset']) : 0;
+        $pdo = $this->repo->getPdo();
+
+        $stmt = $pdo->prepare("
+            SELECT * FROM dashboard_notifications
+            WHERE school_id = :school_id AND (user_id = :user_id OR (user_role = :role AND user_id IS NULL))
+            ORDER BY id DESC
+            LIMIT :limit OFFSET :offset
+        ");
+        $stmt->bindValue(':school_id', $schoolId, PDO::PARAM_INT);
+        $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
+        $stmt->bindValue(':role', $role, PDO::PARAM_STR);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function deleteNotification(array $user, int $id): array
     {
         $schoolId = (int)($user['school_id'] ?? 0);
         $userId = (int)($user['id'] ?? 0);
@@ -837,12 +861,12 @@ class StudentService extends BaseService
         $pdo = $this->repo->getPdo();
 
         $stmt = $pdo->prepare("
-            SELECT * FROM dashboard_notifications
-            WHERE school_id = :school_id AND (user_id = :user_id OR (user_role = :role AND user_id IS NULL))
-            ORDER BY id DESC
+            DELETE FROM dashboard_notifications
+            WHERE id = :id AND school_id = :school_id AND (user_id = :user_id OR (user_role = :role AND user_id IS NULL))
         ");
-        $stmt->execute([':school_id' => $schoolId, ':user_id' => $userId, ':role' => $role]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $stmt->execute([':id' => $id, ':school_id' => $schoolId, ':user_id' => $userId, ':role' => $role]);
+
+        return ['success' => true];
     }
 
     public function markAllNotificationsRead(array $user): array

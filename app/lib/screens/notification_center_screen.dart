@@ -31,24 +31,50 @@ class NotificationCenterScreen extends StatefulWidget {
 }
 
 class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
+  final ScrollController _scrollController = ScrollController();
   List<dynamic> _notifications = [];
   bool _isLoading = true;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+  int _offset = 0;
+  final int _limit = 10;
   String _errorText = '';
 
   @override
   void initState() {
     super.initState();
-    _fetchNotifications();
+    _fetchInitialNotifications();
     _markAllRead();
+    _scrollController.addListener(_onScroll);
   }
 
-  Future<void> _fetchNotifications() async {
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 100 &&
+        !_isLoadingMore &&
+        !_isLoading &&
+        _hasMore) {
+      _fetchMoreNotifications();
+    }
+  }
+
+  Future<void> _fetchInitialNotifications() async {
     setState(() {
       _isLoading = true;
       _errorText = '';
+      _offset = 0;
+      _hasMore = true;
+      _notifications = [];
     });
     try {
-      final uri = Uri.parse('${widget.baseUrl}/api/student/notifications');
+      final isStaff = widget.studentId == null;
+      final endpoint = isStaff ? '/api/school/notifications' : '/api/student/notifications';
+      final uri = Uri.parse('${widget.baseUrl}$endpoint?limit=$_limit&offset=0');
       final response = await http.get(
         uri,
         headers: {
@@ -60,9 +86,19 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
 
       if (response.statusCode == 200) {
         final decoded = json.decode(response.body);
+        List<dynamic> fetched = [];
+        if (decoded['data'] is List) {
+          fetched = decoded['data'];
+        } else if (decoded['data'] is Map && decoded['data']['notifications'] != null) {
+          fetched = decoded['data']['notifications'];
+        }
         setState(() {
-          _notifications = decoded['data'] ?? [];
+          _notifications = fetched;
           _isLoading = false;
+          _offset = fetched.length;
+          if (fetched.length < _limit) {
+            _hasMore = false;
+          }
         });
       } else {
         setState(() {
@@ -78,9 +114,107 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
     }
   }
 
+  Future<void> _fetchMoreNotifications() async {
+    if (_isLoadingMore || !_hasMore) return;
+    setState(() {
+      _isLoadingMore = true;
+    });
+
+    try {
+      final isStaff = widget.studentId == null;
+      final endpoint = isStaff ? '/api/school/notifications' : '/api/student/notifications';
+      final uri = Uri.parse('${widget.baseUrl}$endpoint?limit=$_limit&offset=$_offset');
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${widget.token}',
+          if (widget.studentId != null) 'X-Student-Id': widget.studentId.toString(),
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+        List<dynamic> fetched = [];
+        if (decoded['data'] is List) {
+          fetched = decoded['data'];
+        } else if (decoded['data'] is Map && decoded['data']['notifications'] != null) {
+          fetched = decoded['data']['notifications'];
+        }
+        setState(() {
+          _notifications.addAll(fetched);
+          _offset += fetched.length;
+          _isLoadingMore = false;
+          if (fetched.length < _limit) {
+            _hasMore = false;
+          }
+        });
+      } else {
+        setState(() {
+          _isLoadingMore = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isLoadingMore = false;
+      });
+    }
+  }
+
+  Future<void> _deleteNotification(int id, int index) async {
+    final deletedItem = _notifications[index];
+    setState(() {
+      _notifications.removeAt(index);
+    });
+
+    try {
+      final isStaff = widget.studentId == null;
+      final endpoint = isStaff ? '/api/school/notifications/$id' : '/api/student/notifications/$id';
+      final uri = Uri.parse('${widget.baseUrl}$endpoint');
+      final response = await http.delete(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${widget.token}',
+          if (widget.studentId != null) 'X-Student-Id': widget.studentId.toString(),
+        },
+      );
+
+      if (response.statusCode == 200) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Notification permanently deleted.'),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _notifications.insert(index, deletedItem);
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to delete notification.'), backgroundColor: Colors.red),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _notifications.insert(index, deletedItem);
+        });
+      }
+    }
+  }
+
   Future<void> _markAllRead() async {
     try {
-      final uri = Uri.parse('${widget.baseUrl}/api/student/notifications/read-all');
+      final isStaff = widget.studentId == null;
+      final endpoint = isStaff ? '/api/school/notifications/read-all' : '/api/student/notifications/read-all';
+      final uri = Uri.parse('${widget.baseUrl}$endpoint');
       await http.post(
         uri,
         headers: {
@@ -94,23 +228,27 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
     }
   }
 
-  String _formatDate(String? createdDate) {
-    if (createdDate == null || createdDate.isEmpty) return '—';
+  String _formatDateTime(String? createdDate) {
+    if (createdDate == null || createdDate.trim().isEmpty) return '—';
     try {
-      final parts = createdDate.split(' ')[0].split('-');
-      if (parts.length != 3) return createdDate;
-      final year = parts[0];
-      final monthInt = int.parse(parts[1]);
-      final dayInt = int.parse(parts[2]);
-
+      final dt = DateTime.parse(createdDate.replaceFirst(' ', 'T'));
       final months = [
-        'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
       ];
-      if (monthInt < 1 || monthInt > 12) return createdDate;
-      final formattedDay = dayInt.toString().padLeft(2, '0');
-      return '$formattedDay ${months[monthInt - 1]} $year';
-    } catch (e) {
+      final day = dt.day.toString().padLeft(2, '0');
+      final month = months[dt.month - 1];
+      final year = dt.year;
+
+      int hour = dt.hour;
+      final minute = dt.minute.toString().padLeft(2, '0');
+      final ampm = hour >= 12 ? 'PM' : 'AM';
+      hour = hour % 12;
+      if (hour == 0) hour = 12;
+      final hourStr = hour.toString().padLeft(2, '0');
+
+      return '$day $month $year, $hourStr:$minute $ampm';
+    } catch (_) {
       return createdDate;
     }
   }
@@ -145,7 +283,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                     Text(_errorText, style: const TextStyle(color: Colors.red)),
                     const SizedBox(height: 12),
                     ElevatedButton(
-                      onPressed: _fetchNotifications,
+                      onPressed: _fetchInitialNotifications,
                       style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo),
                       child: const Text('Retry'),
                     ),
@@ -154,7 +292,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
               )
             : _notifications.isEmpty
                 ? RefreshIndicator(
-                    onRefresh: _fetchNotifications,
+                    onRefresh: _fetchInitialNotifications,
                     child: SingleChildScrollView(
                       physics: const AlwaysScrollableScrollPhysics(),
                       child: Container(
@@ -179,15 +317,64 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                     ),
                   )
                 : RefreshIndicator(
-                    onRefresh: _fetchNotifications,
+                    onRefresh: _fetchInitialNotifications,
                     child: ListView.builder(
+                      controller: _scrollController,
                       physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      itemCount: _notifications.length,
+                      itemCount: _notifications.length + (_isLoadingMore ? 1 : 0),
                       itemBuilder: (context, index) {
+                        if (index == _notifications.length) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.indigo),
+                                ),
+                                SizedBox(width: 12),
+                                Text(
+                                  'Loading Notifications...',
+                                  style: TextStyle(color: Colors.indigo, fontWeight: FontWeight.bold, fontSize: 13),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+
                         final notif = _notifications[index];
                         final isUnread = notif['is_read'] == 0 || notif['is_read'] == false || notif['is_read'] == '0';
-                        return Card(
+                        final notifId = (notif['id'] is int) ? notif['id'] as int : int.tryParse(notif['id'].toString()) ?? index;
+
+                        return Dismissible(
+                          key: Key('notif_$notifId'),
+                          direction: DismissDirection.startToEnd, // Right swipe delete
+                          background: Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            alignment: Alignment.centerLeft,
+                            padding: const EdgeInsets.only(left: 24),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade600,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.delete_forever_rounded, color: Colors.white, size: 26),
+                                SizedBox(width: 8),
+                                Text(
+                                  'DELETE',
+                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                                ),
+                              ],
+                            ),
+                          ),
+                          onDismissed: (direction) {
+                            _deleteNotification(notifId, index);
+                          },
+                          child: Card(
                           margin: const EdgeInsets.only(bottom: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           elevation: 1,
@@ -477,7 +664,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                         ),
                                         const SizedBox(height: 10),
                                         Text(
-                                          _formatDate(notif['created_at']),
+                                          _formatDateTime(notif['created_at']),
                                           style: TextStyle(
                                             fontSize: 11,
                                             color: Colors.grey.shade500,
@@ -491,10 +678,11 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                               ),
                             ),
                           ),
-                        );
-                      },
-                    ),
-                  );
+                        ),
+                      );
+                    },
+                  ),
+                );
 
     if (widget.isEmbedded) {
       return bodyContent;

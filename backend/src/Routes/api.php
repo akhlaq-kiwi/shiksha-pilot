@@ -194,6 +194,7 @@ return function (App $app) {
     // Persisted Dashboard Notifications
     $app->get('/api/school/notifications', [SchoolAdminController::class, 'getNotifications']);
     $app->post('/api/school/notifications/{id}/read', [SchoolAdminController::class, 'markNotificationRead']);
+    $app->delete('/api/school/notifications/{id}', [SchoolAdminController::class, 'deleteNotification']);
 
     // Announcements Domain
     $app->get('/api/school/announcements', [SchoolAdminController::class, 'getAnnouncements']);
@@ -292,6 +293,7 @@ return function (App $app) {
     $app->get('/api/student/notifications', [StudentController::class, 'getNotifications']);
     $app->post('/api/student/notifications/read-all', [StudentController::class, 'markAllNotificationsRead']);
     $app->post('/api/student/notifications/{id}/read', [StudentController::class, 'markNotificationRead']);
+    $app->delete('/api/student/notifications/{id}', [StudentController::class, 'deleteNotification']);
 
     // Word Builder Game endpoints
     $app->get('/api/student/game/word-builder/progress', [VocabularyController::class, 'getGameProgress']);

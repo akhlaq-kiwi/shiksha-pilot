@@ -13752,11 +13752,13 @@ Only approve the settlement after reviewing all financial records.
         return $timeline;
     }
 
-    public function getNotifications(array $user): array
+    public function getNotifications(array $user, array $params = []): array
     {
         $schoolId = $this->getSchoolId($user);
         $role = $user['role'] ?? '';
         $userId = (int)($user['id'] ?? 0);
+        $limit = isset($params['limit']) ? max(1, (int)$params['limit']) : 10;
+        $offset = isset($params['offset']) ? max(0, (int)$params['offset']) : 0;
         $pdo = $this->classRepo->getPdo();
 
         if ($role === 'SCHOOL_ADMIN') {
@@ -13764,10 +13766,13 @@ Only approve the settlement after reviewing all financial records.
                 SELECT * FROM dashboard_notifications
                 WHERE school_id = :sid AND user_role = 'SCHOOL_ADMIN'
                 ORDER BY id DESC
-                LIMIT 15
+                LIMIT :limit OFFSET :offset
             ");
-            $stmt->execute([':sid' => $schoolId]);
-            $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $stmt->bindValue(':sid', $schoolId, PDO::PARAM_INT);
+            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+            $stmt->execute();
+            $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
             $stmtUnread = $pdo->prepare("
                 SELECT COUNT(*) FROM dashboard_notifications
@@ -13779,16 +13784,21 @@ Only approve the settlement after reviewing all financial records.
             // TEACHER or any other staff role
             $stmt = $pdo->prepare("
                 SELECT * FROM dashboard_notifications
-                WHERE school_id = :sid AND user_role = :role AND user_id = :uid
+                WHERE school_id = :sid AND user_role = :role AND (user_id = :uid OR user_id IS NULL)
                 ORDER BY id DESC
-                LIMIT 15
+                LIMIT :limit OFFSET :offset
             ");
-            $stmt->execute([':sid' => $schoolId, ':role' => $role, ':uid' => $userId]);
-            $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $stmt->bindValue(':sid', $schoolId, PDO::PARAM_INT);
+            $stmt->bindValue(':role', $role, PDO::PARAM_STR);
+            $stmt->bindValue(':uid', $userId, PDO::PARAM_INT);
+            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+            $stmt->execute();
+            $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
             $stmtUnread = $pdo->prepare("
                 SELECT COUNT(*) FROM dashboard_notifications
-                WHERE school_id = :sid AND user_role = :role AND user_id = :uid AND is_read = 0
+                WHERE school_id = :sid AND user_role = :role AND (user_id = :uid OR user_id IS NULL) AND is_read = 0
             ");
             $stmtUnread->execute([':sid' => $schoolId, ':role' => $role, ':uid' => $userId]);
             $unreadCount = (int)$stmtUnread->fetchColumn();
@@ -13808,6 +13818,20 @@ Only approve the settlement after reviewing all financial records.
         $stmt = $pdo->prepare("
             UPDATE dashboard_notifications 
             SET is_read = 1 
+            WHERE id = :id AND school_id = :sid
+        ");
+        $stmt->execute([':id' => $id, ':sid' => $schoolId]);
+
+        return ['success' => true];
+    }
+
+    public function deleteNotification(array $user, int $id): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->classRepo->getPdo();
+
+        $stmt = $pdo->prepare("
+            DELETE FROM dashboard_notifications 
             WHERE id = :id AND school_id = :sid
         ");
         $stmt->execute([':id' => $id, ':sid' => $schoolId]);

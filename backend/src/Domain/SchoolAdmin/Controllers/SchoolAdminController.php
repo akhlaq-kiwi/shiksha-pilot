@@ -1785,18 +1785,25 @@ class SchoolAdminController extends BaseController
     public function getNotifications(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
-        $data = $this->service->getNotifications($user);
+        $queryParams = $request->getQueryParams();
+        $data = $this->service->getNotifications($user, $queryParams);
         return $this->success($response, $data);
     }
 
     public function markNotificationRead(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
         $id = (int)$args['id'];
         $data = $this->service->markNotificationRead($user, $id);
         return $this->success($response, $data, 'Notification marked as read');
+    }
+
+    public function deleteNotification(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $id = (int)$args['id'];
+        $data = $this->service->deleteNotification($user, $id);
+        return $this->success($response, $data, 'Notification deleted successfully');
     }
 
     public function getCredentials(Request $request, Response $response, array $args): Response

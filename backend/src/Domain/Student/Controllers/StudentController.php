@@ -151,10 +151,22 @@ class StudentController extends BaseController
     {
         $user = $this->authenticate($request);
         $this->requireRole($user, ['STUDENT', 'PARENT', 'TEACHER']);
+        $queryParams = $request->getQueryParams();
 
-        $data = $this->service->getNotifications($user);
+        $data = $this->service->getNotifications($user, $queryParams);
 
         return $this->success($response, $data);
+    }
+
+    public function deleteNotification(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['STUDENT', 'PARENT', 'TEACHER']);
+
+        $id = (int)$args['id'];
+        $data = $this->service->deleteNotification($user, $id);
+
+        return $this->success($response, $data, 'Notification deleted successfully');
     }
 
     public function markAllNotificationsRead(Request $request, Response $response): Response
