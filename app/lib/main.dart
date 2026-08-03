@@ -169,7 +169,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
     final role = prefs.getString('user_role');
-    final baseUrl = prefs.getString('base_url') ?? 'http://127.0.0.1:8000';
+    final baseUrl = prefs.getString('base_url') ?? 'http://qa.your-domain.com:8000';
 
     if (token != null && role != null) {
       final leaveService = LeaveService(baseUrl: baseUrl, token: token);
@@ -317,7 +317,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _serverUrlController = TextEditingController(text: 'http://127.0.0.1:8000');
+  final _serverUrlController = TextEditingController(text: 'http://qa.your-domain.com:8000');
   
   bool _obscurePassword = true;
   bool _isLoading = false;
