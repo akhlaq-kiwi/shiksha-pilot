@@ -1171,10 +1171,6 @@ export default function ExamsPage() {
       return;
     }
 
-    const isGradeType = newPaper.evaluation_type === 'grade';
-    const finalMaxMarks = isGradeType ? 0 : maxMarksParsed;
-    const finalPassingMarks = isGradeType ? 0 : passingMarksParsed;
-
     let updatedPapers = [];
     if (editingPaper) {
       updatedPapers = timetablePapers.map(p => {
@@ -1185,8 +1181,8 @@ export default function ExamsPage() {
             ...newPaper,
             evaluation_type: newPaper.evaluation_type || 'marks',
             grading_scale: newPaper.grading_scale || 'A,B,C,D,E',
-            max_marks: finalMaxMarks,
-            passing_marks: finalPassingMarks,
+            max_marks: maxMarksParsed,
+            passing_marks: passingMarksParsed,
             subject_name: matchedSubject ? matchedSubject.name : 'Unknown Subject'
           };
         }
@@ -1198,8 +1194,8 @@ export default function ExamsPage() {
         ...newPaper,
         evaluation_type: newPaper.evaluation_type || 'marks',
         grading_scale: newPaper.grading_scale || 'A,B,C,D,E',
-        max_marks: finalMaxMarks,
-        passing_marks: finalPassingMarks,
+        max_marks: maxMarksParsed,
+        passing_marks: passingMarksParsed,
         subject_name: matchedSubject ? matchedSubject.name : 'Unknown Subject'
       };
       updatedPapers = [...timetablePapers, paperObj];
