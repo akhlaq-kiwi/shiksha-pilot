@@ -833,6 +833,7 @@ class TeacherService extends BaseService
             JOIN examination_papers ep ON e.id = ep.exam_id
             LEFT JOIN examination_class_status ecs ON e.id = ecs.exam_id AND ecs.class_id = ep.class_id
             WHERE ep.class_id = :class_id AND e.school_id = :school_id
+              AND (COALESCE(ecs.scheme_published, 0) = 1 OR COALESCE(ecs.admit_card_published, 0) = 1 OR ecs.status = 'Published')
             ORDER BY e.start_date ASC, e.id ASC
         ");
         $stmt->execute([':class_id' => $classId, ':school_id' => $schoolId]);
@@ -880,8 +881,15 @@ class TeacherService extends BaseService
         $resultPublished = ($statusInfo && $statusInfo['result_status'] === 'Published') ? 1 : 0;
 
         // Fetch Exam basic info
-        $stmtExam = $pdo->prepare("SELECT name, start_date, end_date FROM examinations WHERE id = :id AND school_id = :sid LIMIT 1");
-        $stmtExam->execute([':id' => $examId, ':sid' => $schoolId]);
+        $stmtExam = $pdo->prepare("
+            SELECT e.name, e.start_date, e.end_date 
+            FROM examinations e
+            LEFT JOIN examination_class_status ecs ON e.id = ecs.exam_id AND ecs.class_id = :class_id
+            WHERE e.id = :id AND e.school_id = :sid 
+              AND (COALESCE(ecs.scheme_published, 0) = 1 OR COALESCE(ecs.admit_card_published, 0) = 1 OR ecs.status = 'Published')
+            LIMIT 1
+        ");
+        $stmtExam->execute([':id' => $examId, ':sid' => $schoolId, ':class_id' => $classId]);
         $exam = $stmtExam->fetch(PDO::FETCH_ASSOC);
         if (!$exam) {
             throw new NotFoundException('Examination not found.');
@@ -897,16 +905,18 @@ class TeacherService extends BaseService
             'result' => null
         ];
 
-        // 2. Fetch scheme papers for teacher class
-        $stmtScheme = $pdo->prepare("
-            SELECT ep.id, ep.subject_id, ep.exam_date, ep.start_time, ep.end_time, ep.max_marks, ep.passing_marks, ep.room, s.name AS subject_name
-            FROM examination_papers ep
-            JOIN subjects s ON ep.subject_id = s.id
-            WHERE ep.exam_id = :exam_id AND ep.class_id = :class_id
-            ORDER BY ep.exam_date ASC, ep.start_time ASC
-        ");
-        $stmtScheme->execute([':exam_id' => $examId, ':class_id' => $classId]);
-        $response['scheme'] = $stmtScheme->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        // 2. Fetch scheme papers for teacher class if published
+        if ($schemePublished) {
+            $stmtScheme = $pdo->prepare("
+                SELECT ep.id, ep.subject_id, ep.exam_date, ep.start_time, ep.end_time, ep.max_marks, ep.passing_marks, ep.room, s.name AS subject_name
+                FROM examination_papers ep
+                JOIN subjects s ON ep.subject_id = s.id
+                WHERE ep.exam_id = :exam_id AND ep.class_id = :class_id
+                ORDER BY ep.exam_date ASC, ep.start_time ASC
+            ");
+            $stmtScheme->execute([':exam_id' => $examId, ':class_id' => $classId]);
+            $response['scheme'] = $stmtScheme->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        }
 
         // 3. Fetch result if published
         if ($resultPublished) {
