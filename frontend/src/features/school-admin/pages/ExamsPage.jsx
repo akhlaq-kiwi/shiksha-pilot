@@ -738,6 +738,13 @@ export default function ExamsPage() {
   }, [success]);
 
   useEffect(() => {
+    if (info) {
+      const timer = setTimeout(() => setInfo(''), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [info]);
+
+  useEffect(() => {
     loadDashboard();
     const handleYearSwitch = () => {
       loadDashboard();
