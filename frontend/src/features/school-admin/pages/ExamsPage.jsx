@@ -1120,19 +1120,23 @@ export default function ExamsPage() {
       return;
     }
 
-    const maxMarksParsed = parseFloat(newPaper.max_marks);
-    const passingMarksParsed = parseFloat(newPaper.passing_marks);
-    if (isNaN(maxMarksParsed) || maxMarksParsed <= 0) {
-      setError('Maximum Marks must be a positive number.');
-      return;
-    }
-    if (isNaN(passingMarksParsed) || passingMarksParsed < 0) {
-      setError('Passing Marks must be a non-negative number.');
-      return;
-    }
-    if (passingMarksParsed > maxMarksParsed) {
-      setError('Passing Marks cannot exceed Maximum Marks.');
-      return;
+    const isGradeType = newPaper.evaluation_type === 'grade';
+    const maxMarksParsed = isGradeType ? 0 : parseFloat(newPaper.max_marks);
+    const passingMarksParsed = isGradeType ? 0 : parseFloat(newPaper.passing_marks);
+
+    if (!isGradeType) {
+      if (isNaN(maxMarksParsed) || maxMarksParsed <= 0) {
+        setError('Maximum Marks must be a positive number.');
+        return;
+      }
+      if (isNaN(passingMarksParsed) || passingMarksParsed < 0) {
+        setError('Passing Marks must be a non-negative number.');
+        return;
+      }
+      if (passingMarksParsed > maxMarksParsed) {
+        setError('Passing Marks cannot exceed Maximum Marks.');
+        return;
+      }
     }
 
     // Duplicate subject check
