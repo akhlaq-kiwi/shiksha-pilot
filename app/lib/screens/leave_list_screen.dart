@@ -9,12 +9,14 @@ class LeaveListScreen extends StatefulWidget {
   final LeaveService leaveService;
   final String userRole; // 'TEACHER' or 'PARENT' or 'STUDENT'
   final int? selectedStudentId; // only relevant for parent role
+  final int initialTabIndex; // 0 for Official Holidays, 1 for Leave Requests (default 1)
 
   const LeaveListScreen({
     Key? key,
     required this.leaveService,
     required this.userRole,
     this.selectedStudentId,
+    this.initialTabIndex = 1,
   }) : super(key: key);
 
   @override
@@ -663,6 +665,7 @@ class _LeaveListScreenState extends State<LeaveListScreen> {
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 2,
+      initialIndex: widget.initialTabIndex,
       child: Scaffold(
         backgroundColor: const Color(0xFFF8FAFC),
         appBar: AppBar(

@@ -458,7 +458,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               final titleLower = title.toString().toLowerCase();
               final msgLower = message.toString().toLowerCase();
 
-              if (titleLower.contains('leave') || msgLower.contains('leave')) {
+              final isHolidayNotif = titleLower.contains('holiday') || msgLower.contains('holiday');
+              if (titleLower.contains('leave') || msgLower.contains('leave') || isHolidayNotif) {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -466,6 +467,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       leaveService: widget.leaveService,
                       userRole: widget.userRole,
                       selectedStudentId: _activeStudentId,
+                      initialTabIndex: isHolidayNotif ? 0 : 1,
                     ),
                   ),
                 ).then((_) => _loadSessionInfo());

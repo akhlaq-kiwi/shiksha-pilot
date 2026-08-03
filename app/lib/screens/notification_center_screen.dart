@@ -219,7 +219,8 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                 http.post(uri, headers: headers).catchError((_) => http.Response('', 500));
                               } catch (_) {}
 
-                              if (linkStr.contains('leaves') || titleLower.contains('leave') || msgLower.contains('leave')) {
+                              final isHolidayNotif = titleLower.contains('holiday') || msgLower.contains('holiday');
+                              if (linkStr.contains('leaves') || titleLower.contains('leave') || msgLower.contains('leave') || isHolidayNotif) {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
@@ -227,6 +228,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                       leaveService: LeaveService(baseUrl: widget.baseUrl, token: widget.token),
                                       userRole: widget.studentId != null ? 'PARENT' : 'TEACHER',
                                       selectedStudentId: widget.studentId,
+                                      initialTabIndex: isHolidayNotif ? 0 : 1,
                                     ),
                                   ),
                                 );

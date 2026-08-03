@@ -77,11 +77,13 @@ class NotificationHelper {
                   token: token,
                   studentId: notifStudentId ?? studentId,
                 );
-              } else if (link.contains('leaves') || title.contains('leave') || message.contains('leave')) {
+              } else if (link.contains('leaves') || title.contains('leave') || message.contains('leave') || title.contains('holiday') || message.contains('holiday')) {
+                final isHolidayNotif = title.contains('holiday') || message.contains('holiday');
                 targetScreen = LeaveListScreen(
                   leaveService: leaveService,
                   userRole: userRole,
                   selectedStudentId: notifStudentId ?? studentId,
+                  initialTabIndex: isHolidayNotif ? 0 : 1,
                 );
               } else if (link.contains('timetable') || title.contains('timetable') || message.contains('timetable')) {
                 targetScreen = TimetableScreen(
