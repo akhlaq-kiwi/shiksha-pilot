@@ -11655,15 +11655,30 @@ Only approve the settlement after reviewing all financial records.
         }
 
         // 2. Update status in examination_class_status
-        $stmt = $pdo->prepare("
-            INSERT INTO examination_class_status (exam_id, class_id, scheme_published)
-            VALUES (:exam_id, :class_id, 0)
-            ON DUPLICATE KEY UPDATE scheme_published = 0
+        if ($classId > 0) {
+            $stmt = $pdo->prepare("
+                INSERT INTO examination_class_status (exam_id, class_id, scheme_published)
+                VALUES (:exam_id, :class_id, 0)
+                ON DUPLICATE KEY UPDATE scheme_published = 0
+            ");
+            $stmt->execute([
+                ':exam_id' => $examId,
+                ':class_id' => $classId
+            ]);
+        } else {
+            $stmt = $pdo->prepare("UPDATE examination_class_status SET scheme_published = 0 WHERE exam_id = :exam_id");
+            $stmt->execute([':exam_id' => $examId]);
+        }
+
+        // Check if any class still has published components; if none, sync master exam status to Draft
+        $stmtCheckAnyPub = $pdo->prepare("
+            SELECT COUNT(*) FROM examination_class_status 
+            WHERE exam_id = :exam_id AND (scheme_published = 1 OR admit_card_published = 1 OR status = 'Published')
         ");
-        $stmt->execute([
-            ':exam_id' => $examId,
-            ':class_id' => $classId
-        ]);
+        $stmtCheckAnyPub->execute([':exam_id' => $examId]);
+        if ((int)$stmtCheckAnyPub->fetchColumn() === 0) {
+            $pdo->prepare("UPDATE examinations SET status = 'Draft' WHERE id = :id")->execute([':id' => $examId]);
+        }
 
         // 3. Log audit
         $stmtInfo = $pdo->prepare("
@@ -11675,7 +11690,7 @@ Only approve the settlement after reviewing all financial records.
         ");
         $stmtInfo->execute([':class_id' => $classId]);
         $info = $stmtInfo->fetch(PDO::FETCH_ASSOC);
-        $className = $info ? $info['class_name'] : '';
+        $className = $info ? $info['class_name'] : ($classId > 0 ? '' : 'All Classes');
         $ayName = $info ? $info['academic_year_name'] : '';
 
         $this->logAudit($pdo, $user, 'Examinations', 'Unpublish Scheme', "Reverted Scheme to Draft for exam '{$exam['name']}' (Class: {$className})", $ayName);
@@ -11698,15 +11713,30 @@ Only approve the settlement after reviewing all financial records.
         }
 
         // 2. Update status in examination_class_status
-        $stmt = $pdo->prepare("
-            INSERT INTO examination_class_status (exam_id, class_id, admit_card_published)
-            VALUES (:exam_id, :class_id, 0)
-            ON DUPLICATE KEY UPDATE admit_card_published = 0
+        if ($classId > 0) {
+            $stmt = $pdo->prepare("
+                INSERT INTO examination_class_status (exam_id, class_id, admit_card_published)
+                VALUES (:exam_id, :class_id, 0)
+                ON DUPLICATE KEY UPDATE admit_card_published = 0
+            ");
+            $stmt->execute([
+                ':exam_id' => $examId,
+                ':class_id' => $classId
+            ]);
+        } else {
+            $stmt = $pdo->prepare("UPDATE examination_class_status SET admit_card_published = 0 WHERE exam_id = :exam_id");
+            $stmt->execute([':exam_id' => $examId]);
+        }
+
+        // Check if any class still has published components; if none, sync master exam status to Draft
+        $stmtCheckAnyPub = $pdo->prepare("
+            SELECT COUNT(*) FROM examination_class_status 
+            WHERE exam_id = :exam_id AND (scheme_published = 1 OR admit_card_published = 1 OR status = 'Published')
         ");
-        $stmt->execute([
-            ':exam_id' => $examId,
-            ':class_id' => $classId
-        ]);
+        $stmtCheckAnyPub->execute([':exam_id' => $examId]);
+        if ((int)$stmtCheckAnyPub->fetchColumn() === 0) {
+            $pdo->prepare("UPDATE examinations SET status = 'Draft' WHERE id = :id")->execute([':id' => $examId]);
+        }
 
         // 3. Log audit
         $stmtInfo = $pdo->prepare("
