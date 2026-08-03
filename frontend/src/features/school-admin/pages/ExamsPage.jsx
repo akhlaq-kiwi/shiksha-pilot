@@ -938,14 +938,13 @@ export default function ExamsPage() {
       return;
     }
 
-    // Check if dates have changed AND papers exist for this examination
+    // Check if dates have changed for this examination
     const datesChanged = selectedExamToEdit && (
       (editExamData.start_date && editExamData.start_date !== selectedExamToEdit.start_date) ||
       (editExamData.end_date && editExamData.end_date !== selectedExamToEdit.end_date)
     );
-    const hasPapers = selectedExamToEdit && Number(selectedExamToEdit.papers_count || 0) > 0;
 
-    if (datesChanged && hasPapers) {
+    if (datesChanged) {
       setIsEditExamOpen(false);
       setIsResetPapersConfirmOpen(true);
       return;
@@ -2936,31 +2935,34 @@ export default function ExamsPage() {
                         <TableCell className="text-xs font-mono">{formatTimeString(paper.start_time)} – {formatTimeString(paper.end_time)}</TableCell>
                         <TableCell className="text-xs font-mono">{isGradePaper ? '—' : paper.max_marks}</TableCell>
                         <TableCell className="text-xs font-mono">{isGradePaper ? '—' : paper.passing_marks}</TableCell>
-                      {!isReadOnly && (examClassStatuses.find(c => c.id === parseInt(selectedClassId))?.status || 'Draft') === 'Draft' && (
-                        <TableCell className="text-right">
-                          <DropdownMenu>
-                            <DropdownItem onClick={() => {
-                              setEditingPaper(paper);
-                              setNewPaper({
-                                subject_id: paper.subject_id.toString(),
-                                exam_date: paper.exam_date,
-                                start_time: paper.start_time.slice(0, 5),
-                                end_time: paper.end_time.slice(0, 5),
-                                max_marks: parseFloat(paper.max_marks) || 100,
-                                passing_marks: parseFloat(paper.passing_marks) || 40,
-                                room: paper.room || ''
-                              });
-                            }}>
-                              Edit Paper
-                            </DropdownItem>
-                            <DropdownItem destructive onClick={() => handleDeletePaperClick(paper)}>
-                              Delete Paper
-                            </DropdownItem>
-                          </DropdownMenu>
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  ))}
+                        {!isReadOnly && (examClassStatuses.find(c => c.id === parseInt(selectedClassId))?.status || 'Draft') === 'Draft' && (
+                          <TableCell className="text-right">
+                            <DropdownMenu>
+                              <DropdownItem onClick={() => {
+                                setEditingPaper(paper);
+                                setNewPaper({
+                                  subject_id: paper.subject_id.toString(),
+                                  exam_date: paper.exam_date,
+                                  start_time: paper.start_time.slice(0, 5),
+                                  end_time: paper.end_time.slice(0, 5),
+                                  evaluation_type: paper.evaluation_type || (parseFloat(paper.max_marks) === 0 ? 'grade' : 'marks'),
+                                  grading_scale: paper.grading_scale || 'A,B,C,D,E',
+                                  max_marks: parseFloat(paper.max_marks) || 100,
+                                  passing_marks: parseFloat(paper.passing_marks) || 40,
+                                  room: paper.room || ''
+                                });
+                              }}>
+                                Edit Paper
+                              </DropdownItem>
+                              <DropdownItem destructive onClick={() => handleDeletePaperClick(paper)}>
+                                Delete Paper
+                              </DropdownItem>
+                            </DropdownMenu>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </Card>
