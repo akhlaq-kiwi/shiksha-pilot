@@ -103,6 +103,12 @@ export function compileReportCardData(card = {}, schoolProfile = {}, currentYear
     };
   });
 
+  // Sort subjects: Marks-based first, Grade-based at the bottom
+  subjects.sort((a, b) => {
+    if (a.is_grade_only === b.is_grade_only) return 0;
+    return a.is_grade_only ? 1 : -1;
+  });
+
   const numericSubjects = subjects.filter(s => !s.is_grade_only);
   const totalObtained = numericSubjects.reduce((sum, s) => sum + (parseFloat(s.marks_obtained) || 0), 0);
   const totalMax = numericSubjects.reduce((sum, s) => sum + (parseFloat(s.max_marks) || 0), 0);
@@ -279,8 +285,15 @@ export function compileFinalSessionReportCardData(
       max_marks: hasNumericScore ? grandTotalMax : '—',
       passing_marks: 33,
       grade,
-      result: hasNumericScore ? (grandTotalObtained >= (grandTotalMax * 0.33) ? 'PASS' : 'FAIL') : 'PASS'
+      result: hasNumericScore ? (grandTotalObtained >= (grandTotalMax * 0.33) ? 'PASS' : 'FAIL') : 'PASS',
+      is_grade_only: !hasNumericScore
     };
+  });
+
+  // Sort final session subjects: Marks-based first, Grade-based at the bottom
+  finalSubjects.sort((a, b) => {
+    if (a.is_grade_only === b.is_grade_only) return 0;
+    return a.is_grade_only ? 1 : -1;
   });
 
   // Calculate grand session totals
