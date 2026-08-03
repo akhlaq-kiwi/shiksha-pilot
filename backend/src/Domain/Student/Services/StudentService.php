@@ -583,7 +583,7 @@ class StudentService extends BaseService
                 $monthlyFees[] = [
                     'id' => (int)$paymentsMap[$month]['id'],
                     'month' => $month,
-                    'amount' => (float)$paymentsMap[$month]['amount_paid'],
+                    'amount' => (int)round((float)$paymentsMap[$month]['amount_paid']),
                     'payment_date' => $paymentsMap[$month]['payment_date'],
                     'status' => 'Paid',
                     'receipt_no' => $paymentsMap[$month]['receipt_no']
@@ -592,7 +592,7 @@ class StudentService extends BaseService
                 $monthlyFees[] = [
                     'id' => 0,
                     'month' => $month,
-                    'amount' => $monthAmount,
+                    'amount' => (int)round($monthAmount),
                     'payment_date' => null,
                     'status' => 'Unpaid',
                     'receipt_no' => null
@@ -633,7 +633,7 @@ class StudentService extends BaseService
                 'id' => (int)$row['id'],
                 'description' => $row['fee_name'] === 'Transport Fees' ? 'Transport Fee' : $row['fee_name'],
                 'custom_description' => $row['description'] ?? '',
-                'amount' => $amt,
+                'amount' => (int)round($amt),
                 'payment_date' => $row['payment_date'],
                 'due_date' => $dueDate,
                 'status' => $isPaid ? 'Paid' : 'Pending'
@@ -646,9 +646,9 @@ class StudentService extends BaseService
         $totalOutstanding = $monthlyDue + $additionalDue;
 
         return [
-            'total_outstanding' => $totalOutstanding,
-            'monthly_due' => $monthlyDue,
-            'additional_due' => $additionalDue,
+            'total_outstanding' => (int)round($totalOutstanding),
+            'monthly_due' => (int)round($monthlyDue),
+            'additional_due' => (int)round($additionalDue),
             'monthly_fees' => $monthlyFees,
             'additional_fees' => $additionalFees
         ];
