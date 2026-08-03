@@ -565,7 +565,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                           builder: (context) => NoticeDetailsScreen(
                                             subject: matchingNotice['subject'] ?? '',
                                             description: matchingNotice['description'] ?? '',
-                                            publishDate: _formatDate(matchingNotice['created_at']),
+                                            publishDate: _formatDateTime(matchingNotice['created_at']),
                                           ),
                                         ),
                                       );
