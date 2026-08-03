@@ -77,6 +77,7 @@ export function compileReportCardData(card = {}, schoolProfile = {}, currentYear
     if (isGradeOnly) {
       const assignedGrade = rawVal && rawVal !== '—' ? rawVal : (s.grade || 'A');
       return {
+        subject_id: s.subject_id || s.id || null,
         subject_name: s.subject_name || s.name || 'Subject',
         marks_obtained: assignedGrade,
         max_marks: 'GRADE',
@@ -93,6 +94,7 @@ export function compileReportCardData(card = {}, schoolProfile = {}, currentYear
     const result = obtained >= pass ? 'PASS' : 'FAIL';
 
     return {
+      subject_id: s.subject_id || s.id || null,
       subject_name: s.subject_name || s.name || 'Subject',
       marks_obtained: obtained,
       max_marks: max,
@@ -104,9 +106,15 @@ export function compileReportCardData(card = {}, schoolProfile = {}, currentYear
   });
 
   // Sort subjects: Marks-based first, Grade-based at the bottom
+  // Secondary sort: Master subject order (subject_id)
   subjects.sort((a, b) => {
-    if (a.is_grade_only === b.is_grade_only) return 0;
-    return a.is_grade_only ? 1 : -1;
+    if (a.is_grade_only !== b.is_grade_only) {
+      return a.is_grade_only ? 1 : -1;
+    }
+    if (a.subject_id && b.subject_id && a.subject_id !== b.subject_id) {
+      return a.subject_id - b.subject_id;
+    }
+    return 0;
   });
 
   const numericSubjects = subjects.filter(s => !s.is_grade_only);
@@ -213,6 +221,7 @@ export function compileFinalSessionReportCardData(examCards = [], weightagePolic
                           ['A+', 'A', 'B', 'C', 'D', 'E'].includes(rawVal);
       const assignedGrade = rawVal && rawVal !== '—' ? rawVal : (sub.grade || 'A');
       subjectMap[name][examName] = {
+        subject_id: sub.subject_id || sub.id || null,
         marks_obtained: isGradeOnly ? assignedGrade : (parseFloat(sub.marks_obtained) || 0),
         max_marks: isGradeOnly ? 'GRADE' : (parseFloat(sub.max_marks) || 100),
         passing_marks: isGradeOnly ? 'C' : (parseFloat(sub.passing_marks) || 33),
@@ -234,10 +243,12 @@ export function compileFinalSessionReportCardData(examCards = [], weightagePolic
     let grandTotalMax = 0;
     let hasNumericScore = false;
     let lastAssignedGrade = 'A';
+    let masterSubjectId = null;
 
     session_exams.forEach(exName => {
       const score = examScoresMap[exName];
       if (score) {
+        if (score.subject_id && !masterSubjectId) masterSubjectId = score.subject_id;
         if (score.is_grade_only) {
           lastAssignedGrade = score.grade || 'A';
         } else {
@@ -260,6 +271,7 @@ export function compileFinalSessionReportCardData(examCards = [], weightagePolic
       : lastAssignedGrade;
 
     return {
+      subject_id: masterSubjectId,
       subject_name: subjName,
       exam_scores: examScoresMap,
       grand_total_max: !isSubjectGradeOnly ? grandTotalMax : 'GRADE',
@@ -274,9 +286,15 @@ export function compileFinalSessionReportCardData(examCards = [], weightagePolic
   });
 
   // Sort final session subjects: Marks-based first, Grade-based at the bottom
+  // Secondary sort: Master subject order (subject_id)
   finalSubjects.sort((a, b) => {
-    if (a.is_grade_only === b.is_grade_only) return 0;
-    return a.is_grade_only ? 1 : -1;
+    if (a.is_grade_only !== b.is_grade_only) {
+      return a.is_grade_only ? 1 : -1;
+    }
+    if (a.subject_id && b.subject_id && a.subject_id !== b.subject_id) {
+      return a.subject_id - b.subject_id;
+    }
+    return 0;
   });
 
   // Calculate grand session totals

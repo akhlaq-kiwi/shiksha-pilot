@@ -11835,6 +11835,7 @@ Only approve the settlement after reviewing all financial records.
             FROM examination_papers ep
             JOIN subjects s ON ep.subject_id = s.id
             WHERE ep.exam_id = :exam_id AND ep.class_id = :class_id
+            ORDER BY s.id ASC, ep.id ASC
         ");
         $stmtPapers->execute([':exam_id' => $examId, ':class_id' => $classId]);
         $papers = $stmtPapers->fetchAll(PDO::FETCH_ASSOC) ?: [];
