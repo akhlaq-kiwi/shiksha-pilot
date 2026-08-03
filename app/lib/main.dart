@@ -169,7 +169,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
     final role = prefs.getString('user_role');
-    final baseUrl = prefs.getString('base_url') ?? 'http://qa.your-domain.com:8000';
+    final baseUrl = prefs.getString('base_url') ?? 'https://qa.shikshapilot.com';
 
     if (token != null && role != null) {
       final leaveService = LeaveService(baseUrl: baseUrl, token: token);
@@ -317,7 +317,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _serverUrlController = TextEditingController(text: 'http://qa.your-domain.com:8000');
+  final _serverUrlController = TextEditingController(text: 'https://qa.shikshapilot.com');
   
   bool _obscurePassword = true;
   bool _isLoading = false;
@@ -722,41 +722,6 @@ class _LoginScreenState extends State<LoginScreen> {
                             return null;
                           },
                         ),
-                        const SizedBox(height: 8),
-
-                        // Server URL Settings Toggle
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton.icon(
-                            onPressed: () => setState(() => _showServerConfig = !_showServerConfig),
-                            icon: const Icon(Icons.settings, size: 14),
-                            label: Text(
-                              _showServerConfig ? 'Hide Server Settings' : 'Server Settings',
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                          ),
-                        ),
-                        if (_showServerConfig) ...[
-                          TextFormField(
-                            controller: _serverUrlController,
-                            keyboardType: TextInputType.url,
-                            decoration: InputDecoration(
-                              labelText: 'Server URL',
-                              prefixIcon: const Icon(Icons.dns),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              helperText: 'e.g. http://10.55.253.71:8000 or http://qa.your-domain.com:8000',
-                            ),
-                            validator: (value) {
-                              if (value == null || value.trim().isEmpty) {
-                                return 'Please enter server URL';
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 12),
-                        ],
                         const SizedBox(height: 16),
 
                         // Login Button
