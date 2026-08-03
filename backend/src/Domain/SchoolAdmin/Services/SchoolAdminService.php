@@ -2321,6 +2321,8 @@ class SchoolAdminService extends BaseService
                     ':file_size' => (int)$doc['file_size']
                 ]);
             }
+        }
+
         // Auto-sync active user account for mobile app login
         $this->syncUserAccountForStaff($pdo, $schoolId, $data['name'], $data['phone'], $data['role'] ?? 'Teacher');
 
