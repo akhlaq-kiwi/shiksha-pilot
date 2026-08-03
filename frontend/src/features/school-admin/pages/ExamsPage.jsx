@@ -858,6 +858,10 @@ export default function ExamsPage() {
   };
 
   const handleToggleExamPublishStatus = (exam) => {
+    if (exam.status === 'Draft' && (!exam.start_date || !exam.end_date || !exam.publish_date)) {
+      setError('Please edit the examination and configure Start Date, End Date, and Publish Date before publishing.');
+      return;
+    }
     setTogglePublishTarget(exam);
     setShowTogglePublishModal(true);
   };
@@ -2107,11 +2111,12 @@ export default function ExamsPage() {
                             <DropdownItem onClick={() => handleEditExamClick(e)}>
                               Edit Examination
                             </DropdownItem>
-                            <DropdownItem onClick={() => handleToggleExamPublishStatus(e)}>
+                            <DropdownItem 
+                              onClick={() => handleToggleExamPublishStatus(e)}
+                              disabled={e.status === 'Draft' && (!e.start_date || !e.end_date || !e.publish_date)}
+                              title={e.status === 'Draft' && (!e.start_date || !e.end_date || !e.publish_date) ? "Please configure exam dates before publishing." : ""}
+                            >
                               {e.status === 'Draft' ? 'Publish Examination' : 'Move to Draft'}
-                            </DropdownItem>
-                            <DropdownItem destructive onClick={() => handleDeleteExamClick(e)}>
-                              Delete Examination
                             </DropdownItem>
                           </DropdownMenu>
                         )}

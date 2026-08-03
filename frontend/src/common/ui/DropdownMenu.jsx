@@ -107,17 +107,21 @@ export function DropdownMenu({ trigger, children, align = 'right' }) {
   );
 }
 
-export function DropdownItem({ children, className, onClick, destructive = false, ...props }) {
+export function DropdownItem({ children, className, onClick, destructive = false, disabled = false, title, ...props }) {
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      title={title}
       className={twMerge(
         clsx(
           "block w-full text-left px-4 py-2 font-medium transition-colors text-body-md whitespace-nowrap rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/50",
-          destructive 
-            ? "text-danger-700 hover:bg-danger-50" 
-            : "text-text-primary hover:bg-secondary/80",
+          disabled 
+            ? "opacity-40 cursor-not-allowed text-text-muted hover:bg-transparent" 
+            : destructive 
+              ? "text-danger-700 hover:bg-danger-50 cursor-pointer" 
+              : "text-text-primary hover:bg-secondary/80 cursor-pointer",
           className
         )
       )}
