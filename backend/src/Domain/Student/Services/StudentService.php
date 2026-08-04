@@ -942,6 +942,7 @@ class StudentService extends BaseService
         $student = $this->resolveStudent($user);
         $classId = (int) $student['class_id'];
         $schoolId = (int) ($user['school_id'] ?? 0);
+        $academicYearId = (int) ($student['academic_year_id'] ?? 0);
         $pdo = $this->repo->getPdo();
 
         $stmt = $pdo->prepare("
@@ -950,17 +951,23 @@ class StudentService extends BaseService
                    COALESCE(ecs.admit_card_published, 0) AS admit_card_published,
                    COALESCE(ecs.status, 'Draft') AS result_status
             FROM examinations e
-            JOIN examination_papers ep ON e.id = ep.exam_id
-            LEFT JOIN examination_class_status ecs ON e.id = ecs.exam_id AND ecs.class_id = :class_id_1
-            WHERE ep.class_id = :class_id_2 
-              AND e.school_id = :school_id 
+            LEFT JOIN examination_class_status ecs ON e.id = ecs.exam_id AND ecs.class_id = :class_id
+            WHERE e.school_id = :school_id 
               AND e.status = 'Published'
-            ORDER BY e.start_date ASC, e.id ASC
+              AND (e.academic_year_id = :ayid OR :ayid_check = 0 OR e.academic_year_id IS NULL)
+            ORDER BY 
+              CASE 
+                WHEN LOWER(e.name) LIKE '%quarterly%' THEN 1 
+                WHEN LOWER(e.name) LIKE '%half%' THEN 2 
+                WHEN LOWER(e.name) LIKE '%annual%' THEN 3 
+                ELSE 4 
+              END ASC, e.start_date ASC, e.id ASC
         ");
         $stmt->execute([
-            ':class_id_1' => $classId,
-            ':class_id_2' => $classId,
-            ':school_id' => $schoolId
+            ':class_id' => $classId,
+            ':school_id' => $schoolId,
+            ':ayid' => $academicYearId,
+            ':ayid_check' => $academicYearId
         ]);
         $exams = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 

@@ -825,18 +825,33 @@ class TeacherService extends BaseService
         }
         $schoolId = (int)$user['school_id'];
 
+        $stmtAy = $pdo->prepare("SELECT academic_year_id FROM classes WHERE id = :cid LIMIT 1");
+        $stmtAy->execute([':cid' => $classId]);
+        $academicYearId = (int)($stmtAy->fetchColumn() ?: 0);
+
         $stmt = $pdo->prepare("
             SELECT DISTINCT e.id, e.name, e.start_date, e.end_date,
                    COALESCE(ecs.scheme_published, 0) AS scheme_published,
                    COALESCE(ecs.status, 'Draft') AS result_status
             FROM examinations e
-            JOIN examination_papers ep ON e.id = ep.exam_id
-            LEFT JOIN examination_class_status ecs ON e.id = ecs.exam_id AND ecs.class_id = ep.class_id
-            WHERE ep.class_id = :class_id AND e.school_id = :school_id
+            LEFT JOIN examination_class_status ecs ON e.id = ecs.exam_id AND ecs.class_id = :class_id
+            WHERE e.school_id = :school_id
               AND e.status = 'Published'
-            ORDER BY e.start_date ASC, e.id ASC
+              AND (e.academic_year_id = :ayid OR :ayid_check = 0 OR e.academic_year_id IS NULL)
+            ORDER BY 
+              CASE 
+                WHEN LOWER(e.name) LIKE '%quarterly%' THEN 1 
+                WHEN LOWER(e.name) LIKE '%half%' THEN 2 
+                WHEN LOWER(e.name) LIKE '%annual%' THEN 3 
+                ELSE 4 
+              END ASC, e.start_date ASC, e.id ASC
         ");
-        $stmt->execute([':class_id' => $classId, ':school_id' => $schoolId]);
+        $stmt->execute([
+            ':class_id' => $classId,
+            ':school_id' => $schoolId,
+            ':ayid' => $academicYearId,
+            ':ayid_check' => $academicYearId
+        ]);
         $exams = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
         $today = date('Y-m-d');
