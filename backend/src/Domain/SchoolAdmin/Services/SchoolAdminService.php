@@ -2499,7 +2499,7 @@ class SchoolAdminService extends BaseService
 
             if ($conflict) {
                 $schoolName = $conflict['school_name'] ?? 'another school';
-                $errMsg = "This mobile number ({$phone}) is already active in '{$schoolName}'. Please mark the student as inactive in the previous school before registering here.";
+                $errMsg = "Mobile number active in {$schoolName}. Deactivate first.";
                 throw new ValidationException([
                     'parent_phone' => $errMsg,
                     'student_mobile' => $errMsg,
@@ -2545,7 +2545,7 @@ class SchoolAdminService extends BaseService
 
         if ($conflict) {
             $schoolName = $conflict['school_name'] ?? 'another school';
-            $errMsg = "This mobile number ({$phone}) is already active in '{$schoolName}'. Please mark the staff member as inactive in the previous school before registering here.";
+            $errMsg = "Mobile number active in {$schoolName}. Deactivate first.";
             throw new ValidationException([
                 'phone' => $errMsg
             ]);
