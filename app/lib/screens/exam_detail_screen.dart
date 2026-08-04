@@ -786,7 +786,8 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                                         ((double.tryParse(currentPaper?['max_marks']?.toString() ?? '') ?? -1) == 0.0);
                                                     if (isGradeSubject) {
                                                       final currentVal = marksControllers[sId]?.text.trim().toUpperCase();
-                                                      final validGrades = ['A+', 'A', 'B+', 'B', 'C+', 'C', 'D+', 'D', 'E', 'F'];
+                                                      final apiGrades = (marksSheetData?['available_grades'] as List<dynamic>?)?.map((e) => e.toString()).toList();
+                                                      final validGrades = (apiGrades != null && apiGrades.isNotEmpty) ? apiGrades : ['A', 'B', 'C', 'D'];
                                                       final selectedGrade = validGrades.contains(currentVal) ? currentVal : null;
 
                                                       return SizedBox(

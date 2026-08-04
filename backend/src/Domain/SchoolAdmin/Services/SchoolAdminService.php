@@ -11969,13 +11969,10 @@ Only approve the settlement after reviewing all financial records.
                 (:sid, :min, :max, :grade, :point, :remark)
             ");
             $defaults = [
-                [91.00, 100.00, 'A+', 10, 'Outstanding'],
-                [81.00, 90.00, 'A', 9, 'Excellent'],
-                [71.00, 80.00, 'B+', 8, 'Very Good'],
-                [61.00, 70.00, 'B', 7, 'Good'],
-                [51.00, 60.00, 'C', 6, 'Average'],
-                [41.00, 50.00, 'D', 5, 'Pass'],
-                [0.00, 40.00, 'F', 0, 'Fail']
+                [75.00, 100.00, 'A', 10, 'Excellent'],
+                [60.00, 74.99, 'B', 8, 'Good'],
+                [40.00, 59.99, 'C', 6, 'Average'],
+                [0.00, 39.99, 'D', 0, 'Fail']
             ];
             foreach ($defaults as $row) {
                 $stmtIns->execute([

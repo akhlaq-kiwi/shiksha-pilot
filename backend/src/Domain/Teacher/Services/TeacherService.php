@@ -1083,6 +1083,13 @@ class TeacherService extends BaseService
             ];
         }
 
+        $stmtGrades = $pdo->prepare("SELECT grade FROM grade_configurations WHERE school_id = :sid ORDER BY min_percentage DESC");
+        $stmtGrades->execute([':sid' => $schoolId]);
+        $configuredGrades = $stmtGrades->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        if (empty($configuredGrades)) {
+            $configuredGrades = ['A', 'B', 'C', 'D'];
+        }
+
         return [
             'exam_name' => $examName,
             'class_name' => $className,
@@ -1090,6 +1097,7 @@ class TeacherService extends BaseService
             'evaluation_type' => $paper['evaluation_type'] ?? ((float)$paper['max_marks'] == 0 ? 'grade' : 'marks'),
             'max_marks' => (float)$paper['max_marks'],
             'passing_marks' => (float)$paper['passing_marks'],
+            'available_grades' => array_values(array_unique($configuredGrades)),
             'is_result_published' => $isResultPublished,
             'students' => $list
         ];

@@ -685,13 +685,10 @@ export default function ExamsPage() {
 
   const handleResetGradesDefault = () => {
     setGradeScales([
-      { min_percentage: 91, max_percentage: 100, grade: 'A+', grade_point: 10, remark: 'Outstanding' },
-      { min_percentage: 81, max_percentage: 90, grade: 'A', grade_point: 9, remark: 'Excellent' },
-      { min_percentage: 71, max_percentage: 80, grade: 'B+', grade_point: 8, remark: 'Very Good' },
-      { min_percentage: 61, max_percentage: 70, grade: 'B', grade_point: 7, remark: 'Good' },
-      { min_percentage: 51, max_percentage: 60, grade: 'C', grade_point: 6, remark: 'Average' },
-      { min_percentage: 41, max_percentage: 50, grade: 'D', grade_point: 5, remark: 'Pass' },
-      { min_percentage: 0, max_percentage: 40, grade: 'F', grade_point: 0, remark: 'Fail' }
+      { min_percentage: 75, max_percentage: 100, grade: 'A', grade_point: 10, remark: 'Excellent' },
+      { min_percentage: 60, max_percentage: 74.99, grade: 'B', grade_point: 8, remark: 'Good' },
+      { min_percentage: 40, max_percentage: 59.99, grade: 'C', grade_point: 6, remark: 'Average' },
+      { min_percentage: 0, max_percentage: 39.99, grade: 'D', grade_point: 0, remark: 'Fail' }
     ]);
   };
 
@@ -3076,24 +3073,25 @@ export default function ExamsPage() {
                         </TableCell>
                         <TableCell>
                           {isGradeSheet ? (
-                            <Select
-                              className="h-8 text-xs font-bold w-full cursor-pointer"
-                              disabled={s.is_absent === 1}
-                              value={s.is_absent === 1 ? '' : (s.marks_obtained || '')}
-                              onChange={e => handleMarkCellChange(s.student_id, 'marks_obtained', e.target.value)}
-                            >
-                              <option value="">-- Grade --</option>
-                              <option value="A+">Grade A+</option>
-                              <option value="A">Grade A</option>
-                              <option value="B+">Grade B+</option>
-                              <option value="B">Grade B</option>
-                              <option value="C+">Grade C+</option>
-                              <option value="C">Grade C</option>
-                              <option value="D+">Grade D+</option>
-                              <option value="D">Grade D</option>
-                              <option value="E">Grade E</option>
-                              <option value="F">Grade F</option>
-                            </Select>
+                            (() => {
+                              const dynamicGrades = (gradeScales && gradeScales.length > 0)
+                                ? Array.from(new Set(gradeScales.map(g => g.grade).filter(Boolean)))
+                                : ['A', 'B', 'C', 'D'];
+
+                              return (
+                                <Select
+                                  className="h-8 text-xs font-bold w-full cursor-pointer"
+                                  disabled={s.is_absent === 1}
+                                  value={s.is_absent === 1 ? '' : (s.marks_obtained || '')}
+                                  onChange={e => handleMarkCellChange(s.student_id, 'marks_obtained', e.target.value)}
+                                >
+                                  <option value="">-- Grade --</option>
+                                  {dynamicGrades.map(g => (
+                                    <option key={g} value={g}>Grade {g}</option>
+                                  ))}
+                                </Select>
+                              );
+                            })()
                           ) : (
                             <Input 
                               type="text"
