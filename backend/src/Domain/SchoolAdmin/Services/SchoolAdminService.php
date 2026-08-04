@@ -11318,6 +11318,14 @@ Only approve the settlement after reviewing all financial records.
                 ]);
             }
 
+            // Automatically set scheme_published = 1 for this exam and class
+            $stmtStatus = $pdo->prepare("
+                INSERT INTO examination_class_status (exam_id, class_id, status, scheme_published, updated_at)
+                VALUES (:exam_id, :class_id, 'Draft', 1, NOW())
+                ON DUPLICATE KEY UPDATE scheme_published = 1, updated_at = NOW()
+            ");
+            $stmtStatus->execute([':exam_id' => $examId, ':class_id' => $classId]);
+
             $pdo->commit();
         } catch (\Exception $e) {
             $pdo->rollBack();

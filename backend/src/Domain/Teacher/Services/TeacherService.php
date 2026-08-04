@@ -918,18 +918,16 @@ class TeacherService extends BaseService
             'result' => null
         ];
 
-        // 2. Fetch scheme papers for teacher class if published
-        if ($schemePublished) {
-            $stmtScheme = $pdo->prepare("
-                SELECT ep.id, ep.subject_id, ep.exam_date, ep.start_time, ep.end_time, ep.max_marks, ep.passing_marks, ep.room, s.name AS subject_name
-                FROM examination_papers ep
-                JOIN subjects s ON ep.subject_id = s.id
-                WHERE ep.exam_id = :exam_id AND ep.class_id = :class_id
-                ORDER BY ep.exam_date ASC, ep.start_time ASC
-            ");
-            $stmtScheme->execute([':exam_id' => $examId, ':class_id' => $classId]);
-            $response['scheme'] = $stmtScheme->fetchAll(PDO::FETCH_ASSOC) ?: [];
-        }
+        // 2. Fetch current live scheme papers for teacher class
+        $stmtScheme = $pdo->prepare("
+            SELECT ep.id, ep.subject_id, ep.exam_date, ep.start_time, ep.end_time, ep.max_marks, ep.passing_marks, ep.room, s.name AS subject_name
+            FROM examination_papers ep
+            JOIN subjects s ON ep.subject_id = s.id
+            WHERE ep.exam_id = :exam_id AND ep.class_id = :class_id
+            ORDER BY ep.exam_date ASC, ep.start_time ASC
+        ");
+        $stmtScheme->execute([':exam_id' => $examId, ':class_id' => $classId]);
+        $response['scheme'] = $stmtScheme->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
         // 3. Fetch result if published
         if ($resultPublished) {
