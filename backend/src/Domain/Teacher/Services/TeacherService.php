@@ -920,7 +920,9 @@ class TeacherService extends BaseService
 
         // 2. Fetch current live scheme papers for teacher class
         $stmtScheme = $pdo->prepare("
-            SELECT ep.id, ep.subject_id, ep.exam_date, ep.start_time, ep.end_time, ep.max_marks, ep.passing_marks, ep.room, ep.evaluation_type, s.name AS subject_name
+            SELECT ep.id, ep.subject_id, ep.exam_date, ep.start_time, ep.end_time, ep.max_marks, ep.passing_marks, ep.room,
+                   CASE WHEN ep.max_marks = 0 THEN 'grade' ELSE 'marks' END AS evaluation_type,
+                   s.name AS subject_name
             FROM examination_papers ep
             JOIN subjects s ON ep.subject_id = s.id
             WHERE ep.exam_id = :exam_id AND ep.class_id = :class_id
