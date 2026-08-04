@@ -2415,7 +2415,7 @@ export default function FinanceManagementPage() {
             <AlertTriangle className="h-5 w-5 flex-shrink-0 text-amber-500 mt-0.5" />
             <div>
               <strong className="block font-bold text-amber-900 dark:text-amber-200 mb-0.5 uppercase tracking-wider text-[11px]">Fee Ledger Impact Notice:</strong>
-              Current month ki transport fees (jo due hai) fee card me rahegi, lekin agle month se is student ki transport fees fee card me add nahi hogi.
+              The current month's transport fee (which is due) will remain on the fee card, but starting next month, transport fees will no longer be added to this student's fee card.
             </div>
           </div>
         </div>

@@ -72,7 +72,7 @@ export const schoolService = {
   },
 
   deleteClass(className) {
-    return apiClient.delete('/api/school/classes', { data: { name: className } });
+    return apiClient.delete(`/api/school/classes?name=${encodeURIComponent(className)}`, { body: { name: className } });
   },
 
   deleteSection(classId) {

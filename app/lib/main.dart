@@ -22,7 +22,7 @@ void callbackDispatcher() {
           final prefs = await SharedPreferences.getInstance();
           final token = prefs.getString('auth_token') ?? '';
           final userRole = prefs.getString('user_role') ?? '';
-          final baseUrl = prefs.getString('base_url') ?? 'http://10.55.253.71:8000';
+          final baseUrl = prefs.getString('base_url') ?? 'http://127.0.0.1:8000';
           if (token.isEmpty || userRole.isEmpty) return true;
 
           final isSchoolStaff = userRole.toUpperCase() == 'TEACHER' || 
@@ -169,9 +169,10 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
     final role = prefs.getString('user_role');
+    final baseUrl = prefs.getString('base_url') ?? 'https://qa.shikshapilot.com';
 
     if (token != null && role != null) {
-      final leaveService = LeaveService(baseUrl: _baseUrl, token: token);
+      final leaveService = LeaveService(baseUrl: baseUrl, token: token);
       
       final roleUpper = role.toUpperCase();
       if (roleUpper == 'PARENT' || roleUpper == 'STUDENT') {
@@ -306,7 +307,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 // Login Screen
 // -----------------------------------------------------------------------------
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({Key? key}) : super(key: key);
+  final String? initialErrorMessage;
+  const LoginScreen({Key? key, this.initialErrorMessage}) : super(key: key);
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -316,20 +318,42 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _serverUrlController = TextEditingController(text: 'https://qa.shikshapilot.com');
   
   bool _obscurePassword = true;
   bool _isLoading = false;
+  bool _showServerConfig = false;
   String _errorMessage = '';
 
   String? _phoneValidationError;
   String? _passwordValidationError;
 
-  final String _baseUrl = 'http://10.55.253.71:8000';
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialErrorMessage != null && widget.initialErrorMessage!.isNotEmpty) {
+      _errorMessage = widget.initialErrorMessage!;
+    }
+    _loadServerUrl();
+  }
+
+  Future<void> _loadServerUrl() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedUrl = prefs.getString('base_url');
+    if (savedUrl != null && savedUrl.isNotEmpty) {
+      if (mounted) {
+        setState(() {
+          _serverUrlController.text = savedUrl;
+        });
+      }
+    }
+  }
 
   @override
   void dispose() {
     _phoneController.dispose();
     _passwordController.dispose();
+    _serverUrlController.dispose();
     super.dispose();
   }
 
@@ -341,8 +365,12 @@ class _LoginScreenState extends State<LoginScreen> {
       _errorMessage = '';
     });
 
+    final activeBaseUrl = _serverUrlController.text.trim().replaceAll(RegExp(r'/$'), '');
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('base_url', activeBaseUrl);
+
     try {
-      final authService = AuthService(baseUrl: _baseUrl);
+      final authService = AuthService(baseUrl: activeBaseUrl);
       final data = await authService.login(
         _phoneController.text.trim(),
         _passwordController.text,
@@ -354,7 +382,6 @@ class _LoginScreenState extends State<LoginScreen> {
       final name = user['name'] as String;
 
       // Save credentials locally
-      final prefs = await SharedPreferences.getInstance();
       await prefs.setString('auth_token', token);
       await prefs.setString('user_role', role);
       await prefs.setString('user_name', name);
@@ -362,7 +389,30 @@ class _LoginScreenState extends State<LoginScreen> {
       await prefs.setString('school_name', ((user['school_name'] as String?) ?? 'Shiksha Pilot Academy').toUpperCase());
       await prefs.setString('user_photo', (user['staff_photo_path'] as String?) ?? '');
 
-      final leaveService = LeaveService(baseUrl: _baseUrl, token: token);
+      final leaveService = LeaveService(baseUrl: activeBaseUrl, token: token);
+
+      final pendingPayload = prefs.getString('pending_notification_payload');
+      if (pendingPayload != null && pendingPayload.isNotEmpty) {
+        await prefs.remove('pending_notification_payload');
+        try {
+          final notif = json.decode(pendingPayload);
+          final selId = prefs.getInt('selected_student_id');
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => HomeScreen(
+                  leaveService: leaveService,
+                  userRole: role,
+                  selectedStudentId: selId,
+                ),
+              ),
+            );
+            NotificationHelper.navigateToTarget(notif, activeBaseUrl, token, role, selId);
+            return;
+          }
+        } catch (_) {}
+      }
 
       if (role == 'STUDENT') {
         final students = await leaveService.getChildren();
@@ -425,7 +475,8 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       }
     } catch (e) {
-      final errorMsg = e.toString().replaceAll('Exception:', '').trim();
+      final rawError = e.toString();
+      final errorMsg = rawError.replaceAll('Exception:', '').trim();
       
       setState(() {
         _phoneValidationError = null;
@@ -433,7 +484,12 @@ class _LoginScreenState extends State<LoginScreen> {
         _errorMessage = '';
       });
 
-      if (errorMsg.toLowerCase().contains('mobile no not found')) {
+      if (rawError.contains('SocketException') || rawError.contains('ClientException') || rawError.contains('Connection refused') || rawError.contains('Failed host lookup')) {
+        setState(() {
+          _errorMessage = 'Cannot connect to server at "$activeBaseUrl". Please check Server Settings or Network Connection.';
+          _showServerConfig = true;
+        });
+      } else if (errorMsg.toLowerCase().contains('mobile no not found')) {
         setState(() {
           _phoneValidationError = 'Mobile No not found';
         });
@@ -443,6 +499,10 @@ class _LoginScreenState extends State<LoginScreen> {
           _passwordValidationError = 'Incorrect password';
         });
         _formKey.currentState!.validate();
+      } else if (errorMsg.toLowerCase().contains('inactive') || errorMsg.toLowerCase().contains('account marked as inactive')) {
+        setState(() {
+          _errorMessage = 'Your account marked as Inactive Please contact Academy management';
+        });
       } else if (errorMsg.toLowerCase().contains('validation failed') ||
                  errorMsg.toLowerCase().contains('invalid credentials') ||
                  errorMsg.toLowerCase().contains('invalid credential')) {
@@ -693,7 +753,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             return null;
                           },
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 16),
 
                         // Login Button
                         ElevatedButton(

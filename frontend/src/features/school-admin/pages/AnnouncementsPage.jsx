@@ -334,7 +334,7 @@ export default function AnnouncementsPage() {
   ];
 
   return (
-    <div className="space-y-6 p-1 md:p-6 max-w-7xl mx-auto animate-in fade-in duration-200">
+    <div className="space-y-6 p-1 md:p-6 max-w-7xl mx-auto min-h-[calc(100vh-140px)] flex flex-col animate-in fade-in duration-200">
       {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/60 pb-5">
         <div>
@@ -368,8 +368,8 @@ export default function AnnouncementsPage() {
       </div>
 
       {/* Grid Table Layout with standard columns */}
-      <Card className="shadow-xs border border-border bg-surface overflow-hidden">
-        <CardContent className="p-0">
+      <Card className="shadow-xs border border-border bg-surface flex-1 min-h-[480px] overflow-visible pb-16">
+        <CardContent className="p-0 flex-1 flex flex-col overflow-visible">
           {loading ? (
             <div className="flex justify-center items-center py-24">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
@@ -388,7 +388,7 @@ export default function AnnouncementsPage() {
               </div>
             </div>
           ) : (
-            <Table>
+            <Table containerClassName="overflow-visible border-none shadow-none bg-transparent">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-1/2">Title</TableHead>
@@ -397,9 +397,9 @@ export default function AnnouncementsPage() {
                   <TableHead className="w-1/12 text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
+              <TableBody className="overflow-visible">
                 {filteredAnnouncements.map((ann) => (
-                  <TableRow key={ann.id}>
+                  <TableRow key={ann.id} className="overflow-visible">
                     {/* Title */}
                     <TableCell className="font-bold text-text-primary">
                       {ann.subject}
@@ -431,8 +431,8 @@ export default function AnnouncementsPage() {
                     </TableCell>
 
                     {/* Action dropdown button */}
-                    <TableCell className="text-right">
-                      <div className="dropdown-container relative inline-block text-left">
+                    <TableCell className="text-right overflow-visible">
+                      <div className="dropdown-container relative inline-block text-left z-30">
                         <button
                           type="button"
                           onClick={(e) => {
@@ -445,7 +445,7 @@ export default function AnnouncementsPage() {
                         </button>
                         
                         {activeDropdownId === ann.id && (
-                          <div className="absolute right-0 top-full mt-1.5 w-36 bg-surface border border-border shadow-lg rounded-xl py-1 z-20 animate-in fade-in slide-in-from-top-1 duration-100 text-left">
+                          <div className="absolute right-0 top-full mt-1.5 w-40 bg-surface border border-border shadow-xl rounded-xl py-1.5 z-50 animate-in fade-in slide-in-from-top-1 duration-100 text-left">
                             <button
                               type="button"
                               onClick={() => {

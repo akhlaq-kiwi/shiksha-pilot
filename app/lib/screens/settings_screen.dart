@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../services/leave_service.dart';
 import '../services/auth_service.dart';
 import '../main.dart';
+import '../widgets/change_password_dialog.dart';
 import 'full_screen_image_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -225,7 +226,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 final childPhoto = child['photo_path']?.toString() ?? '';
                 Widget leadingWidget;
                 if (childPhoto.isNotEmpty) {
-                  final fullUrl = childPhoto.startsWith('http') ? childPhoto : 'http://10.55.253.71:8000' + childPhoto;
+                  final fullUrl = childPhoto.startsWith('http') ? childPhoto : '${widget.leaveService.baseUrl}$childPhoto';
                   leadingWidget = CircleAvatar(
                     backgroundImage: NetworkImage(fullUrl),
                     backgroundColor: Colors.indigo.shade50,
@@ -269,165 +270,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showChangePasswordDialog() {
-    final _formKey = GlobalKey<FormState>();
-    final _currentPasswordController = TextEditingController();
-    final _newPasswordController = TextEditingController();
-    final _confirmPasswordController = TextEditingController();
-    bool _isUpdating = false;
-    String _errorText = '';
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: const Text(
-                'Change Password',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-              ),
-              content: Form(
-                key: _formKey,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      TextFormField(
-                        controller: _currentPasswordController,
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Current Password',
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Current password is required';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _newPasswordController,
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                          labelText: 'New Password',
-                          hintText: 'Min 6 chars, 1 uppercase, 1 digit',
-                          hintStyle: TextStyle(fontSize: 11),
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'New password is required';
-                          }
-                          if (value.length < 6) {
-                            return 'At least 6 characters required';
-                          }
-                          bool hasUppercase = value.contains(RegExp(r'[A-Z]'));
-                          bool hasDigits = value.contains(RegExp(r'[0-9]'));
-                          bool hasAlpha = value.contains(RegExp(r'[a-zA-Z]'));
-                          if (!hasUppercase || !hasDigits || !hasAlpha) {
-                            return 'Must contain 1 uppercase, 1 digit & 1 letter';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _confirmPasswordController,
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Confirm Password',
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Confirm password is required';
-                          }
-                          if (value != _newPasswordController.text) {
-                            return 'Passwords do not match';
-                          }
-                          return null;
-                        },
-                      ),
-                      if (_errorText.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          _errorText,
-                          style: const TextStyle(color: Colors.red, fontSize: 12),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: _isUpdating ? null : () => Navigator.pop(context),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: _isUpdating
-                      ? null
-                      : () async {
-                          if (_formKey.currentState!.validate()) {
-                            setDialogState(() {
-                              _isUpdating = true;
-                              _errorText = '';
-                            });
-
-                            try {
-                              final authService = AuthService(
-                                baseUrl: widget.leaveService.baseUrl,
-                              );
-                              await authService.changePassword(
-                                widget.leaveService.token,
-                                _currentPasswordController.text,
-                                _newPasswordController.text,
-                              );
-
-                              if (context.mounted) {
-                                Navigator.pop(context);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Password updated successfully!'),
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
-                              }
-                            } catch (e) {
-                              setDialogState(() {
-                                _isUpdating = false;
-                                _errorText = e.toString();
-                              });
-                            }
-                          }
-                        },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.indigo,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: _isUpdating
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text('Update'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+    ChangePasswordDialog.show(
+      context,
+      baseUrl: widget.leaveService.baseUrl,
+      token: widget.leaveService.token,
     );
   }
 
@@ -437,14 +283,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Profile Details', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildDetailRow('Name', _userName),
-            _buildDetailRow('Phone', _userPhone),
-            _buildDetailRow('Associated School', _schoolName),
-          ],
+        content: Container(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildDetailRow('Name', _userName),
+              _buildDetailRow('Phone', _userPhone),
+              _buildDetailRow('Associated School', _schoolName),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -473,41 +322,60 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _showThemeSelector() {
     showDialog(
       context: context,
-      builder: (context) => SimpleDialog(
-        title: const Text('Select Appearance Mode', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+      builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        children: ['Light Mode', 'Dark Mode', 'System Defaults'].map((mode) {
-          return SimpleDialogOption(
-            onPressed: () async {
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setString('theme_mode', mode);
-              setState(() {
-                _currentTheme = mode;
-              });
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Theme changed to $mode.'), behavior: SnackBarBehavior.floating),
-              );
-            },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Row(
-                children: [
-                  Icon(
+        title: const Text('Appearance Theme', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        content: Container(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: ['Light Mode', 'Dark Mode', 'System Defaults'].map((mode) {
+              final isSelected = _currentTheme == mode;
+              return Container(
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                decoration: BoxDecoration(
+                  color: isSelected ? Colors.indigo.shade50.withOpacity(0.4) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: ListTile(
+                  leading: Icon(
                     mode == 'Light Mode'
                         ? Icons.light_mode_rounded
                         : mode == 'Dark Mode'
                             ? Icons.dark_mode_rounded
                             : Icons.settings_brightness_rounded,
-                    color: Colors.indigo,
+                    color: isSelected ? Colors.indigo.shade800 : Colors.grey.shade700,
                   ),
-                  const SizedBox(width: 12),
-                  Text(mode, style: const TextStyle(fontWeight: FontWeight.w600)),
-                ],
-              ),
-            ),
-          );
-        }).toList(),
+                  title: Text(
+                    mode,
+                    style: TextStyle(
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      color: isSelected ? Colors.indigo.shade800 : Colors.black87,
+                    ),
+                  ),
+                  trailing: isSelected ? Icon(Icons.check_circle, color: Colors.indigo.shade800) : null,
+                  onTap: () async {
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setString('theme_mode', mode);
+                    setState(() {
+                      _currentTheme = mode;
+                    });
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Theme changed to $mode.'), behavior: SnackBarBehavior.floating),
+                    );
+                  },
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
       ),
     );
   }
@@ -518,9 +386,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Help & Support', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: const Text(
-          'For any queries, please reach out to the school administration office or contact Shiksha Pilot technical support at support@shikshapilot.com.',
-          style: TextStyle(height: 1.4),
+        content: Container(
+          width: double.maxFinite,
+          child: const Text(
+            'For any queries, please reach out to the school administration office or contact Shiksha Pilot technical support at support@shikshapilot.com.',
+            style: TextStyle(height: 1.4),
+          ),
         ),
         actions: [
           TextButton(
@@ -538,16 +409,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('About App', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
-            Text('Shiksha Pilot School Hub', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            SizedBox(height: 4),
-            Text('Version: 1.0.0 (Production-Build)', style: TextStyle(color: Colors.grey, fontSize: 12)),
-            SizedBox(height: 12),
-            Text('A unified school portals platform designed for parents, teachers, and administrators.'),
-          ],
+        content: Container(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Text('Shiksha Pilot School Hub', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              SizedBox(height: 4),
+              Text('Version: 1.0.0 (Production-Build)', style: TextStyle(color: Colors.grey, fontSize: 12)),
+              SizedBox(height: 12),
+              Text('A unified school portals platform designed for parents, teachers, and administrators.'),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -564,7 +438,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     String photoUrl = _userPhoto;
     Widget avatarWidget;
     if (photoUrl.isNotEmpty) {
-      final fullUrl = photoUrl.startsWith('http') ? photoUrl : 'http://10.55.253.71:8000' + photoUrl;
+      final fullUrl = photoUrl.startsWith('http') ? photoUrl : '${widget.leaveService.baseUrl}$photoUrl';
       avatarWidget = CircleAvatar(
         radius: 46,
         backgroundImage: NetworkImage(fullUrl),
@@ -695,7 +569,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   GestureDetector(
                     onTap: () {
                       if (_userPhoto.isNotEmpty) {
-                        final fullUrl = _userPhoto.startsWith('http') ? _userPhoto : 'http://10.55.253.71:8000' + _userPhoto;
+                        final fullUrl = _userPhoto.startsWith('http') ? _userPhoto : '${widget.leaveService.baseUrl}$_userPhoto';
                         Navigator.push(
                           context,
                           MaterialPageRoute(

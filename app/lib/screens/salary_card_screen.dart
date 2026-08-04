@@ -62,24 +62,44 @@ class _SalaryCardScreenState extends State<SalaryCardScreen> {
 
       if (response.statusCode == 200) {
         final decoded = json.decode(response.body);
-        final data = decoded['data'] ?? {};
-        setState(() {
-          _currentYearData = data['current_year'] ?? {};
-          _previousYearData = data['previous_year'] ?? {};
-          _hasUnpaidPrev = _previousYearData['has_unpaid'] == true;
-          _isLoading = false;
-        });
+        final rawData = decoded['data'];
+        
+        Map<String, dynamic> currentYr = {};
+        Map<String, dynamic> prevYr = {};
+
+        if (rawData is Map) {
+          if (rawData['current_year'] is Map) {
+            currentYr = Map<String, dynamic>.from(rawData['current_year']);
+          }
+          if (rawData['previous_year'] is Map) {
+            prevYr = Map<String, dynamic>.from(rawData['previous_year']);
+          }
+        }
+
+        if (mounted) {
+          setState(() {
+            _currentYearData = currentYr;
+            _previousYearData = prevYr;
+            _hasUnpaidPrev = _previousYearData['has_unpaid'] == true;
+            _isLoading = false;
+          });
+        }
       } else {
+        if (mounted) {
+          setState(() {
+            _errorText = 'Failed to load salary details.';
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Salary fetch error: $e');
+      if (mounted) {
         setState(() {
-          _errorText = 'Failed to load salary details.';
+          _errorText = 'An error occurred while loading salary.';
           _isLoading = false;
         });
       }
-    } catch (e) {
-      setState(() {
-        _errorText = 'An error occurred. Please check connection.';
-        _isLoading = false;
-      });
     }
   }
 

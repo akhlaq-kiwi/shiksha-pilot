@@ -35,8 +35,18 @@ async function request(endpoint, options = {}) {
     localStorage.removeItem('shiksha_pilot_token');
     localStorage.removeItem('shiksha_pilot_role');
     localStorage.removeItem('shiksha_pilot_user');
-    window.location.replace('/login');
-    throw new Error('Unauthorized session expired');
+    
+    let errorMsg = 'Your account marked as Inactive Please contact Academy management';
+    try {
+      const data = await response.clone().json();
+      if (data?.message) {
+        errorMsg = data.message;
+      }
+    } catch (_) {}
+
+    sessionStorage.setItem('login_error_message', errorMsg);
+    window.location.replace(`/login?error=${encodeURIComponent(errorMsg)}`);
+    throw new Error(errorMsg);
   }
 
   // Handle PDF/blob/excel exports
@@ -62,7 +72,14 @@ export const apiClient = {
   get: (endpoint, options = {}) => request(endpoint, { ...options, method: 'GET' }),
   post: (endpoint, body, options = {}) => request(endpoint, { ...options, method: 'POST', body }),
   put: (endpoint, body, options = {}) => request(endpoint, { ...options, method: 'PUT', body }),
-  delete: (endpoint, options = {}) => request(endpoint, { ...options, method: 'DELETE' }),
+  delete: (endpoint, bodyOrOptions = {}) => {
+    if (bodyOrOptions && (bodyOrOptions.data !== undefined || bodyOrOptions.body !== undefined)) {
+      const body = bodyOrOptions.body !== undefined ? bodyOrOptions.body : bodyOrOptions.data;
+      const { data, body: unused, ...restOptions } = bodyOrOptions;
+      return request(endpoint, { ...restOptions, method: 'DELETE', body });
+    }
+    return request(endpoint, { ...bodyOrOptions, method: 'DELETE' });
+  },
 };
 
 export default apiClient;

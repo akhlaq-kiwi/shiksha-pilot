@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
@@ -25,9 +26,17 @@ void _checkUnauthorized(http.Response response) async {
     await prefs.remove('user_name');
     await prefs.remove('selected_student_id');
     
+    String errorMsg = 'Your account marked as Inactive Please contact Academy management';
+    try {
+      final bodyData = json.decode(response.body);
+      if (bodyData is Map && bodyData['message'] != null && bodyData['message'].toString().isNotEmpty) {
+        errorMsg = bodyData['message'].toString();
+      }
+    } catch (_) {}
+
     // Globally redirect to LoginScreen using MaterialApp navigatorKey
     MyApp.navigatorKey.currentState?.pushAndRemoveUntil(
-      MaterialPageRoute(builder: (context) => const LoginScreen()),
+      MaterialPageRoute(builder: (context) => LoginScreen(initialErrorMessage: errorMsg)),
       (route) => false,
     );
   }

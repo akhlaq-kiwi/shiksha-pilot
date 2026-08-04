@@ -32,15 +32,59 @@ abstract class BaseController
             throw new UnauthorizedException();
         }
 
-        // Verify active account status and handle token invalidation if password changed
+        // Verify active account status and handle token invalidation if password changed or account inactivated
         if (isset($user['id']) && isset($user['pwd'])) {
             $pdo = $this->tokenService->getPdo();
-            $stmt = $pdo->prepare("SELECT password, status FROM users WHERE id = :id LIMIT 1");
+            $stmt = $pdo->prepare("SELECT id, role, phone, school_id, password, status FROM users WHERE id = :id LIMIT 1");
             $stmt->execute(['id' => $user['id']]);
             $dbUser = $stmt->fetch(\PDO::FETCH_ASSOC);
 
-            if (!$dbUser || $dbUser['status'] !== 'ACTIVE' || substr($dbUser['password'], 0, 10) !== $user['pwd']) {
+            if (!$dbUser || substr($dbUser['password'], 0, 10) !== $user['pwd']) {
                 throw new UnauthorizedException("Session invalid or password changed. Please login again.");
+            }
+
+            $isInactive = ($dbUser['status'] !== 'ACTIVE');
+            $userRole = strtoupper((string)($dbUser['role'] ?? ''));
+            $schoolId = (int)($dbUser['school_id'] ?? 0);
+            $phone = (string)($dbUser['phone'] ?? '');
+
+            // For Teacher/Staff role: check if staff profile in school was marked Inactive or exit_date set
+            if (!$isInactive && ($userRole === 'TEACHER' || $userRole === 'STAFF') && $schoolId > 0 && !empty($phone)) {
+                $stmtStaff = $pdo->prepare("
+                    SELECT status, exit_date FROM staff 
+                    WHERE school_id = :sid AND phone = :phone 
+                    ORDER BY id DESC LIMIT 1
+                ");
+                $stmtStaff->execute([':sid' => $schoolId, ':phone' => $phone]);
+                $staffRow = $stmtStaff->fetch(\PDO::FETCH_ASSOC);
+                if ($staffRow) {
+                    $sStatus = strtoupper((string)($staffRow['status'] ?? ''));
+                    if ($sStatus !== 'ACTIVE' || !empty($staffRow['exit_date'])) {
+                        $isInactive = true;
+                    }
+                }
+            }
+
+            // For Student/Parent role: check if all matching student profiles were marked Inactive
+            if (!$isInactive && ($userRole === 'STUDENT' || $userRole === 'PARENT') && $schoolId > 0 && !empty($phone)) {
+                $stmtStu = $pdo->prepare("
+                    SELECT COUNT(*) FROM students 
+                    WHERE school_id = :sid 
+                      AND (parent_phone = :p1 OR father_phone = :p2 OR student_mobile = :p3)
+                      AND (status IS NULL OR UPPER(status) = 'ACTIVE')
+                      AND exit_date IS NULL
+                ");
+                $stmtStu->execute([':sid' => $schoolId, ':p1' => $phone, ':p2' => $phone, ':p3' => $phone]);
+                $activeStuCount = (int)$stmtStu->fetchColumn();
+                if ($activeStuCount === 0) {
+                    $isInactive = true;
+                }
+            }
+
+            if ($isInactive) {
+                $stmtOff = $pdo->prepare("UPDATE users SET status = 'INACTIVE' WHERE id = :id");
+                $stmtOff->execute([':id' => $dbUser['id']]);
+                throw new UnauthorizedException("Your account marked as Inactive Please contact Academy management");
             }
         }
 
