@@ -2485,6 +2485,22 @@ class SchoolAdminService extends BaseService
         $validPhones = array_unique($validPhones);
         if (empty($validPhones)) return;
 
+        static $studentPhoneCols = null;
+        if ($studentPhoneCols === null) {
+            try {
+                $stmtCols = $pdo->query("SHOW COLUMNS FROM students");
+                $allCols = $stmtCols ? $stmtCols->fetchAll(PDO::FETCH_COLUMN) : [];
+                $candidateCols = ['parent_phone', 'father_phone', 'mother_phone', 'student_mobile', 'guardian_phone', 'phone'];
+                $studentPhoneCols = array_values(array_intersect($candidateCols, $allCols));
+            } catch (\Throwable $e) {
+                $studentPhoneCols = ['parent_phone', 'father_phone', 'student_mobile'];
+            }
+        }
+
+        if (empty($studentPhoneCols)) return;
+
+        $colConditions = implode(' OR ', array_map(fn($col) => "s.`{$col}` = :phone", $studentPhoneCols));
+
         foreach ($validPhones as $phone) {
             // Check active student in another school
             $stmt = $pdo->prepare("
@@ -2493,7 +2509,7 @@ class SchoolAdminService extends BaseService
                 JOIN schools sch ON s.school_id = sch.id
                 WHERE s.school_id != :current_sid 
                   AND (LOWER(s.status) = 'active')
-                  AND (s.parent_phone = :phone OR s.father_phone = :phone OR s.student_mobile = :phone OR s.mother_phone = :phone OR s.emergency_phone = :phone)
+                  AND ({$colConditions})
                 LIMIT 1
             ");
             $stmt->execute([':current_sid' => $currentSchoolId, ':phone' => $phone]);
