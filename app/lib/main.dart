@@ -307,7 +307,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 // Login Screen
 // -----------------------------------------------------------------------------
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({Key? key}) : super(key: key);
+  final String? initialErrorMessage;
+  const LoginScreen({Key? key, this.initialErrorMessage}) : super(key: key);
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -330,6 +331,9 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialErrorMessage != null && widget.initialErrorMessage!.isNotEmpty) {
+      _errorMessage = widget.initialErrorMessage!;
+    }
     _loadServerUrl();
   }
 
@@ -472,6 +476,10 @@ class _LoginScreenState extends State<LoginScreen> {
           _passwordValidationError = 'Incorrect password';
         });
         _formKey.currentState!.validate();
+      } else if (errorMsg.toLowerCase().contains('inactive') || errorMsg.toLowerCase().contains('account marked as inactive')) {
+        setState(() {
+          _errorMessage = 'Your account marked as Inactive Please contact Academy management';
+        });
       } else if (errorMsg.toLowerCase().contains('validation failed') ||
                  errorMsg.toLowerCase().contains('invalid credentials') ||
                  errorMsg.toLowerCase().contains('invalid credential')) {

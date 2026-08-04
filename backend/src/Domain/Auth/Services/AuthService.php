@@ -62,9 +62,58 @@ class AuthService extends BaseService
             throw new \App\Shared\Exceptions\ValidationException(['password' => 'Incorrect password']);
         }
 
-        if (($user['status'] ?? '') !== 'ACTIVE' || (isset($user['school_id']) && $user['school_id'] !== null && ($user['school_status'] ?? '') !== 'ACTIVE')) {
+        $role = strtoupper($user['role'] ?? '');
+        $schoolId = isset($user['school_id']) ? (int)$user['school_id'] : 0;
+        $pdo = $this->repo->getPdo();
+
+        $isInactive = (($user['status'] ?? '') !== 'ACTIVE');
+
+        if ($schoolId > 0 && ($user['school_status'] ?? '') !== 'ACTIVE') {
+            $isInactive = true;
+        }
+
+        // For Teacher/Staff role: check if staff profile in school is inactive or exit_date set
+        if (!$isInactive && ($role === 'TEACHER' || $role === 'STAFF') && $schoolId > 0) {
+            $stmtStaff = $pdo->prepare("
+                SELECT status, exit_date FROM staff 
+                WHERE school_id = :sid AND phone = :phone 
+                ORDER BY id DESC LIMIT 1
+            ");
+            $stmtStaff->execute([':sid' => $schoolId, ':phone' => $phone]);
+            $staffRow = $stmtStaff->fetch(\PDO::FETCH_ASSOC);
+            if ($staffRow) {
+                $sStatus = strtoupper((string)($staffRow['status'] ?? ''));
+                if ($sStatus !== 'ACTIVE' || !empty($staffRow['exit_date'])) {
+                    $isInactive = true;
+                }
+            }
+        }
+
+        // For Student/Parent role: check if all matching student profiles are inactive
+        if (!$isInactive && ($role === 'STUDENT' || $role === 'PARENT') && $schoolId > 0) {
+            $stmtStu = $pdo->prepare("
+                SELECT COUNT(*) FROM students 
+                WHERE school_id = :sid 
+                  AND (parent_phone = :p1 OR father_phone = :p2 OR student_mobile = :p3)
+                  AND (status IS NULL OR UPPER(status) = 'ACTIVE')
+                  AND exit_date IS NULL
+            ");
+            $stmtStu->execute([':sid' => $schoolId, ':p1' => $phone, ':p2' => $phone, ':p3' => $phone]);
+            $activeStuCount = (int)$stmtStu->fetchColumn();
+            if ($activeStuCount === 0) {
+                $isInactive = true;
+            }
+        }
+
+        if ($isInactive) {
+            $stmtOff = $pdo->prepare("UPDATE users SET status = 'INACTIVE' WHERE id = :id");
+            $stmtOff->execute([':id' => $user['id']]);
+
             $this->logAuditDirect($user, 'Security', 'Failed Login Attempt', 'Failed login attempt for inactive user "' . ($user['name'] ?? $user['email']) . '"');
-            throw new \App\Shared\Exceptions\ValidationException(['phone' => 'Account is inactive. Please contact admin.']);
+            throw new \App\Shared\Exceptions\ValidationException(
+                ['phone' => 'Your account marked as Inactive Please contact Academy management'],
+                'Your account marked as Inactive Please contact Academy management'
+            );
         }
 
         // Apply Login Matrix restrictions based on clientType

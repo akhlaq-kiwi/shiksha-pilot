@@ -1533,8 +1533,8 @@ class SchoolAdminService extends BaseService
 
         $updatedClassId = !empty($data['class_name']) ? (int)$data['class_name'] : (int)$student['class_id'];
         $updatedCategory = array_key_exists('student_category', $data) ? $data['student_category'] : ($student['student_category'] ?? null);
-        // Auto-sync active user account for student/parent mobile login
-        $this->syncUserAccountForStudent($pdo, $schoolId, $name, $parentPhone, $data['student_email'] ?? null);
+        // Auto-sync user account status for student/parent login
+        $this->syncUserAccountForStudent($pdo, $schoolId, $name, $parentPhone, $data['student_email'] ?? null, $status);
 
         return $this->studentRepo->findDetailById($schoolId, $id);
     }
@@ -2383,16 +2383,29 @@ class SchoolAdminService extends BaseService
             }
         }
 
-        // Auto-sync active user account for mobile app login
-        $this->syncUserAccountForStaff($pdo, $schoolId, $data['name'], $data['phone'], $data['role'] ?? 'Teacher');
+        // Auto-sync user account status for login
+        $this->syncUserAccountForStaff($pdo, $schoolId, $data['name'], $data['phone'], $data['role'] ?? 'Teacher', $status);
 
         return $this->getStaffDetails($user, $id);
     }
 
-    private function syncUserAccountForStudent(PDO $pdo, int $schoolId, string $name, ?string $phone, ?string $email = null): void
+    private function syncUserAccountForStudent(PDO $pdo, int $schoolId, string $name, ?string $phone, ?string $email = null, string $status = 'ACTIVE'): void
     {
         $phone = trim((string)$phone);
         if (empty($phone) || strlen($phone) < 10) return;
+
+        // Check if there are any active student records for this phone
+        $stmtActive = $pdo->prepare("
+            SELECT COUNT(*) FROM students 
+            WHERE school_id = :sid 
+              AND (parent_phone = :p1 OR father_phone = :p2 OR student_mobile = :p3)
+              AND (status IS NULL OR UPPER(status) = 'ACTIVE')
+              AND exit_date IS NULL
+        ");
+        $stmtActive->execute([':sid' => $schoolId, ':p1' => $phone, ':p2' => $phone, ':p3' => $phone]);
+        $activeCount = (int)$stmtActive->fetchColumn();
+
+        $targetStatus = ($activeCount > 0 && strcasecmp($status, 'ACTIVE') === 0) ? 'ACTIVE' : 'INACTIVE';
 
         $stmtCheck = $pdo->prepare("SELECT id FROM users WHERE phone = :phone LIMIT 1");
         $stmtCheck->execute([':phone' => $phone]);
@@ -2403,30 +2416,33 @@ class SchoolAdminService extends BaseService
             $hashedPassword = password_hash($defaultPassword, PASSWORD_BCRYPT);
             $stmtInsert = $pdo->prepare("
                 INSERT INTO users (phone, email, password, plain_password, role, name, status, school_id, force_password_change)
-                VALUES (:phone, :email, :pwd, :plain, 'STUDENT', :name, 'ACTIVE', :sid, 0)
+                VALUES (:phone, :email, :pwd, :plain, 'STUDENT', :name, :status, :sid, 0)
             ");
             $stmtInsert->execute([
-                ':phone' => $phone,
-                ':email' => !empty($email) ? trim($email) : null,
-                ':pwd'   => $hashedPassword,
-                ':plain' => $defaultPassword,
-                ':name'  => trim($name),
-                ':sid'   => $schoolId
+                ':phone'  => $phone,
+                ':email'  => !empty($email) ? trim($email) : null,
+                ':pwd'    => $hashedPassword,
+                ':plain'  => $defaultPassword,
+                ':name'   => trim($name),
+                ':status' => $targetStatus,
+                ':sid'    => $schoolId
             ]);
         } else {
             $stmtUpdate = $pdo->prepare("
                 UPDATE users 
-                SET status = 'ACTIVE', school_id = COALESCE(school_id, :sid), name = :name
+                SET status = :status, school_id = COALESCE(school_id, :sid), name = :name
                 WHERE id = :id
             ");
-            $stmtUpdate->execute([':sid' => $schoolId, ':name' => trim($name), ':id' => $existing['id']]);
+            $stmtUpdate->execute([':status' => $targetStatus, ':sid' => $schoolId, ':name' => trim($name), ':id' => $existing['id']]);
         }
     }
 
-    private function syncUserAccountForStaff(PDO $pdo, int $schoolId, string $name, string $phone, string $role = 'TEACHER'): void
+    private function syncUserAccountForStaff(PDO $pdo, int $schoolId, string $name, string $phone, string $role = 'TEACHER', string $status = 'ACTIVE'): void
     {
         $phone = trim($phone);
         if (empty($phone) || strlen($phone) < 10) return;
+
+        $targetStatus = (strcasecmp($status, 'ACTIVE') === 0) ? 'ACTIVE' : 'INACTIVE';
 
         $stmtCheck = $pdo->prepare("SELECT id FROM users WHERE phone = :phone LIMIT 1");
         $stmtCheck->execute([':phone' => $phone]);
@@ -2437,22 +2453,23 @@ class SchoolAdminService extends BaseService
             $hashedPassword = password_hash($defaultPassword, PASSWORD_BCRYPT);
             $stmtInsert = $pdo->prepare("
                 INSERT INTO users (phone, password, plain_password, role, name, status, school_id, force_password_change)
-                VALUES (:phone, :pwd, :plain, 'TEACHER', :name, 'ACTIVE', :sid, 0)
+                VALUES (:phone, :pwd, :plain, 'TEACHER', :name, :status, :sid, 0)
             ");
             $stmtInsert->execute([
-                ':phone' => $phone,
-                ':pwd'   => $hashedPassword,
-                ':plain' => $defaultPassword,
-                ':name'  => trim($name),
-                ':sid'   => $schoolId
+                ':phone'  => $phone,
+                ':pwd'    => $hashedPassword,
+                ':plain'  => $defaultPassword,
+                ':name'   => trim($name),
+                ':status' => $targetStatus,
+                ':sid'    => $schoolId
             ]);
         } else {
             $stmtUpdate = $pdo->prepare("
                 UPDATE users 
-                SET status = 'ACTIVE', school_id = :sid, name = :name
+                SET status = :status, school_id = :sid, name = :name
                 WHERE id = :id
             ");
-            $stmtUpdate->execute([':sid' => $schoolId, ':name' => trim($name), ':id' => $existing['id']]);
+            $stmtUpdate->execute([':status' => $targetStatus, ':sid' => $schoolId, ':name' => trim($name), ':id' => $existing['id']]);
         }
     }
 

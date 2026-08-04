@@ -35,8 +35,18 @@ async function request(endpoint, options = {}) {
     localStorage.removeItem('shiksha_pilot_token');
     localStorage.removeItem('shiksha_pilot_role');
     localStorage.removeItem('shiksha_pilot_user');
-    window.location.replace('/login');
-    throw new Error('Unauthorized session expired');
+    
+    let errorMsg = 'Your account marked as Inactive Please contact Academy management';
+    try {
+      const data = await response.clone().json();
+      if (data?.message) {
+        errorMsg = data.message;
+      }
+    } catch (_) {}
+
+    sessionStorage.setItem('login_error_message', errorMsg);
+    window.location.replace(`/login?error=${encodeURIComponent(errorMsg)}`);
+    throw new Error(errorMsg);
   }
 
   // Handle PDF/blob/excel exports

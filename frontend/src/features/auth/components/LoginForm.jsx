@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Shield, Key, Phone, AlertCircle, RefreshCw, Eye, EyeOff } from 'lucide-react';
 import logoImg from '../../../assets/logo.png';
 import { authService } from '../../../common/services/authService';
@@ -13,6 +13,17 @@ export default function LoginForm({ onLoginSuccess }) {
   
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlErr = params.get('error');
+    const sessionErr = sessionStorage.getItem('login_error_message');
+    const msg = urlErr || sessionErr;
+    if (msg) {
+      setErrors({ phone: decodeURIComponent(msg) });
+      sessionStorage.removeItem('login_error_message');
+    }
+  }, []);
 
   const handlePasswordLogin = async (e) => {
     e.preventDefault();
@@ -36,18 +47,19 @@ export default function LoginForm({ onLoginSuccess }) {
       const data = await authService.login(phone, password);
       onLoginSuccess(data.user);
     } catch (err) {
-      if (err.data && err.data.errors) {
+      const msg = err.message || (err.data && (err.data.message || err.data.phone || err.data.errors?.phone)) || '';
+      if (msg.toLowerCase().includes('inactive')) {
+        setErrors({ phone: 'Your account marked as Inactive Please contact Academy management' });
+      } else if (err.data && err.data.errors) {
         setErrors(err.data.errors);
       } else if (err.data && typeof err.data === 'object') {
         setErrors(err.data);
       } else {
-        const msg = err.message || '';
         if (msg.toLowerCase().includes('phone') || msg.toLowerCase().includes('mobile') || msg.toLowerCase().includes('account')) {
           setErrors({ phone: 'No account found with this mobile number.' });
         } else if (msg.toLowerCase().includes('password')) {
           setErrors({ password: 'Incorrect password. Please try again.' });
         } else {
-          // Case 3 fallback
           setErrors({
             phone: ' ',
             password: 'Invalid mobile number or password.'
