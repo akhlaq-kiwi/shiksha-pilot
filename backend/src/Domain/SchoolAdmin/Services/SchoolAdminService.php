@@ -2499,9 +2499,16 @@ class SchoolAdminService extends BaseService
 
         if (empty($studentPhoneCols)) return;
 
-        $colConditions = implode(' OR ', array_map(fn($col) => "s.`{$col}` = :phone", $studentPhoneCols));
-
         foreach ($validPhones as $phone) {
+            $colConditionsArr = [];
+            $queryParams = [':current_sid' => $currentSchoolId];
+            foreach ($studentPhoneCols as $idx => $col) {
+                $paramKey = ":phone_{$idx}";
+                $colConditionsArr[] = "s.`{$col}` = {$paramKey}";
+                $queryParams[$paramKey] = $phone;
+            }
+            $colConditions = implode(' OR ', $colConditionsArr);
+
             // Check active student in another school
             $stmt = $pdo->prepare("
                 SELECT s.school_id, sch.name AS school_name
@@ -2512,7 +2519,7 @@ class SchoolAdminService extends BaseService
                   AND ({$colConditions})
                 LIMIT 1
             ");
-            $stmt->execute([':current_sid' => $currentSchoolId, ':phone' => $phone]);
+            $stmt->execute($queryParams);
             $conflict = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if (!$conflict) {
