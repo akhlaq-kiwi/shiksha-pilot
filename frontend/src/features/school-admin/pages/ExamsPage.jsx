@@ -2618,27 +2618,29 @@ export default function ExamsPage() {
                   </CardContent>
                 </Card>
 
-                {/* CARD 3: Single Exam Report Cards */}
-                <Card className="hover:border-primary/20 transition-all shadow-xs flex flex-col justify-between">
-                  <CardContent className="p-6 space-y-4 flex-1 flex flex-col justify-between">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-primary">
-                        <Award className="h-5 w-5" />
-                        <h4 className="text-base font-bold text-text-primary">
-                          {selectedExam?.name ? `${selectedExam.name} Report Cards` : 'Exam Report Cards'}
-                        </h4>
+                {/* CARD 3: Single Exam Report Cards (Hidden for Annual Exam because numbers are directly included in Final Report Card) */}
+                {!isAnnualExam && (
+                  <Card className="hover:border-primary/20 transition-all shadow-xs flex flex-col justify-between">
+                    <CardContent className="p-6 space-y-4 flex-1 flex flex-col justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-primary">
+                          <Award className="h-5 w-5" />
+                          <h4 className="text-base font-bold text-text-primary">
+                            {selectedExam?.name ? `${selectedExam.name} Report Cards` : 'Exam Report Cards'}
+                          </h4>
+                        </div>
+                        <p className="text-xs text-text-secondary leading-relaxed">
+                          Generate, preview, print, or download individual exam report cards with automated class ranks, section ranks, and attendance.
+                        </p>
                       </div>
-                      <p className="text-xs text-text-secondary leading-relaxed">
-                        Generate, preview, print, or download individual exam report cards with automated class ranks, section ranks, and attendance.
-                      </p>
-                    </div>
-                    <div className="pt-2">
-                      <Button className="w-full flex items-center justify-center gap-2 text-xs font-bold" onClick={() => handleOpenReportCards(selectedExam, currentClass.id)}>
-                        <Award className="h-4 w-4" /> Open {selectedExam?.name || 'Exam'} Report Cards
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                      <div className="pt-2">
+                        <Button className="w-full flex items-center justify-center gap-2 text-xs font-bold" onClick={() => handleOpenReportCards(selectedExam, currentClass.id)}>
+                          <Award className="h-4 w-4" /> Open {selectedExam?.name || 'Exam'} Report Cards
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* CARD 5: Final Academic Report Cards (Annual Session Summary - Only for Annual Exam) */}
                 {isAnnualExam && (
