@@ -900,6 +900,25 @@ export default function ExamsPage() {
     setIsEditExamOpen(true);
   };
 
+  const handlePublishMasterExam = async (exam, targetStatus) => {
+    setError('');
+    setSuccess('');
+    setLoading(true);
+    try {
+      await schoolService.updateExamination(exam.id, { status: targetStatus });
+      setSuccess(targetStatus === 'Published' 
+        ? `Examination '${exam.name}' published successfully! It is now visible in the Mobile Application for Teachers & Students.` 
+        : `Examination '${exam.name}' reverted to Draft. It is now hidden from the Mobile Application.`
+      );
+      loadDashboard();
+    } catch (err) {
+      console.error(err);
+      setError(err?.response?.data?.message || err?.message || 'Failed to update examination status.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleUpdateExam = async (e) => {
     if (e) e.preventDefault();
     if (!editExamData.name) {
@@ -2281,6 +2300,15 @@ export default function ExamsPage() {
                             <DropdownItem onClick={() => handleEditExamClick(e)}>
                               Edit Examination
                             </DropdownItem>
+                            {e.status === 'Published' ? (
+                              <DropdownItem onClick={() => handlePublishMasterExam(e, 'Draft')} className="text-rose-600 font-semibold hover:bg-rose-50">
+                                Revert to Draft
+                              </DropdownItem>
+                            ) : (
+                              <DropdownItem onClick={() => handlePublishMasterExam(e, 'Published')} className="text-emerald-600 font-semibold hover:bg-emerald-50">
+                                Publish Examination
+                              </DropdownItem>
+                            )}
                           </DropdownMenu>
                         )}
                       </div>

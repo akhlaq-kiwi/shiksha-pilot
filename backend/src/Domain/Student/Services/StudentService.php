@@ -954,7 +954,7 @@ class StudentService extends BaseService
             LEFT JOIN examination_class_status ecs ON e.id = ecs.exam_id AND ecs.class_id = :class_id_1
             WHERE ep.class_id = :class_id_2 
               AND e.school_id = :school_id 
-              AND (COALESCE(ecs.scheme_published, 0) = 1 OR COALESCE(ecs.admit_card_published, 0) = 1 OR ecs.status = 'Published')
+              AND e.status = 'Published'
             ORDER BY e.start_date ASC, e.id ASC
         ");
         $stmt->execute([
@@ -1077,12 +1077,10 @@ class StudentService extends BaseService
         $stmtExam = $pdo->prepare("
             SELECT e.name, e.start_date, e.end_date 
             FROM examinations e
-            LEFT JOIN examination_class_status ecs ON e.id = ecs.exam_id AND ecs.class_id = :class_id
-            WHERE e.id = :id AND e.school_id = :sid 
-              AND (COALESCE(ecs.scheme_published, 0) = 1 OR COALESCE(ecs.admit_card_published, 0) = 1 OR ecs.status = 'Published')
+            WHERE e.id = :id AND e.school_id = :sid AND e.status = 'Published'
             LIMIT 1
         ");
-        $stmtExam->execute([':id' => $examId, ':sid' => $schoolId, ':class_id' => $classId]);
+        $stmtExam->execute([':id' => $examId, ':sid' => $schoolId]);
         $exam = $stmtExam->fetch(PDO::FETCH_ASSOC);
         if (!$exam) {
             throw new NotFoundException('Examination not found.');
