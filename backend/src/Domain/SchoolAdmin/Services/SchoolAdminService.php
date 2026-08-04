@@ -1188,6 +1188,10 @@ class SchoolAdminService extends BaseService
         $parentPhone = !empty($data['parent_phone']) ? trim((string)$data['parent_phone']) : (!empty($data['father_phone']) ? trim((string)$data['father_phone']) : (!empty($data['student_mobile']) ? trim((string)$data['student_mobile']) : null));
         $fatherPhone = !empty($data['father_phone']) ? trim((string)$data['father_phone']) : $parentPhone;
 
+        if (strcasecmp($status, 'ACTIVE') === 0 || strcasecmp($status, 'Active') === 0) {
+            $this->checkActiveStudentPhoneConflictInOtherSchools($pdo, $schoolId, [$parentPhone, $fatherPhone, $data['student_mobile'] ?? null]);
+        }
+
         $id = $this->studentRepo->create([
             'school_id'    => $schoolId,
             'name'         => $name,
@@ -1432,8 +1436,18 @@ class SchoolAdminService extends BaseService
 
         // Status based on Exit Date
         $exitDate = !empty($data['exit_date']) ? $data['exit_date'] : null;
+        $status = $exitDate !== null ? 'Inactive' : ($data['status'] ?? ($student['status'] ?? 'Active'));
         $parentPhone = !empty($data['parent_phone']) ? trim((string)$data['parent_phone']) : (!empty($data['father_phone']) ? trim((string)$data['father_phone']) : (!empty($data['student_mobile']) ? trim((string)$data['student_mobile']) : ($student['parent_phone'] ?? null)));
         $fatherPhone = !empty($data['father_phone']) ? trim((string)$data['father_phone']) : $parentPhone;
+
+        if (strcasecmp($status, 'ACTIVE') === 0 || strcasecmp($status, 'Active') === 0) {
+            $this->checkActiveStudentPhoneConflictInOtherSchools($pdo, $schoolId, [$parentPhone, $fatherPhone, $data['student_mobile'] ?? null]);
+        } else {
+            if (!empty($parentPhone)) {
+                $stmtUsersOff = $pdo->prepare("UPDATE users SET status = 'INACTIVE' WHERE school_id = :sid AND phone = :phone");
+                $stmtUsersOff->execute([':sid' => $schoolId, ':phone' => $parentPhone]);
+            }
+        }
 
         $this->studentRepo->update($id, [
             'name'         => $name,
@@ -2184,6 +2198,10 @@ class SchoolAdminService extends BaseService
         // 3. Status Mapping
         $status = !empty($data['exit_date']) ? 'Inactive' : 'ACTIVE';
 
+        if (strcasecmp($status, 'ACTIVE') === 0) {
+            $this->checkActiveStaffPhoneConflictInOtherSchools($pdo, $schoolId, $data['phone']);
+        }
+
         // 4. Save
         $id = $this->staffRepo->create([
             'school_id'               => $schoolId,
@@ -2311,6 +2329,13 @@ class SchoolAdminService extends BaseService
         // 3. Status Mapping
         $status = !empty($data['exit_date']) ? 'Inactive' : 'ACTIVE';
 
+        if (strcasecmp($status, 'ACTIVE') === 0) {
+            $this->checkActiveStaffPhoneConflictInOtherSchools($pdo, $schoolId, $data['phone']);
+        } else {
+            $stmtUsersOff = $pdo->prepare("UPDATE users SET status = 'INACTIVE' WHERE school_id = :sid AND phone = :phone");
+            $stmtUsersOff->execute([':sid' => $schoolId, ':phone' => trim($data['phone'])]);
+        }
+
         // 4. Update
         $this->staffRepo->update($id, [
             'name'                    => $data['name'],
@@ -2424,10 +2449,106 @@ class SchoolAdminService extends BaseService
         } else {
             $stmtUpdate = $pdo->prepare("
                 UPDATE users 
-                SET status = 'ACTIVE', school_id = COALESCE(school_id, :sid), name = :name
+                SET status = 'ACTIVE', school_id = :sid, name = :name
                 WHERE id = :id
             ");
             $stmtUpdate->execute([':sid' => $schoolId, ':name' => trim($name), ':id' => $existing['id']]);
+        }
+    }
+
+    private function checkActiveStudentPhoneConflictInOtherSchools(PDO $pdo, int $currentSchoolId, array $phones): void
+    {
+        $validPhones = [];
+        foreach ($phones as $p) {
+            $p = trim((string)$p);
+            if (!empty($p) && strlen($p) >= 10) {
+                $validPhones[] = $p;
+            }
+        }
+        $validPhones = array_unique($validPhones);
+        if (empty($validPhones)) return;
+
+        foreach ($validPhones as $phone) {
+            // Check active student in another school
+            $stmt = $pdo->prepare("
+                SELECT s.school_id, sch.name AS school_name
+                FROM students s
+                JOIN schools sch ON s.school_id = sch.id
+                WHERE s.school_id != :current_sid 
+                  AND (LOWER(s.status) = 'active')
+                  AND (s.phone = :phone OR s.parent_phone = :phone OR s.father_phone = :phone OR s.student_mobile = :phone)
+                LIMIT 1
+            ");
+            $stmt->execute([':current_sid' => $currentSchoolId, ':phone' => $phone]);
+            $conflict = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$conflict) {
+                // Also check active user in another school
+                $stmtUser = $pdo->prepare("
+                    SELECT u.school_id, sch.name AS school_name
+                    FROM users u
+                    JOIN schools sch ON u.school_id = sch.id
+                    WHERE u.school_id != :current_sid
+                      AND UPPER(u.status) = 'ACTIVE'
+                      AND u.phone = :phone
+                    LIMIT 1
+                ");
+                $stmtUser->execute([':current_sid' => $currentSchoolId, ':phone' => $phone]);
+                $conflict = $stmtUser->fetch(PDO::FETCH_ASSOC);
+            }
+
+            if ($conflict) {
+                $schoolName = $conflict['school_name'] ?? 'doosre school';
+                $errMsg = "Yeh mobile number ({$phone}) pehle se '{$schoolName}' me Active state me registered hai. Naye school me register karne ke liye pehle pichhle school se student ko inactive mark karwayein.";
+                throw new ValidationException([
+                    'parent_phone' => $errMsg,
+                    'student_mobile' => $errMsg,
+                    'father_phone' => $errMsg,
+                    'phone' => $errMsg
+                ]);
+            }
+        }
+    }
+
+    private function checkActiveStaffPhoneConflictInOtherSchools(PDO $pdo, int $currentSchoolId, ?string $phone): void
+    {
+        $phone = trim((string)$phone);
+        if (empty($phone) || strlen($phone) < 10) return;
+
+        // Check active staff in another school
+        $stmt = $pdo->prepare("
+            SELECT st.school_id, sch.name AS school_name
+            FROM staff st
+            JOIN schools sch ON st.school_id = sch.id
+            WHERE st.school_id != :current_sid 
+              AND (LOWER(st.status) = 'active')
+              AND st.phone = :phone
+            LIMIT 1
+        ");
+        $stmt->execute([':current_sid' => $currentSchoolId, ':phone' => $phone]);
+        $conflict = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$conflict) {
+            // Also check active user in another school
+            $stmtUser = $pdo->prepare("
+                SELECT u.school_id, sch.name AS school_name
+                FROM users u
+                JOIN schools sch ON u.school_id = sch.id
+                WHERE u.school_id != :current_sid
+                  AND UPPER(u.status) = 'ACTIVE'
+                  AND u.phone = :phone
+                LIMIT 1
+            ");
+            $stmtUser->execute([':current_sid' => $currentSchoolId, ':phone' => $phone]);
+            $conflict = $stmtUser->fetch(PDO::FETCH_ASSOC);
+        }
+
+        if ($conflict) {
+            $schoolName = $conflict['school_name'] ?? 'doosre school';
+            $errMsg = "Yeh mobile number ({$phone}) pehle se '{$schoolName}' me Active state me registered hai. Naye school me register karne ke liye pehle pichhle school se staff ko inactive mark karwayein.";
+            throw new ValidationException([
+                'phone' => $errMsg
+            ]);
         }
     }
 
