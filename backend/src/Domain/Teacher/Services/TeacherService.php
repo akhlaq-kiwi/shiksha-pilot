@@ -1187,4 +1187,67 @@ class TeacherService extends BaseService
 
         return ['saved_count' => $savedCount];
     }
+
+    public function getNotifications(array $user, int $limit = 50, int $offset = 0): array
+    {
+        $schoolId = (int)($user['school_id'] ?? 0);
+        $userId = (int)($user['id'] ?? 0);
+        $role = strtoupper($user['role'] ?? 'TEACHER');
+        $pdo = $this->teacherRepo->getPdo();
+
+        $stmt = $pdo->prepare("
+            SELECT * FROM dashboard_notifications
+            WHERE school_id = :school_id AND (user_id = :user_id OR (user_role = :role AND user_id IS NULL))
+            ORDER BY id DESC
+            LIMIT :limit OFFSET :offset
+        ");
+        $stmt->bindValue(':school_id', $schoolId, PDO::PARAM_INT);
+        $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
+        $stmt->bindValue(':role', $role, PDO::PARAM_STR);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function markNotificationRead(array $user, int $id): array
+    {
+        $schoolId = (int)($user['school_id'] ?? 0);
+        $userId = (int)($user['id'] ?? 0);
+        $role = strtoupper($user['role'] ?? 'TEACHER');
+        $pdo = $this->teacherRepo->getPdo();
+
+        $stmt = $pdo->prepare("
+            UPDATE dashboard_notifications
+            SET is_read = 1
+            WHERE id = :id AND school_id = :school_id AND (user_id = :user_id OR (user_role = :role AND user_id IS NULL))
+        ");
+        $stmt->execute([
+            ':id' => $id,
+            ':school_id' => $schoolId,
+            ':user_id' => $userId,
+            ':role' => $role
+        ]);
+        return ['status' => 'success'];
+    }
+
+    public function deleteNotification(array $user, int $id): array
+    {
+        $schoolId = (int)($user['school_id'] ?? 0);
+        $userId = (int)($user['id'] ?? 0);
+        $role = strtoupper($user['role'] ?? 'TEACHER');
+        $pdo = $this->teacherRepo->getPdo();
+
+        $stmt = $pdo->prepare("
+            DELETE FROM dashboard_notifications
+            WHERE id = :id AND school_id = :school_id AND (user_id = :user_id OR (user_role = :role AND user_id IS NULL))
+        ");
+        $stmt->execute([
+            ':id' => $id,
+            ':school_id' => $schoolId,
+            ':user_id' => $userId,
+            ':role' => $role
+        ]);
+        return ['status' => 'success'];
+    }
 }

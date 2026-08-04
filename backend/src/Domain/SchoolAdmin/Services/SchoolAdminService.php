@@ -11454,11 +11454,11 @@ Only approve the settlement after reviewing all financial records.
                 ]);
             }
 
-            // Automatically set scheme_published = 1 for this exam and class
+            // Ensure examination_class_status record exists without force-setting scheme_published
             $stmtStatus = $pdo->prepare("
-                INSERT INTO examination_class_status (exam_id, class_id, status, scheme_published, updated_at)
-                VALUES (:exam_id, :class_id, 'Draft', 1, NOW())
-                ON DUPLICATE KEY UPDATE scheme_published = 1, updated_at = NOW()
+                INSERT INTO examination_class_status (exam_id, class_id, status, updated_at)
+                VALUES (:exam_id, :class_id, 'Draft', NOW())
+                ON DUPLICATE KEY UPDATE updated_at = NOW()
             ");
             $stmtStatus->execute([':exam_id' => $examId, ':class_id' => $classId]);
 
@@ -12013,7 +12013,12 @@ Only approve the settlement after reviewing all financial records.
             JOIN students s ON s.class_id = :class_id AND s.school_id = u.school_id
             WHERE u.school_id = :school_id
               AND (
-                (u.role = 'STUDENT' AND u.email = s.email AND s.email IS NOT NULL AND s.email != '')
+                (u.role = 'STUDENT' AND (
+                    (u.student_id IS NOT NULL AND u.student_id = s.id) OR
+                    (s.email IS NOT NULL AND s.email != '' AND u.email = s.email) OR
+                    (s.student_mobile IS NOT NULL AND s.student_mobile != '' AND u.phone = s.student_mobile) OR
+                    (s.parent_phone IS NOT NULL AND s.parent_phone != '' AND u.phone = s.parent_phone)
+                ))
                 OR 
                 (u.role = 'PARENT' AND (
                     (s.parent_phone IS NOT NULL AND s.parent_phone != '' AND u.phone = s.parent_phone) OR
@@ -12022,7 +12027,6 @@ Only approve the settlement after reviewing all financial records.
                     (s.student_mobile IS NOT NULL AND s.student_mobile != '' AND u.phone = s.student_mobile)
                 ))
               )
-            GROUP BY u.id
         ");
         $stmtUsers->execute([':class_id' => $classId, ':school_id' => $schoolId]);
         $studentParentUsers = $stmtUsers->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -12059,27 +12063,30 @@ Only approve the settlement after reviewing all financial records.
             }
         }
 
-        // If not ADMIT_CARD, send to the class teacher as well
-        if ($type !== 'ADMIT_CARD') {
-            $stmtTeacher = $pdo->prepare("
-                SELECT u.id AS user_id
-                FROM users u
-                JOIN staff st ON u.phone = st.phone AND u.school_id = st.school_id
-                JOIN class_teacher_assignments cta ON st.id = cta.teacher_id AND st.school_id = cta.school_id
-                WHERE cta.class_id = :class_id AND u.role = 'TEACHER' AND u.school_id = :school_id
-                LIMIT 1
-            ");
-            $stmtTeacher->execute([':class_id' => $classId, ':school_id' => $schoolId]);
-            $teacherUserId = $stmtTeacher->fetchColumn();
-
-            if ($teacherUserId) {
-                $stmtInsert->execute([
+        // Also insert role-wide broadcast notifications for STUDENT and TEACHER
+        $stmtCheckBroad = $pdo->prepare("
+            SELECT COUNT(*) FROM dashboard_notifications
+            WHERE school_id = :school_id AND user_role = :role AND user_id IS NULL AND title = :title AND message = :message
+              AND created_at >= NOW() - INTERVAL 1 MINUTE
+        ");
+        $stmtBroad = $pdo->prepare("
+            INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, is_read)
+            VALUES (:school_id, :role, NULL, :title, :message, :link, 0)
+        ");
+        foreach (['STUDENT', 'TEACHER'] as $bRole) {
+            $stmtCheckBroad->execute([
+                ':school_id' => $schoolId,
+                ':role'      => $bRole,
+                ':title'     => $title,
+                ':message'   => $message
+            ]);
+            if ((int)$stmtCheckBroad->fetchColumn() === 0) {
+                $stmtBroad->execute([
                     ':school_id' => $schoolId,
-                    ':role' => 'TEACHER',
-                    ':user_id' => (int)$teacherUserId,
-                    ':title' => $title,
-                    ':message' => $message,
-                    ':link' => $link
+                    ':role'      => $bRole,
+                    ':title'     => $title,
+                    ':message'   => $message,
+                    ':link'      => $link
                 ]);
             }
         }

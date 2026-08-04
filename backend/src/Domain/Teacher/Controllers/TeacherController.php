@@ -241,4 +241,33 @@ class TeacherController extends BaseController
         $data = $this->service->saveMarksSheet($user, $examId, $body);
         return $this->success($response, $data, 'Marks saved successfully');
     }
+
+    public function getNotifications(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, 'TEACHER');
+        $queryParams = $request->getQueryParams();
+        $limit = isset($queryParams['limit']) ? (int)$queryParams['limit'] : 50;
+        $offset = isset($queryParams['offset']) ? (int)$queryParams['offset'] : 0;
+        $data = $this->service->getNotifications($user, $limit, $offset);
+        return $this->success($response, $data);
+    }
+
+    public function markNotificationRead(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, 'TEACHER');
+        $id = (int)$args['id'];
+        $data = $this->service->markNotificationRead($user, $id);
+        return $this->success($response, $data);
+    }
+
+    public function deleteNotification(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, 'TEACHER');
+        $id = (int)$args['id'];
+        $data = $this->service->deleteNotification($user, $id);
+        return $this->success($response, $data);
+    }
 }

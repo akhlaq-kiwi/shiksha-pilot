@@ -275,6 +275,9 @@ return function (App $app) {
     $app->get('/api/teacher/schedule/today', [TeacherController::class, 'getTodaySchedule']);
     $app->get('/api/teacher/salaries', [TeacherController::class, 'getSalaries']);
     $app->get('/api/teacher/salaries/receipt', [TeacherController::class, 'getSalarySlip']);
+    $app->get('/api/teacher/notifications', [TeacherController::class, 'getNotifications']);
+    $app->post('/api/teacher/notifications/{id}/read', [TeacherController::class, 'markNotificationRead']);
+    $app->delete('/api/teacher/notifications/{id}', [TeacherController::class, 'deleteNotification']);
 
     // Student / Parent Domain
     $app->get('/api/student/dashboard', [StudentController::class, 'getDashboard']);
