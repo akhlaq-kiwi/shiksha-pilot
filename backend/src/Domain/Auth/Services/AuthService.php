@@ -194,7 +194,7 @@ class AuthService extends BaseService
                 throw new \App\Shared\Exceptions\ValidationException(['current_password' => 'Current password is required.']);
             }
             if (!password_verify($currentPassword, (string) ($user['password'] ?? ''))) {
-                throw new \App\Shared\Exceptions\ValidationException(['current_password' => 'Current password is incorrect.']);
+                throw new \App\Shared\Exceptions\ValidationException(['current_password' => 'Current password is incorrect.'], 'Current password is incorrect.');
             }
         }
 
