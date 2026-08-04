@@ -3057,7 +3057,7 @@ export default function ExamsPage() {
                 </TableHeader>
                 <TableBody>
                   {marksSheet.students.map(s => {
-                    const isReadOnlyField = isReadOnly || selectedExam.status === 'Published';
+                    const isReadOnlyField = isReadOnly;
                     const currentPaper = timetablePapers.find(p => p.subject_id.toString() === selectedSubjectId);
                     const isGradeSheet = marksSheet.evaluation_type === 'grade' || parseFloat(marksSheet.max_marks) === 0 || currentPaper?.evaluation_type === 'grade';
 
