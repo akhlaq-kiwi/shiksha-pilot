@@ -376,15 +376,33 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
     });
   }
 
-  void _showEnterMarksModal() {
-    final scheme = (_details['scheme'] as List<dynamic>?) ?? [];
+  void _showEnterMarksModal() async {
+    List<dynamic> scheme = (_details['scheme'] as List<dynamic>?) ?? [];
     if (scheme.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No scheduled subjects found for this exam timetable.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      try {
+        final freshData = await widget.examService.getExamDetails(
+          widget.examId,
+          widget.userRole,
+          widget.studentId,
+        );
+        if (mounted) {
+          setState(() {
+            _details = freshData;
+          });
+        }
+        scheme = (freshData['scheme'] as List<dynamic>?) ?? [];
+      } catch (_) {}
+    }
+
+    if (scheme.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No scheduled subjects found for this exam timetable.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
       return;
     }
 
