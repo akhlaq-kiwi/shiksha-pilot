@@ -2493,7 +2493,7 @@ class SchoolAdminService extends BaseService
                 JOIN schools sch ON s.school_id = sch.id
                 WHERE s.school_id != :current_sid 
                   AND (LOWER(s.status) = 'active')
-                  AND (s.phone = :phone OR s.parent_phone = :phone OR s.father_phone = :phone OR s.student_mobile = :phone)
+                  AND (s.parent_phone = :phone OR s.father_phone = :phone OR s.student_mobile = :phone OR s.mother_phone = :phone OR s.emergency_phone = :phone)
                 LIMIT 1
             ");
             $stmt->execute([':current_sid' => $currentSchoolId, ':phone' => $phone]);
