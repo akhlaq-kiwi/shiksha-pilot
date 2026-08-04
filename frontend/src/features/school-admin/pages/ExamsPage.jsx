@@ -647,6 +647,10 @@ export default function ExamsPage() {
 
     try {
       await schoolService.saveGradeConfigurations({ scales: gradeScales });
+      const freshGrades = await schoolService.getGradeConfigurations().catch(() => null);
+      if (freshGrades) {
+        setGradeScales(freshGrades);
+      }
       setGradeSuccess('Grading configurations saved successfully.');
     } catch (err) {
       console.error(err);
@@ -742,6 +746,20 @@ export default function ExamsPage() {
       return () => clearTimeout(timer);
     }
   }, [info]);
+
+  useEffect(() => {
+    if (gradeSuccess) {
+      const timer = setTimeout(() => setGradeSuccess(''), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [gradeSuccess]);
+
+  useEffect(() => {
+    if (gradeError) {
+      const timer = setTimeout(() => setGradeError(''), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [gradeError]);
 
   useEffect(() => {
     loadDashboard();
