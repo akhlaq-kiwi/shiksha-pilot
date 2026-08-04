@@ -27,7 +27,6 @@ class ChangePasswordDialog extends StatefulWidget {
 }
 
 class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
-  final _formKey = GlobalKey<FormState>();
   final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -60,56 +59,38 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
     });
   }
 
-  bool _validateClientSide() {
+  Future<void> _submitPasswordChange() async {
     _clearInlineErrors();
-    bool isValid = true;
 
     final currentPass = _currentPasswordController.text;
     final newPass = _newPasswordController.text;
     final confirmPass = _confirmPasswordController.text;
 
-    // 1. Current Password Validation
+    // ─────────────────────────────────────────────────────────────────────────
+    // Step 1 – Empty Field Validation
+    // ─────────────────────────────────────────────────────────────────────────
+    bool hasEmpty = false;
     if (currentPass.isEmpty) {
       _currentPasswordError = 'Current password is required.';
-      isValid = false;
+      hasEmpty = true;
     }
-
-    // 2. New Password Validation
     if (newPass.isEmpty) {
       _newPasswordError = 'New password is required.';
-      isValid = false;
-    } else if (newPass.length < 6) {
-      _newPasswordError = 'At least 6 characters required.';
-      isValid = false;
-    } else {
-      bool hasUppercase = newPass.contains(RegExp(r'[A-Z]'));
-      bool hasDigits = newPass.contains(RegExp(r'[0-9]'));
-      bool hasAlpha = newPass.contains(RegExp(r'[a-zA-Z]'));
-      if (!hasUppercase || !hasDigits || !hasAlpha) {
-        _newPasswordError = 'Must contain 1 uppercase, 1 digit & 1 letter.';
-        isValid = false;
-      } else if (currentPass.isNotEmpty && newPass == currentPass) {
-        _newPasswordError = 'New password must be different from current password.';
-        isValid = false;
-      }
+      hasEmpty = true;
     }
-
-    // 3. Confirm Password Validation
     if (confirmPass.isEmpty) {
       _confirmPasswordError = 'Confirm password is required.';
-      isValid = false;
-    } else if (confirmPass != newPass) {
-      _confirmPasswordError = 'Passwords do not match.';
-      isValid = false;
+      hasEmpty = true;
     }
 
-    setState(() {});
-    return isValid;
-  }
+    if (hasEmpty) {
+      setState(() {});
+      return; // Do not continue to next validation until all fields are filled
+    }
 
-  Future<void> _submitPasswordChange() async {
-    if (!_validateClientSide()) return;
-
+    // ─────────────────────────────────────────────────────────────────────────
+    // Steps 2 - 6 Sequential Validation & Backend Sync
+    // ─────────────────────────────────────────────────────────────────────────
     setState(() {
       _isUpdating = true;
     });
@@ -122,12 +103,52 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
       }
 
       final authService = AuthService(baseUrl: widget.baseUrl);
+
+      // Call API: Backend verifies Current Password against database FIRST (Step 2)
       await authService.changePassword(
         activeToken,
-        _currentPasswordController.text,
-        _newPasswordController.text,
+        currentPass,
+        newPass,
       );
 
+      // Step 3 – New Password Must Differ
+      if (currentPass == newPass) {
+        setState(() {
+          _isUpdating = false;
+          _newPasswordError = 'New password must be different from your current password.';
+        });
+        return;
+      }
+
+      // Step 4 – Password Policy
+      if (newPass.length < 6) {
+        setState(() {
+          _isUpdating = false;
+          _newPasswordError = 'At least 6 characters required.';
+        });
+        return;
+      }
+      bool hasUppercase = newPass.contains(RegExp(r'[A-Z]'));
+      bool hasDigits = newPass.contains(RegExp(r'[0-9]'));
+      bool hasAlpha = newPass.contains(RegExp(r'[a-zA-Z]'));
+      if (!hasUppercase || !hasDigits || !hasAlpha) {
+        setState(() {
+          _isUpdating = false;
+          _newPasswordError = 'Must contain 1 uppercase, 1 digit & 1 letter.';
+        });
+        return;
+      }
+
+      // Step 5 – Confirm Password Match
+      if (confirmPass != newPass) {
+        setState(() {
+          _isUpdating = false;
+          _confirmPasswordError = 'Passwords do not match.';
+        });
+        return;
+      }
+
+      // Step 6 – Password Updated Successfully
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -142,14 +163,23 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
       if (mounted) {
         setState(() {
           _isUpdating = false;
+          // Step 2 Stop Check: If current password is incorrect, ONLY show current password error
           if (e.fieldErrors.containsKey('current_password')) {
             _currentPasswordError = e.fieldErrors['current_password'];
-          }
-          if (e.fieldErrors.containsKey('new_password')) {
-            _newPasswordError = e.fieldErrors['new_password'];
-          }
-          if (e.fieldErrors.containsKey('confirm_password')) {
-            _confirmPasswordError = e.fieldErrors['confirm_password'];
+            _newPasswordError = null;
+            _confirmPasswordError = null;
+          } else {
+            // Client checks for step 3, 4, 5 after current password verification
+            if (currentPass == newPass) {
+              _newPasswordError = 'New password must be different from your current password.';
+            } else if (e.fieldErrors.containsKey('new_password')) {
+              _newPasswordError = e.fieldErrors['new_password'];
+            }
+            if (confirmPass != newPass) {
+              _confirmPasswordError = 'Passwords do not match.';
+            } else if (e.fieldErrors.containsKey('confirm_password')) {
+              _confirmPasswordError = e.fieldErrors['confirm_password'];
+            }
           }
           if (!e.fieldErrors.containsKey('current_password') &&
               !e.fieldErrors.containsKey('new_password') &&
@@ -164,9 +194,11 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
         setState(() {
           _isUpdating = false;
           if (rawMsg.toLowerCase().contains('current password')) {
-            _currentPasswordError = 'The current password you entered is incorrect.';
+            _currentPasswordError = 'Current password is incorrect.';
+            _newPasswordError = null;
+            _confirmPasswordError = null;
           } else if (rawMsg.toLowerCase().contains('different')) {
-            _newPasswordError = 'New password must be different from current password.';
+            _newPasswordError = 'New password must be different from your current password.';
           } else {
             _generalError = rawMsg.isNotEmpty ? rawMsg : 'Failed to update password. Please try again.';
           }
@@ -202,6 +234,8 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
                 border: const OutlineInputBorder(),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                 errorText: _currentPasswordError,
+                errorMaxLines: 4,
+                errorStyle: const TextStyle(fontSize: 12, height: 1.25),
                 suffixIcon: IconButton(
                   icon: Icon(
                     _obscureCurrent ? Icons.visibility_off : Icons.visibility,
@@ -229,6 +263,8 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
                 border: const OutlineInputBorder(),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                 errorText: _newPasswordError,
+                errorMaxLines: 4,
+                errorStyle: const TextStyle(fontSize: 12, height: 1.25),
                 suffixIcon: IconButton(
                   icon: Icon(
                     _obscureNew ? Icons.visibility_off : Icons.visibility,
@@ -254,6 +290,8 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
                 border: const OutlineInputBorder(),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                 errorText: _confirmPasswordError,
+                errorMaxLines: 4,
+                errorStyle: const TextStyle(fontSize: 12, height: 1.25),
                 suffixIcon: IconButton(
                   icon: Icon(
                     _obscureConfirm ? Icons.visibility_off : Icons.visibility,
