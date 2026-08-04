@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GraduationCap, Sun, Moon, Bell, LogOut } from 'lucide-react';
+import logoImg from '../assets/logo.png';
 import { useTheme } from '../theme/ThemeContext';
 import { authService } from '../common/services/authService';
 import { Button } from '../common/ui/button';
@@ -231,8 +232,8 @@ const AppLayout = ({ children }) => {
                 )
               ) : (
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="flex items-center justify-center w-8 h-8 rounded-md bg-zinc-900 dark:bg-zinc-50 flex-shrink-0">
-                    <GraduationCap className="w-4 h-4 text-zinc-50 dark:text-zinc-900" />
+                  <div className="flex items-center justify-center h-[36px] w-auto flex-shrink-0">
+                    <img src={logoImg} alt="Shiksha Pilot Logo" className="h-[36px] w-auto object-contain" />
                   </div>
                   <span className="text-sm font-bold text-text-primary font-display tracking-tight leading-none">
                     Shiksha Pilot
