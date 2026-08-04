@@ -391,6 +391,29 @@ class _LoginScreenState extends State<LoginScreen> {
 
       final leaveService = LeaveService(baseUrl: activeBaseUrl, token: token);
 
+      final pendingPayload = prefs.getString('pending_notification_payload');
+      if (pendingPayload != null && pendingPayload.isNotEmpty) {
+        await prefs.remove('pending_notification_payload');
+        try {
+          final notif = json.decode(pendingPayload);
+          final selId = prefs.getInt('selected_student_id');
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => HomeScreen(
+                  leaveService: leaveService,
+                  userRole: role,
+                  selectedStudentId: selId,
+                ),
+              ),
+            );
+            NotificationHelper.navigateToTarget(notif, activeBaseUrl, token, role, selId);
+            return;
+          }
+        } catch (_) {}
+      }
+
       if (role == 'STUDENT') {
         final students = await leaveService.getChildren();
         if (students.isEmpty) {

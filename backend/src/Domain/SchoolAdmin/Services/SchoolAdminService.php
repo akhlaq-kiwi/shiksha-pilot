@@ -11084,6 +11084,10 @@ Only approve the settlement after reviewing all financial records.
         ]);
 
         $id = (int)$pdo->lastInsertId();
+
+        if (strcasecmp((string)($data['status'] ?? ''), 'Published') === 0) {
+            $this->notifyExamScheduled($pdo, $schoolId, $name, $startDate, $endDate);
+        }
         
         $stmtGet = $pdo->prepare("SELECT * FROM examinations WHERE id = :id LIMIT 1");
         $stmtGet->execute([':id' => $id]);
@@ -11214,6 +11218,60 @@ Only approve the settlement after reviewing all financial records.
                 WHERE exam_id = :exam_id
             ");
             $stmtClassReset->execute([':exam_id' => $id]);
+        }
+
+        if ($status === 'Published' && !empty($startDate) && !empty($endDate)) {
+            $this->notifyExamScheduled($pdo, $schoolId, $name, $startDate, $endDate);
+        }
+    }
+
+    private function notifyExamScheduled(\PDO $pdo, int $schoolId, string $examName, ?string $startDate, ?string $endDate): void
+    {
+        if (empty($startDate) || empty($endDate) || $startDate === '-' || $endDate === '-') {
+            return;
+        }
+
+        $formatDate = function($dateStr) {
+            try {
+                $dt = new \DateTime($dateStr);
+                return $dt->format('j M Y');
+            } catch (\Throwable $e) {
+                return $dateStr;
+            }
+        };
+
+        $formattedStart = $formatDate($startDate);
+        $formattedEnd = $formatDate($endDate);
+
+        $title = "Examination Scheduled";
+        $message = "{$examName} has been scheduled from {$formattedStart} to {$formattedEnd}. Click here to check.";
+        $link = "/exams";
+
+        $roles = ['TEACHER', 'STUDENT'];
+        foreach ($roles as $role) {
+            $stmtCheck = $pdo->prepare("
+                SELECT COUNT(*) FROM dashboard_notifications
+                WHERE school_id = :sid AND user_role = :role AND title = :title AND message = :msg
+            ");
+            $stmtCheck->execute([
+                ':sid' => $schoolId,
+                ':role' => $role,
+                ':title' => $title,
+                ':msg' => $message
+            ]);
+            if ((int)$stmtCheck->fetchColumn() === 0) {
+                $stmtIns = $pdo->prepare("
+                    INSERT INTO dashboard_notifications (school_id, user_role, title, message, link, is_read)
+                    VALUES (:sid, :role, :title, :msg, :link, 0)
+                ");
+                $stmtIns->execute([
+                    ':sid' => $schoolId,
+                    ':role' => $role,
+                    ':title' => $title,
+                    ':msg' => $message,
+                    ':link' => $link
+                ]);
+            }
         }
     }
 
