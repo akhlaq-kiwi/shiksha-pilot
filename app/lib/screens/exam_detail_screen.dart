@@ -2711,21 +2711,18 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                             : _showAdmitCardModal,
                       ),
 
-                    // 3. Result Card (TEACHER & STUDENT/PARENT - Requires Report Cards Published)
-                    _buildFeatureCard(
-                      title: widget.userRole == 'TEACHER' ? 'Student Results' : 'Exam Result',
-                      subtitle: resultPub 
-                          ? (widget.userRole == 'TEACHER' ? 'View class performance breakdown' : 'View your report card')
-                          : 'Not Published Yet',
-                      icon: Icons.workspace_premium_rounded,
-                      isPublished: resultPub,
-                      disabledMessage: widget.userRole == 'TEACHER'
-                          ? 'Report cards have not been published yet for this examination.'
-                          : 'Report card is not published yet.',
-                      onTap: (widget.userRole != 'TEACHER' && resultRestricted)
-                          ? () {
-                              Navigator.push(
-                                context,
+                    // 3. Result Card (STUDENT/PARENT only - Hidden for Teachers to protect fee dues compliance)
+                    if (widget.userRole != 'TEACHER')
+                      _buildFeatureCard(
+                        title: 'Exam Result',
+                        subtitle: resultPub ? 'View your report card' : 'Not Published Yet',
+                        icon: Icons.workspace_premium_rounded,
+                        isPublished: resultPub,
+                        disabledMessage: 'Report card is not published yet.',
+                        onTap: resultRestricted
+                            ? () {
+                                Navigator.push(
+                                  context,
                                   MaterialPageRoute(
                                     builder: (context) => DueRestrictionScreen(
                                       title: 'Exam Result Temporarily Unavailable',
@@ -2738,8 +2735,8 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                   ),
                                 );
                               }
-                          : _showResultModal,
-                    ),
+                            : _showResultModal,
+                      ),
                   ],
                 ),
     );
