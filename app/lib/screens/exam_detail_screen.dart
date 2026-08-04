@@ -2598,6 +2598,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
     final bool schemePub = _details['scheme_published'] == 1;
     final bool admitPub = _details['admit_card_published'] == 1;
     final bool resultPub = _details['result_published'] == 1;
+    final bool hasPapers = (_details['has_papers'] == 1) || (_details['scheme'] is List && (_details['scheme'] as List).isNotEmpty);
     
     final bool admitCardRestricted = _details['admit_card_restricted'] == true;
     final bool resultRestricted = _details['result_restricted'] == true;
@@ -2668,16 +2669,18 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                       subtitle: schemePub ? 'View examination timetable scheme' : 'Not Published Yet',
                       icon: Icons.calendar_month_rounded,
                       isPublished: schemePub,
+                      disabledMessage: 'Examination scheme is not published yet.',
                       onTap: _showSchemeModal,
                     ),
 
-                    // 1b. Enter Marks Card (TEACHER only)
+                    // 1b. Enter Marks Card (TEACHER only - Requires papers added)
                     if (widget.userRole == 'TEACHER')
                       _buildFeatureCard(
                         title: 'Enter Marks',
-                        subtitle: 'Input student marks for assigned class',
+                        subtitle: hasPapers ? 'Input student marks for assigned class' : 'No Papers Added Yet',
                         icon: Icons.edit_note_rounded,
-                        isPublished: true,
+                        isPublished: hasPapers,
+                        disabledMessage: 'No papers have been added for this examination yet.',
                         onTap: _showEnterMarksModal,
                       ),
 
@@ -2688,6 +2691,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                         subtitle: admitPub ? 'View room & seat allocations' : 'Not Published Yet',
                         icon: Icons.badge_rounded,
                         isPublished: admitPub,
+                        disabledMessage: 'Admit card is not published yet.',
                         onTap: admitCardRestricted
                             ? () {
                                 Navigator.push(
@@ -2707,14 +2711,17 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                             : _showAdmitCardModal,
                       ),
 
-                    // 3. Result Card
+                    // 3. Result Card (TEACHER & STUDENT/PARENT - Requires Report Cards Published)
                     _buildFeatureCard(
                       title: widget.userRole == 'TEACHER' ? 'Student Results' : 'Exam Result',
                       subtitle: resultPub 
                           ? (widget.userRole == 'TEACHER' ? 'View class performance breakdown' : 'View your report card')
                           : 'Not Published Yet',
                       icon: Icons.workspace_premium_rounded,
-                      isPublished: widget.userRole == 'TEACHER' ? true : resultPub,
+                      isPublished: resultPub,
+                      disabledMessage: widget.userRole == 'TEACHER'
+                          ? 'Report cards have not been published yet for this examination.'
+                          : 'Report card is not published yet.',
                       onTap: (widget.userRole != 'TEACHER' && resultRestricted)
                           ? () {
                               Navigator.push(
@@ -2744,6 +2751,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
     required IconData icon,
     required bool isPublished,
     required VoidCallback onTap,
+    String? disabledMessage,
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
@@ -2769,7 +2777,18 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
         borderRadius: BorderRadius.circular(20),
         child: InkWell(
           borderRadius: BorderRadius.circular(20),
-          onTap: isPublished ? onTap : null,
+          onTap: () {
+            if (isPublished) {
+              onTap();
+            } else if (disabledMessage != null && disabledMessage.isNotEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(disabledMessage),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+          },
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
             child: Row(

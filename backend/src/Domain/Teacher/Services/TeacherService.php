@@ -929,7 +929,9 @@ class TeacherService extends BaseService
             ORDER BY ep.exam_date ASC, ep.start_time ASC
         ");
         $stmtScheme->execute([':exam_id' => $examId, ':class_id' => $classId]);
-        $response['scheme'] = $stmtScheme->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $schemePapers = $stmtScheme->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $response['scheme'] = $schemePapers;
+        $response['has_papers'] = !empty($schemePapers) ? 1 : 0;
 
         // 3. Fetch result if published
         if ($resultPublished) {
