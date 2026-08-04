@@ -7052,8 +7052,11 @@ class SchoolAdminService extends BaseService
         }
 
         // 1.5. Report lock check
-        if ($this->isTransactionInReport($pdo, $schoolId, $row['created_at'])) {
-            throw new ValidationException(['locked' => 'This payment has already been included in a generated Financial Report and can no longer be reverted.']);
+        if ($this->isTransactionInReport($pdo, $schoolId, $row['created_at']) || $this->isTransactionInReport($pdo, $schoolId, $row['payment_date'])) {
+            throw new ValidationException(
+                ['locked' => 'This Fee has been included in financial report. This action can not be done'],
+                'This Fee has been included in financial report. This action can not be done'
+            );
         }
 
         // 2. Outstanding migration lock check
@@ -7749,8 +7752,11 @@ class SchoolAdminService extends BaseService
         }
 
         // Check if the payment date falls within any generated financial report
-        if ($this->isTransactionInReport($pdo, $schoolId, $payment['created_at'])) {
-            throw new ValidationException(['locked' => 'This payment has already been included in a generated Financial Report and can no longer be reverted.']);
+        if ($this->isTransactionInReport($pdo, $schoolId, $payment['created_at']) || $this->isTransactionInReport($pdo, $schoolId, $payment['payment_date'])) {
+            throw new ValidationException(
+                ['locked' => 'This Fee has been included in financial report. This action can not be done'],
+                'This Fee has been included in financial report. This action can not be done'
+            );
         }
 
         // Verify and delete payout
@@ -9246,6 +9252,14 @@ Only approve the settlement after reviewing all financial records.
         if ($expTimestamp < $startY || $expTimestamp > $endY) {
             throw new ValidationException(['academic_year' => 'Cannot delete expenses from historical or inactive academic years.']);
         }
+
+        if ($this->isTransactionInReport($pdo, $schoolId, $expense['created_at'] ?? $expense['expense_date']) || $this->isTransactionInReport($pdo, $schoolId, $expense['expense_date'])) {
+            throw new ValidationException(
+                ['locked' => 'This Fee has been included in financial report. This action can not be done'],
+                'This Fee has been included in financial report. This action can not be done'
+            );
+        }
+
         $stmt = $pdo->prepare("DELETE FROM school_expenses WHERE id = :id AND school_id = :sid");
         $stmt->execute([':id' => $id, ':sid' => $schoolId]);
 
@@ -9908,8 +9922,11 @@ Only approve the settlement after reviewing all financial records.
         }
 
         // 1. Report lock check
-        if ($this->isTransactionInReport($pdo, $schoolId, $paymentDetails['updated_at'])) {
-            throw new ValidationException(['locked' => 'This payment has already been included in a generated Financial Report and can no longer be reverted.']);
+        if ($this->isTransactionInReport($pdo, $schoolId, $paymentDetails['updated_at']) || $this->isTransactionInReport($pdo, $schoolId, $paymentDetails['payment_date'])) {
+            throw new ValidationException(
+                ['locked' => 'This Fee has been included in financial report. This action can not be done'],
+                'This Fee has been included in financial report. This action can not be done'
+            );
         }
 
         // 2. Writable year check & Outstanding migration lock check
@@ -10647,8 +10664,12 @@ Only approve the settlement after reviewing all financial records.
         }
     }
 
-    private function isTransactionInReport(\PDO $pdo, int $schoolId, string $txTime): bool
+    private function isTransactionInReport(\PDO $pdo, int $schoolId, ?string $txTime): bool
     {
+        if (empty($txTime) || $txTime === '-') return false;
+        $txVal = strtotime($txTime);
+        if ($txVal === false || $txVal <= 0) return false;
+
         $stmt = $pdo->prepare("SELECT * FROM financial_reports WHERE school_id = :sid ORDER BY created_at ASC");
         $stmt->execute([':sid' => $schoolId]);
         $reports = $stmt->fetchAll(\PDO::FETCH_ASSOC);
