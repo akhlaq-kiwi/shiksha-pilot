@@ -2498,8 +2498,8 @@ class SchoolAdminService extends BaseService
             }
 
             if ($conflict) {
-                $schoolName = $conflict['school_name'] ?? 'doosre school';
-                $errMsg = "Yeh mobile number ({$phone}) pehle se '{$schoolName}' me Active state me registered hai. Naye school me register karne ke liye pehle pichhle school se student ko inactive mark karwayein.";
+                $schoolName = $conflict['school_name'] ?? 'another school';
+                $errMsg = "This mobile number ({$phone}) is already active in '{$schoolName}'. Please mark the student as inactive in the previous school before registering here.";
                 throw new ValidationException([
                     'parent_phone' => $errMsg,
                     'student_mobile' => $errMsg,
@@ -2544,8 +2544,8 @@ class SchoolAdminService extends BaseService
         }
 
         if ($conflict) {
-            $schoolName = $conflict['school_name'] ?? 'doosre school';
-            $errMsg = "Yeh mobile number ({$phone}) pehle se '{$schoolName}' me Active state me registered hai. Naye school me register karne ke liye pehle pichhle school se staff ko inactive mark karwayein.";
+            $schoolName = $conflict['school_name'] ?? 'another school';
+            $errMsg = "This mobile number ({$phone}) is already active in '{$schoolName}'. Please mark the staff member as inactive in the previous school before registering here.";
             throw new ValidationException([
                 'phone' => $errMsg
             ]);
