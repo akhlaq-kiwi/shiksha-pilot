@@ -492,6 +492,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                 return;
                               }
 
+                              final isLeaveReqNotif = titleLower.contains('approve') || titleLower.contains('reject') || msgLower.contains('approve') || msgLower.contains('reject') || titleLower.contains('request') || msgLower.contains('request');
                               final isHolidayNotif = titleLower.contains('holiday') || msgLower.contains('holiday');
                               if (linkStr.contains('leaves') || titleLower.contains('leave') || msgLower.contains('leave') || isHolidayNotif) {
                                 Navigator.push(
@@ -501,7 +502,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                       leaveService: LeaveService(baseUrl: widget.baseUrl, token: widget.token),
                                       userRole: widget.studentId != null ? 'PARENT' : 'TEACHER',
                                       selectedStudentId: widget.studentId,
-                                      initialTabIndex: isHolidayNotif ? 0 : 1,
+                                      initialTabIndex: isLeaveReqNotif ? 1 : 0,
                                     ),
                                   ),
                                 );

@@ -9,14 +9,14 @@ class LeaveListScreen extends StatefulWidget {
   final LeaveService leaveService;
   final String userRole; // 'TEACHER' or 'PARENT' or 'STUDENT'
   final int? selectedStudentId; // only relevant for parent role
-  final int initialTabIndex; // 0 for Official Holidays, 1 for Leave Requests (default 1)
+  final int initialTabIndex; // 0 for Official Holidays, 1 for Leave Requests (default 0)
 
   const LeaveListScreen({
     Key? key,
     required this.leaveService,
     required this.userRole,
     this.selectedStudentId,
-    this.initialTabIndex = 1,
+    this.initialTabIndex = 0,
   }) : super(key: key);
 
   @override

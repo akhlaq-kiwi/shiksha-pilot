@@ -458,6 +458,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               final titleLower = title.toString().toLowerCase();
               final msgLower = message.toString().toLowerCase();
 
+              final isLeaveApprovalOrReqNotif = titleLower.contains('approve') || titleLower.contains('reject') || msgLower.contains('approve') || msgLower.contains('reject') || titleLower.contains('request') || msgLower.contains('request');
               final isHolidayNotif = titleLower.contains('holiday') || msgLower.contains('holiday');
               if (titleLower.contains('leave') || msgLower.contains('leave') || isHolidayNotif) {
                 Navigator.push(
@@ -467,7 +468,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       leaveService: widget.leaveService,
                       userRole: widget.userRole,
                       selectedStudentId: _activeStudentId,
-                      initialTabIndex: isHolidayNotif ? 0 : 1,
+                      initialTabIndex: isLeaveApprovalOrReqNotif ? 1 : 0,
                     ),
                   ),
                 ).then((_) => _loadSessionInfo());
@@ -1003,6 +1004,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               leaveService: widget.leaveService,
               userRole: widget.userRole,
               selectedStudentId: _activeStudentId,
+              initialTabIndex: 0, // Always open Official Holidays on normal icon click
             ),
           ),
         ).then((_) => _loadSessionInfo()); // reload details in case anything changed
