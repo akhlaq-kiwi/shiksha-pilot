@@ -6794,21 +6794,24 @@ class SchoolAdminService extends BaseService
 
     public function deleteClass(array $user, array $data): array
     {
-        if (empty($data['name'])) {
-            throw new ValidationException(['name' => 'Class name is required for deletion.']);
+        $className = trim((string)($data['name'] ?? $data['class_name'] ?? $data['className'] ?? ''));
+        if (empty($className)) {
+            throw new ValidationException(
+                ['name' => 'Class name is required for deletion.'],
+                'This action can not be done'
+            );
         }
 
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->classRepo->getPdo();
-        $className = trim((string)$data['name']);
 
         // Find all class IDs for this class name in this school
-        $stmtFind = $pdo->prepare("SELECT id FROM classes WHERE school_id = :sid AND name = :name");
+        $stmtFind = $pdo->prepare("SELECT id FROM classes WHERE school_id = :sid AND LOWER(TRIM(name)) = LOWER(TRIM(:name))");
         $stmtFind->execute([':sid' => $schoolId, ':name' => $className]);
         $classIds = $stmtFind->fetchAll(PDO::FETCH_COLUMN);
 
         if (empty($classIds)) {
-            throw new NotFoundException('Class not found.');
+            throw new NotFoundException("Class '{$className}' not found.");
         }
 
         $inClause = implode(',', array_map('intval', $classIds));
@@ -6816,15 +6819,18 @@ class SchoolAdminService extends BaseService
         // Check if students are enrolled in this class across any section
         $stmtCount = $pdo->prepare("
             SELECT COUNT(*) FROM students 
-            WHERE school_id = :sid AND class_id IN ({$inClause}) AND status = 'ACTIVE'
+            WHERE school_id = :sid AND class_id IN ({$inClause})
         ");
         $stmtCount->execute([':sid' => $schoolId]);
         $studentCount = (int)$stmtCount->fetchColumn();
 
         if ($studentCount > 0) {
-            throw new ValidationException([
-                'students' => 'This class cannot be deleted because students are currently enrolled. Please transfer or remove all students before deleting this class.'
-            ]);
+            throw new ValidationException(
+                [
+                    'students' => 'This action can not be done because students are currently enrolled in this class. Please transfer or remove all students before deleting this class.'
+                ],
+                'This action can not be done'
+            );
         }
 
         // Safe deletion inside transaction to handle foreign key dependencies
@@ -6985,9 +6991,12 @@ class SchoolAdminService extends BaseService
         $studentCount = (int)$stmtCount->fetchColumn();
 
         if ($studentCount > 0) {
-            throw new ValidationException([
-                'students' => 'This section cannot be deleted because students belong to this section. Please reassign or remove all students before deleting this section.'
-            ]);
+            throw new ValidationException(
+                [
+                    'students' => 'This action can not be done because students belong to this section. Please reassign or remove all students before deleting this section.'
+                ],
+                'This action can not be done'
+            );
         }
 
         // Safe deletion of section

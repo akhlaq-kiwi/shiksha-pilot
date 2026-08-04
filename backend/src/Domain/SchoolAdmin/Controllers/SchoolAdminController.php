@@ -1136,7 +1136,10 @@ class SchoolAdminController extends BaseController
         $this->requireRole($user, ['SCHOOL_ADMIN']);
 
         $body   = RequestParser::body($request);
-        $result = $this->service->deleteClass($user, $body);
+        $query  = RequestParser::query($request);
+        $data   = array_merge($query, $body);
+
+        $result = $this->service->deleteClass($user, $data);
 
         return $this->success($response, $result, 'Class deleted');
     }

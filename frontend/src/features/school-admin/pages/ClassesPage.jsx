@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
-import { Plus, Search, Users, User, X, MoreVertical } from 'lucide-react';
+import { Plus, Search, Users, User, X, MoreVertical, Check } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardContent } from '../../../common/ui/card';
 import { Input } from '../../../common/ui/input';
@@ -113,6 +113,7 @@ export default function ClassesPage() {
   // New Class Form State (Modal)
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [classNameInput, setClassNameInput] = useState('');
+  const [selectedClassNames, setSelectedClassNames] = useState([]); // Array for multi-class creation (unselected by default)
   const [sectionTypeInput, setSectionTypeInput] = useState(''); // 'Alphabet Sections' | 'Color Sections' | ''
   const [selectedSections, setSelectedSections] = useState([]); // ['A', 'B'] or ['Red', 'Blue']
   const [savingClass, setSavingClass] = useState(false);
@@ -232,6 +233,7 @@ export default function ClassesPage() {
     setIsEditing(false);
     setEditOldClassName('');
     setClassNameInput('');
+    setSelectedClassNames([]); // Reset to unselected by default
     setSectionTypeInput('');
     setSelectedSections([]);
     setOriginalSections([]);
@@ -281,20 +283,41 @@ export default function ClassesPage() {
     }
   };
 
-  const executeSaveClass = async (sectionsPayload) => {
+  const executeSaveMultipleClasses = async (classNamesList) => {
     setSavingClass(true);
+    setClassFormError('');
+    try {
+      for (const name of classNamesList) {
+        await schoolService.createClass({
+          name: name.trim(),
+          sections: []
+        });
+      }
+      handleCloseClassForm();
+      await loadData();
+    } catch (err) {
+      console.error(err);
+      setClassFormError(err.message || 'Failed to create one or more classes.');
+    } finally {
+      setSavingClass(false);
+    }
+  };
+
+  const executeSaveClass = async (sectionsPayload, targetClassName = null) => {
+    setSavingClass(true);
+    const clsName = targetClassName || classNameInput;
     try {
       const isTransition = isEditing && originalSections.length === 0 && sectionsPayload.length > 0 && editingStudentCount > 0;
 
       if (isEditing) {
         await schoolService.updateClass({
           oldName: editOldClassName,
-          name: classNameInput.trim(),
+          name: clsName.trim(),
           sections: sectionsPayload
         });
       } else {
         await schoolService.createClass({
-          name: classNameInput.trim(),
+          name: clsName.trim(),
           sections: sectionsPayload
         });
       }
@@ -330,30 +353,43 @@ export default function ClassesPage() {
     if (e) e.preventDefault();
     let hasError = false;
 
-    if (!classNameInput.trim()) {
-      setClassFormError('Please select a class.');
-      hasError = true;
+    if (isEditing) {
+      if (!classNameInput.trim()) {
+        setClassFormError('Please select a class.');
+        hasError = true;
+      }
     } else {
-      setClassFormError('');
+      if (selectedClassNames.length === 0) {
+        setClassFormError('Please select at least one class.');
+        hasError = true;
+      }
     }
 
     setSectionTypeError('');
     setSectionsFieldError('');
 
-    if (selectedSections.length > 4) {
-      setSectionsFieldError('Maximum 4 sections allowed.');
-      hasError = true;
+    if (isEditing || selectedClassNames.length === 1) {
+      if (selectedSections.length > 4) {
+        setSectionsFieldError('Maximum 4 sections allowed.');
+        hasError = true;
+      }
     }
 
     if (hasError) return;
 
-    if (isEditing && originalSections.length > 0 && selectedSections.length === 0) {
-      // Show confirmation dialog before merging all sections back to none
-      setShowMergeConfirm(true);
-      return;
+    if (isEditing) {
+      if (originalSections.length > 0 && selectedSections.length === 0) {
+        setShowMergeConfirm(true);
+        return;
+      }
+      await executeSaveClass(selectedSections);
+    } else {
+      if (selectedClassNames.length === 1) {
+        await executeSaveClass(selectedSections, selectedClassNames[0]);
+      } else {
+        await executeSaveMultipleClasses(selectedClassNames);
+      }
     }
-
-    await executeSaveClass(selectedSections);
   };
 
   // Delete Class & Warning Modal States
@@ -365,7 +401,7 @@ export default function ClassesPage() {
   const handleDeleteClassClick = (gc) => {
     if (gc.studentCount > 0) {
       setDeleteWarningMessage(
-        'This class cannot be deleted because students are currently enrolled.\n\nPlease transfer or remove all students before deleting this class.'
+        'This action can not be done because students are currently enrolled in this class.\n\nPlease transfer or remove all students before deleting this class.'
       );
       return;
     }
@@ -414,7 +450,13 @@ export default function ClassesPage() {
     // Populate student counts by grouping matching class names
     Object.keys(groups).forEach(name => {
       groups[name].sections.sort();
-      groups[name].studentCount = students.filter(s => s.class_name === name && s.status === 'ACTIVE').length;
+      const matchingClassIds = classes.filter(c => c.name && c.name.trim().toLowerCase() === name.trim().toLowerCase()).map(c => c.id);
+      
+      groups[name].studentCount = students.filter(s => {
+        const matchesName = s.class_name && s.class_name.trim().toLowerCase() === name.trim().toLowerCase();
+        const matchesId = s.class_id && matchingClassIds.includes(s.class_id);
+        return matchesName || matchesId;
+      }).length;
     });
 
     return Object.values(groups).sort((a, b) => {
@@ -1103,97 +1145,167 @@ export default function ClassesPage() {
             {/* Modal Form */}
             <form onSubmit={handleCreateClass} className="p-6 space-y-5">
               
-              {/* Field 1: Select Class */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-text-secondary uppercase">Select Class <span className="text-red-500">*</span></label>
-                {isEditing ? (
+              {/* Field 1: Select Class / Classes */}
+              {isEditing ? (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-text-secondary uppercase">Select Class <span className="text-red-500">*</span></label>
                   <Input 
                     value={classNameInput} 
                     disabled 
                     className="bg-zinc-100 dark:bg-zinc-800 font-bold cursor-not-allowed" 
                   />
-                ) : (
-                  <select 
-                    value={classNameInput} 
-                    onChange={e => { setClassNameInput(e.target.value); setClassFormError(''); }} 
-                    required 
-                    className={`flex h-9 w-full rounded-md border bg-surface px-3 py-1.5 text-sm text-text-primary shadow-xs transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-950 dark:border-zinc-800 ${classFormError ? 'border-red-500 focus-visible:ring-red-500' : 'border-zinc-200'}`}
-                  >
-                    <option value="">Select Class...</option>
-                    {availablePredefinedClasses.length === 0 ? (
-                      <option value="" disabled>All standard classes added</option>
-                    ) : (
-                      availablePredefinedClasses.map(c => (
-                        <option key={c.name} value={c.name}>
-                          {c.name}
-                        </option>
-                      ))
-                    )}
-                  </select>
-                )}
-                {classFormError && (
-                  <p className="text-[11px] text-red-500 font-semibold">{classFormError}</p>
-                )}
-              </div>
-
-              {/* Field 2: Section Type (Optional) */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-text-secondary uppercase">Section Type (Optional)</label>
-                <select
-                  value={sectionTypeInput}
-                  onChange={e => handleSectionTypeChange(e.target.value)}
-                  disabled={isEditing && editingStudentCount > 0 && sectionTypeInput !== ''}
-                  className={`flex h-9 w-full rounded-md border bg-surface px-3 py-1.5 text-sm text-text-primary shadow-xs transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-950 dark:border-zinc-800 ${isEditing && editingStudentCount > 0 && sectionTypeInput !== '' ? 'bg-zinc-100 dark:bg-zinc-800 cursor-not-allowed' : ''}`}
-                >
-                  <option value="">No Sections (Optional)</option>
-                  <option value={SECTION_TYPES.ALPHABET}>Alphabet Sections (A, B, C, D)</option>
-                  <option value={SECTION_TYPES.COLOR}>Color Sections (Red, Blue, Green, Yellow)</option>
-                </select>
-                {isEditing && editingStudentCount > 0 && sectionTypeInput !== '' && (
-                  <p className="text-[11px] text-amber-600 font-bold mt-1">
-                    Section type cannot be changed because students are already assigned to this class.
-                  </p>
-                )}
-                {sectionTypeError && (
-                  <p className="text-[11px] text-red-500 font-semibold">{sectionTypeError}</p>
-                )}
-              </div>
-
-              {/* Field 3: Multi-Select Checkboxes for Sections */}
-              {sectionTypeInput && (
-                <div className="space-y-2 animate-in fade-in duration-200">
+                </div>
+              ) : (
+                <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-bold text-text-secondary uppercase">
-                      Select Sections (Optional)
+                      Select Class(es) <span className="text-red-500">*</span>
                     </label>
-                    <span className="text-[11px] font-bold text-text-muted">Max 4</span>
+                    <div className="flex items-center gap-2">
+                      {selectedClassNames.length > 0 && (
+                        <span className="text-[11px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                          {selectedClassNames.length} Selected
+                        </span>
+                      )}
+                      {availablePredefinedClasses.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (selectedClassNames.length === availablePredefinedClasses.length) {
+                              setSelectedClassNames([]);
+                            } else {
+                              setSelectedClassNames(availablePredefinedClasses.map(c => c.name));
+                            }
+                            setClassFormError('');
+                          }}
+                          className="text-[11px] font-bold text-primary hover:underline cursor-pointer"
+                        >
+                          {selectedClassNames.length === availablePredefinedClasses.length ? 'Deselect All' : 'Select All'}
+                        </button>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 p-3 bg-zinc-50 dark:bg-zinc-900/50 border border-border rounded-xl">
-                    {(sectionTypeInput === SECTION_TYPES.ALPHABET ? ALPHABET_SECTIONS : COLOR_SECTIONS).map(sec => {
-                      const isChecked = selectedSections.includes(sec);
-                      return (
-                        <label 
-                          key={sec}
-                          onClick={() => handleToggleSection(sec)}
-                          className={`flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer select-none transition-all ${isChecked ? 'border-primary bg-primary/10 text-primary font-bold shadow-xs' : 'border-border bg-surface text-text-primary hover:border-zinc-300'}`}
-                        >
-                          <input 
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => {}} 
-                            className="rounded border-zinc-300 text-primary focus:ring-primary h-4 w-4"
-                          />
-                          <span className="text-sm">{sec}</span>
-                        </label>
-                      );
-                    })}
+                  <div className="max-h-56 overflow-y-auto p-2 bg-zinc-50 dark:bg-zinc-900/50 border border-border rounded-xl space-y-1 divide-y divide-border/30">
+                    {availablePredefinedClasses.length === 0 ? (
+                      <p className="text-xs text-text-muted text-center py-4 italic">All standard classes have been added.</p>
+                    ) : (
+                      availablePredefinedClasses.map(c => {
+                        const isSelected = selectedClassNames.includes(c.name);
+                        return (
+                          <div
+                            key={c.name}
+                            onClick={() => {
+                              setClassFormError('');
+                              if (isSelected) {
+                                setSelectedClassNames(prev => prev.filter(name => name !== c.name));
+                              } else {
+                                setSelectedClassNames(prev => [...prev, c.name]);
+                              }
+                            }}
+                            className={`flex items-center justify-between p-2.5 rounded-lg cursor-pointer select-none transition-all ${
+                              isSelected
+                                ? 'bg-primary/10 border border-primary/30 text-primary font-bold shadow-2xs'
+                                : 'hover:bg-zinc-100 dark:hover:bg-zinc-800/60 text-text-primary'
+                            }`}
+                          >
+                            <span className="text-xs font-semibold">{c.name}</span>
+
+                            {/* Circular Checkbox */}
+                            <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all ${
+                              isSelected
+                                ? 'bg-primary border-primary text-white shadow-2xs'
+                                : 'border-zinc-300 dark:border-zinc-700 bg-surface'
+                            }`}>
+                              {isSelected && (
+                                <svg className="w-3 h-3 stroke-current" fill="none" viewBox="0 0 24 24" strokeWidth="3" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                </svg>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
                   </div>
-                  {sectionsFieldError && (
-                    <p className="text-[11px] text-red-500 font-semibold">{sectionsFieldError}</p>
+                  {classFormError && (
+                    <p className="text-[11px] text-red-500 font-semibold">{classFormError}</p>
                   )}
                 </div>
               )}
+
+              {/* Section Type & Section Checkboxes - Visible ONLY if 1 Class is Selected OR Editing Mode */}
+              {(isEditing || selectedClassNames.length === 1) ? (
+                <>
+                  {/* Field 2: Section Type (Optional) */}
+                  <div className="space-y-1.5 animate-in fade-in duration-200">
+                    <label className="text-xs font-bold text-text-secondary uppercase">Section Type (Optional)</label>
+                    <select
+                      value={sectionTypeInput}
+                      onChange={e => handleSectionTypeChange(e.target.value)}
+                      disabled={isEditing && editingStudentCount > 0 && sectionTypeInput !== ''}
+                      className={`flex h-9 w-full rounded-md border bg-surface px-3 py-1.5 text-sm text-text-primary shadow-xs transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-950 dark:border-zinc-800 ${isEditing && editingStudentCount > 0 && sectionTypeInput !== '' ? 'bg-zinc-100 dark:bg-zinc-800 cursor-not-allowed' : ''}`}
+                    >
+                      <option value="">No Sections (Optional)</option>
+                      <option value={SECTION_TYPES.ALPHABET}>Alphabet Sections (A, B, C, D)</option>
+                      <option value={SECTION_TYPES.COLOR}>Color Sections (Red, Blue, Green, Yellow)</option>
+                    </select>
+                    {isEditing && editingStudentCount > 0 && sectionTypeInput !== '' && (
+                      <p className="text-[11px] text-amber-600 font-bold mt-1">
+                        Section type cannot be changed because students are already assigned to this class.
+                      </p>
+                    )}
+                    {sectionTypeError && (
+                      <p className="text-[11px] text-red-500 font-semibold">{sectionTypeError}</p>
+                    )}
+                  </div>
+
+                  {/* Field 3: Multi-Select Checkboxes for Sections */}
+                  {sectionTypeInput && (
+                    <div className="space-y-2 animate-in fade-in duration-200">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-text-secondary uppercase">
+                          Select Sections (Optional)
+                        </label>
+                        <span className="text-[11px] font-bold text-text-muted">Max 4</span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 p-3 bg-zinc-50 dark:bg-zinc-900/50 border border-border rounded-xl">
+                        {(sectionTypeInput === SECTION_TYPES.ALPHABET ? ALPHABET_SECTIONS : COLOR_SECTIONS).map(sec => {
+                          const isChecked = selectedSections.includes(sec);
+                          return (
+                            <div 
+                              key={sec}
+                              onClick={() => handleToggleSection(sec)}
+                              className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer select-none transition-all ${
+                                isChecked 
+                                  ? 'border-primary bg-primary/10 text-primary font-bold shadow-2xs' 
+                                  : 'border-border bg-surface text-text-primary hover:border-zinc-300 hover:bg-zinc-50/50 dark:hover:bg-zinc-800/40'
+                              }`}
+                            >
+                              <div className={`w-4.5 h-4.5 rounded-md border flex items-center justify-center transition-all shrink-0 ${
+                                isChecked
+                                  ? 'bg-primary border-primary text-white shadow-2xs'
+                                  : 'border-zinc-300 dark:border-zinc-700 bg-surface'
+                              }`}>
+                                {isChecked && (
+                                  <svg className="w-3 h-3 stroke-current" fill="none" viewBox="0 0 24 24" strokeWidth="3" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                  </svg>
+                                )}
+                              </div>
+                              <span className="text-sm font-semibold">{sec}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {sectionsFieldError && (
+                        <p className="text-[11px] text-red-500 font-semibold">{sectionsFieldError}</p>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : null}
 
               {/* Action Buttons */}
               <div className="flex gap-2 justify-end pt-2">
@@ -1248,9 +1360,9 @@ export default function ClassesPage() {
       {deleteWarningMessage && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-surface border border-border rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-amber-500/10">
-              <h3 className="font-bold text-amber-600 text-base tracking-tight font-display">
-                Cannot Delete Class
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-red-500/10">
+              <h3 className="font-bold text-red-600 text-base tracking-tight font-display">
+                This action can not be done
               </h3>
               <button 
                 type="button" 
@@ -1261,10 +1373,10 @@ export default function ClassesPage() {
               </button>
             </div>
             <div className="p-6 space-y-4">
-              <div className="p-4 bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 rounded-xl text-xs leading-relaxed space-y-2">
-                <p className="font-bold text-sm">Action Blocked</p>
+              <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-700 dark:text-red-400 rounded-xl text-xs leading-relaxed space-y-2">
+                <p className="font-bold text-sm">This action can not be done</p>
                 <p>Students are currently enrolled in this class.</p>
-                <p>Please transfer or remove all students before deleting it.</p>
+                <p>Please transfer or remove all students before deleting this class.</p>
               </div>
               <div className="flex justify-end pt-2">
                 <Button onClick={() => setDeleteWarningMessage('')}>Understood</Button>
@@ -1299,7 +1411,7 @@ export default function ClassesPage() {
               <p className="text-xs text-text-secondary leading-relaxed">
                 Are you sure you want to delete <strong className="text-text-primary">{deleteClassTarget.name}</strong>?
               </p>
-              <p className="text-xs font-bold text-red-500">This action cannot be undone.</p>
+              <p className="text-xs font-medium text-text-muted">This class will be permanently removed.</p>
               <div className="flex gap-2 justify-end pt-2">
                 <Button variant="secondary" onClick={() => setDeleteClassTarget(null)} disabled={isDeletingClass}>
                   Cancel

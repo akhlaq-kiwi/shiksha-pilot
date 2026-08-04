@@ -62,7 +62,14 @@ export const apiClient = {
   get: (endpoint, options = {}) => request(endpoint, { ...options, method: 'GET' }),
   post: (endpoint, body, options = {}) => request(endpoint, { ...options, method: 'POST', body }),
   put: (endpoint, body, options = {}) => request(endpoint, { ...options, method: 'PUT', body }),
-  delete: (endpoint, options = {}) => request(endpoint, { ...options, method: 'DELETE' }),
+  delete: (endpoint, bodyOrOptions = {}) => {
+    if (bodyOrOptions && (bodyOrOptions.data !== undefined || bodyOrOptions.body !== undefined)) {
+      const body = bodyOrOptions.body !== undefined ? bodyOrOptions.body : bodyOrOptions.data;
+      const { data, body: unused, ...restOptions } = bodyOrOptions;
+      return request(endpoint, { ...restOptions, method: 'DELETE', body });
+    }
+    return request(endpoint, { ...bodyOrOptions, method: 'DELETE' });
+  },
 };
 
 export default apiClient;
