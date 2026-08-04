@@ -186,8 +186,8 @@ const AppLayout = ({ children }) => {
                 schoolProfile ? (
                   <div className="flex items-center gap-3 min-w-0">
                     <span 
-                      className="text-sm font-bold text-text-primary font-display tracking-tight leading-none truncate uppercase"
-                      style={{ fontWeight: 700 }}
+                      className="text-sm font-black text-text-primary font-display tracking-tight leading-none truncate uppercase"
+                      style={{ fontWeight: 900 }}
                     >
                       {schoolProfile.name}
                     </span>
@@ -235,7 +235,7 @@ const AppLayout = ({ children }) => {
                   <div className="flex items-center justify-center h-[36px] w-auto flex-shrink-0">
                     <img src={logoImg} alt="Shiksha Pilot Logo" className="h-[36px] w-auto object-contain" />
                   </div>
-                  <span className="text-sm font-bold text-text-primary font-display tracking-tight leading-none">
+                  <span className="text-sm font-black text-text-primary font-display tracking-tight leading-none" style={{ fontWeight: 900 }}>
                     Shiksha Pilot
                   </span>
                 </div>
