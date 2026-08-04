@@ -254,21 +254,23 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
   }
 
   String _getDynamicNotificationHeading(dynamic notif) {
-    final title = (notif['title'] ?? '').toString().toLowerCase();
+    final rawTitle = (notif['title'] ?? '').toString().trim();
+    if (rawTitle.isNotEmpty) {
+      return rawTitle;
+    }
     final message = (notif['message'] ?? '').toString().toLowerCase();
     final link = (notif['link'] ?? '').toString().toLowerCase();
 
-    if (link.contains('leave') || title.contains('leave') || message.contains('leave') ||
-        link.contains('holiday') || title.contains('holiday') || message.contains('holiday')) {
+    if (link.contains('leave') || message.contains('leave')) {
       return 'Leave Notification';
-    } else if (link.contains('attendance') || title.contains('attendance') || message.contains('attendance')) {
+    } else if (link.contains('attendance') || message.contains('attendance')) {
       return 'Attendance Notification';
-    } else if (link.contains('fee') || title.contains('fee') || message.contains('fee')) {
+    } else if (link.contains('fee') || message.contains('fee')) {
       return 'Fee Notification';
-    } else if (link.contains('timetable') || title.contains('timetable') || message.contains('timetable')) {
+    } else if (link.contains('timetable') || message.contains('timetable')) {
       return 'Timetable Notification';
     }
-    return notif['title'] ?? 'Notification';
+    return 'Notification';
   }
 
   @override
@@ -405,6 +407,90 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                 };
                                 http.post(uri, headers: headers).catchError((_) => http.Response('', 500));
                               } catch (_) {}
+
+                              final isNoticeNotif = linkStr.contains('notice') || linkStr.contains('announcement') || titleLower.contains('notice') || titleLower.contains('announcement');
+                              if (isNoticeNotif) {
+                                showDialog(
+                                  context: context,
+                                  barrierDismissible: false,
+                                  builder: (context) => const Center(child: CircularProgressIndicator()),
+                                );
+
+                                try {
+                                  final noticesUri = Uri.parse('${widget.baseUrl}/api/student/announcements');
+                                  final headers = {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': 'Bearer ${widget.token}',
+                                    if (widget.studentId != null) 'X-Student-Id': widget.studentId.toString(),
+                                  };
+                                  final response = await http.get(noticesUri, headers: headers);
+                                  
+                                  if (Navigator.canPop(context)) {
+                                    Navigator.pop(context);
+                                  }
+
+                                  if (response.statusCode == 200) {
+                                    final decoded = json.decode(response.body);
+                                    final List<dynamic> notices = decoded['data'] ?? decoded;
+                                    
+                                    final matchingNotice = notices.firstWhere(
+                                      (n) => n['subject'].toString().trim().toLowerCase() == notif['title'].toString().trim().toLowerCase(),
+                                      orElse: () => null,
+                                    );
+
+                                    if (matchingNotice != null) {
+                                      final int noticeId = matchingNotice['id'] as int;
+                                      final readUri = Uri.parse('${widget.baseUrl}/api/student/announcements/$noticeId/read');
+                                      await http.post(readUri, headers: headers);
+
+                                      if (context.mounted) {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => NoticeDetailsScreen(
+                                              subject: matchingNotice['subject'] ?? '',
+                                              description: matchingNotice['description'] ?? '',
+                                              publishDate: _formatDateTime(matchingNotice['created_at']),
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    } else {
+                                      if (context.mounted) {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => NoticeScreen(
+                                              baseUrl: widget.baseUrl,
+                                              token: widget.token,
+                                              userRole: widget.studentId != null ? 'PARENT' : 'STUDENT',
+                                              studentId: widget.studentId,
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  }
+                                } catch (e) {
+                                  if (Navigator.canPop(context)) {
+                                    Navigator.pop(context);
+                                  }
+                                  if (context.mounted) {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => NoticeScreen(
+                                          baseUrl: widget.baseUrl,
+                                          token: widget.token,
+                                          userRole: widget.studentId != null ? 'PARENT' : 'STUDENT',
+                                          studentId: widget.studentId,
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                }
+                                return;
+                              }
 
                               final isHolidayNotif = titleLower.contains('holiday') || msgLower.contains('holiday');
                               if (linkStr.contains('leaves') || titleLower.contains('leave') || msgLower.contains('leave') || isHolidayNotif) {

@@ -14847,8 +14847,8 @@ Only approve the settlement after reviewing all financial records.
         }
 
         $stmtNotif = $pdo->prepare("
-            INSERT INTO dashboard_notifications (school_id, user_role, title, message, is_read)
-            VALUES (:sch, :role, :title, :msg, 0)
+            INSERT INTO dashboard_notifications (school_id, user_role, title, message, link, is_read)
+            VALUES (:sch, :role, :title, :msg, '/notice', 0)
         ");
         foreach ($rolesToNotify as $role) {
             $stmtNotif->execute([
