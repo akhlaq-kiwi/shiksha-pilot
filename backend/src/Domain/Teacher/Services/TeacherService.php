@@ -920,7 +920,7 @@ class TeacherService extends BaseService
 
         // 2. Fetch current live scheme papers for teacher class
         $stmtScheme = $pdo->prepare("
-            SELECT ep.id, ep.subject_id, ep.exam_date, ep.start_time, ep.end_time, ep.max_marks, ep.passing_marks, ep.room, s.name AS subject_name
+            SELECT ep.id, ep.subject_id, ep.exam_date, ep.start_time, ep.end_time, ep.max_marks, ep.passing_marks, ep.room, ep.evaluation_type, s.name AS subject_name
             FROM examination_papers ep
             JOIN subjects s ON ep.subject_id = s.id
             WHERE ep.exam_id = :exam_id AND ep.class_id = :class_id
@@ -1068,11 +1068,14 @@ class TeacherService extends BaseService
         foreach ($students as $s) {
             $studentId = (int)$s['id'];
             $m = $marksMap[$studentId] ?? ['marks_obtained' => null, 'is_absent' => 0, 'remarks' => ''];
+            $isGradePaper = ($paper['evaluation_type'] ?? '') === 'grade' || (float)$paper['max_marks'] == 0;
+            $rawMarks = $m['marks_obtained'] ?? null;
+
             $list[] = [
                 'student_id' => $studentId,
                 'student_name' => $s['name'],
                 'roll_no' => $s['roll_no'] ?? '',
-                'marks_obtained' => $m['marks_obtained'] !== null ? (float)$m['marks_obtained'] : null,
+                'marks_obtained' => ($rawMarks !== null && $rawMarks !== '') ? ($isGradePaper ? (string)$rawMarks : (float)$rawMarks) : null,
                 'is_absent' => (int)$m['is_absent'],
                 'remarks' => $m['remarks'] ?: ''
             ];
@@ -1082,6 +1085,7 @@ class TeacherService extends BaseService
             'exam_name' => $examName,
             'class_name' => $className,
             'subject_name' => $paper['subject_name'],
+            'evaluation_type' => $paper['evaluation_type'] ?? ((float)$paper['max_marks'] == 0 ? 'grade' : 'marks'),
             'max_marks' => (float)$paper['max_marks'],
             'passing_marks' => (float)$paper['passing_marks'],
             'is_result_published' => $isResultPublished,

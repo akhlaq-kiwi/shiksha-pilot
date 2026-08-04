@@ -776,7 +776,14 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
 
                                                   // Marks/Grade Field - Editable only in Edit Mode & if Result Not Published
                                                   (() {
-                                                    final isGradeSubject = (marksSheetData?['evaluation_type'] == 'grade') || (maxM == 0.0);
+                                                    final currentPaper = scheme.firstWhere(
+                                                      (p) => ((p['subject_id'] is int) ? p['subject_id'] : int.tryParse(p['subject_id'].toString()) ?? 0) == selectedSubjectId,
+                                                      orElse: () => null,
+                                                    );
+                                                    final isGradeSubject = (marksSheetData?['evaluation_type'] == 'grade') ||
+                                                        (currentPaper?['evaluation_type'] == 'grade') ||
+                                                        (maxM == 0.0) ||
+                                                        ((double.tryParse(currentPaper?['max_marks']?.toString() ?? '') ?? -1) == 0.0);
                                                     if (isGradeSubject) {
                                                       final currentVal = marksControllers[sId]?.text.trim().toUpperCase();
                                                       final validGrades = ['A+', 'A', 'B+', 'B', 'C+', 'C', 'D+', 'D', 'E', 'F'];
