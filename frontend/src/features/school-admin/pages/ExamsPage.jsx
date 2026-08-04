@@ -2320,9 +2320,11 @@ export default function ExamsPage() {
                                 Revert to Draft
                               </DropdownItem>
                             ) : (
-                              <DropdownItem onClick={() => handlePublishMasterExam(e, 'Published')} className="text-emerald-600 font-semibold hover:bg-emerald-50">
-                                Publish Examination
-                              </DropdownItem>
+                              (e.start_date && e.end_date && String(e.start_date).trim() !== '' && String(e.start_date).trim() !== '-' && String(e.end_date).trim() !== '' && String(e.end_date).trim() !== '-') && (
+                                <DropdownItem onClick={() => handlePublishMasterExam(e, 'Published')} className="text-emerald-600 font-semibold hover:bg-emerald-50">
+                                  Publish Examination
+                                </DropdownItem>
+                              )
                             )}
                           </DropdownMenu>
                         )}

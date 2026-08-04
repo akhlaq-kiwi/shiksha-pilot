@@ -11133,6 +11133,14 @@ Only approve the settlement after reviewing all financial records.
             throw new ValidationException(['name' => 'Examination Name is required.']);
         }
 
+        if (strcasecmp((string)$status, 'Published') === 0) {
+            $s = trim((string)($startDate ?? ''));
+            $e = trim((string)($endDate ?? ''));
+            if ($s === '' || $s === '-' || $e === '' || $e === '-') {
+                throw new ValidationException(['start_date' => 'Start Date and End Date are required to publish an examination.'], 'Start Date and End Date are required to publish an examination.');
+            }
+        }
+
         if (!empty($startDate) && !empty($endDate) && $endDate < $startDate) {
             throw new ValidationException(['end_date' => 'End Date cannot be before Start Date.']);
         }
