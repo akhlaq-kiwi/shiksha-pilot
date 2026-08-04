@@ -3057,7 +3057,7 @@ export default function ExamsPage() {
                 </TableHeader>
                 <TableBody>
                   {marksSheet.students.map(s => {
-                    const isReadOnlyField = isReadOnly;
+                    const isReadOnlyField = false;
                     const currentPaper = timetablePapers.find(p => p.subject_id.toString() === selectedSubjectId);
                     const isGradeSheet = marksSheet.evaluation_type === 'grade' || parseFloat(marksSheet.max_marks) === 0 || currentPaper?.evaluation_type === 'grade';
 
@@ -3068,7 +3068,7 @@ export default function ExamsPage() {
                         <TableCell>
                           <input 
                             type="checkbox" 
-                            className="rounded border-zinc-300 h-4 w-4 accent-primary" 
+                            className="rounded border-zinc-300 h-4 w-4 accent-primary cursor-pointer" 
                             disabled={isReadOnlyField}
                             checked={s.is_absent === 1}
                             onChange={e => handleMarkCellChange(s.student_id, 'is_absent', e.target.checked)}
@@ -3077,18 +3077,22 @@ export default function ExamsPage() {
                         <TableCell>
                           {isGradeSheet ? (
                             <Select
-                              className="h-8 text-xs font-bold w-full"
-                              disabled={s.is_absent === 1 || isReadOnlyField}
+                              className="h-8 text-xs font-bold w-full cursor-pointer"
+                              disabled={s.is_absent === 1}
                               value={s.is_absent === 1 ? '' : (s.marks_obtained || '')}
                               onChange={e => handleMarkCellChange(s.student_id, 'marks_obtained', e.target.value)}
                             >
                               <option value="">-- Grade --</option>
                               <option value="A+">Grade A+</option>
                               <option value="A">Grade A</option>
+                              <option value="B+">Grade B+</option>
                               <option value="B">Grade B</option>
+                              <option value="C+">Grade C+</option>
                               <option value="C">Grade C</option>
+                              <option value="D+">Grade D+</option>
                               <option value="D">Grade D</option>
                               <option value="E">Grade E</option>
+                              <option value="F">Grade F</option>
                             </Select>
                           ) : (
                             <Input 

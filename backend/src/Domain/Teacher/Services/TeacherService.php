@@ -1145,11 +1145,18 @@ class TeacherService extends BaseService
             $studentId = (int)$item['student_id'];
             $isAbsent = !empty($item['is_absent']) ? 1 : 0;
             
+            $isGradePaper = ($paper['evaluation_type'] ?? '') === 'grade' || (float)$paper['max_marks'] == 0;
             $rawMarks = $item['marks_obtained'] ?? null;
-            $marksObtained = ($rawMarks !== null && $rawMarks !== '' && !$isAbsent) ? (float)$rawMarks : null;
-            if ($marksObtained !== null) {
-                if ($marksObtained < 0) $marksObtained = 0;
-                if ($marksObtained > $maxMarks) $marksObtained = $maxMarks;
+            if ($rawMarks !== null && $rawMarks !== '' && !$isAbsent) {
+                if ($isGradePaper) {
+                    $marksObtained = trim((string)$rawMarks);
+                } else {
+                    $marksObtained = (float)$rawMarks;
+                    if ($marksObtained < 0) $marksObtained = 0;
+                    if ($maxMarks > 0 && $marksObtained > $maxMarks) $marksObtained = $maxMarks;
+                }
+            } else {
+                $marksObtained = null;
             }
             $remarks = $item['remarks'] ?? null;
 

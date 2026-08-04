@@ -475,12 +475,19 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                 isSaving = true;
               });
               try {
+                final isGradeSubject = (marksSheetData?['evaluation_type'] == 'grade') || (maxM == 0.0);
                 List<Map<String, dynamic>> marksPayload = [];
                 for (var s in studentsList) {
                   final sId = s['student_id'] as int;
                   final isAb = absentMap[sId] ?? false;
                   final valStr = marksControllers[sId]?.text.trim() ?? '';
-                  final val = double.tryParse(valStr);
+                  
+                  dynamic val;
+                  if (isGradeSubject) {
+                    val = isAb ? null : (valStr.isEmpty ? null : valStr);
+                  } else {
+                    val = isAb ? null : double.tryParse(valStr);
+                  }
 
                   marksPayload.add({
                     'student_id': sId,
@@ -749,34 +756,73 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                                   ),
                                                   const SizedBox(width: 8),
 
-                                                  // Marks Input Field - Editable only in Edit Mode & if Result Not Published
-                                                  SizedBox(
-                                                    width: 75,
-                                                    height: 42,
-                                                    child: TextField(
-                                                      controller: marksControllers[sId],
-                                                      enabled: isEditingMode && !isAb && !isResultPublished,
-                                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                                      inputFormatters: [
-                                                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                                                        MaxValueTextInputFormatter(maxM),
-                                                      ],
-                                                      textAlign: TextAlign.center,
-                                                      style: TextStyle(
-                                                        fontWeight: FontWeight.bold,
-                                                        fontSize: 14,
-                                                        color: (isEditingMode && !isResultPublished) ? Colors.black87 : Colors.indigo.shade900,
-                                                      ),
-                                                      decoration: InputDecoration(
-                                                        hintText: isAb ? 'ABS' : '0.0',
-                                                        hintStyle: TextStyle(fontSize: 12, color: isAb ? Colors.red : Colors.grey),
-                                                        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                                        filled: true,
-                                                        fillColor: isAb ? Colors.red.shade50 : ((isEditingMode && !isResultPublished) ? Colors.white : Colors.grey.shade100),
-                                                      ),
-                                                    ),
-                                                  ),
+                                                  // Marks/Grade Field - Editable only in Edit Mode & if Result Not Published
+                                                  (() {
+                                                    final isGradeSubject = (marksSheetData?['evaluation_type'] == 'grade') || (maxM == 0.0);
+                                                    if (isGradeSubject) {
+                                                      final currentVal = marksControllers[sId]?.text.trim().toUpperCase();
+                                                      final validGrades = ['A+', 'A', 'B+', 'B', 'C+', 'C', 'D+', 'D', 'E', 'F'];
+                                                      final selectedGrade = validGrades.contains(currentVal) ? currentVal : null;
+
+                                                      return SizedBox(
+                                                        width: 95,
+                                                        height: 42,
+                                                        child: DropdownButtonFormField<String>(
+                                                          value: isAb ? null : selectedGrade,
+                                                          decoration: InputDecoration(
+                                                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                                            filled: true,
+                                                            fillColor: isAb
+                                                                ? Colors.red.shade50
+                                                                : ((isEditingMode && !isResultPublished) ? Colors.white : Colors.grey.shade100),
+                                                          ),
+                                                          hint: Text(isAb ? 'ABS' : 'Grade', style: TextStyle(fontSize: 11, color: isAb ? Colors.red : Colors.grey, fontWeight: FontWeight.bold)),
+                                                          items: validGrades
+                                                              .map((g) => DropdownMenuItem<String>(
+                                                                    value: g,
+                                                                    child: Text(g, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                                                  ))
+                                                              .toList(),
+                                                          onChanged: (isEditingMode && !isAb && !isResultPublished)
+                                                              ? (val) {
+                                                                  setModalState(() {
+                                                                    marksControllers[sId]?.text = val ?? '';
+                                                                  });
+                                                                }
+                                                              : null,
+                                                        ),
+                                                      );
+                                                    } else {
+                                                      return SizedBox(
+                                                        width: 75,
+                                                        height: 42,
+                                                        child: TextField(
+                                                          controller: marksControllers[sId],
+                                                          enabled: isEditingMode && !isAb && !isResultPublished,
+                                                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                                          inputFormatters: [
+                                                            FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                                                            MaxValueTextInputFormatter(maxM),
+                                                          ],
+                                                          textAlign: TextAlign.center,
+                                                          style: TextStyle(
+                                                            fontWeight: FontWeight.bold,
+                                                            fontSize: 14,
+                                                            color: (isEditingMode && !isResultPublished) ? Colors.black87 : Colors.indigo.shade900,
+                                                          ),
+                                                          decoration: InputDecoration(
+                                                            hintText: isAb ? 'ABS' : '0.0',
+                                                            hintStyle: TextStyle(fontSize: 12, color: isAb ? Colors.red : Colors.grey),
+                                                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                                            filled: true,
+                                                            fillColor: isAb ? Colors.red.shade50 : ((isEditingMode && !isResultPublished) ? Colors.white : Colors.grey.shade100),
+                                                          ),
+                                                        ),
+                                                      );
+                                                    }
+                                                  })(),
                                                 ],
                                               );
                                             },
