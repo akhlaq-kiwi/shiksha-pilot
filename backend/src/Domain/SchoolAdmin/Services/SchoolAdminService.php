@@ -2411,6 +2411,15 @@ class SchoolAdminService extends BaseService
         $stmtCheck->execute([':phone' => $phone]);
         $existing = $stmtCheck->fetch(PDO::FETCH_ASSOC);
 
+        $cleanEmail = !empty($email) ? trim((string)$email) : null;
+        if (!empty($cleanEmail)) {
+            $stmtEmailCheck = $pdo->prepare("SELECT id FROM users WHERE LOWER(email) = LOWER(:email) AND id != :ex_id LIMIT 1");
+            $stmtEmailCheck->execute([':email' => $cleanEmail, ':ex_id' => $existing ? (int)$existing['id'] : 0]);
+            if ($stmtEmailCheck->fetchColumn() !== false) {
+                $cleanEmail = null;
+            }
+        }
+
         if (!$existing) {
             $defaultPassword = 'Test@123';
             $hashedPassword = password_hash($defaultPassword, PASSWORD_BCRYPT);
@@ -2420,7 +2429,7 @@ class SchoolAdminService extends BaseService
             ");
             $stmtInsert->execute([
                 ':phone'  => $phone,
-                ':email'  => !empty($email) ? trim($email) : null,
+                ':email'  => $cleanEmail,
                 ':pwd'    => $hashedPassword,
                 ':plain'  => $defaultPassword,
                 ':name'   => trim($name),
@@ -2430,10 +2439,10 @@ class SchoolAdminService extends BaseService
         } else {
             $stmtUpdate = $pdo->prepare("
                 UPDATE users 
-                SET status = :status, school_id = COALESCE(school_id, :sid), name = :name
+                SET status = :status, school_id = COALESCE(school_id, :sid), name = :name, email = COALESCE(:email, email)
                 WHERE id = :id
             ");
-            $stmtUpdate->execute([':status' => $targetStatus, ':sid' => $schoolId, ':name' => trim($name), ':id' => $existing['id']]);
+            $stmtUpdate->execute([':status' => $targetStatus, ':sid' => $schoolId, ':name' => trim($name), ':email' => $cleanEmail, ':id' => (int)$existing['id']]);
         }
     }
 
@@ -12014,10 +12023,10 @@ Only approve the settlement after reviewing all financial records.
             WHERE u.school_id = :school_id
               AND (
                 (u.role = 'STUDENT' AND (
-                    (u.student_id IS NOT NULL AND u.student_id = s.id) OR
-                    (s.email IS NOT NULL AND s.email != '' AND u.email = s.email) OR
                     (s.student_mobile IS NOT NULL AND s.student_mobile != '' AND u.phone = s.student_mobile) OR
-                    (s.parent_phone IS NOT NULL AND s.parent_phone != '' AND u.phone = s.parent_phone)
+                    (s.parent_phone IS NOT NULL AND s.parent_phone != '' AND u.phone = s.parent_phone) OR
+                    (s.father_phone IS NOT NULL AND s.father_phone != '' AND u.phone = s.father_phone) OR
+                    (s.email IS NOT NULL AND s.email != '' AND u.email = s.email)
                 ))
                 OR 
                 (u.role = 'PARENT' AND (
