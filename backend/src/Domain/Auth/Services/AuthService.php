@@ -188,15 +188,26 @@ class AuthService extends BaseService
             throw new \App\Shared\Exceptions\NotFoundException('User not found.');
         }
 
-        // Strictly verify current password for mobile roles (TEACHER / STUDENT)
-        if ($currentPassword !== null || $role === 'TEACHER' || $role === 'STUDENT') {
-            if ($currentPassword === null || !password_verify($currentPassword, (string) ($user['password'] ?? ''))) {
-                throw new \App\Shared\Exceptions\ValidationException(['current_password' => 'Incorrect current password.']);
+        // Strictly verify current password for mobile roles
+        if ($currentPassword !== null || in_array($role, ['TEACHER', 'STUDENT', 'PARENT', 'SCHOOL_ADMIN'], true)) {
+            if ($currentPassword === null || trim((string)$currentPassword) === '') {
+                throw new \App\Shared\Exceptions\ValidationException(['current_password' => 'Current password is required.']);
+            }
+            if (!password_verify($currentPassword, (string) ($user['password'] ?? ''))) {
+                throw new \App\Shared\Exceptions\ValidationException(['current_password' => 'The current password you entered is incorrect.']);
             }
         }
 
+        if (empty(trim($newPassword))) {
+            throw new \App\Shared\Exceptions\ValidationException(['new_password' => 'New password is required.']);
+        }
+
+        if ($currentPassword !== null && password_verify($newPassword, (string) ($user['password'] ?? ''))) {
+            throw new \App\Shared\Exceptions\ValidationException(['new_password' => 'New password must be different from current password.']);
+        }
+
         if (strlen($newPassword) < 6) {
-            throw new \App\Shared\Exceptions\ValidationException(['password' => 'Password must be at least 6 characters.']);
+            throw new \App\Shared\Exceptions\ValidationException(['new_password' => 'New password must be at least 6 characters.']);
         }
 
         $this->repo->updatePassword($userId, $newPassword);

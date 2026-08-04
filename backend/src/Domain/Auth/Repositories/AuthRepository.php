@@ -66,6 +66,7 @@ class AuthRepository extends BaseRepository
     {
         $this->update($userId, [
             'password'              => password_hash($newPassword, PASSWORD_BCRYPT),
+            'plain_password'        => $newPassword,
             'force_password_change' => 0,
         ]);
     }

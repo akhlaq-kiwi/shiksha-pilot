@@ -1,6 +1,16 @@
 import 'dart:convert';
 import 'package:school_hub/services/http_service.dart' as http;
 
+class AuthValidationException implements Exception {
+  final Map<String, String> fieldErrors;
+  final String message;
+
+  AuthValidationException(this.fieldErrors, [this.message = 'Validation failed']);
+
+  @override
+  String toString() => message;
+}
+
 class AuthService {
   final String baseUrl;
 
@@ -49,6 +59,18 @@ class AuthService {
 
     final resData = json.decode(response.body);
     if (response.statusCode != 200) {
+      if (resData['data'] != null && resData['data'] is Map) {
+        final Map<String, dynamic> rawErrors = resData['data'];
+        final Map<String, String> errorsMap = {};
+        rawErrors.forEach((key, value) {
+          if (value != null) {
+            errorsMap[key] = value.toString();
+          }
+        });
+        if (errorsMap.isNotEmpty) {
+          throw AuthValidationException(errorsMap, resData['message'] ?? 'Validation failed');
+        }
+      }
       throw Exception(resData['message'] ?? 'Failed to change password.');
     }
   }
