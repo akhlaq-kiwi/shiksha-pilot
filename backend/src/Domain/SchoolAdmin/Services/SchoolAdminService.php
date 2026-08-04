@@ -10772,17 +10772,6 @@ Only approve the settlement after reviewing all financial records.
 
         if ($academicYearId > 0) {
             $this->autoSeedDefaultSessionExams($pdo, $schoolId, $academicYearId);
-            
-            // Auto-sync status of examinations based on examination_class_status published records
-            $stmtSync = $pdo->prepare("
-                UPDATE examinations e
-                SET e.status = CASE 
-                    WHEN (SELECT COUNT(*) FROM examination_class_status ecs WHERE ecs.exam_id = e.id AND ecs.status = 'Published') > 0 THEN 'Published'
-                    ELSE 'Draft'
-                END
-                WHERE e.school_id = :sid AND e.academic_year_id = :ayid
-            ");
-            $stmtSync->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
         }
 
         $stmt = $pdo->prepare("
@@ -11559,9 +11548,6 @@ Only approve the settlement after reviewing all financial records.
             ':class_id' => $classId
         ]);
 
-        $stmtUpd = $pdo->prepare("UPDATE examinations SET status = 'Published' WHERE id = :id AND status = 'Draft'");
-        $stmtUpd->execute([':id' => $examId]);
-
         // 4. Fetch additional info for audit logging
         $stmtInfo = $pdo->prepare("
             SELECT c.name AS class_name, ay.name AS academic_year_name
@@ -11670,16 +11656,6 @@ Only approve the settlement after reviewing all financial records.
             $stmt->execute([':exam_id' => $examId]);
         }
 
-        // Check if any class still has published components; if none, sync master exam status to Draft
-        $stmtCheckAnyPub = $pdo->prepare("
-            SELECT COUNT(*) FROM examination_class_status 
-            WHERE exam_id = :exam_id AND (scheme_published = 1 OR admit_card_published = 1 OR status = 'Published')
-        ");
-        $stmtCheckAnyPub->execute([':exam_id' => $examId]);
-        if ((int)$stmtCheckAnyPub->fetchColumn() === 0) {
-            $pdo->prepare("UPDATE examinations SET status = 'Draft' WHERE id = :id")->execute([':id' => $examId]);
-        }
-
         // 3. Log audit
         $stmtInfo = $pdo->prepare("
             SELECT c.name AS class_name, ay.name AS academic_year_name
@@ -11726,16 +11702,6 @@ Only approve the settlement after reviewing all financial records.
         } else {
             $stmt = $pdo->prepare("UPDATE examination_class_status SET admit_card_published = 0 WHERE exam_id = :exam_id");
             $stmt->execute([':exam_id' => $examId]);
-        }
-
-        // Check if any class still has published components; if none, sync master exam status to Draft
-        $stmtCheckAnyPub = $pdo->prepare("
-            SELECT COUNT(*) FROM examination_class_status 
-            WHERE exam_id = :exam_id AND (scheme_published = 1 OR admit_card_published = 1 OR status = 'Published')
-        ");
-        $stmtCheckAnyPub->execute([':exam_id' => $examId]);
-        if ((int)$stmtCheckAnyPub->fetchColumn() === 0) {
-            $pdo->prepare("UPDATE examinations SET status = 'Draft' WHERE id = :id")->execute([':id' => $examId]);
         }
 
         // 3. Log audit
