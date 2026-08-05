@@ -119,7 +119,9 @@ class _AttachmentGalleryScreenState extends State<AttachmentGalleryScreen> {
           final name = att['file_name'] ?? 'File';
           final type = att['file_type'] ?? '';
 
-          final fullUrl = rawPath.startsWith('http') ? rawPath : '${widget.baseUrl}$rawPath';
+          final cleanBaseUrl = widget.baseUrl.replaceAll(RegExp(r'/$'), '');
+          final cleanRawPath = rawPath.startsWith('/') ? rawPath : '/$rawPath';
+          final fullUrl = rawPath.startsWith('http') ? rawPath : '$cleanBaseUrl$cleanRawPath';
           final isPdf = type == 'pdf' || name.toLowerCase().endsWith('.pdf');
 
           if (isPdf) {

@@ -22,11 +22,22 @@ class HomeworkService extends BaseService
 
     private function getUploadsDirectory(): string
     {
-        $dir = __DIR__ . '/../../../../public/uploads/homework';
-        if (!is_dir($dir)) {
-            mkdir($dir, 0777, true);
+        $baseDir = dirname(__DIR__, 4);
+        $targetDir = $baseDir . '/public/uploads/homework';
+
+        if (!is_dir($targetDir)) {
+            $alt1 = dirname(__DIR__, 5) . '/backend/public/uploads/homework';
+            if (is_dir($alt1)) {
+                return $alt1;
+            }
+            $alt2 = dirname(__DIR__, 5) . '/public/uploads/homework';
+            if (is_dir($alt2)) {
+                return $alt2;
+            }
+            @mkdir($targetDir, 0777, true);
         }
-        return $dir;
+
+        return $targetDir;
     }
 
     public function uploadAttachment($uploadedFile): array
@@ -228,9 +239,11 @@ class HomeworkService extends BaseService
 
         // Delete physical attachment files from disk
         if (!empty($existing['attachments'])) {
+            $uploadsDir = $this->getUploadsDirectory();
             foreach ($existing['attachments'] as $att) {
                 if (!empty($att['file_path'])) {
-                    $fullPath = __DIR__ . '/../../../../public' . $att['file_path'];
+                    $filename = basename($att['file_path']);
+                    $fullPath = $uploadsDir . DIRECTORY_SEPARATOR . $filename;
                     if (file_exists($fullPath)) {
                         @unlink($fullPath);
                     }

@@ -22,16 +22,22 @@ void callbackDispatcher() {
           final prefs = await SharedPreferences.getInstance();
           final token = prefs.getString('auth_token') ?? '';
           final userRole = prefs.getString('user_role') ?? '';
-          final baseUrl = prefs.getString('base_url') ?? 'http://127.0.0.1:8000';
+          final baseUrl = prefs.getString('base_url') ?? 'https://qa.shikshapilot.com';
           if (token.isEmpty || userRole.isEmpty) return true;
 
-          final isSchoolStaff = userRole.toUpperCase() == 'TEACHER' || 
-                                userRole.toUpperCase() == 'SCHOOL_ADMIN' || 
-                                userRole.toUpperCase() == 'PRINCIPAL';
-
-          final path = isSchoolStaff 
-              ? '/api/school/notifications' 
-              : '/api/student/notifications';
+          final roleUpper = userRole.toUpperCase();
+          final String path;
+          final bool isSchoolStaff;
+          if (roleUpper == 'TEACHER') {
+            path = '/api/teacher/notifications';
+            isSchoolStaff = true;
+          } else if (roleUpper == 'SCHOOL_ADMIN' || roleUpper == 'PRINCIPAL' || roleUpper == 'SUPER_ADMIN') {
+            path = '/api/school/notifications';
+            isSchoolStaff = true;
+          } else {
+            path = '/api/student/notifications';
+            isSchoolStaff = false;
+          }
               
           final studentId = prefs.getInt('selected_student_id');
 
@@ -50,17 +56,29 @@ void callbackDispatcher() {
                 : (decodedBody['data'] ?? []);
 
             if (data.isNotEmpty) {
-              final latestNotif = data.first;
-              final int latestId = latestNotif['id'] is int 
-                  ? latestNotif['id'] 
-                  : int.parse(latestNotif['id'].toString());
-              final isUnread = latestNotif['is_read'] == 0 || latestNotif['is_read'] == false || latestNotif['is_read'] == '0';
+              int lastNotifiedId = prefs.getInt('last_notified_id_$userRole') ?? 0;
+              int maxId = lastNotifiedId;
 
-              final lastNotifiedId = prefs.getInt('last_notified_id_$userRole') ?? 0;
-              if (isUnread && latestId > lastNotifiedId) {
-                await prefs.setInt('last_notified_id_$userRole', latestId);
+              final unreadNotifs = data.where((n) {
+                final isUnread = n['is_read'] == 0 || n['is_read'] == false || n['is_read'] == '0';
+                final int nId = n['id'] is int ? n['id'] : int.parse(n['id'].toString());
+                return isUnread && nId > lastNotifiedId;
+              }).toList();
+
+              unreadNotifs.sort((a, b) {
+                final int aId = a['id'] is int ? a['id'] : int.parse(a['id'].toString());
+                final int bId = b['id'] is int ? b['id'] : int.parse(b['id'].toString());
+                return aId.compareTo(bId);
+              });
+
+              if (unreadNotifs.isNotEmpty) {
                 await NotificationHelper.init();
-                await NotificationHelper.showNotification(latestNotif);
+                for (final notif in unreadNotifs) {
+                  final int nId = notif['id'] is int ? notif['id'] : int.parse(notif['id'].toString());
+                  if (nId > maxId) maxId = nId;
+                  await NotificationHelper.showNotification(notif);
+                }
+                await prefs.setInt('last_notified_id_$userRole', maxId);
               }
             }
           }
@@ -170,6 +188,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     final token = prefs.getString('auth_token');
     final role = prefs.getString('user_role');
     final baseUrl = prefs.getString('base_url') ?? 'https://qa.shikshapilot.com';
+    await prefs.setString('base_url', baseUrl);
 
     if (token != null && role != null) {
       final leaveService = LeaveService(baseUrl: baseUrl, token: token);
