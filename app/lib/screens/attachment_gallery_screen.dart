@@ -124,16 +124,23 @@ class _AttachmentGalleryScreenState extends State<AttachmentGalleryScreen> {
     );
 
     try {
-      final cleanBaseUrl = widget.baseUrl.replaceAll(RegExp(r'/$'), '');
-      final cleanRawPath = fullUrl.startsWith('/') ? fullUrl : '/$fullUrl';
-      final primaryUrl = fullUrl.startsWith('http') ? fullUrl : '$cleanBaseUrl$cleanRawPath';
+      final prefs = await SharedPreferences.getInstance();
+      String activeBaseUrl = widget.baseUrl.trim();
+      if (activeBaseUrl.isEmpty || !activeBaseUrl.startsWith('http')) {
+        activeBaseUrl = prefs.getString('base_url') ?? 'https://qa.shikshapilot.com';
+      }
+      final cleanBaseUrl = activeBaseUrl.replaceAll(RegExp(r'/$'), '');
 
-      String? fallbackUrl;
-      if (!fullUrl.startsWith('http')) {
+      final List<String> candidateUrls = [];
+      if (fullUrl.startsWith('http')) {
+        candidateUrls.add(fullUrl);
+      } else {
+        final cleanRawPath = fullUrl.startsWith('/') ? fullUrl : '/$fullUrl';
+        candidateUrls.add('$cleanBaseUrl$cleanRawPath');
         if (cleanRawPath.contains('/uploads/homework/')) {
-          fallbackUrl = '$cleanBaseUrl${cleanRawPath.replaceFirst('/uploads/homework/', '/uploads/')}';
+          candidateUrls.add('$cleanBaseUrl${cleanRawPath.replaceFirst('/uploads/homework/', '/uploads/')}');
         } else if (cleanRawPath.contains('/uploads/')) {
-          fallbackUrl = '$cleanBaseUrl${cleanRawPath.replaceFirst('/uploads/', '/uploads/homework/')}';
+          candidateUrls.add('$cleanBaseUrl${cleanRawPath.replaceFirst('/uploads/', '/uploads/homework/')}');
         }
       }
 
@@ -142,18 +149,31 @@ class _AttachmentGalleryScreenState extends State<AttachmentGalleryScreen> {
         'Accept': 'application/pdf,*/*',
       };
 
-      var response = await http.get(Uri.parse(primaryUrl), headers: headers);
-      if (response.statusCode != 200 && fallbackUrl != null) {
-        response = await http.get(Uri.parse(fallbackUrl), headers: headers);
+      http.Response? response;
+      for (final url in candidateUrls) {
+        try {
+          final res = await http.get(Uri.parse(url), headers: headers);
+          if (res.statusCode == 200 && res.bodyBytes.isNotEmpty) {
+            response = res;
+            break;
+          }
+        } catch (_) {}
       }
 
-      if (response.statusCode == 200) {
-        await Printing.sharePdf(
-          bytes: response.bodyBytes,
-          filename: filename,
-        );
+      if (response != null && response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PdfViewerScreen(
+                pdfBytes: response.bodyBytes,
+                title: filename,
+              ),
+            ),
+          );
+        }
       } else {
-        throw Exception('Failed to load PDF');
+        throw Exception('Failed to load PDF document from server');
       }
     } catch (e) {
       if (mounted) {
@@ -325,6 +345,43 @@ class _AttachmentGalleryScreenState extends State<AttachmentGalleryScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class PdfViewerScreen extends StatelessWidget {
+  final Uint8List pdfBytes;
+  final String title;
+
+  const PdfViewerScreen({
+    Key? key,
+    required this.pdfBytes,
+    required this.title,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        title: Text(
+          title,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          overflow: TextOverflow.ellipsis,
+        ),
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
+      body: PdfPreview(
+        build: (format) => pdfBytes,
+        allowPrinting: true,
+        allowSharing: true,
+        canChangeOrientation: false,
+        canChangePageFormat: false,
+        maxPageWidth: 700,
+        pdfFileName: title,
       ),
     );
   }
