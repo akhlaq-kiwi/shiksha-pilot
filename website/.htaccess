@@ -13,10 +13,10 @@ DirectoryIndex index.php
   RewriteCond %{HTTP_HOST} !:[0-9]+$
   RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
-  # 2. Force the canonical apex host (no www) — avoids duplicate-content
-  #    URLs ranking against each other.
-  RewriteCond %{HTTP_HOST} ^www\.shikshapilot\.com$ [NC]
-  RewriteRule ^ https://shikshapilot.com%{REQUEST_URI} [L,R=301]
+  # 2. Force the canonical www host — avoids duplicate-content URLs
+  #    ranking against each other.
+  RewriteCond %{HTTP_HOST} ^shikshapilot\.com$ [NC]
+  RewriteRule ^ https://www.shikshapilot.com%{REQUEST_URI} [L,R=301]
 
   # 3. Collapse trailing slashes (except the root) — /features/ -> /features
   RewriteCond %{REQUEST_FILENAME} !-d

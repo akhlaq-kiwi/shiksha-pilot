@@ -9,7 +9,7 @@
 $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
 
 define('SITE_NAME', 'Shiksha Pilot');
-define('SITE_DOMAIN', 'shikshapilot.com');
+define('SITE_DOMAIN', 'www.shikshapilot.com');
 define('SITE_URL', 'https://' . SITE_DOMAIN); // canonical/OG tags always use production https
 define('SITE_TAGLINE', 'School-running, minus the paperwork');
 define('SITE_LOCALE', 'en_IN');
