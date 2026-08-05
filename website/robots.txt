@@ -62,4 +62,4 @@ Allow: /
 User-agent: cohere-ai
 Allow: /
 
-Sitemap: https://shikshapilot.com/sitemap.xml
+Sitemap: https://www.shikshapilot.com/sitemap.xml

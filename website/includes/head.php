@@ -65,6 +65,7 @@ window.dataLayer = window.dataLayer || [];
 <meta property="og:image" content="<?php echo htmlspecialchars($ogImage, ENT_QUOTES); ?>">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="<?php echo htmlspecialchars(SITE_NAME . ' — ' . $pageTitle, ENT_QUOTES); ?>">
 <meta property="og:locale" content="<?php echo SITE_LOCALE; ?>">
 
 <!-- Twitter -->
@@ -112,6 +113,19 @@ $organizationSchema = [
     'description' => 'School management platform covering attendance, examinations, fee collection, timetables and leave requests for K-12 schools.',
 ];
 echo '<script type="application/ld+json">' . json_encode($organizationSchema, JSON_UNESCAPED_SLASHES) . '</script>' . "\n";
+
+// WebSite schema — a distinct entity from Organization, this is what
+// Google reads to understand the site itself (as opposed to the company
+// behind it). Strengthens the entity signal that feeds sitelinks under
+// the main search result; sitelinks themselves are never something a
+// site can request directly, only earn through structure + authority.
+$websiteSchema = [
+    '@context' => 'https://schema.org',
+    '@type' => 'WebSite',
+    'name' => SITE_NAME,
+    'url' => SITE_URL,
+];
+echo '<script type="application/ld+json">' . json_encode($websiteSchema, JSON_UNESCAPED_SLASHES) . '</script>' . "\n";
 
 if (!empty($pageJsonLd)) {
     foreach ($pageJsonLd as $schema) {
