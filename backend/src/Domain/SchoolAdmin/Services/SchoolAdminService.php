@@ -2557,24 +2557,17 @@ class SchoolAdminService extends BaseService
                 SELECT phone, role 
                 FROM users 
                 WHERE (RIGHT(REGEXP_REPLACE(phone, '[^0-9]', ''), 10) = :phone OR phone LIKE :phone_like)
-                  AND (UPPER(role) IN ('SUPER_ADMIN', 'SCHOOL_ADMIN', 'ADMIN', 'TENANT_ADMIN') OR role IS NOT NULL)
+                  AND (UPPER(role) IN ('SUPER_ADMIN', 'SCHOOL_ADMIN', 'ADMIN', 'TENANT_ADMIN'))
                 LIMIT 1
             ");
             $stmtUser->execute([':phone' => $phone, ':phone_like' => "%{$phone}%"]);
             $userConflict = $stmtUser->fetch(PDO::FETCH_ASSOC);
 
-            // Filter out non-admin roles if query returned a regular teacher/student user
-            if ($userConflict && !in_array(strtoupper((string)$userConflict['role']), ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'ADMIN', 'TENANT_ADMIN'], true)) {
-                $userConflict = null;
-            }
-
             if (!$userConflict) {
-                // 2. Check schools table for admin_phone or contact_phone
+                // 2. Check schools table for contact_phone
                 $stmtSchool = $pdo->prepare("
                     SELECT id, name FROM schools 
-                    WHERE RIGHT(REGEXP_REPLACE(admin_phone, '[^0-9]', ''), 10) = :phone
-                       OR RIGHT(REGEXP_REPLACE(contact_phone, '[^0-9]', ''), 10) = :phone
-                       OR admin_phone LIKE :phone_like
+                    WHERE RIGHT(REGEXP_REPLACE(contact_phone, '[^0-9]', ''), 10) = :phone
                        OR contact_phone LIKE :phone_like
                     LIMIT 1
                 ");
@@ -2588,13 +2581,8 @@ class SchoolAdminService extends BaseService
             if ($userConflict) {
                 $errMsg = 'Entered number already registered';
                 throw new ValidationException([
-                    'phone' => $errMsg,
                     'student_mobile' => $errMsg,
-                    'parent_phone' => $errMsg,
-                    'father_phone' => $errMsg,
-                    'mother_phone' => $errMsg,
-                    'contact_phone' => $errMsg,
-                    'emergency_phone' => $errMsg
+                    'phone' => $errMsg
                 ], $errMsg);
             }
         }

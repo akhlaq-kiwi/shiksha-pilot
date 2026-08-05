@@ -947,13 +947,11 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
         </button>
       </div>
 
-      {/*
-        Top-of-form summary with jump links. On a 4-tab, 1400+ line form a
-        field-level message can be scrolled hundreds of pixels out of view -
-        this makes every current error visible and actionable from one place,
-        whether it came from client validation or the server on submit.
-      */}
-      <FormErrorSummary errors={errors} title="Please fix the following before continuing" />
+      {errors.form && (
+        <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl text-xs font-semibold">
+          {errors.form}
+        </div>
+      )}
 
       {/* Tabs list (4 steps sequence) */}
       <div className="flex border-b border-border text-sm overflow-x-auto whitespace-nowrap scrollbar-none gap-4">
