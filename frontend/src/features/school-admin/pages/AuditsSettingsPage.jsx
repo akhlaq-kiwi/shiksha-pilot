@@ -227,8 +227,15 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
   const [showNoDraftModal, setShowNoDraftModal] = useState(false);
   const [creatingDraft, setCreatingDraft] = useState(false);
 
-  // Class Fee Configuration States
-  const [selectedClassId, setSelectedClassId] = useState('');
+  const [showSelectClassNotice, setShowSelectClassNotice] = useState(true);
+
+  useEffect(() => {
+    setShowSelectClassNotice(true);
+    const timer = setTimeout(() => {
+      setShowSelectClassNotice(false);
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, []);
   const [configuredClassIds, setConfiguredClassIds] = useState([]);
   const [feeMode, setFeeMode] = useState('SAME'); // 'SAME' or 'DIFFERENT'
   const [sameFeeAmount, setSameFeeAmount] = useState('');
@@ -1068,8 +1075,8 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
             </div>
           )}
 
-          {!selectedClassId && (
-            <div className="p-3.5 bg-primary/5 border border-primary/10 rounded-xl flex items-center gap-2.5 text-xs text-primary font-bold">
+          {!selectedClassId && showSelectClassNotice && (
+            <div className="p-3.5 bg-primary/5 border border-primary/10 rounded-xl flex items-center gap-2.5 text-xs text-primary font-bold animate-in fade-in duration-300">
               <ShieldAlert className="h-4 w-4 text-primary flex-shrink-0" />
               <span>Please select a class to configure its fee structure.</span>
             </div>
@@ -1111,33 +1118,32 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
             <p className="text-[11px] text-text-muted">This amount will be applied to all 12 academic months automatically.</p>
           </div>
 
-            {selectedClassId && (isConfigLocked || isReadOnly) ? (
-              <div className="mt-6 p-4 bg-zinc-100 border border-zinc-200 dark:bg-zinc-900/50 dark:border-zinc-800 rounded-xl flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center">
-                    <Lock className="h-4 w-4 text-zinc-500" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-text-primary font-display">Fee Configuration Locked</p>
-                    <p className="text-[11px] text-text-muted mt-0.5">{isReadOnly ? 'Fee configuration cannot be modified in an archived academic year.' : 'This configuration is permanently locked for the active year.'}</p>
-                  </div>
+          {selectedClassId && (isConfigLocked || isReadOnly) ? (
+            <div className="mt-6 p-4 bg-zinc-100 border border-zinc-200 dark:bg-zinc-900/50 dark:border-zinc-800 rounded-xl flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center">
+                  <Lock className="h-4 w-4 text-zinc-500" />
                 </div>
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-zinc-200 text-zinc-600 border border-zinc-300">
-                  LOCKED
-                </span>
+                <div>
+                  <p className="text-xs font-bold text-text-primary font-display">Fee Configuration Locked</p>
+                  <p className="text-[11px] text-text-muted mt-0.5">{isReadOnly ? 'Fee configuration cannot be modified in an archived academic year.' : 'This configuration is permanently locked for the active year.'}</p>
+                </div>
               </div>
-            ) : (
-              <div className="mt-6 flex justify-end">
-                <Button 
-                  onClick={handleConfirmSaveConfig}
-                  disabled={!selectedClassId}
-                  className="font-bold flex items-center gap-1.5 shadow-sm bg-primary"
-                >
-                  Save Fee Configuration
-                </Button>
-              </div>
-            )}
-          </div>
+              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-zinc-200 text-zinc-600 border border-zinc-300">
+                LOCKED
+              </span>
+            </div>
+          ) : (
+            <div className="mt-6 flex justify-end">
+              <Button 
+                onClick={handleConfirmSaveConfig}
+                disabled={!selectedClassId}
+                className="font-bold flex items-center gap-1.5 shadow-sm bg-primary"
+              >
+                Save Fee Configuration
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
