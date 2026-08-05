@@ -70,6 +70,9 @@ function site_pages() {
         ['path' => '/',             'label' => 'Home',       'file' => 'index.php',      'priority' => '1.0', 'changefreq' => 'weekly'],
         ['path' => '/features',     'label' => 'Features',   'file' => 'features.php',   'priority' => '0.9', 'changefreq' => 'monthly'],
         ['path' => '/mobile-app',   'label' => 'Mobile App',  'file' => 'mobile-app.php', 'priority' => '0.8', 'changefreq' => 'monthly'],
+        ['path' => '/schools',      'label' => 'Explore Schools', 'file' => 'schools.php', 'priority' => '0.7', 'changefreq' => 'weekly'],
         ['path' => '/contact',      'label' => 'Book a Demo', 'file' => 'contact.php',    'priority' => '0.7', 'changefreq' => 'monthly'],
+        ['path' => '/privacy-policy', 'label' => 'Privacy Policy', 'file' => 'privacy-policy.php', 'priority' => '0.3', 'changefreq' => 'yearly'],
+        ['path' => '/terms',        'label' => 'Terms of Use', 'file' => 'terms.php',      'priority' => '0.3', 'changefreq' => 'yearly'],
     ];
 }

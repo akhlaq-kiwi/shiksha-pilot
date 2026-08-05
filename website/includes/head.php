@@ -74,7 +74,10 @@ window.dataLayer = window.dataLayer || [];
 <meta name="twitter:description" content="<?php echo htmlspecialchars($pageDescription, ENT_QUOTES); ?>">
 <meta name="twitter:image" content="<?php echo htmlspecialchars($ogImage, ENT_QUOTES); ?>">
 
-<link rel="icon" href="<?php echo ASSET_BASE; ?>/images/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="<?php echo ASSET_BASE; ?>/images/favicon.ico" sizes="any">
+<link rel="icon" href="<?php echo ASSET_BASE; ?>/images/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="<?php echo ASSET_BASE; ?>/images/favicon-512.png" sizes="512x512" type="image/png">
+<link rel="apple-touch-icon" href="<?php echo ASSET_BASE; ?>/images/favicon-180.png">
 <link rel="alternate icon" href="<?php echo ASSET_BASE; ?>/images/favicon.svg">
 
 <!--
@@ -105,7 +108,7 @@ $organizationSchema = [
     '@type' => 'Organization',
     'name' => SITE_NAME,
     'url' => SITE_URL,
-    'logo' => ASSET_BASE . '/images/favicon.svg',
+    'logo' => ASSET_BASE . '/images/logo.png',
     'description' => 'School management platform covering attendance, examinations, fee collection, timetables and leave requests for K-12 schools.',
 ];
 echo '<script type="application/ld+json">' . json_encode($organizationSchema, JSON_UNESCAPED_SLASHES) . '</script>' . "\n";

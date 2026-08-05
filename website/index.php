@@ -1,5 +1,8 @@
 <?php
 require_once __DIR__ . '/includes/config.php';
+require_once __DIR__ . '/includes/directory.php';
+
+$directoryTopStates = array_slice(get_directory_states(), 0, 6);
 
 $pageTitle       = 'School Management Software for K-12 Schools';
 $pageDescription = 'Shiksha Pilot is one connected platform for attendance, exams, fee collection, timetables and leave requests — built for schools from kindergarten to class 12.';
@@ -44,50 +47,154 @@ require_once __DIR__ . '/includes/header.php';
       <svg class="doodle" style="left:12%; top:78%; --r:-6deg; animation-delay:1.6s;" width="40" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2" fill="#fff" stroke="#26333f" stroke-width="1.6"/><path d="M8 8h8M8 12h8M8 16h5" stroke="#34b3e8" stroke-width="1.6" stroke-linecap="round"/></svg>
       <svg class="doodle" style="right:10%; top:10%; --r:8deg; animation-delay:0.4s;" width="34" viewBox="0 0 24 24"><path d="M4 20L18 6M18 6l-2-4 6 2z" fill="#ff6b4a" stroke="#26333f" stroke-width="1.6" stroke-linejoin="round"/></svg>
 
-      <svg class="mascot" viewBox="0 0 380 260" role="img" aria-label="Illustration of a teacher and two students holding books in front of a school building">
-        <ellipse cx="190" cy="240" rx="150" ry="10" fill="#26333f" opacity="0.10"/>
-        <g opacity="0.96">
-          <rect x="46" y="70" width="288" height="120" rx="6" fill="#ffe3b0" stroke="#26333f" stroke-width="3"/>
-          <path d="M36 78 L190 22 L344 78 Z" fill="#ff6b4a" stroke="#26333f" stroke-width="3" stroke-linejoin="round"/>
-          <rect x="176" y="4" width="6" height="22" fill="#26333f"/>
-          <path d="M182 6 L206 13 L182 20 Z" fill="#34b3e8" stroke="#26333f" stroke-width="1.6" stroke-linejoin="round"/>
-          <rect x="164" y="128" width="52" height="62" rx="3" fill="#c97b12" stroke="#26333f" stroke-width="3"/>
-          <circle cx="204" cy="160" r="3" fill="#26333f"/>
-          <rect x="70" y="96" width="34" height="34" rx="4" fill="#c4ecf8" stroke="#26333f" stroke-width="2.5"/>
-          <rect x="118" y="96" width="34" height="34" rx="4" fill="#c4ecf8" stroke="#26333f" stroke-width="2.5"/>
-          <rect x="228" y="96" width="34" height="34" rx="4" fill="#c4ecf8" stroke="#26333f" stroke-width="2.5"/>
-          <rect x="276" y="96" width="34" height="34" rx="4" fill="#c4ecf8" stroke="#26333f" stroke-width="2.5"/>
-          <path d="M70 113h34M87 96v34M228 113h34M245 96v34M118 113h34M135 96v34M276 113h34M293 96v34" stroke="#26333f" stroke-width="2"/>
+      <svg class="mascot" viewBox="0 0 380 340" role="img" aria-label="Illustration of a teacher holding a phone, connected digitally to two students, with the school building behind">
+        <defs>
+          <radialGradient id="gradSkin" cx="35%" cy="30%" r="75%">
+            <stop offset="0%" stop-color="#fff2df"/>
+            <stop offset="100%" stop-color="#ffdba6"/>
+          </radialGradient>
+          <radialGradient id="gradHair" cx="35%" cy="25%" r="80%">
+            <stop offset="0%" stop-color="#8adcf7"/>
+            <stop offset="100%" stop-color="#2ba3d6"/>
+          </radialGradient>
+          <radialGradient id="gradTop" cx="35%" cy="20%" r="85%">
+            <stop offset="0%" stop-color="#3f4c5c"/>
+            <stop offset="100%" stop-color="#1c232c"/>
+          </radialGradient>
+          <radialGradient id="gradTrouser" cx="35%" cy="20%" r="85%">
+            <stop offset="0%" stop-color="#333d4a"/>
+            <stop offset="100%" stop-color="#1c232c"/>
+          </radialGradient>
+          <radialGradient id="gradRoof" cx="32%" cy="20%" r="85%">
+            <stop offset="0%" stop-color="#ff9c7f"/>
+            <stop offset="100%" stop-color="#f0552f"/>
+          </radialGradient>
+          <radialGradient id="gradWall" cx="30%" cy="20%" r="90%">
+            <stop offset="0%" stop-color="#fff2d9"/>
+            <stop offset="100%" stop-color="#ffdfa2"/>
+          </radialGradient>
+          <radialGradient id="gradDoor" cx="35%" cy="20%" r="85%">
+            <stop offset="0%" stop-color="#dd955a"/>
+            <stop offset="100%" stop-color="#a8672f"/>
+          </radialGradient>
+          <radialGradient id="gradWindow" cx="35%" cy="25%" r="80%">
+            <stop offset="0%" stop-color="#e7f7ff"/>
+            <stop offset="100%" stop-color="#b7e5f7"/>
+          </radialGradient>
+          <radialGradient id="gradCoral" cx="35%" cy="20%" r="85%">
+            <stop offset="0%" stop-color="#ff9678"/>
+            <stop offset="100%" stop-color="#f0552f"/>
+          </radialGradient>
+          <radialGradient id="gradSky" cx="35%" cy="20%" r="85%">
+            <stop offset="0%" stop-color="#79cdf1"/>
+            <stop offset="100%" stop-color="#1f96c9"/>
+          </radialGradient>
+          <filter id="softDrop" x="-30%" y="-30%" width="160%" height="160%">
+            <feDropShadow dx="0" dy="5" stdDeviation="5" flood-color="#26333f" flood-opacity="0.22"/>
+          </filter>
+        </defs>
+
+        <ellipse cx="190" cy="322" rx="165" ry="10" fill="#26333f" opacity="0.10"/>
+
+        <!-- school building, behind -->
+        <g opacity="0.98" filter="url(#softDrop)">
+          <rect x="46" y="70" width="288" height="120" rx="14" fill="url(#gradWall)" stroke="#e3b877" stroke-width="1.4"/>
+          <path d="M36 78 L190 22 L344 78 Z" fill="url(#gradRoof)" stroke="#c8461f" stroke-width="1.4" stroke-linejoin="round"/>
+          <ellipse cx="130" cy="55" rx="30" ry="7" fill="#fff" opacity="0.25"/>
+          <rect x="176" y="4" width="6" height="22" rx="3" fill="#4a4038"/>
+          <path d="M182 6 L206 13 L182 20 Z" fill="url(#gradSky)" stroke="#1f96c9" stroke-width="1" stroke-linejoin="round"/>
+          <rect x="164" y="128" width="52" height="62" rx="10" fill="url(#gradDoor)" stroke="#8a5426" stroke-width="1.4"/>
+          <circle cx="202" cy="160" r="3" fill="#4a2f14"/>
+          <rect x="70" y="96" width="34" height="34" rx="10" fill="url(#gradWindow)" stroke="#8fc9e0" stroke-width="1.4"/>
+          <rect x="118" y="96" width="34" height="34" rx="10" fill="url(#gradWindow)" stroke="#8fc9e0" stroke-width="1.4"/>
+          <rect x="228" y="96" width="34" height="34" rx="10" fill="url(#gradWindow)" stroke="#8fc9e0" stroke-width="1.4"/>
+          <rect x="276" y="96" width="34" height="34" rx="10" fill="url(#gradWindow)" stroke="#8fc9e0" stroke-width="1.4"/>
+          <path d="M87 96v34M245 96v34M135 96v34M293 96v34" stroke="#8fc9e0" stroke-width="1.4"/>
         </g>
+
+        <!-- digital signal: teacher's phone "reaching" the students -->
         <g>
-          <rect x="164" y="178" width="52" height="66" rx="18" fill="#46ab78" stroke="#26333f" stroke-width="3"/>
-          <rect x="150" y="188" width="16" height="40" rx="8" fill="#46ab78" stroke="#26333f" stroke-width="3"/>
-          <rect x="214" y="188" width="16" height="40" rx="8" fill="#46ab78" stroke="#26333f" stroke-width="3"/>
-          <circle cx="190" cy="160" r="24" fill="#ffe0b0" stroke="#26333f" stroke-width="3"/>
-          <path d="M166 152a24 20 0 0 1 48 -3" fill="#26333f"/>
-          <circle cx="182" cy="160" r="2.6" fill="#26333f"/>
-          <circle cx="198" cy="160" r="2.6" fill="#26333f"/>
-          <path d="M181 169q9 6 18 0" stroke="#26333f" stroke-width="2.4" fill="none" stroke-linecap="round"/>
-          <rect x="176" y="206" width="28" height="20" rx="2" fill="#fff" stroke="#26333f" stroke-width="2.6"/>
-          <path d="M190 206v20" stroke="#26333f" stroke-width="1.6"/>
+          <path d="M186,196 a22,22 0 0 1 0,42" stroke="#34b3e8" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+          <path d="M198,183 a38,38 0 0 1 0,68" stroke="#34b3e8" stroke-width="3.2" fill="none" stroke-linecap="round" opacity="0.55"/>
+          <path d="M210,171 a54,54 0 0 1 0,92" stroke="#34b3e8" stroke-width="3.2" fill="none" stroke-linecap="round" opacity="0.3"/>
         </g>
-        <g>
-          <rect x="88" y="204" width="38" height="42" rx="14" fill="#ff6b4a" stroke="#26333f" stroke-width="3"/>
-          <circle cx="107" cy="186" r="17" fill="#ffe0b0" stroke="#26333f" stroke-width="3"/>
-          <path d="M91 180a17 15 0 0 1 34 -2" fill="#26333f"/>
-          <circle cx="101" cy="186" r="2" fill="#26333f"/>
-          <circle cx="113" cy="186" r="2" fill="#26333f"/>
-          <path d="M100 193q7 4 14 0" stroke="#26333f" stroke-width="2" fill="none" stroke-linecap="round"/>
-          <rect x="122" y="212" width="20" height="16" rx="2" fill="#fff" stroke="#26333f" stroke-width="2.2" transform="rotate(8 132 220)"/>
+
+        <!-- teacher, left, holding a phone -->
+        <g filter="url(#softDrop)">
+          <rect x="92" y="284" width="17" height="36" rx="8" fill="url(#gradTrouser)"/>
+          <rect x="118" y="284" width="17" height="36" rx="8" fill="url(#gradTrouser)"/>
+          <ellipse cx="100" cy="321" rx="12" ry="5" fill="#141a21"/>
+          <ellipse cx="127" cy="321" rx="12" ry="5" fill="#141a21"/>
+          <!-- top (rolled sleeve on the phone-holding arm) -->
+          <rect x="84" y="198" width="56" height="88" rx="24" fill="url(#gradTop)"/>
+          <rect x="70" y="208" width="16" height="56" rx="8" fill="url(#gradTop)"/>
+          <rect x="126" y="204" width="15" height="30" rx="7" fill="url(#gradTop)" transform="rotate(-32 133 204)"/>
+          <ellipse cx="98" cy="212" rx="16" ry="10" fill="#fff" opacity="0.12"/>
+          <!-- forearm (skin) reaching up to the phone -->
+          <rect x="132" y="196" width="14" height="30" rx="7" fill="url(#gradSkin)" stroke="#e3ac6a" stroke-width="1.2" transform="rotate(-18 139 210)"/>
+          <!-- neck + head -->
+          <rect x="103" y="188" width="18" height="16" fill="url(#gradSkin)"/>
+          <circle cx="112" cy="167" r="27" fill="url(#gradSkin)" stroke="#e3ac6a" stroke-width="1.2"/>
+          <ellipse cx="101" cy="158" rx="9" ry="6" fill="#fff" opacity="0.35"/>
+          <!-- flowing hair: a symmetric top + two mirrored side locks, kept as
+               separate simple shapes rather than one freeform path so the
+               left/right symmetry is guaranteed by the mirrored coordinates,
+               not by hand-eyeballed curve control points. -->
+          <path d="M84,163 a28,25 0 1 1 56,0" fill="url(#gradHair)" stroke="#1f7ea6" stroke-width="1.2"/>
+          <path d="M84,158 C76,175 77,200 88,213 C90,196 89,175 96,162 Z" fill="url(#gradHair)" stroke="#1f7ea6" stroke-width="1.2" stroke-linejoin="round"/>
+          <path d="M140,158 C148,175 147,200 136,213 C134,196 135,175 128,162 Z" fill="url(#gradHair)" stroke="#1f7ea6" stroke-width="1.2" stroke-linejoin="round"/>
+          <ellipse cx="100" cy="146" rx="12" ry="6" fill="#fff" opacity="0.3"/>
+          <!-- face -->
+          <path d="M100,159 q4,-3 8,0" stroke="#3a2b1a" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <path d="M116,159 q4,-3 8,0" stroke="#3a2b1a" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <circle cx="103" cy="167" r="2.4" fill="#26333f"/>
+          <circle cx="121" cy="167" r="2.4" fill="#26333f"/>
+          <path d="M111,169 q1,4 4,4" stroke="#d69a5c" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+          <path d="M101,178 q11,7 22,0" stroke="#a8532f" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+          <circle cx="95" cy="174" r="1" fill="#e2946a" opacity="0.7"/>
+          <circle cx="98" cy="177" r="1" fill="#e2946a" opacity="0.7"/>
+          <circle cx="128" cy="174" r="1" fill="#e2946a" opacity="0.7"/>
+          <circle cx="125" cy="177" r="1" fill="#e2946a" opacity="0.7"/>
+          <!-- phone, held near chest -->
+          <rect x="140" y="192" width="26" height="44" rx="6" fill="#fbfdff" stroke="#c9d2da" stroke-width="1.4"/>
+          <circle cx="147" cy="199" r="2.2" fill="#46ab78"/>
+          <path d="M146,209h14M146,217h14M146,225h9" stroke="#34b3e8" stroke-width="2" stroke-linecap="round"/>
         </g>
-        <g>
-          <rect x="252" y="206" width="36" height="40" rx="14" fill="#34b3e8" stroke="#26333f" stroke-width="3"/>
-          <circle cx="270" cy="188" r="16" fill="#ffe0b0" stroke="#26333f" stroke-width="3"/>
-          <path d="M255 182a16 14 0 0 1 32 -2" fill="#26333f"/>
-          <circle cx="264" cy="188" r="1.9" fill="#26333f"/>
-          <circle cx="276" cy="188" r="1.9" fill="#26333f"/>
-          <path d="M263 195q7 4 13 0" stroke="#26333f" stroke-width="2" fill="none" stroke-linecap="round"/>
-          <rect x="228" y="212" width="19" height="15" rx="2" fill="#fff" stroke="#26333f" stroke-width="2.2" transform="rotate(-10 237 219)"/>
+
+        <!-- student, right (closer), holding a small tablet -->
+        <g filter="url(#softDrop)">
+          <rect x="254" y="294" width="15" height="32" rx="7" fill="url(#gradTrouser)"/>
+          <rect x="278" y="294" width="15" height="32" rx="7" fill="url(#gradTrouser)"/>
+          <ellipse cx="261" cy="327" rx="10" ry="4.5" fill="#141a21"/>
+          <ellipse cx="285" cy="327" rx="10" ry="4.5" fill="#141a21"/>
+          <rect x="246" y="222" width="52" height="72" rx="22" fill="url(#gradCoral)"/>
+          <rect x="232" y="230" width="15" height="46" rx="7" fill="url(#gradCoral)"/>
+          <rect x="290" y="222" width="15" height="42" rx="7" fill="url(#gradCoral)" transform="rotate(24 297 222)"/>
+          <ellipse cx="260" cy="234" rx="14" ry="8" fill="#fff" opacity="0.14"/>
+          <circle cx="272" cy="196" r="23" fill="url(#gradSkin)" stroke="#e3ac6a" stroke-width="1.2"/>
+          <ellipse cx="264" cy="188" rx="8" ry="5" fill="#fff" opacity="0.35"/>
+          <path d="M247,188 a23,19 0 0 1 46,-3" fill="#4a3826"/>
+          <circle cx="264" cy="196" r="2.3" fill="#26333f"/>
+          <circle cx="280" cy="196" r="2.3" fill="#26333f"/>
+          <path d="M263,204 q9,5 18,0" stroke="#a8532f" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+          <rect x="299" y="202" width="23" height="31" rx="5" fill="#fbfdff" stroke="#c9d2da" stroke-width="1.4"/>
+          <path d="M304,212h13M304,220h13" stroke="#9a6fe0" stroke-width="1.8" stroke-linecap="round"/>
+        </g>
+
+        <!-- student, right (further back, smaller) -->
+        <g filter="url(#softDrop)">
+          <rect x="312" y="290" width="13" height="28" rx="6" fill="url(#gradTrouser)"/>
+          <rect x="332" y="290" width="13" height="28" rx="6" fill="url(#gradTrouser)"/>
+          <rect x="308" y="228" width="44" height="62" rx="18" fill="url(#gradSky)"/>
+          <rect x="296" y="234" width="13" height="40" rx="6" fill="url(#gradSky)"/>
+          <rect x="350" y="234" width="13" height="40" rx="6" fill="url(#gradSky)"/>
+          <ellipse cx="317" cy="238" rx="11" ry="6" fill="#fff" opacity="0.14"/>
+          <circle cx="330" cy="206" r="19" fill="url(#gradSkin)" stroke="#e3ac6a" stroke-width="1.2"/>
+          <ellipse cx="323" cy="200" rx="6" ry="4" fill="#fff" opacity="0.35"/>
+          <path d="M311,199 a19,16 0 0 1 38,-2" fill="#4a3826"/>
+          <circle cx="324" cy="206" r="1.9" fill="#26333f"/>
+          <circle cx="337" cy="206" r="1.9" fill="#26333f"/>
+          <path d="M322,213 q8,4 15,0" stroke="#a8532f" stroke-width="2" fill="none" stroke-linecap="round"/>
         </g>
       </svg>
     </div>
@@ -251,6 +358,26 @@ require_once __DIR__ . '/includes/header.php';
         </div>
       </div>
       <div class="phone-bubble" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3l9 5-9 5-9-5 9-5z" stroke="#fff" stroke-width="1.8"/></svg></div>
+    </div>
+  </div>
+</section>
+
+<section id="explore-schools">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="tag">not a customer yet?</span>
+      <h2>Browse CBSE schools across India, state by state.</h2>
+      <p>A free directory of CBSE-affiliated schools by state and city — handy if you're a parent looking for a school, or a school looking to see how Shiksha Pilot could help run yours.</p>
+    </div>
+    <div class="district-list">
+      <?php foreach ($directoryTopStates as $s): ?>
+        <a class="district-chip" href="<?php echo PAGE_BASE; ?>/schools-in-<?php echo htmlspecialchars($s['state_slug'], ENT_QUOTES); ?>">
+          <?php echo htmlspecialchars(directory_display_name($s['state']), ENT_QUOTES); ?>
+        </a>
+      <?php endforeach; ?>
+    </div>
+    <div class="hero-ctas" style="margin-top:28px;">
+      <a class="btn btn-coral" href="<?php echo PAGE_BASE; ?>/schools">Explore all schools &rarr;</a>
     </div>
   </div>
 </section>

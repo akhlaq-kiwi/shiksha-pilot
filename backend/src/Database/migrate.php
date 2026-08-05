@@ -141,6 +141,10 @@ try {
     require_once __DIR__ . '/vocabulary_seeder.php';
     seedVocabulary($pdo);
 
+    // Run School Directory Seeder
+    require_once __DIR__ . '/school_directory_seeder.php';
+    seedSchoolDirectory($pdo);
+
 } catch (Exception $e) {
     echo "\nMigration failed: " . $e->getMessage() . "\n";
     exit(1);
