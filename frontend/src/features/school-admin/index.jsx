@@ -56,52 +56,23 @@ import AppSidebar from '../../common/components/AppSidebar';
  * label changes, or renaming a menu item would silently revoke a teacher's
  * access to that page.
  */
-const NAV_GROUPS = [
-  {
-    label: 'Overview',
-    items: [
-      { path: '/school-admin', label: 'Dashboard', permissionKey: 'Dashboard', icon: LayoutDashboard, exact: true },
-    ],
-  },
-  {
-    label: 'Academics',
-    items: [
-      { path: '/school-admin/classes',    label: 'Classes',      permissionKey: 'Classes',      icon: Users },
-      { path: '/school-admin/timetable',  label: 'Timetable',    permissionKey: 'Timetable',    icon: Clock },
-      { path: '/school-admin/attendance', label: 'Attendance',   permissionKey: 'Attendance',   icon: ClipboardCheck },
-      { path: '/school-admin/exams',      label: 'Examinations', permissionKey: 'Examinations', icon: FileText },
-    ],
-  },
-  {
-    label: 'People',
-    items: [
-      { path: '/school-admin/staff',          label: 'Teachers',      permissionKey: 'Teachers',      icon: UserCog },
-      { path: '/school-admin/leave-requests', label: 'Leave requests', permissionKey: 'Manage Leaves', icon: FileText },
-      { path: '/school-admin/achievements',   label: 'Achievements',  permissionKey: 'Achievements',  icon: Trophy },
-    ],
-  },
-  {
-    label: 'Finance',
-    items: [
-      // Renamed for distinguishability; permissionKey preserves the stored value.
-      { path: '/school-admin/finance',            label: 'Fee collection',   permissionKey: 'Fees Portal',        icon: DollarSign },
-      { path: '/school-admin/fee-follow-ups',     label: 'Fee follow-up',    permissionKey: 'Fee Follow-up',      icon: PhoneCall },
-      { path: '/school-admin/financial-reports',  label: 'Reports',          permissionKey: 'Financial Reports',  icon: FileText },
-      { path: '/school-admin/finance-management', label: 'Accounts & payroll', permissionKey: 'Finance Management', icon: Landmark },
-    ],
-  },
-  {
-    label: 'School',
-    items: [
-      { path: '/school-admin/announcements',   label: 'Announcements',    permissionKey: 'Announcements',     icon: Megaphone },
-      { path: '/school-admin/audits-settings', label: 'Settings',         permissionKey: 'Audits & Settings', icon: Settings },
-      { path: '/school-admin/security',        label: 'Security',         permissionKey: 'Security',          icon: Shield },
-    ],
-  },
+const NAV_ITEMS = [
+  { path: '/school-admin',                    label: 'Dashboard',         permissionKey: 'Dashboard',          icon: LayoutDashboard, exact: true },
+  { path: '/school-admin/staff',              label: 'Teachers',          permissionKey: 'Teachers',           icon: UserCog },
+  { path: '/school-admin/classes',            label: 'Classes',           permissionKey: 'Classes',            icon: Users },
+  { path: '/school-admin/finance',            label: 'Fee collection',    permissionKey: 'Fees Portal',        icon: DollarSign },
+  { path: '/school-admin/financial-reports',  label: 'Financial report',  permissionKey: 'Financial Reports',  icon: FileText },
+  { path: '/school-admin/finance-management', label: 'Accounts & payroll', permissionKey: 'Finance Management', icon: Landmark },
+  { path: '/school-admin/fee-follow-ups',     label: 'Fee follow-up',     permissionKey: 'Fee Follow-up',      icon: PhoneCall },
+  { path: '/school-admin/timetable',          label: 'Timetable',         permissionKey: 'Timetable',          icon: Clock },
+  { path: '/school-admin/attendance',         label: 'Attendance',        permissionKey: 'Attendance',         icon: ClipboardCheck },
+  { path: '/school-admin/announcements',       label: 'Announcements',     permissionKey: 'Announcements',      icon: Megaphone },
+  { path: '/school-admin/leave-requests',     label: 'Leave requests',    permissionKey: 'Manage Leaves',      icon: FileText },
+  { path: '/school-admin/exams',              label: 'Examinations',      permissionKey: 'Examinations',       icon: FileText },
+  { path: '/school-admin/achievements',       label: 'Achievements',     permissionKey: 'Achievements',       icon: Trophy },
+  { path: '/school-admin/audits-settings',     label: 'Settings',          permissionKey: 'Audits & Settings',  icon: Settings },
+  { path: '/school-admin/security',            label: 'Security',          permissionKey: 'Security',           icon: Shield },
 ];
-
-/** Flat list retained for route guards and redirects. */
-const NAV_ITEMS = NAV_GROUPS.flatMap((g) => g.items);
 
 // Onboarding content screen when no active academic year is present
 function OnboardingScreen() {
@@ -371,11 +342,6 @@ export default function SchoolAdminPortal() {
 
   const visibleNavItems = NAV_ITEMS.filter(isPermitted);
 
-  /** Grouped nav with empty groups dropped, for the sidebar. */
-  const visibleNavGroups = NAV_GROUPS
-    .map((group) => ({ ...group, items: group.items.filter(isPermitted) }))
-    .filter((group) => group.items.length > 0);
-
   // URL route guard access logic
   const currentItem = NAV_ITEMS.find(item => {
     if (item.exact) return location.pathname === item.path;
@@ -586,7 +552,7 @@ export default function SchoolAdminPortal() {
 
       {/* Sidebar — shared across portals; groups on desktop, drawer on mobile */}
       <AppSidebar
-        groups={visibleNavGroups}
+        items={visibleNavItems}
         isActive={(item) => isActive(item.path, item.exact)}
         onNavigate={(path) => nav(path)}
         title={role === 'TEACHER' ? 'Teacher menu' : 'School admin menu'}

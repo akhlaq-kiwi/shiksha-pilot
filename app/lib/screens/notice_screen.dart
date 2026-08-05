@@ -146,10 +146,17 @@ class _NoticeScreenState extends State<NoticeScreen> {
     try {
       final date = DateTime.parse(dateStr);
       final months = [
-        'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
       ];
-      return '${date.day} ${months[date.month - 1]} ${date.year}';
+      int hour = date.hour;
+      final minute = date.minute.toString().padLeft(2, '0');
+      final ampm = hour >= 12 ? 'PM' : 'AM';
+      hour = hour % 12;
+      if (hour == 0) hour = 12;
+      final hourStr = hour.toString().padLeft(2, '0');
+
+      return '${date.day.toString().padLeft(2, '0')} ${months[date.month - 1]} ${date.year}, $hourStr:$minute $ampm';
     } catch (e) {
       return dateStr;
     }

@@ -303,24 +303,24 @@ class SchoolAdminController extends BaseController
         return $this->success($response, $result, 'Holiday created successfully');
     }
 
-    public function updateHoliday(Request $request, Response $response): Response
+    public function updateHoliday(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
         $this->requireRole($user, ['SCHOOL_ADMIN']);
 
-        $id = (int)$request->getAttribute('id');
+        $id = (int)($args['id'] ?? 0);
         $body = RequestParser::body($request);
         $result = $this->service->updateHoliday($user, $id, $body);
 
         return $this->success($response, $result, 'Holiday updated successfully');
     }
 
-    public function deleteHoliday(Request $request, Response $response): Response
+    public function deleteHoliday(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
         $this->requireRole($user, ['SCHOOL_ADMIN']);
 
-        $id = (int)$request->getAttribute('id');
+        $id = (int)($args['id'] ?? 0);
         $result = $this->service->deleteHoliday($user, $id);
 
         return $this->success($response, $result, 'Holiday deleted successfully');
@@ -1136,7 +1136,10 @@ class SchoolAdminController extends BaseController
         $this->requireRole($user, ['SCHOOL_ADMIN']);
 
         $body   = RequestParser::body($request);
-        $result = $this->service->deleteClass($user, $body);
+        $query  = RequestParser::query($request);
+        $data   = array_merge($query, $body);
+
+        $result = $this->service->deleteClass($user, $data);
 
         return $this->success($response, $result, 'Class deleted');
     }
@@ -1785,18 +1788,25 @@ class SchoolAdminController extends BaseController
     public function getNotifications(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
-        $data = $this->service->getNotifications($user);
+        $queryParams = $request->getQueryParams();
+        $data = $this->service->getNotifications($user, $queryParams);
         return $this->success($response, $data);
     }
 
     public function markNotificationRead(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
         $id = (int)$args['id'];
         $data = $this->service->markNotificationRead($user, $id);
         return $this->success($response, $data, 'Notification marked as read');
+    }
+
+    public function deleteNotification(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $id = (int)$args['id'];
+        $data = $this->service->deleteNotification($user, $id);
+        return $this->success($response, $data, 'Notification deleted successfully');
     }
 
     public function getCredentials(Request $request, Response $response, array $args): Response

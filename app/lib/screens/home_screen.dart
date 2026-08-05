@@ -22,6 +22,7 @@ import 'package:school_hub/main.dart';
 import 'package:school_hub/services/exam_service.dart';
 import 'package:school_hub/screens/exam_list_screen.dart';
 import 'package:school_hub/screens/achievements_screen.dart';
+import 'package:school_hub/widgets/change_password_dialog.dart';
 
 class LauncherFeature {
   final String name;
@@ -305,7 +306,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _syncProfileDetails(String token) async {
     try {
-      final authService = AuthService(baseUrl: 'http://10.55.253.71:8000');
+      final authService = AuthService(baseUrl: widget.leaveService.baseUrl);
       final profile = await authService.fetchProfile(token);
       
       final latestPhoto = (profile['photo_path'] as String?) ?? (profile['staff_photo_path'] as String?) ?? '';
@@ -458,7 +459,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               final titleLower = title.toString().toLowerCase();
               final msgLower = message.toString().toLowerCase();
 
-              if (titleLower.contains('leave') || msgLower.contains('leave')) {
+              final isLeaveApprovalOrReqNotif = titleLower.contains('approve') || titleLower.contains('reject') || msgLower.contains('approve') || msgLower.contains('reject') || titleLower.contains('request') || msgLower.contains('request');
+              final isHolidayNotif = titleLower.contains('holiday') || msgLower.contains('holiday');
+              if (titleLower.contains('leave') || msgLower.contains('leave') || isHolidayNotif) {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -466,6 +469,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       leaveService: widget.leaveService,
                       userRole: widget.userRole,
                       selectedStudentId: _activeStudentId,
+                      initialTabIndex: isLeaveApprovalOrReqNotif ? 1 : 0,
                     ),
                   ),
                 ).then((_) => _loadSessionInfo());
@@ -632,166 +636,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   void _showChangePasswordDialog() {
-    final _formKey = GlobalKey<FormState>();
-    final _currentPasswordController = TextEditingController();
-    final _newPasswordController = TextEditingController();
-    final _confirmPasswordController = TextEditingController();
-    bool _isUpdating = false;
-    String _errorText = '';
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: const Text(
-                'Change Password',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-              ),
-              content: Form(
-                key: _formKey,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      TextFormField(
-                        controller: _currentPasswordController,
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Current Password',
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Current password is required';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _newPasswordController,
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                          labelText: 'New Password',
-                          hintText: 'Min 6 chars, 1 uppercase, 1 digit',
-                          hintStyle: TextStyle(fontSize: 11),
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'New password is required';
-                          }
-                          if (value.length < 6) {
-                            return 'At least 6 characters required';
-                          }
-                          bool hasUppercase = value.contains(RegExp(r'[A-Z]'));
-                          bool hasDigits = value.contains(RegExp(r'[0-9]'));
-                          bool hasAlpha = value.contains(RegExp(r'[a-zA-Z]'));
-                          if (!hasUppercase || !hasDigits || !hasAlpha) {
-                            return 'Must contain 1 uppercase, 1 digit & 1 letter';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _confirmPasswordController,
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Confirm Password',
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Confirm password is required';
-                          }
-                          if (value != _newPasswordController.text) {
-                            return 'Passwords do not match';
-                          }
-                          return null;
-                        },
-                      ),
-                      if (_errorText.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          _errorText,
-                          style: const TextStyle(color: Colors.red, fontSize: 12),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: _isUpdating ? null : () => Navigator.pop(context),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: _isUpdating
-                      ? null
-                      : () async {
-                          if (_formKey.currentState!.validate()) {
-                            setDialogState(() {
-                              _isUpdating = true;
-                              _errorText = '';
-                            });
-
-                            try {
-                              final prefs = await SharedPreferences.getInstance();
-                              final token = prefs.getString('auth_token') ?? '';
-                              final authService = AuthService(baseUrl: 'http://10.55.253.71:8000');
-                              await authService.changePassword(
-                                token,
-                                _currentPasswordController.text,
-                                _newPasswordController.text,
-                              );
-
-                              if (context.mounted) {
-                                Navigator.pop(context);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Password updated successfully!'),
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
-                              }
-                            } catch (e) {
-                              setDialogState(() {
-                                _isUpdating = false;
-                                _errorText = e.toString().replaceAll('Exception:', '').trim();
-                              });
-                            }
-                          }
-                        },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.indigo,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: _isUpdating
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text('Update'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
+    ChangePasswordDialog.show(context, baseUrl: widget.leaveService.baseUrl);
   }
 
   void _showProfilePopup() {
@@ -815,7 +660,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
         Widget avatarChild;
         if (photoUrl.isNotEmpty) {
-          final fullUrl = photoUrl.startsWith('http') ? photoUrl : 'http://10.55.253.71:8000' + photoUrl;
+          final fullUrl = photoUrl.startsWith('http') ? photoUrl : '${widget.leaveService.baseUrl}$photoUrl';
           avatarChild = ClipOval(
             child: Image.network(
               fullUrl,
@@ -1001,6 +846,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               leaveService: widget.leaveService,
               userRole: widget.userRole,
               selectedStudentId: _activeStudentId,
+              initialTabIndex: 0, // Always open Official Holidays on normal icon click
             ),
           ),
         ).then((_) => _loadSessionInfo()); // reload details in case anything changed
@@ -1041,13 +887,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
         ).then((_) => _fetchUnreadNotificationsCount());
-      } else if (feature.name == 'Salary') {
+      } else if (feature.name == 'Salary' || feature.name == 'Staff Salary' || feature.name == 'Salaries') {
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('auth_token') ?? widget.leaveService.token;
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => SalaryCardScreen(
               baseUrl: widget.leaveService.baseUrl,
-              token: widget.leaveService.token,
+              token: token,
             ),
           ),
         );
@@ -1181,7 +1029,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         }
 
                         if (photoUrl.isNotEmpty) {
-                          final fullUrl = photoUrl.startsWith('http') ? photoUrl : 'http://10.55.253.71:8000' + photoUrl;
+                          final fullUrl = photoUrl.startsWith('http') ? photoUrl : '${widget.leaveService.baseUrl}$photoUrl';
                           Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -1211,7 +1059,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                               }
 
                               if (photoUrl.isNotEmpty) {
-                                final fullUrl = photoUrl.startsWith('http') ? photoUrl : 'http://10.55.253.71:8000' + photoUrl;
+                                final fullUrl = photoUrl.startsWith('http') ? photoUrl : '${widget.leaveService.baseUrl}$photoUrl';
                                 return ClipOval(
                                   child: Image.network(
                                     fullUrl,

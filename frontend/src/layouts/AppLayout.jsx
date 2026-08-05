@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GraduationCap, Sun, Moon, Bell, LogOut } from 'lucide-react';
+import logoImg from '../assets/logo.png';
 import { useTheme } from '../theme/ThemeContext';
 import { authService } from '../common/services/authService';
 import { Button } from '../common/ui/button';
@@ -28,9 +29,12 @@ const ROLE_LABELS = {
   PARENT: 'Parent',
 };
 
+import { useConfirm } from '../common/components/ConfirmDialog';
+
 const AppLayout = ({ children }) => {
   const { theme, resolvedTheme, toggleTheme, applySchoolTheme } = useTheme();
   const navigate = useNavigate();
+  const confirm = useConfirm();
 
   const user = authService.getCurrentUser();
   const role = authService.getUserRole();
@@ -182,8 +186,8 @@ const AppLayout = ({ children }) => {
                 schoolProfile ? (
                   <div className="flex items-center gap-3 min-w-0">
                     <span 
-                      className="text-sm font-bold text-text-primary font-display tracking-tight leading-none truncate uppercase"
-                      style={{ fontWeight: 700 }}
+                      className="text-sm font-black text-text-primary font-display tracking-tight leading-none truncate uppercase"
+                      style={{ fontWeight: 900 }}
                     >
                       {schoolProfile.name}
                     </span>
@@ -195,16 +199,17 @@ const AppLayout = ({ children }) => {
                           <select
                             id="academic-year-switcher"
                             value={currentYear.id}
-                            onChange={(e) => {
+                            onChange={async (e) => {
                               const nextId = e.target.value;
                               const next = academicYears.find((y) => String(y.id) === String(nextId));
                               const leavingActive = currentYear.status === 'ACTIVE' && next?.status !== 'ACTIVE';
                               if (leavingActive) {
-                                const ok = window.confirm(
-                                  `Switch from the active year to ${next?.name}?\n\n` +
-                                  'All dashboards, fees, attendance and exam figures will show ' +
-                                  `${next?.name} data until you switch back.`
-                                );
+                                const ok = await confirm({
+                                  title: `Switch from active year to ${next?.name}?`,
+                                  message: `All dashboards, fees, attendance and exam figures will show ${next?.name} data until you switch back.`,
+                                  confirmLabel: 'Switch Year',
+                                  danger: false,
+                                });
                                 if (!ok) return;
                               }
                               selectYear(nextId);
@@ -227,10 +232,10 @@ const AppLayout = ({ children }) => {
                 )
               ) : (
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="flex items-center justify-center w-8 h-8 rounded-md bg-zinc-900 dark:bg-zinc-50 flex-shrink-0">
-                    <GraduationCap className="w-4 h-4 text-zinc-50 dark:text-zinc-900" />
+                  <div className="flex items-center justify-center h-[36px] w-auto flex-shrink-0">
+                    <img src={logoImg} alt="Shiksha Pilot Logo" className="h-[36px] w-auto object-contain" />
                   </div>
-                  <span className="text-sm font-bold text-text-primary font-display tracking-tight leading-none">
+                  <span className="text-sm font-black text-text-primary font-display tracking-tight leading-none" style={{ fontWeight: 900 }}>
                     Shiksha Pilot
                   </span>
                 </div>
@@ -427,15 +432,6 @@ const AppLayout = ({ children }) => {
       <main id="main-content" className="flex-1 w-full flex flex-col md:flex-row">
         {children}
       </main>
-
-      {/* Footer */}
-      <footer className="border-t border-border bg-surface py-4 no-print">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
-          <p className="text-[11px] text-text-muted text-center">
-            &copy; 2026 Shiksha Pilot. Cloud-Native School Management Platform.
-          </p>
-        </div>
-      </footer>
 
       <Dialog
         isOpen={showLogoutConfirm}

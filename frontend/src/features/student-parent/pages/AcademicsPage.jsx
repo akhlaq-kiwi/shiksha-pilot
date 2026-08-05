@@ -259,7 +259,6 @@ export default function AcademicsPage({ timetable, subjects, results }) {
                   <thead>
                     <tr className="bg-zinc-100 border-b border-zinc-400">
                       <th className="p-2 border-r border-zinc-400 font-bold uppercase">Subject</th>
-                      <th className="p-2 border-r border-zinc-400 font-bold uppercase text-center w-24">Paper Type</th>
                       <th className="p-2 border-r border-zinc-400 font-bold uppercase text-center w-24">Max Marks</th>
                       <th className="p-2 border-r border-zinc-400 font-bold uppercase text-center w-24">Passing</th>
                       <th className="p-2 border-r border-zinc-400 font-bold uppercase text-center w-28">Obtained Marks</th>
@@ -271,7 +270,6 @@ export default function AcademicsPage({ timetable, subjects, results }) {
                     {selectedCard.subjects.map((s, idx) => (
                       <tr key={idx} className="border-b border-zinc-300">
                         <td className="p-2 border-r border-zinc-400 font-semibold">{s.subject_name}</td>
-                        <td className="p-2 border-r border-zinc-400 text-center font-semibold">{s.paper_type || 'Written'}</td>
                         <td className="p-2 border-r border-zinc-400 text-center font-mono">{s.max_marks}</td>
                         <td className="p-2 border-r border-zinc-400 text-center font-mono">{s.passing_marks}</td>
                         <td className="p-2 border-r border-zinc-400 text-center font-mono font-bold">{s.marks_obtained}</td>

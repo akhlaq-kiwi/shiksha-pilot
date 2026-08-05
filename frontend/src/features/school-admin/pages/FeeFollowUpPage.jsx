@@ -128,7 +128,8 @@ export default function FeeFollowUpPage() {
     const errors = {};
     if (!extendForm.promised_date) errors.promised_date = 'New promised date is required';
     
-    const today = new Date().toISOString().split('T')[0];
+    const dToday = new Date();
+    const today = `${dToday.getFullYear()}-${String(dToday.getMonth() + 1).padStart(2, '0')}-${String(dToday.getDate()).padStart(2, '0')}`;
     if (extendForm.promised_date && extendForm.promised_date <= today) {
       errors.promised_date = 'Date must be in the future';
     }
@@ -282,7 +283,8 @@ export default function FeeFollowUpPage() {
       errors.pending_amount = 'Pending Amount cannot be negative';
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    const dToday2 = new Date();
+    const today = `${dToday2.getFullYear()}-${String(dToday2.getMonth() + 1).padStart(2, '0')}-${String(dToday2.getDate()).padStart(2, '0')}`;
     if (form.promised_date && form.promised_date <= today) {
       errors.promised_date = 'Date must be in the future';
     }
@@ -401,7 +403,7 @@ export default function FeeFollowUpPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto px-4 py-6">
+    <div className="space-y-6 max-w-7xl mx-auto px-4 py-6 min-h-[calc(100vh-140px)] flex flex-col animate-in fade-in duration-200">
       
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-4">
@@ -498,10 +500,10 @@ export default function FeeFollowUpPage() {
       </Card>
 
       {/* Main Listing Grid */}
-      <Card className="shadow-2xs border border-border bg-surface overflow-hidden">
-        <CardContent className="p-0">
+      <Card className="shadow-2xs border border-border bg-surface flex-1 min-h-[480px] overflow-visible flex flex-col">
+        <CardContent className="p-0 flex-1 flex flex-col overflow-visible">
           
-          <div id="followup-report-area" className="overflow-x-auto w-full bg-surface p-4">
+          <div id="followup-report-area" className="overflow-x-auto w-full bg-surface p-4 flex-1 flex flex-col min-h-[420px]">
             <div className="hidden pdf-only flex justify-between items-center border-b border-border pb-4 mb-4">
               <div>
                 <h1 className="text-lg font-bold text-black">Fee Follow-ups Report</h1>
