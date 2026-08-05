@@ -290,8 +290,10 @@ export default function StaffPage() {
   const [success, setSuccess] = useState('');
   const [formErrors, setFormErrors] = useState({});
 
-  const loadStaff = async () => {
-    setLoading(true);
+  const loadStaff = async (showLoading = false) => {
+    if (showLoading || staff.length === 0) {
+      setLoading(true);
+    }
     setError('');
     try {
       const data = await schoolService.getStaff({ date: getLocalDateStr() });
@@ -320,7 +322,7 @@ export default function StaffPage() {
   const { isReadOnly } = useAcademicYear();
 
   useEffect(() => {
-    loadStaff();
+    loadStaff(true);
     const fetchTimetableSettings = async () => {
       try {
         const settings = await schoolAdminService.getTimetableSettings();
@@ -354,7 +356,7 @@ export default function StaffPage() {
     fetchYears();
 
     const handleYearSwitch = () => {
-      loadStaff();
+      loadStaff(true);
       if (selectedTeacherId && view === 'details') {
         loadTeacherDetails(selectedTeacherId);
       }
@@ -363,7 +365,7 @@ export default function StaffPage() {
     return () => {
       window.removeEventListener('academic-year-switched', handleYearSwitch);
     };
-  }, [selectedTeacherId, view]);
+  }, []);
 
   useEffect(() => {
     if (selectedTeacherId && view === 'details') {
@@ -1551,7 +1553,7 @@ export default function StaffPage() {
           <Button variant="secondary" onClick={() => setIsAddStaffOpen(false)}>Cancel</Button>
           <Button onClick={handleAddStaff} disabled={submitting}>{submitting ? 'Saving...' : (newStaff.id ? 'Save Changes' : 'Add Teacher')}</Button>
         </>}>
-        <div className="max-h-[70vh] overflow-y-auto pr-2 space-y-6 pt-2">
+        <div className="space-y-6 pt-2">
           
           {/* SECTION 1 — Teacher Photo upload only (no section heading) */}
           <div className="space-y-2 border-b border-border pb-4">
