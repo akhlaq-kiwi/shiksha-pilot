@@ -51,7 +51,7 @@ async function request(endpoint, options = {}) {
 
   // Handle PDF/blob/excel exports
   const contentType = response.headers.get('content-type');
-  if (contentType && (contentType.includes('application/pdf') || contentType.includes('application/vnd.ms-excel') || contentType.includes('application/octet-stream'))) {
+  if (contentType && (contentType.includes('application/pdf') || contentType.includes('application/vnd.ms-excel') || contentType.includes('application/vnd.openxmlformats') || contentType.includes('spreadsheetml') || contentType.includes('application/octet-stream') || contentType.includes('excel'))) {
     return response.blob();
   }
 

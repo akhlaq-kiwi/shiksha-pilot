@@ -8826,6 +8826,9 @@ Only approve the settlement after reviewing all financial records.
         $addPayments = $stmtAddFeeList->fetchAll(PDO::FETCH_ASSOC);
 
         // Format previous year dues descriptions
+        $stmtActiveAY = $pdo->prepare("SELECT id, name FROM academic_years WHERE school_id = :sid AND is_current = 1 LIMIT 1");
+        $stmtActiveAY->execute([':sid' => $schoolId]);
+        $workingYear = $stmtActiveAY->fetch(PDO::FETCH_ASSOC);
         $workingYearId = $workingYear ? (int)$workingYear['id'] : 0;
         $stmtAYNames = $pdo->prepare("SELECT id, name FROM academic_years WHERE school_id = :sid");
         $stmtAYNames->execute([':sid' => $schoolId]);
