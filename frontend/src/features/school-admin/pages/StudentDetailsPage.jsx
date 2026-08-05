@@ -9,6 +9,7 @@ import { apiClient } from '../../../common/services/apiClient';
 import html2pdf from 'html2pdf.js';
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 import { FeeReceiptModal } from '../components/FeeReceiptModal';
+import { formatCurrency } from '../../../common/utils/format';
 import { 
   User, BookOpen, Users, Home, Calendar, FileText, 
   Download, Printer, AlertCircle, Eye, ChevronDown, ChevronUp, X, ShieldAlert, Phone 
@@ -402,8 +403,8 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
   const [followUpLoading, setFollowUpLoading] = useState(false);
   const [activeLedgerTab, setActiveLedgerTab] = useState('monthly'); // 'monthly' | 'additional'
   
-  // Accordion toggle for Documents (closed by default)
-  const [docsOpen, setDocsOpen] = useState(false);
+  // Accordion toggle for Documents (open by default)
+  const [docsOpen, setDocsOpen] = useState(true);
 
   // Modal view triggers
   const [viewingDoc, setViewingDoc] = useState(null); // { name, path }

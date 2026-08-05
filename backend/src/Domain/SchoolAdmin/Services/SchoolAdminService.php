@@ -2628,7 +2628,8 @@ class SchoolAdminService extends BaseService
             }
 
             if ($conflict) {
-                $errMsg = "Number already registered in other school. Inactive first";
+                $schoolName = $conflict['school_name'] ?? 'another school';
+                $errMsg = "The number is registered in {$schoolName}. Please inactive";
                 throw new ValidationException([
                     'parent_phone' => $errMsg,
                     'student_mobile' => $errMsg,
@@ -2677,7 +2678,8 @@ class SchoolAdminService extends BaseService
         }
 
         if ($conflict) {
-            $errMsg = "Number already registered in other school. Inactive first";
+            $schoolName = $conflict['school_name'] ?? 'another school';
+            $errMsg = "The number is registered in {$schoolName}. Please inactive";
             throw new ValidationException([
                 'phone' => $errMsg
             ]);
