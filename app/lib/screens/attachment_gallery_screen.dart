@@ -161,12 +161,13 @@ class _AttachmentGalleryScreenState extends State<AttachmentGalleryScreen> {
       }
 
       if (response != null && response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
+        final pdfData = response.bodyBytes;
         if (mounted) {
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => PdfViewerScreen(
-                pdfBytes: response.bodyBytes,
+                pdfBytes: pdfData,
                 title: filename,
               ),
             ),
