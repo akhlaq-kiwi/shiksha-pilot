@@ -873,11 +873,33 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
       onSuccess();
     } catch (err) {
       console.error(err);
+      let fieldErrors = {};
+
+      if (err.data && typeof err.data === 'object') {
+        if (err.data.errors && typeof err.data.errors === 'object') {
+          fieldErrors = { ...err.data.errors };
+        } else {
+          fieldErrors = { ...err.data };
+        }
+      }
+
+      if (err.message && (err.message.includes('registered') || err.message.includes('phone') || err.message.includes('contact') || err.message.includes('already') || err.message.includes('Admin'))) {
+        fieldErrors.student_mobile = fieldErrors.student_mobile || fieldErrors.phone || fieldErrors.parent_phone || fieldErrors.father_phone || err.message;
+      }
+
+      if (fieldErrors.phone || fieldErrors.parent_phone || fieldErrors.father_phone) {
+        fieldErrors.student_mobile = fieldErrors.student_mobile || fieldErrors.phone || fieldErrors.parent_phone || fieldErrors.father_phone;
+      }
+
       if (err.data && err.data.subscription_limit_reached) {
         setShowLimitReached({ limit: err.data.limit });
+      } else if (Object.keys(fieldErrors).length > 0) {
+        setErrors(fieldErrors);
+        setActiveTab(1); // Jump back to Basic Details tab so user sees the inline field error!
       } else if (err.message && err.message.includes('{')) {
         try {
           setErrors(JSON.parse(err.message));
+          setActiveTab(1);
         } catch {
           setErrors({ form: err.message });
         }

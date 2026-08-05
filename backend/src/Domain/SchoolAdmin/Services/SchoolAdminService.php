@@ -1215,6 +1215,16 @@ class SchoolAdminService extends BaseService
         $parentPhone = !empty($data['parent_phone']) ? trim((string)$data['parent_phone']) : (!empty($data['father_phone']) ? trim((string)$data['father_phone']) : (!empty($data['student_mobile']) ? trim((string)$data['student_mobile']) : null));
         $fatherPhone = !empty($data['father_phone']) ? trim((string)$data['father_phone']) : $parentPhone;
 
+        // Unconditionally check if any entered phone is a Super Admin or School Admin number
+        $this->checkAdminOrSuperAdminPhoneConflict($pdo, [
+            $parentPhone,
+            $fatherPhone,
+            $data['student_mobile'] ?? null,
+            $data['father_phone'] ?? null,
+            $data['mother_phone'] ?? null,
+            $data['parent_phone'] ?? null
+        ]);
+
         if (strcasecmp($status, 'ACTIVE') === 0 || strcasecmp($status, 'Active') === 0) {
             $this->checkActiveStudentPhoneConflictInOtherSchools($pdo, $schoolId, [$parentPhone, $fatherPhone, $data['student_mobile'] ?? null]);
         }
@@ -1466,6 +1476,16 @@ class SchoolAdminService extends BaseService
         $status = $exitDate !== null ? 'Inactive' : ($data['status'] ?? ($student['status'] ?? 'Active'));
         $parentPhone = !empty($data['parent_phone']) ? trim((string)$data['parent_phone']) : (!empty($data['father_phone']) ? trim((string)$data['father_phone']) : (!empty($data['student_mobile']) ? trim((string)$data['student_mobile']) : ($student['parent_phone'] ?? null)));
         $fatherPhone = !empty($data['father_phone']) ? trim((string)$data['father_phone']) : $parentPhone;
+
+        // Unconditionally check if any entered phone is a Super Admin or School Admin number
+        $this->checkAdminOrSuperAdminPhoneConflict($pdo, [
+            $parentPhone,
+            $fatherPhone,
+            $data['student_mobile'] ?? null,
+            $data['father_phone'] ?? null,
+            $data['mother_phone'] ?? null,
+            $data['parent_phone'] ?? null
+        ]);
 
         if (strcasecmp($status, 'ACTIVE') === 0 || strcasecmp($status, 'Active') === 0) {
             $this->checkActiveStudentPhoneConflictInOtherSchools($pdo, $schoolId, [$parentPhone, $fatherPhone, $data['student_mobile'] ?? null]);
@@ -2521,9 +2541,9 @@ class SchoolAdminService extends BaseService
         $phoneList = is_array($phones) ? $phones : [$phones];
         $validPhones = [];
         foreach ($phoneList as $p) {
-            $p = trim((string)$p);
-            if (!empty($p) && strlen($p) >= 10) {
-                $validPhones[] = $p;
+            $cleaned = preg_replace('/[^0-9]/', '', (string)$p);
+            if (!empty($cleaned) && strlen($cleaned) >= 10) {
+                $validPhones[] = substr($cleaned, -10); // Check 10-digit normalized phone
             }
         }
         $validPhones = array_unique($validPhones);
@@ -2531,33 +2551,52 @@ class SchoolAdminService extends BaseService
             return;
         }
 
-        $inClause = implode(',', array_map(fn($idx) => ":p{$idx}", array_keys($validPhones)));
-        $params = [];
-        foreach (array_values($validPhones) as $idx => $phone) {
-            $params[":p{$idx}"] = $phone;
-        }
+        foreach ($validPhones as $phone) {
+            // 1. Check users table for SUPER_ADMIN, SCHOOL_ADMIN, ADMIN roles
+            $stmtUser = $pdo->prepare("
+                SELECT phone, role 
+                FROM users 
+                WHERE (RIGHT(REGEXP_REPLACE(phone, '[^0-9]', ''), 10) = :phone OR phone LIKE :phone_like)
+                  AND (UPPER(role) IN ('SUPER_ADMIN', 'SCHOOL_ADMIN', 'ADMIN', 'TENANT_ADMIN') OR role IS NOT NULL)
+                LIMIT 1
+            ");
+            $stmtUser->execute([':phone' => $phone, ':phone_like' => "%{$phone}%"]);
+            $userConflict = $stmtUser->fetch(PDO::FETCH_ASSOC);
 
-        $stmt = $pdo->prepare("
-            SELECT phone, role 
-            FROM users 
-            WHERE phone IN ({$inClause}) 
-              AND UPPER(role) IN ('SUPER_ADMIN', 'SCHOOL_ADMIN') 
-              AND UPPER(status) = 'ACTIVE'
-            LIMIT 1
-        ");
-        $stmt->execute($params);
-        $userConflict = $stmt->fetch(PDO::FETCH_ASSOC);
+            // Filter out non-admin roles if query returned a regular teacher/student user
+            if ($userConflict && !in_array(strtoupper((string)$userConflict['role']), ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'ADMIN', 'TENANT_ADMIN'], true)) {
+                $userConflict = null;
+            }
 
-        if ($userConflict) {
-            $errMsg = 'Entered number already registered';
-            throw new ValidationException([
-                'phone' => $errMsg,
-                'parent_phone' => $errMsg,
-                'student_mobile' => $errMsg,
-                'father_phone' => $errMsg,
-                'admin_phone' => $errMsg,
-                'contact_phone' => $errMsg
-            ], $errMsg);
+            if (!$userConflict) {
+                // 2. Check schools table for admin_phone or contact_phone
+                $stmtSchool = $pdo->prepare("
+                    SELECT id, name FROM schools 
+                    WHERE RIGHT(REGEXP_REPLACE(admin_phone, '[^0-9]', ''), 10) = :phone
+                       OR RIGHT(REGEXP_REPLACE(contact_phone, '[^0-9]', ''), 10) = :phone
+                       OR admin_phone LIKE :phone_like
+                       OR contact_phone LIKE :phone_like
+                    LIMIT 1
+                ");
+                $stmtSchool->execute([':phone' => $phone, ':phone_like' => "%{$phone}%"]);
+                $schoolConflict = $stmtSchool->fetch(PDO::FETCH_ASSOC);
+                if ($schoolConflict) {
+                    $userConflict = ['role' => 'SCHOOL_ADMIN'];
+                }
+            }
+
+            if ($userConflict) {
+                $errMsg = 'Entered number already registered';
+                throw new ValidationException([
+                    'phone' => $errMsg,
+                    'student_mobile' => $errMsg,
+                    'parent_phone' => $errMsg,
+                    'father_phone' => $errMsg,
+                    'mother_phone' => $errMsg,
+                    'contact_phone' => $errMsg,
+                    'emergency_phone' => $errMsg
+                ], $errMsg);
+            }
         }
     }
 
