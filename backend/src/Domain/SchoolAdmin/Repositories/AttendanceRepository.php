@@ -108,6 +108,12 @@ class AttendanceRepository extends BaseRepository
      */
     public function upsert(array $data): void
     {
+        $normalized = [];
+        foreach ($data as $k => $v) {
+            $key = str_starts_with((string)$k, ':') ? (string)$k : ':' . (string)$k;
+            $normalized[$key] = $v;
+        }
+
         $stmt = $this->pdo->prepare("
             INSERT INTO attendance (school_id, student_id, class_id, date, status, marked_by)
             VALUES (:school_id, :student_id, :class_id, :date, :status, :marked_by)
@@ -115,6 +121,6 @@ class AttendanceRepository extends BaseRepository
                 status    = VALUES(status),
                 marked_by = VALUES(marked_by)
         ");
-        $stmt->execute($data);
+        $stmt->execute($normalized);
     }
 }

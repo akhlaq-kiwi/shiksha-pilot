@@ -22,6 +22,7 @@ import 'package:school_hub/main.dart';
 import 'package:school_hub/services/exam_service.dart';
 import 'package:school_hub/screens/exam_list_screen.dart';
 import 'package:school_hub/screens/achievements_screen.dart';
+import 'package:school_hub/screens/homework_list_screen.dart';
 import 'package:school_hub/widgets/change_password_dialog.dart';
 
 class LauncherFeature {
@@ -110,6 +111,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       icon: Icons.menu_book_rounded,
       color: Colors.indigo,
       allowedRoles: ['PARENT', 'TEACHER', 'STUDENT'],
+      isAvailable: true,
     ),
     LauncherFeature(
       name: 'Timetable',
@@ -482,6 +484,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       token: widget.leaveService.token,
                       userRole: widget.userRole,
                       selectedStudentId: _activeStudentId,
+                    ),
+                  ),
+                );
+              } else if (titleLower.contains('homework') || msgLower.contains('homework') || titleLower.contains('assignment') || msgLower.contains('assignment')) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => HomeworkListScreen(
+                      userRole: widget.userRole,
+                      selectedStudentId: _activeStudentId,
+                      baseUrl: widget.leaveService.baseUrl,
                     ),
                   ),
                 );
@@ -927,6 +940,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
         ).then((_) => _fetchUnreadNotificationsCount());
+      } else if (feature.name == 'Homework') {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => HomeworkListScreen(
+              userRole: widget.userRole,
+              selectedStudentId: _activeStudentId,
+              baseUrl: widget.leaveService.baseUrl,
+            ),
+          ),
+        );
       } else if (feature.name == 'Timetable') {
         Navigator.push(
           context,

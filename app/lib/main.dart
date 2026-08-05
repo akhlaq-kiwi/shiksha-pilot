@@ -346,6 +346,13 @@ class _LoginScreenState extends State<LoginScreen> {
           _serverUrlController.text = savedUrl;
         });
       }
+    } else {
+      await prefs.setString('base_url', 'https://qa.shikshapilot.com');
+      if (mounted) {
+        setState(() {
+          _serverUrlController.text = 'https://qa.shikshapilot.com';
+        });
+      }
     }
   }
 
@@ -503,8 +510,7 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() {
           _errorMessage = 'Your account marked as Inactive Please contact Academy management';
         });
-      } else if (errorMsg.toLowerCase().contains('validation failed') ||
-                 errorMsg.toLowerCase().contains('invalid credentials') ||
+      } else if (errorMsg.toLowerCase().contains('invalid credentials') ||
                  errorMsg.toLowerCase().contains('invalid credential')) {
         setState(() {
           _phoneValidationError = 'Invalid credential';

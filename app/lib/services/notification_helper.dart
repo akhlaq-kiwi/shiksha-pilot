@@ -9,6 +9,7 @@ import '../screens/timetable_screen.dart';
 import '../screens/notification_center_screen.dart';
 import '../screens/fees_card_screen.dart';
 import '../screens/exam_list_screen.dart';
+import '../screens/homework_list_screen.dart';
 import '../services/leave_service.dart';
 import '../services/exam_service.dart';
 import '../main.dart';
@@ -128,6 +129,12 @@ class NotificationHelper {
       targetScreen = TimetableScreen(
         baseUrl: leaveService.baseUrl,
         token: leaveService.token,
+        userRole: userRole,
+        selectedStudentId: notifStudentId ?? studentId,
+      );
+    } else if (link.contains('homework') || title.contains('homework') || message.contains('homework') || link.contains('assignment') || title.contains('assignment') || message.contains('assignment')) {
+      targetScreen = HomeworkListScreen(
+        baseUrl: baseUrl,
         userRole: userRole,
         selectedStudentId: notifStudentId ?? studentId,
       );
