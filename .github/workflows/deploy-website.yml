@@ -90,5 +90,19 @@ jobs:
           sshpass -e ssh -o StrictHostKeyChecking=no -p "${{ secrets.PROD_SSH_PORT }}" \
             "${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }}" "$EXTRACT_CMD"
 
+      - name: Run migrations on remote
+        env:
+          SSHPASS: ${{ secrets.PROD_SSH_PASSWORD }}
+        run: |
+          set -e
+          # The website (school directory pages) reads from the same
+          # shiksha_pilot DB as the app. Run the app's migrate.php — already
+          # deployed at PROD_REMOTE_PATH — so new tables/seed data (e.g.
+          # school_directory) exist before the website goes live and pages
+          # querying them start hitting SQL errors instead of 500ing.
+          MIGRATE_CMD="php ${{ secrets.PROD_REMOTE_PATH }}/api/src/Database/migrate.php"
+          sshpass -e ssh -o StrictHostKeyChecking=no -p "${{ secrets.PROD_SSH_PORT }}" \
+            "${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }}" "$MIGRATE_CMD"
+
       - name: Done
         run: echo "Website deployment completed successfully."
