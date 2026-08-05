@@ -217,8 +217,8 @@ class PlatformService extends BaseService
             $stmtPhone = $pdo->prepare("SELECT COUNT(*) FROM users WHERE phone = :phone");
             $stmtPhone->execute([':phone' => $data['admin_phone']]);
             if ((int)$stmtPhone->fetchColumn() > 0) {
-                $errors['admin_phone'] = 'This mobile number is already registered. Please use a different mobile number.';
-                $errors['contact_phone'] = 'This mobile number is already registered. Please use a different mobile number.';
+                $errors['admin_phone'] = 'Entered number already registered';
+                $errors['contact_phone'] = 'Entered number already registered';
             }
         }
 
@@ -528,8 +528,8 @@ class PlatformService extends BaseService
 
         if ($this->users->findByPhone((string) $data['phone']) !== null) {
             throw new \App\Shared\Exceptions\ValidationException(
-                ['phone' => 'Phone number already registered.'],
-                'Phone number already registered.',
+                ['phone' => 'Entered number already registered'],
+                'Entered number already registered',
             );
         }
 

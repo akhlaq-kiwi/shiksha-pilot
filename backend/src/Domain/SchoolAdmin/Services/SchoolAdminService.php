@@ -2489,8 +2489,55 @@ class SchoolAdminService extends BaseService
         }
     }
 
+    private function checkAdminOrSuperAdminPhoneConflict(PDO $pdo, array|string $phones): void
+    {
+        $phoneList = is_array($phones) ? $phones : [$phones];
+        $validPhones = [];
+        foreach ($phoneList as $p) {
+            $p = trim((string)$p);
+            if (!empty($p) && strlen($p) >= 10) {
+                $validPhones[] = $p;
+            }
+        }
+        $validPhones = array_unique($validPhones);
+        if (empty($validPhones)) {
+            return;
+        }
+
+        $inClause = implode(',', array_map(fn($idx) => ":p{$idx}", array_keys($validPhones)));
+        $params = [];
+        foreach (array_values($validPhones) as $idx => $phone) {
+            $params[":p{$idx}"] = $phone;
+        }
+
+        $stmt = $pdo->prepare("
+            SELECT phone, role 
+            FROM users 
+            WHERE phone IN ({$inClause}) 
+              AND UPPER(role) IN ('SUPER_ADMIN', 'SCHOOL_ADMIN') 
+              AND UPPER(status) = 'ACTIVE'
+            LIMIT 1
+        ");
+        $stmt->execute($params);
+        $userConflict = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($userConflict) {
+            $errMsg = 'Entered number already registered';
+            throw new ValidationException([
+                'phone' => $errMsg,
+                'parent_phone' => $errMsg,
+                'student_mobile' => $errMsg,
+                'father_phone' => $errMsg,
+                'admin_phone' => $errMsg,
+                'contact_phone' => $errMsg
+            ], $errMsg);
+        }
+    }
+
     private function checkActiveStudentPhoneConflictInOtherSchools(PDO $pdo, int $currentSchoolId, array $phones): void
     {
+        $this->checkAdminOrSuperAdminPhoneConflict($pdo, $phones);
+
         $validPhones = [];
         foreach ($phones as $p) {
             $p = trim((string)$p);
@@ -2568,6 +2615,10 @@ class SchoolAdminService extends BaseService
 
     private function checkActiveStaffPhoneConflictInOtherSchools(PDO $pdo, int $currentSchoolId, ?string $phone): void
     {
+        if (!empty($phone)) {
+            $this->checkAdminOrSuperAdminPhoneConflict($pdo, [$phone]);
+        }
+
         $phone = trim((string)$phone);
         if (empty($phone) || strlen($phone) < 10) return;
 

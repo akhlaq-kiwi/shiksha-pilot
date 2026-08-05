@@ -1075,7 +1075,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
             </div>
           )}
 
-          <div className="flex flex-col sm:flex-row sm:items-end gap-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-end gap-6">
             <div className="w-full sm:w-[240px]">
               <label className="text-xs font-bold text-text-secondary uppercase block mb-2">Class *</label>
               <select
@@ -1093,78 +1093,23 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                 ))}
               </select>
             </div>
-
-            <div className="flex-1 flex flex-col justify-end min-w-[280px]">
-              <label htmlFor="fee-mode" className="text-xs font-bold text-text-secondary uppercase mb-2">Fee Mode</label>
-              <div className="flex items-center gap-6 h-10">
-                <label className="flex items-center gap-2 text-xs font-bold uppercase cursor-pointer select-none">
-                  <input
-                    type="radio"
-                    name="feeMode"
-                    value="SAME"
-                    checked={feeMode === 'SAME'}
-                    disabled={!selectedClassId || isConfigLocked}
-                    onChange={() => setFeeMode('SAME')}
-                    className="rounded-full border-zinc-300 text-primary focus:ring-primary h-4 w-4"
-                  />
-                  Same fee for all months
-                </label>
-                <label className="flex items-center gap-2 text-xs font-bold uppercase cursor-pointer select-none">
-                  <input
-                    type="radio"
-                    name="feeMode"
-                    value="DIFFERENT"
-                    checked={feeMode === 'DIFFERENT'}
-                    disabled={!selectedClassId || isConfigLocked}
-                    onChange={() => setFeeMode('DIFFERENT')}
-                    className="rounded-full border-zinc-300 text-primary focus:ring-primary h-4 w-4"
-                  />
-                  Different fee every month
-                </label>
-              </div>
-            </div>
           </div>
 
-          <div className="border-t border-border pt-4 mt-2">
-            {feeMode === 'SAME' ? (
-              <div className="space-y-2 w-full sm:w-[240px]">
-                <label className="text-xs font-bold text-text-secondary uppercase">Fee Amount</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-xs text-text-muted">₹</span>
-                  <Input id="fee-mode"
-                    type="number"
-                    placeholder="e.g. 1500"
-                    value={sameFeeAmount}
-                    onChange={e => setSameFeeAmount(e.target.value)}
-                    disabled={!selectedClassId || isConfigLocked}
-                    className="pl-7 text-xs font-semibold w-full"
-                  />
-                </div>
-                <p className="text-[11px] text-text-muted">This amount will be applied to all 12 academic months automatically.</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <p className="text-[11px] text-text-muted font-bold uppercase">Monthly Fees Grid</p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  {['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'].map(m => (
-                    <div key={m} className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-text-secondary uppercase">{m}</label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-2.5 text-xs text-text-muted">₹</span>
-                        <Input aria-label="0"
-                          type="number"
-                          placeholder="0"
-                          value={monthlyFeesMap[m] || ''}
-                          onChange={e => setMonthlyFeesMap(p => ({ ...p, [m]: e.target.value }))}
-                          disabled={!selectedClassId || isConfigLocked}
-                          className="pl-7 text-xs font-semibold"
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+          <div className="border-t border-border pt-4 mt-2 space-y-2 w-full sm:w-[240px]">
+            <label className="text-xs font-bold text-text-secondary uppercase block">Fee Amount</label>
+            <div className="relative">
+              <span className="absolute left-3 top-2.5 text-xs text-text-muted">₹</span>
+              <Input
+                type="number"
+                placeholder="e.g. 1500"
+                value={sameFeeAmount}
+                onChange={e => setSameFeeAmount(e.target.value)}
+                disabled={!selectedClassId || isConfigLocked}
+                className="pl-7 text-xs font-semibold w-full"
+              />
+            </div>
+            <p className="text-[11px] text-text-muted">This amount will be applied to all 12 academic months automatically.</p>
+          </div>
 
             {selectedClassId && (isConfigLocked || isReadOnly) ? (
               <div className="mt-6 p-4 bg-zinc-100 border border-zinc-200 dark:bg-zinc-900/50 dark:border-zinc-800 rounded-xl flex items-center justify-between">
