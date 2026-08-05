@@ -669,14 +669,25 @@ export default function StaffPage() {
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       console.error(err);
+      let fieldErrors = {};
+
       if (err.data && typeof err.data === 'object') {
-        setFormErrors(err.data);
-      } else if (err.message && (err.message.includes('contact number') || err.message.includes('phone') || err.message.includes('registered') || err.message.includes('exists') || err.message.includes('other school'))) {
-        setFormErrors({
-          phone: err.message
-        });
+        if (err.data.errors && typeof err.data.errors === 'object') {
+          fieldErrors = { ...err.data.errors };
+        } else {
+          fieldErrors = { ...err.data };
+        }
       }
-      setError(err.message || 'Failed to save teacher details.');
+
+      if (!fieldErrors.phone && err.message && (err.message.includes('contact number') || err.message.includes('phone') || err.message.includes('registered') || err.message.includes('exists') || err.message.includes('other school') || err.message.includes('inactive') || err.message.includes('Inactive'))) {
+        fieldErrors.phone = err.message;
+      }
+
+      setFormErrors(fieldErrors);
+
+      if (Object.keys(fieldErrors).length === 0) {
+        setError(err.message || 'Failed to save teacher details.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -1617,7 +1628,7 @@ export default function StaffPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-1.5">
                 <label htmlFor="phone" className="text-xs font-bold text-text-secondary uppercase">Contact Number <span className="text-red-500">*</span></label>
-                <Input id="phone" name="phone" value={newStaff.phone} onChange={handleTextChange} placeholder="10-digit mobile number" required />
+                <Input id="phone" name="phone" value={newStaff.phone} onChange={handleTextChange} placeholder="10-digit mobile number" className={formErrors.phone ? 'border-red-500 ring-1 ring-red-500' : ''} required />
                 {formErrors.phone && <p className="text-[11px] text-red-500 font-semibold">{formErrors.phone}</p>}
               </div>
               
