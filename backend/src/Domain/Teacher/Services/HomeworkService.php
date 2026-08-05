@@ -23,14 +23,14 @@ class HomeworkService extends BaseService
     private function getUploadsDirectory(): string
     {
         $baseDir = dirname(__DIR__, 4);
-        $targetDir = $baseDir . '/public/uploads/homework';
+        $targetDir = $baseDir . '/public/uploads';
 
         if (!is_dir($targetDir)) {
-            $alt1 = dirname(__DIR__, 5) . '/backend/public/uploads/homework';
+            $alt1 = dirname(__DIR__, 5) . '/backend/public/uploads';
             if (is_dir($alt1)) {
                 return $alt1;
             }
-            $alt2 = dirname(__DIR__, 5) . '/public/uploads/homework';
+            $alt2 = dirname(__DIR__, 5) . '/public/uploads';
             if (is_dir($alt2)) {
                 return $alt2;
             }
@@ -60,14 +60,14 @@ class HomeworkService extends BaseService
         }
 
         $directory = $this->getUploadsDirectory();
-        $uniqueName = sprintf('%s_%s.%s', bin2hex(random_bytes(8)), time(), $extension);
+        $uniqueName = sprintf('hw_%s_%s.%s', bin2hex(random_bytes(8)), time(), $extension);
         $uploadedFile->moveTo($directory . DIRECTORY_SEPARATOR . $uniqueName);
 
         $fileType = ($extension === 'pdf') ? 'pdf' : 'image';
 
         return [
             'file_name' => $originalFilename,
-            'file_path' => '/uploads/homework/' . $uniqueName,
+            'file_path' => '/uploads/' . $uniqueName,
             'file_type' => $fileType,
             'file_size' => $size,
         ];
