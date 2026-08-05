@@ -227,6 +227,8 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
   const [showNoDraftModal, setShowNoDraftModal] = useState(false);
   const [creatingDraft, setCreatingDraft] = useState(false);
 
+  // Class Fee Configuration States
+  const [selectedClassId, setSelectedClassId] = useState('');
   const [showSelectClassNotice, setShowSelectClassNotice] = useState(true);
 
   useEffect(() => {
