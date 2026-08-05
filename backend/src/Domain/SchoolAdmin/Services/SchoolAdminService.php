@@ -1805,18 +1805,25 @@ class SchoolAdminService extends BaseService
 
     private function getUploadsDirectory(): string
     {
-        $baseDir = dirname(__DIR__, 4);
-        $targetDir = $baseDir . '/public/uploads';
+        $docRoot = $_SERVER['DOCUMENT_ROOT'] ?? '';
+        if (!empty($docRoot) && is_dir($docRoot)) {
+            $targetDir = rtrim($docRoot, '/\\') . '/uploads';
+            if (!is_dir($targetDir)) {
+                @mkdir($targetDir, 0777, true);
+            }
+            if (is_dir($targetDir) && is_writable($targetDir)) {
+                return $targetDir;
+            }
+        }
 
+        $baseDir = dirname(__DIR__, 4);
+        $altPublic = dirname(__DIR__, 5) . '/public/uploads';
+        if (is_dir($altPublic) && is_writable($altPublic)) {
+            return $altPublic;
+        }
+
+        $targetDir = $baseDir . '/public/uploads';
         if (!is_dir($targetDir)) {
-            $alt1 = dirname(__DIR__, 5) . '/backend/public/uploads';
-            if (is_dir($alt1)) {
-                return $alt1;
-            }
-            $alt2 = dirname(__DIR__, 5) . '/public/uploads';
-            if (is_dir($alt2)) {
-                return $alt2;
-            }
             @mkdir($targetDir, 0777, true);
         }
 

@@ -20,23 +20,61 @@ class HomeworkService extends BaseService
         $this->pdo = $pdo;
     }
 
+    private function syncExistingUploadsToWebRoot(string $targetWebDir): void
+    {
+        $candidateDirs = [
+            dirname(__DIR__, 4) . '/public/uploads',
+            dirname(__DIR__, 5) . '/backend/public/uploads',
+            dirname(__DIR__, 4) . '/public/uploads/homework',
+            dirname(__DIR__, 5) . '/backend/public/uploads/homework',
+            dirname(__DIR__, 5) . '/public/uploads',
+        ];
+
+        foreach ($candidateDirs as $srcDir) {
+            if ($srcDir === $targetWebDir || !is_dir($srcDir)) {
+                continue;
+            }
+            $files = @glob($srcDir . '/*');
+            if (is_array($files)) {
+                foreach ($files as $file) {
+                    if (is_file($file)) {
+                        $dest = $targetWebDir . '/' . basename($file);
+                        if (!file_exists($dest)) {
+                            @copy($file, $dest);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private function getUploadsDirectory(): string
     {
-        $baseDir = dirname(__DIR__, 4);
-        $targetDir = $baseDir . '/public/uploads';
+        $docRoot = $_SERVER['DOCUMENT_ROOT'] ?? '';
+        if (!empty($docRoot) && is_dir($docRoot)) {
+            $targetDir = rtrim($docRoot, '/\\') . '/uploads';
+            if (!is_dir($targetDir)) {
+                @mkdir($targetDir, 0777, true);
+            }
+            if (is_dir($targetDir) && is_writable($targetDir)) {
+                $this->syncExistingUploadsToWebRoot($targetDir);
+                return $targetDir;
+            }
+        }
 
+        $baseDir = dirname(__DIR__, 4);
+        $altPublic = dirname(__DIR__, 5) . '/public/uploads';
+        if (is_dir($altPublic) && is_writable($altPublic)) {
+            $this->syncExistingUploadsToWebRoot($altPublic);
+            return $altPublic;
+        }
+
+        $targetDir = $baseDir . '/public/uploads';
         if (!is_dir($targetDir)) {
-            $alt1 = dirname(__DIR__, 5) . '/backend/public/uploads';
-            if (is_dir($alt1)) {
-                return $alt1;
-            }
-            $alt2 = dirname(__DIR__, 5) . '/public/uploads';
-            if (is_dir($alt2)) {
-                return $alt2;
-            }
             @mkdir($targetDir, 0777, true);
         }
 
+        $this->syncExistingUploadsToWebRoot($targetDir);
         return $targetDir;
     }
 
