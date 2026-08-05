@@ -700,6 +700,14 @@ class PlatformService extends BaseService
         $actorInfo = $this->actorInfo($actor);
         $pdo = $this->schools->getPdo();
 
+        // Ensure notification columns exist safely BEFORE starting transaction (DDL causes implicit commit in MySQL)
+        try {
+            $pdo->exec("ALTER TABLE dashboard_notifications ADD COLUMN user_role VARCHAR(50) DEFAULT 'SCHOOL_ADMIN'");
+        } catch (\Throwable $ex) {}
+        try {
+            $pdo->exec("ALTER TABLE dashboard_notifications ADD COLUMN user_id INT DEFAULT NULL");
+        } catch (\Throwable $ex) {}
+
         $pdo->beginTransaction();
         try {
             // Lock school record
@@ -841,14 +849,6 @@ class PlatformService extends BaseService
                 $actionStr
             );
 
-            // Ensure columns exist on target database safely
-            try {
-                $pdo->exec("ALTER TABLE dashboard_notifications ADD COLUMN user_role VARCHAR(50) DEFAULT 'SCHOOL_ADMIN'");
-            } catch (\Throwable $ex) {}
-            try {
-                $pdo->exec("ALTER TABLE dashboard_notifications ADD COLUMN user_id INT DEFAULT NULL");
-            } catch (\Throwable $ex) {}
-
             // Send School Admin Notification
             $stmtAdmins = $pdo->prepare("SELECT id FROM users WHERE school_id = :school_id AND role = 'SCHOOL_ADMIN'");
             $stmtAdmins->execute([':school_id' => $schoolId]);
@@ -883,8 +883,10 @@ class PlatformService extends BaseService
             }
 
             $pdo->commit();
-        } catch (\Exception $e) {
-            $pdo->rollBack();
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             throw $e;
         }
 
