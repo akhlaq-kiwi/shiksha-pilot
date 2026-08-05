@@ -650,16 +650,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   letterSpacing: 1,
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Sign in to access leaves hub',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.white.withOpacity(0.7),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
               const SizedBox(height: 36),
 
               // Form Card
