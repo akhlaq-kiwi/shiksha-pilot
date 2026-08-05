@@ -781,6 +781,33 @@ class SchoolAdminService extends BaseService
             return $ap;
         }, $additionalPayments);
 
+        // Fetch student documents
+        $documents = [];
+        try {
+            $pdo->exec("
+                CREATE TABLE IF NOT EXISTS `student_documents` (
+                  `id` int NOT NULL AUTO_INCREMENT,
+                  `school_id` int NOT NULL,
+                  `student_id` int NOT NULL,
+                  `category` varchar(100) NOT NULL,
+                  `file_name` varchar(255) NOT NULL,
+                  `file_path` varchar(255) NOT NULL,
+                  `file_size` int NOT NULL,
+                  `upload_date` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+                  PRIMARY KEY (`id`),
+                  KEY `school_id` (`school_id`),
+                  KEY `student_id` (`student_id`),
+                  CONSTRAINT `student_documents_ibfk_1` FOREIGN KEY (`school_id`) REFERENCES `schools` (`id`) ON DELETE CASCADE,
+                  CONSTRAINT `student_documents_ibfk_2` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            ");
+            $stmtDocs = $pdo->prepare("SELECT * FROM student_documents WHERE student_id = :sid ORDER BY id ASC");
+            $stmtDocs->execute([':sid' => $id]);
+            $documents = $stmtDocs->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (\Throwable $e) {}
+
+        $student['documents'] = $documents;
+
         return [
             'student' => $student,
             'fee_summary' => [
@@ -2601,8 +2628,7 @@ class SchoolAdminService extends BaseService
             }
 
             if ($conflict) {
-                $schoolName = $conflict['school_name'] ?? 'another school';
-                $errMsg = "Mobile number active in {$schoolName}. Deactivate first.";
+                $errMsg = "Number already registered in other school. Inactive first";
                 throw new ValidationException([
                     'parent_phone' => $errMsg,
                     'student_mobile' => $errMsg,
@@ -2651,8 +2677,7 @@ class SchoolAdminService extends BaseService
         }
 
         if ($conflict) {
-            $schoolName = $conflict['school_name'] ?? 'another school';
-            $errMsg = "Mobile number active in {$schoolName}. Deactivate first.";
+            $errMsg = "Number already registered in other school. Inactive first";
             throw new ValidationException([
                 'phone' => $errMsg
             ]);

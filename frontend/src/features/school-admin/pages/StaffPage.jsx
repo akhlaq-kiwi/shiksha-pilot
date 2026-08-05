@@ -668,14 +668,10 @@ export default function StaffPage() {
     } catch (err) {
       console.error(err);
       if (err.data && typeof err.data === 'object') {
-        const errors = { ...err.data };
-        if (errors.phone) {
-          errors.phone = "Phone number already exists. Please use a different mobile number.";
-        }
-        setFormErrors(errors);
-      } else if (err.message && (err.message.includes('contact number') || err.message.includes('phone') || err.message.includes('registered') || err.message.includes('exists'))) {
+        setFormErrors(err.data);
+      } else if (err.message && (err.message.includes('contact number') || err.message.includes('phone') || err.message.includes('registered') || err.message.includes('exists') || err.message.includes('other school'))) {
         setFormErrors({
-          phone: "Phone number already exists. Please use a different mobile number."
+          phone: err.message
         });
       }
       setError(err.message || 'Failed to save teacher details.');

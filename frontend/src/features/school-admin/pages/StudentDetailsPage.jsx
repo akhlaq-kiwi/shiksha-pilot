@@ -952,38 +952,92 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
 
                 {docsOpen && (
                   <div className="p-6 border-t border-border animate-in slide-in-from-top-2 duration-300">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                      {[
-                        { key: 'birth_cert_path', label: 'Birth Certificate' },
-                        { key: 'aadhaar_path', label: 'Aadhaar Card' },
-                        { key: 'transfer_cert_path', label: 'Transfer Certificate (TC)' },
-                        { key: 'report_card_path', label: 'Previous Report Card' },
-                        { key: 'additional_docs_path', label: 'Additional Documents' }
-                      ].map(doc => {
-                        const hasDoc = !!student[doc.key];
-                        return (
-                          <div key={doc.key} className="flex items-center justify-between p-3 border border-border rounded-xl bg-zinc-50/50 dark:bg-zinc-900/10">
-                            <div>
-                              <p className="font-bold text-text-primary uppercase text-[11px] tracking-wider">{doc.label}</p>
-                              <p className="text-[11px] text-text-muted mt-0.5">
-                                {hasDoc ? 'Scanned PDF/Image copy' : 'No document uploaded'}
-                              </p>
+                    {(!student.documents || student.documents.length === 0) &&
+                     !student.birth_cert_path && !student.aadhaar_path && !student.transfer_cert_path && !student.report_card_path && !student.additional_docs_path ? (
+                      <div className="p-4 bg-zinc-50 dark:bg-zinc-900/50 border border-dashed border-border rounded-xl text-center">
+                        <p className="text-xs text-text-muted font-medium">No documents uploaded for this student.</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                        {/* 1. Array-based uploaded documents (student.documents) */}
+                        {Array.isArray(student.documents) && student.documents.map((doc, idx) => {
+                          const rawPath = doc.file_path || doc.path || '';
+                          const fileUrl = rawPath ? (rawPath.startsWith('http') ? rawPath : `${window.location.origin.includes('localhost') ? 'http://localhost:8000' : ''}${rawPath.startsWith('/') ? '' : '/'}${rawPath}`) : '#';
+
+                          return (
+                            <div key={doc.id || idx} className="flex items-center justify-between p-3 border border-border rounded-xl bg-zinc-50/50 dark:bg-zinc-900/10">
+                              <div className="min-w-0 pr-2">
+                                <p className="font-bold text-text-primary uppercase text-[11px] tracking-wider truncate">{doc.category || doc.file_name || 'Document'}</p>
+                                <p className="text-[11px] text-text-muted truncate mt-0.5">{doc.file_name || 'File attachment'}</p>
+                              </div>
+                              {rawPath ? (
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <button 
+                                    onClick={() => setViewingDoc({ name: doc.category || doc.file_name, path: fileUrl })}
+                                    className="p-2 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-colors flex items-center gap-1 text-xs font-semibold shadow-2xs"
+                                  >
+                                    <Eye className="h-3.5 w-3.5" />
+                                    <span>View</span>
+                                  </button>
+                                  <a
+                                    href={fileUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="p-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-text-primary rounded-lg transition-colors flex items-center gap-1 text-xs font-semibold shadow-2xs"
+                                    title="Download Document"
+                                  >
+                                    <Download className="h-3.5 w-3.5" />
+                                    <span>Download</span>
+                                  </a>
+                                </div>
+                              ) : (
+                                <span className="text-[11px] text-text-muted font-bold uppercase tracking-wider flex-shrink-0">Missing</span>
+                              )}
                             </div>
-                            {hasDoc ? (
-                              <button 
-                                onClick={() => setViewingDoc({ name: doc.label, path: student[doc.key] })}
-                                className="p-2 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-colors flex items-center gap-1 text-xs font-semibold shadow-xs"
-                              >
-                                <Eye className="h-3.5 w-3.5" />
-                                <span>View File</span>
-                              </button>
-                            ) : (
-                              <span className="text-[11px] text-text-muted font-bold uppercase tracking-wider">Missing</span>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+                          );
+                        })}
+
+                        {/* 2. Legacy individual document paths fallback */}
+                        {[
+                          { key: 'birth_cert_path', label: 'Birth Certificate' },
+                          { key: 'aadhaar_path', label: 'Aadhaar Card' },
+                          { key: 'transfer_cert_path', label: 'Transfer Certificate (TC)' },
+                          { key: 'report_card_path', label: 'Previous Report Card' },
+                          { key: 'additional_docs_path', label: 'Additional Documents' }
+                        ].filter(doc => !!student[doc.key]).map(doc => {
+                          const rawPath = student[doc.key];
+                          const fileUrl = rawPath ? (rawPath.startsWith('http') ? rawPath : `${window.location.origin.includes('localhost') ? 'http://localhost:8000' : ''}${rawPath.startsWith('/') ? '' : '/'}${rawPath}`) : '#';
+
+                          return (
+                            <div key={doc.key} className="flex items-center justify-between p-3 border border-border rounded-xl bg-zinc-50/50 dark:bg-zinc-900/10">
+                              <div className="min-w-0 pr-2">
+                                <p className="font-bold text-text-primary uppercase text-[11px] tracking-wider truncate">{doc.label}</p>
+                                <p className="text-[11px] text-text-muted truncate mt-0.5">Scanned PDF/Image copy</p>
+                              </div>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <button 
+                                  onClick={() => setViewingDoc({ name: doc.label, path: fileUrl })}
+                                  className="p-2 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-colors flex items-center gap-1 text-xs font-semibold shadow-2xs"
+                                >
+                                  <Eye className="h-3.5 w-3.5" />
+                                  <span>View</span>
+                                </button>
+                                <a
+                                  href={fileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="p-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-text-primary rounded-lg transition-colors flex items-center gap-1 text-xs font-semibold shadow-2xs"
+                                  title="Download Document"
+                                >
+                                  <Download className="h-3.5 w-3.5" />
+                                  <span>Download</span>
+                                </a>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
               </Card>
