@@ -306,6 +306,7 @@ return function (App $app) {
     $app->put('/api/teacher/homework/{id}', [HomeworkController::class, 'updateHomework']);
     $app->delete('/api/teacher/homework/{id}', [HomeworkController::class, 'deleteHomework']);
     $app->get('/api/student/homework', [HomeworkController::class, 'getStudentHomework']);
+    $app->get('/uploads/{filename:.+}', [HomeworkController::class, 'serveUpload']);
 
     // Word Builder Game endpoints
     $app->get('/api/student/game/word-builder/progress', [VocabularyController::class, 'getGameProgress']);

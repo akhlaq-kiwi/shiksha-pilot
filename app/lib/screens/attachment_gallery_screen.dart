@@ -256,27 +256,47 @@ class _AttachmentGalleryScreenState extends State<AttachmentGalleryScreen> {
 
           if (error != null || bytes == null) {
             return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.broken_image_rounded, size: 64, color: Colors.white54),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Unable to load image: $name',
-                    style: const TextStyle(color: Colors.white70, fontSize: 13),
-                  ),
-                  const SizedBox(height: 16),
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      _loadImageForIndex(index);
-                    },
-                    icon: const Icon(Icons.refresh_rounded, color: Colors.white70, size: 18),
-                    label: const Text('Retry', style: TextStyle(color: Colors.white70)),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Colors.white38),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.broken_image_rounded, size: 64, color: Colors.white54),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Unable to load image: $name',
+                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center,
                     ),
-                  ),
-                ],
+                    if (error != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        error,
+                        style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    Text(
+                      'URL: $fullUrl',
+                      style: const TextStyle(color: Colors.white38, fontSize: 11),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 20),
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        _loadImageForIndex(index);
+                      },
+                      icon: const Icon(Icons.refresh_rounded, color: Colors.white70, size: 18),
+                      label: const Text('Retry', style: TextStyle(color: Colors.white70)),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Colors.white38),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             );
           }

@@ -91,4 +91,51 @@ class HomeworkController extends BaseController
         $data = $this->service->deleteHomework($user, $id);
         return $this->success($response, $data, 'Homework deleted successfully');
     }
+
+    public function serveUpload(Request $request, Response $response, array $args): Response
+    {
+        $filename = ltrim((string)($args['filename'] ?? ''), '/');
+        if (empty($filename)) {
+            $response->getBody()->write('File not specified');
+            return $response->withStatus(400);
+        }
+
+        $baseNameOnly = basename($filename);
+        $dirs = [
+            dirname(__DIR__, 4) . '/public/uploads',
+            dirname(__DIR__, 5) . '/backend/public/uploads',
+            dirname(__DIR__, 5) . '/public/uploads',
+            dirname(__DIR__, 4) . '/public/uploads/homework',
+            dirname(__DIR__, 5) . '/backend/public/uploads/homework',
+            dirname(__DIR__, 5) . '/public/uploads/homework',
+        ];
+
+        $filePath = null;
+        foreach ($dirs as $dir) {
+            $candidate = $dir . '/' . $filename;
+            if (file_exists($candidate) && is_file($candidate)) {
+                $filePath = $candidate;
+                break;
+            }
+            $candidateBase = $dir . '/' . $baseNameOnly;
+            if (file_exists($candidateBase) && is_file($candidateBase)) {
+                $filePath = $candidateBase;
+                break;
+            }
+        }
+
+        if (!$filePath) {
+            $response->getBody()->write('File not found');
+            return $response->withStatus(404);
+        }
+
+        $mimeType = mime_content_type($filePath) ?: 'application/octet-stream';
+        $stream = new \Slim\Psr7\Stream(fopen($filePath, 'rb'));
+
+        return $response
+            ->withHeader('Content-Type', $mimeType)
+            ->withHeader('Content-Length', (string)filesize($filePath))
+            ->withHeader('Access-Control-Allow-Origin', '*')
+            ->withBody($stream);
+    }
 }
