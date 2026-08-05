@@ -148,7 +148,7 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
         builder: (context) => AttachmentGalleryScreen(
           attachments: attachments,
           initialIndex: initialIndex,
-          baseUrl: widget.baseUrl,
+          baseUrl: widget.baseUrl.isNotEmpty ? widget.baseUrl : _homeworkService.baseUrl,
         ),
       ),
     );

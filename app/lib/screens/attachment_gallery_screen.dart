@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:printing/printing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AttachmentGalleryScreen extends StatefulWidget {
   final List<dynamic> attachments;
@@ -56,16 +57,27 @@ class _AttachmentGalleryScreenState extends State<AttachmentGalleryScreen> {
       _errorStates[index] = null;
     });
 
-    final cleanBaseUrl = widget.baseUrl.replaceAll(RegExp(r'/$'), '');
-    final cleanRawPath = rawPath.startsWith('/') ? rawPath : '/$rawPath';
-    final primaryUrl = rawPath.startsWith('http') ? rawPath : '$cleanBaseUrl$cleanRawPath';
+    final prefs = await SharedPreferences.getInstance();
+    String activeBaseUrl = widget.baseUrl.trim();
+    if (activeBaseUrl.isEmpty || !activeBaseUrl.startsWith('http')) {
+      activeBaseUrl = prefs.getString('base_url') ?? 'https://qa.shikshapilot.com';
+    }
+    final cleanBaseUrl = activeBaseUrl.replaceAll(RegExp(r'/$'), '');
 
-    String? fallbackUrl;
-    if (!rawPath.startsWith('http')) {
+    final List<String> candidateUrls = [];
+    if (rawPath.startsWith('http')) {
+      candidateUrls.add(rawPath);
+    } else {
+      final cleanRawPath = rawPath.startsWith('/') ? rawPath : '/$rawPath';
+      candidateUrls.add('$cleanBaseUrl$cleanRawPath');
       if (cleanRawPath.contains('/uploads/homework/')) {
-        fallbackUrl = '$cleanBaseUrl${cleanRawPath.replaceFirst('/uploads/homework/', '/uploads/')}';
+        candidateUrls.add('$cleanBaseUrl${cleanRawPath.replaceFirst('/uploads/homework/', '/uploads/')}');
       } else if (cleanRawPath.contains('/uploads/')) {
-        fallbackUrl = '$cleanBaseUrl${cleanRawPath.replaceFirst('/uploads/', '/uploads/homework/')}';
+        candidateUrls.add('$cleanBaseUrl${cleanRawPath.replaceFirst('/uploads/', '/uploads/homework/')}');
+      }
+      if (cleanBaseUrl.startsWith('https://')) {
+        final httpBaseUrl = cleanBaseUrl.replaceFirst('https://', 'http://');
+        candidateUrls.add('$httpBaseUrl$cleanRawPath');
       }
     }
 
@@ -74,29 +86,31 @@ class _AttachmentGalleryScreenState extends State<AttachmentGalleryScreen> {
       'Accept': 'image/*,*/*',
     };
 
-    try {
-      var response = await http.get(Uri.parse(primaryUrl), headers: headers);
-      if (response.statusCode != 200 && fallbackUrl != null) {
-        response = await http.get(Uri.parse(fallbackUrl), headers: headers);
-      }
-
-      if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
-        if (mounted) {
-          setState(() {
-            _loadedImageBytes[index] = response.bodyBytes;
-            _loadingStates[index] = false;
-          });
+    String lastErr = 'Failed to load image';
+    for (final url in candidateUrls) {
+      try {
+        final response = await http.get(Uri.parse(url), headers: headers);
+        if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
+          if (mounted) {
+            setState(() {
+              _loadedImageBytes[index] = response.bodyBytes;
+              _loadingStates[index] = false;
+            });
+          }
+          return;
+        } else {
+          lastErr = 'HTTP ${response.statusCode} on $url';
         }
-      } else {
-        throw Exception('HTTP ${response.statusCode}');
+      } catch (e) {
+        lastErr = '$e on $url';
       }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _loadingStates[index] = false;
-          _errorStates[index] = e.toString();
-        });
-      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _loadingStates[index] = false;
+        _errorStates[index] = lastErr;
+      });
     }
   }
 
