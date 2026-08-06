@@ -6897,9 +6897,14 @@ class SchoolAdminService extends BaseService
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
         $academicYearId = $workingYear ? (int)$workingYear['id'] : null;
 
-        // Get all existing classes for oldName
-        $stmtOld = $pdo->prepare("SELECT * FROM classes WHERE school_id = :school_id AND name = :name");
-        $stmtOld->execute([':school_id' => $schoolId, ':name' => $oldName]);
+        // Get all existing classes for oldName scoped strictly to current working academic year
+        if ($academicYearId !== null) {
+            $stmtOld = $pdo->prepare("SELECT * FROM classes WHERE school_id = :school_id AND name = :name AND academic_year_id = :ayid");
+            $stmtOld->execute([':school_id' => $schoolId, ':name' => $oldName, ':ayid' => $academicYearId]);
+        } else {
+            $stmtOld = $pdo->prepare("SELECT * FROM classes WHERE school_id = :school_id AND name = :name AND academic_year_id IS NULL");
+            $stmtOld->execute([':school_id' => $schoolId, ':name' => $oldName]);
+        }
         $oldClasses = $stmtOld->fetchAll();
 
         $oldSectionsMap = [];
@@ -6976,14 +6981,24 @@ class SchoolAdminService extends BaseService
                     }
                     
                     // Find the class ID matching $targetSec in the updated classes list
-                    $stmtFindTarget = $pdo->prepare("SELECT id FROM classes WHERE school_id = :sid AND name = :name AND academic_year_id = :ayid AND (section = :sec1 OR (section IS NULL AND :sec2 = '')) LIMIT 1");
-                    $stmtFindTarget->execute([
-                        ':sid' => $schoolId,
-                        ':name' => $newName,
-                        ':ayid' => $academicYearId,
-                        ':sec1' => $targetSec === '' ? null : $targetSec,
-                        ':sec2' => $targetSec === '' ? null : $targetSec
-                    ]);
+                    if ($academicYearId !== null) {
+                        $stmtFindTarget = $pdo->prepare("SELECT id FROM classes WHERE school_id = :sid AND name = :name AND academic_year_id = :ayid AND (section = :sec1 OR (section IS NULL AND :sec2 = '')) LIMIT 1");
+                        $stmtFindTarget->execute([
+                            ':sid' => $schoolId,
+                            ':name' => $newName,
+                            ':ayid' => $academicYearId,
+                            ':sec1' => $targetSec === '' ? null : $targetSec,
+                            ':sec2' => $targetSec === '' ? null : $targetSec
+                        ]);
+                    } else {
+                        $stmtFindTarget = $pdo->prepare("SELECT id FROM classes WHERE school_id = :sid AND name = :name AND academic_year_id IS NULL AND (section = :sec1 OR (section IS NULL AND :sec2 = '')) LIMIT 1");
+                        $stmtFindTarget->execute([
+                            ':sid' => $schoolId,
+                            ':name' => $newName,
+                            ':sec1' => $targetSec === '' ? null : $targetSec,
+                            ':sec2' => $targetSec === '' ? null : $targetSec
+                        ]);
+                    }
                     $targetClassId = (int)$stmtFindTarget->fetchColumn();
                 }
 
