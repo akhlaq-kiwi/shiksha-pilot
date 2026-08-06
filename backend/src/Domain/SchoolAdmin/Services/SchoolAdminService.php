@@ -7598,26 +7598,18 @@ class SchoolAdminService extends BaseService
             return ['next_roll_no' => 1];
         }
 
-        $stmtClass = $pdo->prepare("SELECT name FROM classes WHERE id = :id AND school_id = :sid LIMIT 1");
-        $stmtClass->execute([':id' => $classId, ':sid' => $schoolId]);
-        $className = $stmtClass->fetchColumn();
-        if (!$className) {
-            return ['next_roll_no' => 1];
-        }
-
         $stmtRoll = $pdo->prepare("
-            SELECT COALESCE(MAX(CAST(s.roll_no AS UNSIGNED)), 0)
-            FROM students s
-            JOIN classes c ON s.class_id = c.id
-            WHERE s.school_id = :sid 
-              AND c.name COLLATE utf8mb4_unicode_ci = :cname COLLATE utf8mb4_unicode_ci
-              AND s.status = 'ACTIVE'
-              AND s.roll_no IS NOT NULL 
-              AND s.roll_no REGEXP '^[0-9]+$'
+            SELECT COALESCE(MAX(CAST(roll_no AS UNSIGNED)), 0)
+            FROM students
+            WHERE school_id = :sid 
+              AND class_id = :cid
+              AND status = 'ACTIVE'
+              AND roll_no IS NOT NULL 
+              AND roll_no REGEXP '^[0-9]+$'
         ");
         $stmtRoll->execute([
             ':sid' => $schoolId,
-            ':cname' => $className
+            ':cid' => $classId
         ]);
         $maxRoll = (int)$stmtRoll->fetchColumn();
         $nextRollNo = $maxRoll > 0 ? $maxRoll + 1 : 1;
@@ -7639,31 +7631,22 @@ class SchoolAdminService extends BaseService
             return false;
         }
 
-        $stmtC = $pdo->prepare("SELECT name FROM classes WHERE id = :cid AND school_id = :sid LIMIT 1");
-        $stmtC->execute([':cid' => $classId, ':sid' => $schoolId]);
-        $className = $stmtC->fetchColumn();
-
-        if (!$className) {
-            return false;
-        }
-
         $sql = "
-            SELECT s.id 
-            FROM students s
-            JOIN classes c ON s.class_id = c.id
-            WHERE s.school_id = :sid 
-              AND c.name COLLATE utf8mb4_unicode_ci = :cname COLLATE utf8mb4_unicode_ci 
-              AND s.roll_no = :roll_no 
-              AND s.status = 'ACTIVE'
+            SELECT id 
+            FROM students
+            WHERE school_id = :sid 
+              AND class_id = :cid 
+              AND roll_no = :roll_no 
+              AND status = 'ACTIVE'
         ";
         $params = [
             ':sid' => $schoolId,
-            ':cname' => $className,
+            ':cid' => $classId,
             ':roll_no' => $rollNo
         ];
 
         if ($excludeId !== null && $excludeId > 0) {
-            $sql .= " AND s.id != :exclude_id";
+            $sql .= " AND id != :exclude_id";
             $params[':exclude_id'] = $excludeId;
         }
         $sql .= " LIMIT 1";

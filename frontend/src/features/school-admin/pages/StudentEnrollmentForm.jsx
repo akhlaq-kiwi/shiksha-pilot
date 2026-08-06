@@ -381,16 +381,32 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
     loadFormDependencies();
   }, [studentId]);
 
-  // Pre-fetch next available roll number for the class
+  // Helper to extract primitive roll_no from response
+  const extractRollNoNumber = (data) => {
+    if (data === null || data === undefined) return '';
+    if (typeof data === 'number' || typeof data === 'string') return String(data);
+    if (typeof data === 'object') {
+      if (data.next_roll_no !== undefined && data.next_roll_no !== null) {
+        return extractRollNoNumber(data.next_roll_no);
+      }
+      if (data.data !== undefined && data.data !== null) {
+        return extractRollNoNumber(data.data);
+      }
+    }
+    return '';
+  };
+
+  // Pre-fetch next available roll number for the class / section
   useEffect(() => {
     const fetchNextRollNo = async () => {
       if (formData.class_id && !studentId) {
         try {
           const res = await schoolService.getNextRollNo(formData.class_id);
-          if (res && res.next_roll_no) {
+          const nextVal = extractRollNoNumber(res);
+          if (nextVal) {
             setFormData(prev => ({
               ...prev,
-              roll_no: String(res.next_roll_no)
+              roll_no: nextVal
             }));
           }
         } catch (err) {
@@ -401,13 +417,14 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
     fetchNextRollNo();
   }, [formData.class_id, studentId]);
 
-  // Real-time roll number duplicate check
+  // Real-time roll number duplicate check at class / section level
   useEffect(() => {
     const checkRollUniqueness = async () => {
       if (formData.class_id && formData.roll_no) {
         try {
           const res = await schoolService.checkRollNo(formData.class_id, formData.roll_no, studentId);
-          if (res && res.exists) {
+          const exists = typeof res === 'object' && res !== null ? (res.exists ?? res.data?.exists ?? false) : Boolean(res);
+          if (exists) {
             setErrors(prev => ({
               ...prev,
               roll_no: 'The roll no is already assigned'
