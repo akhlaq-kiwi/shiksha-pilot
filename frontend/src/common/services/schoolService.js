@@ -33,6 +33,16 @@ export const schoolService = {
     return apiClient.post(`/api/school/students/${id}/advance`, { class_id: classId });
   },
 
+  checkSrNoExists(params = {}) {
+    return apiClient.get(buildUrl('/api/school/students/check-sr-no', params));
+  },
+
+  checkRollNo(classId, rollNo, excludeId) {
+    const query = { class_id: classId, roll_no: rollNo };
+    if (excludeId) query.exclude_id = excludeId;
+    return apiClient.get(buildUrl('/api/school/students/check-roll-no', query));
+  },
+
   uploadDocument(formData) {
     return apiClient.post('/api/school/upload', formData);
   },
