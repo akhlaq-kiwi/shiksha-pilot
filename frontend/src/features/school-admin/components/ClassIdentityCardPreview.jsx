@@ -598,7 +598,7 @@ export default function ClassIdentityCardPreview({
                               Mobile
                             </span>
                             <span
-                              className="text-xs font-bold text-zinc-900 font-mono block truncate"
+                              className="text-[13.5px] font-bold text-zinc-900 font-mono block truncate"
                               style={{ lineHeight: '1.25' }}
                             >
                               {s.father_phone || s.parent_phone || s.student_mobile || s.guardian_phone || s.mobile || s.phone || '—'}
