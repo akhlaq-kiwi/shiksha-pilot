@@ -545,7 +545,7 @@ export default function ClassIdentityCardPreview({
                         {/* 1. Student Name */}
                         <div>
                           <span
-                            className="text-[8px] font-bold text-zinc-400 uppercase tracking-wider block"
+                            className="text-[7.5px] font-bold text-zinc-400 uppercase tracking-wider block"
                             style={{ lineHeight: '1.3' }}
                           >
                             Student Name
@@ -567,15 +567,15 @@ export default function ClassIdentityCardPreview({
                             Father Name
                           </span>
                           <span
-                            className="text-[9.5px] font-bold text-zinc-800 uppercase block truncate"
-                            style={{ lineHeight: '1.3' }}
+                            className="text-xs font-bold text-zinc-900 uppercase font-display block truncate"
+                            style={{ lineHeight: '1.25' }}
                           >
                             {s.father_name || s.fatherName || s.parent_name || '—'}
                           </span>
                         </div>
 
                         {/* 3. Class/Sec & 4. Mobile */}
-                        <div className="grid grid-cols-2 gap-x-2 gap-y-1 pt-1 border-t border-zinc-200/80 text-[9.5px]">
+                        <div className="grid grid-cols-2 gap-x-2 gap-y-1 pt-1 border-t border-zinc-200/80">
                           <div>
                             <span
                               className="text-[7.5px] font-bold text-zinc-400 uppercase tracking-wider block"
@@ -584,8 +584,8 @@ export default function ClassIdentityCardPreview({
                               Class/Sec
                             </span>
                             <span
-                              className="font-bold text-zinc-800 block truncate"
-                              style={{ lineHeight: '1.3' }}
+                              className="text-xs font-bold text-zinc-900 uppercase block truncate"
+                              style={{ lineHeight: '1.25' }}
                             >
                               {classSecDisplay}
                             </span>
@@ -598,8 +598,8 @@ export default function ClassIdentityCardPreview({
                               Mobile
                             </span>
                             <span
-                              className="font-bold text-zinc-800 font-mono block truncate"
-                              style={{ lineHeight: '1.3' }}
+                              className="text-xs font-bold text-zinc-900 font-mono block truncate"
+                              style={{ lineHeight: '1.25' }}
                             >
                               {s.father_phone || s.parent_phone || s.student_mobile || s.guardian_phone || s.mobile || s.phone || '—'}
                             </span>
@@ -634,7 +634,7 @@ export default function ClassIdentityCardPreview({
                             Address
                           </span>
                           <p
-                            className="text-[9px] font-semibold text-zinc-800 leading-tight line-clamp-2 break-words"
+                            className="text-xs font-bold text-zinc-900 leading-snug line-clamp-2 break-words"
                             style={{ lineHeight: '1.25' }}
                           >
                             {formattedAddress}
