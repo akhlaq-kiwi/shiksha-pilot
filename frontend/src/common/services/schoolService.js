@@ -313,6 +313,12 @@ export const schoolService = {
     return apiClient.get(`/api/school/classes/${classId}/next-roll-no`);
   },
 
+  checkRollNo(classId, rollNo, excludeId = null) {
+    let url = `/api/school/students/check-roll-no?class_id=${classId}&roll_no=${encodeURIComponent(rollNo)}`;
+    if (excludeId) url += `&exclude_id=${excludeId}`;
+    return apiClient.get(url);
+  },
+
   getStaffPayments(params) {
     return apiClient.get(buildUrl('/api/school/staff-payments', params));
   },

@@ -63,6 +63,7 @@ return function (App $app) {
     $app->get('/api/school/stats', [SchoolAdminController::class, 'getDashboardStats']);
     $app->get('/api/school/students', [SchoolAdminController::class, 'getStudents']);
     $app->get('/api/school/students/check-sr-no', [SchoolAdminController::class, 'checkSrNo']);
+    $app->get('/api/school/students/check-roll-no', [SchoolAdminController::class, 'checkRollNo']);
     $app->get('/api/school/students/{id}', [SchoolAdminController::class, 'getStudentById']);
     $app->get('/api/school/students/{student_id}/fees/receipt', [SchoolAdminController::class, 'getFeeReceipt']);
     $app->post('/api/school/students', [SchoolAdminController::class, 'createStudent']);

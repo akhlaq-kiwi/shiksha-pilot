@@ -1222,6 +1222,14 @@ class SchoolAdminService extends BaseService
             $srNo = (string)($highest > 0 ? $highest + 1 : 1001);
         }
 
+        // Uniqueness check for Roll Number in the same class
+        if ($classId !== null && !empty($data['roll_no'])) {
+            $rollNoVal = trim((string)$data['roll_no']);
+            if ($this->checkRollNoExistsInternal($pdo, $schoolId, (int)$classId, $rollNoVal)) {
+                $errors['roll_no'] = 'The roll no is already assigned';
+            }
+        }
+
         if (!empty($errors)) {
             throw new ValidationException($errors);
         }
@@ -1492,6 +1500,18 @@ class SchoolAdminService extends BaseService
             if (empty($srNo)) {
                 $highest = $this->getHighestSrNo($schoolId);
                 $srNo = (string)($highest > 0 ? $highest + 1 : 1001);
+            }
+        }
+
+        if (!empty($errors)) {
+            throw new ValidationException($errors);
+        }
+
+        // Uniqueness check for Roll Number in the same class
+        if ($classId !== null && !empty($data['roll_no'])) {
+            $rollNoVal = trim((string)$data['roll_no']);
+            if ($this->checkRollNoExistsInternal($pdo, $schoolId, (int)$classId, $rollNoVal, $id)) {
+                $errors['roll_no'] = 'The roll no is already assigned';
             }
         }
 
@@ -7574,29 +7594,83 @@ class SchoolAdminService extends BaseService
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->classRepo->getPdo();
 
-        $stmtClass = $pdo->prepare("SELECT id, academic_year_id FROM classes WHERE id = :id AND school_id = :sid LIMIT 1");
-        $stmtClass->execute([':id' => $classId, ':sid' => $schoolId]);
-        $class = $stmtClass->fetch(\PDO::FETCH_ASSOC);
-        if (!$class) {
-            throw new NotFoundException('Class not found.');
+        if ($classId <= 0) {
+            return ['next_roll_no' => 1];
         }
 
-        $academicYearId = (int)$class['academic_year_id'];
+        $stmtClass = $pdo->prepare("SELECT name FROM classes WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtClass->execute([':id' => $classId, ':sid' => $schoolId]);
+        $className = $stmtClass->fetchColumn();
+        if (!$className) {
+            return ['next_roll_no' => 1];
+        }
 
         $stmtRoll = $pdo->prepare("
-            SELECT MAX(CAST(roll_no AS UNSIGNED)) 
-            FROM students 
-            WHERE class_id = :class_id AND academic_year_id = :academic_year_id AND school_id = :school_id
+            SELECT COALESCE(MAX(CAST(s.roll_no AS UNSIGNED)), 0)
+            FROM students s
+            JOIN classes c ON s.class_id = c.id
+            WHERE s.school_id = :sid 
+              AND c.name COLLATE utf8mb4_unicode_ci = :cname COLLATE utf8mb4_unicode_ci
+              AND s.status = 'ACTIVE'
+              AND s.roll_no IS NOT NULL 
+              AND s.roll_no REGEXP '^[0-9]+$'
         ");
         $stmtRoll->execute([
-            ':class_id' => $classId,
-            ':academic_year_id' => $academicYearId,
-            ':school_id' => $schoolId
+            ':sid' => $schoolId,
+            ':cname' => $className
         ]);
         $maxRoll = (int)$stmtRoll->fetchColumn();
-        $nextRollNo = $maxRoll + 1;
+        $nextRollNo = $maxRoll > 0 ? $maxRoll + 1 : 1;
 
         return ['next_roll_no' => $nextRollNo];
+    }
+
+    public function checkRollNoExists(array $user, int $classId, string $rollNo, ?int $excludeId = null): bool
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->studentRepo->getPdo();
+        return $this->checkRollNoExistsInternal($pdo, $schoolId, $classId, $rollNo, $excludeId);
+    }
+
+    private function checkRollNoExistsInternal(\PDO $pdo, int $schoolId, int $classId, string $rollNo, ?int $excludeId = null): bool
+    {
+        $rollNo = trim($rollNo);
+        if ($classId <= 0 || $rollNo === '') {
+            return false;
+        }
+
+        $stmtC = $pdo->prepare("SELECT name FROM classes WHERE id = :cid AND school_id = :sid LIMIT 1");
+        $stmtC->execute([':cid' => $classId, ':sid' => $schoolId]);
+        $className = $stmtC->fetchColumn();
+
+        if (!$className) {
+            return false;
+        }
+
+        $sql = "
+            SELECT s.id 
+            FROM students s
+            JOIN classes c ON s.class_id = c.id
+            WHERE s.school_id = :sid 
+              AND c.name COLLATE utf8mb4_unicode_ci = :cname COLLATE utf8mb4_unicode_ci 
+              AND s.roll_no = :roll_no 
+              AND s.status = 'ACTIVE'
+        ";
+        $params = [
+            ':sid' => $schoolId,
+            ':cname' => $className,
+            ':roll_no' => $rollNo
+        ];
+
+        if ($excludeId !== null && $excludeId > 0) {
+            $sql .= " AND s.id != :exclude_id";
+            $params[':exclude_id'] = $excludeId;
+        }
+        $sql .= " LIMIT 1";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchColumn() !== false;
     }
 
     public function getStaffPayments(array $user, string $month): array

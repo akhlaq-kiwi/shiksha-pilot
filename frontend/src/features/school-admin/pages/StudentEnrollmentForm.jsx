@@ -401,6 +401,35 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
     fetchNextRollNo();
   }, [formData.class_id, studentId]);
 
+  // Real-time roll number duplicate check
+  useEffect(() => {
+    const checkRollUniqueness = async () => {
+      if (formData.class_id && formData.roll_no) {
+        try {
+          const res = await schoolService.checkRollNo(formData.class_id, formData.roll_no, studentId);
+          if (res && res.exists) {
+            setErrors(prev => ({
+              ...prev,
+              roll_no: 'The roll no is already assigned'
+            }));
+          } else {
+            setErrors(prev => {
+              const copy = { ...prev };
+              if (copy.roll_no === 'The roll no is already assigned') {
+                delete copy.roll_no;
+              }
+              return copy;
+            });
+          }
+        } catch (err) {
+          console.error('Failed to check roll number uniqueness:', err);
+        }
+      }
+    };
+    const timer = setTimeout(checkRollUniqueness, 250);
+    return () => clearTimeout(timer);
+  }, [formData.class_id, formData.roll_no, studentId]);
+
   // Set default class fields from props for new student
   useEffect(() => {
     if (!studentId && currentClassName && classesList.length > 0) {
@@ -1179,9 +1208,10 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                       <Input id="roll_no"
                         name="roll_no"
                         value={formData.roll_no || ''}
-                        onChange={handleTextChange}
+                        onChange={handleNumericChange}
                         placeholder="e.g. 15"
                       />
+                      {errors.roll_no && <p className="text-[11px] text-red-500 font-semibold">{errors.roll_no}</p>}
                     </div>
                   </div>
 
