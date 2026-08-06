@@ -1266,15 +1266,11 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
               <div className="space-y-6 animate-in fade-in duration-200">
                 <div>
                   <h3 className="text-sm font-bold text-text-primary uppercase tracking-wide border-b border-border pb-2 mb-4">Current Address</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4">
                     <div className="space-y-1.5">
-                      <label htmlFor="current_address_line_1" className="text-xs font-bold text-text-secondary uppercase">Address Line 1 <span className="text-red-500">*</span></label>
+                      <label htmlFor="current_address_line_1" className="text-xs font-bold text-text-secondary uppercase">Address <span className="text-red-500">*</span></label>
                       <Input id="current_address_line_1" name="current_address_line_1" value={formData.current_address_line_1} onChange={handleTextChange} placeholder="House no, street, locality..." required />
                       {errors.current_address_line_1 && <p className="text-[11px] text-red-500 font-semibold">{errors.current_address_line_1}</p>}
-                    </div>
-                    <div className="space-y-1.5">
-                      <label htmlFor="current_address_line_2" className="text-xs font-bold text-text-secondary uppercase">Address Line 2</label>
-                      <Input id="current_address_line_2" name="current_address_line_2" value={formData.current_address_line_2} onChange={handleTextChange} placeholder="Apartment, suite, unit, etc. (optional)" />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-3">
@@ -1323,15 +1319,11 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
 
                   {formData.same_as_current === 0 && (
                     <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 gap-4">
                         <div className="space-y-1.5">
-                          <label htmlFor="permanent_address_line_1" className="text-xs font-bold text-text-secondary uppercase">Permanent Address Line 1 <span className="text-red-500">*</span></label>
+                          <label htmlFor="permanent_address_line_1" className="text-xs font-bold text-text-secondary uppercase">Permanent Address <span className="text-red-500">*</span></label>
                           <Input id="permanent_address_line_1" name="permanent_address_line_1" value={formData.permanent_address_line_1} onChange={handleTextChange} placeholder="House no, street, locality..." required />
                           {errors.permanent_address_line_1 && <p className="text-[11px] text-red-500 font-semibold">{errors.permanent_address_line_1}</p>}
-                        </div>
-                        <div className="space-y-1.5">
-                          <label htmlFor="permanent_address_line_2" className="text-xs font-bold text-text-secondary uppercase">Permanent Address Line 2</label>
-                          <Input id="permanent_address_line_2" name="permanent_address_line_2" value={formData.permanent_address_line_2} onChange={handleTextChange} placeholder="Apartment, suite, unit, etc. (optional)" />
                         </div>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

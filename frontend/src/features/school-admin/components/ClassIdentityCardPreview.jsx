@@ -608,21 +608,40 @@ export default function ClassIdentityCardPreview({
                       </div>
                     </div>
 
-                    {/* 5. Add (Address at bottom separately) */}
-                    <div className="pt-1.5 border-t border-zinc-200/80 text-left">
-                      <span
-                        className="text-[7.5px] font-bold text-zinc-400 uppercase tracking-wider block"
-                        style={{ lineHeight: '1.3' }}
-                      >
-                        Add
-                      </span>
-                      <p
-                        className="text-[9px] font-semibold text-zinc-800 leading-tight line-clamp-2 break-words"
-                        style={{ lineHeight: '1.25' }}
-                      >
-                        {s.address || s.permanent_address || s.street_address || s.current_address || '—'}
-                      </p>
-                    </div>
+                    {/* 5. Add (Address + City at bottom separately) */}
+                    {(() => {
+                      const rawAddr = (s.current_address_line || s.address || s.permanent_address_line || s.current_address || '').trim();
+                      const rawCity = (s.current_city || s.city || s.permanent_city || '').trim();
+                      let formattedAddress = '—';
+                      if (rawAddr && rawCity) {
+                        if (rawAddr.toLowerCase().endsWith(rawCity.toLowerCase())) {
+                          formattedAddress = rawAddr;
+                        } else {
+                          formattedAddress = `${rawAddr}, ${rawCity}`;
+                        }
+                      } else if (rawAddr) {
+                        formattedAddress = rawAddr;
+                      } else if (rawCity) {
+                        formattedAddress = rawCity;
+                      }
+
+                      return (
+                        <div className="pt-1.5 border-t border-zinc-200/80 text-left">
+                          <span
+                            className="text-[7.5px] font-bold text-zinc-400 uppercase tracking-wider block"
+                            style={{ lineHeight: '1.3' }}
+                          >
+                            Add
+                          </span>
+                          <p
+                            className="text-[9px] font-semibold text-zinc-800 leading-tight line-clamp-2 break-words"
+                            style={{ lineHeight: '1.25' }}
+                          >
+                            {formattedAddress}
+                          </p>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Card Footer Bar: Displays Signature image with "Principal Signature" title below */}
