@@ -3280,7 +3280,11 @@ class SchoolAdminService extends BaseService
                         $newClassId = (int)$pdo->lastInsertId();
                         $classMap[(int)$oc['id']] = $newClassId;
                     }
-                       // 4. Duplicate subjects - no longer needed since they are school-level master subjects.
+                }
+
+                $oldClassIds = array_keys($classMap);
+
+                // 4. Duplicate subjects - no longer needed since they are school-level master subjects.
                 // We just map the subject IDs to themselves to maintain compatibility.
                 $subjectMap = []; 
                 $stmtSubjects = $pdo->prepare("SELECT id FROM subjects WHERE school_id = :sid");
@@ -3288,7 +3292,7 @@ class SchoolAdminService extends BaseService
                 $subjectIds = $stmtSubjects->fetchAll(PDO::FETCH_COLUMN) ?: [];
                 foreach ($subjectIds as $sid) {
                     $subjectMap[(int)$sid] = (int)$sid;
-                }             }
+                }
 
                 // 4. Duplicate timetable entries
                 $stmtTimetable = $pdo->prepare("SELECT * FROM timetable WHERE school_id = :sid AND class_id IS NOT NULL");
@@ -3301,7 +3305,7 @@ class SchoolAdminService extends BaseService
                 ");
                 foreach ($oldTimetables as $ot) {
                     $oldClassId = (int)$ot['class_id'];
-                    if (in_array($oldClassId, $oldClassIds, true)) {
+                    if (isset($classMap[$oldClassId])) {
                         $newClassId = $classMap[$oldClassId];
                         $oldSubjId = (int)$ot['subject_id'];
                         $newSubjId = $subjectMap[$oldSubjId] ?? null;
@@ -3336,7 +3340,7 @@ class SchoolAdminService extends BaseService
                 $stmtInsFee = $pdo->prepare("INSERT INTO fee_structures (school_id, name, amount, frequency, class_id) VALUES (:school_id, :name, :amount, :frequency, :class_id)");
                 foreach ($oldFeeStructures as $ofs) {
                     $oldClassId = (int)$ofs['class_id'];
-                    if (in_array($oldClassId, $oldClassIds, true)) {
+                    if (isset($classMap[$oldClassId])) {
                         $newClassId = $classMap[$oldClassId];
                         $stmtInsFee->execute([
                             ':school_id' => $schoolId,
