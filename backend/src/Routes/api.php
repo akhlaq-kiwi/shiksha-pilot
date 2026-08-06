@@ -12,6 +12,7 @@ use App\Domain\Teacher\Controllers\TeacherController;
 use App\Domain\Student\Controllers\StudentController;
 use App\Domain\SchoolAdmin\Controllers\LeaveRequestController;
 use App\Domain\Student\Controllers\VocabularyController;
+use App\Domain\Teacher\Controllers\HomeworkController;
 
 use App\Domain\Platform\Controllers\ReportCardTemplateController;
 
@@ -297,6 +298,15 @@ return function (App $app) {
     $app->post('/api/student/notifications/read-all', [StudentController::class, 'markAllNotificationsRead']);
     $app->post('/api/student/notifications/{id}/read', [StudentController::class, 'markNotificationRead']);
     $app->delete('/api/student/notifications/{id}', [StudentController::class, 'deleteNotification']);
+
+    // Homework Module
+    $app->post('/api/homework/upload-attachment', [HomeworkController::class, 'uploadAttachment']);
+    $app->get('/api/teacher/homework', [HomeworkController::class, 'getTeacherHomework']);
+    $app->post('/api/teacher/homework', [HomeworkController::class, 'createHomework']);
+    $app->put('/api/teacher/homework/{id}', [HomeworkController::class, 'updateHomework']);
+    $app->delete('/api/teacher/homework/{id}', [HomeworkController::class, 'deleteHomework']);
+    $app->get('/api/student/homework', [HomeworkController::class, 'getStudentHomework']);
+    $app->get('/uploads/{filename:.+}', [HomeworkController::class, 'serveUpload']);
 
     // Word Builder Game endpoints
     $app->get('/api/student/game/word-builder/progress', [VocabularyController::class, 'getGameProgress']);

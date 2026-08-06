@@ -22,6 +22,7 @@ import 'package:school_hub/main.dart';
 import 'package:school_hub/services/exam_service.dart';
 import 'package:school_hub/screens/exam_list_screen.dart';
 import 'package:school_hub/screens/achievements_screen.dart';
+import 'package:school_hub/screens/homework_list_screen.dart';
 import 'package:school_hub/widgets/change_password_dialog.dart';
 
 class LauncherFeature {
@@ -110,6 +111,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       icon: Icons.menu_book_rounded,
       color: Colors.indigo,
       allowedRoles: ['PARENT', 'TEACHER', 'STUDENT'],
+      isAvailable: true,
     ),
     LauncherFeature(
       name: 'Timetable',
@@ -387,13 +389,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (token.isEmpty) return;
       final baseUrl = widget.leaveService.baseUrl;
 
-      final isSchoolStaff = widget.userRole.toUpperCase() == 'TEACHER' || 
-                            widget.userRole.toUpperCase() == 'SCHOOL_ADMIN' || 
-                            widget.userRole.toUpperCase() == 'PRINCIPAL';
-
-      final path = isSchoolStaff 
-          ? '/api/school/notifications' 
-          : '/api/student/notifications';
+      final roleUpper = widget.userRole.toUpperCase();
+      final String path;
+      final bool isSchoolStaff;
+      if (roleUpper == 'TEACHER') {
+        path = '/api/teacher/notifications';
+        isSchoolStaff = true;
+      } else if (roleUpper == 'SCHOOL_ADMIN' || roleUpper == 'PRINCIPAL' || roleUpper == 'SUPER_ADMIN') {
+        path = '/api/school/notifications';
+        isSchoolStaff = true;
+      } else {
+        path = '/api/student/notifications';
+        isSchoolStaff = false;
+      }
 
       final uri = Uri.parse('$baseUrl$path');
 
@@ -417,18 +425,29 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           });
         }
 
-        // Show push notification toast banner for the latest unread notification
         if (data.isNotEmpty) {
-          final latestNotif = data.first;
-          final int latestId = latestNotif['id'] is int 
-              ? latestNotif['id'] 
-              : int.parse(latestNotif['id'].toString());
-          final isUnread = latestNotif['is_read'] == 0 || latestNotif['is_read'] == false || latestNotif['is_read'] == '0';
+          int lastNotifiedId = prefs.getInt('last_notified_id_${widget.userRole}') ?? 0;
+          int maxId = lastNotifiedId;
 
-          final lastNotifiedId = prefs.getInt('last_notified_id_${widget.userRole}') ?? 0;
-          if (isUnread && latestId > lastNotifiedId) {
-            await prefs.setInt('last_notified_id_${widget.userRole}', latestId);
-            await NotificationHelper.showNotification(latestNotif);
+          final unreadNotifs = data.where((n) {
+            final isUnread = n['is_read'] == 0 || n['is_read'] == false || n['is_read'] == '0';
+            final int nId = n['id'] is int ? n['id'] : int.parse(n['id'].toString());
+            return isUnread && nId > lastNotifiedId;
+          }).toList();
+
+          unreadNotifs.sort((a, b) {
+            final int aId = a['id'] is int ? a['id'] : int.parse(a['id'].toString());
+            final int bId = b['id'] is int ? b['id'] : int.parse(b['id'].toString());
+            return aId.compareTo(bId);
+          });
+
+          if (unreadNotifs.isNotEmpty) {
+            for (final notif in unreadNotifs) {
+              final int nId = notif['id'] is int ? notif['id'] : int.parse(notif['id'].toString());
+              if (nId > maxId) maxId = nId;
+              await NotificationHelper.showNotification(notif);
+            }
+            await prefs.setInt('last_notified_id_${widget.userRole}', maxId);
           }
         }
       }
@@ -482,6 +501,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       token: widget.leaveService.token,
                       userRole: widget.userRole,
                       selectedStudentId: _activeStudentId,
+                    ),
+                  ),
+                );
+              } else if (titleLower.contains('homework') || msgLower.contains('homework') || titleLower.contains('assignment') || msgLower.contains('assignment')) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => HomeworkListScreen(
+                      userRole: widget.userRole,
+                      selectedStudentId: _activeStudentId,
+                      baseUrl: widget.leaveService.baseUrl,
                     ),
                   ),
                 );
@@ -927,6 +957,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
         ).then((_) => _fetchUnreadNotificationsCount());
+      } else if (feature.name == 'Homework') {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => HomeworkListScreen(
+              userRole: widget.userRole,
+              selectedStudentId: _activeStudentId,
+              baseUrl: widget.leaveService.baseUrl,
+            ),
+          ),
+        );
       } else if (feature.name == 'Timetable') {
         Navigator.push(
           context,

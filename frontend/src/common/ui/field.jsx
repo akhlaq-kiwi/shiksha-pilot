@@ -97,8 +97,17 @@ export const Field = ({
  * field-level message 800px below the fold is invisible.
  */
 export const FormErrorSummary = ({ errors, title = 'Please fix the following', className }) => {
-  const entries = Object.entries(errors || {}).filter(([, v]) => !!v);
-  if (entries.length === 0) return null;
+  const rawEntries = Object.entries(errors || {}).filter(([, v]) => !!v);
+  if (rawEntries.length === 0) return null;
+
+  // Deduplicate entries by unique error message text
+  const uniqueMap = new Map();
+  rawEntries.forEach(([key, msg]) => {
+    if (!uniqueMap.has(msg)) {
+      uniqueMap.set(msg, key);
+    }
+  });
+  const entries = Array.from(uniqueMap.entries()).map(([msg, key]) => [key, msg]);
 
   return (
     <div

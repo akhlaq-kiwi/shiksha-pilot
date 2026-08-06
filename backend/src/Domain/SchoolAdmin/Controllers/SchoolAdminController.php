@@ -1373,7 +1373,7 @@ class SchoolAdminController extends BaseController
 
         $response->getBody()->write($excelData);
         return $response
-            ->withHeader('Content-Type', 'application/vnd.ms-excel')
+            ->withHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
             ->withHeader('Content-Disposition', 'attachment; filename="' . $filename . '"')
             ->withHeader('Pragma', 'no-cache')
             ->withHeader('Expires', '0');

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Plus, CheckCircle2, ChevronRight, UserCog, Users, ShieldAlert, Award, FileSpreadsheet, ArrowLeft, RefreshCw, Check, Lock, Save, Trash2, Loader2, AlertTriangle, X } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
@@ -40,6 +40,16 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
   const [replacePrevTeacherName, setReplacePrevTeacherName] = useState('');
   const [replaceNewTeacherId, setReplaceNewTeacherId] = useState('');
   const [replaceNewTeacherName, setReplaceNewTeacherName] = useState('');
+
+  // Auto-clear success message for Class Teacher assignment after 5 seconds
+  useEffect(() => {
+    if (assignSuccess) {
+      const timer = setTimeout(() => {
+        setAssignSuccess('');
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [assignSuccess]);
 
   const MENU_OPTIONS = [
     'Dashboard',
@@ -229,6 +239,15 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
 
   // Class Fee Configuration States
   const [selectedClassId, setSelectedClassId] = useState('');
+  const [showSelectClassNotice, setShowSelectClassNotice] = useState(true);
+
+  useEffect(() => {
+    setShowSelectClassNotice(true);
+    const timer = setTimeout(() => {
+      setShowSelectClassNotice(false);
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, []);
   const [configuredClassIds, setConfiguredClassIds] = useState([]);
   const [feeMode, setFeeMode] = useState('SAME'); // 'SAME' or 'DIFFERENT'
   const [sameFeeAmount, setSameFeeAmount] = useState('');
@@ -241,6 +260,14 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
   const [feeError, setFeeError] = useState('');
   const [feeSuccess, setFeeSuccess] = useState('');
   const [isSwitchingClass, setIsSwitchingClass] = useState(false);
+
+  useEffect(() => {
+    if (!feeSuccess) return;
+    const timer = setTimeout(() => {
+      setFeeSuccess('');
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [feeSuccess]);
 
   // Source Data for Wizard
   const [staff, setStaff] = useState([]);
@@ -479,6 +506,32 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
     }
   }, [location.state]);
 
+  // Group classes by unique Class Name so fee configuration applies class-wide across all sections
+  const uniqueClassGroups = useMemo(() => {
+    const map = new Map();
+    (classes || []).forEach(c => {
+      if (!c.name) return;
+      if (!map.has(c.name)) {
+        map.set(c.name, []);
+      }
+      map.get(c.name).push(c);
+    });
+
+    return Array.from(map.entries()).map(([className, items]) => {
+      const hasConfiguredName = (configuredClassIds || []).some(cid => {
+        const found = (classes || []).find(cl => String(cl.id) === String(cid));
+        return found && found.name === className;
+      });
+
+      return {
+        name: className,
+        primaryId: String(items[0].id),
+        allIds: items.map(item => String(item.id)),
+        isConfigured: items.some(item => configuredClassIds.includes(String(item.id))) || hasConfiguredName
+      };
+    });
+  }, [classes, configuredClassIds]);
+
   // Load configuration for the selected class and active academic year
   useEffect(() => {
     const fetchConfig = async () => {
@@ -498,20 +551,30 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
 
       try {
         setFeeError('');
-        const res = await schoolService.getClassFeeConfigurations({
-          class_id: selectedClassId,
+        const selectedGroup = uniqueClassGroups.find(g => g.allIds.includes(String(selectedClassId)));
+        const targetName = selectedGroup ? selectedGroup.name : (classes.find(c => String(c.id) === String(selectedClassId))?.name);
+
+        const allConfigs = await schoolService.getClassFeeConfigurations({
           academic_year_id: activeYear.id
         });
-        
-        if (res && res.length > 0) {
-          const config = res[0];
-          setFeeMode(config.mode);
+
+        let config = null;
+        if (allConfigs && allConfigs.length > 0) {
+          config = allConfigs.find(cfg => {
+            if (selectedGroup && selectedGroup.allIds.includes(String(cfg.class_id))) return true;
+            const c = classes.find(cl => String(cl.id) === String(cfg.class_id));
+            return c && c.name === targetName;
+          });
+        }
+
+        if (config) {
+          setFeeMode(config.mode || 'SAME');
           setIsConfigLocked(false); // Ignore is_locked: monthly fee must be editable whenever required
           
           if (config.mode === 'SAME') {
-            setSameFeeAmount(config.monthly_fees.April || '');
+            setSameFeeAmount(config.monthly_fees?.April || '');
           } else {
-            setMonthlyFeesMap(config.monthly_fees);
+            setMonthlyFeesMap(config.monthly_fees || {});
           }
         } else {
           setIsConfigLocked(false);
@@ -529,7 +592,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
     };
 
     fetchConfig();
-  }, [selectedClassId, academicYears]);
+  }, [selectedClassId, academicYears, uniqueClassGroups, classes]);
 
   const handleConfirmSaveConfig = () => {
     setFeeError('');
@@ -592,14 +655,22 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
     }
 
     try {
-      await schoolService.saveClassFeeConfiguration({
-        class_id: parseInt(selectedClassId, 10),
-        academic_year_id: activeYear.id,
-        mode: feeMode,
-        monthly_fees: feesMap
-      });
+      const selectedGroup = uniqueClassGroups.find(g => g.allIds.includes(String(selectedClassId)));
+      const idsToSave = selectedGroup ? selectedGroup.allIds : [String(selectedClassId)];
+
+      await Promise.all(
+        idsToSave.map(cid =>
+          schoolService.saveClassFeeConfiguration({
+            class_id: parseInt(cid, 10),
+            academic_year_id: activeYear.id,
+            mode: feeMode,
+            monthly_fees: feesMap
+          })
+        )
+      );
 
       setFeeSuccess('Fee configuration saved successfully.');
+      setTimeout(() => setFeeSuccess(''), 5000);
       setIsConfigLocked(false);
       fetchConfiguredClasses();
       setSelectedClassId('');
@@ -1068,14 +1139,14 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
             </div>
           )}
 
-          {!selectedClassId && (
-            <div className="p-3.5 bg-primary/5 border border-primary/10 rounded-xl flex items-center gap-2.5 text-xs text-primary font-bold">
+          {!selectedClassId && showSelectClassNotice && (
+            <div className="p-3.5 bg-primary/5 border border-primary/10 rounded-xl flex items-center gap-2.5 text-xs text-primary font-bold animate-in fade-in duration-300">
               <ShieldAlert className="h-4 w-4 text-primary flex-shrink-0" />
               <span>Please select a class to configure its fee structure.</span>
             </div>
           )}
 
-          <div className="flex flex-col sm:flex-row sm:items-end gap-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-end gap-6">
             <div className="w-full sm:w-[240px]">
               <label className="text-xs font-bold text-text-secondary uppercase block mb-2">Class *</label>
               <select
@@ -1085,114 +1156,58 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                 className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs"
               >
                 <option value="">Select Class</option>
-                {classes.map(c => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}{c.section ? ` - ${c.section}` : ''}
-                    {configuredClassIds.includes(String(c.id)) ? ' (Configured)' : ''}
+                {uniqueClassGroups.map(group => (
+                  <option key={group.name} value={group.primaryId}>
+                    {group.name}
+                    {group.isConfigured ? ' (Configured)' : ''}
                   </option>
                 ))}
               </select>
             </div>
+          </div>
 
-            <div className="flex-1 flex flex-col justify-end min-w-[280px]">
-              <label htmlFor="fee-mode" className="text-xs font-bold text-text-secondary uppercase mb-2">Fee Mode</label>
-              <div className="flex items-center gap-6 h-10">
-                <label className="flex items-center gap-2 text-xs font-bold uppercase cursor-pointer select-none">
-                  <input
-                    type="radio"
-                    name="feeMode"
-                    value="SAME"
-                    checked={feeMode === 'SAME'}
-                    disabled={!selectedClassId || isConfigLocked}
-                    onChange={() => setFeeMode('SAME')}
-                    className="rounded-full border-zinc-300 text-primary focus:ring-primary h-4 w-4"
-                  />
-                  Same fee for all months
-                </label>
-                <label className="flex items-center gap-2 text-xs font-bold uppercase cursor-pointer select-none">
-                  <input
-                    type="radio"
-                    name="feeMode"
-                    value="DIFFERENT"
-                    checked={feeMode === 'DIFFERENT'}
-                    disabled={!selectedClassId || isConfigLocked}
-                    onChange={() => setFeeMode('DIFFERENT')}
-                    className="rounded-full border-zinc-300 text-primary focus:ring-primary h-4 w-4"
-                  />
-                  Different fee every month
-                </label>
-              </div>
+          <div className="border-t border-border pt-4 mt-2 space-y-2 w-full sm:w-[240px]">
+            <label className="text-xs font-bold text-text-secondary uppercase block">Fee Amount</label>
+            <div className="relative">
+              <span className="absolute left-3 top-2.5 text-xs text-text-muted">₹</span>
+              <Input
+                type="number"
+                placeholder="e.g. 1500"
+                value={sameFeeAmount}
+                onChange={e => setSameFeeAmount(e.target.value)}
+                disabled={!selectedClassId || isConfigLocked}
+                className="pl-7 text-xs font-semibold w-full"
+              />
             </div>
+            <p className="text-[11px] text-text-muted">This amount will be applied to all 12 academic months automatically.</p>
           </div>
 
-          <div className="border-t border-border pt-4 mt-2">
-            {feeMode === 'SAME' ? (
-              <div className="space-y-2 w-full sm:w-[240px]">
-                <label className="text-xs font-bold text-text-secondary uppercase">Fee Amount</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-xs text-text-muted">₹</span>
-                  <Input id="fee-mode"
-                    type="number"
-                    placeholder="e.g. 1500"
-                    value={sameFeeAmount}
-                    onChange={e => setSameFeeAmount(e.target.value)}
-                    disabled={!selectedClassId || isConfigLocked}
-                    className="pl-7 text-xs font-semibold w-full"
-                  />
+          {selectedClassId && (isConfigLocked || isReadOnly) ? (
+            <div className="mt-6 p-4 bg-zinc-100 border border-zinc-200 dark:bg-zinc-900/50 dark:border-zinc-800 rounded-xl flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center">
+                  <Lock className="h-4 w-4 text-zinc-500" />
                 </div>
-                <p className="text-[11px] text-text-muted">This amount will be applied to all 12 academic months automatically.</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <p className="text-[11px] text-text-muted font-bold uppercase">Monthly Fees Grid</p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  {['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'].map(m => (
-                    <div key={m} className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-text-secondary uppercase">{m}</label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-2.5 text-xs text-text-muted">₹</span>
-                        <Input aria-label="0"
-                          type="number"
-                          placeholder="0"
-                          value={monthlyFeesMap[m] || ''}
-                          onChange={e => setMonthlyFeesMap(p => ({ ...p, [m]: e.target.value }))}
-                          disabled={!selectedClassId || isConfigLocked}
-                          className="pl-7 text-xs font-semibold"
-                        />
-                      </div>
-                    </div>
-                  ))}
+                <div>
+                  <p className="text-xs font-bold text-text-primary font-display">Fee Configuration Locked</p>
+                  <p className="text-[11px] text-text-muted mt-0.5">{isReadOnly ? 'Fee configuration cannot be modified in an archived academic year.' : 'This configuration is permanently locked for the active year.'}</p>
                 </div>
               </div>
-            )}
-
-            {selectedClassId && (isConfigLocked || isReadOnly) ? (
-              <div className="mt-6 p-4 bg-zinc-100 border border-zinc-200 dark:bg-zinc-900/50 dark:border-zinc-800 rounded-xl flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center">
-                    <Lock className="h-4 w-4 text-zinc-500" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-text-primary font-display">Fee Configuration Locked</p>
-                    <p className="text-[11px] text-text-muted mt-0.5">{isReadOnly ? 'Fee configuration cannot be modified in an archived academic year.' : 'This configuration is permanently locked for the active year.'}</p>
-                  </div>
-                </div>
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-zinc-200 text-zinc-600 border border-zinc-300">
-                  LOCKED
-                </span>
-              </div>
-            ) : (
-              <div className="mt-6 flex justify-end">
-                <Button 
-                  onClick={handleConfirmSaveConfig}
-                  disabled={!selectedClassId}
-                  className="font-bold flex items-center gap-1.5 shadow-sm bg-primary"
-                >
-                  Save Fee Configuration
-                </Button>
-              </div>
-            )}
-          </div>
+              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-zinc-200 text-zinc-600 border border-zinc-300">
+                LOCKED
+              </span>
+            </div>
+          ) : (
+            <div className="mt-6 flex justify-end">
+              <Button 
+                onClick={handleConfirmSaveConfig}
+                disabled={!selectedClassId}
+                className="font-bold flex items-center gap-1.5 shadow-sm bg-primary"
+              >
+                Save Fee Configuration
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 

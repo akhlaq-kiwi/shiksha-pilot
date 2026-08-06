@@ -290,8 +290,10 @@ export default function StaffPage() {
   const [success, setSuccess] = useState('');
   const [formErrors, setFormErrors] = useState({});
 
-  const loadStaff = async () => {
-    setLoading(true);
+  const loadStaff = async (showLoading = false) => {
+    if (showLoading || staff.length === 0) {
+      setLoading(true);
+    }
     setError('');
     try {
       const data = await schoolService.getStaff({ date: getLocalDateStr() });
@@ -320,7 +322,7 @@ export default function StaffPage() {
   const { isReadOnly } = useAcademicYear();
 
   useEffect(() => {
-    loadStaff();
+    loadStaff(true);
     const fetchTimetableSettings = async () => {
       try {
         const settings = await schoolAdminService.getTimetableSettings();
@@ -354,7 +356,7 @@ export default function StaffPage() {
     fetchYears();
 
     const handleYearSwitch = () => {
-      loadStaff();
+      loadStaff(true);
       if (selectedTeacherId && view === 'details') {
         loadTeacherDetails(selectedTeacherId);
       }
@@ -363,7 +365,7 @@ export default function StaffPage() {
     return () => {
       window.removeEventListener('academic-year-switched', handleYearSwitch);
     };
-  }, [selectedTeacherId, view]);
+  }, []);
 
   useEffect(() => {
     if (selectedTeacherId && view === 'details') {
@@ -667,18 +669,25 @@ export default function StaffPage() {
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       console.error(err);
+      let fieldErrors = {};
+
       if (err.data && typeof err.data === 'object') {
-        const errors = { ...err.data };
-        if (errors.phone) {
-          errors.phone = "Phone number already exists. Please use a different mobile number.";
+        if (err.data.errors && typeof err.data.errors === 'object') {
+          fieldErrors = { ...err.data.errors };
+        } else {
+          fieldErrors = { ...err.data };
         }
-        setFormErrors(errors);
-      } else if (err.message && (err.message.includes('contact number') || err.message.includes('phone') || err.message.includes('registered') || err.message.includes('exists'))) {
-        setFormErrors({
-          phone: "Phone number already exists. Please use a different mobile number."
-        });
       }
-      setError(err.message || 'Failed to save teacher details.');
+
+      if (!fieldErrors.phone && err.message && (err.message.includes('contact number') || err.message.includes('phone') || err.message.includes('registered') || err.message.includes('exists') || err.message.includes('other school') || err.message.includes('inactive') || err.message.includes('Inactive'))) {
+        fieldErrors.phone = err.message;
+      }
+
+      setFormErrors(fieldErrors);
+
+      if (Object.keys(fieldErrors).length === 0) {
+        setError(err.message || 'Failed to save teacher details.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -1555,7 +1564,7 @@ export default function StaffPage() {
           <Button variant="secondary" onClick={() => setIsAddStaffOpen(false)}>Cancel</Button>
           <Button onClick={handleAddStaff} disabled={submitting}>{submitting ? 'Saving...' : (newStaff.id ? 'Save Changes' : 'Add Teacher')}</Button>
         </>}>
-        <div className="max-h-[70vh] overflow-y-auto pr-2 space-y-6 pt-2">
+        <div className="space-y-6 pt-2">
           
           {/* SECTION 1 — Teacher Photo upload only (no section heading) */}
           <div className="space-y-2 border-b border-border pb-4">
@@ -1619,7 +1628,7 @@ export default function StaffPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-1.5">
                 <label htmlFor="phone" className="text-xs font-bold text-text-secondary uppercase">Contact Number <span className="text-red-500">*</span></label>
-                <Input id="phone" name="phone" value={newStaff.phone} onChange={handleTextChange} placeholder="10-digit mobile number" required />
+                <Input id="phone" name="phone" value={newStaff.phone} onChange={handleTextChange} placeholder="10-digit mobile number" className={formErrors.phone ? 'border-red-500 ring-1 ring-red-500' : ''} required />
                 {formErrors.phone && <p className="text-[11px] text-red-500 font-semibold">{formErrors.phone}</p>}
               </div>
               

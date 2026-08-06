@@ -544,9 +544,21 @@ class StudentService extends BaseService
         $stmtCfg = $pdo->prepare("SELECT * FROM class_fee_configurations WHERE school_id = :sid AND class_id = :cid LIMIT 1");
         $stmtCfg->execute([':sid' => $schoolId, ':cid' => $classId]);
         $config = $stmtCfg->fetch();
+        if (!$config && $classId) {
+            $stmtFallback = $pdo->prepare("
+                SELECT cfg.* 
+                FROM class_fee_configurations cfg
+                JOIN classes c1 ON cfg.class_id = c1.id
+                JOIN classes c2 ON c1.name COLLATE utf8mb4_unicode_ci = c2.name COLLATE utf8mb4_unicode_ci AND c1.school_id = c2.school_id
+                WHERE cfg.school_id = :sid AND c2.id = :cid
+                LIMIT 1
+            ");
+            $stmtFallback->execute([':sid' => $schoolId, ':cid' => $classId]);
+            $config = $stmtFallback->fetch();
+        }
         $monthlyFeesAmountMap = [];
         if ($config) {
-            $monthlyFeesAmountMap = json_decode($config['monthly_fees'], true);
+            $monthlyFeesAmountMap = is_string($config['monthly_fees']) ? json_decode($config['monthly_fees'], true) : $config['monthly_fees'];
         }
 
         // 2. Fetch fee structures to find any fallback monthly fee

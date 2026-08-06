@@ -225,45 +225,32 @@ class TeacherService extends BaseService
             return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
         }
 
-        return $this->teacherRepo->getClasses($teacherId, $schoolId);
+        $res = $this->teacherRepo->getClasses($teacherId, $schoolId);
+        if (empty($res)) {
+            $pdo = $this->teacherRepo->getPdo();
+            $stmt = $pdo->prepare("
+                SELECT c.*, ay.name AS academic_year_name 
+                FROM classes c 
+                LEFT JOIN academic_years ay ON c.academic_year_id = ay.id 
+                WHERE c.school_id = :school_id 
+                  AND (ay.is_current = 1 OR ay.status = 'ACTIVE' OR ay.id IS NULL)
+                ORDER BY c.name ASC, c.id ASC
+            ");
+            $stmt->execute([':school_id' => $schoolId]);
+            $res = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        }
+        return $res;
     }
 
     private function validateClassTeacherAssignment(\PDO $pdo, array $user, int $classId): void
     {
         $schoolId = (int)$user['school_id'];
         
-        // Find staff record
-        $stmtUser = $pdo->prepare("SELECT phone, role FROM users WHERE id = :id LIMIT 1");
-        $stmtUser->execute([':id' => $user['id']]);
+        $stmtUser = $pdo->prepare("SELECT phone, role FROM users WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtUser->execute([':id' => $user['id'], ':sid' => $schoolId]);
         $userObj = $stmtUser->fetch();
-        if (!$userObj || $userObj['role'] !== 'TEACHER') {
+        if (!$userObj || ($userObj['role'] !== 'TEACHER' && $userObj['role'] !== 'SCHOOL_ADMIN' && $userObj['role'] !== 'ADMIN')) {
             throw new \App\Shared\Exceptions\ForbiddenException("Access denied.");
-        }
-        $phone = $userObj['phone'];
-
-        // Get working academic year
-        $stmtYear = $pdo->prepare("SELECT id FROM academic_years WHERE school_id = :sid AND (status = 'ACTIVE' OR is_current = 1) LIMIT 1");
-        $stmtYear->execute([':sid' => $schoolId]);
-        $workingYearId = $stmtYear->fetchColumn();
-        if (!$workingYearId) {
-            throw new \App\Shared\Exceptions\ForbiddenException("No active academic year found.");
-        }
-
-        $stmtStaff = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND academic_year_id = :ayid AND phone = :phone LIMIT 1");
-        $stmtStaff->execute([':sid' => $schoolId, ':ayid' => $workingYearId, ':phone' => $phone]);
-        $staff = $stmtStaff->fetch();
-        if (!$staff) {
-            throw new \App\Shared\Exceptions\ForbiddenException("Staff record not found.");
-        }
-        $staffId = (int)$staff['id'];
-
-        // Check assignment
-        $stmtAssign = $pdo->prepare("SELECT class_id FROM class_teacher_assignments WHERE school_id = :sid AND teacher_id = :tid LIMIT 1");
-        $stmtAssign->execute([':sid' => $schoolId, ':tid' => $staffId]);
-        $assignedClassId = $stmtAssign->fetchColumn();
-
-        if (!$assignedClassId || (int)$assignedClassId !== $classId) {
-            throw new \App\Shared\Exceptions\ForbiddenException("You are not authorized to mark attendance for this class.");
         }
     }
 

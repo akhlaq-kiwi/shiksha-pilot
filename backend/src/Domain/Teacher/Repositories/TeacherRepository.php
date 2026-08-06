@@ -52,7 +52,9 @@ class TeacherRepository extends BaseRepository
             FROM subjects s
             JOIN classes c ON s.class_id = c.id
             LEFT JOIN academic_years ay ON c.academic_year_id = ay.id
-            WHERE s.teacher_id = :teacher_id AND c.school_id = :school_id
+            WHERE s.teacher_id = :teacher_id 
+              AND c.school_id = :school_id
+              AND (ay.is_current = 1 OR ay.status = 'ACTIVE' OR ay.id IS NULL)
             ORDER BY c.name
         ";
 

@@ -654,6 +654,23 @@ class SchoolAdminService extends BaseService
     {
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->studentRepo->getPdo();
+
+        // Auto-reassign any unsectioned students whose class now has sections to Section A
+        try {
+            $stmtAutoReassign = $pdo->prepare("
+                UPDATE students s
+                JOIN classes c_old ON s.class_id = c_old.id
+                JOIN classes c_new ON c_old.school_id = c_new.school_id 
+                                  AND c_old.name COLLATE utf8mb4_unicode_ci = c_new.name COLLATE utf8mb4_unicode_ci
+                SET s.class_id = c_new.id
+                WHERE s.school_id = :sid 
+                  AND (c_old.section IS NULL OR TRIM(c_old.section) = '')
+                  AND c_new.section IS NOT NULL 
+                  AND TRIM(c_new.section) != ''
+            ");
+            $stmtAutoReassign->execute([':sid' => $schoolId]);
+        } catch (\Throwable $e) {}
+
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
         if ($workingYear) {
             $filters['academic_year_id'] = (int)$workingYear['id'];
@@ -753,9 +770,44 @@ class SchoolAdminService extends BaseService
                 ':academic_year_id' => $workingYearId
             ]);
             $cfgRow = $stmtCfg->fetch(PDO::FETCH_ASSOC);
+
+            if (!$cfgRow) {
+                // Fallback: Check if any other section/class record with the same class name has a fee configuration
+                $stmtFallbackCfg = $pdo->prepare("
+                    SELECT cfg.* 
+                    FROM class_fee_configurations cfg
+                    JOIN classes c1 ON cfg.class_id = c1.id
+                    JOIN classes c2 ON c1.name COLLATE utf8mb4_unicode_ci = c2.name COLLATE utf8mb4_unicode_ci AND c1.school_id = c2.school_id
+                    WHERE cfg.school_id = :school_id AND c2.id = :class_id AND cfg.academic_year_id = :academic_year_id
+                    LIMIT 1
+                ");
+                $stmtFallbackCfg->execute([
+                    ':school_id' => $schoolId,
+                    ':class_id' => $workingYearClassId,
+                    ':academic_year_id' => $workingYearId
+                ]);
+                $cfgRow = $stmtFallbackCfg->fetch(PDO::FETCH_ASSOC);
+                if ($cfgRow) {
+                    // Auto-sync for this class section ID
+                    $stmtInsSync = $pdo->prepare("
+                        INSERT INTO class_fee_configurations (school_id, class_id, academic_year_id, mode, monthly_fees, is_locked)
+                        VALUES (:sid, :cid, :ayid, :mode, :fees, :locked)
+                        ON DUPLICATE KEY UPDATE mode = VALUES(mode), monthly_fees = VALUES(monthly_fees)
+                    ");
+                    $stmtInsSync->execute([
+                        ':sid' => $schoolId,
+                        ':cid' => $workingYearClassId,
+                        ':ayid' => $workingYearId,
+                        ':mode' => $cfgRow['mode'],
+                        ':fees' => is_array($cfgRow['monthly_fees']) ? json_encode($cfgRow['monthly_fees']) : $cfgRow['monthly_fees'],
+                        ':locked' => (int)$cfgRow['is_locked']
+                    ]);
+                }
+            }
+
             if ($cfgRow) {
                 $classFeeConfig = $cfgRow;
-                $classFeeConfig['monthly_fees'] = json_decode($cfgRow['monthly_fees'], true);
+                $classFeeConfig['monthly_fees'] = is_string($cfgRow['monthly_fees']) ? json_decode($cfgRow['monthly_fees'], true) : $cfgRow['monthly_fees'];
                 $classFeeConfig['is_locked'] = (int)$cfgRow['is_locked'];
             }
         }
@@ -780,6 +832,33 @@ class SchoolAdminService extends BaseService
             $ap['amount'] = (float)$ap['amount'];
             return $ap;
         }, $additionalPayments);
+
+        // Fetch student documents
+        $documents = [];
+        try {
+            $pdo->exec("
+                CREATE TABLE IF NOT EXISTS `student_documents` (
+                  `id` int NOT NULL AUTO_INCREMENT,
+                  `school_id` int NOT NULL,
+                  `student_id` int NOT NULL,
+                  `category` varchar(100) NOT NULL,
+                  `file_name` varchar(255) NOT NULL,
+                  `file_path` varchar(255) NOT NULL,
+                  `file_size` int NOT NULL,
+                  `upload_date` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+                  PRIMARY KEY (`id`),
+                  KEY `school_id` (`school_id`),
+                  KEY `student_id` (`student_id`),
+                  CONSTRAINT `student_documents_ibfk_1` FOREIGN KEY (`school_id`) REFERENCES `schools` (`id`) ON DELETE CASCADE,
+                  CONSTRAINT `student_documents_ibfk_2` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            ");
+            $stmtDocs = $pdo->prepare("SELECT * FROM student_documents WHERE student_id = :sid ORDER BY id ASC");
+            $stmtDocs->execute([':sid' => $id]);
+            $documents = $stmtDocs->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (\Throwable $e) {}
+
+        $student['documents'] = $documents;
 
         return [
             'student' => $student,
@@ -1188,6 +1267,16 @@ class SchoolAdminService extends BaseService
         $parentPhone = !empty($data['parent_phone']) ? trim((string)$data['parent_phone']) : (!empty($data['father_phone']) ? trim((string)$data['father_phone']) : (!empty($data['student_mobile']) ? trim((string)$data['student_mobile']) : null));
         $fatherPhone = !empty($data['father_phone']) ? trim((string)$data['father_phone']) : $parentPhone;
 
+        // Unconditionally check if any entered phone is a Super Admin or School Admin number
+        $this->checkAdminOrSuperAdminPhoneConflict($pdo, [
+            $parentPhone,
+            $fatherPhone,
+            $data['student_mobile'] ?? null,
+            $data['father_phone'] ?? null,
+            $data['mother_phone'] ?? null,
+            $data['parent_phone'] ?? null
+        ]);
+
         if (strcasecmp($status, 'ACTIVE') === 0 || strcasecmp($status, 'Active') === 0) {
             $this->checkActiveStudentPhoneConflictInOtherSchools($pdo, $schoolId, [$parentPhone, $fatherPhone, $data['student_mobile'] ?? null]);
         }
@@ -1439,6 +1528,16 @@ class SchoolAdminService extends BaseService
         $status = $exitDate !== null ? 'Inactive' : ($data['status'] ?? ($student['status'] ?? 'Active'));
         $parentPhone = !empty($data['parent_phone']) ? trim((string)$data['parent_phone']) : (!empty($data['father_phone']) ? trim((string)$data['father_phone']) : (!empty($data['student_mobile']) ? trim((string)$data['student_mobile']) : ($student['parent_phone'] ?? null)));
         $fatherPhone = !empty($data['father_phone']) ? trim((string)$data['father_phone']) : $parentPhone;
+
+        // Unconditionally check if any entered phone is a Super Admin or School Admin number
+        $this->checkAdminOrSuperAdminPhoneConflict($pdo, [
+            $parentPhone,
+            $fatherPhone,
+            $data['student_mobile'] ?? null,
+            $data['father_phone'] ?? null,
+            $data['mother_phone'] ?? null,
+            $data['parent_phone'] ?? null
+        ]);
 
         if (strcasecmp($status, 'ACTIVE') === 0 || strcasecmp($status, 'Active') === 0) {
             $this->checkActiveStudentPhoneConflictInOtherSchools($pdo, $schoolId, [$parentPhone, $fatherPhone, $data['student_mobile'] ?? null]);
@@ -1805,18 +1904,25 @@ class SchoolAdminService extends BaseService
 
     private function getUploadsDirectory(): string
     {
-        $baseDir = dirname(__DIR__, 4);
-        $targetDir = $baseDir . '/public/uploads';
+        $docRoot = $_SERVER['DOCUMENT_ROOT'] ?? '';
+        if (!empty($docRoot) && is_dir($docRoot)) {
+            $targetDir = rtrim($docRoot, '/\\') . '/uploads';
+            if (!is_dir($targetDir)) {
+                @mkdir($targetDir, 0777, true);
+            }
+            if (is_dir($targetDir) && is_writable($targetDir)) {
+                return $targetDir;
+            }
+        }
 
+        $baseDir = dirname(__DIR__, 4);
+        $altPublic = dirname(__DIR__, 5) . '/public/uploads';
+        if (is_dir($altPublic) && is_writable($altPublic)) {
+            return $altPublic;
+        }
+
+        $targetDir = $baseDir . '/public/uploads';
         if (!is_dir($targetDir)) {
-            $alt1 = dirname(__DIR__, 5) . '/backend/public/uploads';
-            if (is_dir($alt1)) {
-                return $alt1;
-            }
-            $alt2 = dirname(__DIR__, 5) . '/public/uploads';
-            if (is_dir($alt2)) {
-                return $alt2;
-            }
             @mkdir($targetDir, 0777, true);
         }
 
@@ -2482,8 +2588,62 @@ class SchoolAdminService extends BaseService
         }
     }
 
+    private function checkAdminOrSuperAdminPhoneConflict(PDO $pdo, array|string $phones): void
+    {
+        $phoneList = is_array($phones) ? $phones : [$phones];
+        $validPhones = [];
+        foreach ($phoneList as $p) {
+            $cleaned = preg_replace('/[^0-9]/', '', (string)$p);
+            if (!empty($cleaned) && strlen($cleaned) >= 10) {
+                $validPhones[] = substr($cleaned, -10); // Check 10-digit normalized phone
+            }
+        }
+        $validPhones = array_unique($validPhones);
+        if (empty($validPhones)) {
+            return;
+        }
+
+        foreach ($validPhones as $phone) {
+            // 1. Check users table for SUPER_ADMIN, SCHOOL_ADMIN, ADMIN roles
+            $stmtUser = $pdo->prepare("
+                SELECT phone, role 
+                FROM users 
+                WHERE (RIGHT(REGEXP_REPLACE(phone, '[^0-9]', ''), 10) = :phone OR phone LIKE :phone_like)
+                  AND (UPPER(role) IN ('SUPER_ADMIN', 'SCHOOL_ADMIN', 'ADMIN', 'TENANT_ADMIN'))
+                LIMIT 1
+            ");
+            $stmtUser->execute([':phone' => $phone, ':phone_like' => "%{$phone}%"]);
+            $userConflict = $stmtUser->fetch(PDO::FETCH_ASSOC);
+
+            if (!$userConflict) {
+                // 2. Check schools table for contact_phone
+                $stmtSchool = $pdo->prepare("
+                    SELECT id, name FROM schools 
+                    WHERE RIGHT(REGEXP_REPLACE(contact_phone, '[^0-9]', ''), 10) = :phone
+                       OR contact_phone LIKE :phone_like
+                    LIMIT 1
+                ");
+                $stmtSchool->execute([':phone' => $phone, ':phone_like' => "%{$phone}%"]);
+                $schoolConflict = $stmtSchool->fetch(PDO::FETCH_ASSOC);
+                if ($schoolConflict) {
+                    $userConflict = ['role' => 'SCHOOL_ADMIN'];
+                }
+            }
+
+            if ($userConflict) {
+                $errMsg = 'Entered number already registered';
+                throw new ValidationException([
+                    'student_mobile' => $errMsg,
+                    'phone' => $errMsg
+                ], $errMsg);
+            }
+        }
+    }
+
     private function checkActiveStudentPhoneConflictInOtherSchools(PDO $pdo, int $currentSchoolId, array $phones): void
     {
+        $this->checkAdminOrSuperAdminPhoneConflict($pdo, $phones);
+
         $validPhones = [];
         foreach ($phones as $p) {
             $p = trim((string)$p);
@@ -2548,7 +2708,7 @@ class SchoolAdminService extends BaseService
 
             if ($conflict) {
                 $schoolName = $conflict['school_name'] ?? 'another school';
-                $errMsg = "Mobile number active in {$schoolName}. Deactivate first.";
+                $errMsg = "The number is registered in {$schoolName}. Please inactive";
                 throw new ValidationException([
                     'parent_phone' => $errMsg,
                     'student_mobile' => $errMsg,
@@ -2561,6 +2721,10 @@ class SchoolAdminService extends BaseService
 
     private function checkActiveStaffPhoneConflictInOtherSchools(PDO $pdo, int $currentSchoolId, ?string $phone): void
     {
+        if (!empty($phone)) {
+            $this->checkAdminOrSuperAdminPhoneConflict($pdo, [$phone]);
+        }
+
         $phone = trim((string)$phone);
         if (empty($phone) || strlen($phone) < 10) return;
 
@@ -2594,7 +2758,7 @@ class SchoolAdminService extends BaseService
 
         if ($conflict) {
             $schoolName = $conflict['school_name'] ?? 'another school';
-            $errMsg = "Mobile number active in {$schoolName}. Deactivate first.";
+            $errMsg = "The number is registered in {$schoolName}. Please inactive";
             throw new ValidationException([
                 'phone' => $errMsg
             ]);
@@ -2712,6 +2876,33 @@ class SchoolAdminService extends BaseService
                 'section'          => $secVal,
                 'academic_year_id' => $academicYearId,
             ]);
+
+            // Inherit existing fee configuration if another section of this class was configured
+            $stmtExistingCfg = $pdo->prepare("
+                SELECT cfg.* 
+                FROM class_fee_configurations cfg
+                JOIN classes c ON cfg.class_id = c.id
+                WHERE cfg.school_id = :sid AND c.name = :cname
+                LIMIT 1
+            ");
+            $stmtExistingCfg->execute([':sid' => $schoolId, ':cname' => trim((string)$data['name'])]);
+            $existingFeeCfg = $stmtExistingCfg->fetch(PDO::FETCH_ASSOC);
+
+            if ($existingFeeCfg) {
+                $stmtInsFeeCfg = $pdo->prepare("
+                    INSERT INTO class_fee_configurations (school_id, class_id, academic_year_id, mode, monthly_fees, is_locked)
+                    VALUES (:sid, :cid, :ayid, :mode, :monthly_fees, :is_locked)
+                    ON DUPLICATE KEY UPDATE mode = VALUES(mode), monthly_fees = VALUES(monthly_fees)
+                ");
+                $stmtInsFeeCfg->execute([
+                    ':sid' => $schoolId,
+                    ':cid' => $id,
+                    ':ayid' => $existingFeeCfg['academic_year_id'],
+                    ':mode' => $existingFeeCfg['mode'],
+                    ':monthly_fees' => is_array($existingFeeCfg['monthly_fees']) ? json_encode($existingFeeCfg['monthly_fees']) : $existingFeeCfg['monthly_fees'],
+                    ':is_locked' => $existingFeeCfg['is_locked']
+                ]);
+            }
 
             $lastInsertedClass = $this->classRepo->findById($id);
             $this->log('Class created', ['id' => $id, 'school_id' => $schoolId]);
@@ -6672,32 +6863,6 @@ class SchoolAdminService extends BaseService
             $newSections = [null];
         }
 
-        // Check Section Type Lock if students are already assigned
-        $stmtCount = $pdo->prepare("
-            SELECT COUNT(*) 
-            FROM students s
-            JOIN classes c ON s.class_id = c.id
-            WHERE s.school_id = :sid AND c.name = :cname
-        ");
-        $stmtCount->execute([':sid' => $schoolId, ':cname' => $oldName]);
-        $assignedStudentCount = (int)$stmtCount->fetchColumn();
-
-        if ($assignedStudentCount > 0) {
-            $stmtOldSec = $pdo->prepare("SELECT section FROM classes WHERE school_id = :sid AND name = :name AND section IS NOT NULL");
-            $stmtOldSec->execute([':sid' => $schoolId, ':name' => $oldName]);
-            $oldSecList = array_filter(array_map('trim', $stmtOldSec->fetchAll(PDO::FETCH_COLUMN)));
-
-            if (!empty($oldSecList)) {
-                $oldFirst = $oldSecList[0];
-                $oldIsColor = in_array(ucfirst(strtolower($oldFirst)), $colorAllowed, true);
-                $oldIsAlphabet = in_array(strtoupper($oldFirst), $alphabetAllowed, true);
-
-                if (($oldIsAlphabet && $isColor) || ($oldIsColor && $isAlphabet)) {
-                    throw new ValidationException(['section_type' => 'Section type cannot be changed because students are already assigned to this class.']);
-                }
-            }
-        }
-
         // Get currently active or draft academic year
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
         $academicYearId = $workingYear ? (int)$workingYear['id'] : null;
@@ -6797,13 +6962,15 @@ class SchoolAdminService extends BaseService
                 }
 
                 if (!empty($targetClassId)) {
-                    $tablesToMigrate = ['students', 'subjects', 'attendance', 'academic_achievement_snapshots'];
+                    $tablesToMigrate = ['students', 'subjects', 'attendance', 'academic_achievement_snapshots', 'class_fee_configurations'];
                     foreach ($tablesToMigrate as $tbl) {
-                        $stmtMigrate = $pdo->prepare("UPDATE {$tbl} SET class_id = :target_id WHERE class_id = :old_id");
-                        $stmtMigrate->execute([
-                            ':target_id' => $targetClassId,
-                            ':old_id' => $oldClassId
-                        ]);
+                        try {
+                            $stmtMigrate = $pdo->prepare("UPDATE {$tbl} SET class_id = :target_id WHERE class_id = :old_id");
+                            $stmtMigrate->execute([
+                                ':target_id' => $targetClassId,
+                                ':old_id' => $oldClassId
+                            ]);
+                        } catch (\Throwable $e) {}
                     }
                 }
 
@@ -6811,6 +6978,20 @@ class SchoolAdminService extends BaseService
                 $this->log('Class section deleted on edit', ['id' => $oldClassId, 'school_id' => $schoolId]);
             }
         }
+
+        // Auto-sync fee configurations for all new and updated sections of this class
+        try {
+            $stmtSyncAll = $pdo->prepare("
+                INSERT INTO class_fee_configurations (school_id, class_id, academic_year_id, mode, monthly_fees, is_locked)
+                SELECT c.school_id, c.id, cfg.academic_year_id, cfg.mode, cfg.monthly_fees, cfg.is_locked
+                FROM classes c
+                JOIN classes c_src ON c.school_id = c_src.school_id AND c.name = c_src.name
+                JOIN class_fee_configurations cfg ON c_src.id = cfg.class_id
+                WHERE c.school_id = :sid AND c.name = :cname AND c.id != c_src.id
+                ON DUPLICATE KEY UPDATE mode = VALUES(mode), monthly_fees = VALUES(monthly_fees)
+            ");
+            $stmtSyncAll->execute([':sid' => $schoolId, ':cname' => $newName]);
+        } catch (\Throwable $e) {}
 
         // Roll Number Reassignment for all affected class IDs in $processedIds
         if (!empty($processedIds)) {
@@ -6925,7 +7106,7 @@ class SchoolAdminService extends BaseService
         $this->requireWritableAcademicYear($pdo, $schoolId);
 
         $className = trim((string)$data['class_name']);
-        $destSection = trim((string)$data['destination_section']);
+        $destSection = preg_replace('/^Section\s+/i', '', trim((string)$data['destination_section']));
         $studentIds = array_map('intval', $data['student_ids']);
 
         // Get currently active academic year
@@ -6936,14 +7117,15 @@ class SchoolAdminService extends BaseService
         $stmtDest = $pdo->prepare("
             SELECT id FROM classes 
             WHERE school_id = :sid 
-              AND academic_year_id = :ayid 
-              AND name = :name 
-              AND (section = :sec1 OR (section IS NULL AND :sec2 = ''))
+              AND (academic_year_id = :ayid1 OR :ayid2 IS NULL) 
+              AND name COLLATE utf8mb4_unicode_ci = :name COLLATE utf8mb4_unicode_ci 
+              AND (section COLLATE utf8mb4_unicode_ci = :sec1 OR (section IS NULL AND :sec2 = ''))
             LIMIT 1
         ");
         $stmtDest->execute([
             ':sid' => $schoolId,
-            ':ayid' => $academicYearId,
+            ':ayid1' => $academicYearId,
+            ':ayid2' => $academicYearId,
             ':name' => $className,
             ':sec1' => $destSection === '' ? null : $destSection,
             ':sec2' => $destSection === '' ? null : $destSection
@@ -7163,6 +7345,20 @@ class SchoolAdminService extends BaseService
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->feeRepo->getPdo();
 
+        // Run class-name auto-sync query so all sections of a class automatically share the fee configuration
+        try {
+            $stmtSync = $pdo->prepare("
+                INSERT INTO class_fee_configurations (school_id, class_id, academic_year_id, mode, monthly_fees, is_locked)
+                SELECT c.school_id, c.id, cfg.academic_year_id, cfg.mode, cfg.monthly_fees, cfg.is_locked
+                FROM classes c
+                JOIN classes c_src ON c.school_id = c_src.school_id AND c.name COLLATE utf8mb4_unicode_ci = c_src.name COLLATE utf8mb4_unicode_ci
+                JOIN class_fee_configurations cfg ON c_src.id = cfg.class_id
+                WHERE c.school_id = :sid AND c.id != c_src.id
+                ON DUPLICATE KEY UPDATE mode = VALUES(mode), monthly_fees = VALUES(monthly_fees)
+            ");
+            $stmtSync->execute([':sid' => $schoolId]);
+        } catch (\Throwable $e) {}
+
         $query = "SELECT * FROM class_fee_configurations WHERE school_id = :school_id";
         $params = [':school_id' => $schoolId];
 
@@ -7181,7 +7377,7 @@ class SchoolAdminService extends BaseService
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         foreach ($rows as &$row) {
-            $row['monthly_fees'] = json_decode($row['monthly_fees'], true);
+            $row['monthly_fees'] = is_string($row['monthly_fees']) ? json_decode($row['monthly_fees'], true) : $row['monthly_fees'];
             $row['is_locked'] = (int)$row['is_locked'];
         }
 
@@ -8714,6 +8910,9 @@ Only approve the settlement after reviewing all financial records.
         $addPayments = $stmtAddFeeList->fetchAll(PDO::FETCH_ASSOC);
 
         // Format previous year dues descriptions
+        $stmtActiveAY = $pdo->prepare("SELECT id, name FROM academic_years WHERE school_id = :sid AND is_current = 1 LIMIT 1");
+        $stmtActiveAY->execute([':sid' => $schoolId]);
+        $workingYear = $stmtActiveAY->fetch(PDO::FETCH_ASSOC);
         $workingYearId = $workingYear ? (int)$workingYear['id'] : 0;
         $stmtAYNames = $pdo->prepare("SELECT id, name FROM academic_years WHERE school_id = :sid");
         $stmtAYNames->execute([':sid' => $schoolId]);

@@ -873,11 +873,33 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
       onSuccess();
     } catch (err) {
       console.error(err);
+      let fieldErrors = {};
+
+      if (err.data && typeof err.data === 'object') {
+        if (err.data.errors && typeof err.data.errors === 'object') {
+          fieldErrors = { ...err.data.errors };
+        } else {
+          fieldErrors = { ...err.data };
+        }
+      }
+
+      if (err.message && (err.message.includes('registered') || err.message.includes('phone') || err.message.includes('contact') || err.message.includes('already') || err.message.includes('Admin'))) {
+        fieldErrors.student_mobile = fieldErrors.student_mobile || fieldErrors.phone || fieldErrors.parent_phone || fieldErrors.father_phone || err.message;
+      }
+
+      if (fieldErrors.phone || fieldErrors.parent_phone || fieldErrors.father_phone) {
+        fieldErrors.student_mobile = fieldErrors.student_mobile || fieldErrors.phone || fieldErrors.parent_phone || fieldErrors.father_phone;
+      }
+
       if (err.data && err.data.subscription_limit_reached) {
         setShowLimitReached({ limit: err.data.limit });
+      } else if (Object.keys(fieldErrors).length > 0) {
+        setErrors(fieldErrors);
+        setActiveTab(1); // Jump back to Basic Details tab so user sees the inline field error!
       } else if (err.message && err.message.includes('{')) {
         try {
           setErrors(JSON.parse(err.message));
+          setActiveTab(1);
         } catch {
           setErrors({ form: err.message });
         }
@@ -925,13 +947,11 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
         </button>
       </div>
 
-      {/*
-        Top-of-form summary with jump links. On a 4-tab, 1400+ line form a
-        field-level message can be scrolled hundreds of pixels out of view -
-        this makes every current error visible and actionable from one place,
-        whether it came from client validation or the server on submit.
-      */}
-      <FormErrorSummary errors={errors} title="Please fix the following before continuing" />
+      {errors.form && (
+        <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl text-xs font-semibold">
+          {errors.form}
+        </div>
+      )}
 
       {/* Tabs list (4 steps sequence) */}
       <div className="flex border-b border-border text-sm overflow-x-auto whitespace-nowrap scrollbar-none gap-4">

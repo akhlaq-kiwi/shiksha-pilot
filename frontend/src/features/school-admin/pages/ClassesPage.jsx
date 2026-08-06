@@ -244,11 +244,6 @@ export default function ClassesPage() {
   };
 
   const handleSectionTypeChange = (newType) => {
-    if (isEditing && editingStudentCount > 0 && sectionTypeInput !== '' && newType !== sectionTypeInput) {
-      setSectionTypeError('Section type cannot be changed because students are already assigned to this class.');
-      return;
-    }
-
     if (selectedSections.length > 0 && sectionTypeInput && newType !== sectionTypeInput) {
       setPendingSectionType(newType);
       setShowSectionTypeConfirm(true);
@@ -1243,18 +1238,12 @@ export default function ClassesPage() {
                     <select
                       value={sectionTypeInput}
                       onChange={e => handleSectionTypeChange(e.target.value)}
-                      disabled={isEditing && editingStudentCount > 0 && sectionTypeInput !== ''}
-                      className={`flex h-9 w-full rounded-md border bg-surface px-3 py-1.5 text-sm text-text-primary shadow-xs transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-950 dark:border-zinc-800 ${isEditing && editingStudentCount > 0 && sectionTypeInput !== '' ? 'bg-zinc-100 dark:bg-zinc-800 cursor-not-allowed' : ''}`}
+                      className="flex h-9 w-full rounded-md border bg-surface px-3 py-1.5 text-sm text-text-primary shadow-xs transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-950 dark:border-zinc-800"
                     >
                       <option value="">No Sections (Optional)</option>
                       <option value={SECTION_TYPES.ALPHABET}>Alphabet Sections (A, B, C, D)</option>
                       <option value={SECTION_TYPES.COLOR}>Color Sections (Red, Blue, Green, Yellow)</option>
                     </select>
-                    {isEditing && editingStudentCount > 0 && sectionTypeInput !== '' && (
-                      <p className="text-[11px] text-amber-600 font-bold mt-1">
-                        Section type cannot be changed because students are already assigned to this class.
-                      </p>
-                    )}
                     {sectionTypeError && (
                       <p className="text-[11px] text-red-500 font-semibold">{sectionTypeError}</p>
                     )}

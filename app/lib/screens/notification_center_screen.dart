@@ -9,6 +9,7 @@ import 'exam_list_screen.dart';
 import 'exam_detail_screen.dart';
 import '../services/exam_service.dart';
 import 'fees_card_screen.dart';
+import 'homework_list_screen.dart';
 
 class NotificationCenterScreen extends StatefulWidget {
   final String baseUrl;
@@ -407,6 +408,21 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                 };
                                 http.post(uri, headers: headers).catchError((_) => http.Response('', 500));
                               } catch (_) {}
+
+                              final isHomeworkNotif = linkStr.contains('homework') || titleLower.contains('homework') || msgLower.contains('homework') || linkStr.contains('assignment') || titleLower.contains('assignment') || msgLower.contains('assignment');
+                              if (isHomeworkNotif) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => HomeworkListScreen(
+                                      baseUrl: widget.baseUrl,
+                                      userRole: widget.studentId != null ? 'PARENT' : (widget.userRole ?? 'STUDENT'),
+                                      selectedStudentId: widget.studentId,
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
 
                               final isNoticeNotif = linkStr.contains('notice') || linkStr.contains('announcement') || titleLower.contains('notice') || titleLower.contains('announcement');
                               if (isNoticeNotif) {
