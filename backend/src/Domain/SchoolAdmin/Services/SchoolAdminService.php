@@ -3244,36 +3244,33 @@ class SchoolAdminService extends BaseService
                 $stmtClasses->execute([':sid' => $schoolId, ':prev_id' => $prevYearId]);
                 $oldClasses = $stmtClasses->fetchAll(PDO::FETCH_ASSOC);
 
-                // 3. Duplicate all classes into the new academic year, avoiding duplicates
-                $classMap = []; // [old_class_id => new_class_id]
-                $stmtFindClass = $pdo->prepare("
+                // 3. Duplicate base classes (WITHOUT sections) into the new academic year
+                $classMap = []; // [old_class_id => new_unsectioned_class_id]
+                $stmtFindBaseClass = $pdo->prepare("
                     SELECT id FROM classes 
                     WHERE school_id = :sid 
                       AND academic_year_id = :ayid 
                       AND name = :name 
-                      AND (section = :section OR (section IS NULL AND :section_null = 1))
+                      AND section IS NULL
                       AND (stream = :stream OR (stream IS NULL AND :stream_null = 1))
                     LIMIT 1
                 ");
-                $stmtInsClass = $pdo->prepare("INSERT INTO classes (school_id, name, section, stream, academic_year_id) VALUES (:school_id, :name, :section, :stream, :new_ay_id)");
+                $stmtInsBaseClass = $pdo->prepare("INSERT INTO classes (school_id, name, section, stream, academic_year_id) VALUES (:school_id, :name, NULL, :stream, :new_ay_id)");
                 foreach ($oldClasses as $oc) {
-                    $stmtFindClass->execute([
+                    $stmtFindBaseClass->execute([
                         ':sid' => $schoolId,
                         ':ayid' => $newYearId,
-                        ':name' => $oc['name'],
-                        ':section' => $oc['section'],
-                        ':section_null' => $oc['section'] === null ? 1 : 0,
+                        ':name' => trim((string)$oc['name']),
                         ':stream' => $oc['stream'],
                         ':stream_null' => $oc['stream'] === null ? 1 : 0
                     ]);
-                    $existingClassId = $stmtFindClass->fetchColumn();
+                    $existingClassId = $stmtFindBaseClass->fetchColumn();
                     if ($existingClassId !== false) {
                         $classMap[(int)$oc['id']] = (int)$existingClassId;
                     } else {
-                        $stmtInsClass->execute([
+                        $stmtInsBaseClass->execute([
                             ':school_id' => $schoolId,
-                            ':name' => $oc['name'],
-                            ':section' => $oc['section'],
+                            ':name' => trim((string)$oc['name']),
                             ':stream' => $oc['stream'],
                             ':new_ay_id' => $newYearId
                         ]);
@@ -3289,9 +3286,9 @@ class SchoolAdminService extends BaseService
                 $subjectMap = []; 
                 $stmtSubjects = $pdo->prepare("SELECT id FROM subjects WHERE school_id = :sid");
                 $stmtSubjects->execute([':sid' => $schoolId]);
-                $subjectIds = $stmtSubjects->fetchAll(PDO::FETCH_COLUMN) ?: [];
-                foreach ($subjectIds as $sid) {
-                    $subjectMap[(int)$sid] = (int)$sid;
+                $allSubjects = $stmtSubjects->fetchAll(PDO::FETCH_ASSOC);
+                foreach ($allSubjects as $subj) {
+                    $subjectMap[(int)$subj['id']] = (int)$subj['id'];
                 }
 
                 // 4. Duplicate timetable entries
@@ -3389,7 +3386,7 @@ class SchoolAdminService extends BaseService
                     $studentId = (int)$sm['student_id'];
                     $action = $sm['action'];
 
-                    $stmtStu = $pdo->prepare("SELECT s.class_id, s.name AS student_name, s.status, c.name, c.section FROM students s LEFT JOIN classes c ON s.class_id = c.id WHERE s.id = :id AND s.school_id = :sid LIMIT 1");
+                    $stmtStu = $pdo->prepare("SELECT s.class_id, s.name AS student_name, s.status, c.name, c.section, c.stream FROM students s LEFT JOIN classes c ON s.class_id = c.id WHERE s.id = :id AND s.school_id = :sid LIMIT 1");
                     $stmtStu->execute([':id' => $studentId, ':sid' => $schoolId]);
                     $stuInfo = $stmtStu->fetch(PDO::FETCH_ASSOC);
                     if (!$stuInfo || ($stuInfo['status'] ?? 'ACTIVE') !== 'ACTIVE') continue;
@@ -3404,7 +3401,6 @@ class SchoolAdminService extends BaseService
                         if ($action === 'promote') {
                             $studentsPromotedCount++;
                             $currentClassName = $stuInfo['name'] ?? '';
-                            $section = $stuInfo['section'];
                             $nextClassName = null;
 
                             foreach ($classOrder as $index => $name) {
@@ -3424,15 +3420,15 @@ class SchoolAdminService extends BaseService
                             }
 
                             if ($nextClassName !== null) {
-                                $fId = $this->findClassByNameAndSection($pdo, $schoolId, $newYearId, $nextClassName, $section, $stuInfo['stream'] ?? null);
+                                $fId = $this->findClassByNameAndSection($pdo, $schoolId, $newYearId, $nextClassName, null, $stuInfo['stream'] ?? null);
                                 if ($fId !== null) {
                                     $newClassId = $fId;
                                 } else {
-                                    $stmtCreateC = $pdo->prepare("INSERT INTO classes (school_id, name, section, academic_year_id) VALUES (:sid, :name, :section, :new_ay_id)");
+                                    $stmtCreateC = $pdo->prepare("INSERT INTO classes (school_id, name, section, stream, academic_year_id) VALUES (:sid, :name, NULL, :stream, :new_ay_id)");
                                     $stmtCreateC->execute([
                                         ':sid' => $schoolId,
                                         ':name' => trim($nextClassName),
-                                        ':section' => $section !== null ? trim((string)$section) : null,
+                                        ':stream' => $stuInfo['stream'] ?? null,
                                         ':new_ay_id' => $newYearId
                                     ]);
                                     $newClassId = (int)$pdo->lastInsertId();
@@ -3441,18 +3437,17 @@ class SchoolAdminService extends BaseService
                         } elseif ($action === 'repeat') {
                             $studentsRepeatedCount++;
                             $currentClassName = $stuInfo['name'] ?? '';
-                            $section = $stuInfo['section'];
 
                             if (!empty($currentClassName)) {
-                                $fId = $this->findClassByNameAndSection($pdo, $schoolId, $newYearId, $currentClassName, $section, $stuInfo['stream'] ?? null);
+                                $fId = $this->findClassByNameAndSection($pdo, $schoolId, $newYearId, $currentClassName, null, $stuInfo['stream'] ?? null);
                                 if ($fId !== null) {
                                     $newClassId = $fId;
                                 } else {
-                                    $stmtCreateC = $pdo->prepare("INSERT INTO classes (school_id, name, section, academic_year_id) VALUES (:sid, :name, :section, :new_ay_id)");
+                                    $stmtCreateC = $pdo->prepare("INSERT INTO classes (school_id, name, section, stream, academic_year_id) VALUES (:sid, :name, NULL, :stream, :new_ay_id)");
                                     $stmtCreateC->execute([
                                         ':sid' => $schoolId,
                                         ':name' => trim($currentClassName),
-                                        ':section' => $section !== null ? trim((string)$section) : null,
+                                        ':stream' => $stuInfo['stream'] ?? null,
                                         ':new_ay_id' => $newYearId
                                     ]);
                                     $newClassId = (int)$pdo->lastInsertId();
