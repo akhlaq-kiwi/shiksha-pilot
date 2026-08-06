@@ -487,7 +487,11 @@ export default function ClassIdentityCardPreview({
                   {chunk.map((s, idx) => {
                     const studentRoll = s.roll_no || s.roll || '-';
                     const studentAdmNo = s.sr_no || s.admission_no || `SR-${s.id}`;
-                    const classSecDisplay = `${s.class_name || classNameProp}${s.section ? ' (' + s.section + ')' : ''}`;
+                    const sec = s.section && String(s.section).trim() !== '' ? String(s.section).trim() : null;
+                    const baseClassName = s.class_name || classNameProp;
+                    const classSecDisplay = sec && !baseClassName.includes(' - ' + sec) && !baseClassName.includes(' (' + sec + ')')
+                      ? `${baseClassName} (${sec})`
+                      : baseClassName;
 
                     return (
                       <div
