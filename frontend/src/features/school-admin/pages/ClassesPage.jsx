@@ -936,7 +936,21 @@ export default function ClassesPage() {
               {transferSourceSec && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between border-b border-border pb-1.5">
-                    <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Select Students</span>
+                    {(() => {
+                      const srcStus = students.filter(s => s.class_name === selectedClassName && s.section === transferSourceSec && s.status === 'ACTIVE');
+                      const totalCount = srcStus.length;
+                      const selectedCount = selectedTransferStudents.length;
+                      return (
+                        <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
+                          Select Students
+                          {totalCount > 0 && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-extrabold bg-primary/10 text-primary border border-primary/20">
+                              {selectedCount}/{totalCount}
+                            </span>
+                          )}
+                        </span>
+                      );
+                    })()}
                     {students.filter(s => s.class_name === selectedClassName && s.section === transferSourceSec && s.status === 'ACTIVE').length > 0 && (
                       <label className="flex items-center gap-2 cursor-pointer select-none">
                         <input

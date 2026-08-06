@@ -1222,6 +1222,14 @@ class SchoolAdminService extends BaseService
             $srNo = (string)($highest > 0 ? $highest + 1 : 1001);
         }
 
+        // Uniqueness check for Roll Number in the same class
+        if ($classId !== null && !empty($data['roll_no'])) {
+            $rollNoVal = trim((string)$data['roll_no']);
+            if ($this->checkRollNoExistsInternal($pdo, $schoolId, (int)$classId, $rollNoVal)) {
+                $errors['roll_no'] = 'The roll no is already assigned';
+            }
+        }
+
         if (!empty($errors)) {
             throw new ValidationException($errors);
         }
@@ -1492,6 +1500,18 @@ class SchoolAdminService extends BaseService
             if (empty($srNo)) {
                 $highest = $this->getHighestSrNo($schoolId);
                 $srNo = (string)($highest > 0 ? $highest + 1 : 1001);
+            }
+        }
+
+        if (!empty($errors)) {
+            throw new ValidationException($errors);
+        }
+
+        // Uniqueness check for Roll Number in the same class
+        if ($classId !== null && !empty($data['roll_no'])) {
+            $rollNoVal = trim((string)$data['roll_no']);
+            if ($this->checkRollNoExistsInternal($pdo, $schoolId, (int)$classId, $rollNoVal, $id)) {
+                $errors['roll_no'] = 'The roll no is already assigned';
             }
         }
 
@@ -3260,7 +3280,11 @@ class SchoolAdminService extends BaseService
                         $newClassId = (int)$pdo->lastInsertId();
                         $classMap[(int)$oc['id']] = $newClassId;
                     }
-                       // 4. Duplicate subjects - no longer needed since they are school-level master subjects.
+                }
+
+                $oldClassIds = array_keys($classMap);
+
+                // 4. Duplicate subjects - no longer needed since they are school-level master subjects.
                 // We just map the subject IDs to themselves to maintain compatibility.
                 $subjectMap = []; 
                 $stmtSubjects = $pdo->prepare("SELECT id FROM subjects WHERE school_id = :sid");
@@ -3268,7 +3292,7 @@ class SchoolAdminService extends BaseService
                 $subjectIds = $stmtSubjects->fetchAll(PDO::FETCH_COLUMN) ?: [];
                 foreach ($subjectIds as $sid) {
                     $subjectMap[(int)$sid] = (int)$sid;
-                }             }
+                }
 
                 // 4. Duplicate timetable entries
                 $stmtTimetable = $pdo->prepare("SELECT * FROM timetable WHERE school_id = :sid AND class_id IS NOT NULL");
@@ -3278,10 +3302,13 @@ class SchoolAdminService extends BaseService
                 $stmtInsTimetable = $pdo->prepare("
                     INSERT INTO timetable (school_id, class_id, subject_id, teacher_id, day_of_week, period_number, start_date, is_published) 
                     VALUES (:school_id, :class_id, :subject_id, :teacher_id, :day_of_week, :period_number, :start_date, 0)
+                    ON DUPLICATE KEY UPDATE 
+                      subject_id = VALUES(subject_id), 
+                      teacher_id = VALUES(teacher_id)
                 ");
                 foreach ($oldTimetables as $ot) {
                     $oldClassId = (int)$ot['class_id'];
-                    if (in_array($oldClassId, $oldClassIds, true)) {
+                    if (isset($classMap[$oldClassId])) {
                         $newClassId = $classMap[$oldClassId];
                         $oldSubjId = (int)$ot['subject_id'];
                         $newSubjId = $subjectMap[$oldSubjId] ?? null;
@@ -3294,6 +3321,10 @@ class SchoolAdminService extends BaseService
                             if ($staffId !== false && in_array((int)$staffId, $teacherMigrations, true)) {
                                 $teacherId = $ot['teacher_id'];
                             }
+                        }
+
+                        if ($teacherId === null) {
+                            $teacherId = $ot['teacher_id'] !== null ? $ot['teacher_id'] : (int)($user['id'] ?? 0);
                         }
 
                         $stmtInsTimetable->execute([
@@ -3313,10 +3344,16 @@ class SchoolAdminService extends BaseService
                 $stmtFeeStructures->execute([':sid' => $schoolId]);
                 $oldFeeStructures = $stmtFeeStructures->fetchAll(PDO::FETCH_ASSOC);
 
-                $stmtInsFee = $pdo->prepare("INSERT INTO fee_structures (school_id, name, amount, frequency, class_id) VALUES (:school_id, :name, :amount, :frequency, :class_id)");
+                $stmtInsFee = $pdo->prepare("
+                    INSERT INTO fee_structures (school_id, name, amount, frequency, class_id) 
+                    VALUES (:school_id, :name, :amount, :frequency, :class_id)
+                    ON DUPLICATE KEY UPDATE 
+                      amount = VALUES(amount), 
+                      frequency = VALUES(frequency)
+                ");
                 foreach ($oldFeeStructures as $ofs) {
                     $oldClassId = (int)$ofs['class_id'];
-                    if (in_array($oldClassId, $oldClassIds, true)) {
+                    if (isset($classMap[$oldClassId])) {
                         $newClassId = $classMap[$oldClassId];
                         $stmtInsFee->execute([
                             ':school_id' => $schoolId,
@@ -3629,21 +3666,19 @@ class SchoolAdminService extends BaseService
 
                                         // Create dashboard notifications
                                         $stmtNotif = $pdo->prepare("
-                                            INSERT INTO dashboard_notifications (school_id, user_role, message, path, is_read, academic_year_id)
-                                            VALUES (:sid, :role, :msg, '/student/fees', 0, :ayid)
+                                            INSERT INTO dashboard_notifications (school_id, user_role, title, message, link, is_read)
+                                            VALUES (:sid, :role, 'Late Payment Penalty', :msg, '/student/fees', 0)
                                         ");
                                         $notifMsg = "A late payment penalty of INR " . $penaltyAmount . " has been applied for previous year dues.";
                                         $stmtNotif->execute([
                                             ':sid' => $schoolId,
                                             ':role' => 'STUDENT',
-                                            ':msg' => $notifMsg,
-                                            ':ayid' => $newYearId
+                                            ':msg' => $notifMsg
                                         ]);
                                         $stmtNotif->execute([
                                             ':sid' => $schoolId,
                                             ':role' => 'PARENT',
-                                            ':msg' => $notifMsg,
-                                            ':ayid' => $newYearId
+                                            ':msg' => $notifMsg
                                         ]);
                                     }
                                 }
@@ -6996,22 +7031,7 @@ class SchoolAdminService extends BaseService
         // Roll Number Reassignment for all affected class IDs in $processedIds
         if (!empty($processedIds)) {
             foreach ($processedIds as $cid) {
-                // Fetch active students in random order
-                $stmtSt = $pdo->prepare("SELECT id FROM students WHERE class_id = :cid AND status = 'ACTIVE' ORDER BY RAND()");
-                $stmtSt->execute([':cid' => $cid]);
-                $stIds = $stmtSt->fetchAll(PDO::FETCH_COLUMN);
-
-                if (!empty($stIds)) {
-                    $roll = 1;
-                    $stmtUpRoll = $pdo->prepare("UPDATE students SET roll_no = :roll WHERE id = :id");
-                    foreach ($stIds as $stId) {
-                        $stmtUpRoll->execute([
-                            ':roll' => (string)$roll,
-                            ':id'   => $stId
-                        ]);
-                        $roll++;
-                    }
-                }
+                $this->resequenceSectionRollNumbers($pdo, $schoolId, (int)$cid);
             }
         }
 
@@ -7137,23 +7157,19 @@ class SchoolAdminService extends BaseService
         }
         $destClassId = (int)$destClassId;
 
+        // Find source class IDs before transfer so we can resequence them afterwards
+        $inIds = implode(',', array_map('intval', $studentIds));
+        $stmtSrc = $pdo->prepare("SELECT DISTINCT class_id FROM students WHERE id IN ({$inIds}) AND school_id = :sid");
+        $stmtSrc->execute([':sid' => $schoolId]);
+        $sourceClassIds = $stmtSrc->fetchAll(\PDO::FETCH_COLUMN);
+
         // Transfer each student
         $pdo->beginTransaction();
         try {
-            // Find max roll number in destination
-            $stmtMaxRoll = $pdo->prepare("
-                SELECT MAX(CAST(roll_no AS UNSIGNED)) 
-                FROM students 
-                WHERE class_id = :class_id AND status = 'ACTIVE'
-            ");
-            $stmtMaxRoll->execute([':class_id' => $destClassId]);
-            $maxRoll = (int)$stmtMaxRoll->fetchColumn();
-            $nextRoll = $maxRoll + 1;
-
-            // Update students class_id and roll_no
+            // Update students class_id
             $stmtUpdateStudent = $pdo->prepare("
                 UPDATE students 
-                SET class_id = :dest_id, roll_no = :roll_no
+                SET class_id = :dest_id
                 WHERE id = :student_id AND school_id = :sid
             ");
 
@@ -7174,7 +7190,6 @@ class SchoolAdminService extends BaseService
             foreach ($studentIds as $stuId) {
                 $stmtUpdateStudent->execute([
                     ':dest_id' => $destClassId,
-                    ':roll_no' => (string)$nextRoll,
                     ':student_id' => $stuId,
                     ':sid' => $schoolId
                 ]);
@@ -7188,7 +7203,14 @@ class SchoolAdminService extends BaseService
                     ':student_id' => $stuId,
                     ':sid' => $schoolId
                 ]);
-                $nextRoll++;
+            }
+
+            // Resequence destination section roll numbers (1..N)
+            $this->resequenceSectionRollNumbers($pdo, $schoolId, $destClassId);
+
+            // Resequence all affected source sections roll numbers (1..N)
+            foreach ($sourceClassIds as $srcCid) {
+                $this->resequenceSectionRollNumbers($pdo, $schoolId, (int)$srcCid);
             }
 
             $pdo->commit();
@@ -7574,29 +7596,93 @@ class SchoolAdminService extends BaseService
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->classRepo->getPdo();
 
-        $stmtClass = $pdo->prepare("SELECT id, academic_year_id FROM classes WHERE id = :id AND school_id = :sid LIMIT 1");
-        $stmtClass->execute([':id' => $classId, ':sid' => $schoolId]);
-        $class = $stmtClass->fetch(\PDO::FETCH_ASSOC);
-        if (!$class) {
-            throw new NotFoundException('Class not found.');
+        if ($classId <= 0) {
+            return ['next_roll_no' => 1];
         }
 
-        $academicYearId = (int)$class['academic_year_id'];
-
         $stmtRoll = $pdo->prepare("
-            SELECT MAX(CAST(roll_no AS UNSIGNED)) 
-            FROM students 
-            WHERE class_id = :class_id AND academic_year_id = :academic_year_id AND school_id = :school_id
+            SELECT COALESCE(MAX(CAST(roll_no AS UNSIGNED)), 0)
+            FROM students
+            WHERE school_id = :sid 
+              AND class_id = :cid
+              AND status = 'ACTIVE'
+              AND roll_no IS NOT NULL 
+              AND roll_no REGEXP '^[0-9]+$'
         ");
         $stmtRoll->execute([
-            ':class_id' => $classId,
-            ':academic_year_id' => $academicYearId,
-            ':school_id' => $schoolId
+            ':sid' => $schoolId,
+            ':cid' => $classId
         ]);
         $maxRoll = (int)$stmtRoll->fetchColumn();
-        $nextRollNo = $maxRoll + 1;
+        $nextRollNo = $maxRoll > 0 ? $maxRoll + 1 : 1;
 
         return ['next_roll_no' => $nextRollNo];
+    }
+
+    public function checkRollNoExists(array $user, int $classId, string $rollNo, ?int $excludeId = null): bool
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->studentRepo->getPdo();
+        return $this->checkRollNoExistsInternal($pdo, $schoolId, $classId, $rollNo, $excludeId);
+    }
+
+    public function resequenceSectionRollNumbers(\PDO $pdo, int $schoolId, int $classId): void
+    {
+        if ($classId <= 0) return;
+
+        $stmtSt = $pdo->prepare("
+            SELECT id 
+            FROM students 
+            WHERE school_id = :sid AND class_id = :cid AND status = 'ACTIVE' 
+            ORDER BY name ASC, id ASC
+        ");
+        $stmtSt->execute([':sid' => $schoolId, ':cid' => $classId]);
+        $stIds = $stmtSt->fetchAll(\PDO::FETCH_COLUMN);
+
+        if (!empty($stIds)) {
+            $roll = 1;
+            $stmtUp = $pdo->prepare("UPDATE students SET roll_no = :roll WHERE id = :id AND school_id = :sid");
+            foreach ($stIds as $stId) {
+                $stmtUp->execute([
+                    ':roll' => (string)$roll,
+                    ':id'   => $stId,
+                    ':sid'  => $schoolId
+                ]);
+                $roll++;
+            }
+        }
+    }
+
+    private function checkRollNoExistsInternal(\PDO $pdo, int $schoolId, int $classId, string $rollNo, ?int $excludeId = null): bool
+    {
+        $rollNo = trim($rollNo);
+        if ($classId <= 0 || $rollNo === '') {
+            return false;
+        }
+
+        $sql = "
+            SELECT id 
+            FROM students
+            WHERE school_id = :sid 
+              AND class_id = :cid 
+              AND roll_no = :roll_no 
+              AND status = 'ACTIVE'
+        ";
+        $params = [
+            ':sid' => $schoolId,
+            ':cid' => $classId,
+            ':roll_no' => $rollNo
+        ];
+
+        if ($excludeId !== null && $excludeId > 0) {
+            $sql .= " AND id != :exclude_id";
+            $params[':exclude_id'] = $excludeId;
+        }
+        $sql .= " LIMIT 1";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchColumn() !== false;
     }
 
     public function getStaffPayments(array $user, string $month): array

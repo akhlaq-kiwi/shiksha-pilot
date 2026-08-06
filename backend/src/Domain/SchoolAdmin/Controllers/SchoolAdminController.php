@@ -1166,6 +1166,32 @@ class SchoolAdminController extends BaseController
         return $this->success($response, $result, 'Section deleted');
     }
 
+    public function getNextRollNo(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $classId = (int)($args['class_id'] ?? 0);
+        $nextRollNo = $this->service->getNextRollNo($user, $classId);
+
+        return $this->success($response, ['next_roll_no' => $nextRollNo]);
+    }
+
+    public function checkRollNo(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $params = RequestParser::query($request);
+        $classId = isset($params['class_id']) ? (int)$params['class_id'] : 0;
+        $rollNo = (string)($params['roll_no'] ?? '');
+        $excludeId = isset($params['exclude_id']) && $params['exclude_id'] !== '' ? (int)$params['exclude_id'] : null;
+
+        $exists = $this->service->checkRollNoExists($user, $classId, $rollNo, $excludeId);
+
+        return $this->success($response, ['exists' => $exists]);
+    }
+
     public function deleteFeePayment(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
@@ -1246,17 +1272,6 @@ class SchoolAdminController extends BaseController
         $data = $this->service->lockClassFeeConfiguration($user, $body);
 
         return $this->success($response, $data, 'Class fee configuration locked successfully');
-    }
-
-    public function getNextRollNo(Request $request, Response $response, array $args): Response
-    {
-        $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
-
-        $classId = (int)($args['class_id'] ?? 0);
-        $data = $this->service->getNextRollNo($user, $classId);
-
-        return $this->success($response, $data);
     }
 
     public function getStaffPayments(Request $request, Response $response): Response
