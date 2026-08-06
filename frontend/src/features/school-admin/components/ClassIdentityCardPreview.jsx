@@ -647,29 +647,6 @@ export default function ClassIdentityCardPreview({
                       );
                     })()}
                   </div>
-
-                  {/* Card Footer Bar: Displays Signature image with "Principal Signature" title below */}
-                  <div className="px-3.5 py-2 bg-white border-t border-zinc-200 flex items-center justify-end min-h-[44px]">
-                    <div className="flex flex-col items-center justify-end shrink-0 text-center">
-                      {activeSignature && !signatureError ? (
-                        <img
-                          src={activeSignature}
-                          alt="Principal Signature"
-                          onError={() => setSignatureError(true)}
-                          className="id-card-signature-img h-8 w-auto max-w-[95px] object-contain mb-0.5"
-                          style={{ maxHeight: '32px', maxWidth: '95px', width: 'auto', objectFit: 'contain' }}
-                        />
-                      ) : (
-                        <div className="w-16 border-b border-dashed border-zinc-400 mb-1" />
-                      )}
-                      <span
-                        className="text-[7.5px] font-bold text-zinc-700 uppercase tracking-wider block"
-                        style={{ lineHeight: '1.25' }}
-                      >
-                        Principal Signature
-                      </span>
-                    </div>
-                  </div>
                 </div>
               );
             })}
