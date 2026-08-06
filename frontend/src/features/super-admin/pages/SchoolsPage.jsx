@@ -598,7 +598,7 @@ function PlanSelectionDialog({ school, onClose, onAssigned }) {
                             {isCurrent && <span className="text-[11px] font-bold uppercase bg-zinc-200 text-zinc-700 px-1.5 py-0.5 rounded-md">Current</span>}
                             {String(selectedPlanId) === String(p.id) && !isCurrent && <Sparkles className="h-3.5 w-3.5 text-primary" />}
                           </h4>
-                          <p className="text-xs text-text-muted mt-1 leading-relaxed">{p.description || 'Standard plan benefits'}</p>
+                          <p className="text-xs text-text-muted mt-1 leading-relaxed whitespace-pre-line break-words">{p.description || 'Standard plan benefits'}</p>
                         </div>
                         <div className="text-right">
                           <span className="font-bold text-sm text-text-primary">

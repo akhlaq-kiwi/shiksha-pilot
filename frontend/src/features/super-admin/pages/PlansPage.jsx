@@ -11,6 +11,7 @@ import { useConfirm } from '../../../common/components/ConfirmDialog';
 function PlanDialog({ plan, onClose, onSaved }) {
   const toast = useToast();
   const isEdit = !!plan?.id;
+  const textareaRef = React.useRef(null);
 
   const [form, setForm] = useState({
     name:          plan?.name          ?? '',
@@ -22,6 +23,18 @@ function PlanDialog({ plan, onClose, onSaved }) {
     is_active:      plan?.is_active      != null ? String(plan.is_active) : '1',
   });
   const [saving, setSaving] = useState(false);
+
+  // Auto-expand textarea height dynamically without scrollbar
+  const adjustTextareaHeight = () => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.max(80, textareaRef.current.scrollHeight)}px`;
+    }
+  };
+
+  useEffect(() => {
+    adjustTextareaHeight();
+  }, [form.description]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -55,7 +68,7 @@ function PlanDialog({ plan, onClose, onSaved }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-surface border border-border rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95 fade-in duration-200">
+      <div className="relative bg-surface border border-border rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95 fade-in duration-200 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5 border-b border-border/60 pb-3">
           <div>
             <h3 className="text-base font-bold text-text-primary">{isEdit ? `Configure ${plan.name} Plan` : 'Create New Plan'}</h3>
@@ -157,11 +170,15 @@ function PlanDialog({ plan, onClose, onSaved }) {
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-text-secondary uppercase">Description</label>
             <textarea
-              rows={3}
+              ref={textareaRef}
               value={form.description}
-              onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+              onChange={e => {
+                setForm(p => ({ ...p, description: e.target.value }));
+                adjustTextareaHeight();
+              }}
               placeholder="Features and standard services included in this tier"
-              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
+              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none overflow-hidden"
+              style={{ minHeight: '80px' }}
               required
             />
           </div>
@@ -274,7 +291,7 @@ export default function PlansPage() {
             filteredPlans.map(p => (
               <Card
                 key={p.id}
-                className={`relative overflow-hidden border border-border bg-surface shadow-sm rounded-2xl flex flex-col justify-between h-[320px] transition-all hover:shadow-md ${p.is_active === 0 || p.is_active === '0' || p.is_active === false ? 'opacity-65 bg-zinc-50/50 dark:bg-zinc-900/10' : ''}`}
+                className={`relative overflow-hidden border border-border bg-surface shadow-sm rounded-2xl flex flex-col justify-between min-h-[340px] h-full transition-all hover:shadow-md ${p.is_active === 0 || p.is_active === '0' || p.is_active === false ? 'opacity-65 bg-zinc-50/50 dark:bg-zinc-900/10' : ''}`}
               >
                 <div className="p-6 flex-1 flex flex-col justify-between">
                   <div>
@@ -311,12 +328,12 @@ export default function PlansPage() {
                       </div>
                     </div>
 
-                    <p className="mt-4 text-xs text-text-muted line-clamp-3 leading-relaxed font-semibold">
+                    <div className="mt-4 text-xs text-text-muted leading-relaxed font-semibold whitespace-pre-line break-words">
                       {p.description || 'No plan description provided.'}
-                    </p>
+                    </div>
                   </div>
 
-                  <div className="flex gap-2.5 mt-6 border-t border-border/50 pt-4">
+                  <div className="flex gap-2.5 mt-6 border-t border-border/50 pt-4 shrink-0">
                     <Button
                       variant="outline"
                       className="flex-1 text-xs py-1.5 flex items-center justify-center gap-1.5 font-bold"
