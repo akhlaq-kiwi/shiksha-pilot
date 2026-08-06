@@ -417,35 +417,6 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
     fetchNextRollNo();
   }, [formData.class_id, studentId]);
 
-  // Real-time roll number duplicate check at class / section level
-  useEffect(() => {
-    const checkRollUniqueness = async () => {
-      if (formData.class_id && formData.roll_no) {
-        try {
-          const res = await schoolService.checkRollNo(formData.class_id, formData.roll_no, studentId);
-          const exists = typeof res === 'object' && res !== null ? (res.exists ?? res.data?.exists ?? false) : Boolean(res);
-          if (exists) {
-            setErrors(prev => ({
-              ...prev,
-              roll_no: 'The roll no is already assigned'
-            }));
-          } else {
-            setErrors(prev => {
-              const copy = { ...prev };
-              if (copy.roll_no === 'The roll no is already assigned') {
-                delete copy.roll_no;
-              }
-              return copy;
-            });
-          }
-        } catch (err) {
-          console.error('Failed to check roll number uniqueness:', err);
-        }
-      }
-    };
-    const timer = setTimeout(checkRollUniqueness, 250);
-    return () => clearTimeout(timer);
-  }, [formData.class_id, formData.roll_no, studentId]);
 
   // Set default class fields from props for new student
   useEffect(() => {
