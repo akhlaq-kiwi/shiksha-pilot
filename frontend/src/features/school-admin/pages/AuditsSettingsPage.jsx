@@ -41,6 +41,16 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
   const [replaceNewTeacherId, setReplaceNewTeacherId] = useState('');
   const [replaceNewTeacherName, setReplaceNewTeacherName] = useState('');
 
+  // Auto-clear success message for Class Teacher assignment after 5 seconds
+  useEffect(() => {
+    if (assignSuccess) {
+      const timer = setTimeout(() => {
+        setAssignSuccess('');
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [assignSuccess]);
+
   const MENU_OPTIONS = [
     'Dashboard',
     'Classes',
