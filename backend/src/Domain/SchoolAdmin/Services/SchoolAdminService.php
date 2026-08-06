@@ -7016,22 +7016,7 @@ class SchoolAdminService extends BaseService
         // Roll Number Reassignment for all affected class IDs in $processedIds
         if (!empty($processedIds)) {
             foreach ($processedIds as $cid) {
-                // Fetch active students in random order
-                $stmtSt = $pdo->prepare("SELECT id FROM students WHERE class_id = :cid AND status = 'ACTIVE' ORDER BY RAND()");
-                $stmtSt->execute([':cid' => $cid]);
-                $stIds = $stmtSt->fetchAll(PDO::FETCH_COLUMN);
-
-                if (!empty($stIds)) {
-                    $roll = 1;
-                    $stmtUpRoll = $pdo->prepare("UPDATE students SET roll_no = :roll WHERE id = :id");
-                    foreach ($stIds as $stId) {
-                        $stmtUpRoll->execute([
-                            ':roll' => (string)$roll,
-                            ':id'   => $stId
-                        ]);
-                        $roll++;
-                    }
-                }
+                $this->resequenceSectionRollNumbers($pdo, $schoolId, (int)$cid);
             }
         }
 
@@ -7157,23 +7142,19 @@ class SchoolAdminService extends BaseService
         }
         $destClassId = (int)$destClassId;
 
+        // Find source class IDs before transfer so we can resequence them afterwards
+        $inIds = implode(',', array_map('intval', $studentIds));
+        $stmtSrc = $pdo->prepare("SELECT DISTINCT class_id FROM students WHERE id IN ({$inIds}) AND school_id = :sid");
+        $stmtSrc->execute([':sid' => $schoolId]);
+        $sourceClassIds = $stmtSrc->fetchAll(\PDO::FETCH_COLUMN);
+
         // Transfer each student
         $pdo->beginTransaction();
         try {
-            // Find max roll number in destination
-            $stmtMaxRoll = $pdo->prepare("
-                SELECT MAX(CAST(roll_no AS UNSIGNED)) 
-                FROM students 
-                WHERE class_id = :class_id AND status = 'ACTIVE'
-            ");
-            $stmtMaxRoll->execute([':class_id' => $destClassId]);
-            $maxRoll = (int)$stmtMaxRoll->fetchColumn();
-            $nextRoll = $maxRoll + 1;
-
-            // Update students class_id and roll_no
+            // Update students class_id
             $stmtUpdateStudent = $pdo->prepare("
                 UPDATE students 
-                SET class_id = :dest_id, roll_no = :roll_no
+                SET class_id = :dest_id
                 WHERE id = :student_id AND school_id = :sid
             ");
 
@@ -7194,7 +7175,6 @@ class SchoolAdminService extends BaseService
             foreach ($studentIds as $stuId) {
                 $stmtUpdateStudent->execute([
                     ':dest_id' => $destClassId,
-                    ':roll_no' => (string)$nextRoll,
                     ':student_id' => $stuId,
                     ':sid' => $schoolId
                 ]);
@@ -7208,7 +7188,14 @@ class SchoolAdminService extends BaseService
                     ':student_id' => $stuId,
                     ':sid' => $schoolId
                 ]);
-                $nextRoll++;
+            }
+
+            // Resequence destination section roll numbers (1..N)
+            $this->resequenceSectionRollNumbers($pdo, $schoolId, $destClassId);
+
+            // Resequence all affected source sections roll numbers (1..N)
+            foreach ($sourceClassIds as $srcCid) {
+                $this->resequenceSectionRollNumbers($pdo, $schoolId, (int)$srcCid);
             }
 
             $pdo->commit();
@@ -7622,6 +7609,33 @@ class SchoolAdminService extends BaseService
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->studentRepo->getPdo();
         return $this->checkRollNoExistsInternal($pdo, $schoolId, $classId, $rollNo, $excludeId);
+    }
+
+    public function resequenceSectionRollNumbers(\PDO $pdo, int $schoolId, int $classId): void
+    {
+        if ($classId <= 0) return;
+
+        $stmtSt = $pdo->prepare("
+            SELECT id 
+            FROM students 
+            WHERE school_id = :sid AND class_id = :cid AND status = 'ACTIVE' 
+            ORDER BY name ASC, id ASC
+        ");
+        $stmtSt->execute([':sid' => $schoolId, ':cid' => $classId]);
+        $stIds = $stmtSt->fetchAll(\PDO::FETCH_COLUMN);
+
+        if (!empty($stIds)) {
+            $roll = 1;
+            $stmtUp = $pdo->prepare("UPDATE students SET roll_no = :roll WHERE id = :id AND school_id = :sid");
+            foreach ($stIds as $stId) {
+                $stmtUp->execute([
+                    ':roll' => (string)$roll,
+                    ':id'   => $stId,
+                    ':sid'  => $schoolId
+                ]);
+                $roll++;
+            }
+        }
     }
 
     private function checkRollNoExistsInternal(\PDO $pdo, int $schoolId, int $classId, string $rollNo, ?int $excludeId = null): bool
