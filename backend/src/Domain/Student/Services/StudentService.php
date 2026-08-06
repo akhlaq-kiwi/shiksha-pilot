@@ -549,7 +549,7 @@ class StudentService extends BaseService
                 SELECT cfg.* 
                 FROM class_fee_configurations cfg
                 JOIN classes c1 ON cfg.class_id = c1.id
-                JOIN classes c2 ON c1.name = c2.name AND c1.school_id = c2.school_id
+                JOIN classes c2 ON c1.name COLLATE utf8mb4_unicode_ci = c2.name COLLATE utf8mb4_unicode_ci AND c1.school_id = c2.school_id
                 WHERE cfg.school_id = :sid AND c2.id = :cid
                 LIMIT 1
             ");

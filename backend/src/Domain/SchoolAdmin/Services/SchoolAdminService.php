@@ -660,16 +660,15 @@ class SchoolAdminService extends BaseService
             $stmtAutoReassign = $pdo->prepare("
                 UPDATE students s
                 JOIN classes c_old ON s.class_id = c_old.id
-                JOIN (
-                    SELECT school_id, name, MIN(id) as min_sec_id
-                    FROM classes
-                    WHERE school_id = :sid AND section IS NOT NULL AND TRIM(section) != ''
-                    GROUP BY school_id, name
-                ) c_new ON c_old.school_id = c_new.school_id AND c_old.name = c_new.name
-                SET s.class_id = c_new.min_sec_id
-                WHERE s.school_id = :sid2 AND (c_old.section IS NULL OR TRIM(c_old.section) = '')
+                JOIN classes c_new ON c_old.school_id = c_new.school_id 
+                                  AND c_old.name COLLATE utf8mb4_unicode_ci = c_new.name COLLATE utf8mb4_unicode_ci
+                SET s.class_id = c_new.id
+                WHERE s.school_id = :sid 
+                  AND (c_old.section IS NULL OR TRIM(c_old.section) = '')
+                  AND c_new.section IS NOT NULL 
+                  AND TRIM(c_new.section) != ''
             ");
-            $stmtAutoReassign->execute([':sid' => $schoolId, ':sid2' => $schoolId]);
+            $stmtAutoReassign->execute([':sid' => $schoolId]);
         } catch (\Throwable $e) {}
 
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
@@ -778,7 +777,7 @@ class SchoolAdminService extends BaseService
                     SELECT cfg.* 
                     FROM class_fee_configurations cfg
                     JOIN classes c1 ON cfg.class_id = c1.id
-                    JOIN classes c2 ON c1.name = c2.name AND c1.school_id = c2.school_id
+                    JOIN classes c2 ON c1.name COLLATE utf8mb4_unicode_ci = c2.name COLLATE utf8mb4_unicode_ci AND c1.school_id = c2.school_id
                     WHERE cfg.school_id = :school_id AND c2.id = :class_id AND cfg.academic_year_id = :academic_year_id
                     LIMIT 1
                 ");
@@ -7107,7 +7106,7 @@ class SchoolAdminService extends BaseService
         $this->requireWritableAcademicYear($pdo, $schoolId);
 
         $className = trim((string)$data['class_name']);
-        $destSection = trim((string)$data['destination_section']);
+        $destSection = preg_replace('/^Section\s+/i', '', trim((string)$data['destination_section']));
         $studentIds = array_map('intval', $data['student_ids']);
 
         // Get currently active academic year
@@ -7118,14 +7117,15 @@ class SchoolAdminService extends BaseService
         $stmtDest = $pdo->prepare("
             SELECT id FROM classes 
             WHERE school_id = :sid 
-              AND academic_year_id = :ayid 
-              AND name = :name 
-              AND (section = :sec1 OR (section IS NULL AND :sec2 = ''))
+              AND (academic_year_id = :ayid1 OR :ayid2 IS NULL) 
+              AND name COLLATE utf8mb4_unicode_ci = :name COLLATE utf8mb4_unicode_ci 
+              AND (section COLLATE utf8mb4_unicode_ci = :sec1 OR (section IS NULL AND :sec2 = ''))
             LIMIT 1
         ");
         $stmtDest->execute([
             ':sid' => $schoolId,
-            ':ayid' => $academicYearId,
+            ':ayid1' => $academicYearId,
+            ':ayid2' => $academicYearId,
             ':name' => $className,
             ':sec1' => $destSection === '' ? null : $destSection,
             ':sec2' => $destSection === '' ? null : $destSection
@@ -7351,7 +7351,7 @@ class SchoolAdminService extends BaseService
                 INSERT INTO class_fee_configurations (school_id, class_id, academic_year_id, mode, monthly_fees, is_locked)
                 SELECT c.school_id, c.id, cfg.academic_year_id, cfg.mode, cfg.monthly_fees, cfg.is_locked
                 FROM classes c
-                JOIN classes c_src ON c.school_id = c_src.school_id AND c.name = c_src.name
+                JOIN classes c_src ON c.school_id = c_src.school_id AND c.name COLLATE utf8mb4_unicode_ci = c_src.name COLLATE utf8mb4_unicode_ci
                 JOIN class_fee_configurations cfg ON c_src.id = cfg.class_id
                 WHERE c.school_id = :sid AND c.id != c_src.id
                 ON DUPLICATE KEY UPDATE mode = VALUES(mode), monthly_fees = VALUES(monthly_fees)
