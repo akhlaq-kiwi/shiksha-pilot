@@ -29,3 +29,5 @@ scratch/add_teachers_for_user.php
 .qa.env
 .builds/
 backend/public/uploads/*
+*.apk
+app-release.apk
