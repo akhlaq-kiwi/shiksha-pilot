@@ -654,6 +654,24 @@ class SchoolAdminService extends BaseService
     {
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->studentRepo->getPdo();
+
+        // Auto-reassign any unsectioned students whose class now has sections to Section A
+        try {
+            $stmtAutoReassign = $pdo->prepare("
+                UPDATE students s
+                JOIN classes c_old ON s.class_id = c_old.id
+                JOIN (
+                    SELECT school_id, name, MIN(id) as min_sec_id
+                    FROM classes
+                    WHERE school_id = :sid AND section IS NOT NULL AND TRIM(section) != ''
+                    GROUP BY school_id, name
+                ) c_new ON c_old.school_id = c_new.school_id AND c_old.name = c_new.name
+                SET s.class_id = c_new.min_sec_id
+                WHERE s.school_id = :sid2 AND (c_old.section IS NULL OR TRIM(c_old.section) = '')
+            ");
+            $stmtAutoReassign->execute([':sid' => $schoolId, ':sid2' => $schoolId]);
+        } catch (\Throwable $e) {}
+
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
         if ($workingYear) {
             $filters['academic_year_id'] = (int)$workingYear['id'];
