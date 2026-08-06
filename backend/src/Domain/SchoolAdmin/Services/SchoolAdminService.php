@@ -6846,32 +6846,6 @@ class SchoolAdminService extends BaseService
             $newSections = [null];
         }
 
-        // Check Section Type Lock if students are already assigned
-        $stmtCount = $pdo->prepare("
-            SELECT COUNT(*) 
-            FROM students s
-            JOIN classes c ON s.class_id = c.id
-            WHERE s.school_id = :sid AND c.name = :cname
-        ");
-        $stmtCount->execute([':sid' => $schoolId, ':cname' => $oldName]);
-        $assignedStudentCount = (int)$stmtCount->fetchColumn();
-
-        if ($assignedStudentCount > 0) {
-            $stmtOldSec = $pdo->prepare("SELECT section FROM classes WHERE school_id = :sid AND name = :name AND section IS NOT NULL");
-            $stmtOldSec->execute([':sid' => $schoolId, ':name' => $oldName]);
-            $oldSecList = array_filter(array_map('trim', $stmtOldSec->fetchAll(PDO::FETCH_COLUMN)));
-
-            if (!empty($oldSecList)) {
-                $oldFirst = $oldSecList[0];
-                $oldIsColor = in_array(ucfirst(strtolower($oldFirst)), $colorAllowed, true);
-                $oldIsAlphabet = in_array(strtoupper($oldFirst), $alphabetAllowed, true);
-
-                if (($oldIsAlphabet && $isColor) || ($oldIsColor && $isAlphabet)) {
-                    throw new ValidationException(['section_type' => 'Section type cannot be changed because students are already assigned to this class.']);
-                }
-            }
-        }
-
         // Get currently active or draft academic year
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
         $academicYearId = $workingYear ? (int)$workingYear['id'] : null;
