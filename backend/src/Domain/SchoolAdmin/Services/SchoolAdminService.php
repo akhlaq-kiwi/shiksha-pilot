@@ -3320,6 +3320,10 @@ class SchoolAdminService extends BaseService
                             }
                         }
 
+                        if ($teacherId === null) {
+                            $teacherId = $ot['teacher_id'] !== null ? $ot['teacher_id'] : (int)($user['id'] ?? 0);
+                        }
+
                         $stmtInsTimetable->execute([
                             ':school_id' => $schoolId,
                             ':class_id' => $newClassId,
