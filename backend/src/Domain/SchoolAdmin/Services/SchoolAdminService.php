@@ -3666,21 +3666,19 @@ class SchoolAdminService extends BaseService
 
                                         // Create dashboard notifications
                                         $stmtNotif = $pdo->prepare("
-                                            INSERT INTO dashboard_notifications (school_id, user_role, message, path, is_read, academic_year_id)
-                                            VALUES (:sid, :role, :msg, '/student/fees', 0, :ayid)
+                                            INSERT INTO dashboard_notifications (school_id, user_role, title, message, link, is_read)
+                                            VALUES (:sid, :role, 'Late Payment Penalty', :msg, '/student/fees', 0)
                                         ");
                                         $notifMsg = "A late payment penalty of INR " . $penaltyAmount . " has been applied for previous year dues.";
                                         $stmtNotif->execute([
                                             ':sid' => $schoolId,
                                             ':role' => 'STUDENT',
-                                            ':msg' => $notifMsg,
-                                            ':ayid' => $newYearId
+                                            ':msg' => $notifMsg
                                         ]);
                                         $stmtNotif->execute([
                                             ':sid' => $schoolId,
                                             ':role' => 'PARENT',
-                                            ':msg' => $notifMsg,
-                                            ':ayid' => $newYearId
+                                            ':msg' => $notifMsg
                                         ]);
                                     }
                                 }
