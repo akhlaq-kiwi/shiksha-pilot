@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Plus, CheckCircle2, ChevronRight, UserCog, Users, ShieldAlert, Award, FileSpreadsheet, ArrowLeft, RefreshCw, Check, Lock, Save, Trash2, Loader2, AlertTriangle, X } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
@@ -251,6 +251,14 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
   const [feeSuccess, setFeeSuccess] = useState('');
   const [isSwitchingClass, setIsSwitchingClass] = useState(false);
 
+  useEffect(() => {
+    if (!feeSuccess) return;
+    const timer = setTimeout(() => {
+      setFeeSuccess('');
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [feeSuccess]);
+
   // Source Data for Wizard
   const [staff, setStaff] = useState([]);
   const [students, setStudents] = useState([]);
@@ -488,6 +496,32 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
     }
   }, [location.state]);
 
+  // Group classes by unique Class Name so fee configuration applies class-wide across all sections
+  const uniqueClassGroups = useMemo(() => {
+    const map = new Map();
+    (classes || []).forEach(c => {
+      if (!c.name) return;
+      if (!map.has(c.name)) {
+        map.set(c.name, []);
+      }
+      map.get(c.name).push(c);
+    });
+
+    return Array.from(map.entries()).map(([className, items]) => {
+      const hasConfiguredName = (configuredClassIds || []).some(cid => {
+        const found = (classes || []).find(cl => String(cl.id) === String(cid));
+        return found && found.name === className;
+      });
+
+      return {
+        name: className,
+        primaryId: String(items[0].id),
+        allIds: items.map(item => String(item.id)),
+        isConfigured: items.some(item => configuredClassIds.includes(String(item.id))) || hasConfiguredName
+      };
+    });
+  }, [classes, configuredClassIds]);
+
   // Load configuration for the selected class and active academic year
   useEffect(() => {
     const fetchConfig = async () => {
@@ -507,20 +541,30 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
 
       try {
         setFeeError('');
-        const res = await schoolService.getClassFeeConfigurations({
-          class_id: selectedClassId,
+        const selectedGroup = uniqueClassGroups.find(g => g.allIds.includes(String(selectedClassId)));
+        const targetName = selectedGroup ? selectedGroup.name : (classes.find(c => String(c.id) === String(selectedClassId))?.name);
+
+        const allConfigs = await schoolService.getClassFeeConfigurations({
           academic_year_id: activeYear.id
         });
-        
-        if (res && res.length > 0) {
-          const config = res[0];
-          setFeeMode(config.mode);
+
+        let config = null;
+        if (allConfigs && allConfigs.length > 0) {
+          config = allConfigs.find(cfg => {
+            if (selectedGroup && selectedGroup.allIds.includes(String(cfg.class_id))) return true;
+            const c = classes.find(cl => String(cl.id) === String(cfg.class_id));
+            return c && c.name === targetName;
+          });
+        }
+
+        if (config) {
+          setFeeMode(config.mode || 'SAME');
           setIsConfigLocked(false); // Ignore is_locked: monthly fee must be editable whenever required
           
           if (config.mode === 'SAME') {
-            setSameFeeAmount(config.monthly_fees.April || '');
+            setSameFeeAmount(config.monthly_fees?.April || '');
           } else {
-            setMonthlyFeesMap(config.monthly_fees);
+            setMonthlyFeesMap(config.monthly_fees || {});
           }
         } else {
           setIsConfigLocked(false);
@@ -538,7 +582,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
     };
 
     fetchConfig();
-  }, [selectedClassId, academicYears]);
+  }, [selectedClassId, academicYears, uniqueClassGroups, classes]);
 
   const handleConfirmSaveConfig = () => {
     setFeeError('');
@@ -601,14 +645,22 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
     }
 
     try {
-      await schoolService.saveClassFeeConfiguration({
-        class_id: parseInt(selectedClassId, 10),
-        academic_year_id: activeYear.id,
-        mode: feeMode,
-        monthly_fees: feesMap
-      });
+      const selectedGroup = uniqueClassGroups.find(g => g.allIds.includes(String(selectedClassId)));
+      const idsToSave = selectedGroup ? selectedGroup.allIds : [String(selectedClassId)];
+
+      await Promise.all(
+        idsToSave.map(cid =>
+          schoolService.saveClassFeeConfiguration({
+            class_id: parseInt(cid, 10),
+            academic_year_id: activeYear.id,
+            mode: feeMode,
+            monthly_fees: feesMap
+          })
+        )
+      );
 
       setFeeSuccess('Fee configuration saved successfully.');
+      setTimeout(() => setFeeSuccess(''), 5000);
       setIsConfigLocked(false);
       fetchConfiguredClasses();
       setSelectedClassId('');
@@ -1094,10 +1146,10 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                 className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs"
               >
                 <option value="">Select Class</option>
-                {classes.map(c => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}{c.section ? ` - ${c.section}` : ''}
-                    {configuredClassIds.includes(String(c.id)) ? ' (Configured)' : ''}
+                {uniqueClassGroups.map(group => (
+                  <option key={group.name} value={group.primaryId}>
+                    {group.name}
+                    {group.isConfigured ? ' (Configured)' : ''}
                   </option>
                 ))}
               </select>

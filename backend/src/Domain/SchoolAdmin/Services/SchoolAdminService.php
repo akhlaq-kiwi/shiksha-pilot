@@ -753,9 +753,44 @@ class SchoolAdminService extends BaseService
                 ':academic_year_id' => $workingYearId
             ]);
             $cfgRow = $stmtCfg->fetch(PDO::FETCH_ASSOC);
+
+            if (!$cfgRow) {
+                // Fallback: Check if any other section/class record with the same class name has a fee configuration
+                $stmtFallbackCfg = $pdo->prepare("
+                    SELECT cfg.* 
+                    FROM class_fee_configurations cfg
+                    JOIN classes c1 ON cfg.class_id = c1.id
+                    JOIN classes c2 ON c1.name = c2.name AND c1.school_id = c2.school_id
+                    WHERE cfg.school_id = :school_id AND c2.id = :class_id AND cfg.academic_year_id = :academic_year_id
+                    LIMIT 1
+                ");
+                $stmtFallbackCfg->execute([
+                    ':school_id' => $schoolId,
+                    ':class_id' => $workingYearClassId,
+                    ':academic_year_id' => $workingYearId
+                ]);
+                $cfgRow = $stmtFallbackCfg->fetch(PDO::FETCH_ASSOC);
+                if ($cfgRow) {
+                    // Auto-sync for this class section ID
+                    $stmtInsSync = $pdo->prepare("
+                        INSERT INTO class_fee_configurations (school_id, class_id, academic_year_id, mode, monthly_fees, is_locked)
+                        VALUES (:sid, :cid, :ayid, :mode, :fees, :locked)
+                        ON DUPLICATE KEY UPDATE mode = VALUES(mode), monthly_fees = VALUES(monthly_fees)
+                    ");
+                    $stmtInsSync->execute([
+                        ':sid' => $schoolId,
+                        ':cid' => $workingYearClassId,
+                        ':ayid' => $workingYearId,
+                        ':mode' => $cfgRow['mode'],
+                        ':fees' => is_array($cfgRow['monthly_fees']) ? json_encode($cfgRow['monthly_fees']) : $cfgRow['monthly_fees'],
+                        ':locked' => (int)$cfgRow['is_locked']
+                    ]);
+                }
+            }
+
             if ($cfgRow) {
                 $classFeeConfig = $cfgRow;
-                $classFeeConfig['monthly_fees'] = json_decode($cfgRow['monthly_fees'], true);
+                $classFeeConfig['monthly_fees'] = is_string($cfgRow['monthly_fees']) ? json_decode($cfgRow['monthly_fees'], true) : $cfgRow['monthly_fees'];
                 $classFeeConfig['is_locked'] = (int)$cfgRow['is_locked'];
             }
         }
@@ -2824,6 +2859,33 @@ class SchoolAdminService extends BaseService
                 'section'          => $secVal,
                 'academic_year_id' => $academicYearId,
             ]);
+
+            // Inherit existing fee configuration if another section of this class was configured
+            $stmtExistingCfg = $pdo->prepare("
+                SELECT cfg.* 
+                FROM class_fee_configurations cfg
+                JOIN classes c ON cfg.class_id = c.id
+                WHERE cfg.school_id = :sid AND c.name = :cname
+                LIMIT 1
+            ");
+            $stmtExistingCfg->execute([':sid' => $schoolId, ':cname' => trim((string)$data['name'])]);
+            $existingFeeCfg = $stmtExistingCfg->fetch(PDO::FETCH_ASSOC);
+
+            if ($existingFeeCfg) {
+                $stmtInsFeeCfg = $pdo->prepare("
+                    INSERT INTO class_fee_configurations (school_id, class_id, academic_year_id, mode, monthly_fees, is_locked)
+                    VALUES (:sid, :cid, :ayid, :mode, :monthly_fees, :is_locked)
+                    ON DUPLICATE KEY UPDATE mode = VALUES(mode), monthly_fees = VALUES(monthly_fees)
+                ");
+                $stmtInsFeeCfg->execute([
+                    ':sid' => $schoolId,
+                    ':cid' => $id,
+                    ':ayid' => $existingFeeCfg['academic_year_id'],
+                    ':mode' => $existingFeeCfg['mode'],
+                    ':monthly_fees' => is_array($existingFeeCfg['monthly_fees']) ? json_encode($existingFeeCfg['monthly_fees']) : $existingFeeCfg['monthly_fees'],
+                    ':is_locked' => $existingFeeCfg['is_locked']
+                ]);
+            }
 
             $lastInsertedClass = $this->classRepo->findById($id);
             $this->log('Class created', ['id' => $id, 'school_id' => $schoolId]);
@@ -6909,13 +6971,15 @@ class SchoolAdminService extends BaseService
                 }
 
                 if (!empty($targetClassId)) {
-                    $tablesToMigrate = ['students', 'subjects', 'attendance', 'academic_achievement_snapshots'];
+                    $tablesToMigrate = ['students', 'subjects', 'attendance', 'academic_achievement_snapshots', 'class_fee_configurations'];
                     foreach ($tablesToMigrate as $tbl) {
-                        $stmtMigrate = $pdo->prepare("UPDATE {$tbl} SET class_id = :target_id WHERE class_id = :old_id");
-                        $stmtMigrate->execute([
-                            ':target_id' => $targetClassId,
-                            ':old_id' => $oldClassId
-                        ]);
+                        try {
+                            $stmtMigrate = $pdo->prepare("UPDATE {$tbl} SET class_id = :target_id WHERE class_id = :old_id");
+                            $stmtMigrate->execute([
+                                ':target_id' => $targetClassId,
+                                ':old_id' => $oldClassId
+                            ]);
+                        } catch (\Throwable $e) {}
                     }
                 }
 
@@ -6923,6 +6987,20 @@ class SchoolAdminService extends BaseService
                 $this->log('Class section deleted on edit', ['id' => $oldClassId, 'school_id' => $schoolId]);
             }
         }
+
+        // Auto-sync fee configurations for all new and updated sections of this class
+        try {
+            $stmtSyncAll = $pdo->prepare("
+                INSERT INTO class_fee_configurations (school_id, class_id, academic_year_id, mode, monthly_fees, is_locked)
+                SELECT c.school_id, c.id, cfg.academic_year_id, cfg.mode, cfg.monthly_fees, cfg.is_locked
+                FROM classes c
+                JOIN classes c_src ON c.school_id = c_src.school_id AND c.name = c_src.name
+                JOIN class_fee_configurations cfg ON c_src.id = cfg.class_id
+                WHERE c.school_id = :sid AND c.name = :cname AND c.id != c_src.id
+                ON DUPLICATE KEY UPDATE mode = VALUES(mode), monthly_fees = VALUES(monthly_fees)
+            ");
+            $stmtSyncAll->execute([':sid' => $schoolId, ':cname' => $newName]);
+        } catch (\Throwable $e) {}
 
         // Roll Number Reassignment for all affected class IDs in $processedIds
         if (!empty($processedIds)) {
@@ -7275,6 +7353,20 @@ class SchoolAdminService extends BaseService
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->feeRepo->getPdo();
 
+        // Run class-name auto-sync query so all sections of a class automatically share the fee configuration
+        try {
+            $stmtSync = $pdo->prepare("
+                INSERT INTO class_fee_configurations (school_id, class_id, academic_year_id, mode, monthly_fees, is_locked)
+                SELECT c.school_id, c.id, cfg.academic_year_id, cfg.mode, cfg.monthly_fees, cfg.is_locked
+                FROM classes c
+                JOIN classes c_src ON c.school_id = c_src.school_id AND c.name = c_src.name
+                JOIN class_fee_configurations cfg ON c_src.id = cfg.class_id
+                WHERE c.school_id = :sid AND c.id != c_src.id
+                ON DUPLICATE KEY UPDATE mode = VALUES(mode), monthly_fees = VALUES(monthly_fees)
+            ");
+            $stmtSync->execute([':sid' => $schoolId]);
+        } catch (\Throwable $e) {}
+
         $query = "SELECT * FROM class_fee_configurations WHERE school_id = :school_id";
         $params = [':school_id' => $schoolId];
 
@@ -7293,7 +7385,7 @@ class SchoolAdminService extends BaseService
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         foreach ($rows as &$row) {
-            $row['monthly_fees'] = json_decode($row['monthly_fees'], true);
+            $row['monthly_fees'] = is_string($row['monthly_fees']) ? json_decode($row['monthly_fees'], true) : $row['monthly_fees'];
             $row['is_locked'] = (int)$row['is_locked'];
         }
 
