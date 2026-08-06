@@ -423,9 +423,7 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
       if (formData.class_id && formData.roll_no) {
         try {
           const res = await schoolService.checkRollNo(formData.class_id, formData.roll_no, studentId);
-          const exists = (typeof res === 'object' && res !== null && res.exists !== undefined)
-            ? Boolean(res.exists)
-            : false;
+          const exists = typeof res === 'object' && res !== null ? (res.exists ?? res.data?.exists ?? false) : Boolean(res);
           if (exists) {
             setErrors(prev => ({
               ...prev,
