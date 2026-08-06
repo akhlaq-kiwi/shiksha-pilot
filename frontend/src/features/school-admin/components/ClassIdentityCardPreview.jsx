@@ -533,87 +533,95 @@ export default function ClassIdentityCardPreview({
                   </div>
 
                   {/* Card Content Body */}
-                  <div className="p-3.5 bg-zinc-50/80 flex items-start gap-3.5 flex-1">
-                    {/* Left: Student Photo */}
-                    <div className="id-card-photo w-24 h-28 shrink-0 rounded-xl overflow-hidden border-2 border-zinc-300 bg-white shadow-2xs" style={{ width: '96px', height: '112px', flexShrink: 0 }}>
-                      <IdCardAvatar src={s.photo_path} name={s.name} updatedAt={s.updated_at} />
+                  <div className="p-3.5 bg-zinc-50/80 flex flex-col justify-between flex-1 gap-2">
+                    <div className="flex items-start gap-3.5">
+                      {/* Left: Student Photo */}
+                      <div className="id-card-photo w-24 h-28 shrink-0 rounded-xl overflow-hidden border-2 border-zinc-300 bg-white shadow-2xs" style={{ width: '96px', height: '112px', flexShrink: 0 }}>
+                        <IdCardAvatar src={s.photo_path} name={s.name} updatedAt={s.updated_at} />
+                      </div>
+
+                      {/* Right: Details Grid */}
+                      <div className="flex-1 min-w-0 space-y-1.5 text-left">
+                        {/* 1. Student Name */}
+                        <div>
+                          <span
+                            className="text-[8px] font-bold text-zinc-400 uppercase tracking-wider block"
+                            style={{ lineHeight: '1.3' }}
+                          >
+                            Student Name
+                          </span>
+                          <h3
+                            className="text-xs font-bold text-zinc-900 uppercase font-display leading-snug truncate"
+                            style={{ lineHeight: '1.25' }}
+                          >
+                            {s.name || '—'}
+                          </h3>
+                        </div>
+
+                        {/* 2. Father Name */}
+                        <div className="pt-1 border-t border-zinc-200/80">
+                          <span
+                            className="text-[7.5px] font-bold text-zinc-400 uppercase tracking-wider block"
+                            style={{ lineHeight: '1.3' }}
+                          >
+                            Father Name
+                          </span>
+                          <span
+                            className="text-[9.5px] font-bold text-zinc-800 uppercase block truncate"
+                            style={{ lineHeight: '1.3' }}
+                          >
+                            {s.father_name || s.fatherName || s.parent_name || '—'}
+                          </span>
+                        </div>
+
+                        {/* 3. Class/Sec & 4. Mobile */}
+                        <div className="grid grid-cols-2 gap-x-2 gap-y-1 pt-1 border-t border-zinc-200/80 text-[9.5px]">
+                          <div>
+                            <span
+                              className="text-[7.5px] font-bold text-zinc-400 uppercase tracking-wider block"
+                              style={{ lineHeight: '1.3' }}
+                            >
+                              Class/Sec
+                            </span>
+                            <span
+                              className="font-bold text-zinc-800 block truncate"
+                              style={{ lineHeight: '1.3' }}
+                            >
+                              {classSecDisplay}
+                            </span>
+                          </div>
+                          <div>
+                            <span
+                              className="text-[7.5px] font-bold text-zinc-400 uppercase tracking-wider block"
+                              style={{ lineHeight: '1.3' }}
+                            >
+                              Mobile
+                            </span>
+                            <span
+                              className="font-bold text-zinc-800 font-mono block truncate"
+                              style={{ lineHeight: '1.3' }}
+                            >
+                              {s.father_phone || s.parent_phone || s.student_mobile || s.guardian_phone || s.mobile || s.phone || '—'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
-                    {/* Right: Details Grid */}
-                    <div className="flex-1 min-w-0 space-y-1.5 text-left">
-                      <div>
-                        <span
-                          className="text-[8px] font-bold text-zinc-400 uppercase tracking-wider block"
-                          style={{ lineHeight: '1.3' }}
-                        >
-                          Student Name
-                        </span>
-                        <h3
-                          className="text-xs font-bold text-zinc-900 uppercase font-display pb-0.5 leading-normal"
-                          style={{ lineHeight: '1.25', paddingBottom: '2px' }}
-                        >
-                          {s.name}
-                        </h3>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-x-2 gap-y-1 pt-1 border-t border-zinc-200/80 text-[9.5px]">
-                        <div>
-                          <span
-                            className="text-[7.5px] font-bold text-zinc-400 uppercase tracking-wider block"
-                            style={{ lineHeight: '1.3' }}
-                          >
-                            Roll No.
-                          </span>
-                          <span
-                            className="font-bold text-zinc-900 font-mono block"
-                            style={{ lineHeight: '1.3' }}
-                          >
-                            {studentRoll}
-                          </span>
-                        </div>
-                        <div>
-                          <span
-                            className="text-[7.5px] font-bold text-zinc-400 uppercase tracking-wider block"
-                            style={{ lineHeight: '1.3' }}
-                          >
-                            Adm / SR No.
-                          </span>
-                          <span
-                            className="font-bold text-zinc-800 font-mono block"
-                            style={{ lineHeight: '1.3' }}
-                          >
-                            {studentAdmNo}
-                          </span>
-                        </div>
-                        <div>
-                          <span
-                            className="text-[7.5px] font-bold text-zinc-400 uppercase tracking-wider block"
-                            style={{ lineHeight: '1.3' }}
-                          >
-                            Class & Sec
-                          </span>
-                          <span
-                            className="font-bold text-zinc-800 block"
-                            style={{ lineHeight: '1.3' }}
-                          >
-                            {classSecDisplay}
-                          </span>
-                        </div>
-                        <div>
-                          <span
-                            className="text-[7.5px] font-bold text-zinc-400 uppercase tracking-wider block"
-                            style={{ lineHeight: '1.3' }}
-                          >
-                            DOB
-                          </span>
-                          <span
-                            className="font-bold text-zinc-800 block"
-                            style={{ lineHeight: '1.3' }}
-                          >
-                            {s.date_of_birth || s.dob || '—'}
-                          </span>
-                        </div>
-                      </div>
+                    {/* 5. Add (Address at bottom separately) */}
+                    <div className="pt-1.5 border-t border-zinc-200/80 text-left">
+                      <span
+                        className="text-[7.5px] font-bold text-zinc-400 uppercase tracking-wider block"
+                        style={{ lineHeight: '1.3' }}
+                      >
+                        Add
+                      </span>
+                      <p
+                        className="text-[9px] font-semibold text-zinc-800 leading-tight line-clamp-2 break-words"
+                        style={{ lineHeight: '1.25' }}
+                      >
+                        {s.address || s.permanent_address || s.street_address || s.current_address || '—'}
+                      </p>
                     </div>
                   </div>
 
