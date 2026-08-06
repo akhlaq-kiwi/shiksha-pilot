@@ -850,9 +850,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
           <div className="flex border-b border-border text-sm overflow-x-auto whitespace-nowrap scrollbar-none gap-6">
             {[
               { id: 'finance', label: 'Finance' },
-              { id: 'profile', label: 'Student & Parents' },
-              { id: 'academic', label: 'Academic Results' },
-              { id: 'followup', label: 'Follow-up History' }
+              { id: 'profile', label: 'Student & Parents' }
             ].map(tab => (
               <button
                 key={tab.id}
@@ -1045,79 +1043,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
             </div>
           )}
 
-          {/* Sub-tab 2: Academic Results */}
-          {activeSubTab === 'academic' && (
-            <div className="space-y-6 animate-in fade-in duration-200">
-              <Card className="shadow-xs">
-                <CardContent className="p-6 space-y-4">
-                  <div className="flex items-center gap-2 border-b border-border pb-2.5">
-                    <Calendar className="h-4 w-4 text-primary" />
-                    <h4 className="text-xs font-bold text-text-primary uppercase tracking-wider">Attendance Summary</h4>
-                  </div>
-                  <div className="flex flex-col sm:flex-row items-center gap-6">
-                    <div className="relative flex items-center justify-center">
-                      <div className="w-24 h-24 rounded-full border-8 border-zinc-100 dark:border-zinc-800 flex flex-col items-center justify-center relative">
-                        <span className="text-lg font-bold text-text-primary">{attendance_summary.percentage}%</span>
-                        <span className="text-[8px] text-text-muted uppercase font-bold">Rate</span>
-                      </div>
-                    </div>
-                    <div className="text-xs space-y-1.5 flex-1 w-full">
-                      <p className="flex justify-between max-w-sm"><span className="text-text-muted font-medium">Total Session Classes:</span> <span className="font-bold font-mono">{attendance_summary.total_marked} Days</span></p>
-                      <p className="flex justify-between max-w-sm"><span className="text-text-muted font-medium">Attended (Present):</span> <span className="font-bold font-mono text-teal-600">{attendance_summary.present_count} Days</span></p>
-                      <p className="flex justify-between max-w-sm"><span className="text-text-muted font-medium">Absences/Leaves:</span> <span className="font-bold font-mono text-red-500">{attendance_summary.total_marked - attendance_summary.present_count} Days</span></p>
-                      <div className="w-full bg-zinc-100 dark:bg-zinc-800 h-2 rounded-full overflow-hidden max-w-sm mt-3">
-                        <div className="bg-primary h-full rounded-full transition-all" style={{ width: `${attendance_summary.percentage}%` }}></div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
 
-              <Card className="shadow-xs">
-                <CardContent className="p-6 space-y-4">
-                  <div className="flex items-center gap-2 border-b border-border pb-2.5">
-                    <FileText className="h-4 w-4 text-primary" />
-                    <h4 className="text-xs font-bold text-text-primary uppercase tracking-wider">Examination Summary</h4>
-                  </div>
-
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Exam Name</TableHead>
-                        <TableHead>Subject</TableHead>
-                        <TableHead>Marks Obtained</TableHead>
-                        <TableHead>Max Marks</TableHead>
-                        <TableHead>Grade</TableHead>
-                        <TableHead>Remarks</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {exam_results.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={6} className="text-center py-6 text-text-muted text-xs">No exam marks entered for this student.</TableCell>
-                        </TableRow>
-                      ) : (
-                        exam_results.map((r, i) => (
-                          <TableRow key={i}>
-                            <TableCell className="font-semibold text-text-primary text-xs">{r.exam_name}</TableCell>
-                            <TableCell className="text-text-secondary text-xs">{r.subject_name || '-'}</TableCell>
-                            <TableCell className="font-bold font-mono text-xs text-primary">{r.marks_obtained}</TableCell>
-                            <TableCell className="font-mono text-xs text-text-muted">{r.max_marks}</TableCell>
-                            <TableCell>
-                              <span className="px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-[11px] font-bold uppercase text-primary border border-border">
-                                {r.grade || 'A'}
-                              </span>
-                            </TableCell>
-                            <TableCell className="text-text-secondary text-xs truncate max-w-[150px]">{r.remarks || '-'}</TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </div>
-          )}
 
           {/* Sub-tab 3: Finance */}
           {activeSubTab === 'finance' && (
@@ -1399,62 +1325,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
             </div>
           )}
 
-          {/* Sub-tab 4: Follow-up Timeline */}
-          {activeSubTab === 'followup' && (
-            <div className="space-y-6 animate-in fade-in duration-200">
-              <Card className="shadow-xs border border-border bg-surface">
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-2 border-b border-border pb-3 mb-5">
-                    <Phone className="h-4 w-4 text-primary" />
-                    <h4 className="text-xs font-bold text-text-primary uppercase tracking-wider">Fee Follow-up Timeline</h4>
-                  </div>
-                  
-                  {followUpLoading ? (
-                    <div className="flex justify-center py-10">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
-                    </div>
-                  ) : followUpHistory.length === 0 ? (
-                    <div className="text-center py-10 text-text-muted text-xs">
-                      No follow-ups recorded for this student.
-                    </div>
-                  ) : (
-                    <div className="relative pl-6 border-l-2 border-border space-y-8 ml-2 mt-2">
-                      {followUpHistory.map((item, idx) => {
-                        let dotColor = 'bg-primary border-primary/20';
-                        if (item.type === 'completed') {
-                          dotColor = 'bg-emerald-500 border-emerald-500/20';
-                        } else if (item.type === 'note') {
-                          dotColor = 'bg-amber-500 border-amber-500/20';
-                        }
-                        
-                        return (
-                          <div key={idx} className="relative">
-                            {/* Connector dot */}
-                            <span className={`absolute -left-[31px] top-1.5 w-4 h-4 rounded-full border-4 ${dotColor}`} />
-                            
-                            <div className="space-y-1 text-xs">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="font-bold text-text-primary text-sm">{item.title}</span>
-                                <span className="text-[11px] text-text-muted shrink-0 font-mono">{item.date}</span>
-                              </div>
-                              <p className="text-text-secondary whitespace-pre-line leading-relaxed mt-1">
-                                {item.description}
-                              </p>
-                              {item.user && (
-                                <div className="text-[11px] text-text-muted font-medium pt-1">
-                                  Logged by: <span className="text-text-secondary">{item.user}</span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          )}
+
 
         </div>
 
