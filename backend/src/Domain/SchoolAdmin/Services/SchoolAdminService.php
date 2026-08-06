@@ -3575,7 +3575,7 @@ class SchoolAdminService extends BaseService
                             // Apply Late Payment Penalty if configured
                             if ($lppConfig && isset($lppConfig['percentage']) && (float)$lppConfig['percentage'] > 0) {
                                 $percentage = (float)$lppConfig['percentage'];
-                                $penaltyAmount = round($outstanding * $percentage / 100, 2);
+                                $penaltyAmount = round($outstanding * $percentage / 100);
                                 if ($penaltyAmount > 0) {
                                     // Duplicate protection
                                     $stmtCheckLppPay = $pdo->prepare("

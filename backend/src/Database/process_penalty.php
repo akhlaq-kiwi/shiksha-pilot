@@ -140,7 +140,7 @@ foreach ($queue as $row) {
             ");
             $stmtInc->execute([':appid' => $applicationId]);
         } else {
-            $penalty = round($due * $percentage / 100, 2);
+            $penalty = round($due * $percentage / 100);
             
             if ($penalty <= 0) {
                 // Skip student
