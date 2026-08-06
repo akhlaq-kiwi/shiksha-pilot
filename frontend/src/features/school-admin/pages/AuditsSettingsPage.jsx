@@ -10,6 +10,7 @@ import { schoolService } from '../../../common/services/schoolService';
 import { apiClient } from '../../../common/services/apiClient';
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 import { schoolAdminService } from '../../../common/services/schoolAdminService';
+import { getClassIndex } from '../../../common/constants/predefinedClasses';
 
 export default function AuditsSettingsPage({ onYearsUpdated }) {
   const location = useLocation();
@@ -1741,7 +1742,16 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                   {classes.length === 0 ? (
                     <p className="text-center py-6 text-xs text-text-muted">No classes defined to promote students.</p>
                   ) : (
-                    classes.map(c => {
+                    [...classes].sort((a, b) => {
+                      const idxA = getClassIndex(a.name);
+                      const idxB = getClassIndex(b.name);
+                      if (idxA !== idxB) {
+                        if (idxA === -1) return 1;
+                        if (idxB === -1) return -1;
+                        return idxA - idxB;
+                      }
+                      return (a.section || '').localeCompare(b.section || '', undefined, { numeric: true, sensitivity: 'base' });
+                    }).map(c => {
                       const classStudents = students.filter(s => s.class_id === c.id && s.status === 'ACTIVE');
                       if (classStudents.length === 0) return null;
 
