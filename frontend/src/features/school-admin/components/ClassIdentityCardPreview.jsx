@@ -631,7 +631,7 @@ export default function ClassIdentityCardPreview({
                             className="text-[7.5px] font-bold text-zinc-400 uppercase tracking-wider block"
                             style={{ lineHeight: '1.3' }}
                           >
-                            Add
+                            Address
                           </span>
                           <p
                             className="text-[9px] font-semibold text-zinc-800 leading-tight line-clamp-2 break-words"
