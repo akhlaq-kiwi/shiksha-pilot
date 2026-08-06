@@ -875,8 +875,6 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-2 text-xs">
                     <p><span className="text-text-muted block font-medium">Academic Session</span> <span className="font-semibold text-text-primary text-sm">{student.academic_year_name || '2025–2026'}</span></p>
                     <p><span className="text-text-muted block font-medium">Admission Date</span> <span className="font-semibold text-text-primary text-sm">{student.admission_date || '-'}</span></p>
-                    <p><span className="text-text-muted block font-medium">Admission Fee</span> <span className="font-semibold text-text-primary text-sm">{student.admission_fee ? formatCurrency(student.admission_fee) : '-'}</span></p>
-                    <p><span className="text-text-muted block font-medium">Student Category</span> <span className="font-semibold text-text-primary text-sm">{student.student_category || '-'}</span></p>
                     <p><span className="text-text-muted block font-medium">Date of Birth</span> <span className="font-semibold text-text-primary text-sm">{student.dob || '-'}</span></p>
                     <p><span className="text-text-muted block font-medium">Aadhaar Number</span> <span className="font-semibold font-mono text-text-primary text-sm">{student.aadhaar_no || '-'}</span></p>
                     <p><span className="text-text-muted block font-medium">Category</span> <span className="font-semibold text-text-primary text-sm">{student.category || '-'}</span></p>
@@ -884,7 +882,6 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                     <p><span className="text-text-muted block font-medium">Student Mobile</span> <span className="font-semibold font-mono text-text-primary text-sm">{student.student_mobile || '-'}</span></p>
                     <p><span className="text-text-muted block font-medium">Student Email</span> <span className="font-semibold text-text-primary text-sm">{student.student_email || '-'}</span></p>
                     <p><span className="text-text-muted block font-medium">Class Assigned</span> <span className="font-semibold text-text-primary text-sm">{student.class_name || 'Not Assigned'}</span></p>
-                    <p><span className="text-text-muted block font-medium">Exit Date</span> <span className="font-semibold text-text-primary text-sm">{student.exit_date || 'Not Assigned'}</span></p>
                   </div>
                 </CardContent>
               </Card>
