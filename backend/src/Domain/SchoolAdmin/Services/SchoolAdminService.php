@@ -3302,6 +3302,9 @@ class SchoolAdminService extends BaseService
                 $stmtInsTimetable = $pdo->prepare("
                     INSERT INTO timetable (school_id, class_id, subject_id, teacher_id, day_of_week, period_number, start_date, is_published) 
                     VALUES (:school_id, :class_id, :subject_id, :teacher_id, :day_of_week, :period_number, :start_date, 0)
+                    ON DUPLICATE KEY UPDATE 
+                      subject_id = VALUES(subject_id), 
+                      teacher_id = VALUES(teacher_id)
                 ");
                 foreach ($oldTimetables as $ot) {
                     $oldClassId = (int)$ot['class_id'];
@@ -3341,7 +3344,13 @@ class SchoolAdminService extends BaseService
                 $stmtFeeStructures->execute([':sid' => $schoolId]);
                 $oldFeeStructures = $stmtFeeStructures->fetchAll(PDO::FETCH_ASSOC);
 
-                $stmtInsFee = $pdo->prepare("INSERT INTO fee_structures (school_id, name, amount, frequency, class_id) VALUES (:school_id, :name, :amount, :frequency, :class_id)");
+                $stmtInsFee = $pdo->prepare("
+                    INSERT INTO fee_structures (school_id, name, amount, frequency, class_id) 
+                    VALUES (:school_id, :name, :amount, :frequency, :class_id)
+                    ON DUPLICATE KEY UPDATE 
+                      amount = VALUES(amount), 
+                      frequency = VALUES(frequency)
+                ");
                 foreach ($oldFeeStructures as $ofs) {
                     $oldClassId = (int)$ofs['class_id'];
                     if (isset($classMap[$oldClassId])) {
