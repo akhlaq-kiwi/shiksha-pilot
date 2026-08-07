@@ -305,7 +305,20 @@ const AppLayout = ({ children }) => {
                                 </span>
                               </div>
                               <p className="text-[11px] text-text-secondary mt-1 whitespace-pre-line leading-relaxed">
-                                {n.message}
+                                {(() => {
+                                  if (!n.message) return '';
+                                  const parts = n.message.split(/(\*\*.*?\*\*)/g);
+                                  return parts.map((part, index) => {
+                                    if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
+                                      return (
+                                        <strong key={index} className="font-bold text-text-primary">
+                                          {part.slice(2, -2)}
+                                        </strong>
+                                      );
+                                    }
+                                    return part;
+                                  });
+                                })()}
                               </p>
                             </div>
                           ))

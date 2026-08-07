@@ -855,7 +855,7 @@ class PlatformService extends BaseService
             $adminIds = $stmtAdmins->fetchAll(PDO::FETCH_COLUMN) ?: [];
 
             $notifTitle = "Subscription Upgraded Successfully";
-            $notifMsg = "Your school's subscription has been upgraded to **{$newPlan['name']}**. Your new subscription benefits are now active.";
+            $notifMsg = "Your school's subscription has been upgraded to {$newPlan['name']}. Your new subscription benefits are now active.";
 
             if (!empty($adminIds)) {
                 $stmtNotif = $pdo->prepare("
