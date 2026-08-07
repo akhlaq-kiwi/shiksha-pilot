@@ -233,10 +233,25 @@ function SubscriptionExpiredScreen({ profile }) {
                     <div className="space-y-4">
                       <div className="border-b border-border/60 pb-4">
                         <h4 className="text-base font-bold text-text-primary font-display">{p.name}</h4>
-                        <p className="text-2xl font-bold text-text-primary tracking-tight mt-1">
-                          ₹{parseFloat(p.price).toLocaleString('en-IN')}
-                          <span className="text-xs font-bold text-text-secondary tracking-normal">/{p.duration_unit}</span>
-                        </p>
+                        <div className="flex items-center justify-between mt-1">
+                          <span className="text-2xl font-bold text-text-primary tracking-tight">
+                            ₹{parseFloat(p.price).toLocaleString('en-IN')}
+                          </span>
+                          <span className="text-xs font-bold text-text-secondary bg-zinc-100 dark:bg-zinc-800/80 px-2.5 py-1 rounded-lg">
+                            {(() => {
+                              const v = parseInt(p.duration_value, 10) || 1;
+                              const u = (p.duration_unit || 'month').toLowerCase();
+                              if (u === 'month' || u === 'months') {
+                                if (v === 12) return 'Validity 1 Year';
+                                return `Validity ${v} Month${v > 1 ? 's' : ''}`;
+                              }
+                              if (u === 'year' || u === 'years') {
+                                return `Validity ${v} Year${v > 1 ? 's' : ''}`;
+                              }
+                              return `Validity ${v} ${p.duration_unit}`;
+                            })()}
+                          </span>
+                        </div>
                         <p className="text-[11px] text-primary font-bold uppercase mt-2.5 block">
                           {p.student_limit ? `Up to ${p.student_limit.toLocaleString()} Students` : 'Unlimited Students'}
                         </p>

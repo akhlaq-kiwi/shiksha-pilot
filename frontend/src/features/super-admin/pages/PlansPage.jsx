@@ -302,15 +302,24 @@ export default function PlansPage() {
                       </span>
                     </div>
 
-                    <div className="mt-3 flex items-baseline gap-0.5">
-                      <span className="text-3xl font-bold text-text-primary">
+                    <div className="mt-3 flex items-center justify-between">
+                      <span className="text-3xl font-bold text-text-primary font-display">
                         {p.price > 0 ? `₹${Number(p.price).toLocaleString()}` : 'Free'}
                       </span>
-                      {p.price > 0 && (
-                        <span className="text-xs text-text-muted">
-                          /{p.duration_value} {p.duration_unit}{p.duration_value > 1 ? 's' : ''}
-                        </span>
-                      )}
+                      <span className="text-xs font-bold text-text-secondary bg-zinc-100 dark:bg-zinc-800/80 px-2.5 py-1 rounded-lg">
+                        {(() => {
+                          const v = parseInt(p.duration_value, 10) || 1;
+                          const u = (p.duration_unit || 'month').toLowerCase();
+                          if (u === 'month' || u === 'months') {
+                            if (v === 12) return 'Validity 1 Year';
+                            return `Validity ${v} Month${v > 1 ? 's' : ''}`;
+                          }
+                          if (u === 'year' || u === 'years') {
+                            return `Validity ${v} Year${v > 1 ? 's' : ''}`;
+                          }
+                          return `Validity ${v} ${p.duration_unit}`;
+                        })()}
+                      </span>
                     </div>
 
                     <div className="mt-4 text-xs text-text-secondary border-t border-border/50 pt-3 space-y-1.5 font-semibold">
@@ -318,12 +327,6 @@ export default function PlansPage() {
                         Student Limit:{' '}
                         <span className="text-text-primary font-bold">
                           {p.student_limit ? Number(p.student_limit).toLocaleString() : 'Unlimited'}
-                        </span>
-                      </div>
-                      <div>
-                        Duration:{' '}
-                        <span className="text-text-primary font-bold">
-                          {p.duration_value} {p.duration_unit === 'month' ? 'Month' : 'Year'}{p.duration_value > 1 ? 's' : ''}
                         </span>
                       </div>
                     </div>
