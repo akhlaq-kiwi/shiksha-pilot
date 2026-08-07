@@ -218,6 +218,7 @@ function CredentialsDialog({ school, onClose }) {
       setMobileNumber(updated.mobile_number);
       setPassword(updated.password);
       toast.success('School credentials updated successfully.', 'Updated');
+      onClose();
     } catch (err) {
       setError(err.message || 'Failed to update credentials.');
     } finally {
@@ -256,18 +257,18 @@ function CredentialsDialog({ school, onClose }) {
 
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-text-secondary uppercase">Password</label>
-              <div className="flex items-center gap-1.5">
+              <div className="relative">
                 <Input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   required
-                  className="flex-1 font-mono text-xs"
+                  className="pr-10 font-mono text-xs"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="p-2 rounded-md border border-border hover:bg-zinc-50 dark:hover:bg-zinc-800 text-text-muted hover:text-text-primary transition-colors"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-text-muted hover:text-text-primary transition-colors"
                   title={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -275,25 +276,22 @@ function CredentialsDialog({ school, onClose }) {
               </div>
             </div>
 
-            <div className="flex flex-col gap-2 pt-3">
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="flex-1 flex items-center justify-center gap-1.5 h-9 text-xs"
-                  onClick={handleCopy}
-                >
-                  <Copy className="h-3.5 w-3.5" /> Copy Credentials
-                </Button>
-                <Button
-                  type="submit"
-                  className="flex-1 h-9 text-xs"
-                  disabled={saving}
-                >
-                  {saving ? 'Updating…' : 'Update Credentials'}
-                </Button>
-              </div>
-              <Button type="button" variant="secondary" className="w-full h-9 text-xs" onClick={onClose}>Close</Button>
+            <div className="flex gap-2 pt-3">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1 flex items-center justify-center gap-1.5 h-9 text-xs font-bold"
+                onClick={handleCopy}
+              >
+                <Copy className="h-3.5 w-3.5" /> Copy Credentials
+              </Button>
+              <Button
+                type="submit"
+                className="flex-1 h-9 text-xs font-bold"
+                disabled={saving}
+              >
+                {saving ? 'Updating…' : 'Update Credentials'}
+              </Button>
             </div>
           </form>
         )}
