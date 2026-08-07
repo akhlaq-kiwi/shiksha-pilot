@@ -762,31 +762,30 @@ export default function ProfilePage({ mode = 'details' }) {
                         <div className="flex justify-between items-center py-1">
                           <span className="text-2xl font-bold text-text-primary">₹{parseFloat(plan.price).toLocaleString('en-IN')}</span>
                           <span className="text-xs font-bold text-text-secondary bg-zinc-100 dark:bg-zinc-800/80 px-2.5 py-1 rounded-lg">
-                            {(() => {
-                              const v = parseInt(plan.duration_value, 10) || 1;
-                              const u = (plan.duration_unit || 'month').toLowerCase();
-                              if (u === 'month' || u === 'months') {
-                                if (v === 12) return 'Validity 1 Year';
-                                return `Validity ${v} Month${v > 1 ? 's' : ''}`;
-                              }
-                              if (u === 'year' || u === 'years') {
-                                return `Validity ${v} Year${v > 1 ? 's' : ''}`;
-                              }
-                              return `Validity ${v} ${plan.duration_unit}`;
-                            })()}
+                            {isCurrent && profile?.subscription_expiry ? (
+                              `Expires on ${(() => {
+                                const d = new Date(profile.subscription_expiry);
+                                const day = d.getDate();
+                                const month = d.toLocaleString('en-US', { month: 'long' });
+                                const year = d.getFullYear();
+                                return `${day} ${month} ${year}`;
+                              })()}`
+                            ) : (
+                              (() => {
+                                const v = parseInt(plan.duration_value, 10) || 1;
+                                const u = (plan.duration_unit || 'month').toLowerCase();
+                                if (u === 'month' || u === 'months') {
+                                  if (v === 12) return 'Validity 1 Year';
+                                  return `Validity ${v} Month${v > 1 ? 's' : ''}`;
+                                }
+                                if (u === 'year' || u === 'years') {
+                                  return `Validity ${v} Year${v > 1 ? 's' : ''}`;
+                                }
+                                return `Validity ${v} ${plan.duration_unit}`;
+                              })()
+                            )}
                           </span>
                         </div>
-                        {isCurrent && profile?.subscription_expiry && (
-                          <div className="text-[11px] text-text-muted font-semibold">
-                            Expires on {(() => {
-                              const d = new Date(profile.subscription_expiry);
-                              const day = d.getDate();
-                              const month = d.toLocaleString('en-US', { month: 'long' });
-                              const year = d.getFullYear();
-                              return `${day} ${month} ${year}`;
-                            })()}
-                          </div>
-                        )}
 
                         <div className="text-xs text-text-secondary leading-relaxed font-medium whitespace-pre-line break-words">
                           {plan.description || 'No plan description provided.'}
