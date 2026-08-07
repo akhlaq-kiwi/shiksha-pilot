@@ -337,20 +337,28 @@ export default function PlansPage() {
                   </div>
 
                   <div className="flex gap-2.5 mt-6 border-t border-border/50 pt-4 shrink-0">
-                    <Button
-                      variant="outline"
-                      className="flex-1 text-xs py-1.5 flex items-center justify-center gap-1.5 font-bold"
-                      onClick={() => setConfiguringPlan(p)}
-                    >
-                      <Pencil className="h-3.5 w-3.5" /> Edit
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="flex-1 text-xs py-1.5 flex items-center justify-center gap-1.5 text-red-600 hover:bg-red-500/5 hover:text-red-700 border-red-200 dark:border-red-950 font-bold"
-                      onClick={() => handleDelete(p.id, p.name)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" /> Delete
-                    </Button>
+                    {(p.assigned_schools_count || 0) > 0 ? (
+                      <div className="w-full text-center py-2 px-3 rounded-xl bg-zinc-100 dark:bg-zinc-800/60 border border-border/60 text-xs font-bold text-text-secondary">
+                        Assigned In: {p.assigned_schools_count} {p.assigned_schools_count === 1 ? 'school' : 'schools'}
+                      </div>
+                    ) : (
+                      <>
+                        <Button
+                          variant="outline"
+                          className="flex-1 text-xs py-1.5 flex items-center justify-center gap-1.5 font-bold"
+                          onClick={() => setConfiguringPlan(p)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" /> Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="flex-1 text-xs py-1.5 flex items-center justify-center gap-1.5 text-red-600 hover:bg-red-500/5 hover:text-red-700 border-red-200 dark:border-red-950 font-bold"
+                          onClick={() => handleDelete(p.id, p.name)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" /> Delete
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
               </Card>

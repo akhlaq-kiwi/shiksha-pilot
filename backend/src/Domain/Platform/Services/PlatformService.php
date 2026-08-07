@@ -565,22 +565,28 @@ class PlatformService extends BaseService
         $plans = $this->plans->findAll([], 'id ASC');
         $pdo = $this->plans->getPdo();
 
-        $assignedNames = [];
+        $assignedCounts = [];
         try {
-            $stmtSub = $pdo->query("SELECT DISTINCT LOWER(TRIM(plan_name)) FROM subscriptions WHERE plan_name IS NOT NULL AND plan_name != ''");
-            $subNames = $stmtSub->fetchAll(PDO::FETCH_COLUMN) ?: [];
+            $stmtSch = $pdo->query("SELECT LOWER(TRIM(plan)) as plan_name, COUNT(DISTINCT id) as cnt FROM schools WHERE plan IS NOT NULL AND TRIM(plan) != '' GROUP BY LOWER(TRIM(plan))");
+            $schRows = $stmtSch->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            foreach ($schRows as $r) {
+                $name = $r['plan_name'];
+                $assignedCounts[$name] = ($assignedCounts[$name] ?? 0) + (int)$r['cnt'];
+            }
 
-            $stmtSch = $pdo->query("SELECT DISTINCT LOWER(TRIM(plan)) FROM schools WHERE plan IS NOT NULL AND plan != ''");
-            $schNames = $stmtSch->fetchAll(PDO::FETCH_COLUMN) ?: [];
-
-            $assignedNames = array_flip(array_unique(array_merge($subNames, $schNames)));
+            $stmtSub = $pdo->query("SELECT LOWER(TRIM(plan_name)) as plan_name, COUNT(DISTINCT school_id) as cnt FROM subscriptions WHERE plan_name IS NOT NULL AND TRIM(plan_name) != '' GROUP BY LOWER(TRIM(plan_name))");
+            $subRows = $stmtSub->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            foreach ($subRows as $r) {
+                $name = $r['plan_name'];
+                $assignedCounts[$name] = max($assignedCounts[$name] ?? 0, (int)$r['cnt']);
+            }
         } catch (\Throwable $e) {
-            $assignedNames = [];
+            $assignedCounts = [];
         }
 
         foreach ($plans as &$p) {
             $cleanName = strtolower(trim((string)($p['name'] ?? '')));
-            $p['assigned_schools_count'] = isset($assignedNames[$cleanName]) ? 1 : 0;
+            $p['assigned_schools_count'] = (int)($assignedCounts[$cleanName] ?? 0);
         }
 
         return $plans;
@@ -616,6 +622,21 @@ class PlatformService extends BaseService
         $plan = $this->plans->findById($id);
         if ($plan === null) {
             throw new NotFoundException('Plan not found.');
+        }
+
+        $pdo = $this->plans->getPdo();
+        $cleanName = strtolower(trim((string)$plan['name']));
+        $stmtCheck = $pdo->prepare("
+            SELECT (
+                (SELECT COUNT(*) FROM subscriptions WHERE LOWER(TRIM(plan_name)) = :name) +
+                (SELECT COUNT(*) FROM schools WHERE LOWER(TRIM(plan)) = :name)
+            ) AS cnt
+        ");
+        $stmtCheck->execute([':name' => $cleanName]);
+        $cnt = (int)$stmtCheck->fetchColumn();
+
+        if ($cnt > 0) {
+            throw new \App\Shared\Exceptions\ValidationException(['plan' => 'Cannot edit a plan that is assigned to 1 or more schools.']);
         }
 
         $this->plans->update($id, [
@@ -1130,6 +1151,22 @@ class PlatformService extends BaseService
         if ($plan === null) {
             throw new NotFoundException('Plan not found.');
         }
+
+        $pdo = $this->plans->getPdo();
+        $cleanName = strtolower(trim((string)$plan['name']));
+        $stmtCheck = $pdo->prepare("
+            SELECT (
+                (SELECT COUNT(*) FROM subscriptions WHERE LOWER(TRIM(plan_name)) = :name) +
+                (SELECT COUNT(*) FROM schools WHERE LOWER(TRIM(plan)) = :name)
+            ) AS cnt
+        ");
+        $stmtCheck->execute([':name' => $cleanName]);
+        $cnt = (int)$stmtCheck->fetchColumn();
+
+        if ($cnt > 0) {
+            throw new \App\Shared\Exceptions\ValidationException(['plan' => 'Cannot delete a plan that is assigned to 1 or more schools.']);
+        }
+
         $this->plans->delete($id);
     }
 
