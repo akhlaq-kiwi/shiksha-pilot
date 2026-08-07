@@ -813,14 +813,12 @@ export default function ProfilePage({ mode = 'details' }) {
                         <th className="p-4">Expiry Date</th>
                         <th className="p-4">Duration</th>
                         <th className="p-4">Amount</th>
-                        <th className="p-4">Status</th>
-                        <th className="p-4">Features Included</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/60">
                       {subHistory.length === 0 ? (
                         <tr>
-                          <td colSpan="7" className="p-8 text-center text-text-muted font-medium">
+                          <td colSpan="5" className="p-8 text-center text-text-muted font-medium">
                             No subscription history records found.
                           </td>
                         </tr>
@@ -850,14 +848,6 @@ export default function ProfilePage({ mode = 'details' }) {
                               </td>
                               <td className="p-4 font-bold text-text-primary">
                                 ₹{parseFloat(sub.amount).toLocaleString('en-IN')}
-                              </td>
-                              <td className="p-4">
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${sub.status === 'PAID' ? 'bg-green-500/10 text-green-600 border border-green-500/20' : 'bg-red-500/10 text-red-600 border border-red-500/20'}`}>
-                                  {sub.status}
-                                </span>
-                              </td>
-                              <td className="p-4 text-text-secondary leading-relaxed max-w-xs truncate font-medium" title={sub.features || '—'}>
-                                {sub.features || '—'}
                               </td>
                             </tr>
                           );
