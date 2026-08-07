@@ -20,7 +20,11 @@ export default function LoginForm({ onLoginSuccess }) {
     const sessionErr = sessionStorage.getItem('login_error_message');
     const msg = urlErr || sessionErr;
     if (msg) {
-      setErrors({ phone: decodeURIComponent(msg) });
+      const decodedMsg = decodeURIComponent(msg);
+      // Only show error message if it explicitly pertains to inactive account or specific error
+      if (decodedMsg.toLowerCase().includes('inactive') || decodedMsg.toLowerCase().includes('password') || decodedMsg.toLowerCase().includes('blocked')) {
+        setErrors({ phone: decodedMsg });
+      }
       sessionStorage.removeItem('login_error_message');
     }
   }, []);
