@@ -562,18 +562,27 @@ class PlatformService extends BaseService
 
     public function getPlans(): array
     {
+        $plans = $this->plans->findAll([], 'id ASC');
         $pdo = $this->plans->getPdo();
-        $stmt = $pdo->query("
-            SELECT p.*,
-                   (SELECT COUNT(*) FROM subscriptions s WHERE LOWER(TRIM(s.plan_name)) = LOWER(TRIM(p.name))) +
-                   (SELECT COUNT(*) FROM schools sch WHERE LOWER(TRIM(sch.plan)) = LOWER(TRIM(p.name))) AS assigned_schools_count
-            FROM plans p
-            ORDER BY p.id ASC
-        ");
-        $plans = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        foreach ($plans as &$p) {
-            $p['assigned_schools_count'] = (int) $p['assigned_schools_count'];
+
+        $assignedNames = [];
+        try {
+            $stmtSub = $pdo->query("SELECT DISTINCT LOWER(TRIM(plan_name)) FROM subscriptions WHERE plan_name IS NOT NULL AND plan_name != ''");
+            $subNames = $stmtSub->fetchAll(PDO::FETCH_COLUMN) ?: [];
+
+            $stmtSch = $pdo->query("SELECT DISTINCT LOWER(TRIM(plan)) FROM schools WHERE plan IS NOT NULL AND plan != ''");
+            $schNames = $stmtSch->fetchAll(PDO::FETCH_COLUMN) ?: [];
+
+            $assignedNames = array_flip(array_unique(array_merge($subNames, $schNames)));
+        } catch (\Throwable $e) {
+            $assignedNames = [];
         }
+
+        foreach ($plans as &$p) {
+            $cleanName = strtolower(trim((string)($p['name'] ?? '')));
+            $p['assigned_schools_count'] = isset($assignedNames[$cleanName]) ? 1 : 0;
+        }
+
         return $plans;
     }
 
