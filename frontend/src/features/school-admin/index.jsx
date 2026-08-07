@@ -216,44 +216,50 @@ function SubscriptionExpiredScreen({ profile }) {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Fetching plans...</p>
             </div>
-          ) : plans.length === 0 ? (
-            <div className="py-12 border border-border bg-surface rounded-2xl text-text-muted text-sm font-semibold max-w-lg mx-auto space-y-1.5 p-6">
-              <p className="text-text-primary font-bold">No subscription plans are currently available.</p>
-              <p className="text-xs font-medium">Please contact the Super Admin for assistance.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto text-left">
-              {plans.map(p => (
-                <Card key={p.id} className="shadow-sm border-border bg-surface flex flex-col justify-between p-6 rounded-2xl min-h-[350px] relative hover:shadow-md transition-all duration-200">
-                  <div className="space-y-4">
-                    <div className="border-b border-border/60 pb-4">
-                      <h4 className="text-base font-bold text-text-primary font-display">{p.name}</h4>
-                      <p className="text-2xl font-bold text-text-primary tracking-tight mt-1">
-                        ₹{parseFloat(p.price).toLocaleString('en-IN')}
-                        <span className="text-xs font-bold text-text-secondary tracking-normal">/{p.duration_unit}</span>
-                      </p>
-                      <p className="text-[11px] text-primary font-bold uppercase mt-2.5 block">
-                        {p.student_limit ? `Up to ${p.student_limit.toLocaleString()} Students` : 'Unlimited Students'}
-                      </p>
+          ) : (() => {
+            const availablePlans = (plans || []).filter(p => parseFloat(p.price || 0) > 0);
+            if (availablePlans.length === 0) {
+              return (
+                <div className="py-12 border border-border bg-surface rounded-2xl text-text-muted text-sm font-semibold max-w-lg mx-auto space-y-1.5 p-6">
+                  <p className="text-text-primary font-bold">No subscription plans are currently available.</p>
+                  <p className="text-xs font-medium">Please contact the Super Admin for assistance.</p>
+                </div>
+              );
+            }
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto text-left">
+                {availablePlans.map(p => (
+                  <Card key={p.id} className="shadow-sm border-border bg-surface flex flex-col justify-between p-6 rounded-2xl min-h-[350px] relative hover:shadow-md transition-all duration-200">
+                    <div className="space-y-4">
+                      <div className="border-b border-border/60 pb-4">
+                        <h4 className="text-base font-bold text-text-primary font-display">{p.name}</h4>
+                        <p className="text-2xl font-bold text-text-primary tracking-tight mt-1">
+                          ₹{parseFloat(p.price).toLocaleString('en-IN')}
+                          <span className="text-xs font-bold text-text-secondary tracking-normal">/{p.duration_unit}</span>
+                        </p>
+                        <p className="text-[11px] text-primary font-bold uppercase mt-2.5 block">
+                          {p.student_limit ? `Up to ${p.student_limit.toLocaleString()} Students` : 'Unlimited Students'}
+                        </p>
+                      </div>
+
+                      <div className="text-xs text-text-secondary leading-relaxed font-medium whitespace-pre-line break-words">
+                        {p.description || 'No plan description provided.'}
+                      </div>
                     </div>
 
-                    <p className="text-xs text-text-secondary leading-relaxed font-medium">
-                      {p.description}
-                    </p>
-                  </div>
-
-                  <div className="pt-6">
-                    <Button 
-                      className="w-full font-bold bg-amber-600 hover:bg-amber-700 text-white flex items-center justify-center gap-1.5 shadow-sm text-xs py-2 rounded-xl"
-                      onClick={() => setContactOpen(true)}
-                    >
-                      CONTACT SUPER ADMIN
-                    </Button>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
+                    <div className="pt-6">
+                      <Button 
+                        className="w-full font-bold bg-amber-600 hover:bg-amber-700 text-white flex items-center justify-center gap-1.5 shadow-sm text-xs py-2 rounded-xl"
+                        onClick={() => setContactOpen(true)}
+                      >
+                        CONTACT SUPER ADMIN
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            );
+          })()}
         </div>
       </div>
 
