@@ -703,8 +703,8 @@ export default function ProfilePage({ mode = 'details' }) {
                   })()}
                 </div>
               </div>
-              <div className="text-xs font-semibold text-primary bg-primary/10 border border-primary/20 p-3.5 rounded-xl max-w-md leading-relaxed">
-                When you upgrade your plan, the amount of your remaining days will be adjusted in your new plan.
+              <div className="text-xs font-semibold text-primary bg-primary/10 border border-primary/20 p-3.5 rounded-xl max-w-[460px] leading-relaxed">
+                When you upgrade your plan, the value of your remaining days will be adjusted in your new plan, so you will not lose the benefit of the time left on your current plan.
               </div>
             </CardContent>
           </Card>
