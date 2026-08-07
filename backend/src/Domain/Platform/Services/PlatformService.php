@@ -562,7 +562,19 @@ class PlatformService extends BaseService
 
     public function getPlans(): array
     {
-        return $this->plans->findAll([], 'id ASC');
+        $pdo = $this->plans->getPdo();
+        $stmt = $pdo->query("
+            SELECT p.*,
+                   (SELECT COUNT(*) FROM subscriptions s WHERE LOWER(TRIM(s.plan_name)) = LOWER(TRIM(p.name))) +
+                   (SELECT COUNT(*) FROM schools sch WHERE LOWER(TRIM(sch.plan)) = LOWER(TRIM(p.name))) AS assigned_schools_count
+            FROM plans p
+            ORDER BY p.id ASC
+        ");
+        $plans = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($plans as &$p) {
+            $p['assigned_schools_count'] = (int) $p['assigned_schools_count'];
+        }
+        return $plans;
     }
 
     public function createPlan(array $data): array
@@ -579,6 +591,8 @@ class PlatformService extends BaseService
             'price'          => (int) $data['price'],
             'student_limit'  => isset($data['student_limit']) && $data['student_limit'] !== '' ? (int) $data['student_limit'] : null,
             'description'    => $data['description'] ?? null,
+            'duration_value' => isset($data['duration_value']) ? (int) $data['duration_value'] : 12,
+            'duration_unit'  => isset($data['duration_unit']) ? (string) $data['duration_unit'] : 'month',
             'type'           => in_array($type, ['standard', 'trial', 'custom']) ? $type : 'custom',
             'trial_duration' => isset($data['trial_duration']) ? (int) $data['trial_duration'] : null,
             'trial_unit'     => $data['trial_unit'] ?? null,
@@ -596,13 +610,15 @@ class PlatformService extends BaseService
         }
 
         $this->plans->update($id, [
-            'name'          => $data['name']          ?? $plan['name'],
-            'price'         => isset($data['price']) ? (int) $data['price'] : $plan['price'],
-            'student_limit' => array_key_exists('student_limit', $data)
+            'name'           => $data['name']          ?? $plan['name'],
+            'price'          => isset($data['price']) ? (int) $data['price'] : $plan['price'],
+            'student_limit'  => array_key_exists('student_limit', $data)
                 ? ($data['student_limit'] !== '' && $data['student_limit'] !== null ? (int) $data['student_limit'] : null)
                 : $plan['student_limit'],
-            'description'   => $data['description']  ?? $plan['description'],
-            'is_active'     => isset($data['is_active']) ? (int) $data['is_active'] : $plan['is_active'],
+            'description'    => $data['description']  ?? $plan['description'],
+            'duration_value' => isset($data['duration_value']) ? (int) $data['duration_value'] : ($plan['duration_value'] ?? 12),
+            'duration_unit'  => isset($data['duration_unit']) ? (string) $data['duration_unit'] : ($plan['duration_unit'] ?? 'month'),
+            'is_active'      => isset($data['is_active']) ? (int) $data['is_active'] : $plan['is_active'],
         ]);
 
         return $this->plans->findById($id);
