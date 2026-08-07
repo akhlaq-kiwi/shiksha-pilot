@@ -686,25 +686,25 @@ export default function ProfilePage({ mode = 'details' }) {
       {mode === 'plans' && (
         <div className="space-y-6">
           {/* Current plan card */}
-          <Card className="shadow-xs border-border bg-surface">
-            <CardContent className="p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="space-y-1">
+          <Card className="shadow-xs border-2 border-primary/30 bg-primary/5 rounded-2xl overflow-hidden">
+            <CardContent className="p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="space-y-1 shrink-0">
                 <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Current Subscription Plan</p>
-                <div className="flex items-center gap-2">
-                  <span className="text-xl font-bold text-text-primary tracking-tight">{profile?.plan || 'Premium'}</span>
+                <div className="flex items-center gap-2.5">
+                  <span className="text-2xl font-bold text-text-primary tracking-tight font-display">{profile?.plan || 'Premium'}</span>
                   {(() => {
                     const daysText = calculateDaysLeftText(profile?.subscription_expiry);
                     const isExpired = daysText === 'Expired';
                     return (
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${isExpired ? 'bg-red-500/10 text-red-600 border border-red-500/20' : 'bg-primary/10 text-primary border border-primary/20'}`}>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${isExpired ? 'bg-red-500/10 text-red-600 border border-red-500/20' : 'bg-primary/15 text-primary border border-primary/30'}`}>
                         {daysText}
                       </span>
                     );
                   })()}
                 </div>
               </div>
-              <div className="text-xs text-text-secondary max-w-sm">
-                Your billing and plan details are configured by the Super Admin. If you need to make changes, please get in touch with support.
+              <div className="text-xs font-semibold text-primary bg-primary/10 border border-primary/20 p-3.5 rounded-xl max-w-md leading-relaxed">
+                When you upgrade your plan, the amount of your remaining days will be adjusted in your new plan.
               </div>
             </CardContent>
           </Card>
@@ -748,7 +748,7 @@ export default function ProfilePage({ mode = 'details' }) {
                 {sortedPlans.map(plan => {
                   const isCurrent = currentPlanName !== '' && currentPlanName !== 'none' && currentPlanName === (plan.name || '').trim().toLowerCase();
                   return (
-                    <Card key={plan.id} className={`shadow-xs flex flex-col justify-between overflow-hidden border ${isCurrent ? 'border-primary ring-1 ring-primary' : 'border-border'} min-h-[350px] relative p-6 rounded-2xl hover:shadow-md transition-all duration-200`}>
+                    <Card key={plan.id} className={`shadow-xs flex flex-col justify-between overflow-hidden border ${isCurrent ? 'border-primary ring-1 ring-primary' : 'border-border'} hover:border-primary hover:ring-1 hover:ring-primary min-h-[350px] relative p-6 rounded-2xl hover:shadow-md transition-all duration-200`}>
                       <div className="space-y-4">
                         <div className="border-b border-border/60 pb-4">
                           <div className="flex justify-between items-start">
