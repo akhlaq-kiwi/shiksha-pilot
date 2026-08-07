@@ -648,7 +648,20 @@ export default function SchoolDetailPage({ schools, onToggleStatus, onDeleteScho
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-bold text-text-primary">₹{Number(p.price).toLocaleString()}</p>
-                    <p className="text-[11px] text-text-muted">/month</p>
+                    <p className="text-[11px] text-text-muted font-semibold">
+                      {(() => {
+                        const v = parseInt(p.duration_value, 10) || 1;
+                        const u = (p.duration_unit || 'month').toLowerCase();
+                        if (u === 'month' || u === 'months') {
+                          if (v === 12) return 'Validity 1 Year';
+                          return `Validity ${v} Month${v > 1 ? 's' : ''}`;
+                        }
+                        if (u === 'year' || u === 'years') {
+                          return `Validity ${v} Year${v > 1 ? 's' : ''}`;
+                        }
+                        return `Validity ${v} ${p.duration_unit}`;
+                      })()}
+                    </p>
                   </div>
                 </div>
               ))}

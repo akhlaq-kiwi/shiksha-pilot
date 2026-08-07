@@ -252,10 +252,10 @@ class SchoolAdminService extends BaseService
             SELECT e.class_id 
             FROM exam_marks em
             JOIN exams e ON em.exam_id = e.id
-            WHERE em.student_id = :student_id AND e.academic_year_id = :ay_id AND e.school_id = :sid
+            WHERE em.student_id = :student_id AND e.school_id = :sid
             LIMIT 1
         ");
-        $stmt->execute([':student_id' => $studentId, ':ay_id' => $academicYearId, ':sid' => $schoolId]);
+        $stmt->execute([':student_id' => $studentId, ':sid' => $schoolId]);
         $classId = $stmt->fetchColumn();
         if ($classId !== false && $classId !== null) {
             return (int)$classId;
@@ -270,45 +270,45 @@ class SchoolAdminService extends BaseService
                 $className = $currentClass['name'];
                 $section = $currentClass['section'];
 
-                // Let's try matching same name class first
+                // Let's try matching same name class first (prefer exact section match, fallback to unsectioned class)
                 $stmt = $pdo->prepare("
                     SELECT id FROM classes 
-                    WHERE school_id = :sid AND academic_year_id = :ay_id AND name = :name AND (section = :section OR (section IS NULL AND :section_null = 1)) 
+                    WHERE school_id = :sid AND academic_year_id = :ay_id AND name = :name 
+                    ORDER BY CASE WHEN section = :section THEN 0 WHEN section IS NULL OR TRIM(section) = '' THEN 1 ELSE 2 END 
                     LIMIT 1
                 ");
                 $stmt->execute([
                     ':sid' => $schoolId,
                     ':ay_id' => $academicYearId,
                     ':name' => $className,
-                    ':section' => $section,
-                    ':section_null' => $section === null ? 1 : 0
+                    ':section' => $section
                 ]);
                 $cid = $stmt->fetchColumn();
                 if ($cid !== false) {
-                    preg_match('/\d+/', $className, $matches);
-                    if ($matches) {
-                        $num = (int)$matches[0];
-                        if ($num > 1) {
-                            $prevClassName = str_replace((string)$num, (string)($num - 1), $className);
-                            $stmt = $pdo->prepare("
-                                SELECT id FROM classes 
-                                WHERE school_id = :sid AND academic_year_id = :ay_id AND name = :name AND (section = :section OR (section IS NULL AND :section_null = 1)) 
-                                LIMIT 1
-                            ");
-                            $stmt->execute([
-                                ':sid' => $schoolId,
-                                ':ay_id' => $academicYearId,
-                                ':name' => $prevClassName,
-                                ':section' => $section,
-                                ':section_null' => $section === null ? 1 : 0
-                            ]);
-                            $prevCid = $stmt->fetchColumn();
-                            if ($prevCid !== false) {
-                                return (int)$prevCid;
-                            }
-                        }
-                    }
                     return (int)$cid;
+                }
+
+                // If exact name didn't match, check next/prev class name
+                preg_match('/\d+/', $className, $matches);
+                if ($matches) {
+                    $num = (int)$matches[0];
+                    $nextClassName = str_replace((string)$num, (string)($num + 1), $className);
+                    $stmt = $pdo->prepare("
+                        SELECT id FROM classes 
+                        WHERE school_id = :sid AND academic_year_id = :ay_id AND name = :name 
+                        ORDER BY CASE WHEN section = :section THEN 0 WHEN section IS NULL OR TRIM(section) = '' THEN 1 ELSE 2 END 
+                        LIMIT 1
+                    ");
+                    $stmt->execute([
+                        ':sid' => $schoolId,
+                        ':ay_id' => $academicYearId,
+                        ':name' => $nextClassName,
+                        ':section' => $section
+                    ]);
+                    $nextCid = $stmt->fetchColumn();
+                    if ($nextCid !== false) {
+                        return (int)$nextCid;
+                    }
                 }
             }
         }
@@ -704,7 +704,9 @@ class SchoolAdminService extends BaseService
             $stmtClassName->execute([':cid' => $workingYearClassId]);
             $cls = $stmtClassName->fetch(PDO::FETCH_ASSOC);
             if ($cls) {
-                $sectionStr = !empty($cls['section']) ? ' - ' . $cls['section'] : '';
+                $sec = !empty($cls['section']) ? trim((string)$cls['section']) : null;
+                $student['section'] = $sec;
+                $sectionStr = ($sec !== null && $sec !== '') ? ' - ' . $sec : '';
                 $student['class_name'] = $cls['name'] . $sectionStr;
             }
         }
@@ -12546,13 +12548,10 @@ Only approve the settlement after reviewing all financial records.
                 }
             }
             // Default fallbacks
-            if ($pct >= 90) return 'A+';
-            if ($pct >= 80) return 'A';
-            if ($pct >= 70) return 'B+';
+            if ($pct >= 75) return 'A';
             if ($pct >= 60) return 'B';
-            if ($pct >= 50) return 'C';
-            if ($pct >= 40) return 'D';
-            return 'F';
+            if ($pct >= 40) return 'C';
+            return 'D';
         };
 
         // Fetch Students list
