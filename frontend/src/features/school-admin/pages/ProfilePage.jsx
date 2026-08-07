@@ -750,41 +750,45 @@ export default function ProfilePage({ mode = 'details' }) {
                   return (
                     <Card key={plan.id} className={`shadow-xs flex flex-col justify-between overflow-hidden border ${isCurrent ? 'border-primary ring-1 ring-primary' : 'border-border'} min-h-[350px] relative p-6 rounded-2xl hover:shadow-md transition-all duration-200`}>
                       <div className="space-y-4">
-                        <div className="flex justify-between items-start border-b border-border/60 pb-4">
-                          <div>
+                        <div className="border-b border-border/60 pb-4">
+                          <div className="flex justify-between items-start">
                             <h4 className="text-base font-bold text-text-primary tracking-tight font-display">{plan.name}</h4>
-                          </div>
-                          {isCurrent && (
-                            <span className="text-[11px] font-bold bg-primary text-zinc-50 px-2.5 py-1 rounded-full uppercase tracking-wider">Current</span>
-                          )}
-                        </div>
-                        
-                        <div className="flex justify-between items-center py-1">
-                          <span className="text-2xl font-bold text-text-primary">₹{parseFloat(plan.price).toLocaleString('en-IN')}</span>
-                          <span className="text-xs font-bold text-text-secondary bg-zinc-100 dark:bg-zinc-800/80 px-2.5 py-1 rounded-lg">
-                            {isCurrent && profile?.subscription_expiry ? (
-                              `Expires on ${(() => {
-                                const d = new Date(profile.subscription_expiry);
-                                const day = d.getDate();
-                                const month = d.toLocaleString('en-US', { month: 'long' });
-                                const year = d.getFullYear();
-                                return `${day} ${month} ${year}`;
-                              })()}`
-                            ) : (
-                              (() => {
-                                const v = parseInt(plan.duration_value, 10) || 1;
-                                const u = (plan.duration_unit || 'month').toLowerCase();
-                                if (u === 'month' || u === 'months') {
-                                  if (v === 12) return 'Validity 1 Year';
-                                  return `Validity ${v} Month${v > 1 ? 's' : ''}`;
-                                }
-                                if (u === 'year' || u === 'years') {
-                                  return `Validity ${v} Year${v > 1 ? 's' : ''}`;
-                                }
-                                return `Validity ${v} ${plan.duration_unit}`;
-                              })()
+                            {isCurrent && (
+                              <span className="text-[11px] font-bold bg-primary text-zinc-50 px-2.5 py-1 rounded-full uppercase tracking-wider">Current</span>
                             )}
-                          </span>
+                          </div>
+
+                          <div className="flex items-center justify-between mt-2">
+                            <span className="text-2xl font-bold text-text-primary tracking-tight">₹{parseFloat(plan.price).toLocaleString('en-IN')}</span>
+                            <span className="text-xs font-bold text-text-secondary bg-zinc-100 dark:bg-zinc-800/80 px-2.5 py-1 rounded-lg">
+                              {isCurrent && profile?.subscription_expiry ? (
+                                `Expires on ${(() => {
+                                  const d = new Date(profile.subscription_expiry);
+                                  const day = d.getDate();
+                                  const month = d.toLocaleString('en-US', { month: 'long' });
+                                  const year = d.getFullYear();
+                                  return `${day} ${month} ${year}`;
+                                })()}`
+                              ) : (
+                                (() => {
+                                  const v = parseInt(plan.duration_value, 10) || 1;
+                                  const u = (plan.duration_unit || 'month').toLowerCase();
+                                  if (u === 'month' || u === 'months') {
+                                    if (v === 12) return 'Validity 1 Year';
+                                    return `Validity ${v} Month${v > 1 ? 's' : ''}`;
+                                  }
+                                  if (u === 'year' || u === 'years') {
+                                    return `Validity ${v} Year${v > 1 ? 's' : ''}`;
+                                  }
+                                  return `Validity ${v} ${plan.duration_unit}`;
+                                })()
+                              )}
+                            </span>
+                          </div>
+
+                          <p className="text-[11px] text-primary font-bold uppercase mt-2.5 block">
+                            {plan.student_limit ? `Up to ${Number(plan.student_limit).toLocaleString()} Students` : 'Unlimited Students'}
+                          </p>
                         </div>
 
                         <div className="text-xs text-text-secondary leading-relaxed font-medium whitespace-pre-line break-words">
