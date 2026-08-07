@@ -159,10 +159,7 @@ function CredentialsDialog({ school, onClose }) {
   const [showPassword, setShowPassword] = useState(false);
 
   const [schoolName, setSchoolName] = useState('');
-  const [loginUrl, setLoginUrl] = useState('');
-  const [adminEmail, setAdminEmail] = useState('');
   const [mobileNumber, setMobileNumber] = useState('');
-  const [currentLoginId, setCurrentLoginId] = useState('');
   const [password, setPassword] = useState('');
 
   const loadCredentials = async () => {
@@ -170,10 +167,7 @@ function CredentialsDialog({ school, onClose }) {
       setLoading(true);
       const data = await platformService.getSchoolCredentials(school.id);
       setSchoolName(data.school_name || school.name);
-      setLoginUrl(window.location.origin);
-      setAdminEmail(data.admin_email || '');
       setMobileNumber(data.mobile_number || '');
-      setCurrentLoginId(data.current_login_id || '');
       setPassword(data.password || '');
     } catch (err) {
       setError(err.message || 'Failed to load credentials.');
@@ -189,7 +183,7 @@ function CredentialsDialog({ school, onClose }) {
   }, [school]);
 
   const handleCopy = () => {
-    const text = `School Name: ${schoolName}\nPortal URL: ${loginUrl}\nLogin ID: ${currentLoginId}\nPassword: ${password}`;
+    const text = `Mobile Number: ${mobileNumber}\nPassword: ${password}`;
     navigator.clipboard.writeText(text)
       .then(() => {
         toast.success('Credentials copied to clipboard!', 'Copied');
@@ -203,12 +197,6 @@ function CredentialsDialog({ school, onClose }) {
     e.preventDefault();
     setSaving(true);
     setError('');
-
-    if (!adminEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail)) {
-      setError('A valid admin email is required.');
-      setSaving(false);
-      return;
-    }
 
     if (!/^[0-9]{10}$/.test(mobileNumber.trim())) {
       setError('Mobile number must be exactly 10 digits.');
@@ -224,13 +212,10 @@ function CredentialsDialog({ school, onClose }) {
 
     try {
       const updated = await platformService.updateSchoolCredentials(school.id, {
-        admin_email: adminEmail.trim(),
         mobile_number: mobileNumber.trim(),
         password: password,
       });
-      setAdminEmail(updated.admin_email);
       setMobileNumber(updated.mobile_number);
-      setCurrentLoginId(updated.current_login_id);
       setPassword(updated.password);
       toast.success('School credentials updated successfully.', 'Updated');
     } catch (err) {
@@ -264,29 +249,9 @@ function CredentialsDialog({ school, onClose }) {
           <div className="py-12 text-center text-xs text-text-muted">Loading secure credentials…</div>
         ) : (
           <form onSubmit={handleUpdate} className="space-y-4">
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-text-secondary uppercase">School Name</label>
-              <Input value={schoolName} disabled className="bg-zinc-50 dark:bg-zinc-900 cursor-not-allowed" />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-text-secondary uppercase">Login URL</label>
-              <Input value={loginUrl} disabled className="bg-zinc-50 dark:bg-zinc-900 cursor-not-allowed text-primary font-semibold" />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">Admin Email / Username</label>
-              <Input type="email" value={adminEmail} onChange={e => setAdminEmail(e.target.value)} required />
-            </div>
-
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-text-secondary uppercase">Mobile Number</label>
               <Input type="tel" value={mobileNumber} onChange={e => setMobileNumber(e.target.value)} required />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-text-secondary uppercase">Current Login ID</label>
-              <Input value={currentLoginId} disabled className="bg-zinc-50 dark:bg-zinc-900 cursor-not-allowed font-mono text-xs" />
             </div>
 
             <div className="space-y-1.5">

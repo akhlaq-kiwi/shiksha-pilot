@@ -1196,12 +1196,14 @@ class PlatformService extends BaseService
             throw new NotFoundException('School administrator not found.');
         }
 
-        $email = isset($data['admin_email']) ? trim((string)$data['admin_email']) : '';
+        $email = isset($data['admin_email']) && trim((string)$data['admin_email']) !== ''
+            ? trim((string)$data['admin_email'])
+            : ($admin['email'] ?? '');
         $phone = isset($data['mobile_number']) ? trim((string)$data['mobile_number']) : '';
         $password = isset($data['password']) ? (string)$data['password'] : '';
 
         // Validation Checks
-        if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        if (!empty($email) && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             throw new \App\Shared\Exceptions\ValidationException(['admin_email' => 'Invalid email format.']);
         }
 
