@@ -858,31 +858,31 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
     setSubmitting(true);
     setErrors({});
 
-    const nameParts = splitName(formData.student_name);
-    const isSame = formData.same_as_current === 1;
-    const currentAddress = (formData.current_address_line_1 || '').trim() + 
-      (formData.current_address_line_2 ? ', ' + formData.current_address_line_2.trim() : '');
-    const permanentAddress = isSame 
-      ? currentAddress 
-      : ((formData.permanent_address_line_1 || '').trim() + 
-         (formData.permanent_address_line_2 ? ', ' + formData.permanent_address_line_2.trim() : ''));
-
-    const submitPayload = {
-      ...formData,
-      first_name: nameParts.first_name,
-      middle_name: nameParts.middle_name,
-      last_name: nameParts.last_name,
-      current_address_line: currentAddress,
-      permanent_address_line: permanentAddress,
-      permanent_city: isSame ? formData.current_city : formData.permanent_city,
-      permanent_state: isSame ? formData.current_state : formData.permanent_state,
-      permanent_country: isSame ? (formData.current_country || 'India') : (formData.permanent_country || 'India'),
-      permanent_pin_code: isSame ? formData.current_pin_code : formData.permanent_pin_code,
-      class_id: selectedClassId || formData.class_id,
-      class_name: selectedClassName
-    };
-
     try {
+      const nameParts = splitName(formData.student_name);
+      const isSame = formData.same_as_current === 1;
+      const currentAddress = (formData.current_address_line_1 || '').trim() + 
+        (formData.current_address_line_2 ? ', ' + formData.current_address_line_2.trim() : '');
+      const permanentAddress = isSame 
+        ? currentAddress 
+        : ((formData.permanent_address_line_1 || '').trim() + 
+           (formData.permanent_address_line_2 ? ', ' + formData.permanent_address_line_2.trim() : ''));
+
+      const submitPayload = {
+        ...formData,
+        first_name: nameParts.first_name,
+        middle_name: nameParts.middle_name,
+        last_name: nameParts.last_name,
+        current_address_line: currentAddress,
+        permanent_address_line: permanentAddress,
+        permanent_city: isSame ? formData.current_city : formData.permanent_city,
+        permanent_state: isSame ? formData.current_state : formData.permanent_state,
+        permanent_country: isSame ? (formData.current_country || 'India') : (formData.permanent_country || 'India'),
+        permanent_pin_code: isSame ? formData.current_pin_code : formData.permanent_pin_code,
+        class_id: formData.class_id,
+        class_name: selectedClassName
+      };
+
       if (studentId) {
         await schoolService.updateStudent(studentId, submitPayload);
       } else {

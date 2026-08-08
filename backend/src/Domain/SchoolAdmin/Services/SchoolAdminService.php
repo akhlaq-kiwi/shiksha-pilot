@@ -1399,7 +1399,7 @@ class SchoolAdminService extends BaseService
             'hostel_name' => null,
             'hostel_room_number' => null,
             
-            'photo_path' => $data['photo_path'] ?? null,
+            'photo_path' => $data['photo_path'] ?? $data['profile_image'] ?? null,
             'birth_cert_path' => $data['birth_cert_path'] ?? null,
             'aadhaar_path' => $data['aadhaar_path'] ?? null,
             'transfer_cert_path' => $data['transfer_cert_path'] ?? null,
@@ -1407,6 +1407,23 @@ class SchoolAdminService extends BaseService
             'additional_docs_path' => $data['additional_docs_path'] ?? null,
             'exit_date' => $exitDate,
         ]);
+
+        if (!empty($data['documents']) && is_array($data['documents'])) {
+            $stmtDoc = $pdo->prepare("
+                INSERT INTO student_documents (school_id, student_id, category, file_name, file_path, file_size)
+                VALUES (:sid, :student_id, :category, :file_name, :file_path, :file_size)
+            ");
+            foreach ($data['documents'] as $doc) {
+                $stmtDoc->execute([
+                    ':sid' => $schoolId,
+                    ':student_id' => $id,
+                    ':category' => $doc['category'] ?? $doc['document_type'] ?? 'General',
+                    ':file_name' => $doc['file_name'] ?? $doc['document_name'] ?? 'Document.pdf',
+                    ':file_path' => $doc['file_path'] ?? $doc['document_url'] ?? '',
+                    ':file_size' => (int)($doc['file_size'] ?? 1024)
+                ]);
+            }
+        }
 
         // Auto-sync active user account for student/parent mobile login
         $this->syncUserAccountForStudent($pdo, $schoolId, $name, $parentPhone, $data['student_email'] ?? null);
@@ -2771,7 +2788,7 @@ class SchoolAdminService extends BaseService
 
             if ($conflict) {
                 $schoolName = $conflict['school_name'] ?? 'another school';
-                $errMsg = "The number is registered in {$schoolName}. Please inactive";
+                $errMsg = "The number is already registered in {$schoolName}. Inactive first";
                 throw new ValidationException([
                     'parent_phone' => $errMsg,
                     'student_mobile' => $errMsg,
@@ -2821,7 +2838,7 @@ class SchoolAdminService extends BaseService
 
         if ($conflict) {
             $schoolName = $conflict['school_name'] ?? 'another school';
-            $errMsg = "The number is registered in {$schoolName}. Please inactive";
+            $errMsg = "The number is already registered in {$schoolName}. Inactive first";
             throw new ValidationException([
                 'phone' => $errMsg
             ]);
