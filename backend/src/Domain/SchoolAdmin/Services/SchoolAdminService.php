@@ -4856,6 +4856,63 @@ class SchoolAdminService extends BaseService
         $pdo = $this->attendanceRepo->getPdo();
         $this->requireWritableAcademicYear($pdo, $schoolId);
 
+        $records = $data['students'] ?? $data['records'] ?? null;
+        if (is_array($records) && !empty($records)) {
+            $date = $data['date'] ?? date('Y-m-d');
+            $classId = isset($data['class_id']) ? (int)$data['class_id'] : null;
+
+            // Boundary date validation
+            $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+            if ($workingYear !== null) {
+                $startDate = $workingYear['start_date'];
+                $today = date('Y-m-d');
+                if ($date < $startDate) {
+                    throw new ValidationException(['date' => "Cannot mark attendance before the academic year started ($startDate)."]);
+                }
+                if ($date > $today) {
+                    throw new ValidationException(['date' => "Cannot mark attendance for a future date."]);
+                }
+            }
+
+            // Sunday validation
+            if (date('N', strtotime($date)) == 7) {
+                throw new ValidationException(['date' => 'Cannot mark attendance on a Sunday.']);
+            }
+
+            // Holiday validation
+            $stmtHCheck = $pdo->prepare("SELECT id FROM holidays WHERE school_id = :sid AND date = :date LIMIT 1");
+            $stmtHCheck->execute([':sid' => $schoolId, ':date' => $date]);
+            if ($stmtHCheck->fetchColumn() !== false) {
+                throw new ValidationException(['date' => 'Cannot mark attendance on a holiday.']);
+            }
+
+            $pdo->beginTransaction();
+            try {
+                foreach ($records as $item) {
+                    $stId = (int)($item['student_id'] ?? $item['id'] ?? 0);
+                    if (!$stId) continue;
+                    $stStatus = $item['status'] ?? 'Present';
+                    $stClassId = isset($item['class_id']) ? (int)$item['class_id'] : $classId;
+
+                    $this->attendanceRepo->upsert([
+                        'school_id'  => $schoolId,
+                        'student_id' => $stId,
+                        'class_id'   => $stClassId,
+                        'date'       => $date,
+                        'status'     => $stStatus,
+                        'marked_by'  => (int) $user['id'],
+                    ]);
+                }
+                $pdo->commit();
+                return ['success' => true, 'date' => $date, 'count' => count($records)];
+            } catch (\Throwable $e) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                throw $e;
+            }
+        }
+
         if (empty($data['student_id'])) {
             throw new ValidationException(['student_id' => 'student_id is required']);
         }
@@ -4874,18 +4931,6 @@ class SchoolAdminService extends BaseService
             if ($date > $today) {
                 throw new ValidationException(['date' => "Cannot mark attendance for a future date."]);
             }
-        }
-
-        // Sunday validation
-        if (date('N', strtotime($date)) == 7) {
-            throw new ValidationException(['date' => 'Cannot mark attendance on a Sunday.']);
-        }
-
-        // Holiday validation
-        $stmtHCheck = $pdo->prepare("SELECT id FROM holidays WHERE school_id = :sid AND date = :date LIMIT 1");
-        $stmtHCheck->execute([':sid' => $schoolId, ':date' => $date]);
-        if ($stmtHCheck->fetchColumn() !== false) {
-            throw new ValidationException(['date' => 'Cannot mark attendance on a holiday.']);
         }
 
         // Sunday validation
