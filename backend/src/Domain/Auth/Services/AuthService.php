@@ -116,6 +116,44 @@ class AuthService extends BaseService
             );
         }
 
+        // Subscription Check: Ensure school has an active non-expired subscription plan
+        if ($schoolId > 0 && $role !== 'SUPER_ADMIN') {
+            $stmtSub = $pdo->prepare("
+                SELECT expiry_date, status
+                FROM subscriptions 
+                WHERE school_id = :sid AND status = 'PAID'
+                ORDER BY expiry_date DESC, id DESC
+                LIMIT 1
+            ");
+            $stmtSub->execute([':sid' => $schoolId]);
+            $sub = $stmtSub->fetch(\PDO::FETCH_ASSOC);
+
+            if (!$sub || empty($sub['expiry_date'])) {
+                $this->logAuditDirect($user, 'Security', 'Failed Login Attempt', 'Login blocked: No active subscription plan found for school ID ' . $schoolId);
+                throw new \App\Shared\Exceptions\ValidationException(
+                    [
+                        'subscription' => 'No active subscription plan found for your school. Please purchase a plan first.',
+                        'phone' => 'No active subscription plan found for your school. Please purchase a plan first.'
+                    ],
+                    'No active subscription plan found for your school. Please purchase a plan first.'
+                );
+            }
+
+            $expiryTimestamp = strtotime($sub['expiry_date']);
+            $todayTimestamp = strtotime(date('Y-m-d'));
+
+            if ($expiryTimestamp < $todayTimestamp) {
+                $this->logAuditDirect($user, 'Security', 'Failed Login Attempt', 'Login blocked: School subscription plan expired on ' . $sub['expiry_date']);
+                throw new \App\Shared\Exceptions\ValidationException(
+                    [
+                        'subscription' => 'Your school subscription plan has expired. Please renew your subscription to continue.',
+                        'phone' => 'Your school subscription plan has expired. Please renew your subscription to continue.'
+                    ],
+                    'Your school subscription plan has expired. Please renew your subscription to continue.'
+                );
+            }
+        }
+
         // Apply Login Matrix restrictions based on clientType
         $role = strtoupper($user['role'] ?? '');
         if ($clientType === 'web') {
