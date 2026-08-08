@@ -207,21 +207,21 @@ export default function AttendancePage() {
     if (!activeClass) return;
     setSavingAttendance(true);
     try {
-      await Promise.all(
-        students.map(s => {
-          return schoolService.markAttendance({
-            student_id: s.id,
-            class_id: activeClass.id,
-            date: selectedDate,
-            status: attendanceMap[s.id] || 'Present'
-          });
-        })
-      );
+      const records = students.map(s => ({
+        student_id: s.id,
+        status: attendanceMap[s.id] || 'Present'
+      }));
+
+      await schoolService.markAttendance({
+        class_id: activeClass.id,
+        date: selectedDate,
+        records: records
+      });
       toast.success('Attendance saved successfully.', 'Success');
       await loadDailyData();
     } catch (err) {
       console.error(err);
-      toast.error('Failed to save student attendance.');
+      toast.error(err.message || 'Failed to save student attendance.');
     } finally {
       setSavingAttendance(false);
     }
