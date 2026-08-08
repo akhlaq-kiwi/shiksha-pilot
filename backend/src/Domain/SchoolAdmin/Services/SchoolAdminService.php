@@ -687,28 +687,29 @@ class SchoolAdminService extends BaseService
             throw new NotFoundException('Student not found');
         }
 
-        if (!empty($student['class_name'])) {
-            $sectionStr = !empty($student['section']) ? ' - ' . $student['section'] : '';
-            $student['class_name'] = $student['class_name'] . $sectionStr;
-        }
-
-        // Query Fee Summary: count and sum of payments
         $pdo = $this->studentRepo->getPdo();
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
         $workingYearId = $workingYear ? (int)$workingYear['id'] : ($student['academic_year_id'] !== null ? (int)$student['academic_year_id'] : 0);
         
         $workingYearClassId = $this->getStudentClassForYear($pdo, $id, $schoolId, $workingYearId);
-        if ($workingYearClassId !== null) {
-            $student['class_id'] = $workingYearClassId;
+        $targetClassId = $workingYearClassId !== null ? $workingYearClassId : $student['class_id'];
+
+        if ($targetClassId !== null) {
+            $student['class_id'] = (int)$targetClassId;
             $stmtClassName = $pdo->prepare("SELECT name, section FROM classes WHERE id = :cid LIMIT 1");
-            $stmtClassName->execute([':cid' => $workingYearClassId]);
+            $stmtClassName->execute([':cid' => $targetClassId]);
             $cls = $stmtClassName->fetch(PDO::FETCH_ASSOC);
             if ($cls) {
-                $sec = !empty($cls['section']) ? trim((string)$cls['section']) : null;
+                $sec = (!empty($cls['section']) && trim((string)$cls['section']) !== '') ? trim((string)$cls['section']) : null;
                 $student['section'] = $sec;
                 $sectionStr = ($sec !== null && $sec !== '') ? ' - ' . $sec : '';
                 $student['class_name'] = $cls['name'] . $sectionStr;
             }
+        } else if (!empty($student['class_name'])) {
+            $sec = (!empty($student['section']) && trim((string)$student['section']) !== '') ? trim((string)$student['section']) : null;
+            $student['section'] = $sec;
+            $sectionStr = ($sec !== null && $sec !== '') ? ' - ' . $sec : '';
+            $student['class_name'] = $student['class_name'] . $sectionStr;
         }
 
         $isLedgerLocked = false;
@@ -3665,6 +3666,7 @@ class SchoolAdminService extends BaseService
                                 $oldStu['academic_year_id'] = $newYearId;
                                 $oldStu['status'] = 'ACTIVE';
                                 $oldStu['roll_no'] = $newRollNo;
+                                $oldStu['section'] = null;
 
                                 $cols = array_keys($oldStu);
                                 $placeholders = array_map(fn($c) => ":{$c}", $cols);
