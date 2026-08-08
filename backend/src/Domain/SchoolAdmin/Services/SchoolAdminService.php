@@ -8029,6 +8029,10 @@ class SchoolAdminService extends BaseService
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->staffRepo->getPdo();
 
+        try {
+            $pdo->exec("ALTER TABLE staff_payments MODIFY COLUMN payment_month VARCHAR(100) NOT NULL");
+        } catch (\Throwable $e) {}
+
         $staffId = (int)($data['staff_id'] ?? 0);
         $month = trim($data['month'] ?? '');
 
@@ -8156,6 +8160,10 @@ class SchoolAdminService extends BaseService
     {
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->staffRepo->getPdo();
+
+        try {
+            $pdo->exec("ALTER TABLE staff_payments MODIFY COLUMN payment_month VARCHAR(100) NOT NULL");
+        } catch (\Throwable $e) {}
 
         $staffId = (int)($data['staff_id'] ?? 0);
         $months = $data['months'] ?? [];
