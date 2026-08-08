@@ -138,19 +138,33 @@ class SchoolAdminController extends BaseController
 
         $uploadedFiles = $request->getUploadedFiles();
         if (empty($uploadedFiles)) {
-            return $this->error($response, 'No files uploaded', 400);
+            return $this->error($response, 'No file was uploaded.', 400);
         }
 
         $fileKey = array_key_first($uploadedFiles);
         $uploadedFile = $uploadedFiles[$fileKey];
 
-        if ($uploadedFile->getError() !== UPLOAD_ERR_OK) {
-            return $this->error($response, 'Failed to upload file', 400);
+        $errorCode = $uploadedFile->getError();
+        if ($errorCode !== UPLOAD_ERR_OK) {
+            $errMsgs = [
+                UPLOAD_ERR_INI_SIZE   => 'The uploaded file exceeds the upload_max_filesize directive in php.ini.',
+                UPLOAD_ERR_FORM_SIZE  => 'The uploaded file exceeds the MAX_FILE_SIZE directive in the HTML form.',
+                UPLOAD_ERR_PARTIAL    => 'The uploaded file was only partially uploaded.',
+                UPLOAD_ERR_NO_FILE    => 'No file was uploaded.',
+                UPLOAD_ERR_NO_TMP_DIR => 'Missing a temporary folder on the server.',
+                UPLOAD_ERR_CANT_WRITE => 'Failed to write file to disk.',
+                UPLOAD_ERR_EXTENSION  => 'A PHP extension stopped the file upload.'
+            ];
+            $msg = $errMsgs[$errorCode] ?? 'Failed to upload file (Error code: ' . $errorCode . ')';
+            return $this->error($response, $msg, 400);
         }
 
-        $url = $this->service->handleFileUpload($uploadedFile);
-
-        return $this->success($response, ['url' => $url], 'File uploaded successfully');
+        try {
+            $url = $this->service->handleFileUpload($uploadedFile);
+            return $this->success($response, ['url' => $url], 'File uploaded successfully');
+        } catch (\Throwable $e) {
+            return $this->error($response, 'File save error: ' . $e->getMessage(), 500);
+        }
     }
 
     // -------------------------------------------------------------------------
