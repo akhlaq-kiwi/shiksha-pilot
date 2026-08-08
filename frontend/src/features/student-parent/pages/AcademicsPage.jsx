@@ -312,13 +312,15 @@ export default function AcademicsPage({ timetable, subjects, results }) {
 
               {/* Signatures block */}
               <div className="absolute bottom-10 left-8 right-8 flex justify-between text-xs font-bold pt-8 border-t border-dashed border-zinc-400 font-sans">
-                <div className="text-center w-36">
+                <div className="inline-flex flex-col items-center">
                   <div className="h-8"></div>
-                  <div className="border-t border-zinc-800 pt-1 text-zinc-700">Class Teacher</div>
+                  <div className="w-full border-b border-zinc-800 mb-1"></div>
+                  <span className="text-zinc-700 whitespace-nowrap">Class Teacher</span>
                 </div>
-                <div className="text-center w-36">
+                <div className="inline-flex flex-col items-center">
                   <div className="h-8"></div>
-                  <div className="border-t border-zinc-800 pt-1 text-zinc-700">Principal Signature</div>
+                  <div className="w-full border-b border-zinc-800 mb-1"></div>
+                  <span className="text-zinc-700 whitespace-nowrap">Principal Signature & Stamp</span>
                 </div>
               </div>
 
