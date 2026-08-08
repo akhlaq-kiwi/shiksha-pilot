@@ -1017,7 +1017,7 @@ function ContactSuperAdminDialog({ isOpen, onClose }) {
       isOpen={isOpen}
       onClose={onClose}
       title="Contact Super Admin"
-      description="Get in touch with support to activate or renew subscription plans."
+      description=""
       className="max-w-md animate-in fade-in zoom-in-95 duration-200"
       footer={
         <div className="flex justify-end w-full">
@@ -1029,8 +1029,7 @@ function ContactSuperAdminDialog({ isOpen, onClose }) {
     >
       <div className="space-y-4 text-sm mt-3">
         <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed font-medium">
-          To purchase or renew a subscription plan, please contact the ShikshaPilot Super Admin using any of the methods below.
-          Our team will assist you with plan activation and account renewal.
+          Please get in touch with the ShikshaPilot Support Team using any of the contact methods below for assistance with report card template assignment, account setup, or queries.
         </p>
 
         <div className="bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-xl border border-border space-y-3">

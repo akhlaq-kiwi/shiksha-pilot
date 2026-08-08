@@ -4,7 +4,7 @@ import {
   Plus, ArrowLeft, Calendar, Clock, BookOpen, UserCheck, 
   Settings, Award, Printer, Trash, FileText, CheckCircle, 
   XCircle, Save, AlertCircle, Edit3, Trash2, LayoutDashboard, ChevronRight, Download, X,
-  Users, Check, RotateCcw
+  Users, Check, RotateCcw, Phone
 } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
@@ -19,6 +19,7 @@ import { DropdownMenu, DropdownItem } from '../../../common/ui/DropdownMenu';
 import html2pdf from 'html2pdf.js';
 import ReportCardRenderer from '../../report-card-templates/ReportCardRenderer';
 import { compileFinalSessionReportCardData } from '../../../common/services/reportCardEngine';
+import { ContactSuperAdminDialog } from '../index';
 
 const formatDateString = (dateStr) => {
   if (!dateStr) return '—';
@@ -446,6 +447,7 @@ export default function ExamsPage() {
   const navigate = useNavigate();
   const { currentAcademicYear, isReadOnly } = useAcademicYear();
   const [activeView, setActiveView] = useState('dashboard'); // 'dashboard', 'classes', 'timetable', 'marks', 'reports', 'grade_scale'
+  const [isContactModalOpen, setIsContactModalOpen] = useState(false);
   
   // Data States
   const [exams, setExams] = useState([]);
@@ -781,6 +783,8 @@ export default function ExamsPage() {
       mainEl.scrollTop = 0;
     }
   }, [activeView]);
+
+  const hasReportCardTemplate = Boolean(schoolProfile?.report_card_template_id || schoolProfile?.report_card_template);
 
   // Quick Action counts
   const totalCount = exams.length;
@@ -2202,7 +2206,7 @@ export default function ExamsPage() {
           <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Examinations</h2>
           <p className="text-text-secondary text-sm mt-1">Configure exams, manage timetables, enter marks, and generate student report cards.</p>
         </div>
-        {activeView === 'dashboard' && !isReadOnly && (
+        {activeView === 'dashboard' && !isReadOnly && hasReportCardTemplate && (
           <div className="flex gap-2 sm:items-center">
             <Button className="flex items-center gap-2 font-bold" onClick={() => { setActiveView('grade_scale'); setGradeError(''); setGradeSuccess(''); }}>
               Grade Configuration Scale
@@ -2232,8 +2236,32 @@ export default function ExamsPage() {
         </div>
       )}
 
+      {/* NO REPORT CARD TEMPLATE ASSIGNED NOTICE */}
+      {!loading && !hasReportCardTemplate && (
+        <Card className="p-8 sm:p-12 text-center flex flex-col items-center justify-center border-amber-500/30 bg-amber-500/5 dark:bg-amber-500/10 rounded-2xl space-y-4 no-print my-6">
+          <div className="h-16 w-16 bg-amber-500/20 text-amber-600 rounded-2xl flex items-center justify-center">
+            <FileText className="h-8 w-8" />
+          </div>
+          <div className="space-y-1.5 max-w-lg">
+            <h3 className="text-xl font-bold text-text-primary font-display">
+              No report card template assigned. Please contact ShikshaPilot Teams
+            </h3>
+            <p className="text-xs text-text-secondary leading-relaxed">
+              A report card template must be assigned by Super Admin before you can schedule examinations, manage timetables, enter marks, or generate student report cards.
+            </p>
+          </div>
+          <Button 
+            onClick={() => setIsContactModalOpen(true)}
+            className="font-bold flex items-center gap-2 px-6 mt-2"
+          >
+            <Phone className="h-4 w-4" />
+            Contact
+          </Button>
+        </Card>
+      )}
+
       {/* VIEW 1: DASHBOARD */}
-      {activeView === 'dashboard' && (
+      {hasReportCardTemplate && activeView === 'dashboard' && (
         <div className="space-y-6 animate-in fade-in duration-300 no-print">
           {/* Stats Grid */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -4048,6 +4076,13 @@ export default function ExamsPage() {
         </div>
       </Dialog>
 
+      {/* Contact Super Admin Modal */}
+      <ContactSuperAdminDialog 
+        isOpen={isContactModalOpen} 
+        onClose={() => setIsContactModalOpen(false)}
+        message="Please get in touch with the ShikshaPilot Support Team using any of the contact methods below for assistance with report card template assignment, account setup, or queries."
+        description=""
+      />
 
     </div>
   );
