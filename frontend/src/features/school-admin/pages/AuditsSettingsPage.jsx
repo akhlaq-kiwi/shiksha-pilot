@@ -500,12 +500,29 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
     fetchConfiguredClasses();
   }, [currentYear, academicYears]);
 
-  // Pre-select class from router state redirect if redirecting from Finance
+  // Pre-select class from router state redirect if redirecting from Finance or StudentDetails
   useEffect(() => {
-    if (location.state && location.state.preselectClassId) {
-      setSelectedClassId(String(location.state.preselectClassId));
+    if (location.state && (location.state.preselectClassId || location.state.classId || location.state.selectedClassId)) {
+      const targetId = String(location.state.preselectClassId || location.state.classId || location.state.selectedClassId);
+      if (uniqueClassGroups && uniqueClassGroups.length > 0) {
+        const foundGroup = uniqueClassGroups.find(g => g.allIds.includes(targetId) || g.primaryId === targetId);
+        if (foundGroup) {
+          setSelectedClassId(foundGroup.primaryId);
+        } else {
+          setSelectedClassId(targetId);
+        }
+      } else {
+        setSelectedClassId(targetId);
+      }
+
+      setTimeout(() => {
+        const el = document.getElementById('class-fee-config-panel');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 150);
     }
-  }, [location.state]);
+  }, [location.state, uniqueClassGroups]);
 
   // Group classes by unique Class Name so fee configuration applies class-wide across all sections
   const uniqueClassGroups = useMemo(() => {
@@ -1117,7 +1134,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
       </Card>
 
       {/* Class Fee Configuration Panel */}
-      <Card className="shadow-sm">
+      <Card id="class-fee-config-panel" className="shadow-sm">
         <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
           <CardTitle className="text-sm font-bold text-text-primary">Class Fee Configuration</CardTitle>
         </CardHeader>
