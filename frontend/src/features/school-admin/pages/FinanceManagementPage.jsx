@@ -1074,6 +1074,11 @@ export default function FinanceManagementPage() {
 
   // Filter Fee Types List based on Description keyword match
   const filteredFeeTypes = feeTypes.filter(ft => {
+    // Exclude system-generated internal fee types
+    if (ft.name === 'Transport Fees' || ft.name === 'Admission Fee' || ft.category === 'System Generated') {
+      return false;
+    }
+
     const term = feeSearch.toLowerCase().trim();
     if (!term) return true;
     

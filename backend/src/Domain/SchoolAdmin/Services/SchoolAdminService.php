@@ -9875,6 +9875,8 @@ Only approve the settlement after reviewing all financial records.
                 FROM additional_fee_types aft
                 LEFT JOIN additional_fee_payments afp ON afp.fee_type_id = aft.id
                 WHERE aft.school_id = :sid AND aft.academic_year_id = :ayid
+                  AND aft.name NOT IN ('Transport Fees', 'Admission Fee')
+                  AND (aft.category IS NULL OR aft.category != 'System Generated')
                 GROUP BY aft.name, aft.due_date, aft.academic_year_id
                 ORDER BY id DESC
             ");
@@ -9891,6 +9893,8 @@ Only approve the settlement after reviewing all financial records.
                 FROM additional_fee_types aft
                 LEFT JOIN additional_fee_payments afp ON afp.fee_type_id = aft.id
                 WHERE aft.school_id = :sid
+                  AND aft.name NOT IN ('Transport Fees', 'Admission Fee')
+                  AND (aft.category IS NULL OR aft.category != 'System Generated')
                 GROUP BY aft.name, aft.due_date, aft.academic_year_id
                 ORDER BY id DESC
             ");
