@@ -1142,8 +1142,8 @@ class SchoolAdminService extends BaseService
         if (empty($data['dob'])) {
             $errors['dob'] = 'Date of birth is required';
         }
-        if (empty($data['class_name'])) {
-            $errors['class_name'] = 'Class is required';
+        if (empty($data['class_id']) && empty($data['class_name'])) {
+            $errors['class_id'] = 'Class ID is required.';
         }
 
         // Email and phone formats
@@ -1163,19 +1163,58 @@ class SchoolAdminService extends BaseService
             $errors['aadhaar_no'] = 'Aadhaar number must contain exactly 12 numeric digits.';
         }
 
+        if (!empty($errors)) {
+            throw new ValidationException($errors, 'Validation failed.');
+        }
+
         // Get currently active or draft academic year
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
         $academicYearId = $workingYear ? (int)$workingYear['id'] : 0;
 
-        // Parse and create class if it doesn't exist
+        // Resolve class_id and verify it exists in master catalog and school's added classes
         $classId = null;
-        if (!empty($data['class_id'])) {
-            $classId = (int)$data['class_id'];
-        } elseif (!empty($data['class_name'])) {
-            $classNameInput = trim((string)$data['class_name']);
+        $reqClassInput = $data['class_id'] ?? $data['class_name'] ?? null;
+
+        if (empty($reqClassInput)) {
+            throw new ValidationException(['class_id' => 'Class ID is required.'], 'Class ID is required.');
+        }
+
+        if (is_numeric($reqClassInput)) {
+            $reqId = (int)$reqClassInput;
+            // 1. Direct school class ID check
+            $stmtDirect = $pdo->prepare("SELECT id FROM classes WHERE id = :cid AND school_id = :sid LIMIT 1");
+            $stmtDirect->execute([':cid' => $reqId, ':sid' => $schoolId]);
+            $directClassId = $stmtDirect->fetchColumn();
+
+            if ($directClassId) {
+                $classId = (int)$directClassId;
+            } else {
+                // 2. Check if reqId matches a Master Class ID (e.g. 15 -> Class 11, 14 -> Class 10, 5 -> Class 1)
+                $masterClass = $this->resolveMasterClass($reqId);
+                if ($masterClass) {
+                    $stmtCheckMaster = $pdo->prepare("SELECT id FROM classes WHERE school_id = :sid AND LOWER(name) = LOWER(:name) LIMIT 1");
+                    $stmtCheckMaster->execute([':sid' => $schoolId, ':name' => $masterClass['name']]);
+                    $foundId = $stmtCheckMaster->fetchColumn();
+
+                    if ($foundId) {
+                        $classId = (int)$foundId;
+                    } else {
+                        throw new ValidationException([
+                            'class_id' => 'This class is not added in your Academy yet. Please add the class first.'
+                        ], 'This class is not added in your Academy yet. Please add the class first.');
+                    }
+                } else {
+                    throw new ValidationException([
+                        'class_id' => 'The selected class does not exist in master catalog.'
+                    ], 'The selected class does not exist in master catalog.');
+                }
+            }
+        } else {
+            // String input (e.g. "Class 11" or "B.Tech")
+            $classNameInput = trim((string)$reqClassInput);
             $section = null;
             $finalName = $classNameInput;
-            
+
             if (preg_match('/^(.*?)\s*-\s*([A-Za-z0-9])$/i', $classNameInput, $matches)) {
                 $finalName = trim($matches[1]);
                 $section = trim($matches[2]);
@@ -1186,19 +1225,21 @@ class SchoolAdminService extends BaseService
                 $finalName = trim($matches[1]);
                 $section = trim($matches[2]);
             }
-            
-            $existingClassId = $this->findClassByNameAndSection($pdo, $schoolId, $academicYearId > 0 ? $academicYearId : null, $finalName, $section);
-            if ($existingClassId !== null) {
-                $classId = $existingClassId;
+
+            $masterClass = $this->resolveMasterClass($finalName);
+            if ($masterClass) {
+                $existingClassId = $this->findClassByNameAndSection($pdo, $schoolId, $academicYearId > 0 ? $academicYearId : null, $finalName, $section);
+                if ($existingClassId !== null) {
+                    $classId = $existingClassId;
+                } else {
+                    throw new ValidationException([
+                        'class_id' => 'This class is not added in your Academy yet. Please add the class first.'
+                    ], 'This class is not added in your Academy yet. Please add the class first.');
+                }
             } else {
-                $insStmt = $pdo->prepare("INSERT INTO classes (school_id, name, section, academic_year_id) VALUES (:school_id, :name, :section, :academic_year_id)");
-                $insStmt->execute([
-                    ':school_id' => $schoolId,
-                    ':name' => trim($finalName),
-                    ':section' => $section !== null ? trim((string)$section) : null,
-                    ':academic_year_id' => $academicYearId > 0 ? $academicYearId : null
-                ]);
-                $classId = (int)$pdo->lastInsertId();
+                throw new ValidationException([
+                    'class_id' => 'The selected class does not exist in master catalog.'
+                ], 'The selected class does not exist in master catalog.');
             }
         }
 
@@ -2788,8 +2829,95 @@ class SchoolAdminService extends BaseService
     }
 
     // -------------------------------------------------------------------------
-    // Classes
+    // Classes & Master Catalog
     // -------------------------------------------------------------------------
+
+    public const MASTER_CLASSES = [
+        ['id' => 1, 'name' => 'Play Group', 'category' => 'Pre-Primary'],
+        ['id' => 2, 'name' => 'Nursery', 'category' => 'Pre-Primary'],
+        ['id' => 3, 'name' => 'Lower Kindergarten (LKG)', 'category' => 'Pre-Primary'],
+        ['id' => 4, 'name' => 'Upper Kindergarten (UKG)', 'category' => 'Pre-Primary'],
+        ['id' => 5, 'name' => 'Class 1', 'category' => 'Primary'],
+        ['id' => 6, 'name' => 'Class 2', 'category' => 'Primary'],
+        ['id' => 7, 'name' => 'Class 3', 'category' => 'Primary'],
+        ['id' => 8, 'name' => 'Class 4', 'category' => 'Primary'],
+        ['id' => 9, 'name' => 'Class 5', 'category' => 'Primary'],
+        ['id' => 10, 'name' => 'Class 6', 'category' => 'Middle'],
+        ['id' => 11, 'name' => 'Class 7', 'category' => 'Middle'],
+        ['id' => 12, 'name' => 'Class 8', 'category' => 'Middle'],
+        ['id' => 13, 'name' => 'Class 9', 'category' => 'Secondary'],
+        ['id' => 14, 'name' => 'Class 10', 'category' => 'Secondary'],
+        ['id' => 15, 'name' => 'Class 11', 'category' => 'Senior Secondary'],
+        ['id' => 16, 'name' => 'Class 12', 'category' => 'Senior Secondary'],
+    ];
+
+    public const MASTER_SECTIONS = [
+        ['id' => 1, 'name' => 'A', 'type' => 'Alphabet'],
+        ['id' => 2, 'name' => 'B', 'type' => 'Alphabet'],
+        ['id' => 3, 'name' => 'C', 'type' => 'Alphabet'],
+        ['id' => 4, 'name' => 'D', 'type' => 'Alphabet'],
+        ['id' => 5, 'name' => 'Red', 'type' => 'Color'],
+        ['id' => 6, 'name' => 'Blue', 'type' => 'Color'],
+        ['id' => 7, 'name' => 'Green', 'type' => 'Color'],
+        ['id' => 8, 'name' => 'Yellow', 'type' => 'Color'],
+    ];
+
+    public function getMasterCatalog(): array
+    {
+        return [
+            'classes' => self::MASTER_CLASSES,
+            'sections' => self::MASTER_SECTIONS,
+        ];
+    }
+
+    public function resolveMasterClass($classInput): ?array
+    {
+        if ($classInput === null || $classInput === '') {
+            return null;
+        }
+
+        $inputStr = trim((string)$classInput);
+
+        foreach (self::MASTER_CLASSES as $mc) {
+            if (is_numeric($inputStr) && (int)$inputStr === $mc['id']) {
+                return $mc;
+            }
+            if (strcasecmp($inputStr, $mc['name']) === 0) {
+                return $mc;
+            }
+            if (strcasecmp($mc['name'], 'Lower Kindergarten (LKG)') === 0 && (strcasecmp($inputStr, 'lkg') === 0 || strcasecmp($inputStr, 'lower kindergarten') === 0)) {
+                return $mc;
+            }
+            if (strcasecmp($mc['name'], 'Upper Kindergarten (UKG)') === 0 && (strcasecmp($inputStr, 'ukg') === 0 || strcasecmp($inputStr, 'upper kindergarten') === 0)) {
+                return $mc;
+            }
+            if (strcasecmp($mc['name'], 'Play Group') === 0 && strcasecmp($inputStr, 'pg') === 0) {
+                return $mc;
+            }
+        }
+
+        return null;
+    }
+
+    public function resolveMasterSection($secInput): ?array
+    {
+        if ($secInput === null || $secInput === '') {
+            return null;
+        }
+
+        $inputStr = trim((string)$secInput);
+
+        foreach (self::MASTER_SECTIONS as $ms) {
+            if (is_numeric($inputStr) && (int)$inputStr === $ms['id']) {
+                return $ms;
+            }
+            if (strcasecmp($inputStr, $ms['name']) === 0) {
+                return $ms;
+            }
+        }
+
+        return null;
+    }
 
     public function getClasses(array $user): array
     {
@@ -2801,92 +2929,87 @@ class SchoolAdminService extends BaseService
 
     public function createClass(array $user, array $data): array
     {
-        if (empty($data['name'])) {
-            throw new ValidationException(['name' => 'Please select a class.']);
+        $classInput = $data['class_id'] ?? $data['name'] ?? null;
+        if ($classInput === null || $classInput === '') {
+            throw new ValidationException(['class_id' => 'Please select a class.', 'name' => 'Please select a class.'], 'Please select a class.');
         }
+
+        // Validate against Master Classes catalog
+        $masterClass = $this->resolveMasterClass($classInput);
+        if (!$masterClass) {
+            throw new ValidationException([
+                'class_id' => 'The selected class does not exist in master catalog.',
+                'name' => 'The selected class does not exist in master catalog.'
+            ], 'The selected class does not exist in master catalog.');
+        }
+        $className = $masterClass['name'];
 
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->classRepo->getPdo();
-
-        // Parse sections
-        $sections = [];
-        if (!empty($data['sections'])) {
-            if (is_array($data['sections'])) {
-                $sections = array_map('trim', $data['sections']);
-            } else {
-                $sections = array_filter(array_map('trim', explode(',', (string)$data['sections'])));
-            }
-            $sections = array_values(array_unique($sections));
-        }
-
-        if (!empty($sections)) {
-            if (count($sections) > 4) {
-                throw new ValidationException(['sections' => 'Maximum 4 sections allowed.']);
-            }
-
-            // Validate section types (Alphabet vs Color)
-            $alphabetAllowed = ['A', 'B', 'C', 'D'];
-            $colorAllowed    = ['Red', 'Blue', 'Green', 'Yellow'];
-            
-            $isAlphabet = true;
-            $isColor    = true;
-            foreach ($sections as $sec) {
-                $secUpper = strtoupper($sec);
-                $secTitle = ucfirst(strtolower($sec));
-                if (!in_array($secUpper, $alphabetAllowed, true)) {
-                    $isAlphabet = false;
-                }
-                if (!in_array($secTitle, $colorAllowed, true)) {
-                    $isColor = false;
-                }
-            }
-
-            if (!$isAlphabet && !$isColor) {
-                throw new ValidationException(['sections' => 'Section names must belong to either Alphabet (A, B, C, D) or Color (Red, Blue, Green, Yellow) sections.']);
-            }
-
-            if ($isAlphabet) {
-                $sections = array_map('strtoupper', $sections);
-            } else {
-                $sections = array_map(fn($s) => ucfirst(strtolower($s)), $sections);
-            }
-        } else {
-            $sections = [null];
-        }
 
         // Get currently active or draft academic year
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
         $academicYearId = $workingYear ? (int)$workingYear['id'] : null;
 
-        // Check if the entire class with all sections already exists
-        $existingClasses = $this->classRepo->findBySchool($schoolId);
-        $existingClassNames = array_map(fn($c) => strtolower($c['name']), $existingClasses);
-        if (in_array(strtolower(trim((string)$data['name'])), $existingClassNames, true)) {
-            // Check if all requested sections already exist
-            $existingForThisClass = array_filter($existingClasses, fn($c) => strtolower($c['name']) === strtolower(trim((string)$data['name'])));
-            $existingSecs = array_map(fn($c) => strtolower($c['section'] ?? ''), $existingForThisClass);
-            
-            $allExist = true;
-            foreach ($sections as $sec) {
-                $secLower = strtolower(trim((string)($sec ?? '')));
-                if (!in_array($secLower, $existingSecs, true)) {
-                    $allExist = false;
-                    break;
-                }
-            }
-            if ($allExist) {
-                throw new ValidationException(['name' => 'This class has already been added.']);
+        // Parse and validate sections against Master Sections catalog
+        $rawSections = [];
+        if (!empty($data['sections'])) {
+            if (is_array($data['sections'])) {
+                $rawSections = $data['sections'];
+            } else {
+                $rawSections = array_filter(array_map('trim', explode(',', (string)$data['sections'])));
             }
         }
 
-        $lastInsertedClass = null;
-        foreach ($sections as $sec) {
-            $secVal = $sec !== null ? trim((string)$sec) : null;
-            if ($secVal === '') {
-                $secVal = null;
+        $resolvedSections = [];
+        if (!empty($rawSections)) {
+            if (count($rawSections) > 4) {
+                throw new ValidationException(['sections' => 'Maximum 4 sections allowed.']);
             }
 
-            $existsId = $this->findClassByNameAndSection($pdo, $schoolId, $academicYearId, (string)$data['name'], $secVal, $data['stream'] ?? null);
+            foreach ($rawSections as $secItem) {
+                $masterSec = $this->resolveMasterSection($secItem);
+                if (!$masterSec) {
+                    throw new ValidationException([
+                        'sections' => 'The selected section does not exist in master catalog.'
+                    ], 'The selected section does not exist in master catalog.');
+                }
+                $resolvedSections[] = $masterSec['name'];
+            }
+            $resolvedSections = array_values(array_unique($resolvedSections));
+        }
+
+        // Duplicate checks against existing school classes
+        $existingClasses = $this->classRepo->findBySchool($schoolId, $academicYearId);
+        $existingForThisClass = array_values(array_filter($existingClasses, fn($c) => strcasecmp($c['name'], $className) === 0));
+        $existingSecNames = array_map(fn($c) => $c['section'] ?? null, $existingForThisClass);
+
+        if (!empty($existingForThisClass)) {
+            if (empty($resolvedSections)) {
+                // Class without sections already exists
+                throw new ValidationException([
+                    'class_id' => 'The class is already added in your Academy',
+                    'name' => 'The class is already added in your Academy'
+                ], 'The class is already added in your Academy');
+            }
+
+            // Check if all requested sections or any individual requested section already exists
+            foreach ($resolvedSections as $secName) {
+                foreach ($existingSecNames as $extSec) {
+                    if ($extSec !== null && strcasecmp($extSec, $secName) === 0) {
+                        throw new ValidationException([
+                            'sections' => 'The section is already added in your Academy'
+                        ], 'The section is already added in your Academy');
+                    }
+                }
+            }
+        }
+
+        $sectionsToInsert = !empty($resolvedSections) ? $resolvedSections : [null];
+
+        $lastInsertedClass = null;
+        foreach ($sectionsToInsert as $secVal) {
+            $existsId = $this->findClassByNameAndSection($pdo, $schoolId, $academicYearId, $className, $secVal, $data['stream'] ?? null);
             if ($existsId !== null) {
                 $lastInsertedClass = $this->classRepo->findById($existsId);
                 continue;
@@ -2894,7 +3017,7 @@ class SchoolAdminService extends BaseService
 
             $id = $this->classRepo->create([
                 'school_id'        => $schoolId,
-                'name'             => trim((string)$data['name']),
+                'name'             => $className,
                 'section'          => $secVal,
                 'academic_year_id' => $academicYearId,
             ]);
@@ -2907,7 +3030,7 @@ class SchoolAdminService extends BaseService
                 WHERE cfg.school_id = :sid AND c.name = :cname
                 LIMIT 1
             ");
-            $stmtExistingCfg->execute([':sid' => $schoolId, ':cname' => trim((string)$data['name'])]);
+            $stmtExistingCfg->execute([':sid' => $schoolId, ':cname' => $className]);
             $existingFeeCfg = $stmtExistingCfg->fetch(PDO::FETCH_ASSOC);
 
             if ($existingFeeCfg) {
@@ -6093,6 +6216,14 @@ class SchoolAdminService extends BaseService
             }
         }
 
+        // Requirement 3: Ensure class fee structure is configured before allowing fee deposit
+        if ($classFeeConfig === null && $feeStructureId === null) {
+            throw new ValidationException([
+                'fee_structure' => 'Fee structure is not configured for this class. Please configure class fees first before collecting fees.',
+                'class_id' => 'Fee structure is not configured for this class. Please configure class fees first before collecting fees.'
+            ], 'Fee structure is not configured for this class. Please configure class fees first before collecting fees.');
+        }
+
         // If amount_paid is explicitly sent, we can use it
         if (!empty($data['amount_paid'])) {
             $amountPaid = (float)$data['amount_paid'];
@@ -7302,8 +7433,8 @@ class SchoolAdminService extends BaseService
         // 1.5. Report lock check
         if ($this->isTransactionInReport($pdo, $schoolId, $row['created_at']) || $this->isTransactionInReport($pdo, $schoolId, $row['payment_date'])) {
             throw new ValidationException(
-                ['locked' => 'This Fee has been included in financial report. This action can not be done'],
-                'This Fee has been included in financial report. This action can not be done'
+                ['locked' => 'This action can not be done, This is already included in financial report'],
+                'This action can not be done, This is already included in financial report'
             );
         }
 
@@ -7424,34 +7555,96 @@ class SchoolAdminService extends BaseService
         $pdo = $this->feeRepo->getPdo();
         $this->requireWritableAcademicYear($pdo, $schoolId);
 
-        if (empty($data['class_id'])) {
+        $reqClassInput = $data['class_id'] ?? null;
+        if (empty($reqClassInput)) {
             throw new ValidationException(['class_id' => 'Please select a class.']);
         }
-        if (empty($data['academic_year_id'])) {
-            throw new ValidationException(['academic_year_id' => 'Academic Year is required.']);
+        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+        $workingYearId = $workingYear ? (int)$workingYear['id'] : null;
+
+        $academicYearId = !empty($data['academic_year_id']) ? (int)$data['academic_year_id'] : $workingYearId;
+
+        if ($academicYearId !== null) {
+            $stmtVerifyAY = $pdo->prepare("SELECT id FROM academic_years WHERE id = :ayid AND school_id = :sid LIMIT 1");
+            $stmtVerifyAY->execute([':ayid' => $academicYearId, ':sid' => $schoolId]);
+            $validAyId = $stmtVerifyAY->fetchColumn();
+            if (!$validAyId) {
+                if ($workingYearId !== null) {
+                    $academicYearId = $workingYearId;
+                } else {
+                    throw new ValidationException(['academic_year_id' => 'Invalid Academic Year for your school.']);
+                }
+            }
         }
 
-        $classId = (int)$data['class_id'];
-        $academicYearId = (int)$data['academic_year_id'];
-        $mode = $data['mode'] ?? 'SAME';
+        // Validate Class ID and verify that the class is added in the school
+        $classId = null;
+        if (is_numeric($reqClassInput)) {
+            $reqId = (int)$reqClassInput;
+            // 1. Direct school class ID check
+            $stmtDirect = $pdo->prepare("SELECT id FROM classes WHERE id = :id AND school_id = :sid LIMIT 1");
+            $stmtDirect->execute([':id' => $reqId, ':sid' => $schoolId]);
+            $directId = $stmtDirect->fetchColumn();
+
+            if ($directId) {
+                $classId = (int)$directId;
+            } else {
+                // 2. Check if reqId matches a Master Class ID (e.g. 14 -> Class 10, 5 -> Class 1)
+                $masterClass = $this->resolveMasterClass($reqId);
+                if ($masterClass) {
+                    $stmtMaster = $pdo->prepare("SELECT id FROM classes WHERE school_id = :sid AND LOWER(name) = LOWER(:name) LIMIT 1");
+                    $stmtMaster->execute([':sid' => $schoolId, ':name' => $masterClass['name']]);
+                    $foundSchoolClassId = $stmtMaster->fetchColumn();
+
+                    if ($foundSchoolClassId) {
+                        $classId = (int)$foundSchoolClassId;
+                    } else {
+                        // Master class exists, but not added in this school yet
+                        throw new ValidationException([
+                            'class_id' => 'This class is not added in your Academy yet. Please add the class first.'
+                        ], 'This class is not added in your Academy yet. Please add the class first.');
+                    }
+                } else {
+                    // Invalid class ID completely
+                    throw new ValidationException([
+                        'class_id' => 'The selected class does not exist in master catalog.'
+                    ], 'The selected class does not exist in master catalog.');
+                }
+            }
+        } else {
+            // String class input (e.g. "Class 10" or "B.Tech")
+            $inputStr = trim((string)$reqClassInput);
+            $masterClass = $this->resolveMasterClass($inputStr);
+            if ($masterClass) {
+                $stmtMaster = $pdo->prepare("SELECT id FROM classes WHERE school_id = :sid AND LOWER(name) = LOWER(:name) LIMIT 1");
+                $stmtMaster->execute([':sid' => $schoolId, ':name' => $masterClass['name']]);
+                $foundSchoolClassId = $stmtMaster->fetchColumn();
+
+                if ($foundSchoolClassId) {
+                    $classId = (int)$foundSchoolClassId;
+                } else {
+                    throw new ValidationException([
+                        'class_id' => 'This class is not added in your Academy yet. Please add the class first.'
+                    ], 'This class is not added in your Academy yet. Please add the class first.');
+                }
+            } else {
+                throw new ValidationException([
+                    'class_id' => 'The selected class does not exist in master catalog.'
+                ], 'The selected class does not exist in master catalog.');
+            }
+        }
+
+        $mode = 'SAME';
         $monthlyFees = $data['monthly_fees'] ?? [];
-
-        if (!in_array($mode, ['SAME', 'DIFFERENT'], true)) {
-            throw new ValidationException(['mode' => 'Invalid fee configuration mode.']);
-        }
 
         // Validate monthly fee amounts
         $academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+        if (empty($monthlyFees)) {
+            throw new ValidationException(['monthly_fees' => 'Monthly fee must be greater than ₹0.']);
+        }
+
         foreach ($academicMonths as $m) {
-            if ($mode === 'SAME' && count($monthlyFees) === 0) {
-                throw new ValidationException(['monthly_fees' => 'Monthly fee must be greater than ₹0.']);
-            }
-
             $val = isset($monthlyFees[$m]) ? $monthlyFees[$m] : null;
-            if ($mode === 'DIFFERENT' && ($val === null || $val === '')) {
-                throw new ValidationException(['monthly_fees' => 'Please enter fee for every month.']);
-            }
-
             if ($val !== null && $val !== '') {
                 $valFloat = (float)$val;
                 if ($valFloat <= 0) {
@@ -8080,8 +8273,8 @@ class SchoolAdminService extends BaseService
         // Check if the payment date falls within any generated financial report
         if ($this->isTransactionInReport($pdo, $schoolId, $payment['created_at']) || $this->isTransactionInReport($pdo, $schoolId, $payment['payment_date'])) {
             throw new ValidationException(
-                ['locked' => 'This Fee has been included in financial report. This action can not be done'],
-                'This Fee has been included in financial report. This action can not be done'
+                ['locked' => 'This action can not be done, This is already included in financial report'],
+                'This action can not be done, This is already included in financial report'
             );
         }
 
@@ -9584,8 +9777,8 @@ Only approve the settlement after reviewing all financial records.
 
         if ($this->isTransactionInReport($pdo, $schoolId, $expense['created_at'] ?? $expense['expense_date']) || $this->isTransactionInReport($pdo, $schoolId, $expense['expense_date'])) {
             throw new ValidationException(
-                ['locked' => 'This Fee has been included in financial report. This action can not be done'],
-                'This Fee has been included in financial report. This action can not be done'
+                ['locked' => 'This action can not be done, This is already included in financial report'],
+                'This action can not be done, This is already included in financial report'
             );
         }
 
@@ -10253,8 +10446,8 @@ Only approve the settlement after reviewing all financial records.
         // 1. Report lock check
         if ($this->isTransactionInReport($pdo, $schoolId, $paymentDetails['updated_at']) || $this->isTransactionInReport($pdo, $schoolId, $paymentDetails['payment_date'])) {
             throw new ValidationException(
-                ['locked' => 'This Fee has been included in financial report. This action can not be done'],
-                'This Fee has been included in financial report. This action can not be done'
+                ['locked' => 'This action can not be done, This is already included in financial report'],
+                'This action can not be done, This is already included in financial report'
             );
         }
 

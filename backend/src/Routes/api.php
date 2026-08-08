@@ -119,6 +119,7 @@ return function (App $app) {
     $app->post('/api/school/finance-settings', [SchoolAdminController::class, 'saveFinanceSettings']);
 
 
+    $app->get('/api/school/master-catalog', [SchoolAdminController::class, 'getMasterCatalog']);
     $app->get('/api/school/classes', [SchoolAdminController::class, 'getClasses']);
     $app->post('/api/school/classes', [SchoolAdminController::class, 'createClass']);
     $app->put('/api/school/classes', [SchoolAdminController::class, 'updateClass']);
