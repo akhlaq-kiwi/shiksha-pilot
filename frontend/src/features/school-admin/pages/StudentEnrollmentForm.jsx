@@ -878,6 +878,7 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
       permanent_state: isSame ? formData.current_state : formData.permanent_state,
       permanent_country: isSame ? (formData.current_country || 'India') : (formData.permanent_country || 'India'),
       permanent_pin_code: isSame ? formData.current_pin_code : formData.permanent_pin_code,
+      class_id: selectedClassId || formData.class_id,
       class_name: selectedClassName
     };
 

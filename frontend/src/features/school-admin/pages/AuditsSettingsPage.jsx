@@ -645,15 +645,9 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
     const feesMap = {};
     const academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
     
-    if (feeMode === 'SAME') {
-      academicMonths.forEach(m => {
-        feesMap[m] = parseFloat(sameFeeAmount);
-      });
-    } else {
-      academicMonths.forEach(m => {
-        feesMap[m] = parseFloat(monthlyFeesMap[m]);
-      });
-    }
+    academicMonths.forEach(m => {
+      feesMap[m] = parseFloat(sameFeeAmount);
+    });
 
     try {
       const selectedGroup = uniqueClassGroups.find(g => g.allIds.includes(String(selectedClassId)));

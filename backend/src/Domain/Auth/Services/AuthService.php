@@ -116,6 +116,8 @@ class AuthService extends BaseService
             );
         }
 
+
+
         // Apply Login Matrix restrictions based on clientType
         $role = strtoupper($user['role'] ?? '');
         if ($clientType === 'web') {

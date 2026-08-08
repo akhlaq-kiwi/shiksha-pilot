@@ -217,6 +217,16 @@ class SchoolAdminController extends BaseController
         return $this->success($response, $data);
     }
 
+    public function getMasterCatalog(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'TEACHER', 'PRINCIPAL', 'SUPER_ADMIN']);
+
+        $data = $this->service->getMasterCatalog();
+
+        return $this->success($response, $data);
+    }
+
     public function createClass(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
