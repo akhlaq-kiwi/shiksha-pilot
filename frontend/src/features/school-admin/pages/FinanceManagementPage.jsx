@@ -160,6 +160,7 @@ export default function FinanceManagementPage() {
 
   // Delete Expense Confirmation
   const [deletingExpenseId, setDeletingExpenseId] = useState(null);
+  const [deleteExpenseError, setDeleteExpenseError] = useState('');
 
   // Apply / Edit Additional Fee Form State
   const [isApplyFeeModalOpen, setIsApplyFeeModalOpen] = useState(false);
@@ -858,15 +859,13 @@ export default function FinanceManagementPage() {
 
   const handleDeleteExpenseClick = (exp) => {
     setActiveExpenseDropdownId(null);
-    if (exp.is_locked) {
-      alert('This expense has already been included in a generated financial report and can no longer be modified.');
-      return;
-    }
+    setDeleteExpenseError('');
     setDeletingExpenseId(exp.id);
   };
 
   const handleDeleteExpense = async () => {
     if (!deletingExpenseId) return;
+    setDeleteExpenseError('');
     setError('');
     setSuccess('');
     try {
@@ -877,8 +876,7 @@ export default function FinanceManagementPage() {
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       console.error(err);
-      setError(err.message || 'Failed to delete expense.');
-      setDeletingExpenseId(null);
+      setDeleteExpenseError(err.message || 'Failed to delete expense.');
     }
   };
 
@@ -1844,17 +1842,27 @@ export default function FinanceManagementPage() {
       {/* Delete Expense Confirmation */}
       <Dialog
         isOpen={deletingExpenseId !== null}
-        onClose={() => setDeletingExpenseId(null)}
+        onClose={() => {
+          setDeletingExpenseId(null);
+          setDeleteExpenseError('');
+        }}
         title="Delete Expense Transaction"
         description="Verify transaction voucher reversal."
         footer={<>
-          <Button variant="secondary" onClick={() => setDeletingExpenseId(null)}>Cancel</Button>
+          <Button variant="secondary" onClick={() => {
+            setDeletingExpenseId(null);
+            setDeleteExpenseError('');
+          }}>Cancel</Button>
           <Button variant="destructive" onClick={handleDeleteExpense}>Delete</Button>
         </>}
       >
-        <div className="text-xs text-text-secondary leading-relaxed py-2">
-          Delete this expense? <br/>
-          <strong className="text-red-500 font-bold">This action cannot be undone.</strong>
+        <div className="text-xs text-text-secondary leading-relaxed py-2 space-y-2">
+          <p>Delete this expense?</p>
+          {deleteExpenseError && (
+            <p className="text-red-500 font-bold animate-in fade-in duration-200">
+              {deleteExpenseError}
+            </p>
+          )}
         </div>
       </Dialog>
 
@@ -1870,8 +1878,7 @@ export default function FinanceManagementPage() {
         </>}
       >
         <div className="text-xs text-text-secondary leading-relaxed py-2">
-          Delete this additional fee definition and all assigned student pending payments? <br/>
-          <strong className="text-red-500 font-bold">This action cannot be undone.</strong>
+          Delete this additional fee definition and all assigned student pending payments?
         </div>
       </Dialog>
 
@@ -2243,8 +2250,7 @@ export default function FinanceManagementPage() {
           </>}
         >
           <div className="text-xs text-text-secondary leading-relaxed py-2">
-            Are you sure you want to delete this transport fee assignment? <br/>
-            <strong className="text-red-500 font-bold">This action cannot be undone.</strong>
+            Are you sure you want to delete this transport fee assignment?
             <p className="text-[11px] text-text-muted mt-2">
               Note: Deletion will fail if a billing invoice has already been generated.
             </p>
