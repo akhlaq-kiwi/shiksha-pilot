@@ -11,7 +11,7 @@ class HomeworkService {
 
   static Future<HomeworkService> create() async {
     final prefs = await SharedPreferences.getInstance();
-    final baseUrl = prefs.getString('base_url') ?? 'https://qa.shikshapilot.com';
+    final baseUrl = prefs.getString('base_url') ?? 'https://app.shikshapilot.com';
     final token = prefs.getString('auth_token') ?? '';
     return HomeworkService(baseUrl: baseUrl, token: token);
   }

@@ -51,7 +51,7 @@ class NotificationHelper {
             final token = prefs.getString('auth_token') ?? '';
             final userRole = prefs.getString('user_role') ?? '';
             final studentId = prefs.getInt('selected_student_id');
-            final baseUrl = prefs.getString('base_url') ?? 'https://qa.shikshapilot.com';
+            final baseUrl = prefs.getString('base_url') ?? 'https://app.shikshapilot.com';
 
             // Unauthenticated deep linking redirect to login
             if (token.isEmpty || userRole.isEmpty) {
