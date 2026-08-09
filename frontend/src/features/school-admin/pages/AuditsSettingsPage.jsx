@@ -741,10 +741,12 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
       `;
 
       const tempContainer = document.createElement('div');
-      tempContainer.style.position = 'absolute';
-      tempContainer.style.left = '-9999px';
-      tempContainer.style.top = '-9999px';
+      tempContainer.style.position = 'fixed';
+      tempContainer.style.top = '0';
+      tempContainer.style.left = '0';
       tempContainer.style.width = '794px';
+      tempContainer.style.zIndex = '99999';
+      tempContainer.style.background = '#ffffff';
       tempContainer.innerHTML = pdfHtml;
       document.body.appendChild(tempContainer);
 
@@ -754,14 +756,25 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
         margin: [10, 12, 10, 12],
         filename: filename,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          scrollX: 0,
+          scrollY: 0,
+          x: 0,
+          y: 0,
+          windowWidth: 794
+        },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: [] }
       };
 
       await html2pdf().from(tempContainer).set(opt).save();
 
-      document.body.removeChild(tempContainer);
+      if (document.body.contains(tempContainer)) {
+        document.body.removeChild(tempContainer);
+      }
     } catch (err) {
       console.error('Error generating Fee Structure PDF:', err);
       setFeeError('Failed to generate Fee Structure PDF.');
