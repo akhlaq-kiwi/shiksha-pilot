@@ -104,23 +104,83 @@ class AttendanceRepository extends BaseRepository
     }
 
     /**
-     * Upsert a single attendance record (MySQL ON DUPLICATE KEY UPDATE).
+     * Upsert a single attendance record.
      */
     public function upsert(array $data): void
     {
         $normalized = [];
         foreach ($data as $k => $v) {
-            $key = str_starts_with((string)$k, ':') ? (string)$k : ':' . (string)$k;
+            $key = str_starts_with((string)$k, ':') ? substr((string)$k, 1) : (string)$k;
             $normalized[$key] = $v;
         }
 
-        $stmt = $this->pdo->prepare("
-            INSERT INTO attendance (school_id, student_id, class_id, date, status, marked_by)
-            VALUES (:school_id, :student_id, :class_id, :date, :status, :marked_by)
-            ON DUPLICATE KEY UPDATE
-                status    = VALUES(status),
-                marked_by = VALUES(marked_by)
+        $schoolId  = (int)($normalized['school_id'] ?? 0);
+        $studentId = (int)($normalized['student_id'] ?? 0);
+        $classId   = isset($normalized['class_id']) && $normalized['class_id'] !== '' ? (int)$normalized['class_id'] : null;
+        $date      = (string)($normalized['date'] ?? date('Y-m-d'));
+        $status    = (string)($normalized['status'] ?? 'Present');
+        $markedBy  = isset($normalized['marked_by']) && $normalized['marked_by'] !== '' ? (int)$normalized['marked_by'] : null;
+
+        if (!$schoolId || !$studentId) {
+            return;
+        }
+
+        // Check if an attendance record already exists for this student on this date
+        $stmtCheck = $this->pdo->prepare("
+            SELECT id FROM attendance 
+            WHERE school_id = :school_id AND student_id = :student_id AND date = :date 
+            ORDER BY id DESC LIMIT 1
         ");
-        $stmt->execute($normalized);
+        $stmtCheck->execute([
+            ':school_id'  => $schoolId,
+            ':student_id' => $studentId,
+            ':date'       => $date,
+        ]);
+        $existingId = $stmtCheck->fetchColumn();
+
+        if ($existingId !== false) {
+            // Update the existing record
+            $stmtUpdate = $this->pdo->prepare("
+                UPDATE attendance 
+                SET status = :status, marked_by = :marked_by, class_id = COALESCE(:class_id, class_id)
+                WHERE id = :id
+            ");
+            $stmtUpdate->execute([
+                ':status'    => $status,
+                ':marked_by' => $markedBy,
+                ':class_id'  => $classId,
+                ':id'        => (int)$existingId,
+            ]);
+
+            // Clean up any duplicate records for the same student on the same date
+            $stmtClean = $this->pdo->prepare("
+                DELETE FROM attendance 
+                WHERE school_id = :school_id AND student_id = :student_id AND date = :date AND id != :id
+            ");
+            $stmtClean->execute([
+                ':school_id'  => $schoolId,
+                ':student_id' => $studentId,
+                ':date'       => $date,
+                ':id'         => (int)$existingId,
+            ]);
+        } else {
+            // Insert a new attendance record
+            $stmtInsert = $this->pdo->prepare("
+                INSERT INTO attendance (school_id, student_id, class_id, date, status, marked_by)
+                VALUES (:school_id, :student_id, :class_id, :date, :status, :marked_by)
+                ON DUPLICATE KEY UPDATE
+                    status    = VALUES(status),
+                    marked_by = VALUES(marked_by),
+                    class_id  = COALESCE(VALUES(class_id), class_id)
+            ");
+            $stmtInsert->execute([
+                ':school_id'  => $schoolId,
+                ':student_id' => $studentId,
+                ':class_id'   => $classId,
+                ':date'       => $date,
+                ':status'     => $status,
+                ':marked_by'  => $markedBy,
+            ]);
+        }
     }
 }
