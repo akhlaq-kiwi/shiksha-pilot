@@ -32,14 +32,21 @@ class AuthService {
       return resData['data']; // Contains 'token' and 'user' map
     } else {
       if (resData['data'] != null && resData['data'] is Map) {
-        final errors = resData['data'] as Map<String, dynamic>;
-        if (errors.containsKey('phone')) {
-          throw Exception(errors['phone']);
-        } else if (errors.containsKey('password')) {
-          throw Exception(errors['password']);
+        Map<String, dynamic> errorsMap = Map<String, dynamic>.from(resData['data'] as Map);
+        if (errorsMap['errors'] != null && errorsMap['errors'] is Map) {
+          errorsMap = Map<String, dynamic>.from(errorsMap['errors'] as Map);
+        }
+        if (errorsMap.containsKey('phone') && errorsMap['phone'] != null) {
+          throw Exception(errorsMap['phone'].toString());
+        } else if (errorsMap.containsKey('password') && errorsMap['password'] != null) {
+          throw Exception(errorsMap['password'].toString());
         }
       }
-      throw Exception(resData['message'] ?? 'Login failed. Please check credentials.');
+      final msg = resData['message'] as String?;
+      if (msg != null && msg.isNotEmpty && msg != 'Validation failed.') {
+        throw Exception(msg);
+      }
+      throw Exception('Login failed. Please check your mobile number and password.');
     }
   }
 

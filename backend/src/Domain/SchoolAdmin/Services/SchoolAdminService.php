@@ -687,28 +687,29 @@ class SchoolAdminService extends BaseService
             throw new NotFoundException('Student not found');
         }
 
-        if (!empty($student['class_name'])) {
-            $sectionStr = !empty($student['section']) ? ' - ' . $student['section'] : '';
-            $student['class_name'] = $student['class_name'] . $sectionStr;
-        }
-
-        // Query Fee Summary: count and sum of payments
         $pdo = $this->studentRepo->getPdo();
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
         $workingYearId = $workingYear ? (int)$workingYear['id'] : ($student['academic_year_id'] !== null ? (int)$student['academic_year_id'] : 0);
         
         $workingYearClassId = $this->getStudentClassForYear($pdo, $id, $schoolId, $workingYearId);
-        if ($workingYearClassId !== null) {
-            $student['class_id'] = $workingYearClassId;
+        $targetClassId = $workingYearClassId !== null ? $workingYearClassId : $student['class_id'];
+
+        if ($targetClassId !== null) {
+            $student['class_id'] = (int)$targetClassId;
             $stmtClassName = $pdo->prepare("SELECT name, section FROM classes WHERE id = :cid LIMIT 1");
-            $stmtClassName->execute([':cid' => $workingYearClassId]);
+            $stmtClassName->execute([':cid' => $targetClassId]);
             $cls = $stmtClassName->fetch(PDO::FETCH_ASSOC);
             if ($cls) {
-                $sec = !empty($cls['section']) ? trim((string)$cls['section']) : null;
+                $sec = (!empty($cls['section']) && trim((string)$cls['section']) !== '') ? trim((string)$cls['section']) : null;
                 $student['section'] = $sec;
                 $sectionStr = ($sec !== null && $sec !== '') ? ' - ' . $sec : '';
                 $student['class_name'] = $cls['name'] . $sectionStr;
             }
+        } else if (!empty($student['class_name'])) {
+            $sec = (!empty($student['section']) && trim((string)$student['section']) !== '') ? trim((string)$student['section']) : null;
+            $student['section'] = $sec;
+            $sectionStr = ($sec !== null && $sec !== '') ? ' - ' . $sec : '';
+            $student['class_name'] = $student['class_name'] . $sectionStr;
         }
 
         $isLedgerLocked = false;
@@ -3665,6 +3666,7 @@ class SchoolAdminService extends BaseService
                                 $oldStu['academic_year_id'] = $newYearId;
                                 $oldStu['status'] = 'ACTIVE';
                                 $oldStu['roll_no'] = $newRollNo;
+                                $oldStu['section'] = null;
 
                                 $cols = array_keys($oldStu);
                                 $placeholders = array_map(fn($c) => ":{$c}", $cols);
@@ -8027,6 +8029,10 @@ class SchoolAdminService extends BaseService
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->staffRepo->getPdo();
 
+        try {
+            $pdo->exec("ALTER TABLE staff_payments MODIFY COLUMN payment_month VARCHAR(100) NOT NULL");
+        } catch (\Throwable $e) {}
+
         $staffId = (int)($data['staff_id'] ?? 0);
         $month = trim($data['month'] ?? '');
 
@@ -8154,6 +8160,10 @@ class SchoolAdminService extends BaseService
     {
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->staffRepo->getPdo();
+
+        try {
+            $pdo->exec("ALTER TABLE staff_payments MODIFY COLUMN payment_month VARCHAR(100) NOT NULL");
+        } catch (\Throwable $e) {}
 
         $staffId = (int)($data['staff_id'] ?? 0);
         $months = $data['months'] ?? [];
@@ -9875,6 +9885,8 @@ Only approve the settlement after reviewing all financial records.
                 FROM additional_fee_types aft
                 LEFT JOIN additional_fee_payments afp ON afp.fee_type_id = aft.id
                 WHERE aft.school_id = :sid AND aft.academic_year_id = :ayid
+                  AND aft.name NOT IN ('Transport Fees', 'Admission Fee')
+                  AND (aft.category IS NULL OR aft.category != 'System Generated')
                 GROUP BY aft.name, aft.due_date, aft.academic_year_id
                 ORDER BY id DESC
             ");
@@ -9891,6 +9903,8 @@ Only approve the settlement after reviewing all financial records.
                 FROM additional_fee_types aft
                 LEFT JOIN additional_fee_payments afp ON afp.fee_type_id = aft.id
                 WHERE aft.school_id = :sid
+                  AND aft.name NOT IN ('Transport Fees', 'Admission Fee')
+                  AND (aft.category IS NULL OR aft.category != 'System Generated')
                 GROUP BY aft.name, aft.due_date, aft.academic_year_id
                 ORDER BY id DESC
             ");
