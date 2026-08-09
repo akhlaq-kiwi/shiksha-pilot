@@ -557,210 +557,77 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            // Top Profile Card Header (Fixed, non-scrollable)
-            Container(
-              color: Colors.white,
-              padding: const EdgeInsets.only(top: 24, bottom: 20, left: 20, right: 20),
-              width: double.infinity,
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4)),
+                ],
+              ),
               child: Column(
                 children: [
-                  GestureDetector(
-                    onTap: () {
-                      if (_userPhoto.isNotEmpty) {
-                        final fullUrl = _userPhoto.startsWith('http') ? _userPhoto : '${widget.leaveService.baseUrl}$_userPhoto';
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => FullScreenImageScreen(imageUrl: fullUrl),
-                          ),
-                        );
-                      }
-                    },
-                    child: Hero(
-                      tag: 'user_profile_icon',
-                      child: avatarWidget,
+                  _buildSettingsTile(
+                    icon: Icons.lock_open_rounded,
+                    title: 'Change Password',
+                    subtitle: 'Update account password',
+                    onTap: _showChangePasswordDialog,
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _buildSettingsTile(
+                    icon: Icons.notifications_active_outlined,
+                    title: 'Notifications',
+                    subtitle: 'Toggle push alerts',
+                    trailing: Switch(
+                      value: _notificationsEnabled,
+                      onChanged: (val) async {
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.setBool('notifications_enabled', val);
+                        setState(() {
+                          _notificationsEnabled = val;
+                        });
+                      },
+                      activeColor: Colors.indigo,
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    _userName,
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.black87),
+                  if ((widget.userRole.toUpperCase() == 'STUDENT' || widget.userRole.toUpperCase() == 'PARENT') && _children.length > 1) ...[
+                    const Divider(height: 1, indent: 56),
+                    _buildSettingsTile(
+                      icon: Icons.swap_horiz_rounded,
+                      title: 'Switch Account',
+                      subtitle: 'Change active student profile',
+                      onTap: _showSwitchStudentDialog,
+                    ),
+                  ],
+                  const Divider(height: 1, indent: 56),
+                  _buildSettingsTile(
+                    icon: Icons.color_lens_outlined,
+                    title: 'Appearance Theme',
+                    subtitle: _currentTheme,
+                    onTap: _showThemeSelector,
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _buildSettingsTile(
+                    icon: Icons.help_outline_rounded,
+                    title: 'Help & Support',
+                    subtitle: 'Get customer assistance',
+                    onTap: _showHelpSupport,
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _buildSettingsTile(
+                    icon: Icons.info_outline_rounded,
+                    title: 'About',
+                    subtitle: 'Application version info',
+                    onTap: _showAboutDialog,
                   ),
                 ],
               ),
             ),
-            
-            // Associated School Name Box (Fixed, non-scrollable)
-            Padding(
-              padding: const EdgeInsets.only(left: 16, right: 16, top: 12, bottom: 8),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.indigo.shade50.withOpacity(0.4),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.indigo.shade100, width: 1),
-                ),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      backgroundColor: Colors.indigo,
-                      radius: 20,
-                      child: const Icon(Icons.school, color: Colors.white, size: 20),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'ASSOCIATED SCHOOL',
-                            style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Colors.indigo, letterSpacing: 0.8),
-                          ),
-                          const SizedBox(height: 2),
-                          FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              _schoolName.toUpperCase(),
-                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            
-            // Scrollable Middle Options ("Profile Details" to "About")
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4)),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        _buildSettingsTile(
-                          icon: Icons.person_outline_rounded,
-                          title: 'Profile Details',
-                          subtitle: 'View user profile attributes',
-                          onTap: _showProfileDetails,
-                        ),
-                        const Divider(height: 1, indent: 56),
-                        _buildSettingsTile(
-                          icon: Icons.lock_open_rounded,
-                          title: 'Change Password',
-                          subtitle: 'Update account password',
-                          onTap: _showChangePasswordDialog,
-                        ),
-                        const Divider(height: 1, indent: 56),
-                        _buildSettingsTile(
-                          icon: Icons.notifications_active_outlined,
-                          title: 'Notifications',
-                          subtitle: 'Toggle push alerts',
-                          trailing: Switch(
-                            value: _notificationsEnabled,
-                            onChanged: (val) async {
-                              final prefs = await SharedPreferences.getInstance();
-                              await prefs.setBool('notifications_enabled', val);
-                              setState(() {
-                                _notificationsEnabled = val;
-                              });
-                            },
-                            activeColor: Colors.indigo,
-                          ),
-                        ),
-                        if ((widget.userRole.toUpperCase() == 'STUDENT' || widget.userRole.toUpperCase() == 'PARENT') && _children.length > 1) ...[
-                          const Divider(height: 1, indent: 56),
-                          _buildSettingsTile(
-                            icon: Icons.swap_horiz_rounded,
-                            title: 'Switch Account',
-                            subtitle: 'Change active student profile',
-                            onTap: _showSwitchStudentDialog,
-                          ),
-                        ],
-                        const Divider(height: 1, indent: 56),
-                        _buildSettingsTile(
-                          icon: Icons.color_lens_outlined,
-                          title: 'Appearance Theme',
-                          subtitle: _currentTheme,
-                          onTap: _showThemeSelector,
-                        ),
-                        const Divider(height: 1, indent: 56),
-                        _buildSettingsTile(
-                          icon: Icons.help_outline_rounded,
-                          title: 'Help & Support',
-                          subtitle: 'Get customer assistance',
-                          onTap: _showHelpSupport,
-                        ),
-                        const Divider(height: 1, indent: 56),
-                        _buildSettingsTile(
-                          icon: Icons.info_outline_rounded,
-                          title: 'About',
-                          subtitle: 'Application version info',
-                          onTap: _showAboutDialog,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-            // Danger Logout Action (Fixed, non-scrollable at the bottom)
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Container(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('Confirm Logout'),
-                        content: const Text('Are you sure you want to log out from this device?'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Cancel'),
-                          ),
-                          ElevatedButton(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              _handleLogout();
-                            },
-                            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-                            child: const Text('Log Out'),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.logout_rounded, color: Colors.white),
-                  label: const Text('LOG OUT', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.8)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red.shade600,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(double.infinity, 50),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    elevation: 0,
-                  ),
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
