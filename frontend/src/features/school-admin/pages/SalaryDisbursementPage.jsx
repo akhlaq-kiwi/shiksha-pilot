@@ -232,7 +232,7 @@ export default function SalaryDisbursementPage() {
                         </span>
                       )}
                       <p className="text-sm font-bold text-text-primary">
-                        ₹{parseFloat(teacher.payable_salary || 0).toLocaleString('en-IN')}
+                        ₹{Math.round(parseFloat(teacher.payable_salary || 0)).toLocaleString('en-IN')}
                       </p>
                     </div>
                   </div>

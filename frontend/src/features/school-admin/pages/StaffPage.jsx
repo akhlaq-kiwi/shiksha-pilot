@@ -2011,7 +2011,7 @@ export default function StaffPage() {
                   ₹{(() => {
                     const isJoiningMonth = teacherDetails?.joining_month_proration && teacherDetails?.joining_month_proration.month === disburseMonth;
                     const amount = isJoiningMonth ? teacherDetails.joining_month_proration.payable_salary : (teacherDetails?.salary || 0);
-                    return parseFloat(amount).toLocaleString('en-IN');
+                    return Math.round(parseFloat(amount)).toLocaleString('en-IN');
                   })()}
                   {teacherDetails?.joining_month_proration && teacherDetails?.joining_month_proration.month === disburseMonth && ' (Prorated)'}
                 </span>

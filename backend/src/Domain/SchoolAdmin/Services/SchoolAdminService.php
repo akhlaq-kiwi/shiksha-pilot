@@ -1436,7 +1436,6 @@ class SchoolAdminService extends BaseService
 
         if ($admissionFee !== null && $admissionFee > 0) {
             $this->syncAdmissionFeePayment($pdo, $schoolId, $id, $academicYearId, $admissionFee);
-            $this->sendStudentNotification($pdo, $schoolId, $id, "Admission Fee Added", "Your admission fee has been added to your fee account. Please check your Fees section.");
         }
 
         $this->syncExistingAnnualFeePayment($pdo, $schoolId, $id, (int)$classId, $academicYearId, $studentCategory);
@@ -10500,7 +10499,9 @@ Only approve the settlement after reviewing all financial records.
             $pay['fee_type_id'] = (int)$pay['fee_type_id'];
             $pay['amount'] = (float)$pay['amount'];
 
-            $this->sendStudentNotification($pdo, $schoolId, $pay['student_id'], "Additional Fee Deposited", "{$pay['fee_name']} have been successfully recorded.");
+            if (($pay['fee_name'] ?? '') !== 'Admission Fee') {
+                $this->sendStudentNotification($pdo, $schoolId, $pay['student_id'], "Additional Fee Deposited", "{$pay['fee_name']} have been successfully recorded.");
+            }
             $this->syncFollowUpStatus($pdo, $pay['student_id'], $schoolId);
         }
 
@@ -11105,7 +11106,7 @@ Only approve the settlement after reviewing all financial records.
                     $proratedAmt = $this->calculateProratedAmount($joiningDateStr, $monthlySalary, $targetMonthStr, true);
 
                     $res['is_prorated'] = true;
-                    $res['payable_salary'] = round($proratedAmt, 2);
+                    $res['payable_salary'] = round($proratedAmt);
                     $res['prorated_days'] = $remainingDays;
                     $res['total_days'] = $totalDays;
                     $res['label'] = 'Prorated Salary';

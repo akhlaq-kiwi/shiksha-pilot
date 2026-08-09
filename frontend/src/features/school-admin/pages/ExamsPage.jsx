@@ -4,7 +4,7 @@ import {
   Plus, ArrowLeft, Calendar, Clock, BookOpen, UserCheck, 
   Settings, Award, Printer, Trash, FileText, CheckCircle, 
   XCircle, Save, AlertCircle, Edit3, Trash2, LayoutDashboard, ChevronRight, Download, X,
-  Users, Check, RotateCcw, Phone
+  Users, Check, RotateCcw, Phone, Loader2
 } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
@@ -546,6 +546,7 @@ export default function ExamsPage() {
 
   // Final Session Report Cards State
   const [finalSessionReportCards, setFinalSessionReportCards] = useState([]);
+  const [allClassSortedCards, setAllClassSortedCards] = useState([]);
   const [generatingClassPdf, setGeneratingClassPdf] = useState(false);
   const [weightagePolicy] = useState({
     strategy: 'weighted_percentage',
@@ -1855,6 +1856,13 @@ export default function ExamsPage() {
               break-after: page !important;
               page-break-inside: avoid !important;
               break-inside: avoid !important;
+              max-height: 275mm !important;
+              overflow: hidden !important;
+              margin: 0 auto !important;
+            }
+            .report-card-page-break:last-child {
+              page-break-after: avoid !important;
+              break-after: avoid !important;
             }
           </style>
         </head>
@@ -1892,22 +1900,137 @@ export default function ExamsPage() {
     await printNativeReportCardsContainer('printable-single-report-card', filename);
   };
 
-  const handleDownloadEntireClassPdf = async () => {
-    if (!finalSessionReportCards || finalSessionReportCards.length === 0) return;
-    setGeneratingClassPdf(true);
+  const sortCardsByRollNo = (cardsList = []) => {
+    return [...cardsList].sort((a, b) => {
+      const getRollNo = (c) => {
+        if (!c) return Infinity;
+        const raw = c.student?.roll_no ?? 
+                    c.student?.roll_number ?? 
+                    c.roll_no ?? 
+                    c.roll_number ?? 
+                    c.student_roll_no ?? 
+                    c.student_roll_number ?? '';
+        if (raw === null || raw === undefined || raw === '') return Infinity;
+        const parsed = parseInt(String(raw).trim(), 10);
+        return isNaN(parsed) ? String(raw).trim() : parsed;
+      };
 
-    const classNameClean = (classes.find(c => c.id === parseInt(selectedClassId))?.name || selectedClass?.name || 'Class').toString().replace(/\s+/g, '_');
-    const sessionClean = (currentAcademicYear?.name || '2026-2027').replace(/[\s–—]+/g, '-');
-    const filename = `Class_${classNameClean}_Final_Report_Cards_${sessionClean}`;
+      const valA = getRollNo(a);
+      const valB = getRollNo(b);
 
+      if (typeof valA === 'number' && typeof valB === 'number') {
+        if (valA !== valB) return valA - valB;
+      } else if (typeof valA === 'number') {
+        return -1;
+      } else if (typeof valB === 'number') {
+        return 1;
+      } else {
+        const cmp = String(valA).localeCompare(String(valB), undefined, { numeric: true, sensitivity: 'base' });
+        if (cmp !== 0) return cmp;
+      }
+
+      const nameA = (a.student?.name || a.student_name || a.name || '').toLowerCase();
+      const nameB = (b.student?.name || b.student_name || b.name || '').toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+  };
+
+  const handleDownloadAllClassReportCards = async () => {
     try {
-      await printNativeReportCardsContainer('printable-entire-class-container', filename);
+      setGeneratingClassPdf(true);
+      setError('');
+
+      // Step 1: Resolve Target Class ID & Exam ID
+      const targetClassId = selectedClassId || 
+                            selectedReportCard?.class_id || 
+                            selectedReportCard?.student?.class_id || 
+                            selectedReportCard?.student?.class?.id;
+      
+      const targetExamId = selectedExam?.id || 
+                           selectedReportCard?.exam_id || 
+                           selectedReportCard?.exam?.id;
+
+      const isFinalSession = selectedReportCard?.is_final_session_report || activeView === 'final_reports';
+
+      let cardsToPrint = [];
+
+      // Step 2: Fetch report cards if empty in React state
+      if (isFinalSession) {
+        if (finalSessionReportCards && finalSessionReportCards.length > 0) {
+          cardsToPrint = finalSessionReportCards;
+        } else if (targetClassId) {
+          const allExamsList = (exams && exams.length > 0) ? exams : await schoolService.getExaminations();
+          const allStudentCards = [];
+          for (const ex of allExamsList) {
+            try {
+              const reports = await schoolService.getReportCards(ex.id, targetClassId);
+              if (Array.isArray(reports)) {
+                reports.forEach(r => allStudentCards.push({ ...r, exam_name: ex.name }));
+              }
+            } catch {}
+          }
+          if (allStudentCards.length > 0) {
+            const studentMap = {};
+            allStudentCards.forEach(card => {
+              const sId = card.student_id;
+              if (!studentMap[sId]) studentMap[sId] = [];
+              studentMap[sId].push(card);
+            });
+            cardsToPrint = Object.values(studentMap).map(cardsArray => 
+              compileFinalSessionReportCardData(cardsArray, weightagePolicy, schoolProfile, currentAcademicYear)
+            ).filter(Boolean);
+            setFinalSessionReportCards(cardsToPrint);
+          }
+        }
+      } else {
+        if (reportCards && reportCards.length > 0) {
+          cardsToPrint = reportCards;
+        } else if (targetExamId && targetClassId) {
+          const fetched = await schoolService.getReportCards(targetExamId, parseInt(targetClassId));
+          cardsToPrint = fetched || [];
+          setReportCards(cardsToPrint);
+        }
+      }
+
+      // Fallback: If still empty, use [selectedReportCard]
+      if ((!cardsToPrint || cardsToPrint.length === 0) && selectedReportCard) {
+        cardsToPrint = [selectedReportCard];
+      }
+
+      if (!cardsToPrint || cardsToPrint.length === 0) {
+        setError('No report cards available for this class.');
+        setGeneratingClassPdf(false);
+        return;
+      }
+
+      // Step 3: Sort by Roll Number Ascending
+      const sortedCards = sortCardsByRollNo(cardsToPrint);
+      setAllClassSortedCards(sortedCards);
+
+      // Step 4: Allow React state to flush and mount #printable-all-class-report-cards into DOM
+      await new Promise(resolve => setTimeout(resolve, 350));
+
+      const targetClass = classes.find(c => c.id?.toString() === targetClassId?.toString());
+      const classNameClean = (targetClass?.name || selectedClass?.name || 'Class').toString().replace(/\s+/g, '_');
+      const sessionClean = (currentAcademicYear?.name || '2026-2027').replace(/[\s–—]+/g, '-');
+      const filename = `Class_${classNameClean}_All_Report_Cards_${sessionClean}`;
+
+      const printElement = document.getElementById('printable-all-class-report-cards');
+      if (!printElement) {
+        throw new Error('Printable element #printable-all-class-report-cards not found in DOM.');
+      }
+
+      // Step 5: Render vector printable PDF container
+      await printNativeReportCardsContainer('printable-all-class-report-cards', filename);
     } catch (err) {
-      console.error('Failed to generate class vector PDF:', err);
+      console.error('Failed to generate all report cards PDF:', err);
+      setError('Failed to generate all report cards PDF.');
     } finally {
       setGeneratingClassPdf(false);
     }
   };
+
+  const handleDownloadEntireClassPdf = handleDownloadAllClassReportCards;
 
   const handlePublishClassResults = async (exam, classId) => {
     setError('');
@@ -2110,10 +2233,16 @@ export default function ExamsPage() {
           <div className="flex items-center gap-2">
             <Button
               type="button"
-              onClick={() => window.print()}
+              onClick={handleDownloadAllClassReportCards}
+              disabled={generatingClassPdf}
               className="flex items-center gap-2 text-xs font-bold"
             >
-              <Printer className="h-4 w-4" /> Print Report Card
+              {generatingClassPdf ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              Download all report cards
             </Button>
             <Button
               type="button"
@@ -2143,6 +2272,36 @@ export default function ExamsPage() {
               currentYear={currentAcademicYear}
               exam={selectedExam || { name: 'FINAL ACADEMIC REPORT CARD', is_final_session_report: true }}
             />
+          </div>
+        </div>
+
+        {/* Hidden Multi-Page Printable Container for All Class Report Cards */}
+        <div className="sr-only opacity-0 pointer-events-none fixed -left-[9999px] -top-[9999px]">
+          <div id="printable-all-class-report-cards" className="w-[194mm]">
+            {(allClassSortedCards.length > 0
+              ? allClassSortedCards
+              : sortCardsByRollNo(finalSessionReportCards.length > 0 ? finalSessionReportCards : (reportCards.length > 0 ? reportCards : [selectedReportCard]))
+            ).map((card, idx) => (
+              <div
+                key={card.student_id || card.student?.id || idx}
+                className="report-card-page-break bg-white mb-4"
+                style={{
+                  pageBreakAfter: 'always',
+                  breakAfter: 'page',
+                  pageBreakInside: 'avoid',
+                  breakInside: 'avoid',
+                  maxHeight: '275mm',
+                  overflow: 'hidden'
+                }}
+              >
+                <ReportCardRenderer
+                  card={card}
+                  schoolProfile={schoolProfile}
+                  currentYear={currentAcademicYear}
+                  exam={card.is_final_session_report ? { name: 'FINAL ACADEMIC REPORT CARD', is_final_session_report: true } : (selectedExam || { name: card.exam_name || 'EXAMINATION REPORT CARD' })}
+                />
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -3459,14 +3618,28 @@ export default function ExamsPage() {
 
           {/* Hidden Multi-Page Printable Container for Class PDF Export */}
           <div className="sr-only opacity-0 pointer-events-none fixed -left-[9999px] -top-[9999px]">
-            <div id="printable-entire-class-container" className="w-[194mm]">
-              {finalSessionReportCards.map((card, idx) => (
-                <div key={card.student?.id || idx} className="report-card-page-break bg-white mb-6">
+            <div id="printable-all-class-report-cards" className="w-[194mm]">
+              {(allClassSortedCards.length > 0
+                ? allClassSortedCards
+                : sortCardsByRollNo(finalSessionReportCards.length > 0 ? finalSessionReportCards : reportCards)
+              ).map((card, idx) => (
+                <div
+                  key={card.student_id || card.student?.id || idx}
+                  className="report-card-page-break bg-white"
+                  style={{
+                    pageBreakAfter: 'always',
+                    breakAfter: 'page',
+                    pageBreakInside: 'avoid',
+                    breakInside: 'avoid',
+                    maxHeight: '275mm',
+                    overflow: 'hidden'
+                  }}
+                >
                   <ReportCardRenderer
                     card={card}
                     schoolProfile={schoolProfile}
                     currentYear={currentAcademicYear}
-                    exam={{ name: 'FINAL ACADEMIC REPORT CARD', is_final_session_report: true }}
+                    exam={card.is_final_session_report ? { name: 'FINAL ACADEMIC REPORT CARD', is_final_session_report: true } : (selectedExam || { name: card.exam_name || 'EXAMINATION REPORT CARD' })}
                   />
                 </div>
               ))}
@@ -4015,8 +4188,18 @@ export default function ExamsPage() {
             <div className="flex justify-between items-center bg-zinc-50 border-b border-border p-4 -m-6 mb-6 no-print">
               <span className="text-xs font-bold text-text-secondary">Progress Report Card Preview</span>
               <div className="flex items-center gap-2">
-                <Button type="button" onClick={() => window.print()} className="flex items-center gap-2 font-bold py-1.5 px-3">
-                  <Printer className="h-4 w-4" /> Print Report Card
+                <Button
+                  type="button"
+                  onClick={handleDownloadAllClassReportCards}
+                  disabled={generatingClassPdf}
+                  className="flex items-center gap-2 font-bold py-1.5 px-3 text-xs"
+                >
+                  {generatingClassPdf ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}
+                  Download all report cards
                 </Button>
               </div>
             </div>

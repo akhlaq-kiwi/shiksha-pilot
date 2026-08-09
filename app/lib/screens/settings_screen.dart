@@ -7,6 +7,7 @@ import '../services/auth_service.dart';
 import '../main.dart';
 import '../widgets/change_password_dialog.dart';
 import 'full_screen_image_screen.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class SettingsScreen extends StatefulWidget {
   final LeaveService leaveService;
@@ -228,7 +229,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 if (childPhoto.isNotEmpty) {
                   final fullUrl = childPhoto.startsWith('http') ? childPhoto : '${widget.leaveService.baseUrl}$childPhoto';
                   leadingWidget = CircleAvatar(
-                    backgroundImage: NetworkImage(fullUrl),
+                    backgroundImage: CachedNetworkImageProvider(fullUrl),
                     backgroundColor: Colors.indigo.shade50,
                   );
                 } else {
@@ -441,7 +442,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final fullUrl = photoUrl.startsWith('http') ? photoUrl : '${widget.leaveService.baseUrl}$photoUrl';
       avatarWidget = CircleAvatar(
         radius: 46,
-        backgroundImage: NetworkImage(fullUrl),
+        backgroundImage: CachedNetworkImageProvider(fullUrl),
         backgroundColor: Colors.indigo.shade50,
       );
     } else {
