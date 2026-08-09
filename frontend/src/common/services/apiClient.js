@@ -36,17 +36,25 @@ async function request(endpoint, options = {}) {
     localStorage.removeItem('shiksha_pilot_role');
     localStorage.removeItem('shiksha_pilot_user');
     
-    let errorMsg = 'Your account marked as Inactive Please contact Academy management';
+    let errorMsg = '';
     try {
       const data = await response.clone().json();
-      if (data?.message) {
-        errorMsg = data.message;
-      }
+      errorMsg = data?.message || data?.error || '';
     } catch (_) {}
 
-    sessionStorage.setItem('login_error_message', errorMsg);
-    window.location.replace(`/login?error=${encodeURIComponent(errorMsg)}`);
-    throw new Error(errorMsg);
+    const isInactive = errorMsg.toLowerCase().includes('inactive');
+    if (isInactive) {
+      sessionStorage.setItem('login_error_message', errorMsg);
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.replace(`/login?error=${encodeURIComponent(errorMsg)}`);
+      }
+    } else {
+      sessionStorage.removeItem('login_error_message');
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.replace('/login');
+      }
+    }
+    throw new Error(errorMsg || 'Unauthorized. Please log in.');
   }
 
   // Handle PDF/blob/excel exports

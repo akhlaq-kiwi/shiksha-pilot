@@ -417,35 +417,6 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
     fetchNextRollNo();
   }, [formData.class_id, studentId]);
 
-  // Real-time roll number duplicate check at class / section level
-  useEffect(() => {
-    const checkRollUniqueness = async () => {
-      if (formData.class_id && formData.roll_no) {
-        try {
-          const res = await schoolService.checkRollNo(formData.class_id, formData.roll_no, studentId);
-          const exists = typeof res === 'object' && res !== null ? (res.exists ?? res.data?.exists ?? false) : Boolean(res);
-          if (exists) {
-            setErrors(prev => ({
-              ...prev,
-              roll_no: 'The roll no is already assigned'
-            }));
-          } else {
-            setErrors(prev => {
-              const copy = { ...prev };
-              if (copy.roll_no === 'The roll no is already assigned') {
-                delete copy.roll_no;
-              }
-              return copy;
-            });
-          }
-        } catch (err) {
-          console.error('Failed to check roll number uniqueness:', err);
-        }
-      }
-    };
-    const timer = setTimeout(checkRollUniqueness, 250);
-    return () => clearTimeout(timer);
-  }, [formData.class_id, formData.roll_no, studentId]);
 
   // Set default class fields from props for new student
   useEffect(() => {
@@ -887,30 +858,31 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
     setSubmitting(true);
     setErrors({});
 
-    const nameParts = splitName(formData.student_name);
-    const isSame = formData.same_as_current === 1;
-    const currentAddress = (formData.current_address_line_1 || '').trim() + 
-      (formData.current_address_line_2 ? ', ' + formData.current_address_line_2.trim() : '');
-    const permanentAddress = isSame 
-      ? currentAddress 
-      : ((formData.permanent_address_line_1 || '').trim() + 
-         (formData.permanent_address_line_2 ? ', ' + formData.permanent_address_line_2.trim() : ''));
-
-    const submitPayload = {
-      ...formData,
-      first_name: nameParts.first_name,
-      middle_name: nameParts.middle_name,
-      last_name: nameParts.last_name,
-      current_address_line: currentAddress,
-      permanent_address_line: permanentAddress,
-      permanent_city: isSame ? formData.current_city : formData.permanent_city,
-      permanent_state: isSame ? formData.current_state : formData.permanent_state,
-      permanent_country: isSame ? (formData.current_country || 'India') : (formData.permanent_country || 'India'),
-      permanent_pin_code: isSame ? formData.current_pin_code : formData.permanent_pin_code,
-      class_name: selectedClassName
-    };
-
     try {
+      const nameParts = splitName(formData.student_name);
+      const isSame = formData.same_as_current === 1;
+      const currentAddress = (formData.current_address_line_1 || '').trim() + 
+        (formData.current_address_line_2 ? ', ' + formData.current_address_line_2.trim() : '');
+      const permanentAddress = isSame 
+        ? currentAddress 
+        : ((formData.permanent_address_line_1 || '').trim() + 
+           (formData.permanent_address_line_2 ? ', ' + formData.permanent_address_line_2.trim() : ''));
+
+      const submitPayload = {
+        ...formData,
+        first_name: nameParts.first_name,
+        middle_name: nameParts.middle_name,
+        last_name: nameParts.last_name,
+        current_address_line: currentAddress,
+        permanent_address_line: permanentAddress,
+        permanent_city: isSame ? formData.current_city : formData.permanent_city,
+        permanent_state: isSame ? formData.current_state : formData.permanent_state,
+        permanent_country: isSame ? (formData.current_country || 'India') : (formData.permanent_country || 'India'),
+        permanent_pin_code: isSame ? formData.current_pin_code : formData.permanent_pin_code,
+        class_id: formData.class_id,
+        class_name: selectedClassName
+      };
+
       if (studentId) {
         await schoolService.updateStudent(studentId, submitPayload);
       } else {
@@ -1266,15 +1238,11 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
               <div className="space-y-6 animate-in fade-in duration-200">
                 <div>
                   <h3 className="text-sm font-bold text-text-primary uppercase tracking-wide border-b border-border pb-2 mb-4">Current Address</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4">
                     <div className="space-y-1.5">
-                      <label htmlFor="current_address_line_1" className="text-xs font-bold text-text-secondary uppercase">Address Line 1 <span className="text-red-500">*</span></label>
+                      <label htmlFor="current_address_line_1" className="text-xs font-bold text-text-secondary uppercase">Address <span className="text-red-500">*</span></label>
                       <Input id="current_address_line_1" name="current_address_line_1" value={formData.current_address_line_1} onChange={handleTextChange} placeholder="House no, street, locality..." required />
                       {errors.current_address_line_1 && <p className="text-[11px] text-red-500 font-semibold">{errors.current_address_line_1}</p>}
-                    </div>
-                    <div className="space-y-1.5">
-                      <label htmlFor="current_address_line_2" className="text-xs font-bold text-text-secondary uppercase">Address Line 2</label>
-                      <Input id="current_address_line_2" name="current_address_line_2" value={formData.current_address_line_2} onChange={handleTextChange} placeholder="Apartment, suite, unit, etc. (optional)" />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-3">
@@ -1323,15 +1291,11 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
 
                   {formData.same_as_current === 0 && (
                     <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 gap-4">
                         <div className="space-y-1.5">
-                          <label htmlFor="permanent_address_line_1" className="text-xs font-bold text-text-secondary uppercase">Permanent Address Line 1 <span className="text-red-500">*</span></label>
+                          <label htmlFor="permanent_address_line_1" className="text-xs font-bold text-text-secondary uppercase">Permanent Address <span className="text-red-500">*</span></label>
                           <Input id="permanent_address_line_1" name="permanent_address_line_1" value={formData.permanent_address_line_1} onChange={handleTextChange} placeholder="House no, street, locality..." required />
                           {errors.permanent_address_line_1 && <p className="text-[11px] text-red-500 font-semibold">{errors.permanent_address_line_1}</p>}
-                        </div>
-                        <div className="space-y-1.5">
-                          <label htmlFor="permanent_address_line_2" className="text-xs font-bold text-text-secondary uppercase">Permanent Address Line 2</label>
-                          <Input id="permanent_address_line_2" name="permanent_address_line_2" value={formData.permanent_address_line_2} onChange={handleTextChange} placeholder="Apartment, suite, unit, etc. (optional)" />
                         </div>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

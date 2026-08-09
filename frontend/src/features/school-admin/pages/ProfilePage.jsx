@@ -686,86 +686,131 @@ export default function ProfilePage({ mode = 'details' }) {
       {mode === 'plans' && (
         <div className="space-y-6">
           {/* Current plan card */}
-          <Card className="shadow-xs border-border bg-surface">
-            <CardContent className="p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="space-y-1">
+          <Card className="shadow-xs border-2 border-primary/30 bg-primary/5 rounded-2xl overflow-hidden">
+            <CardContent className="p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="space-y-1 shrink-0">
                 <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Current Subscription Plan</p>
-                <div className="flex items-center gap-2">
-                  <span className="text-xl font-bold text-text-primary tracking-tight">{profile?.plan || 'Premium'}</span>
+                <div className="flex items-center gap-2.5">
+                  <span className="text-2xl font-bold text-text-primary tracking-tight font-display">{profile?.plan || 'Premium'}</span>
                   {(() => {
                     const daysText = calculateDaysLeftText(profile?.subscription_expiry);
                     const isExpired = daysText === 'Expired';
                     return (
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${isExpired ? 'bg-red-500/10 text-red-600 border border-red-500/20' : 'bg-primary/10 text-primary border border-primary/20'}`}>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${isExpired ? 'bg-red-500/10 text-red-600 border border-red-500/20' : 'bg-primary/15 text-primary border border-primary/30'}`}>
                         {daysText}
                       </span>
                     );
                   })()}
                 </div>
               </div>
-              <div className="text-xs text-text-secondary max-w-sm">
-                Your billing and plan details are configured by the Super Admin. If you need to make changes, please get in touch with support.
+              <div className="text-xs font-semibold text-primary bg-primary/10 border border-primary/20 p-3.5 rounded-xl max-w-fit leading-relaxed">
+                When you upgrade your plan, the value of your remaining days will be adjusted in<br className="hidden sm:inline" />
+                {' '}your new plan, so you will not lose the benefit of the time left on your current plan.
               </div>
             </CardContent>
           </Card>
 
           {/* Plans comparison cards */}
-          {plans.length === 0 ? (
-            <div className="py-12 border-2 border-dashed border-border bg-surface rounded-2xl text-center text-text-muted text-sm font-medium">
-              No active subscription plans found. Please contact the Super Administrator.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {plans.map(plan => {
-                const isCurrent = (profile?.plan || '').toLowerCase() === plan.name.toLowerCase();
-                return (
-                  <Card key={plan.id} className={`shadow-xs flex flex-col justify-between overflow-hidden border ${isCurrent ? 'border-primary ring-1 ring-primary' : 'border-border'} min-h-[350px] relative p-6 rounded-2xl hover:shadow-md transition-all duration-200`}>
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-start border-b border-border/60 pb-4">
-                        <div>
-                          <h4 className="text-base font-bold text-text-primary tracking-tight font-display">{plan.name}</h4>
+          {(() => {
+            const currentPlanName = (profile?.plan || '').trim().toLowerCase();
+            const daysLeftText = calculateDaysLeftText(profile?.subscription_expiry);
+            const isCurrentExpired = daysLeftText === 'Expired';
+
+            const filteredPlans = (plans || []).filter(plan => {
+              const priceVal = parseFloat(plan.price || plan.amount || 0);
+              const isFree = priceVal === 0;
+              const isCurrent = currentPlanName !== '' && currentPlanName !== 'none' && currentPlanName === (plan.name || '').trim().toLowerCase();
+              
+              if (isFree) {
+                // Free/0-amount plan is ONLY shown if it is currently assigned as the active (unexpired) current plan!
+                return isCurrent && !isCurrentExpired;
+              }
+              return true;
+            });
+
+            const sortedPlans = [...filteredPlans].sort((a, b) => {
+              const aCurrent = currentPlanName !== '' && currentPlanName !== 'none' && currentPlanName === (a.name || '').trim().toLowerCase();
+              const bCurrent = currentPlanName !== '' && currentPlanName !== 'none' && currentPlanName === (b.name || '').trim().toLowerCase();
+              if (aCurrent && !bCurrent) return -1;
+              if (!aCurrent && bCurrent) return 1;
+              return parseFloat(a.price || 0) - parseFloat(b.price || 0);
+            });
+
+            if (sortedPlans.length === 0) {
+              return (
+                <div className="py-12 border-2 border-dashed border-border bg-surface rounded-2xl text-center text-text-muted text-sm font-medium">
+                  No active subscription plans found. Please contact the Super Administrator.
+                </div>
+              );
+            }
+
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {sortedPlans.map(plan => {
+                  const isCurrent = currentPlanName !== '' && currentPlanName !== 'none' && currentPlanName === (plan.name || '').trim().toLowerCase();
+                  return (
+                    <Card key={plan.id} className={`shadow-xs flex flex-col justify-between overflow-hidden border ${isCurrent ? 'border-primary ring-1 ring-primary' : 'border-border'} hover:border-primary hover:ring-1 hover:ring-primary min-h-[350px] relative p-6 rounded-2xl hover:shadow-md transition-all duration-200`}>
+                      <div className="space-y-4">
+                        <div className="border-b border-border/60 pb-4">
+                          <div className="flex justify-between items-start">
+                            <h4 className="text-base font-bold text-text-primary tracking-tight font-display">{plan.name}</h4>
+                            {isCurrent && (
+                              <span className="text-[11px] font-bold bg-primary text-zinc-50 px-2.5 py-1 rounded-full uppercase tracking-wider">Current</span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center justify-between mt-2">
+                            <span className="text-2xl font-bold text-text-primary tracking-tight">₹{parseFloat(plan.price).toLocaleString('en-IN')}</span>
+                            <span className="text-xs font-bold text-text-secondary bg-zinc-100 dark:bg-zinc-800/80 px-2.5 py-1 rounded-lg">
+                              {isCurrent && profile?.subscription_expiry ? (
+                                `Expires on ${(() => {
+                                  const d = new Date(profile.subscription_expiry);
+                                  const day = d.getDate();
+                                  const month = d.toLocaleString('en-US', { month: 'long' });
+                                  const year = d.getFullYear();
+                                  return `${day} ${month} ${year}`;
+                                })()}`
+                              ) : (
+                                (() => {
+                                  const v = parseInt(plan.duration_value, 10) || 1;
+                                  const u = (plan.duration_unit || 'month').toLowerCase();
+                                  if (u === 'month' || u === 'months') {
+                                    if (v === 12) return 'Validity 1 Year';
+                                    return `Validity ${v} Month${v > 1 ? 's' : ''}`;
+                                  }
+                                  if (u === 'year' || u === 'years') {
+                                    return `Validity ${v} Year${v > 1 ? 's' : ''}`;
+                                  }
+                                  return `Validity ${v} ${plan.duration_unit}`;
+                                })()
+                              )}
+                            </span>
+                          </div>
+
+                          <p className="text-[11px] text-primary font-bold uppercase mt-2.5 block">
+                            {plan.student_limit ? `Up to ${Number(plan.student_limit).toLocaleString()} Students` : 'Unlimited Students'}
+                          </p>
                         </div>
-                        {isCurrent && (
-                          <span className="text-[11px] font-bold bg-primary text-zinc-50 px-2.5 py-1 rounded-full uppercase tracking-wider">Current</span>
-                        )}
-                      </div>
-                      
-                      <div className="flex justify-between items-center py-1">
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-2xl font-bold text-text-primary">₹{parseFloat(plan.price).toLocaleString('en-IN')}</span>
-                          <span className="text-[11px] text-text-muted">
-                            /{plan.duration_value || 1}{plan.duration_unit || 'month'}{(plan.duration_value || 1) > 1 ? 's' : ''}
-                          </span>
+
+                        <div className="text-xs text-text-secondary leading-relaxed font-medium whitespace-pre-line break-words">
+                          {plan.description || 'No plan description provided.'}
                         </div>
-                        {isCurrent && profile?.subscription_expiry && (
-                          <span className="text-xs text-text-secondary font-bold">
-                            Expires on {(() => {
-                              const d = new Date(profile.subscription_expiry);
-                              const day = d.getDate();
-                              const month = d.toLocaleString('en-US', { month: 'long' });
-                              const year = d.getFullYear();
-                              return `${day} ${month} ${year}`;
-                            })()}
-                          </span>
-                        )}
                       </div>
 
-                      <p className="text-xs text-text-secondary leading-relaxed font-medium">{plan.description}</p>
-                    </div>
-
-                    <div className="pt-6">
-                      <Button 
-                        className="w-full font-bold text-xs uppercase tracking-wider bg-amber-600 hover:bg-amber-700 text-white"
-                        onClick={() => setContactOpen(true)}
-                      >
-                        Contact Super Admin
-                      </Button>
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
+                      <div className="pt-6">
+                        <Button 
+                          className="w-full font-bold text-xs uppercase tracking-wider bg-amber-600 hover:bg-amber-700 text-white"
+                          onClick={() => setContactOpen(true)}
+                        >
+                          Contact Super Admin
+                        </Button>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            );
+          })()}
 
           {/* Subscription History section */}
           <div className="space-y-4 pt-6">
@@ -781,14 +826,12 @@ export default function ProfilePage({ mode = 'details' }) {
                         <th className="p-4">Expiry Date</th>
                         <th className="p-4">Duration</th>
                         <th className="p-4">Amount</th>
-                        <th className="p-4">Status</th>
-                        <th className="p-4">Features Included</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/60">
                       {subHistory.length === 0 ? (
                         <tr>
-                          <td colSpan="7" className="p-8 text-center text-text-muted font-medium">
+                          <td colSpan="5" className="p-8 text-center text-text-muted font-medium">
                             No subscription history records found.
                           </td>
                         </tr>
@@ -818,14 +861,6 @@ export default function ProfilePage({ mode = 'details' }) {
                               </td>
                               <td className="p-4 font-bold text-text-primary">
                                 ₹{parseFloat(sub.amount).toLocaleString('en-IN')}
-                              </td>
-                              <td className="p-4">
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${sub.status === 'PAID' ? 'bg-green-500/10 text-green-600 border border-green-500/20' : 'bg-red-500/10 text-red-600 border border-red-500/20'}`}>
-                                  {sub.status}
-                                </span>
-                              </td>
-                              <td className="p-4 text-text-secondary leading-relaxed max-w-xs truncate font-medium" title={sub.features || '—'}>
-                                {sub.features || '—'}
                               </td>
                             </tr>
                           );
@@ -982,7 +1017,7 @@ function ContactSuperAdminDialog({ isOpen, onClose }) {
       isOpen={isOpen}
       onClose={onClose}
       title="Contact Super Admin"
-      description="Get in touch with support to activate or renew subscription plans."
+      description=""
       className="max-w-md animate-in fade-in zoom-in-95 duration-200"
       footer={
         <div className="flex justify-end w-full">
@@ -994,8 +1029,7 @@ function ContactSuperAdminDialog({ isOpen, onClose }) {
     >
       <div className="space-y-4 text-sm mt-3">
         <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed font-medium">
-          To purchase or renew a subscription plan, please contact the ShikshaPilot Super Admin using any of the methods below.
-          Our team will assist you with plan activation and account renewal.
+          Please get in touch with the ShikshaPilot Support Team using any of the contact methods below for assistance with report card template assignment, account setup, or queries.
         </p>
 
         <div className="bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-xl border border-border space-y-3">

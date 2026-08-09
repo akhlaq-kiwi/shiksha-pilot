@@ -473,7 +473,7 @@ class LeaveRequestService extends BaseService
 
         if ($user['role'] === 'STUDENT') {
             $stmt = $pdo->prepare("
-                SELECT s.*, c.name as class_name FROM students s
+                SELECT s.*, c.name as class_name, c.section as section_name FROM students s
                 LEFT JOIN classes c ON s.class_id = c.id
                 WHERE s.email = :email AND s.school_id = :sid
             ");
@@ -481,7 +481,7 @@ class LeaveRequestService extends BaseService
             $students = $stmt->fetchAll(PDO::FETCH_ASSOC);
             if (empty($students) && !empty($user['phone'])) {
                 $stmt = $pdo->prepare("
-                    SELECT s.*, c.name as class_name FROM students s
+                    SELECT s.*, c.name as class_name, c.section as section_name FROM students s
                     LEFT JOIN classes c ON s.class_id = c.id
                     WHERE s.student_mobile = :phone AND s.school_id = :sid
                 ");
@@ -492,7 +492,7 @@ class LeaveRequestService extends BaseService
         } else {
             // PARENT: match via phone (fallback to father_phone, guardian_phone, or student_mobile)
             $stmt = $pdo->prepare("
-                SELECT s.*, c.name as class_name FROM students s
+                SELECT s.*, c.name as class_name, c.section as section_name FROM students s
                 LEFT JOIN classes c ON s.class_id = c.id
                 WHERE (s.parent_phone = :phone1 OR s.father_phone = :phone2 OR s.guardian_phone = :phone3 OR s.student_mobile = :phone4) 
                   AND s.school_id = :sid

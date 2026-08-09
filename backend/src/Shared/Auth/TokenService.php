@@ -9,7 +9,7 @@ use App\Database\Connection;
 
 class TokenService
 {
-    private const TOKEN_TTL = 86400; // 24 hours in seconds
+    private const TOKEN_TTL = 30 * 86400; // 30 days in seconds
 
     public function __construct(private readonly Connection $connection) {}
 
@@ -20,7 +20,7 @@ class TokenService
 
     /**
      * Encode a payload into a base64 token.
-     * Appends an 'exp' claim set 24 hours from now.
+     * Appends an 'exp' claim set 30 days from now.
      */
     public function encode(array $payload): string
     {

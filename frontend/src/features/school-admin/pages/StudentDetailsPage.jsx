@@ -188,7 +188,9 @@ function DepositModal({ student, availableMonths, paidMonths, classFeeConfig, on
       onSave();
     } catch (err) {
       console.error(err);
-      setError(err.message || 'Failed to deposit fees.');
+      const errRes = err.data || err.response?.data;
+      const msg = errRes?.errors?.fee_structure || errRes?.errors?.class_id || errRes?.message || err.message || 'Failed to deposit fees.';
+      setError(msg);
     } finally {
       setSaving(false);
     }

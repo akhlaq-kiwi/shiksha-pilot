@@ -279,13 +279,10 @@ class StudentService extends BaseService
                     return $s['grade'];
                 }
             }
-            if ($pct >= 90) return 'A+';
-            if ($pct >= 80) return 'A';
-            if ($pct >= 70) return 'B+';
+            if ($pct >= 75) return 'A';
             if ($pct >= 60) return 'B';
-            if ($pct >= 50) return 'C';
-            if ($pct >= 40) return 'D';
-            return 'F';
+            if ($pct >= 40) return 'C';
+            return 'D';
         };
 
         // Fetch School Profile & Active Template Details

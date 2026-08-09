@@ -63,6 +63,10 @@ export const schoolService = {
     return this.getStaff().then(list => (list || []).filter(s => s.status === 'ACTIVE' && (s.assigned_periods || 0) < (s.max_periods || 8)));
   },
 
+  getMasterCatalog() {
+    return apiClient.get('/api/school/master-catalog');
+  },
+
   getClasses() {
     return apiClient.get('/api/school/classes');
   },

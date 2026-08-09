@@ -280,15 +280,15 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
         className="pb-1 font-sans flex justify-between items-end text-xs font-bold text-zinc-800 px-6"
         style={{ marginTop: 'auto' }}
       >
-        <div className="flex flex-col items-center">
+        <div className="inline-flex flex-col items-center">
           <div style={{ height: STAMP_SPACE }} aria-hidden="true" />
-          <div className="w-40 border-b border-zinc-800 mb-2" />
-          <span className="uppercase text-[11px] font-bold tracking-wider text-zinc-800">Class Teacher Signature</span>
+          <div className="w-full border-b border-zinc-800 mb-1.5" />
+          <span className="uppercase text-[11px] font-bold tracking-wider text-zinc-800 whitespace-nowrap">Class Teacher Signature</span>
         </div>
-        <div className="flex flex-col items-center">
+        <div className="inline-flex flex-col items-center">
           <div style={{ height: STAMP_SPACE }} aria-hidden="true" />
-          <div className="w-40 border-b border-zinc-800 mb-2" />
-          <span className="uppercase text-[11px] font-bold tracking-wider text-zinc-800">Principal Signature & Stamp</span>
+          <div className="w-full border-b border-zinc-800 mb-1.5" />
+          <span className="uppercase text-[11px] font-bold tracking-wider text-zinc-800 whitespace-nowrap">Principal Signature & Stamp</span>
         </div>
       </div>
     </div>

@@ -11,6 +11,7 @@ import { useConfirm } from '../../../common/components/ConfirmDialog';
 function PlanDialog({ plan, onClose, onSaved }) {
   const toast = useToast();
   const isEdit = !!plan?.id;
+  const textareaRef = React.useRef(null);
 
   const [form, setForm] = useState({
     name:          plan?.name          ?? '',
@@ -22,6 +23,18 @@ function PlanDialog({ plan, onClose, onSaved }) {
     is_active:      plan?.is_active      != null ? String(plan.is_active) : '1',
   });
   const [saving, setSaving] = useState(false);
+
+  // Auto-expand textarea height dynamically without scrollbar
+  const adjustTextareaHeight = () => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.max(80, textareaRef.current.scrollHeight)}px`;
+    }
+  };
+
+  useEffect(() => {
+    adjustTextareaHeight();
+  }, [form.description]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -55,7 +68,7 @@ function PlanDialog({ plan, onClose, onSaved }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-surface border border-border rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95 fade-in duration-200">
+      <div className="relative bg-surface border border-border rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95 fade-in duration-200 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5 border-b border-border/60 pb-3">
           <div>
             <h3 className="text-base font-bold text-text-primary">{isEdit ? `Configure ${plan.name} Plan` : 'Create New Plan'}</h3>
@@ -157,11 +170,15 @@ function PlanDialog({ plan, onClose, onSaved }) {
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-text-secondary uppercase">Description</label>
             <textarea
-              rows={3}
+              ref={textareaRef}
               value={form.description}
-              onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+              onChange={e => {
+                setForm(p => ({ ...p, description: e.target.value }));
+                adjustTextareaHeight();
+              }}
               placeholder="Features and standard services included in this tier"
-              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
+              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none overflow-hidden"
+              style={{ minHeight: '80px' }}
               required
             />
           </div>
@@ -274,7 +291,7 @@ export default function PlansPage() {
             filteredPlans.map(p => (
               <Card
                 key={p.id}
-                className={`relative overflow-hidden border border-border bg-surface shadow-sm rounded-2xl flex flex-col justify-between h-[320px] transition-all hover:shadow-md ${p.is_active === 0 || p.is_active === '0' || p.is_active === false ? 'opacity-65 bg-zinc-50/50 dark:bg-zinc-900/10' : ''}`}
+                className={`relative overflow-hidden border border-border bg-surface shadow-sm rounded-2xl flex flex-col justify-between min-h-[340px] h-full transition-all hover:shadow-md ${p.is_active === 0 || p.is_active === '0' || p.is_active === false ? 'opacity-65 bg-zinc-50/50 dark:bg-zinc-900/10' : ''}`}
               >
                 <div className="p-6 flex-1 flex flex-col justify-between">
                   <div>
@@ -285,15 +302,24 @@ export default function PlansPage() {
                       </span>
                     </div>
 
-                    <div className="mt-3 flex items-baseline gap-0.5">
-                      <span className="text-3xl font-bold text-text-primary">
+                    <div className="mt-3 flex items-center justify-between">
+                      <span className="text-3xl font-bold text-text-primary font-display">
                         {p.price > 0 ? `₹${Number(p.price).toLocaleString()}` : 'Free'}
                       </span>
-                      {p.price > 0 && (
-                        <span className="text-xs text-text-muted">
-                          /{p.duration_value} {p.duration_unit}{p.duration_value > 1 ? 's' : ''}
-                        </span>
-                      )}
+                      <span className="text-xs font-bold text-text-secondary bg-zinc-100 dark:bg-zinc-800/80 px-2.5 py-1 rounded-lg">
+                        {(() => {
+                          const v = parseInt(p.duration_value, 10) || 1;
+                          const u = (p.duration_unit || 'month').toLowerCase();
+                          if (u === 'month' || u === 'months') {
+                            if (v === 12) return 'Validity 1 Year';
+                            return `Validity ${v} Month${v > 1 ? 's' : ''}`;
+                          }
+                          if (u === 'year' || u === 'years') {
+                            return `Validity ${v} Year${v > 1 ? 's' : ''}`;
+                          }
+                          return `Validity ${v} ${p.duration_unit}`;
+                        })()}
+                      </span>
                     </div>
 
                     <div className="mt-4 text-xs text-text-secondary border-t border-border/50 pt-3 space-y-1.5 font-semibold">
@@ -303,34 +329,36 @@ export default function PlansPage() {
                           {p.student_limit ? Number(p.student_limit).toLocaleString() : 'Unlimited'}
                         </span>
                       </div>
-                      <div>
-                        Duration:{' '}
-                        <span className="text-text-primary font-bold">
-                          {p.duration_value} {p.duration_unit === 'month' ? 'Month' : 'Year'}{p.duration_value > 1 ? 's' : ''}
-                        </span>
-                      </div>
                     </div>
 
-                    <p className="mt-4 text-xs text-text-muted line-clamp-3 leading-relaxed font-semibold">
+                    <div className="mt-4 text-xs text-text-muted leading-relaxed font-semibold whitespace-pre-line break-words">
                       {p.description || 'No plan description provided.'}
-                    </p>
+                    </div>
                   </div>
 
-                  <div className="flex gap-2.5 mt-6 border-t border-border/50 pt-4">
-                    <Button
-                      variant="outline"
-                      className="flex-1 text-xs py-1.5 flex items-center justify-center gap-1.5 font-bold"
-                      onClick={() => setConfiguringPlan(p)}
-                    >
-                      <Pencil className="h-3.5 w-3.5" /> Edit
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="flex-1 text-xs py-1.5 flex items-center justify-center gap-1.5 text-red-600 hover:bg-red-500/5 hover:text-red-700 border-red-200 dark:border-red-950 font-bold"
-                      onClick={() => handleDelete(p.id, p.name)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" /> Delete
-                    </Button>
+                  <div className="flex gap-2.5 mt-6 border-t border-border/50 pt-4 shrink-0">
+                    {(p.assigned_schools_count || 0) > 0 ? (
+                      <div className="w-full text-center py-2 px-3 rounded-xl bg-zinc-100 dark:bg-zinc-800/60 border border-border/60 text-xs font-bold text-text-secondary">
+                        Assigned In: {p.assigned_schools_count} {p.assigned_schools_count === 1 ? 'school' : 'schools'}
+                      </div>
+                    ) : (
+                      <>
+                        <Button
+                          variant="outline"
+                          className="flex-1 text-xs py-1.5 flex items-center justify-center gap-1.5 font-bold"
+                          onClick={() => setConfiguringPlan(p)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" /> Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="flex-1 text-xs py-1.5 flex items-center justify-center gap-1.5 text-red-600 hover:bg-red-500/5 hover:text-red-700 border-red-200 dark:border-red-950 font-bold"
+                          onClick={() => handleDelete(p.id, p.name)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" /> Delete
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
               </Card>

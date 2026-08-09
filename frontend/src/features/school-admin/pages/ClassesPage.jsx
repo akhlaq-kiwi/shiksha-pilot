@@ -292,7 +292,9 @@ export default function ClassesPage() {
       await loadData();
     } catch (err) {
       console.error(err);
-      setClassFormError(err.message || 'Failed to create one or more classes.');
+      const errRes = err.data || err.response?.data;
+      const msg = errRes?.errors?.class_id || errRes?.errors?.name || errRes?.errors?.sections || err.message || 'Failed to create one or more classes.';
+      setClassFormError(msg);
     } finally {
       setSavingClass(false);
     }
@@ -329,7 +331,9 @@ export default function ClassesPage() {
     } catch (err) {
       console.error(err);
       const errRes = err.data || err.response?.data;
-      if (errRes?.errors?.name) {
+      if (errRes?.errors?.class_id) {
+        setClassFormError(errRes.errors.class_id);
+      } else if (errRes?.errors?.name) {
         setClassFormError(errRes.errors.name);
       } else if (errRes?.errors?.sections) {
         setSectionsFieldError(errRes.errors.sections);

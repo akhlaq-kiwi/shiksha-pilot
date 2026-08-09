@@ -60,7 +60,7 @@ class _AttachmentGalleryScreenState extends State<AttachmentGalleryScreen> {
     final prefs = await SharedPreferences.getInstance();
     String activeBaseUrl = widget.baseUrl.trim();
     if (activeBaseUrl.isEmpty || !activeBaseUrl.startsWith('http')) {
-      activeBaseUrl = prefs.getString('base_url') ?? 'https://qa.shikshapilot.com';
+      activeBaseUrl = prefs.getString('base_url') ?? 'https://app.shikshapilot.com';
     }
     final cleanBaseUrl = activeBaseUrl.replaceAll(RegExp(r'/$'), '');
 
@@ -127,7 +127,7 @@ class _AttachmentGalleryScreenState extends State<AttachmentGalleryScreen> {
       final prefs = await SharedPreferences.getInstance();
       String activeBaseUrl = widget.baseUrl.trim();
       if (activeBaseUrl.isEmpty || !activeBaseUrl.startsWith('http')) {
-        activeBaseUrl = prefs.getString('base_url') ?? 'https://qa.shikshapilot.com';
+        activeBaseUrl = prefs.getString('base_url') ?? 'https://app.shikshapilot.com';
       }
       final cleanBaseUrl = activeBaseUrl.replaceAll(RegExp(r'/$'), '');
 

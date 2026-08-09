@@ -25,6 +25,8 @@ import 'package:school_hub/services/exam_service.dart';
 import 'package:school_hub/screens/exam_list_screen.dart';
 import 'package:school_hub/screens/achievements_screen.dart';
 import 'package:school_hub/screens/homework_list_screen.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:school_hub/screens/user_profile_screen.dart';
 import 'package:school_hub/widgets/change_password_dialog.dart';
 
 class LauncherFeature {
@@ -678,200 +680,44 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     ChangePasswordDialog.show(context, baseUrl: widget.leaveService.baseUrl);
   }
 
-  void _showProfilePopup() {
-    showDialog(
-      context: context,
-      barrierColor: Colors.black.withOpacity(0.2),
-      builder: (BuildContext context) {
-        // Resolve profile image
-        String photoUrl = '';
-        if (widget.userRole.toUpperCase() == 'PARENT') {
-          final active = _children.firstWhere(
-            (c) => c['id'] == _activeStudentId,
-            orElse: () => null,
-          );
-          if (active != null) {
-            photoUrl = active['photo_path'] ?? '';
-          }
-        } else {
-          photoUrl = _userPhoto;
-        }
+  void _navigateToProfileScreen() {
+    String photoUrl = '';
+    if (widget.userRole.toUpperCase() == 'PARENT' || widget.userRole.toUpperCase() == 'STUDENT') {
+      final active = _children.firstWhere(
+        (c) => c['id'] == _activeStudentId,
+        orElse: () => null,
+      );
+      if (active != null) {
+        photoUrl = active['photo_path'] ?? '';
+      }
+    } else {
+      photoUrl = _userPhoto;
+    }
 
-        Widget avatarChild;
-        if (photoUrl.isNotEmpty) {
-          final fullUrl = photoUrl.startsWith('http') ? photoUrl : '${widget.leaveService.baseUrl}$photoUrl';
-          avatarChild = ClipOval(
-            child: Image.network(
-              fullUrl,
-              width: 54,
-              height: 54,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return Icon(Icons.person, size: 30, color: Colors.indigo.shade800);
-              },
-            ),
-          );
-        } else {
-          avatarChild = Icon(Icons.person, size: 30, color: Colors.indigo.shade800);
-        }
+    final fullPhotoUrl = photoUrl.isNotEmpty
+        ? (photoUrl.startsWith('http') ? photoUrl : '${widget.leaveService.baseUrl}$photoUrl')
+        : '';
 
-        return Dialog(
-          alignment: Alignment.topRight,
-          insetPadding: const EdgeInsets.only(top: 60, right: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: Container(
-            width: 260,
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Header (Profile Avatar and Name only!)
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 27,
-                      backgroundColor: Colors.indigo.shade50,
-                      child: avatarChild,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        _userName,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                const Divider(height: 1),
-                const SizedBox(height: 12),
-
-                // Switch child list (if PARENT and multiple children), placed ABOVE Change Password!
-                if (widget.userRole.toUpperCase() == 'PARENT' && _children.length > 1) ...[
-                  const Text(
-                    'SWITCH STUDENT',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.grey,
-                      letterSpacing: 1.0,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 180),
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: _children.length,
-                      itemBuilder: (context, index) {
-                        final child = _children[index];
-                        final childId = child['id'] as int;
-                        final isCurrent = childId == _activeStudentId;
-                        final childName = child['name'] ?? '';
-                        
-                        return Container(
-                          margin: const EdgeInsets.symmetric(vertical: 2),
-                          decoration: BoxDecoration(
-                            color: isCurrent ? Colors.indigo.shade50.withOpacity(0.4) : Colors.transparent,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(8),
-                            onTap: () async {
-                              Navigator.pop(context); // Close popup dialog
-                              await _handleSwitchStudent(childId);
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.child_care_rounded,
-                                    size: 16,
-                                    color: isCurrent ? Colors.indigo.shade800 : Colors.grey.shade600,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      childName,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-                                        color: isCurrent ? Colors.indigo.shade800 : Colors.black87,
-                                      ),
-                                    ),
-                                  ),
-                                  if (isCurrent)
-                                    Icon(Icons.check, size: 14, color: Colors.indigo.shade800),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Divider(height: 1),
-                  const SizedBox(height: 12),
-                ],
-
-                // Action Menu: Change Password (above Logout)
-                InkWell(
-                  borderRadius: BorderRadius.circular(8),
-                  onTap: () {
-                    Navigator.pop(context); // Close profile popup
-                    _showChangePasswordDialog();
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-                    child: Row(
-                      children: const [
-                        Icon(Icons.lock_open_rounded, size: 18, color: Colors.black54),
-                        SizedBox(width: 12),
-                        Text(
-                          'Change Password',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black87),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 4),
-
-                // Action Menu: Log Out
-                InkWell(
-                  borderRadius: BorderRadius.circular(8),
-                  onTap: () {
-                    Navigator.pop(context); // Close profile popup
-                    _handleLogout();
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-                    child: Row(
-                      children: [
-                        Icon(Icons.logout_rounded, size: 18, color: Colors.red.shade600),
-                        const SizedBox(width: 12),
-                        Text(
-                          'Log Out',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.red.shade600),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => UserProfileScreen(
+          userName: _userName,
+          userRole: widget.userRole,
+          schoolName: _schoolName,
+          userPhone: _userPhone,
+          photoUrl: fullPhotoUrl,
+          children: _children,
+          activeStudentId: _activeStudentId,
+          onSwitchChild: (newId) {
+            setState(() {
+              _activeStudentId = newId;
+              _resolveActiveStudentName();
+            });
+            _fetchUnreadNotificationsCount();
+          },
+        ),
+      ),
     );
   }
 
@@ -1064,30 +910,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ),
                     const SizedBox(width: 12),
                     GestureDetector(
-                      onTap: () {
-                        String photoUrl = '';
-                        if (widget.userRole.toUpperCase() == 'PARENT') {
-                          final active = _children.firstWhere(
-                            (c) => c['id'] == _activeStudentId,
-                            orElse: () => null,
-                          );
-                          if (active != null) {
-                            photoUrl = active['photo_path'] ?? '';
-                          }
-                        } else {
-                          photoUrl = _userPhoto;
-                        }
-
-                        if (photoUrl.isNotEmpty) {
-                          final fullUrl = photoUrl.startsWith('http') ? photoUrl : '${widget.leaveService.baseUrl}$photoUrl';
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => FullScreenImageScreen(imageUrl: fullUrl),
-                            ),
-                          );
-                        }
-                      },
+                      onTap: _navigateToProfileScreen,
                       child: Hero(
                         tag: 'user_profile_icon',
                         child: CircleAvatar(
@@ -1096,7 +919,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           child: Builder(
                             builder: (context) {
                               String photoUrl = '';
-                              if (widget.userRole.toUpperCase() == 'PARENT') {
+                              if (widget.userRole.toUpperCase() == 'PARENT' || widget.userRole.toUpperCase() == 'STUDENT') {
                                 final active = _children.firstWhere(
                                   (c) => c['id'] == _activeStudentId,
                                   orElse: () => null,
@@ -1111,14 +934,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                               if (photoUrl.isNotEmpty) {
                                 final fullUrl = photoUrl.startsWith('http') ? photoUrl : '${widget.leaveService.baseUrl}$photoUrl';
                                 return ClipOval(
-                                  child: Image.network(
-                                    fullUrl,
+                                  child: CachedNetworkImage(
+                                    imageUrl: fullUrl,
                                     width: 48,
                                     height: 48,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return Icon(Icons.person, size: 28, color: Colors.indigo.shade800);
-                                    },
+                                    placeholder: (context, url) => Icon(Icons.person, size: 28, color: Colors.indigo.shade800),
+                                    errorWidget: (context, url, error) => Icon(Icons.person, size: 28, color: Colors.indigo.shade800),
                                   ),
                                 );
                               }

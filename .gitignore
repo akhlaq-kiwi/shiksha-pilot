@@ -37,5 +37,7 @@ backend/config/firebase-service-account.json
 
 .builds/
 backend/public/uploads/*
+app/android/app/google-services.json
+backend/config/firebase-service-account.json
 *.apk
 app-release.apk

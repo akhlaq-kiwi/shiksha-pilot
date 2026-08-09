@@ -159,10 +159,7 @@ function CredentialsDialog({ school, onClose }) {
   const [showPassword, setShowPassword] = useState(false);
 
   const [schoolName, setSchoolName] = useState('');
-  const [loginUrl, setLoginUrl] = useState('');
-  const [adminEmail, setAdminEmail] = useState('');
   const [mobileNumber, setMobileNumber] = useState('');
-  const [currentLoginId, setCurrentLoginId] = useState('');
   const [password, setPassword] = useState('');
 
   const loadCredentials = async () => {
@@ -170,10 +167,7 @@ function CredentialsDialog({ school, onClose }) {
       setLoading(true);
       const data = await platformService.getSchoolCredentials(school.id);
       setSchoolName(data.school_name || school.name);
-      setLoginUrl(window.location.origin);
-      setAdminEmail(data.admin_email || '');
       setMobileNumber(data.mobile_number || '');
-      setCurrentLoginId(data.current_login_id || '');
       setPassword(data.password || '');
     } catch (err) {
       setError(err.message || 'Failed to load credentials.');
@@ -189,7 +183,7 @@ function CredentialsDialog({ school, onClose }) {
   }, [school]);
 
   const handleCopy = () => {
-    const text = `School Name: ${schoolName}\nPortal URL: ${loginUrl}\nLogin ID: ${currentLoginId}\nPassword: ${password}`;
+    const text = `Mobile Number: ${mobileNumber}\nPassword: ${password}`;
     navigator.clipboard.writeText(text)
       .then(() => {
         toast.success('Credentials copied to clipboard!', 'Copied');
@@ -203,12 +197,6 @@ function CredentialsDialog({ school, onClose }) {
     e.preventDefault();
     setSaving(true);
     setError('');
-
-    if (!adminEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail)) {
-      setError('A valid admin email is required.');
-      setSaving(false);
-      return;
-    }
 
     if (!/^[0-9]{10}$/.test(mobileNumber.trim())) {
       setError('Mobile number must be exactly 10 digits.');
@@ -224,15 +212,13 @@ function CredentialsDialog({ school, onClose }) {
 
     try {
       const updated = await platformService.updateSchoolCredentials(school.id, {
-        admin_email: adminEmail.trim(),
         mobile_number: mobileNumber.trim(),
         password: password,
       });
-      setAdminEmail(updated.admin_email);
       setMobileNumber(updated.mobile_number);
-      setCurrentLoginId(updated.current_login_id);
       setPassword(updated.password);
       toast.success('School credentials updated successfully.', 'Updated');
+      onClose();
     } catch (err) {
       setError(err.message || 'Failed to update credentials.');
     } finally {
@@ -264,45 +250,25 @@ function CredentialsDialog({ school, onClose }) {
           <div className="py-12 text-center text-xs text-text-muted">Loading secure credentials…</div>
         ) : (
           <form onSubmit={handleUpdate} className="space-y-4">
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-text-secondary uppercase">School Name</label>
-              <Input value={schoolName} disabled className="bg-zinc-50 dark:bg-zinc-900 cursor-not-allowed" />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-text-secondary uppercase">Login URL</label>
-              <Input value={loginUrl} disabled className="bg-zinc-50 dark:bg-zinc-900 cursor-not-allowed text-primary font-semibold" />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">Admin Email / Username</label>
-              <Input type="email" value={adminEmail} onChange={e => setAdminEmail(e.target.value)} required />
-            </div>
-
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-text-secondary uppercase">Mobile Number</label>
               <Input type="tel" value={mobileNumber} onChange={e => setMobileNumber(e.target.value)} required />
             </div>
 
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-text-secondary uppercase">Current Login ID</label>
-              <Input value={currentLoginId} disabled className="bg-zinc-50 dark:bg-zinc-900 cursor-not-allowed font-mono text-xs" />
-            </div>
-
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-text-secondary uppercase">Password</label>
-              <div className="flex items-center gap-1.5">
+              <div className="relative">
                 <Input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   required
-                  className="flex-1 font-mono text-xs"
+                  className="pr-10 font-mono text-xs"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="p-2 rounded-md border border-border hover:bg-zinc-50 dark:hover:bg-zinc-800 text-text-muted hover:text-text-primary transition-colors"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-text-muted hover:text-text-primary transition-colors"
                   title={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -310,25 +276,22 @@ function CredentialsDialog({ school, onClose }) {
               </div>
             </div>
 
-            <div className="flex flex-col gap-2 pt-3">
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="flex-1 flex items-center justify-center gap-1.5 h-9 text-xs"
-                  onClick={handleCopy}
-                >
-                  <Copy className="h-3.5 w-3.5" /> Copy Credentials
-                </Button>
-                <Button
-                  type="submit"
-                  className="flex-1 h-9 text-xs"
-                  disabled={saving}
-                >
-                  {saving ? 'Updating…' : 'Update Credentials'}
-                </Button>
-              </div>
-              <Button type="button" variant="secondary" className="w-full h-9 text-xs" onClick={onClose}>Close</Button>
+            <div className="flex gap-2 pt-3">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1 flex items-center justify-center gap-1.5 h-9 text-xs font-bold"
+                onClick={handleCopy}
+              >
+                <Copy className="h-3.5 w-3.5" /> Copy Credentials
+              </Button>
+              <Button
+                type="submit"
+                className="flex-1 h-9 text-xs font-bold"
+                disabled={saving}
+              >
+                {saving ? 'Updating…' : 'Update Credentials'}
+              </Button>
             </div>
           </form>
         )}
@@ -598,7 +561,7 @@ function PlanSelectionDialog({ school, onClose, onAssigned }) {
                             {isCurrent && <span className="text-[11px] font-bold uppercase bg-zinc-200 text-zinc-700 px-1.5 py-0.5 rounded-md">Current</span>}
                             {String(selectedPlanId) === String(p.id) && !isCurrent && <Sparkles className="h-3.5 w-3.5 text-primary" />}
                           </h4>
-                          <p className="text-xs text-text-muted mt-1 leading-relaxed">{p.description || 'Standard plan benefits'}</p>
+                          <p className="text-xs text-text-muted mt-1 leading-relaxed whitespace-pre-line break-words">{p.description || 'Standard plan benefits'}</p>
                         </div>
                         <div className="text-right">
                           <span className="font-bold text-sm text-text-primary">
