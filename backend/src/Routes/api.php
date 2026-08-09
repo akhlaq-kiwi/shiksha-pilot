@@ -15,6 +15,7 @@ use App\Domain\Student\Controllers\VocabularyController;
 use App\Domain\Teacher\Controllers\HomeworkController;
 
 use App\Domain\Platform\Controllers\ReportCardTemplateController;
+use App\Shared\Notifications\DeviceTokenController;
 
 return function (App $app) {
     // Auth Domain
@@ -331,4 +332,11 @@ return function (App $app) {
     // Mobile Notices Domain
     $app->get('/api/student/announcements', [StudentController::class, 'getActiveNotices']);
     $app->post('/api/student/announcements/{id}/read', [StudentController::class, 'markNoticeRead']);
+
+    // Push Notifications — device registration is role-agnostic, so these are
+    // shared rather than duplicated per domain like the read endpoints above.
+    $app->post('/api/notifications/device', [DeviceTokenController::class, 'register']);
+    $app->delete('/api/notifications/device', [DeviceTokenController::class, 'unregister']);
+    $app->get('/api/notifications/catalog', [DeviceTokenController::class, 'catalog']);
+    $app->post('/api/notifications/test-push', [DeviceTokenController::class, 'testPush']);
 };

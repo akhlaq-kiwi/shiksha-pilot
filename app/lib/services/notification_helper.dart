@@ -1,9 +1,13 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:printing/printing.dart';
+import 'package:timezone/data/latest_all.dart' as tzdata;
+import 'package:timezone/timezone.dart' as tz;
+import '../constants/notification_categories.dart';
 import '../screens/leave_list_screen.dart';
 import '../screens/timetable_screen.dart';
 import '../screens/notification_center_screen.dart';
@@ -20,8 +24,19 @@ class NotificationHelper {
 
   static Uint8List? _lastDownloadedBytes;
   static String? _lastDownloadedFileName;
+  static bool _channelsCreated = false;
 
   static Future<void> init() async {
+    // zonedSchedule needs the timezone database loaded, and Asia/Kolkata set
+    // explicitly — tz.local otherwise defaults to UTC, which would fire every
+    // scheduled reminder 5.5 hours off.
+    try {
+      tzdata.initializeTimeZones();
+      tz.setLocalLocation(tz.getLocation('Asia/Kolkata'));
+    } catch (_) {
+      // Already initialised on a previous call, or the location is missing.
+    }
+
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
 
@@ -72,10 +87,91 @@ class NotificationHelper {
     );
 
     // Request permissions for Android 13+
-    await _flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.requestNotificationsPermission();
+    try {
+      await _flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>()
+          ?.requestNotificationsPermission();
+    } catch (_) {
+      // Ignored in background isolates where no Activity context exists
+    }
+
+    await _createChannels();
+  }
+
+  /// Create one Android channel per category, up front.
+  ///
+  /// Channels have to exist before a notification references them: an incoming
+  /// FCM message naming an unknown channel_id gets posted with default
+  /// importance and no sound instead of the settings we intended. Creating
+  /// them at startup also makes every category visible in Android's own
+  /// notification settings immediately, so a user can mute fee bookkeeping
+  /// without having to receive one first.
+  static Future<void> _createChannels() async {
+    if (_channelsCreated) return;
+
+    final android = _flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    if (android == null) return;
+
+    for (final category in NotificationCategory.all) {
+      await android.createNotificationChannel(
+        AndroidNotificationChannel(
+          category.id,
+          category.name,
+          description: category.description,
+          importance: category.highImportance ? Importance.max : Importance.defaultImportance,
+          playSound: true,
+        ),
+      );
+    }
+    _channelsCreated = true;
+  }
+
+  /// The Android presentation for a category — shared by locally scheduled
+  /// reminders and by pushes we render ourselves in the foreground, so both
+  /// look identical to the ones Android's tray draws from an FCM payload.
+  static AndroidNotificationDetails androidDetailsFor(NotificationCategory category) {
+    return AndroidNotificationDetails(
+      category.id,
+      category.name,
+      channelDescription: category.description,
+      importance: category.highImportance ? Importance.max : Importance.defaultImportance,
+      priority: category.highImportance ? Priority.high : Priority.defaultPriority,
+      playSound: true,
+      enableVibration: true,
+      icon: '@mipmap/ic_launcher',
+      color: category.color,
+      styleInformation: const BigTextStyleInformation(''),
+    );
+  }
+
+  /// Render an FCM message as a local notification.
+  ///
+  /// Needed in two cases: a foreground message (Android never draws those
+  /// itself) and a data-only message. Reuses the same payload shape as the
+  /// polling path so tap handling has exactly one code path.
+  static Future<void> showFromRemote(RemoteMessage message) async {
+    final data = message.data;
+    final title = message.notification?.title ?? data['title'] ?? '';
+    final body = message.notification?.body ?? data['body'] ?? '';
+    if (title.isEmpty && body.isEmpty) return;
+
+    final category = NotificationCategory.byId(data['category']);
+
+    await _flutterLocalNotificationsPlugin.show(
+      id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      title: title,
+      body: body,
+      notificationDetails: NotificationDetails(android: androidDetailsFor(category)),
+      payload: json.encode({
+        'title': title,
+        'message': body,
+        'link': data['link'] ?? '',
+        'event_key': data['event_key'] ?? '',
+        'category': category.id,
+      }),
+    );
   }
 
   static void navigateToTarget(
@@ -101,6 +197,24 @@ class NotificationHelper {
       }
     } catch (e) {
       debugPrint('Failed to parse student_id from notification link: $e');
+    }
+
+    // Prefer the catalog's event_key when the notification carries one. The
+    // substring matching below is the legacy path — it stays as a fallback for
+    // rows written before event_key existed, but it cannot distinguish an exam
+    // result from an admit card (both are titled with the exam name), which is
+    // exactly why the key was introduced.
+    final eventKey = (notif['event_key'] ?? '').toString();
+    if (eventKey.isNotEmpty) {
+      final routed = _screenForEvent(
+        eventKey, baseUrl, token, userRole, notifStudentId ?? studentId, leaveService,
+      );
+      if (routed != null) {
+        MyApp.navigatorKey.currentState?.push(
+          MaterialPageRoute(builder: (context) => routed),
+        );
+        return;
+      }
     }
 
     Widget targetScreen;
@@ -151,6 +265,112 @@ class NotificationHelper {
     );
   }
 
+  /// Map a catalog event key to its destination screen.
+  ///
+  /// Returns null for events with no meaningful destination (a completed
+  /// download, a subscription change that only concerns the web console), which
+  /// lets the caller fall through to the legacy matching rather than pushing
+  /// an arbitrary screen.
+  static Widget? _screenForEvent(
+    String eventKey,
+    String baseUrl,
+    String token,
+    String userRole,
+    int? studentId,
+    LeaveService leaveService,
+  ) {
+    switch (eventKey) {
+      case NotificationEvent.leaveRequestSubmitted:
+      case NotificationEvent.leaveCancelledByApplicant:
+        return LeaveListScreen(
+          leaveService: leaveService,
+          userRole: userRole,
+          selectedStudentId: studentId,
+          initialTabIndex: 1,
+        );
+
+      case NotificationEvent.leaveApproved:
+      case NotificationEvent.leaveRejected:
+      case NotificationEvent.leaveCancelledByAdmin:
+        return LeaveListScreen(
+          leaveService: leaveService,
+          userRole: userRole,
+          selectedStudentId: studentId,
+          initialTabIndex: 1,
+        );
+
+      case NotificationEvent.holidayAnnounced:
+        return LeaveListScreen(
+          leaveService: leaveService,
+          userRole: userRole,
+          selectedStudentId: studentId,
+          initialTabIndex: 0,
+        );
+
+      case NotificationEvent.homeworkAssigned:
+      case NotificationEvent.homeworkDueReminder:
+        return HomeworkListScreen(
+          baseUrl: baseUrl,
+          userRole: userRole,
+          selectedStudentId: studentId,
+        );
+
+      case NotificationEvent.timetableUpdated:
+      case NotificationEvent.substituteAssigned:
+        return TimetableScreen(
+          baseUrl: baseUrl,
+          token: token,
+          userRole: userRole,
+          selectedStudentId: studentId,
+        );
+
+      case NotificationEvent.examScheduled:
+      case NotificationEvent.examSchemePublished:
+      case NotificationEvent.examSchemeUnpublished:
+      case NotificationEvent.examAdmitCardPublished:
+      case NotificationEvent.examAdmitCardUnpublished:
+      case NotificationEvent.examResultPublished:
+      case NotificationEvent.examStartsTomorrow:
+        return ExamListScreen(
+          examService: ExamService(baseUrl: baseUrl, token: token),
+          userRole: userRole,
+          selectedStudentId: studentId,
+        );
+
+      case NotificationEvent.feeAdmissionAdded:
+      case NotificationEvent.feeAnnualAdded:
+      case NotificationEvent.feeTransportGenerated:
+      case NotificationEvent.feePaymentRecorded:
+      case NotificationEvent.feePaymentReverted:
+      case NotificationEvent.feePenaltyApplied:
+      case NotificationEvent.feeDueReminder:
+        return FeesCardScreen(
+          baseUrl: baseUrl,
+          token: token,
+          studentId: studentId,
+        );
+
+      case NotificationEvent.announcementPublished:
+      case NotificationEvent.attendanceMarkedAbsent:
+      case NotificationEvent.attendanceNotMarkedReminder:
+      case NotificationEvent.achievementAttendanceAward:
+      case NotificationEvent.achievementAcademicTopper:
+      case NotificationEvent.feeFollowupDueToday:
+      case NotificationEvent.feeFollowupOverdue:
+        // These have no dedicated mobile screen yet; the notification centre
+        // shows the full message, which is the useful destination.
+        return NotificationCenterScreen(
+          baseUrl: baseUrl,
+          token: token,
+          studentId: studentId,
+          userRole: userRole,
+        );
+
+      default:
+        return null;
+    }
+  }
+
   static Future<void> showDownloadNotification({
     required String title,
     required String fileName,
@@ -159,24 +379,14 @@ class NotificationHelper {
     _lastDownloadedBytes = Uint8List.fromList(bytes);
     _lastDownloadedFileName = fileName;
 
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'file_downloads_channel',
-      'File Downloads',
-      channelDescription: 'Notifications for downloaded files',
-      importance: Importance.max,
-      priority: Priority.high,
-      playSound: true,
-      enableVibration: true,
-      icon: 'ic_notification',
-      largeIcon: DrawableResourceAndroidBitmap('ic_launcher'),
-      color: Color(0xFF059669),
-      styleInformation: BigTextStyleInformation(''),
+    final NotificationDetails platformDetails = NotificationDetails(
+      android: androidDetailsFor(NotificationCategory.system),
     );
-
-    const NotificationDetails platformDetails = NotificationDetails(android: androidDetails);
 
     final payload = json.encode({
       'type': 'download_complete',
+      'event_key': NotificationEvent.fileDownloadComplete,
+      'category': NotificationCategory.system.id,
       'fileName': fileName,
     });
 
@@ -203,23 +413,12 @@ class NotificationHelper {
         ? notif['id'] 
         : int.tryParse(notif['id'].toString()) ?? DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
-    const AndroidNotificationDetails androidPlatformChannelSpecifics =
-        AndroidNotificationDetails(
-      'school_hub_channel',
-      'School Hub Alerts',
-      channelDescription: 'School Hub notifications channel',
-      importance: Importance.max,
-      priority: Priority.high,
-      playSound: true,
-      enableVibration: true,
-      icon: 'ic_notification',
-      largeIcon: DrawableResourceAndroidBitmap('ic_launcher'),
-      color: Color(0xFF3F51B5), // Indigo brand color
-      styleInformation: BigTextStyleInformation(''),
-    );
-
-    const NotificationDetails platformChannelSpecifics =
-        NotificationDetails(android: androidPlatformChannelSpecifics);
+    // Route through the category channel when the row carries one, so a
+    // notification arriving via the polling fallback looks and behaves exactly
+    // like the same notification arriving via push.
+    final category = NotificationCategory.byId(notif['category']?.toString());
+    final NotificationDetails platformChannelSpecifics =
+        NotificationDetails(android: androidDetailsFor(category));
 
     await _flutterLocalNotificationsPlugin.show(
       id: id,

@@ -18,4 +18,4 @@
 -keep class io.flutter.view.** { *; }
 -keep class io.flutter.provider.** { *; }
 -keep class io.flutter.embedding.** { *; }
--keep class com.shikshapilot.schoolhub.school_hub.** { *; }
+-keep class com.shikshapilot.app.** { *; }

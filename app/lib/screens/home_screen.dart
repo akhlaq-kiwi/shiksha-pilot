@@ -16,6 +16,8 @@ import 'package:school_hub/screens/notice_screen.dart';
 import 'package:school_hub/screens/timetable_screen.dart';
 import 'package:school_hub/services/attendance_service.dart';
 import 'package:school_hub/services/notification_helper.dart';
+import 'package:school_hub/services/push_notification_service.dart';
+import 'package:school_hub/services/local_notification_scheduler.dart';
 import 'package:school_hub/screens/full_screen_image_screen.dart';
 import 'package:workmanager/workmanager.dart';
 import 'package:school_hub/main.dart';
@@ -654,9 +656,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _handleLogout() async {
+    // Detach push and clear scheduled reminders BEFORE wiping prefs — both
+    // need the auth token and the stored FCM token to do their work, and
+    // prefs.clear() destroys them. Otherwise the next person to log in on a
+    // shared family phone inherits this user's notifications.
+    await PushNotificationService.unregisterDevice();
+    await LocalNotificationScheduler.cancelAll();
+
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
-    
+
     if (mounted) {
       // Redirect to LoginScreen
       Navigator.pushAndRemoveUntil(

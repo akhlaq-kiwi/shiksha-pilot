@@ -17,4 +17,32 @@ echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
     <priority><?php echo htmlspecialchars($page['priority'], ENT_QUOTES); ?></priority>
   </url>
 <?php endforeach; ?>
+<?php
+// School directory: one URL per state, one per city/district — generated
+// from the DB rather than a static list, since it changes if the dataset
+// is ever refreshed.
+foreach (get_directory_states() as $state):
+?>
+  <url>
+    <loc><?php echo htmlspecialchars(SITE_URL . '/schools-in-' . $state['state_slug'], ENT_QUOTES); ?></loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+<?php endforeach; ?>
+<?php
+$seenDistricts = [];
+foreach (get_directory_states() as $state):
+    foreach (get_directory_districts_for_state($state['state_slug']) as $district):
+        if (isset($seenDistricts[$district['district_slug']])) continue;
+        $seenDistricts[$district['district_slug']] = true;
+?>
+  <url>
+    <loc><?php echo htmlspecialchars(SITE_URL . '/schools-in-' . $district['district_slug'], ENT_QUOTES); ?></loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+<?php
+    endforeach;
+endforeach;
+?>
 </urlset>

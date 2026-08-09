@@ -10,6 +10,8 @@ use App\Shared\BaseService;
 use App\Shared\Exceptions\NotFoundException;
 use App\Shared\Exceptions\ValidationException;
 use App\Shared\Exceptions\ForbiddenException;
+use App\Shared\Notifications\NotificationCatalog;
+use App\Shared\Notifications\PushDispatcher;
 use Psr\Log\LoggerInterface;
 use PDO;
 
@@ -199,7 +201,8 @@ class LeaveRequestService extends BaseService
             'SCHOOL_ADMIN',
             'New Leave Request',
             "Leave request submitted by $applicantName ($applicantRole)",
-            '/school-admin/leave-requests'
+            '/school-admin/leave-requests',
+            'LEAVE_REQUEST_SUBMITTED'
         );
 
         $this->log('Leave request applied', ['id' => $id, 'role' => $applicantRole, 'school_id' => $schoolId]);
@@ -313,7 +316,8 @@ class LeaveRequestService extends BaseService
                 $applicantUserRole,
                 $title,
                 $message,
-                $leave['applicant_role'] === 'TEACHER' ? '/teacher/leaves' : '/parent/leaves'
+                $leave['applicant_role'] === 'TEACHER' ? '/teacher/leaves' : '/parent/leaves',
+                $newStatus === 'APPROVED' ? 'LEAVE_APPROVED' : 'LEAVE_REJECTED'
             );
 
             $this->commit($pdo);
@@ -390,7 +394,8 @@ class LeaveRequestService extends BaseService
                     'SCHOOL_ADMIN',
                     'Leave Request Cancelled',
                     "A leave request was cancelled by the applicant.",
-                    '/school-admin/leave-requests'
+                    '/school-admin/leave-requests',
+                    'LEAVE_CANCELLED_BY_APPLICANT'
                 );
             } else {
                 $applicantUserRole = $leave['applicant_role'] === 'TEACHER' ? 'TEACHER' : 'PARENT';
@@ -400,7 +405,8 @@ class LeaveRequestService extends BaseService
                     $applicantUserRole,
                     "Leave Request Cancelled by Admin",
                     "Your leave request has been cancelled by an administrator.",
-                    $leave['applicant_role'] === 'TEACHER' ? '/teacher/leaves' : '/parent/leaves'
+                    $leave['applicant_role'] === 'TEACHER' ? '/teacher/leaves' : '/parent/leaves',
+                    'LEAVE_CANCELLED_BY_ADMIN'
                 );
             }
 
@@ -536,18 +542,24 @@ class LeaveRequestService extends BaseService
         return $stmt->fetchAll(PDO::FETCH_COLUMN);
     }
 
-    private function createNotification(PDO $pdo, int $schoolId, string $role, string $title, string $message, ?string $link = null): void
+    private function createNotification(PDO $pdo, int $schoolId, string $role, string $title, string $message, ?string $link = null, ?string $eventKey = null): void
     {
         $stmt = $pdo->prepare("
-            INSERT INTO dashboard_notifications (school_id, user_role, title, message, link, is_read)
-            VALUES (:school_id, :user_role, :title, :message, :link, 0)
+            INSERT INTO dashboard_notifications (school_id, user_role, title, message, link, category, event_key, is_read)
+            VALUES (:school_id, :user_role, :title, :message, :link, :category, :event_key, 0)
         ");
         $stmt->execute([
             ':school_id' => $schoolId,
             ':user_role' => $role,
             ':title' => $title,
             ':message' => $message,
-            ':link' => $link
+            ':link' => $link,
+            ':category' => $eventKey !== null ? NotificationCatalog::categoryFor($eventKey) : null,
+            ':event_key' => $eventKey,
         ]);
+
+        if ($eventKey !== null) {
+            PushDispatcher::pushOnly($pdo, $schoolId, $role, null, $eventKey, $title, $message, $link);
+        }
     }
 }
