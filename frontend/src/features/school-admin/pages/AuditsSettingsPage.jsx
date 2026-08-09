@@ -9,9 +9,8 @@ import { Dialog } from '../../../common/ui/dialog';
 import { schoolService } from '../../../common/services/schoolService';
 import { apiClient } from '../../../common/services/apiClient';
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
-import { schoolAdminService } from '../../../common/services/schoolAdminService';
 import { getClassIndex } from '../../../common/constants/predefinedClasses';
-import html2pdf from 'html2pdf.js';
+import { jsPDF } from 'jspdf';
 
 export default function AuditsSettingsPage({ onYearsUpdated }) {
   const location = useLocation();
@@ -243,7 +242,6 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
   const [selectedClassId, setSelectedClassId] = useState('');
   const [showSelectClassNotice, setShowSelectClassNotice] = useState(true);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
-  const [feeStructurePdfData, setFeeStructurePdfData] = useState(null);
 
   useEffect(() => {
     setShowSelectClassNotice(true);
@@ -678,53 +676,122 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
         }
 
         return {
-          sNo: index + 1,
+          sNo: String(index + 1),
           className: cls.name,
-          amountFormatted: `₹${annualFee.toLocaleString('en-IN')}`
+          amountFormatted: `Rs. ${annualFee.toLocaleString('en-IN')}`
         };
       });
 
-      const preparedData = {
-        title: headerTitle,
-        subtitle: headerSubtitle,
-        filename: `Fee_Structure_${startYr}-${endYr}.pdf`,
-        rows: rowsData
-      };
+      // Create A4 PDF Document (210mm x 297mm) using direct vector primitives
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
 
-      setFeeStructurePdfData(preparedData);
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const marginX = 15;
+      const printableWidth = pageWidth - (marginX * 2); // 180mm
 
-      // Wait a tick (150ms) for React to render the print container into DOM
-      await new Promise(resolve => setTimeout(resolve, 150));
+      // Header Positions
+      const titleY = 22;
+      const subtitleY = 28;
+      const tableTopY = 36;
 
-      const printElement = document.getElementById('fee-structure-pdf-print-area');
-      if (!printElement) {
-        throw new Error('Print template element not found');
-      }
+      // Render Centered Title
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16);
+      doc.setTextColor(15, 23, 42); // Dark Navy #0F172A
+      doc.text(headerTitle, pageWidth / 2, titleY, { align: 'center' });
 
-      const opt = {
-        margin: [10, 12, 10, 12],
-        filename: preparedData.filename,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: {
-          scale: 2,
-          useCORS: true,
-          logging: false,
-          onclone: (clonedDoc) => {
-            const printEl = clonedDoc.getElementById('fee-structure-pdf-print-area');
-            if (printEl) {
-              printEl.style.position = 'static';
-              printEl.style.left = '0';
-              printEl.style.top = '0';
-              printEl.style.display = 'block';
-              printEl.style.visibility = 'visible';
-            }
-          }
-        },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: [] }
-      };
+      // Render Centered Subtitle
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(71, 85, 105); // Slate Gray #475569
+      doc.text(headerSubtitle, pageWidth / 2, subtitleY, { align: 'center' });
 
-      await html2pdf().from(printElement).set(opt).save();
+      // Table Row Height & Font Size Calculations to GUARANTEE 1 SINGLE PAGE
+      const totalRows = rowsData.length;
+      const availableHeight = pageHeight - tableTopY - 15; // 246mm
+      
+      const headerRowHeight = 9;
+      const maxDataRowHeight = 8.5;
+      const minDataRowHeight = 5;
+      
+      const dataRowHeight = Math.min(
+        maxDataRowHeight,
+        Math.max(minDataRowHeight, (availableHeight - headerRowHeight) / (totalRows + 1))
+      );
+
+      const fontSize = Math.min(10, Math.max(7.5, dataRowHeight * 1.05));
+
+      // Column Width Layout
+      const colSNoWidth = 25;
+      const colAmountWidth = 50;
+      const colClassWidth = printableWidth - colSNoWidth - colAmountWidth; // 105mm
+
+      const xSNo = marginX;
+      const xClass = marginX + colSNoWidth;
+      const xAmount = marginX + colSNoWidth + colClassWidth;
+
+      // Render Table Header Row (Dark Navy Background #0F172A)
+      doc.setFillColor(15, 23, 42);
+      doc.rect(marginX, tableTopY, printableWidth, headerRowHeight, 'F');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9.5);
+      doc.setTextColor(255, 255, 255); // White text
+
+      const headerTextY = tableTopY + (headerRowHeight / 2) + 1.2;
+      doc.text('S. NO.', xSNo + (colSNoWidth / 2), headerTextY, { align: 'center' });
+      doc.text('CLASS', xClass + 4, headerTextY, { align: 'left' });
+      doc.text('AMOUNT (Rs.)', xAmount + colAmountWidth - 4, headerTextY, { align: 'right' });
+
+      // Header Outer Border
+      doc.setDrawColor(30, 41, 59); // #1E293B
+      doc.setLineWidth(0.2);
+      doc.rect(marginX, tableTopY, printableWidth, headerRowHeight);
+
+      // Render Data Rows
+      doc.setFontSize(fontSize);
+
+      rowsData.forEach((row, idx) => {
+        const rowY = tableTopY + headerRowHeight + (idx * dataRowHeight);
+        const textY = rowY + (dataRowHeight / 2) + (fontSize * 0.12);
+
+        // Alternating Tint Background
+        if (idx % 2 === 1) {
+          doc.setFillColor(248, 250, 252); // #F8FAFC
+          doc.rect(marginX, rowY, printableWidth, dataRowHeight, 'F');
+        }
+
+        // Row Grid Borders
+        doc.setDrawColor(203, 213, 225); // #CBD5E1
+        doc.setLineWidth(0.15);
+        
+        doc.rect(marginX, rowY, printableWidth, dataRowHeight);
+        doc.line(xClass, rowY, xClass, rowY + dataRowHeight);
+        doc.line(xAmount, rowY, xAmount, rowY + dataRowHeight);
+
+        // 1. S. No (Centered)
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(51, 65, 85); // #334155
+        doc.text(row.sNo, xSNo + (colSNoWidth / 2), textY, { align: 'center' });
+
+        // 2. Class Name (Left Aligned)
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(15, 23, 42); // #0F172A
+        doc.text(row.className, xClass + 4, textY, { align: 'left' });
+
+        // 3. Amount (Right Aligned)
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(15, 23, 42); // #0F172A
+        doc.text(row.amountFormatted, xAmount + colAmountWidth - 4, textY, { align: 'right' });
+      });
+
+      // Save PDF directly to user's device!
+      doc.save(`Fee_Structure_${startYr}-${endYr}.pdf`);
 
     } catch (err) {
       console.error('Error generating Fee Structure PDF:', err);
@@ -2334,152 +2401,6 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
               </Button>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Offscreen Hidden Print Template for Fee Structure PDF (Never flashes on screen) */}
-      {feeStructurePdfData && (
-        <div
-          id="fee-structure-pdf-print-area"
-          style={{
-            position: 'fixed',
-            left: '-9999px',
-            top: '0',
-            width: '794px',
-            backgroundColor: '#ffffff',
-            padding: '24px 28px',
-            boxSizing: 'border-box',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-            color: '#0F172A',
-            pointerEvents: 'none'
-          }}
-        >
-          {/* Header */}
-          <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-            <h1
-              style={{
-                fontSize: feeStructurePdfData.rows.length > 20 ? '15px' : feeStructurePdfData.rows.length > 15 ? '17px' : '20px',
-                fontWeight: '800',
-                textTransform: 'uppercase',
-                letterSpacing: '0.8px',
-                color: '#0F172A',
-                margin: '0 0 6px 0'
-              }}
-            >
-              {feeStructurePdfData.title}
-            </h1>
-            <p
-              style={{
-                fontSize: feeStructurePdfData.rows.length > 20 ? '9.5px' : feeStructurePdfData.rows.length > 15 ? '10.5px' : '12px',
-                fontWeight: '600',
-                color: '#475569',
-                margin: '0'
-              }}
-            >
-              {feeStructurePdfData.subtitle}
-            </p>
-          </div>
-
-          {/* Fee Matrix Table */}
-          <table
-            style={{
-              width: '100%',
-              borderCollapse: 'collapse',
-              margin: '0 auto',
-              backgroundColor: '#ffffff',
-              border: '1px solid #CBD5E1',
-              boxSizing: 'border-box'
-            }}
-          >
-            <thead>
-              <tr style={{ backgroundColor: '#0F172A', color: '#FFFFFF' }}>
-                <th
-                  style={{
-                    width: '15%',
-                    padding: feeStructurePdfData.rows.length > 20 ? '4px 8px' : feeStructurePdfData.rows.length > 15 ? '6px 10px' : '10px 16px',
-                    fontSize: feeStructurePdfData.rows.length > 20 ? '8.5px' : feeStructurePdfData.rows.length > 15 ? '10px' : '13px',
-                    fontWeight: '700',
-                    textAlign: 'center',
-                    border: '1px solid #1E293B',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
-                  }}
-                >
-                  S. No.
-                </th>
-                <th
-                  style={{
-                    width: '55%',
-                    padding: feeStructurePdfData.rows.length > 20 ? '4px 8px' : feeStructurePdfData.rows.length > 15 ? '6px 10px' : '10px 16px',
-                    fontSize: feeStructurePdfData.rows.length > 20 ? '8.5px' : feeStructurePdfData.rows.length > 15 ? '10px' : '13px',
-                    fontWeight: '700',
-                    textAlign: 'left',
-                    border: '1px solid #1E293B',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
-                  }}
-                >
-                  Class
-                </th>
-                <th
-                  style={{
-                    width: '30%',
-                    padding: feeStructurePdfData.rows.length > 20 ? '4px 8px' : feeStructurePdfData.rows.length > 15 ? '6px 10px' : '10px 16px',
-                    fontSize: feeStructurePdfData.rows.length > 20 ? '8.5px' : feeStructurePdfData.rows.length > 15 ? '10px' : '13px',
-                    fontWeight: '700',
-                    textAlign: 'right',
-                    border: '1px solid #1E293B',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
-                  }}
-                >
-                  Amount (₹)
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {feeStructurePdfData.rows.map((r, idx) => (
-                <tr key={r.sNo} style={{ backgroundColor: idx % 2 === 1 ? '#F8FAFC' : '#FFFFFF' }}>
-                  <td
-                    style={{
-                      padding: feeStructurePdfData.rows.length > 20 ? '4px 8px' : feeStructurePdfData.rows.length > 15 ? '6px 10px' : '10px 16px',
-                      fontSize: feeStructurePdfData.rows.length > 20 ? '8.5px' : feeStructurePdfData.rows.length > 15 ? '10px' : '13px',
-                      fontWeight: '600',
-                      textAlign: 'center',
-                      color: '#334155',
-                      border: '1px solid #E2E8F0'
-                    }}
-                  >
-                    {r.sNo}
-                  </td>
-                  <td
-                    style={{
-                      padding: feeStructurePdfData.rows.length > 20 ? '4px 8px' : feeStructurePdfData.rows.length > 15 ? '6px 10px' : '10px 16px',
-                      fontSize: feeStructurePdfData.rows.length > 20 ? '8.5px' : feeStructurePdfData.rows.length > 15 ? '10px' : '13px',
-                      fontWeight: '700',
-                      textAlign: 'left',
-                      color: '#0F172A',
-                      border: '1px solid #E2E8F0'
-                    }}
-                  >
-                    {r.className}
-                  </td>
-                  <td
-                    style={{
-                      padding: feeStructurePdfData.rows.length > 20 ? '4px 8px' : feeStructurePdfData.rows.length > 15 ? '6px 10px' : '10px 16px',
-                      fontSize: feeStructurePdfData.rows.length > 20 ? '8.5px' : feeStructurePdfData.rows.length > 15 ? '10px' : '13px',
-                      fontWeight: '700',
-                      textAlign: 'right',
-                      color: '#0F172A',
-                      border: '1px solid #E2E8F0'
-                    }}
-                  >
-                    {r.amountFormatted}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       )}
 
