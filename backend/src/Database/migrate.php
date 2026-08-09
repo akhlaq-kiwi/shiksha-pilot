@@ -87,11 +87,11 @@ try {
     $stmtDeviceTokens = $pdo->query("SHOW TABLES LIKE 'device_tokens'");
     if (!$stmtDeviceTokens->fetch()) {
         $stmtDeviceTokens->closeCursor();
-        $file009 = __DIR__ . '/Migrations/009_create_push_notifications.sql';
-        if (file_exists($file009)) {
-            $sql009 = file_get_contents($file009);
-            $statements009 = array_filter(array_map('trim', explode(';', $sql009)), fn(string $s) => $s !== '');
-            foreach ($statements009 as $st) {
+        $file014 = __DIR__ . '/Migrations/014_create_push_notifications.sql';
+        if (file_exists($file014)) {
+            $sql014 = file_get_contents($file014);
+            $statements014 = array_filter(array_map('trim', explode(';', $sql014)), fn(string $s) => $s !== '');
+            foreach ($statements014 as $st) {
                 try {
                     $pdo->exec($st);
                 } catch (\Exception $e) {
