@@ -243,6 +243,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
   const [selectedClassId, setSelectedClassId] = useState('');
   const [showSelectClassNotice, setShowSelectClassNotice] = useState(true);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [feeStructurePdfData, setFeeStructurePdfData] = useState(null);
 
   useEffect(() => {
     setShowSelectClassNotice(true);
@@ -683,98 +684,48 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
         };
       });
 
-      const totalRows = rowsData.length;
+      const preparedData = {
+        title: headerTitle,
+        subtitle: headerSubtitle,
+        filename: `Fee_Structure_${startYr}-${endYr}.pdf`,
+        rows: rowsData
+      };
 
-      // Dynamic sizing calculation to guarantee ONE SINGLE PAGE layout
-      let fontSize = '13px';
-      let padding = '10px 16px';
-      let titleSize = '20px';
-      let subtitleSize = '12px';
+      setFeeStructurePdfData(preparedData);
 
-      if (totalRows > 20) {
-        fontSize = '8.5px';
-        padding = '4px 8px';
-        titleSize = '15px';
-        subtitleSize = '9.5px';
-      } else if (totalRows > 15) {
-        fontSize = '10px';
-        padding = '6px 10px';
-        titleSize = '17px';
-        subtitleSize = '10.5px';
-      } else if (totalRows > 10) {
-        fontSize = '11.5px';
-        padding = '8px 12px';
-        titleSize = '18.5px';
-        subtitleSize = '11.5px';
+      // Wait a tick (150ms) for React to render the print container into DOM
+      await new Promise(resolve => setTimeout(resolve, 150));
+
+      const printElement = document.getElementById('fee-structure-pdf-print-area');
+      if (!printElement) {
+        throw new Error('Print template element not found');
       }
-
-      const pdfHtml = `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #0F172A; width: 100%; box-sizing: border-box; padding: 24px 28px; background: #ffffff;">
-          <div style="text-align: center; margin-bottom: 24px;">
-            <h1 style="font-size: ${titleSize}; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; color: #0F172A; margin: 0 0 6px 0; font-family: inherit;">
-              ${headerTitle}
-            </h1>
-            <p style="font-size: ${subtitleSize}; font-weight: 600; color: #475569; margin: 0; font-family: inherit;">
-              ${headerSubtitle}
-            </p>
-          </div>
-
-          <table style="width: 100%; border-collapse: collapse; margin: 0 auto; background: #ffffff; border: 1px solid #CBD5E1; box-sizing: border-box;">
-            <thead>
-              <tr style="background-color: #0F172A; color: #FFFFFF;">
-                <th style="width: 15%; padding: ${padding}; font-size: ${fontSize}; font-weight: 700; text-align: center; border: 1px solid #1E293B; text-transform: uppercase; letter-spacing: 0.5px;">S. No.</th>
-                <th style="width: 55%; padding: ${padding}; font-size: ${fontSize}; font-weight: 700; text-align: left; border: 1px solid #1E293B; text-transform: uppercase; letter-spacing: 0.5px;">Class</th>
-                <th style="width: 30%; padding: ${padding}; font-size: ${fontSize}; font-weight: 700; text-align: right; border: 1px solid #1E293B; text-transform: uppercase; letter-spacing: 0.5px;">Amount (₹)</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rowsData.map((r, idx) => `
-                <tr style="background-color: ${idx % 2 === 1 ? '#F8FAFC' : '#FFFFFF'};">
-                  <td style="padding: ${padding}; font-size: ${fontSize}; font-weight: 600; text-align: center; color: #334155; border: 1px solid #E2E8F0;">${r.sNo}</td>
-                  <td style="padding: ${padding}; font-size: ${fontSize}; font-weight: 700; text-align: left; color: #0F172A; border: 1px solid #E2E8F0;">${r.className}</td>
-                  <td style="padding: ${padding}; font-size: ${fontSize}; font-weight: 700; text-align: right; color: #0F172A; border: 1px solid #E2E8F0; font-family: inherit;">${r.amountFormatted}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-      `;
-
-      const tempContainer = document.createElement('div');
-      tempContainer.style.position = 'fixed';
-      tempContainer.style.top = '0';
-      tempContainer.style.left = '0';
-      tempContainer.style.width = '794px';
-      tempContainer.style.zIndex = '99999';
-      tempContainer.style.background = '#ffffff';
-      tempContainer.innerHTML = pdfHtml;
-      document.body.appendChild(tempContainer);
-
-      const filename = `Fee_Structure_${startYr}-${endYr}.pdf`;
 
       const opt = {
         margin: [10, 12, 10, 12],
-        filename: filename,
+        filename: preparedData.filename,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: {
           scale: 2,
           useCORS: true,
           logging: false,
-          scrollX: 0,
-          scrollY: 0,
-          x: 0,
-          y: 0,
-          windowWidth: 794
+          onclone: (clonedDoc) => {
+            const printEl = clonedDoc.getElementById('fee-structure-pdf-print-area');
+            if (printEl) {
+              printEl.style.position = 'static';
+              printEl.style.left = '0';
+              printEl.style.top = '0';
+              printEl.style.display = 'block';
+              printEl.style.visibility = 'visible';
+            }
+          }
         },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: [] }
       };
 
-      await html2pdf().from(tempContainer).set(opt).save();
+      await html2pdf().from(printElement).set(opt).save();
 
-      if (document.body.contains(tempContainer)) {
-        document.body.removeChild(tempContainer);
-      }
     } catch (err) {
       console.error('Error generating Fee Structure PDF:', err);
       setFeeError('Failed to generate Fee Structure PDF.');
@@ -2383,6 +2334,152 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
               </Button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Offscreen Hidden Print Template for Fee Structure PDF (Never flashes on screen) */}
+      {feeStructurePdfData && (
+        <div
+          id="fee-structure-pdf-print-area"
+          style={{
+            position: 'fixed',
+            left: '-9999px',
+            top: '0',
+            width: '794px',
+            backgroundColor: '#ffffff',
+            padding: '24px 28px',
+            boxSizing: 'border-box',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+            color: '#0F172A',
+            pointerEvents: 'none'
+          }}
+        >
+          {/* Header */}
+          <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+            <h1
+              style={{
+                fontSize: feeStructurePdfData.rows.length > 20 ? '15px' : feeStructurePdfData.rows.length > 15 ? '17px' : '20px',
+                fontWeight: '800',
+                textTransform: 'uppercase',
+                letterSpacing: '0.8px',
+                color: '#0F172A',
+                margin: '0 0 6px 0'
+              }}
+            >
+              {feeStructurePdfData.title}
+            </h1>
+            <p
+              style={{
+                fontSize: feeStructurePdfData.rows.length > 20 ? '9.5px' : feeStructurePdfData.rows.length > 15 ? '10.5px' : '12px',
+                fontWeight: '600',
+                color: '#475569',
+                margin: '0'
+              }}
+            >
+              {feeStructurePdfData.subtitle}
+            </p>
+          </div>
+
+          {/* Fee Matrix Table */}
+          <table
+            style={{
+              width: '100%',
+              borderCollapse: 'collapse',
+              margin: '0 auto',
+              backgroundColor: '#ffffff',
+              border: '1px solid #CBD5E1',
+              boxSizing: 'border-box'
+            }}
+          >
+            <thead>
+              <tr style={{ backgroundColor: '#0F172A', color: '#FFFFFF' }}>
+                <th
+                  style={{
+                    width: '15%',
+                    padding: feeStructurePdfData.rows.length > 20 ? '4px 8px' : feeStructurePdfData.rows.length > 15 ? '6px 10px' : '10px 16px',
+                    fontSize: feeStructurePdfData.rows.length > 20 ? '8.5px' : feeStructurePdfData.rows.length > 15 ? '10px' : '13px',
+                    fontWeight: '700',
+                    textAlign: 'center',
+                    border: '1px solid #1E293B',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}
+                >
+                  S. No.
+                </th>
+                <th
+                  style={{
+                    width: '55%',
+                    padding: feeStructurePdfData.rows.length > 20 ? '4px 8px' : feeStructurePdfData.rows.length > 15 ? '6px 10px' : '10px 16px',
+                    fontSize: feeStructurePdfData.rows.length > 20 ? '8.5px' : feeStructurePdfData.rows.length > 15 ? '10px' : '13px',
+                    fontWeight: '700',
+                    textAlign: 'left',
+                    border: '1px solid #1E293B',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}
+                >
+                  Class
+                </th>
+                <th
+                  style={{
+                    width: '30%',
+                    padding: feeStructurePdfData.rows.length > 20 ? '4px 8px' : feeStructurePdfData.rows.length > 15 ? '6px 10px' : '10px 16px',
+                    fontSize: feeStructurePdfData.rows.length > 20 ? '8.5px' : feeStructurePdfData.rows.length > 15 ? '10px' : '13px',
+                    fontWeight: '700',
+                    textAlign: 'right',
+                    border: '1px solid #1E293B',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}
+                >
+                  Amount (₹)
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {feeStructurePdfData.rows.map((r, idx) => (
+                <tr key={r.sNo} style={{ backgroundColor: idx % 2 === 1 ? '#F8FAFC' : '#FFFFFF' }}>
+                  <td
+                    style={{
+                      padding: feeStructurePdfData.rows.length > 20 ? '4px 8px' : feeStructurePdfData.rows.length > 15 ? '6px 10px' : '10px 16px',
+                      fontSize: feeStructurePdfData.rows.length > 20 ? '8.5px' : feeStructurePdfData.rows.length > 15 ? '10px' : '13px',
+                      fontWeight: '600',
+                      textAlign: 'center',
+                      color: '#334155',
+                      border: '1px solid #E2E8F0'
+                    }}
+                  >
+                    {r.sNo}
+                  </td>
+                  <td
+                    style={{
+                      padding: feeStructurePdfData.rows.length > 20 ? '4px 8px' : feeStructurePdfData.rows.length > 15 ? '6px 10px' : '10px 16px',
+                      fontSize: feeStructurePdfData.rows.length > 20 ? '8.5px' : feeStructurePdfData.rows.length > 15 ? '10px' : '13px',
+                      fontWeight: '700',
+                      textAlign: 'left',
+                      color: '#0F172A',
+                      border: '1px solid #E2E8F0'
+                    }}
+                  >
+                    {r.className}
+                  </td>
+                  <td
+                    style={{
+                      padding: feeStructurePdfData.rows.length > 20 ? '4px 8px' : feeStructurePdfData.rows.length > 15 ? '6px 10px' : '10px 16px',
+                      fontSize: feeStructurePdfData.rows.length > 20 ? '8.5px' : feeStructurePdfData.rows.length > 15 ? '10px' : '13px',
+                      fontWeight: '700',
+                      textAlign: 'right',
+                      color: '#0F172A',
+                      border: '1px solid #E2E8F0'
+                    }}
+                  >
+                    {r.amountFormatted}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
