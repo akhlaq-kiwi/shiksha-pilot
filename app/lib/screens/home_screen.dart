@@ -672,9 +672,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void _showProfilePopup() {
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.2),
+      barrierColor: Colors.black.withOpacity(0.3),
       builder: (BuildContext context) {
-        // Resolve profile image
         String photoUrl = '';
         if (widget.userRole.toUpperCase() == 'PARENT') {
           final active = _children.firstWhere(
@@ -694,171 +693,264 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           avatarChild = ClipOval(
             child: Image.network(
               fullUrl,
-              width: 54,
-              height: 54,
+              width: 72,
+              height: 72,
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) {
-                return Icon(Icons.person, size: 30, color: Colors.indigo.shade800);
+                return Icon(Icons.person, size: 40, color: Colors.indigo.shade800);
               },
             ),
           );
         } else {
-          avatarChild = Icon(Icons.person, size: 30, color: Colors.indigo.shade800);
+          avatarChild = Icon(Icons.person, size: 40, color: Colors.indigo.shade800);
         }
 
         return Dialog(
-          alignment: Alignment.topRight,
-          insetPadding: const EdgeInsets.only(top: 60, right: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           child: Container(
-            width: 260,
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Header (Profile Avatar and Name only!)
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 27,
+            width: 310,
+            padding: const EdgeInsets.all(20),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Top Profile Avatar (Tap to view full screen)
+                  GestureDetector(
+                    onTap: () {
+                      if (photoUrl.isNotEmpty) {
+                        final fullUrl = photoUrl.startsWith('http') ? photoUrl : '${widget.leaveService.baseUrl}$photoUrl';
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => FullScreenImageScreen(imageUrl: fullUrl),
+                          ),
+                        );
+                      }
+                    },
+                    child: CircleAvatar(
+                      radius: 36,
                       backgroundColor: Colors.indigo.shade50,
                       child: avatarChild,
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        _userName,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                const Divider(height: 1),
-                const SizedBox(height: 12),
+                  ),
+                  const SizedBox(height: 12),
 
-                // Switch child list (if PARENT and multiple children), placed ABOVE Change Password!
-                if (widget.userRole.toUpperCase() == 'PARENT' && _children.length > 1) ...[
-                  const Text(
-                    'SWITCH STUDENT',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.grey,
-                      letterSpacing: 1.0,
+                  // Name
+                  Text(
+                    _userName,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 180),
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: _children.length,
-                      itemBuilder: (context, index) {
-                        final child = _children[index];
-                        final childId = child['id'] as int;
-                        final isCurrent = childId == _activeStudentId;
-                        final childName = child['name'] ?? '';
-                        
-                        return Container(
-                          margin: const EdgeInsets.symmetric(vertical: 2),
-                          decoration: BoxDecoration(
-                            color: isCurrent ? Colors.indigo.shade50.withOpacity(0.4) : Colors.transparent,
-                            borderRadius: BorderRadius.circular(8),
+                  const SizedBox(height: 4),
+
+                  // Role Badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.indigo.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      _userRoleDisplay.toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.indigo.shade800,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Basic Details Card (Mobile Phone, Associated School)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (_userPhone.isNotEmpty) ...[
+                          Row(
+                            children: [
+                              Icon(Icons.phone_android_rounded, size: 16, color: Colors.indigo.shade700),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('MOBILE PHONE', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.grey)),
+                                    Text(_userPhone, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.black87)),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(8),
-                            onTap: () async {
-                              Navigator.pop(context); // Close popup dialog
-                              await _handleSwitchStudent(childId);
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                              child: Row(
+                          const Divider(height: 16),
+                        ],
+                        Row(
+                          children: [
+                            Icon(Icons.school_rounded, size: 16, color: Colors.indigo.shade700),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Icon(
-                                    Icons.child_care_rounded,
-                                    size: 16,
-                                    color: isCurrent ? Colors.indigo.shade800 : Colors.grey.shade600,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      childName,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-                                        color: isCurrent ? Colors.indigo.shade800 : Colors.black87,
-                                      ),
-                                    ),
-                                  ),
-                                  if (isCurrent)
-                                    Icon(Icons.check, size: 14, color: Colors.indigo.shade800),
+                                  const Text('ASSOCIATED SCHOOL', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.grey)),
+                                  Text(_schoolName.toUpperCase(), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.black87)),
                                 ],
                               ),
                             ),
-                          ),
-                        );
-                      },
+                          ],
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  const Divider(height: 1),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
+
+                  // Switch Student section if Parent/Student with multiple children
+                  if ((widget.userRole.toUpperCase() == 'PARENT' || widget.userRole.toUpperCase() == 'STUDENT') && _children.length > 1) ...[
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'SWITCH STUDENT',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.grey.shade600, letterSpacing: 0.8),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 140),
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: _children.length,
+                        itemBuilder: (context, index) {
+                          final child = _children[index];
+                          final childId = child['id'] as int;
+                          final isCurrent = childId == _activeStudentId;
+                          final childName = child['name'] ?? '';
+
+                          return Container(
+                            margin: const EdgeInsets.symmetric(vertical: 2),
+                            decoration: BoxDecoration(
+                              color: isCurrent ? Colors.indigo.shade50.withOpacity(0.6) : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(8),
+                              onTap: () async {
+                                Navigator.pop(context);
+                                await _handleSwitchStudent(childId);
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.child_care_rounded,
+                                      size: 16,
+                                      color: isCurrent ? Colors.indigo.shade800 : Colors.grey.shade600,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        childName,
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                                          color: isCurrent ? Colors.indigo.shade800 : Colors.black87,
+                                        ),
+                                      ),
+                                    ),
+                                    if (isCurrent)
+                                      Icon(Icons.check_circle_rounded, size: 16, color: Colors.indigo.shade800),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
+                  // Action Menu: Change Password
+                  InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showChangePasswordDialog();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: const [
+                          Icon(Icons.lock_open_rounded, size: 18, color: Colors.black54),
+                          SizedBox(width: 10),
+                          Text('Change Password', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black87)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Action Menu: Log Out
+                  InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: () {
+                      Navigator.pop(context);
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          title: const Text('Confirm Logout', style: TextStyle(fontWeight: FontWeight.bold)),
+                          content: const Text('Are you sure you want to log out from this device?'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Cancel'),
+                            ),
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                _handleLogout();
+                              },
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade600, foregroundColor: Colors.white),
+                              child: const Text('Log Out'),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.logout_rounded, size: 18, color: Colors.red.shade700),
+                          const SizedBox(width: 10),
+                          Text('Log Out', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.red.shade700)),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
-
-                // Action Menu: Change Password (above Logout)
-                InkWell(
-                  borderRadius: BorderRadius.circular(8),
-                  onTap: () {
-                    Navigator.pop(context); // Close profile popup
-                    _showChangePasswordDialog();
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-                    child: Row(
-                      children: const [
-                        Icon(Icons.lock_open_rounded, size: 18, color: Colors.black54),
-                        SizedBox(width: 12),
-                        Text(
-                          'Change Password',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black87),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 4),
-
-                // Action Menu: Log Out
-                InkWell(
-                  borderRadius: BorderRadius.circular(8),
-                  onTap: () {
-                    Navigator.pop(context); // Close profile popup
-                    _handleLogout();
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-                    child: Row(
-                      children: [
-                        Icon(Icons.logout_rounded, size: 18, color: Colors.red.shade600),
-                        const SizedBox(width: 12),
-                        Text(
-                          'Log Out',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.red.shade600),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         );
@@ -1055,30 +1147,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ),
                     const SizedBox(width: 12),
                     GestureDetector(
-                      onTap: () {
-                        String photoUrl = '';
-                        if (widget.userRole.toUpperCase() == 'PARENT') {
-                          final active = _children.firstWhere(
-                            (c) => c['id'] == _activeStudentId,
-                            orElse: () => null,
-                          );
-                          if (active != null) {
-                            photoUrl = active['photo_path'] ?? '';
-                          }
-                        } else {
-                          photoUrl = _userPhoto;
-                        }
-
-                        if (photoUrl.isNotEmpty) {
-                          final fullUrl = photoUrl.startsWith('http') ? photoUrl : '${widget.leaveService.baseUrl}$photoUrl';
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => FullScreenImageScreen(imageUrl: fullUrl),
-                            ),
-                          );
-                        }
-                      },
+                      onTap: _showProfilePopup,
                       child: Hero(
                         tag: 'user_profile_icon',
                         child: CircleAvatar(

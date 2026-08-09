@@ -29,12 +29,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   bool _isLoadingStudent = true;
   late DateTime _studentToday;
   late DateTime _academicYearStart;
-  late int _studentTotalDays;
-  late PageController _studentPageController;
-  int _studentCurrentPageIndex = 0;
-  DateTime? _studentSelectedDate;
-  String _selectedMonthYear = ''; // e.g. "July 2026"
-  List<String> _selectableMonths = [];
+  late PageController _studentMonthPageController;
+  int _studentMonthPageIndex = 500;
 
   // Teacher States
   List<dynamic> _classes = [];
@@ -82,13 +78,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     } else {
       _studentToday = DateTime(now.year, now.month, now.day);
       _academicYearStart = ayStart;
-      _studentTotalDays = _studentToday.difference(_academicYearStart).inDays + 1;
-      _studentCurrentPageIndex = _studentTotalDays - 1;
-      _studentSelectedDate = _studentToday;
-      _studentPageController = PageController(initialPage: _studentCurrentPageIndex);
+      _studentMonthPageIndex = 500;
+      _studentMonthPageController = PageController(initialPage: 500);
 
-      // Generate selectable months from academic year start to current month
-      _generateSelectableMonths();
       _loadStudentData();
     }
 
@@ -114,7 +106,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     if (widget.userRole.toUpperCase() == 'TEACHER') {
       _teacherPageController.dispose();
     } else {
-      _studentPageController.dispose();
+      _studentMonthPageController.dispose();
     }
     super.dispose();
   }
@@ -140,26 +132,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     return '${months[date.month - 1]} ${date.year}';
   }
 
-  void _generateSelectableMonths() {
-    final months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-    
-    List<String> list = [];
-    DateTime current = DateTime(_academicYearStart.year, _academicYearStart.month, 1);
-    final target = DateTime(_studentToday.year, _studentToday.month, 1);
 
-    while (!current.isAfter(target)) {
-      list.add('${months[current.month - 1]} ${current.year}');
-      current = DateTime(current.year, current.month + 1, 1);
-    }
-    
-    setState(() {
-      _selectableMonths = list.reversed.toList();
-      _selectedMonthYear = _getMonthYearKey(_studentToday);
-    });
-  }
 
   // -----------------------------------------------------------------------------
   // Student API Handlers
@@ -456,13 +429,16 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   }
 
   String _getStudentStatusForDate(DateTime date) {
-    final dateStr = date.toIso8601String().split('T')[0];
-    final match = _studentRecords.firstWhere(
-      (rec) => rec['date'] == dateStr,
-      orElse: () => null,
-    );
-    if (match != null) {
-      return match['status'] as String;
+    final year = date.year.toString();
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+    final targetDateStr = '$year-$month-$day';
+
+    for (var rec in _studentRecords) {
+      final recDate = rec['date'] as String?;
+      if (recDate != null && recDate.startsWith(targetDateStr)) {
+        return rec['status'] as String? ?? '';
+      }
     }
     return '';
   }
@@ -487,12 +463,16 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   Widget build(BuildContext context) {
     final isTeacher = widget.userRole.toUpperCase() == 'TEACHER';
 
+    if (!isTeacher) {
+      return _buildStudentView();
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: Text(
-          isTeacher ? 'Mark Attendance' : 'Attendance',
-          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+        title: const Text(
+          'Mark Attendance',
+          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
         ),
         centerTitle: false,
         backgroundColor: Colors.white,
@@ -525,248 +505,410 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 ],
               ),
             ),
-          
-          Expanded(
-            child: isTeacher ? _buildTeacherView() : _buildStudentView(),
-          ),
+
+          Expanded(child: _buildTeacherView()),
         ],
       ),
     );
   }
 
   // -----------------------------------------------------------------------------
-  // STUDENT VIEW BUILDERS
+  // STUDENT VIEW BUILDERS (Matching Reference Image Design)
   // -----------------------------------------------------------------------------
   Widget _buildStudentView() {
     if (_isLoadingStudent) {
-      return const Center(child: CircularProgressIndicator());
+      return Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          title: const Text('Monthly Attendance', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white)),
+          backgroundColor: const Color(0xFF2196F3),
+          foregroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
     }
 
-    final monthStats = _calculateStatsForMonth(_selectedMonthYear);
-    final overallStats = _calculateOverallStats();
+    final currentMonth = DateTime(
+      _studentToday.year,
+      _studentToday.month + (_studentMonthPageIndex - 500),
+      1,
+    );
 
-    return Column(
-      children: [
-        // Month Selector Dropdown
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade200),
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text('Monthly Attendance', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white)),
+        backgroundColor: const Color(0xFF2196F3),
+        foregroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
+      body: Column(
+        children: [
+          if (_isOffline)
+            Container(
+              color: Colors.red.shade600,
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  Icon(Icons.wifi_off_rounded, color: Colors.white, size: 16),
+                  SizedBox(width: 8),
+                  Text(
+                    'No internet connection. Retrying...',
+                    style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
             ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _selectedMonthYear,
-                isExpanded: true,
-                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87, fontSize: 14),
-                items: _selectableMonths.map((month) {
-                  return DropdownMenuItem<String>(
-                    value: month,
-                    child: Text(month),
+
+          // 1. Top Summary Stats Card (Total Present, Total Absent, Total Leaves, Total Working Days)
+          _buildStudentSummaryStats(currentMonth),
+
+          // 2. Month Navigation Control Bar (< Today Month Year 📅 >)
+          _buildMonthNavigationBar(currentMonth),
+
+          // 3. Swipable Calendar Grid View (Horizontal Left/Right Swipe Support)
+          Expanded(
+            child: PageView.builder(
+              controller: _studentMonthPageController,
+              itemCount: 1000,
+              onPageChanged: (idx) {
+                setState(() {
+                  _studentMonthPageIndex = idx;
+                });
+              },
+              itemBuilder: (context, index) {
+                final pageMonth = DateTime(
+                  _studentToday.year,
+                  _studentToday.month + (index - 500),
+                  1,
+                );
+                return _buildMonthCalendarGrid(pageMonth);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStudentSummaryStats(DateTime month) {
+    int presentCount = 0;
+    int absentCount = 0;
+    int leaveCount = 0;
+
+    for (var rec in _studentRecords) {
+      final dateStr = rec['date'] as String?;
+      if (dateStr != null) {
+        try {
+          final dt = DateTime.parse(dateStr);
+          if (dt.year == month.year && dt.month == month.month) {
+            final status = (rec['status'] as String? ?? '').toUpperCase();
+            if (status == 'PRESENT') presentCount++;
+            else if (status == 'ABSENT') absentCount++;
+            else if (status == 'LEAVE') leaveCount++;
+          }
+        } catch (_) {}
+      }
+    }
+
+    final totalWorkingDays = presentCount + absentCount + leaveCount;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          _buildStatRow('Total Present', '$presentCount', const Color(0xFF4CAF50)),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 4),
+            child: Divider(height: 1, color: Color(0xFFEEEEEE)),
+          ),
+          _buildStatRow('Total Absent', '$absentCount', const Color(0xFFF44336)),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 4),
+            child: Divider(height: 1, color: Color(0xFFEEEEEE)),
+          ),
+          _buildStatRow('Total Leaves', '$leaveCount', const Color(0xFFFF9800)),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 4),
+            child: Divider(height: 1, color: Color(0xFFEEEEEE)),
+          ),
+          _buildStatRow('Total Working Days', '$totalWorkingDays', const Color(0xFF2196F3)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatRow(String label, String value, Color color) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMonthNavigationBar(DateTime month) {
+    final monthNames = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    final monthStr = '${monthNames[month.month - 1]} ${month.year}';
+
+    return Container(
+      color: const Color(0xFF2196F3),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.chevron_left_rounded, color: Colors.white, size: 28),
+                onPressed: () {
+                  _studentMonthPageController.previousPage(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
                   );
-                }).toList(),
-                onChanged: (val) {
-                  if (val != null) {
-                    setState(() {
-                      _selectedMonthYear = val;
-                    });
+                },
+              ),
+              InkWell(
+                onTap: () {
+                  _studentMonthPageController.animateToPage(
+                    500,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                },
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  child: Text(
+                    'Today',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                monthStr,
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              const SizedBox(width: 4),
+              IconButton(
+                icon: const Icon(Icons.calendar_month_rounded, color: Colors.white, size: 20),
+                onPressed: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: month,
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime(2030),
+                  );
+                  if (picked != null) {
+                    final targetMonth = DateTime(picked.year, picked.month, 1);
+                    final baseMonth = DateTime(_studentToday.year, _studentToday.month, 1);
+                    final diffInMonths = (targetMonth.year - baseMonth.year) * 12 + (targetMonth.month - baseMonth.month);
+                    _studentMonthPageController.animateToPage(
+                      500 + diffInMonths,
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeInOut,
+                    );
                   }
                 },
               ),
-            ),
+              IconButton(
+                icon: const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 28),
+                onPressed: () {
+                  _studentMonthPageController.nextPage(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMonthCalendarGrid(DateTime month) {
+    final weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    final firstDayOfMonth = DateTime(month.year, month.month, 1);
+    final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
+    final startOffset = firstDayOfMonth.weekday % 7; // 0 for Sun, 1 for Mon, ..., 6 for Sat
+    final prevMonthLastDay = DateTime(month.year, month.month, 0).day;
+    final totalGridItems = ((startOffset + daysInMonth) > 35) ? 42 : 35;
+
+    return Column(
+      children: [
+        // Days of week header
+        Container(
+          color: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            children: weekDays.map((day) {
+              return Expanded(
+                child: Text(
+                  day,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    color: Colors.grey.shade800,
+                  ),
+                ),
+              );
+            }).toList(),
           ),
         ),
-
-        // Swipable Daily Card Area
+        const Divider(height: 1, color: Color(0xFFE0E0E0)),
+        // Calendar Grid
         Expanded(
-          flex: 2,
-          child: PageView.builder(
-            controller: _studentPageController,
-            itemCount: _studentTotalDays,
-            onPageChanged: (idx) {
-              setState(() {
-                _studentCurrentPageIndex = idx;
-                _studentSelectedDate = _academicYearStart.add(Duration(days: idx));
-                _selectedMonthYear = _getMonthYearKey(_studentSelectedDate!);
-              });
-            },
+          child: GridView.builder(
+            physics: const NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.zero,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 7,
+              childAspectRatio: 0.85,
+            ),
+            itemCount: totalGridItems,
             itemBuilder: (context, index) {
-              final date = _academicYearStart.add(Duration(days: index));
-              final status = _getStudentStatusForDate(date);
-              
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    side: BorderSide(color: Colors.grey.shade200),
+              int dayNumber;
+              bool isCurrentMonth = false;
+              DateTime cellDate;
+
+              if (index < startOffset) {
+                dayNumber = prevMonthLastDay - (startOffset - 1 - index);
+                cellDate = DateTime(month.year, month.month - 1, dayNumber);
+              } else if (index < startOffset + daysInMonth) {
+                dayNumber = index - startOffset + 1;
+                isCurrentMonth = true;
+                cellDate = DateTime(month.year, month.month, dayNumber);
+              } else {
+                dayNumber = index - (startOffset + daysInMonth) + 1;
+                cellDate = DateTime(month.year, month.month + 1, dayNumber);
+              }
+
+              final isToday = cellDate.year == _studentToday.year &&
+                  cellDate.month == _studentToday.month &&
+                  cellDate.day == _studentToday.day;
+
+              final status = isCurrentMonth ? _getStudentStatusForDate(cellDate) : '';
+
+              return Container(
+                decoration: BoxDecoration(
+                  color: isToday ? Colors.blue.shade50.withOpacity(0.4) : Colors.white,
+                  border: Border.all(
+                    color: isToday ? const Color(0xFF2196F3) : Colors.grey.shade300,
+                    width: isToday ? 1.5 : 0.5,
                   ),
-                  color: Colors.white,
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          _formatDisplayDate(date),
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.grey),
-                        ),
-                        const SizedBox(height: 20),
-                        if (status.isNotEmpty) ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: _getStatusColor(status).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(30),
-                              border: Border.all(color: _getStatusColor(status).withOpacity(0.2)),
-                            ),
-                            child: Text(
-                              status.toUpperCase(),
-                              style: TextStyle(
-                                fontSize: 18, 
-                                fontWeight: FontWeight.w900, 
-                                color: _getStatusColor(status),
-                              ),
-                            ),
-                          ),
-                        ] else ...[
-                          const Icon(Icons.help_outline_rounded, size: 48, color: Colors.grey),
-                          const SizedBox(height: 12),
-                          const Text(
-                            'Attendance not available yet.',
-                            style: TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ],
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 4),
+                    Text(
+                      '$dayNumber',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: isToday || isCurrentMonth ? FontWeight.bold : FontWeight.normal,
+                        color: isCurrentMonth
+                            ? (isToday ? const Color(0xFF2196F3) : Colors.black87)
+                            : Colors.grey.shade400,
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 4),
+                    if (isCurrentMonth && status.isNotEmpty) ...[
+                      _buildStatusBadge(status),
+                    ],
+                  ],
                 ),
               );
             },
           ),
         ),
-
-        // Monthly Summary Card
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Card(
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: Colors.grey.shade200),
-            ),
-            color: Colors.white,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '$_selectedMonthYear Summary',
-                        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: Colors.black87),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.indigo.shade50,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          'Rate: ${monthStats['rate']}%',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.indigo),
-                        ),
-                      )
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _buildMiniStat('Present', '${monthStats['present']} Days', Colors.green),
-                      _buildMiniStat('Absent', '${monthStats['absent']} Days', Colors.red),
-                      _buildMiniStat('Leave', '${monthStats['leave']} Day', Colors.amber),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-
-        // Overall Academic Year Card
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Card(
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: Colors.grey.shade200),
-            ),
-            color: Colors.indigo.shade900,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Overall Academic Year',
-                        style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: Colors.white),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          'Rate: ${overallStats['rate']}%',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.white),
-                        ),
-                      )
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _buildMiniStat('Present', '${overallStats['present']}', Colors.white, Colors.white70),
-                      _buildMiniStat('Absent', '${overallStats['absent']}', Colors.white, Colors.white70),
-                      _buildMiniStat('Leave', '${overallStats['leave']}', Colors.white, Colors.white70),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
       ],
     );
   }
 
-  Widget _buildMiniStat(String label, String value, Color valueColor, [Color? labelColor]) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: valueColor),
+  Widget _buildStatusBadge(String status) {
+    Color bg;
+    String text;
+    final st = status.toUpperCase();
+
+    if (st == 'PRESENT') {
+      bg = const Color(0xFF4CAF50);
+      text = 'P';
+    } else if (st == 'ABSENT') {
+      bg = const Color(0xFFF44336);
+      text = 'A';
+    } else if (st == 'LEAVE') {
+      bg = const Color(0xFFFF9800);
+      text = 'L';
+    } else {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      width: 22,
+      height: 22,
+      decoration: BoxDecoration(
+        color: bg,
+        shape: BoxShape.circle,
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: 11,
         ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: labelColor ?? Colors.grey.shade600),
-        ),
-      ],
+      ),
     );
   }
 
@@ -1260,9 +1402,14 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   // Calendar Dialog Picker
   // -----------------------------------------------------------------------------
   Future<void> _openCalendarPicker(BuildContext context, bool isTeacher) async {
-    final DateTime initial = isTeacher ? _teacherSelectedDate! : _studentSelectedDate!;
-    final DateTime startLimit = isTeacher ? _teacherAcademicYearStart : _academicYearStart;
-    final DateTime endLimit = isTeacher ? _teacherToday : _studentToday;
+    final currentStudentMonth = DateTime(
+      _studentToday.year,
+      _studentToday.month + (_studentMonthPageIndex - 500),
+      1,
+    );
+    final DateTime initial = isTeacher ? _teacherSelectedDate! : currentStudentMonth;
+    final DateTime startLimit = isTeacher ? _teacherAcademicYearStart : DateTime(2020, 1, 1);
+    final DateTime endLimit = isTeacher ? _teacherToday : DateTime(2030, 12, 31);
 
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -1273,7 +1420,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.light(
-              primary: Colors.indigo,
+              primary: Color(0xFF2196F3),
               onPrimary: Colors.white,
               onSurface: Colors.black87,
             ),
@@ -1288,8 +1435,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         final page = picked.difference(_teacherAcademicYearStart).inDays;
         _teacherPageController.jumpToPage(page);
       } else {
-        final page = picked.difference(_academicYearStart).inDays;
-        _studentPageController.jumpToPage(page);
+        final targetMonth = DateTime(picked.year, picked.month, 1);
+        final baseMonth = DateTime(_studentToday.year, _studentToday.month, 1);
+        final diffInMonths = (targetMonth.year - baseMonth.year) * 12 + (targetMonth.month - baseMonth.month);
+        _studentMonthPageController.jumpToPage(500 + diffInMonths);
       }
     }
   }

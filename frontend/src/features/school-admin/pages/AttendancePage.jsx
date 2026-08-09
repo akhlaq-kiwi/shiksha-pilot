@@ -124,21 +124,23 @@ export default function AttendancePage() {
       setAttendanceRecords(attData || []);
 
       const map = {};
+      // 1. Initialize default 'Present' for all students
+      (stData || []).forEach(s => {
+        map[s.id] = 'Present';
+      });
+
+      // 2. Override with saved attendance from DB
       if (attData && attData.length > 0) {
         attData.forEach(r => {
           map[r.student_id] = r.status;
         });
-        setAttendanceMap(map);
         setIsCompletedMode(true);
-        setIsEditing(false);
       } else {
-        stData.forEach(s => {
-          map[s.id] = 'Present';
-        });
-        setAttendanceMap(map);
         setIsCompletedMode(false);
-        setIsEditing(false);
       }
+
+      setAttendanceMap(map);
+      setIsEditing(false);
     } catch (err) {
       console.error(err);
       toast.error('Failed to load daily attendance data.');
