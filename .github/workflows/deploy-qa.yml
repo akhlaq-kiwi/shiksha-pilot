@@ -94,11 +94,8 @@ jobs:
           # 1. Decode base64 secret into config/firebase-service-account.json if present
           if [ -n "${{ secrets.QA_FIREBASE_SERVICE_ACCOUNT_B64 }}" ]; then
             echo "${{ secrets.QA_FIREBASE_SERVICE_ACCOUNT_B64 }}" | base64 --decode > "$TEMP_DIR/api/config/firebase-service-account.json"
-          # 2. Or write raw JSON secret if provided directly
           elif [ -n "${{ secrets.QA_FIREBASE_SERVICE_ACCOUNT_JSON }}" ]; then
-            cat << 'JSON_EOF' > "$TEMP_DIR/api/config/firebase-service-account.json"
-${{ secrets.QA_FIREBASE_SERVICE_ACCOUNT_JSON }}
-JSON_EOF
+            echo '${{ secrets.QA_FIREBASE_SERVICE_ACCOUNT_JSON }}' > "$TEMP_DIR/api/config/firebase-service-account.json"
           fi
 
           # Root .htaccess for frontend client-side routing
