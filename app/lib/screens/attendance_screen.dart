@@ -132,26 +132,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     return '${months[date.month - 1]} ${date.year}';
   }
 
-  void _generateSelectableMonths() {
-    final months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-    
-    List<String> list = [];
-    DateTime current = DateTime(_academicYearStart.year, _academicYearStart.month, 1);
-    final target = DateTime(_studentToday.year, _studentToday.month, 1);
 
-    while (!current.isAfter(target)) {
-      list.add('${months[current.month - 1]} ${current.year}');
-      current = DateTime(current.year, current.month + 1, 1);
-    }
-    
-    setState(() {
-      _selectableMonths = list.reversed.toList();
-      _selectedMonthYear = _getMonthYearKey(_studentToday);
-    });
-  }
 
   // -----------------------------------------------------------------------------
   // Student API Handlers
@@ -1421,9 +1402,14 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   // Calendar Dialog Picker
   // -----------------------------------------------------------------------------
   Future<void> _openCalendarPicker(BuildContext context, bool isTeacher) async {
-    final DateTime initial = isTeacher ? _teacherSelectedDate! : _studentSelectedDate!;
-    final DateTime startLimit = isTeacher ? _teacherAcademicYearStart : _academicYearStart;
-    final DateTime endLimit = isTeacher ? _teacherToday : _studentToday;
+    final currentStudentMonth = DateTime(
+      _studentToday.year,
+      _studentToday.month + (_studentMonthPageIndex - 500),
+      1,
+    );
+    final DateTime initial = isTeacher ? _teacherSelectedDate! : currentStudentMonth;
+    final DateTime startLimit = isTeacher ? _teacherAcademicYearStart : DateTime(2020, 1, 1);
+    final DateTime endLimit = isTeacher ? _teacherToday : DateTime(2030, 12, 31);
 
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -1434,7 +1420,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.light(
-              primary: Colors.indigo,
+              primary: Color(0xFF2196F3),
               onPrimary: Colors.white,
               onSurface: Colors.black87,
             ),
@@ -1449,8 +1435,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         final page = picked.difference(_teacherAcademicYearStart).inDays;
         _teacherPageController.jumpToPage(page);
       } else {
-        final page = picked.difference(_academicYearStart).inDays;
-        _studentPageController.jumpToPage(page);
+        final targetMonth = DateTime(picked.year, picked.month, 1);
+        final baseMonth = DateTime(_studentToday.year, _studentToday.month, 1);
+        final diffInMonths = (targetMonth.year - baseMonth.year) * 12 + (targetMonth.month - baseMonth.month);
+        _studentMonthPageController.jumpToPage(500 + diffInMonths);
       }
     }
   }

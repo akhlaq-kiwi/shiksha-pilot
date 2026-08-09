@@ -897,7 +897,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       ),
                       child: Row(
                         children: const [
-                          Icon(Icons.lock_open_rounded, size: 18, color: Colors.black70),
+                          Icon(Icons.lock_open_rounded, size: 18, color: Colors.black54),
                           SizedBox(width: 10),
                           Text('Change Password', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black87)),
                         ],
