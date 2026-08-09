@@ -5,7 +5,9 @@ import 'package:http/http.dart' as http;
 import '../services/leave_service.dart';
 import '../services/auth_service.dart';
 import '../main.dart';
+import '../widgets/change_password_dialog.dart';
 import 'full_screen_image_screen.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class SettingsScreen extends StatefulWidget {
   final LeaveService leaveService;
@@ -225,9 +227,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 final childPhoto = child['photo_path']?.toString() ?? '';
                 Widget leadingWidget;
                 if (childPhoto.isNotEmpty) {
-                  final fullUrl = childPhoto.startsWith('http') ? childPhoto : 'http://10.55.253.71:8000' + childPhoto;
+                  final fullUrl = childPhoto.startsWith('http') ? childPhoto : '${widget.leaveService.baseUrl}$childPhoto';
                   leadingWidget = CircleAvatar(
-                    backgroundImage: NetworkImage(fullUrl),
+                    backgroundImage: CachedNetworkImageProvider(fullUrl),
                     backgroundColor: Colors.indigo.shade50,
                   );
                 } else {
@@ -269,165 +271,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showChangePasswordDialog() {
-    final _formKey = GlobalKey<FormState>();
-    final _currentPasswordController = TextEditingController();
-    final _newPasswordController = TextEditingController();
-    final _confirmPasswordController = TextEditingController();
-    bool _isUpdating = false;
-    String _errorText = '';
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: const Text(
-                'Change Password',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-              ),
-              content: Form(
-                key: _formKey,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      TextFormField(
-                        controller: _currentPasswordController,
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Current Password',
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Current password is required';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _newPasswordController,
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                          labelText: 'New Password',
-                          hintText: 'Min 6 chars, 1 uppercase, 1 digit',
-                          hintStyle: TextStyle(fontSize: 11),
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'New password is required';
-                          }
-                          if (value.length < 6) {
-                            return 'At least 6 characters required';
-                          }
-                          bool hasUppercase = value.contains(RegExp(r'[A-Z]'));
-                          bool hasDigits = value.contains(RegExp(r'[0-9]'));
-                          bool hasAlpha = value.contains(RegExp(r'[a-zA-Z]'));
-                          if (!hasUppercase || !hasDigits || !hasAlpha) {
-                            return 'Must contain 1 uppercase, 1 digit & 1 letter';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _confirmPasswordController,
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Confirm Password',
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Confirm password is required';
-                          }
-                          if (value != _newPasswordController.text) {
-                            return 'Passwords do not match';
-                          }
-                          return null;
-                        },
-                      ),
-                      if (_errorText.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          _errorText,
-                          style: const TextStyle(color: Colors.red, fontSize: 12),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: _isUpdating ? null : () => Navigator.pop(context),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: _isUpdating
-                      ? null
-                      : () async {
-                          if (_formKey.currentState!.validate()) {
-                            setDialogState(() {
-                              _isUpdating = true;
-                              _errorText = '';
-                            });
-
-                            try {
-                              final authService = AuthService(
-                                baseUrl: widget.leaveService.baseUrl,
-                              );
-                              await authService.changePassword(
-                                widget.leaveService.token,
-                                _currentPasswordController.text,
-                                _newPasswordController.text,
-                              );
-
-                              if (context.mounted) {
-                                Navigator.pop(context);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Password updated successfully!'),
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
-                              }
-                            } catch (e) {
-                              setDialogState(() {
-                                _isUpdating = false;
-                                _errorText = e.toString();
-                              });
-                            }
-                          }
-                        },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.indigo,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: _isUpdating
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text('Update'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+    ChangePasswordDialog.show(
+      context,
+      baseUrl: widget.leaveService.baseUrl,
+      token: widget.leaveService.token,
     );
   }
 
@@ -437,14 +284,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Profile Details', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildDetailRow('Name', _userName),
-            _buildDetailRow('Phone', _userPhone),
-            _buildDetailRow('Associated School', _schoolName),
-          ],
+        content: Container(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildDetailRow('Name', _userName),
+              _buildDetailRow('Phone', _userPhone),
+              _buildDetailRow('Associated School', _schoolName),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -473,41 +323,60 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _showThemeSelector() {
     showDialog(
       context: context,
-      builder: (context) => SimpleDialog(
-        title: const Text('Select Appearance Mode', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+      builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        children: ['Light Mode', 'Dark Mode', 'System Defaults'].map((mode) {
-          return SimpleDialogOption(
-            onPressed: () async {
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setString('theme_mode', mode);
-              setState(() {
-                _currentTheme = mode;
-              });
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Theme changed to $mode.'), behavior: SnackBarBehavior.floating),
-              );
-            },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Row(
-                children: [
-                  Icon(
+        title: const Text('Appearance Theme', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        content: Container(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: ['Light Mode', 'Dark Mode', 'System Defaults'].map((mode) {
+              final isSelected = _currentTheme == mode;
+              return Container(
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                decoration: BoxDecoration(
+                  color: isSelected ? Colors.indigo.shade50.withOpacity(0.4) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: ListTile(
+                  leading: Icon(
                     mode == 'Light Mode'
                         ? Icons.light_mode_rounded
                         : mode == 'Dark Mode'
                             ? Icons.dark_mode_rounded
                             : Icons.settings_brightness_rounded,
-                    color: Colors.indigo,
+                    color: isSelected ? Colors.indigo.shade800 : Colors.grey.shade700,
                   ),
-                  const SizedBox(width: 12),
-                  Text(mode, style: const TextStyle(fontWeight: FontWeight.w600)),
-                ],
-              ),
-            ),
-          );
-        }).toList(),
+                  title: Text(
+                    mode,
+                    style: TextStyle(
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      color: isSelected ? Colors.indigo.shade800 : Colors.black87,
+                    ),
+                  ),
+                  trailing: isSelected ? Icon(Icons.check_circle, color: Colors.indigo.shade800) : null,
+                  onTap: () async {
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setString('theme_mode', mode);
+                    setState(() {
+                      _currentTheme = mode;
+                    });
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Theme changed to $mode.'), behavior: SnackBarBehavior.floating),
+                    );
+                  },
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
       ),
     );
   }
@@ -518,9 +387,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Help & Support', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: const Text(
-          'For any queries, please reach out to the school administration office or contact Shiksha Pilot technical support at support@shikshapilot.com.',
-          style: TextStyle(height: 1.4),
+        content: Container(
+          width: double.maxFinite,
+          child: const Text(
+            'For any queries, please reach out to the school administration office or contact Shiksha Pilot technical support at support@shikshapilot.com.',
+            style: TextStyle(height: 1.4),
+          ),
         ),
         actions: [
           TextButton(
@@ -538,16 +410,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('About App', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
-            Text('Shiksha Pilot School Hub', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            SizedBox(height: 4),
-            Text('Version: 1.0.0 (Production-Build)', style: TextStyle(color: Colors.grey, fontSize: 12)),
-            SizedBox(height: 12),
-            Text('A unified school portals platform designed for parents, teachers, and administrators.'),
-          ],
+        content: Container(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Text('Shiksha Pilot School Hub', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              SizedBox(height: 4),
+              Text('Version: 1.0.0 (Production-Build)', style: TextStyle(color: Colors.grey, fontSize: 12)),
+              SizedBox(height: 12),
+              Text('A unified school portals platform designed for parents, teachers, and administrators.'),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -564,10 +439,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     String photoUrl = _userPhoto;
     Widget avatarWidget;
     if (photoUrl.isNotEmpty) {
-      final fullUrl = photoUrl.startsWith('http') ? photoUrl : 'http://10.55.253.71:8000' + photoUrl;
+      final fullUrl = photoUrl.startsWith('http') ? photoUrl : '${widget.leaveService.baseUrl}$photoUrl';
       avatarWidget = CircleAvatar(
         radius: 46,
-        backgroundImage: NetworkImage(fullUrl),
+        backgroundImage: CachedNetworkImageProvider(fullUrl),
         backgroundColor: Colors.indigo.shade50,
       );
     } else {
@@ -683,210 +558,77 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            // Top Profile Card Header (Fixed, non-scrollable)
-            Container(
-              color: Colors.white,
-              padding: const EdgeInsets.only(top: 24, bottom: 20, left: 20, right: 20),
-              width: double.infinity,
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4)),
+                ],
+              ),
               child: Column(
                 children: [
-                  GestureDetector(
-                    onTap: () {
-                      if (_userPhoto.isNotEmpty) {
-                        final fullUrl = _userPhoto.startsWith('http') ? _userPhoto : 'http://10.55.253.71:8000' + _userPhoto;
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => FullScreenImageScreen(imageUrl: fullUrl),
-                          ),
-                        );
-                      }
-                    },
-                    child: Hero(
-                      tag: 'user_profile_icon',
-                      child: avatarWidget,
+                  _buildSettingsTile(
+                    icon: Icons.lock_open_rounded,
+                    title: 'Change Password',
+                    subtitle: 'Update account password',
+                    onTap: _showChangePasswordDialog,
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _buildSettingsTile(
+                    icon: Icons.notifications_active_outlined,
+                    title: 'Notifications',
+                    subtitle: 'Toggle push alerts',
+                    trailing: Switch(
+                      value: _notificationsEnabled,
+                      onChanged: (val) async {
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.setBool('notifications_enabled', val);
+                        setState(() {
+                          _notificationsEnabled = val;
+                        });
+                      },
+                      activeColor: Colors.indigo,
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    _userName,
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.black87),
+                  if ((widget.userRole.toUpperCase() == 'STUDENT' || widget.userRole.toUpperCase() == 'PARENT') && _children.length > 1) ...[
+                    const Divider(height: 1, indent: 56),
+                    _buildSettingsTile(
+                      icon: Icons.swap_horiz_rounded,
+                      title: 'Switch Account',
+                      subtitle: 'Change active student profile',
+                      onTap: _showSwitchStudentDialog,
+                    ),
+                  ],
+                  const Divider(height: 1, indent: 56),
+                  _buildSettingsTile(
+                    icon: Icons.color_lens_outlined,
+                    title: 'Appearance Theme',
+                    subtitle: _currentTheme,
+                    onTap: _showThemeSelector,
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _buildSettingsTile(
+                    icon: Icons.help_outline_rounded,
+                    title: 'Help & Support',
+                    subtitle: 'Get customer assistance',
+                    onTap: _showHelpSupport,
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _buildSettingsTile(
+                    icon: Icons.info_outline_rounded,
+                    title: 'About',
+                    subtitle: 'Application version info',
+                    onTap: _showAboutDialog,
                   ),
                 ],
               ),
             ),
-            
-            // Associated School Name Box (Fixed, non-scrollable)
-            Padding(
-              padding: const EdgeInsets.only(left: 16, right: 16, top: 12, bottom: 8),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.indigo.shade50.withOpacity(0.4),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.indigo.shade100, width: 1),
-                ),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      backgroundColor: Colors.indigo,
-                      radius: 20,
-                      child: const Icon(Icons.school, color: Colors.white, size: 20),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'ASSOCIATED SCHOOL',
-                            style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Colors.indigo, letterSpacing: 0.8),
-                          ),
-                          const SizedBox(height: 2),
-                          FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              _schoolName.toUpperCase(),
-                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            
-            // Scrollable Middle Options ("Profile Details" to "About")
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4)),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        _buildSettingsTile(
-                          icon: Icons.person_outline_rounded,
-                          title: 'Profile Details',
-                          subtitle: 'View user profile attributes',
-                          onTap: _showProfileDetails,
-                        ),
-                        const Divider(height: 1, indent: 56),
-                        _buildSettingsTile(
-                          icon: Icons.lock_open_rounded,
-                          title: 'Change Password',
-                          subtitle: 'Update account password',
-                          onTap: _showChangePasswordDialog,
-                        ),
-                        const Divider(height: 1, indent: 56),
-                        _buildSettingsTile(
-                          icon: Icons.notifications_active_outlined,
-                          title: 'Notifications',
-                          subtitle: 'Toggle push alerts',
-                          trailing: Switch(
-                            value: _notificationsEnabled,
-                            onChanged: (val) async {
-                              final prefs = await SharedPreferences.getInstance();
-                              await prefs.setBool('notifications_enabled', val);
-                              setState(() {
-                                _notificationsEnabled = val;
-                              });
-                            },
-                            activeColor: Colors.indigo,
-                          ),
-                        ),
-                        if ((widget.userRole.toUpperCase() == 'STUDENT' || widget.userRole.toUpperCase() == 'PARENT') && _children.length > 1) ...[
-                          const Divider(height: 1, indent: 56),
-                          _buildSettingsTile(
-                            icon: Icons.swap_horiz_rounded,
-                            title: 'Switch Account',
-                            subtitle: 'Change active student profile',
-                            onTap: _showSwitchStudentDialog,
-                          ),
-                        ],
-                        const Divider(height: 1, indent: 56),
-                        _buildSettingsTile(
-                          icon: Icons.color_lens_outlined,
-                          title: 'Appearance Theme',
-                          subtitle: _currentTheme,
-                          onTap: _showThemeSelector,
-                        ),
-                        const Divider(height: 1, indent: 56),
-                        _buildSettingsTile(
-                          icon: Icons.help_outline_rounded,
-                          title: 'Help & Support',
-                          subtitle: 'Get customer assistance',
-                          onTap: _showHelpSupport,
-                        ),
-                        const Divider(height: 1, indent: 56),
-                        _buildSettingsTile(
-                          icon: Icons.info_outline_rounded,
-                          title: 'About',
-                          subtitle: 'Application version info',
-                          onTap: _showAboutDialog,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-            // Danger Logout Action (Fixed, non-scrollable at the bottom)
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Container(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('Confirm Logout'),
-                        content: const Text('Are you sure you want to log out from this device?'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Cancel'),
-                          ),
-                          ElevatedButton(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              _handleLogout();
-                            },
-                            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-                            child: const Text('Log Out'),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.logout_rounded, color: Colors.white),
-                  label: const Text('LOG OUT', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.8)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red.shade600,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(double.infinity, 50),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    elevation: 0,
-                  ),
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

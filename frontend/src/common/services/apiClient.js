@@ -35,13 +35,31 @@ async function request(endpoint, options = {}) {
     localStorage.removeItem('shiksha_pilot_token');
     localStorage.removeItem('shiksha_pilot_role');
     localStorage.removeItem('shiksha_pilot_user');
-    window.location.replace('/login');
-    throw new Error('Unauthorized session expired');
+    
+    let errorMsg = '';
+    try {
+      const data = await response.clone().json();
+      errorMsg = data?.message || data?.error || '';
+    } catch (_) {}
+
+    const isInactive = errorMsg.toLowerCase().includes('inactive');
+    if (isInactive) {
+      sessionStorage.setItem('login_error_message', errorMsg);
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.replace(`/login?error=${encodeURIComponent(errorMsg)}`);
+      }
+    } else {
+      sessionStorage.removeItem('login_error_message');
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.replace('/login');
+      }
+    }
+    throw new Error(errorMsg || 'Unauthorized. Please log in.');
   }
 
   // Handle PDF/blob/excel exports
   const contentType = response.headers.get('content-type');
-  if (contentType && (contentType.includes('application/pdf') || contentType.includes('application/vnd.ms-excel') || contentType.includes('application/octet-stream'))) {
+  if (contentType && (contentType.includes('application/pdf') || contentType.includes('application/vnd.ms-excel') || contentType.includes('application/vnd.openxmlformats') || contentType.includes('spreadsheetml') || contentType.includes('application/octet-stream') || contentType.includes('excel'))) {
     return response.blob();
   }
 
@@ -62,7 +80,14 @@ export const apiClient = {
   get: (endpoint, options = {}) => request(endpoint, { ...options, method: 'GET' }),
   post: (endpoint, body, options = {}) => request(endpoint, { ...options, method: 'POST', body }),
   put: (endpoint, body, options = {}) => request(endpoint, { ...options, method: 'PUT', body }),
-  delete: (endpoint, options = {}) => request(endpoint, { ...options, method: 'DELETE' }),
+  delete: (endpoint, bodyOrOptions = {}) => {
+    if (bodyOrOptions && (bodyOrOptions.data !== undefined || bodyOrOptions.body !== undefined)) {
+      const body = bodyOrOptions.body !== undefined ? bodyOrOptions.body : bodyOrOptions.data;
+      const { data, body: unused, ...restOptions } = bodyOrOptions;
+      return request(endpoint, { ...restOptions, method: 'DELETE', body });
+    }
+    return request(endpoint, { ...bodyOrOptions, method: 'DELETE' });
+  },
 };
 
 export default apiClient;

@@ -9,6 +9,7 @@ import { apiClient } from '../../../common/services/apiClient';
 import html2pdf from 'html2pdf.js';
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 import { FeeReceiptModal } from '../components/FeeReceiptModal';
+import { formatCurrency } from '../../../common/utils/format';
 import { 
   User, BookOpen, Users, Home, Calendar, FileText, 
   Download, Printer, AlertCircle, Eye, ChevronDown, ChevronUp, X, ShieldAlert, Phone 
@@ -187,7 +188,9 @@ function DepositModal({ student, availableMonths, paidMonths, classFeeConfig, on
       onSave();
     } catch (err) {
       console.error(err);
-      setError(err.message || 'Failed to deposit fees.');
+      const errRes = err.data || err.response?.data;
+      const msg = errRes?.errors?.fee_structure || errRes?.errors?.class_id || errRes?.message || err.message || 'Failed to deposit fees.';
+      setError(msg);
     } finally {
       setSaving(false);
     }
@@ -402,8 +405,8 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
   const [followUpLoading, setFollowUpLoading] = useState(false);
   const [activeLedgerTab, setActiveLedgerTab] = useState('monthly'); // 'monthly' | 'additional'
   
-  // Accordion toggle for Documents (closed by default)
-  const [docsOpen, setDocsOpen] = useState(false);
+  // Accordion toggle for Documents (open by default)
+  const [docsOpen, setDocsOpen] = useState(true);
 
   // Modal view triggers
   const [viewingDoc, setViewingDoc] = useState(null); // { name, path }
@@ -849,9 +852,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
           <div className="flex border-b border-border text-sm overflow-x-auto whitespace-nowrap scrollbar-none gap-6">
             {[
               { id: 'finance', label: 'Finance' },
-              { id: 'profile', label: 'Student & Parents' },
-              { id: 'academic', label: 'Academic Results' },
-              { id: 'followup', label: 'Follow-up History' }
+              { id: 'profile', label: 'Student & Parents' }
             ].map(tab => (
               <button
                 key={tab.id}
@@ -876,8 +877,6 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-2 text-xs">
                     <p><span className="text-text-muted block font-medium">Academic Session</span> <span className="font-semibold text-text-primary text-sm">{student.academic_year_name || '2025–2026'}</span></p>
                     <p><span className="text-text-muted block font-medium">Admission Date</span> <span className="font-semibold text-text-primary text-sm">{student.admission_date || '-'}</span></p>
-                    <p><span className="text-text-muted block font-medium">Admission Fee</span> <span className="font-semibold text-text-primary text-sm">{student.admission_fee ? formatCurrency(student.admission_fee) : '-'}</span></p>
-                    <p><span className="text-text-muted block font-medium">Student Category</span> <span className="font-semibold text-text-primary text-sm">{student.student_category || '-'}</span></p>
                     <p><span className="text-text-muted block font-medium">Date of Birth</span> <span className="font-semibold text-text-primary text-sm">{student.dob || '-'}</span></p>
                     <p><span className="text-text-muted block font-medium">Aadhaar Number</span> <span className="font-semibold font-mono text-text-primary text-sm">{student.aadhaar_no || '-'}</span></p>
                     <p><span className="text-text-muted block font-medium">Category</span> <span className="font-semibold text-text-primary text-sm">{student.category || '-'}</span></p>
@@ -885,7 +884,6 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                     <p><span className="text-text-muted block font-medium">Student Mobile</span> <span className="font-semibold font-mono text-text-primary text-sm">{student.student_mobile || '-'}</span></p>
                     <p><span className="text-text-muted block font-medium">Student Email</span> <span className="font-semibold text-text-primary text-sm">{student.student_email || '-'}</span></p>
                     <p><span className="text-text-muted block font-medium">Class Assigned</span> <span className="font-semibold text-text-primary text-sm">{student.class_name || 'Not Assigned'}</span></p>
-                    <p><span className="text-text-muted block font-medium">Exit Date</span> <span className="font-semibold text-text-primary text-sm">{student.exit_date || 'Not Assigned'}</span></p>
                   </div>
                 </CardContent>
               </Card>
@@ -952,117 +950,99 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
 
                 {docsOpen && (
                   <div className="p-6 border-t border-border animate-in slide-in-from-top-2 duration-300">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                      {[
-                        { key: 'birth_cert_path', label: 'Birth Certificate' },
-                        { key: 'aadhaar_path', label: 'Aadhaar Card' },
-                        { key: 'transfer_cert_path', label: 'Transfer Certificate (TC)' },
-                        { key: 'report_card_path', label: 'Previous Report Card' },
-                        { key: 'additional_docs_path', label: 'Additional Documents' }
-                      ].map(doc => {
-                        const hasDoc = !!student[doc.key];
-                        return (
-                          <div key={doc.key} className="flex items-center justify-between p-3 border border-border rounded-xl bg-zinc-50/50 dark:bg-zinc-900/10">
-                            <div>
-                              <p className="font-bold text-text-primary uppercase text-[11px] tracking-wider">{doc.label}</p>
-                              <p className="text-[11px] text-text-muted mt-0.5">
-                                {hasDoc ? 'Scanned PDF/Image copy' : 'No document uploaded'}
-                              </p>
+                    {(!student.documents || student.documents.length === 0) &&
+                     !student.birth_cert_path && !student.aadhaar_path && !student.transfer_cert_path && !student.report_card_path && !student.additional_docs_path ? (
+                      <div className="p-4 bg-zinc-50 dark:bg-zinc-900/50 border border-dashed border-border rounded-xl text-center">
+                        <p className="text-xs text-text-muted font-medium">No documents uploaded for this student.</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                        {/* 1. Array-based uploaded documents (student.documents) */}
+                        {Array.isArray(student.documents) && student.documents.map((doc, idx) => {
+                          const rawPath = doc.file_path || doc.path || '';
+                          const fileUrl = rawPath ? (rawPath.startsWith('http') ? rawPath : `${window.location.origin.includes('localhost') ? 'http://localhost:8000' : ''}${rawPath.startsWith('/') ? '' : '/'}${rawPath}`) : '#';
+
+                          return (
+                            <div key={doc.id || idx} className="flex items-center justify-between p-3 border border-border rounded-xl bg-zinc-50/50 dark:bg-zinc-900/10">
+                              <div className="min-w-0 pr-2">
+                                <p className="font-bold text-text-primary uppercase text-[11px] tracking-wider truncate">{doc.category || doc.file_name || 'Document'}</p>
+                                <p className="text-[11px] text-text-muted truncate mt-0.5">{doc.file_name || 'File attachment'}</p>
+                              </div>
+                              {rawPath ? (
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <button 
+                                    onClick={() => setViewingDoc({ name: doc.category || doc.file_name, path: fileUrl })}
+                                    className="p-2 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-colors flex items-center gap-1 text-xs font-semibold shadow-2xs"
+                                  >
+                                    <Eye className="h-3.5 w-3.5" />
+                                    <span>View</span>
+                                  </button>
+                                  <a
+                                    href={fileUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="p-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-text-primary rounded-lg transition-colors flex items-center gap-1 text-xs font-semibold shadow-2xs"
+                                    title="Download Document"
+                                  >
+                                    <Download className="h-3.5 w-3.5" />
+                                    <span>Download</span>
+                                  </a>
+                                </div>
+                              ) : (
+                                <span className="text-[11px] text-text-muted font-bold uppercase tracking-wider flex-shrink-0">Missing</span>
+                              )}
                             </div>
-                            {hasDoc ? (
-                              <button 
-                                onClick={() => setViewingDoc({ name: doc.label, path: student[doc.key] })}
-                                className="p-2 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-colors flex items-center gap-1 text-xs font-semibold shadow-xs"
-                              >
-                                <Eye className="h-3.5 w-3.5" />
-                                <span>View File</span>
-                              </button>
-                            ) : (
-                              <span className="text-[11px] text-text-muted font-bold uppercase tracking-wider">Missing</span>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+                          );
+                        })}
+
+                        {/* 2. Legacy individual document paths fallback */}
+                        {[
+                          { key: 'birth_cert_path', label: 'Birth Certificate' },
+                          { key: 'aadhaar_path', label: 'Aadhaar Card' },
+                          { key: 'transfer_cert_path', label: 'Transfer Certificate (TC)' },
+                          { key: 'report_card_path', label: 'Previous Report Card' },
+                          { key: 'additional_docs_path', label: 'Additional Documents' }
+                        ].filter(doc => !!student[doc.key]).map(doc => {
+                          const rawPath = student[doc.key];
+                          const fileUrl = rawPath ? (rawPath.startsWith('http') ? rawPath : `${window.location.origin.includes('localhost') ? 'http://localhost:8000' : ''}${rawPath.startsWith('/') ? '' : '/'}${rawPath}`) : '#';
+
+                          return (
+                            <div key={doc.key} className="flex items-center justify-between p-3 border border-border rounded-xl bg-zinc-50/50 dark:bg-zinc-900/10">
+                              <div className="min-w-0 pr-2">
+                                <p className="font-bold text-text-primary uppercase text-[11px] tracking-wider truncate">{doc.label}</p>
+                                <p className="text-[11px] text-text-muted truncate mt-0.5">Scanned PDF/Image copy</p>
+                              </div>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <button 
+                                  onClick={() => setViewingDoc({ name: doc.label, path: fileUrl })}
+                                  className="p-2 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-colors flex items-center gap-1 text-xs font-semibold shadow-2xs"
+                                >
+                                  <Eye className="h-3.5 w-3.5" />
+                                  <span>View</span>
+                                </button>
+                                <a
+                                  href={fileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="p-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-text-primary rounded-lg transition-colors flex items-center gap-1 text-xs font-semibold shadow-2xs"
+                                  title="Download Document"
+                                >
+                                  <Download className="h-3.5 w-3.5" />
+                                  <span>Download</span>
+                                </a>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
               </Card>
             </div>
           )}
 
-          {/* Sub-tab 2: Academic Results */}
-          {activeSubTab === 'academic' && (
-            <div className="space-y-6 animate-in fade-in duration-200">
-              <Card className="shadow-xs">
-                <CardContent className="p-6 space-y-4">
-                  <div className="flex items-center gap-2 border-b border-border pb-2.5">
-                    <Calendar className="h-4 w-4 text-primary" />
-                    <h4 className="text-xs font-bold text-text-primary uppercase tracking-wider">Attendance Summary</h4>
-                  </div>
-                  <div className="flex flex-col sm:flex-row items-center gap-6">
-                    <div className="relative flex items-center justify-center">
-                      <div className="w-24 h-24 rounded-full border-8 border-zinc-100 dark:border-zinc-800 flex flex-col items-center justify-center relative">
-                        <span className="text-lg font-bold text-text-primary">{attendance_summary.percentage}%</span>
-                        <span className="text-[8px] text-text-muted uppercase font-bold">Rate</span>
-                      </div>
-                    </div>
-                    <div className="text-xs space-y-1.5 flex-1 w-full">
-                      <p className="flex justify-between max-w-sm"><span className="text-text-muted font-medium">Total Session Classes:</span> <span className="font-bold font-mono">{attendance_summary.total_marked} Days</span></p>
-                      <p className="flex justify-between max-w-sm"><span className="text-text-muted font-medium">Attended (Present):</span> <span className="font-bold font-mono text-teal-600">{attendance_summary.present_count} Days</span></p>
-                      <p className="flex justify-between max-w-sm"><span className="text-text-muted font-medium">Absences/Leaves:</span> <span className="font-bold font-mono text-red-500">{attendance_summary.total_marked - attendance_summary.present_count} Days</span></p>
-                      <div className="w-full bg-zinc-100 dark:bg-zinc-800 h-2 rounded-full overflow-hidden max-w-sm mt-3">
-                        <div className="bg-primary h-full rounded-full transition-all" style={{ width: `${attendance_summary.percentage}%` }}></div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
 
-              <Card className="shadow-xs">
-                <CardContent className="p-6 space-y-4">
-                  <div className="flex items-center gap-2 border-b border-border pb-2.5">
-                    <FileText className="h-4 w-4 text-primary" />
-                    <h4 className="text-xs font-bold text-text-primary uppercase tracking-wider">Examination Summary</h4>
-                  </div>
-
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Exam Name</TableHead>
-                        <TableHead>Subject</TableHead>
-                        <TableHead>Marks Obtained</TableHead>
-                        <TableHead>Max Marks</TableHead>
-                        <TableHead>Grade</TableHead>
-                        <TableHead>Remarks</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {exam_results.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={6} className="text-center py-6 text-text-muted text-xs">No exam marks entered for this student.</TableCell>
-                        </TableRow>
-                      ) : (
-                        exam_results.map((r, i) => (
-                          <TableRow key={i}>
-                            <TableCell className="font-semibold text-text-primary text-xs">{r.exam_name}</TableCell>
-                            <TableCell className="text-text-secondary text-xs">{r.subject_name || '-'}</TableCell>
-                            <TableCell className="font-bold font-mono text-xs text-primary">{r.marks_obtained}</TableCell>
-                            <TableCell className="font-mono text-xs text-text-muted">{r.max_marks}</TableCell>
-                            <TableCell>
-                              <span className="px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-[11px] font-bold uppercase text-primary border border-border">
-                                {r.grade || 'A'}
-                              </span>
-                            </TableCell>
-                            <TableCell className="text-text-secondary text-xs truncate max-w-[150px]">{r.remarks || '-'}</TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </div>
-          )}
 
           {/* Sub-tab 3: Finance */}
           {activeSubTab === 'finance' && (
@@ -1344,62 +1324,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
             </div>
           )}
 
-          {/* Sub-tab 4: Follow-up Timeline */}
-          {activeSubTab === 'followup' && (
-            <div className="space-y-6 animate-in fade-in duration-200">
-              <Card className="shadow-xs border border-border bg-surface">
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-2 border-b border-border pb-3 mb-5">
-                    <Phone className="h-4 w-4 text-primary" />
-                    <h4 className="text-xs font-bold text-text-primary uppercase tracking-wider">Fee Follow-up Timeline</h4>
-                  </div>
-                  
-                  {followUpLoading ? (
-                    <div className="flex justify-center py-10">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
-                    </div>
-                  ) : followUpHistory.length === 0 ? (
-                    <div className="text-center py-10 text-text-muted text-xs">
-                      No follow-ups recorded for this student.
-                    </div>
-                  ) : (
-                    <div className="relative pl-6 border-l-2 border-border space-y-8 ml-2 mt-2">
-                      {followUpHistory.map((item, idx) => {
-                        let dotColor = 'bg-primary border-primary/20';
-                        if (item.type === 'completed') {
-                          dotColor = 'bg-emerald-500 border-emerald-500/20';
-                        } else if (item.type === 'note') {
-                          dotColor = 'bg-amber-500 border-amber-500/20';
-                        }
-                        
-                        return (
-                          <div key={idx} className="relative">
-                            {/* Connector dot */}
-                            <span className={`absolute -left-[31px] top-1.5 w-4 h-4 rounded-full border-4 ${dotColor}`} />
-                            
-                            <div className="space-y-1 text-xs">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="font-bold text-text-primary text-sm">{item.title}</span>
-                                <span className="text-[11px] text-text-muted shrink-0 font-mono">{item.date}</span>
-                              </div>
-                              <p className="text-text-secondary whitespace-pre-line leading-relaxed mt-1">
-                                {item.description}
-                              </p>
-                              {item.user && (
-                                <div className="text-[11px] text-text-muted font-medium pt-1">
-                                  Logged by: <span className="text-text-secondary">{item.user}</span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          )}
+
 
         </div>
 

@@ -45,6 +45,8 @@ use App\Domain\Teacher\Repositories\AssignmentRepository;
 use App\Domain\Teacher\Repositories\MaterialRepository;
 use App\Domain\Teacher\Services\TeacherService;
 use App\Domain\Teacher\Controllers\TeacherController;
+use App\Domain\Teacher\Services\HomeworkService;
+use App\Domain\Teacher\Controllers\HomeworkController;
 
 // ── Domain: Student ───────────────────────────────────────────────────────────
 use App\Domain\Student\Repositories\StudentDataRepository;
@@ -325,6 +327,17 @@ class App
                 return new VocabularyController(
                     $c->get(TokenService::class),
                     $c->get(VocabularyService::class),
+                );
+            },
+
+            HomeworkService::class => function ($c) {
+                return new HomeworkService($c->get(Connection::class)->getPdo());
+            },
+
+            HomeworkController::class => function ($c) {
+                return new HomeworkController(
+                    $c->get(TokenService::class),
+                    $c->get(HomeworkService::class),
                 );
             },
         ]);

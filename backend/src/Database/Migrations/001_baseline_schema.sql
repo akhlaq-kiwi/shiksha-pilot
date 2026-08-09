@@ -843,7 +843,7 @@ CREATE TABLE IF NOT EXISTS `staff_payments` (
   `staff_id` int NOT NULL,
   `academic_year_id` int NOT NULL,
   `amount_paid` decimal(12,2) NOT NULL,
-  `payment_month` varchar(20) NOT NULL,
+  `payment_month` varchar(100) NOT NULL,
   `payment_date` date NOT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

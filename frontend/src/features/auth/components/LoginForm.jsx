@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Shield, Key, Phone, AlertCircle, RefreshCw, Eye, EyeOff } from 'lucide-react';
+import logoImg from '../../../assets/logo.png';
 import { authService } from '../../../common/services/authService';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../../common/ui/card';
@@ -12,6 +13,21 @@ export default function LoginForm({ onLoginSuccess }) {
   
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlErr = params.get('error');
+    const sessionErr = sessionStorage.getItem('login_error_message');
+    const msg = urlErr || sessionErr;
+    if (msg) {
+      const decodedMsg = decodeURIComponent(msg);
+      // Only show error message if it explicitly pertains to inactive account or specific error
+      if (decodedMsg.toLowerCase().includes('inactive') || decodedMsg.toLowerCase().includes('password') || decodedMsg.toLowerCase().includes('blocked')) {
+        setErrors({ phone: decodedMsg });
+      }
+      sessionStorage.removeItem('login_error_message');
+    }
+  }, []);
 
   const handlePasswordLogin = async (e) => {
     e.preventDefault();
@@ -35,18 +51,19 @@ export default function LoginForm({ onLoginSuccess }) {
       const data = await authService.login(phone, password);
       onLoginSuccess(data.user);
     } catch (err) {
-      if (err.data && err.data.errors) {
+      const msg = err.message || (err.data && (err.data.message || err.data.phone || err.data.errors?.phone)) || '';
+      if (msg.toLowerCase().includes('inactive')) {
+        setErrors({ phone: 'Your account marked as Inactive Please contact Academy management' });
+      } else if (err.data && err.data.errors) {
         setErrors(err.data.errors);
       } else if (err.data && typeof err.data === 'object') {
         setErrors(err.data);
       } else {
-        const msg = err.message || '';
         if (msg.toLowerCase().includes('phone') || msg.toLowerCase().includes('mobile') || msg.toLowerCase().includes('account')) {
           setErrors({ phone: 'No account found with this mobile number.' });
         } else if (msg.toLowerCase().includes('password')) {
           setErrors({ password: 'Incorrect password. Please try again.' });
         } else {
-          // Case 3 fallback
           setErrors({
             phone: ' ',
             password: 'Invalid mobile number or password.'
@@ -62,11 +79,10 @@ export default function LoginForm({ onLoginSuccess }) {
     <div className="w-full max-w-md mx-auto py-12 px-4">
       <Card className="border border-border shadow-md bg-surface animate-in fade-in duration-300">
         <CardHeader className="space-y-1 text-center">
-          <div className="mx-auto h-12 w-12 bg-zinc-900 text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900 rounded-xl flex items-center justify-center border shadow-xs mb-3">
-            <Shield className="h-6 w-6" />
+          <div className="mx-auto h-[70px] w-auto flex items-center justify-center mb-3">
+            <img src={logoImg} alt="Shiksha Pilot Logo" className="h-[70px] w-auto object-contain" />
           </div>
-          <CardTitle className="text-xl font-bold font-display">Shiksha Pilot Portal Login</CardTitle>
-          <CardDescription>Sign in to continue</CardDescription>
+          <CardTitle className="text-xl font-bold font-display">Login Shiksha Pilot</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
 

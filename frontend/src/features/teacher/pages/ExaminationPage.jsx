@@ -71,6 +71,7 @@ export default function ExaminationPage({ classes, exams, allStudents }) {
     setIsDirty(true);
     toast.info('Your unsaved marks have been restored.', 'Draft restored');
   };
+  const isGradeType = exam?.evaluation_type === 'grade' || Number(exam?.totalMarks ?? exam?.total_marks ?? exam?.maxMarks ?? 100) === 0;
 
   const entered = students.filter((s) => marks[s.id] !== '' && marks[s.id] != null);
   const missing = students.length - entered.length;
@@ -78,16 +79,23 @@ export default function ExaminationPage({ classes, exams, allStudents }) {
   const invalid = students.filter((s) => {
     const raw = marks[s.id];
     if (raw === '' || raw == null) return false;
+    if (isGradeType) {
+      return !['A+', 'A', 'B', 'C', 'D', 'E'].includes(String(raw).toUpperCase().trim());
+    }
     const n = Number(raw);
     return Number.isNaN(n) || n < 0 || n > totalMarks;
   });
 
-  const classAvg = entered.length
+  const classAvg = (!isGradeType && entered.length)
     ? Math.round(entered.reduce((sum, s) => sum + Number(marks[s.id] || 0), 0) / entered.length)
     : null;
 
   const gradeFor = (raw) => {
     if (raw === '' || raw == null) return NOT_ENTERED;
+    if (isGradeType) {
+      const gStr = String(raw).toUpperCase().trim();
+      return { label: gStr, tone: 'text-primary font-bold', bg: 'bg-primary/10' };
+    }
     const pct = (Number(raw) / totalMarks) * 100;
     return GRADE_BANDS.find((b) => pct >= b.minPct) || NOT_ENTERED;
   };
@@ -113,7 +121,9 @@ export default function ExaminationPage({ classes, exams, allStudents }) {
   const handleSave = async () => {
     if (invalid.length > 0) {
       toast.error(
-        `${invalid.length} score${invalid.length > 1 ? 's are' : ' is'} outside 0–${totalMarks}. Correct them before saving.`,
+        isGradeType 
+          ? `${invalid.length} student${invalid.length > 1 ? 's have' : ' has'} invalid grade entries.` 
+          : `${invalid.length} score${invalid.length > 1 ? 's are' : ' is'} outside 0–${totalMarks}. Correct them before saving.`,
         'Cannot save'
       );
       return;
@@ -134,7 +144,7 @@ export default function ExaminationPage({ classes, exams, allStudents }) {
     const payloadMarks = {};
     const payloadRemarks = {};
     entered.forEach((s) => {
-      payloadMarks[s.id] = Number(marks[s.id]);
+      payloadMarks[s.id] = isGradeType ? String(marks[s.id]).trim().toUpperCase() : Number(marks[s.id]);
       if (remarks[s.id]) payloadRemarks[s.id] = remarks[s.id];
     });
 
@@ -271,7 +281,7 @@ export default function ExaminationPage({ classes, exams, allStudents }) {
                   <TableHead className="w-10">#</TableHead>
                   <TableHead>Roll No.</TableHead>
                   <TableHead>Student Name</TableHead>
-                  <TableHead>Score / {totalMarks}</TableHead>
+                  <TableHead>{isGradeType ? 'Assigned Grade' : `Score / ${totalMarks}`}</TableHead>
                   <TableHead>Grade</TableHead>
                   <TableHead>Remarks</TableHead>
                 </TableRow>
@@ -281,7 +291,7 @@ export default function ExaminationPage({ classes, exams, allStudents }) {
                   const raw = marks[s.id] ?? '';
                   const grade = gradeFor(raw);
                   const n = Number(raw);
-                  const isInvalid = raw !== '' && (Number.isNaN(n) || n < 0 || n > totalMarks);
+                  const isInvalid = !isGradeType && raw !== '' && (Number.isNaN(n) || n < 0 || n > totalMarks);
                   const isBlank = raw === '';
                   return (
                     <TableRow key={s.id} className={isBlank ? 'bg-secondary/30' : undefined}>
@@ -289,29 +299,45 @@ export default function ExaminationPage({ classes, exams, allStudents }) {
                       <TableCell className="font-mono text-xs text-text-muted">{s.rollNo}</TableCell>
                       <TableCell className="font-medium text-text-primary">{s.name}</TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Input
-                            ref={(el) => { inputRefs.current[s.id] = el; }}
-                            type="number"
-                            inputMode="numeric"
-                            min={0}
-                            max={totalMarks}
+                        {isGradeType ? (
+                          <FormSelect
                             value={raw}
-                            placeholder="—"
-                            aria-label={`Score for ${s.name}, out of ${totalMarks}`}
-                            aria-invalid={isInvalid || undefined}
                             onChange={(e) => setMark(s.id, e.target.value)}
-                            onKeyDown={(e) => handleKeyDown(e, i)}
-                            className={`h-8 w-20 text-center tabular-nums ${
-                              isInvalid ? 'border-danger-500 focus-visible:ring-danger-500/40' : ''
-                            }`}
-                          />
-                          {isInvalid && (
-                            <span className="text-[11px] font-medium text-danger-600 dark:text-danger-400">
-                              0–{totalMarks}
-                            </span>
-                          )}
-                        </div>
+                            className="h-8 w-28 text-center font-bold text-primary"
+                          >
+                            <option value="">— Select —</option>
+                            <option value="A+">Grade A+</option>
+                            <option value="A">Grade A</option>
+                            <option value="B">Grade B</option>
+                            <option value="C">Grade C</option>
+                            <option value="D">Grade D</option>
+                            <option value="E">Grade E</option>
+                          </FormSelect>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <Input
+                              ref={(el) => { inputRefs.current[s.id] = el; }}
+                              type="number"
+                              inputMode="numeric"
+                              min={0}
+                              max={totalMarks}
+                              value={raw}
+                              placeholder="—"
+                              aria-label={`Score for ${s.name}, out of ${totalMarks}`}
+                              aria-invalid={isInvalid || undefined}
+                              onChange={(e) => setMark(s.id, e.target.value)}
+                              onKeyDown={(e) => handleKeyDown(e, i)}
+                              className={`h-8 w-20 text-center tabular-nums ${
+                                isInvalid ? 'border-danger-500 focus-visible:ring-danger-500/40' : ''
+                              }`}
+                            />
+                            {isInvalid && (
+                              <span className="text-[11px] font-medium text-danger-600 dark:text-danger-400">
+                                0–{totalMarks}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell>
                         <span className={`font-semibold text-sm tabular-nums ${grade.tone}`}>{grade.label}</span>

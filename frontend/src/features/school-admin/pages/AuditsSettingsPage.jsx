@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Plus, CheckCircle2, ChevronRight, UserCog, Users, ShieldAlert, Award, FileSpreadsheet, ArrowLeft, RefreshCw, Check, Lock, Save, Trash2, Loader2, AlertTriangle, X } from 'lucide-react';
+import { Plus, CheckCircle2, ChevronRight, UserCog, Users, ShieldAlert, Award, FileSpreadsheet, ArrowLeft, RefreshCw, Check, Lock, Save, Trash2, Loader2, AlertTriangle, X, Download } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
@@ -9,7 +9,8 @@ import { Dialog } from '../../../common/ui/dialog';
 import { schoolService } from '../../../common/services/schoolService';
 import { apiClient } from '../../../common/services/apiClient';
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
-import { schoolAdminService } from '../../../common/services/schoolAdminService';
+import { getClassIndex } from '../../../common/constants/predefinedClasses';
+import { jsPDF } from 'jspdf';
 
 export default function AuditsSettingsPage({ onYearsUpdated }) {
   const location = useLocation();
@@ -40,6 +41,16 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
   const [replacePrevTeacherName, setReplacePrevTeacherName] = useState('');
   const [replaceNewTeacherId, setReplaceNewTeacherId] = useState('');
   const [replaceNewTeacherName, setReplaceNewTeacherName] = useState('');
+
+  // Auto-clear success message for Class Teacher assignment after 5 seconds
+  useEffect(() => {
+    if (assignSuccess) {
+      const timer = setTimeout(() => {
+        setAssignSuccess('');
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [assignSuccess]);
 
   const MENU_OPTIONS = [
     'Dashboard',
@@ -229,6 +240,16 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
 
   // Class Fee Configuration States
   const [selectedClassId, setSelectedClassId] = useState('');
+  const [showSelectClassNotice, setShowSelectClassNotice] = useState(true);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  useEffect(() => {
+    setShowSelectClassNotice(true);
+    const timer = setTimeout(() => {
+      setShowSelectClassNotice(false);
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, []);
   const [configuredClassIds, setConfiguredClassIds] = useState([]);
   const [feeMode, setFeeMode] = useState('SAME'); // 'SAME' or 'DIFFERENT'
   const [sameFeeAmount, setSameFeeAmount] = useState('');
@@ -241,6 +262,14 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
   const [feeError, setFeeError] = useState('');
   const [feeSuccess, setFeeSuccess] = useState('');
   const [isSwitchingClass, setIsSwitchingClass] = useState(false);
+
+  useEffect(() => {
+    if (!feeSuccess) return;
+    const timer = setTimeout(() => {
+      setFeeSuccess('');
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [feeSuccess]);
 
   // Source Data for Wizard
   const [staff, setStaff] = useState([]);
@@ -472,12 +501,55 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
     fetchConfiguredClasses();
   }, [currentYear, academicYears]);
 
-  // Pre-select class from router state redirect if redirecting from Finance
+  // Group classes by unique Class Name so fee configuration applies class-wide across all sections
+  const uniqueClassGroups = useMemo(() => {
+    const map = new Map();
+    (classes || []).forEach(c => {
+      if (!c.name) return;
+      if (!map.has(c.name)) {
+        map.set(c.name, []);
+      }
+      map.get(c.name).push(c);
+    });
+
+    return Array.from(map.entries()).map(([className, items]) => {
+      const hasConfiguredName = (configuredClassIds || []).some(cid => {
+        const found = (classes || []).find(cl => String(cl.id) === String(cid));
+        return found && found.name === className;
+      });
+
+      return {
+        name: className,
+        primaryId: String(items[0].id),
+        allIds: items.map(item => String(item.id)),
+        isConfigured: items.some(item => configuredClassIds.includes(String(item.id))) || hasConfiguredName
+      };
+    });
+  }, [classes, configuredClassIds]);
+
+  // Pre-select class from router state redirect if redirecting from Finance or StudentDetails
   useEffect(() => {
-    if (location.state && location.state.preselectClassId) {
-      setSelectedClassId(String(location.state.preselectClassId));
+    if (location.state && (location.state.preselectClassId || location.state.classId || location.state.selectedClassId)) {
+      const targetId = String(location.state.preselectClassId || location.state.classId || location.state.selectedClassId);
+      if (uniqueClassGroups && uniqueClassGroups.length > 0) {
+        const foundGroup = uniqueClassGroups.find(g => g.allIds.includes(targetId) || g.primaryId === targetId);
+        if (foundGroup) {
+          setSelectedClassId(foundGroup.primaryId);
+        } else {
+          setSelectedClassId(targetId);
+        }
+      } else {
+        setSelectedClassId(targetId);
+      }
+
+      setTimeout(() => {
+        const el = document.getElementById('class-fee-config-panel');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 150);
     }
-  }, [location.state]);
+  }, [location.state, uniqueClassGroups]);
 
   // Load configuration for the selected class and active academic year
   useEffect(() => {
@@ -498,20 +570,30 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
 
       try {
         setFeeError('');
-        const res = await schoolService.getClassFeeConfigurations({
-          class_id: selectedClassId,
+        const selectedGroup = uniqueClassGroups.find(g => g.allIds.includes(String(selectedClassId)));
+        const targetName = selectedGroup ? selectedGroup.name : (classes.find(c => String(c.id) === String(selectedClassId))?.name);
+
+        const allConfigs = await schoolService.getClassFeeConfigurations({
           academic_year_id: activeYear.id
         });
-        
-        if (res && res.length > 0) {
-          const config = res[0];
-          setFeeMode(config.mode);
+
+        let config = null;
+        if (allConfigs && allConfigs.length > 0) {
+          config = allConfigs.find(cfg => {
+            if (selectedGroup && selectedGroup.allIds.includes(String(cfg.class_id))) return true;
+            const c = classes.find(cl => String(cl.id) === String(cfg.class_id));
+            return c && c.name === targetName;
+          });
+        }
+
+        if (config) {
+          setFeeMode(config.mode || 'SAME');
           setIsConfigLocked(false); // Ignore is_locked: monthly fee must be editable whenever required
           
           if (config.mode === 'SAME') {
-            setSameFeeAmount(config.monthly_fees.April || '');
+            setSameFeeAmount(config.monthly_fees?.April || '');
           } else {
-            setMonthlyFeesMap(config.monthly_fees);
+            setMonthlyFeesMap(config.monthly_fees || {});
           }
         } else {
           setIsConfigLocked(false);
@@ -529,7 +611,195 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
     };
 
     fetchConfig();
-  }, [selectedClassId, academicYears]);
+  }, [selectedClassId, academicYears, uniqueClassGroups, classes]);
+
+  const handleDownloadFeeStructurePdf = async () => {
+    try {
+      setDownloadingPdf(true);
+      const activeYear = currentYear || academicYears.find(y => y.is_current) || academicYears[0];
+      const yearName = activeYear ? activeYear.name : '2026-2027';
+
+      let startYr = '2026';
+      let endYr = '2027';
+      const yearMatch = yearName.match(/(\d{4})\s*[-–—]\s*(\d{4})/);
+      if (yearMatch) {
+        startYr = yearMatch[1];
+        endYr = yearMatch[2];
+      }
+
+      const headerTitle = `FEE STRUCTURE FOR ${startYr} - ${endYr}`;
+      const headerSubtitle = `(Applicable from 1st April to 31st March ${endYr})`;
+
+      // Fetch all classes & configurations dynamically
+      const [allClasses, allConfigs] = await Promise.all([
+        schoolService.getClasses(),
+        activeYear ? schoolService.getClassFeeConfigurations({ academic_year_id: activeYear.id }) : Promise.resolve([])
+      ]);
+
+      const classList = allClasses || classes || [];
+      const configList = allConfigs || [];
+
+      // Group classes by unique class name to get one row per class
+      const classMap = new Map();
+      classList.forEach(c => {
+        if (!c.name) return;
+        if (!classMap.has(c.name)) {
+          classMap.set(c.name, c);
+        }
+      });
+
+      // Sort classes in logical order (Playgroup, Nursery, LKG, UKG, Class 1... Class 12)
+      const sortedClasses = Array.from(classMap.values()).sort((a, b) => {
+        const idxA = getClassIndex(a.name);
+        const idxB = getClassIndex(b.name);
+        if (idxA !== idxB) return idxA - idxB;
+        return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+      });
+
+      // Calculate annual fee for each class
+      const rowsData = sortedClasses.map((cls, index) => {
+        const cfg = configList.find(c => {
+          if (String(c.class_id) === String(cls.id)) return true;
+          const foundCls = classList.find(l => String(l.id) === String(c.class_id));
+          return foundCls && foundCls.name === cls.name;
+        });
+
+        let annualFee = 0;
+        if (cfg) {
+          if (cfg.mode === 'SAME') {
+            const monthlyVal = parseFloat(cfg.monthly_fees?.April || cfg.same_amount || 0);
+            annualFee = Math.round(monthlyVal * 12);
+          } else if (cfg.monthly_fees) {
+            const sum = Object.values(cfg.monthly_fees).reduce((acc, val) => acc + (parseFloat(val) || 0), 0);
+            annualFee = Math.round(sum);
+          }
+        }
+
+        return {
+          sNo: String(index + 1),
+          className: cls.name,
+          amountFormatted: `Rs. ${annualFee.toLocaleString('en-IN')}`
+        };
+      });
+
+      // Create A4 PDF Document (210mm x 297mm) using direct vector primitives
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const marginX = 15;
+      const printableWidth = pageWidth - (marginX * 2); // 180mm
+
+      // Header Positions
+      const titleY = 22;
+      const subtitleY = 28;
+      const tableTopY = 36;
+
+      // Render Centered Title
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16);
+      doc.setTextColor(15, 23, 42); // Dark Navy #0F172A
+      doc.text(headerTitle, pageWidth / 2, titleY, { align: 'center' });
+
+      // Render Centered Subtitle
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(71, 85, 105); // Slate Gray #475569
+      doc.text(headerSubtitle, pageWidth / 2, subtitleY, { align: 'center' });
+
+      // Table Row Height & Font Size Calculations to GUARANTEE 1 SINGLE PAGE
+      const totalRows = rowsData.length;
+      const availableHeight = pageHeight - tableTopY - 15; // 246mm
+      
+      const headerRowHeight = 9;
+      const maxDataRowHeight = 8.5;
+      const minDataRowHeight = 5;
+      
+      const dataRowHeight = Math.min(
+        maxDataRowHeight,
+        Math.max(minDataRowHeight, (availableHeight - headerRowHeight) / (totalRows + 1))
+      );
+
+      const fontSize = Math.min(10, Math.max(7.5, dataRowHeight * 1.05));
+
+      // Column Width Layout
+      const colSNoWidth = 25;
+      const colAmountWidth = 50;
+      const colClassWidth = printableWidth - colSNoWidth - colAmountWidth; // 105mm
+
+      const xSNo = marginX;
+      const xClass = marginX + colSNoWidth;
+      const xAmount = marginX + colSNoWidth + colClassWidth;
+
+      // Render Table Header Row (Dark Navy Background #0F172A)
+      doc.setFillColor(15, 23, 42);
+      doc.rect(marginX, tableTopY, printableWidth, headerRowHeight, 'F');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9.5);
+      doc.setTextColor(255, 255, 255); // White text
+
+      const headerTextY = tableTopY + (headerRowHeight / 2) + 1.2;
+      doc.text('S. NO.', xSNo + (colSNoWidth / 2), headerTextY, { align: 'center' });
+      doc.text('CLASS', xClass + 4, headerTextY, { align: 'left' });
+      doc.text('AMOUNT (Rs.)', xAmount + colAmountWidth - 4, headerTextY, { align: 'right' });
+
+      // Header Outer Border
+      doc.setDrawColor(30, 41, 59); // #1E293B
+      doc.setLineWidth(0.2);
+      doc.rect(marginX, tableTopY, printableWidth, headerRowHeight);
+
+      // Render Data Rows
+      doc.setFontSize(fontSize);
+
+      rowsData.forEach((row, idx) => {
+        const rowY = tableTopY + headerRowHeight + (idx * dataRowHeight);
+        const textY = rowY + (dataRowHeight / 2) + (fontSize * 0.12);
+
+        // Alternating Tint Background
+        if (idx % 2 === 1) {
+          doc.setFillColor(248, 250, 252); // #F8FAFC
+          doc.rect(marginX, rowY, printableWidth, dataRowHeight, 'F');
+        }
+
+        // Row Grid Borders
+        doc.setDrawColor(203, 213, 225); // #CBD5E1
+        doc.setLineWidth(0.15);
+        
+        doc.rect(marginX, rowY, printableWidth, dataRowHeight);
+        doc.line(xClass, rowY, xClass, rowY + dataRowHeight);
+        doc.line(xAmount, rowY, xAmount, rowY + dataRowHeight);
+
+        // 1. S. No (Centered)
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(51, 65, 85); // #334155
+        doc.text(row.sNo, xSNo + (colSNoWidth / 2), textY, { align: 'center' });
+
+        // 2. Class Name (Left Aligned)
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(15, 23, 42); // #0F172A
+        doc.text(row.className, xClass + 4, textY, { align: 'left' });
+
+        // 3. Amount (Right Aligned)
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(15, 23, 42); // #0F172A
+        doc.text(row.amountFormatted, xAmount + colAmountWidth - 4, textY, { align: 'right' });
+      });
+
+      // Save PDF directly to user's device!
+      doc.save(`Fee_Structure_${startYr}-${endYr}.pdf`);
+
+    } catch (err) {
+      console.error('Error generating Fee Structure PDF:', err);
+      setFeeError('Failed to generate Fee Structure PDF.');
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
 
   const handleConfirmSaveConfig = () => {
     setFeeError('');
@@ -581,25 +851,27 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
     const feesMap = {};
     const academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
     
-    if (feeMode === 'SAME') {
-      academicMonths.forEach(m => {
-        feesMap[m] = parseFloat(sameFeeAmount);
-      });
-    } else {
-      academicMonths.forEach(m => {
-        feesMap[m] = parseFloat(monthlyFeesMap[m]);
-      });
-    }
+    academicMonths.forEach(m => {
+      feesMap[m] = parseFloat(sameFeeAmount);
+    });
 
     try {
-      await schoolService.saveClassFeeConfiguration({
-        class_id: parseInt(selectedClassId, 10),
-        academic_year_id: activeYear.id,
-        mode: feeMode,
-        monthly_fees: feesMap
-      });
+      const selectedGroup = uniqueClassGroups.find(g => g.allIds.includes(String(selectedClassId)));
+      const idsToSave = selectedGroup ? selectedGroup.allIds : [String(selectedClassId)];
+
+      await Promise.all(
+        idsToSave.map(cid =>
+          schoolService.saveClassFeeConfiguration({
+            class_id: parseInt(cid, 10),
+            academic_year_id: activeYear.id,
+            mode: feeMode,
+            monthly_fees: feesMap
+          })
+        )
+      );
 
       setFeeSuccess('Fee configuration saved successfully.');
+      setTimeout(() => setFeeSuccess(''), 5000);
       setIsConfigLocked(false);
       fetchConfiguredClasses();
       setSelectedClassId('');
@@ -611,6 +883,10 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
 
   // Open modal to create a Draft Academic Year
   const openCreateModal = () => {
+    if (academicYears.some(y => y.status === 'Draft')) {
+      setError('A Draft academic year already exists. Promote or delete it first.');
+      return;
+    }
     setFormError('');
     // Calculate prefilled next session
     let nextSessionName = '';
@@ -975,7 +1251,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
       <Card className="shadow-sm">
         <CardHeader className="py-3 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-bold text-text-primary">Academic Years</CardTitle>
-          {!isReadOnly && (
+          {!isReadOnly && !academicYears.some(y => y.status === 'Draft') && (
             <Button onClick={openCreateModal} className="h-8 text-xs font-bold bg-primary text-white">
               Create Academic Year
             </Button>
@@ -1047,9 +1323,23 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
       </Card>
 
       {/* Class Fee Configuration Panel */}
-      <Card className="shadow-sm">
-        <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
+      <Card id="class-fee-config-panel" className="shadow-sm">
+        <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-bold text-text-primary">Class Fee Configuration</CardTitle>
+          <Button
+            onClick={handleDownloadFeeStructurePdf}
+            disabled={downloadingPdf}
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs gap-1.5 font-bold border-border shadow-none hover:bg-zinc-100 dark:hover:bg-zinc-800"
+          >
+            {downloadingPdf ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+            ) : (
+              <Download className="h-3.5 w-3.5 text-primary" />
+            )}
+            <span>Download Fee Structure</span>
+          </Button>
         </CardHeader>
         <CardContent className="p-6 space-y-4">
           {feeError && (
@@ -1064,14 +1354,14 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
             </div>
           )}
 
-          {!selectedClassId && (
-            <div className="p-3.5 bg-primary/5 border border-primary/10 rounded-xl flex items-center gap-2.5 text-xs text-primary font-bold">
+          {!selectedClassId && showSelectClassNotice && (
+            <div className="p-3.5 bg-primary/5 border border-primary/10 rounded-xl flex items-center gap-2.5 text-xs text-primary font-bold animate-in fade-in duration-300">
               <ShieldAlert className="h-4 w-4 text-primary flex-shrink-0" />
               <span>Please select a class to configure its fee structure.</span>
             </div>
           )}
 
-          <div className="flex flex-col sm:flex-row sm:items-end gap-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-end gap-6">
             <div className="w-full sm:w-[240px]">
               <label className="text-xs font-bold text-text-secondary uppercase block mb-2">Class *</label>
               <select
@@ -1081,114 +1371,58 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                 className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs"
               >
                 <option value="">Select Class</option>
-                {classes.map(c => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}{c.section ? ` - ${c.section}` : ''}
-                    {configuredClassIds.includes(String(c.id)) ? ' (Configured)' : ''}
+                {uniqueClassGroups.map(group => (
+                  <option key={group.name} value={group.primaryId}>
+                    {group.name}
+                    {group.isConfigured ? ' (Configured)' : ''}
                   </option>
                 ))}
               </select>
             </div>
+          </div>
 
-            <div className="flex-1 flex flex-col justify-end min-w-[280px]">
-              <label htmlFor="fee-mode" className="text-xs font-bold text-text-secondary uppercase mb-2">Fee Mode</label>
-              <div className="flex items-center gap-6 h-10">
-                <label className="flex items-center gap-2 text-xs font-bold uppercase cursor-pointer select-none">
-                  <input
-                    type="radio"
-                    name="feeMode"
-                    value="SAME"
-                    checked={feeMode === 'SAME'}
-                    disabled={!selectedClassId || isConfigLocked}
-                    onChange={() => setFeeMode('SAME')}
-                    className="rounded-full border-zinc-300 text-primary focus:ring-primary h-4 w-4"
-                  />
-                  Same fee for all months
-                </label>
-                <label className="flex items-center gap-2 text-xs font-bold uppercase cursor-pointer select-none">
-                  <input
-                    type="radio"
-                    name="feeMode"
-                    value="DIFFERENT"
-                    checked={feeMode === 'DIFFERENT'}
-                    disabled={!selectedClassId || isConfigLocked}
-                    onChange={() => setFeeMode('DIFFERENT')}
-                    className="rounded-full border-zinc-300 text-primary focus:ring-primary h-4 w-4"
-                  />
-                  Different fee every month
-                </label>
-              </div>
+          <div className="border-t border-border pt-4 mt-2 space-y-2 w-full sm:w-[240px]">
+            <label className="text-xs font-bold text-text-secondary uppercase block">Fee Amount</label>
+            <div className="relative">
+              <span className="absolute left-3 top-2.5 text-xs text-text-muted">₹</span>
+              <Input
+                type="number"
+                placeholder="e.g. 1500"
+                value={sameFeeAmount}
+                onChange={e => setSameFeeAmount(e.target.value)}
+                disabled={!selectedClassId || isConfigLocked}
+                className="pl-7 text-xs font-semibold w-full"
+              />
             </div>
+            <p className="text-[11px] text-text-muted">This amount will be applied to all 12 academic months automatically.</p>
           </div>
 
-          <div className="border-t border-border pt-4 mt-2">
-            {feeMode === 'SAME' ? (
-              <div className="space-y-2 w-full sm:w-[240px]">
-                <label className="text-xs font-bold text-text-secondary uppercase">Fee Amount</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-xs text-text-muted">₹</span>
-                  <Input id="fee-mode"
-                    type="number"
-                    placeholder="e.g. 1500"
-                    value={sameFeeAmount}
-                    onChange={e => setSameFeeAmount(e.target.value)}
-                    disabled={!selectedClassId || isConfigLocked}
-                    className="pl-7 text-xs font-semibold w-full"
-                  />
+          {selectedClassId && (isConfigLocked || isReadOnly) ? (
+            <div className="mt-6 p-4 bg-zinc-100 border border-zinc-200 dark:bg-zinc-900/50 dark:border-zinc-800 rounded-xl flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center">
+                  <Lock className="h-4 w-4 text-zinc-500" />
                 </div>
-                <p className="text-[11px] text-text-muted">This amount will be applied to all 12 academic months automatically.</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <p className="text-[11px] text-text-muted font-bold uppercase">Monthly Fees Grid</p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  {['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'].map(m => (
-                    <div key={m} className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-text-secondary uppercase">{m}</label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-2.5 text-xs text-text-muted">₹</span>
-                        <Input aria-label="0"
-                          type="number"
-                          placeholder="0"
-                          value={monthlyFeesMap[m] || ''}
-                          onChange={e => setMonthlyFeesMap(p => ({ ...p, [m]: e.target.value }))}
-                          disabled={!selectedClassId || isConfigLocked}
-                          className="pl-7 text-xs font-semibold"
-                        />
-                      </div>
-                    </div>
-                  ))}
+                <div>
+                  <p className="text-xs font-bold text-text-primary font-display">Fee Configuration Locked</p>
+                  <p className="text-[11px] text-text-muted mt-0.5">{isReadOnly ? 'Fee configuration cannot be modified in an archived academic year.' : 'This configuration is permanently locked for the active year.'}</p>
                 </div>
               </div>
-            )}
-
-            {selectedClassId && (isConfigLocked || isReadOnly) ? (
-              <div className="mt-6 p-4 bg-zinc-100 border border-zinc-200 dark:bg-zinc-900/50 dark:border-zinc-800 rounded-xl flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center">
-                    <Lock className="h-4 w-4 text-zinc-500" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-text-primary font-display">Fee Configuration Locked</p>
-                    <p className="text-[11px] text-text-muted mt-0.5">{isReadOnly ? 'Fee configuration cannot be modified in an archived academic year.' : 'This configuration is permanently locked for the active year.'}</p>
-                  </div>
-                </div>
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-zinc-200 text-zinc-600 border border-zinc-300">
-                  LOCKED
-                </span>
-              </div>
-            ) : (
-              <div className="mt-6 flex justify-end">
-                <Button 
-                  onClick={handleConfirmSaveConfig}
-                  disabled={!selectedClassId}
-                  className="font-bold flex items-center gap-1.5 shadow-sm bg-primary"
-                >
-                  Save Fee Configuration
-                </Button>
-              </div>
-            )}
-          </div>
+              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-zinc-200 text-zinc-600 border border-zinc-300">
+                LOCKED
+              </span>
+            </div>
+          ) : (
+            <div className="mt-6 flex justify-end">
+              <Button 
+                onClick={handleConfirmSaveConfig}
+                disabled={!selectedClassId}
+                className="font-bold flex items-center gap-1.5 shadow-sm bg-primary"
+              >
+                Save Fee Configuration
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -1722,7 +1956,16 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                   {classes.length === 0 ? (
                     <p className="text-center py-6 text-xs text-text-muted">No classes defined to promote students.</p>
                   ) : (
-                    classes.map(c => {
+                    [...classes].sort((a, b) => {
+                      const idxA = getClassIndex(a.name);
+                      const idxB = getClassIndex(b.name);
+                      if (idxA !== idxB) {
+                        if (idxA === -1) return 1;
+                        if (idxB === -1) return -1;
+                        return idxA - idxB;
+                      }
+                      return (a.section || '').localeCompare(b.section || '', undefined, { numeric: true, sensitivity: 'base' });
+                    }).map(c => {
                       const classStudents = students.filter(s => s.class_id === c.id && s.status === 'ACTIVE');
                       if (classStudents.length === 0) return null;
 

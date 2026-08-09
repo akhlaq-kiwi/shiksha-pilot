@@ -376,15 +376,33 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
     });
   }
 
-  void _showEnterMarksModal() {
-    final scheme = (_details['scheme'] as List<dynamic>?) ?? [];
+  void _showEnterMarksModal() async {
+    List<dynamic> scheme = (_details['scheme'] as List<dynamic>?) ?? [];
     if (scheme.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No scheduled subjects found for this exam timetable.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      try {
+        final freshData = await widget.examService.getExamDetails(
+          widget.examId,
+          widget.userRole,
+          widget.studentId,
+        );
+        if (mounted) {
+          setState(() {
+            _details = freshData;
+          });
+        }
+        scheme = (freshData['scheme'] as List<dynamic>?) ?? [];
+      } catch (_) {}
+    }
+
+    if (scheme.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No scheduled subjects found for this exam timetable.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
       return;
     }
 
@@ -475,12 +493,19 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                 isSaving = true;
               });
               try {
+                final isGradeSubject = (marksSheetData?['evaluation_type'] == 'grade') || (maxM == 0.0);
                 List<Map<String, dynamic>> marksPayload = [];
                 for (var s in studentsList) {
                   final sId = s['student_id'] as int;
                   final isAb = absentMap[sId] ?? false;
                   final valStr = marksControllers[sId]?.text.trim() ?? '';
-                  final val = double.tryParse(valStr);
+                  
+                  dynamic val;
+                  if (isGradeSubject) {
+                    val = isAb ? null : (valStr.isEmpty ? null : valStr);
+                  } else {
+                    val = isAb ? null : double.tryParse(valStr);
+                  }
 
                   marksPayload.add({
                     'student_id': sId,
@@ -749,34 +774,81 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                                   ),
                                                   const SizedBox(width: 8),
 
-                                                  // Marks Input Field - Editable only in Edit Mode & if Result Not Published
-                                                  SizedBox(
-                                                    width: 75,
-                                                    height: 42,
-                                                    child: TextField(
-                                                      controller: marksControllers[sId],
-                                                      enabled: isEditingMode && !isAb && !isResultPublished,
-                                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                                      inputFormatters: [
-                                                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                                                        MaxValueTextInputFormatter(maxM),
-                                                      ],
-                                                      textAlign: TextAlign.center,
-                                                      style: TextStyle(
-                                                        fontWeight: FontWeight.bold,
-                                                        fontSize: 14,
-                                                        color: (isEditingMode && !isResultPublished) ? Colors.black87 : Colors.indigo.shade900,
-                                                      ),
-                                                      decoration: InputDecoration(
-                                                        hintText: isAb ? 'ABS' : '0.0',
-                                                        hintStyle: TextStyle(fontSize: 12, color: isAb ? Colors.red : Colors.grey),
-                                                        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                                        filled: true,
-                                                        fillColor: isAb ? Colors.red.shade50 : ((isEditingMode && !isResultPublished) ? Colors.white : Colors.grey.shade100),
-                                                      ),
-                                                    ),
-                                                  ),
+                                                  // Marks/Grade Field - Editable only in Edit Mode & if Result Not Published
+                                                  (() {
+                                                    final currentPaper = scheme.firstWhere(
+                                                      (p) => ((p['subject_id'] is int) ? p['subject_id'] : int.tryParse(p['subject_id'].toString()) ?? 0) == selectedSubjectId,
+                                                      orElse: () => null,
+                                                    );
+                                                    final isGradeSubject = (marksSheetData?['evaluation_type'] == 'grade') ||
+                                                        (currentPaper?['evaluation_type'] == 'grade') ||
+                                                        (maxM == 0.0) ||
+                                                        ((double.tryParse(currentPaper?['max_marks']?.toString() ?? '') ?? -1) == 0.0);
+                                                    if (isGradeSubject) {
+                                                      final currentVal = marksControllers[sId]?.text.trim().toUpperCase();
+                                                      final apiGrades = (marksSheetData?['available_grades'] as List<dynamic>?)?.map((e) => e.toString()).toList();
+                                                      final validGrades = (apiGrades != null && apiGrades.isNotEmpty) ? apiGrades : ['A', 'B', 'C', 'D'];
+                                                      final selectedGrade = validGrades.contains(currentVal) ? currentVal : null;
+
+                                                      return SizedBox(
+                                                        width: 95,
+                                                        height: 42,
+                                                        child: DropdownButtonFormField<String>(
+                                                          value: isAb ? null : selectedGrade,
+                                                          decoration: InputDecoration(
+                                                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                                            filled: true,
+                                                            fillColor: isAb
+                                                                ? Colors.red.shade50
+                                                                : ((isEditingMode && !isResultPublished) ? Colors.white : Colors.grey.shade100),
+                                                          ),
+                                                          hint: Text(isAb ? 'ABS' : 'Grade', style: TextStyle(fontSize: 11, color: isAb ? Colors.red : Colors.grey, fontWeight: FontWeight.bold)),
+                                                          items: validGrades
+                                                              .map((g) => DropdownMenuItem<String>(
+                                                                    value: g,
+                                                                    child: Text(g, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                                                  ))
+                                                              .toList(),
+                                                          onChanged: (isEditingMode && !isAb && !isResultPublished)
+                                                              ? (val) {
+                                                                  setModalState(() {
+                                                                    marksControllers[sId]?.text = val ?? '';
+                                                                  });
+                                                                }
+                                                              : null,
+                                                        ),
+                                                      );
+                                                    } else {
+                                                      return SizedBox(
+                                                        width: 75,
+                                                        height: 42,
+                                                        child: TextField(
+                                                          controller: marksControllers[sId],
+                                                          enabled: isEditingMode && !isAb && !isResultPublished,
+                                                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                                          inputFormatters: [
+                                                            FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                                                            MaxValueTextInputFormatter(maxM),
+                                                          ],
+                                                          textAlign: TextAlign.center,
+                                                          style: TextStyle(
+                                                            fontWeight: FontWeight.bold,
+                                                            fontSize: 14,
+                                                            color: (isEditingMode && !isResultPublished) ? Colors.black87 : Colors.indigo.shade900,
+                                                          ),
+                                                          decoration: InputDecoration(
+                                                            hintText: isAb ? 'ABS' : '0.0',
+                                                            hintStyle: TextStyle(fontSize: 12, color: isAb ? Colors.red : Colors.grey),
+                                                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                                            filled: true,
+                                                            fillColor: isAb ? Colors.red.shade50 : ((isEditingMode && !isResultPublished) ? Colors.white : Colors.grey.shade100),
+                                                          ),
+                                                        ),
+                                                      );
+                                                    }
+                                                  })(),
                                                 ],
                                               );
                                             },
@@ -2526,6 +2598,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
     final bool schemePub = _details['scheme_published'] == 1;
     final bool admitPub = _details['admit_card_published'] == 1;
     final bool resultPub = _details['result_published'] == 1;
+    final bool hasPapers = (_details['has_papers'] == 1) || (_details['scheme'] is List && (_details['scheme'] as List).isNotEmpty);
     
     final bool admitCardRestricted = _details['admit_card_restricted'] == true;
     final bool resultRestricted = _details['result_restricted'] == true;
@@ -2596,16 +2669,18 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                       subtitle: schemePub ? 'View examination timetable scheme' : 'Not Published Yet',
                       icon: Icons.calendar_month_rounded,
                       isPublished: schemePub,
+                      disabledMessage: 'Examination scheme is not published yet.',
                       onTap: _showSchemeModal,
                     ),
 
-                    // 1b. Enter Marks Card (TEACHER only)
+                    // 1b. Enter Marks Card (TEACHER only - Requires papers added)
                     if (widget.userRole == 'TEACHER')
                       _buildFeatureCard(
                         title: 'Enter Marks',
-                        subtitle: 'Input student marks for assigned class',
+                        subtitle: hasPapers ? 'Input student marks for assigned class' : 'No Papers Added Yet',
                         icon: Icons.edit_note_rounded,
-                        isPublished: true,
+                        isPublished: hasPapers,
+                        disabledMessage: 'No papers have been added for this examination yet.',
                         onTap: _showEnterMarksModal,
                       ),
 
@@ -2616,6 +2691,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                         subtitle: admitPub ? 'View room & seat allocations' : 'Not Published Yet',
                         icon: Icons.badge_rounded,
                         isPublished: admitPub,
+                        disabledMessage: 'Admit card is not published yet.',
                         onTap: admitCardRestricted
                             ? () {
                                 Navigator.push(
@@ -2635,18 +2711,18 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                             : _showAdmitCardModal,
                       ),
 
-                    // 3. Result Card
-                    _buildFeatureCard(
-                      title: widget.userRole == 'TEACHER' ? 'Student Results' : 'Exam Result',
-                      subtitle: resultPub 
-                          ? (widget.userRole == 'TEACHER' ? 'View class performance breakdown' : 'View your report card')
-                          : 'Not Published Yet',
-                      icon: Icons.workspace_premium_rounded,
-                      isPublished: widget.userRole == 'TEACHER' ? true : resultPub,
-                      onTap: (widget.userRole != 'TEACHER' && resultRestricted)
-                          ? () {
-                              Navigator.push(
-                                context,
+                    // 3. Result Card (STUDENT/PARENT only - Hidden for Teachers to protect fee dues compliance)
+                    if (widget.userRole != 'TEACHER')
+                      _buildFeatureCard(
+                        title: 'Exam Result',
+                        subtitle: resultPub ? 'View your report card' : 'Not Published Yet',
+                        icon: Icons.workspace_premium_rounded,
+                        isPublished: resultPub,
+                        disabledMessage: 'Report card is not published yet.',
+                        onTap: resultRestricted
+                            ? () {
+                                Navigator.push(
+                                  context,
                                   MaterialPageRoute(
                                     builder: (context) => DueRestrictionScreen(
                                       title: 'Exam Result Temporarily Unavailable',
@@ -2659,8 +2735,8 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                   ),
                                 );
                               }
-                          : _showResultModal,
-                    ),
+                            : _showResultModal,
+                      ),
                   ],
                 ),
     );
@@ -2672,6 +2748,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
     required IconData icon,
     required bool isPublished,
     required VoidCallback onTap,
+    String? disabledMessage,
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
@@ -2697,7 +2774,18 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
         borderRadius: BorderRadius.circular(20),
         child: InkWell(
           borderRadius: BorderRadius.circular(20),
-          onTap: isPublished ? onTap : null,
+          onTap: () {
+            if (isPublished) {
+              onTap();
+            } else if (disabledMessage != null && disabledMessage.isNotEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(disabledMessage),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+          },
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
             child: Row(

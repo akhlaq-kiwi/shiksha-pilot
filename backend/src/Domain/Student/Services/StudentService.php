@@ -279,13 +279,10 @@ class StudentService extends BaseService
                     return $s['grade'];
                 }
             }
-            if ($pct >= 90) return 'A+';
-            if ($pct >= 80) return 'A';
-            if ($pct >= 70) return 'B+';
+            if ($pct >= 75) return 'A';
             if ($pct >= 60) return 'B';
-            if ($pct >= 50) return 'C';
-            if ($pct >= 40) return 'D';
-            return 'F';
+            if ($pct >= 40) return 'C';
+            return 'D';
         };
 
         // Fetch School Profile & Active Template Details
@@ -452,7 +449,6 @@ class StudentService extends BaseService
 
                 $subjectMarks[] = [
                     'subject_name' => $p['subject_name'],
-                    'paper_type' => $p['paper_type'] ?? 'Written',
                     'max_marks' => $maxM,
                     'passing_marks' => $passM,
                     'marks_obtained' => $absent ? 'ABSENT' : ($obtained !== null ? $obtained : '-'),
@@ -545,9 +541,21 @@ class StudentService extends BaseService
         $stmtCfg = $pdo->prepare("SELECT * FROM class_fee_configurations WHERE school_id = :sid AND class_id = :cid LIMIT 1");
         $stmtCfg->execute([':sid' => $schoolId, ':cid' => $classId]);
         $config = $stmtCfg->fetch();
+        if (!$config && $classId) {
+            $stmtFallback = $pdo->prepare("
+                SELECT cfg.* 
+                FROM class_fee_configurations cfg
+                JOIN classes c1 ON cfg.class_id = c1.id
+                JOIN classes c2 ON c1.name COLLATE utf8mb4_unicode_ci = c2.name COLLATE utf8mb4_unicode_ci AND c1.school_id = c2.school_id
+                WHERE cfg.school_id = :sid AND c2.id = :cid
+                LIMIT 1
+            ");
+            $stmtFallback->execute([':sid' => $schoolId, ':cid' => $classId]);
+            $config = $stmtFallback->fetch();
+        }
         $monthlyFeesAmountMap = [];
         if ($config) {
-            $monthlyFeesAmountMap = json_decode($config['monthly_fees'], true);
+            $monthlyFeesAmountMap = is_string($config['monthly_fees']) ? json_decode($config['monthly_fees'], true) : $config['monthly_fees'];
         }
 
         // 2. Fetch fee structures to find any fallback monthly fee
@@ -584,7 +592,7 @@ class StudentService extends BaseService
                 $monthlyFees[] = [
                     'id' => (int)$paymentsMap[$month]['id'],
                     'month' => $month,
-                    'amount' => (float)$paymentsMap[$month]['amount_paid'],
+                    'amount' => (int)round((float)$paymentsMap[$month]['amount_paid']),
                     'payment_date' => $paymentsMap[$month]['payment_date'],
                     'status' => 'Paid',
                     'receipt_no' => $paymentsMap[$month]['receipt_no']
@@ -593,7 +601,7 @@ class StudentService extends BaseService
                 $monthlyFees[] = [
                     'id' => 0,
                     'month' => $month,
-                    'amount' => $monthAmount,
+                    'amount' => (int)round($monthAmount),
                     'payment_date' => null,
                     'status' => 'Unpaid',
                     'receipt_no' => null
@@ -634,7 +642,7 @@ class StudentService extends BaseService
                 'id' => (int)$row['id'],
                 'description' => $row['fee_name'] === 'Transport Fees' ? 'Transport Fee' : $row['fee_name'],
                 'custom_description' => $row['description'] ?? '',
-                'amount' => $amt,
+                'amount' => (int)round($amt),
                 'payment_date' => $row['payment_date'],
                 'due_date' => $dueDate,
                 'status' => $isPaid ? 'Paid' : 'Pending'
@@ -647,9 +655,9 @@ class StudentService extends BaseService
         $totalOutstanding = $monthlyDue + $additionalDue;
 
         return [
-            'total_outstanding' => $totalOutstanding,
-            'monthly_due' => $monthlyDue,
-            'additional_due' => $additionalDue,
+            'total_outstanding' => (int)round($totalOutstanding),
+            'monthly_due' => (int)round($monthlyDue),
+            'additional_due' => (int)round($additionalDue),
             'monthly_fees' => $monthlyFees,
             'additional_fees' => $additionalFees
         ];
@@ -748,43 +756,54 @@ class StudentService extends BaseService
             $stmtGrp->execute([':receipt_no' => $receiptNo, ':sid' => $schoolId]);
             $groupPayments = $stmtGrp->fetchAll(PDO::FETCH_ASSOC) ?: [];
             
-            $academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
-            usort($groupPayments, function($a, $b) use ($academicMonths) {
-                $idxA = array_search($a['fee_month'], $academicMonths, true);
-                $idxB = array_search($b['fee_month'], $academicMonths, true);
-                return $idxA - $idxB;
-            });
-            
-            $rupee = "Rs";
-            $monthsList = array_column($groupPayments, 'fee_month');
-            $indices = [];
-            foreach ($monthsList as $m) {
-                $idx = array_search($m, $academicMonths, true);
-                if ($idx !== false) {
-                    $indices[] = $idx;
+            if (empty($groupPayments)) {
+                $feeMonthDisplay = !empty($payment['fee_month']) ? $payment['fee_month'] : 'April';
+                $totalAmountPaid = (float)($payment['amount_paid'] ?? 0.0);
+                $billingItemLabel = "Month: ";
+            } else {
+                $academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+                usort($groupPayments, function($a, $b) use ($academicMonths) {
+                    $idxA = array_search(trim($a['fee_month']), $academicMonths);
+                    $idxB = array_search(trim($b['fee_month']), $academicMonths);
+                    if ($idxA === false) $idxA = 99;
+                    if ($idxB === false) $idxB = 99;
+                    return $idxA - $idxB;
+                });
+                
+                $monthsList = array_values(array_filter(array_column($groupPayments, 'fee_month')));
+                if (empty($monthsList)) {
+                    $monthsList = [!empty($payment['fee_month']) ? $payment['fee_month'] : 'April'];
                 }
-            }
-            $isConsecutive = false;
-            if (count($indices) > 1) {
-                $isConsecutive = true;
-                for ($i = 1; $i < count($indices); $i++) {
-                    if ($indices[$i] !== $indices[$i - 1] + 1) {
-                        $isConsecutive = false;
-                        break;
+
+                $indices = [];
+                foreach ($monthsList as $m) {
+                    $idx = array_search(trim($m), $academicMonths);
+                    if ($idx !== false) {
+                        $indices[] = $idx;
                     }
                 }
+                $isConsecutive = false;
+                if (count($indices) > 1 && count($indices) === count($monthsList)) {
+                    $isConsecutive = true;
+                    for ($i = 1; $i < count($indices); $i++) {
+                        if ($indices[$i] !== $indices[$i - 1] + 1) {
+                            $isConsecutive = false;
+                            break;
+                        }
+                    }
+                }
+                if ($isConsecutive && count($monthsList) > 1) {
+                    $feeMonthDisplay = reset($monthsList) . " To " . end($monthsList);
+                } else {
+                    $feeMonthDisplay = implode(', ', $monthsList);
+                }
+                $totalAmountPaid = array_sum(array_column($groupPayments, 'amount_paid'));
+                $billingItemLabel = count($monthsList) > 1 ? "Months: " : "Month: ";
             }
-            if ($isConsecutive) {
-                $feeMonthDisplay = reset($monthsList) . " To " . end($monthsList);
-            } else {
-                $feeMonthDisplay = implode(', ', $monthsList);
-            }
-            $totalAmountPaid = array_sum(array_column($groupPayments, 'amount_paid'));
             $amountPaidFormatted = "Rs " . number_format((float)$totalAmountPaid, 0);
-            $billingItemLabel = count($groupPayments) > 1 ? "Months: " : "Month: ";
         } else {
-            $feeMonthDisplay = $payment['fee_name'];
-            $totalAmountPaid = (float)$payment['amount'];
+            $feeMonthDisplay = !empty($payment['fee_name']) ? $payment['fee_name'] : (!empty($payment['fee_month']) ? $payment['fee_month'] : 'Additional Fee');
+            $totalAmountPaid = (float)($payment['amount'] ?? 0.0);
             $amountPaidFormatted = "Rs " . number_format((float)$totalAmountPaid, 0);
             $billingItemLabel = "Description: ";
         }
@@ -819,7 +838,31 @@ class StudentService extends BaseService
         ];
     }
 
-    public function getNotifications(array $user): array
+    public function getNotifications(array $user, array $params = []): array
+    {
+        $schoolId = (int)($user['school_id'] ?? 0);
+        $userId = (int)($user['id'] ?? 0);
+        $role = strtoupper($user['role'] ?? '');
+        $limit = isset($params['limit']) ? max(1, (int)$params['limit']) : 10;
+        $offset = isset($params['offset']) ? max(0, (int)$params['offset']) : 0;
+        $pdo = $this->repo->getPdo();
+
+        $stmt = $pdo->prepare("
+            SELECT * FROM dashboard_notifications
+            WHERE school_id = :school_id AND (user_id = :user_id OR (user_role = :role AND user_id IS NULL))
+            ORDER BY id DESC
+            LIMIT :limit OFFSET :offset
+        ");
+        $stmt->bindValue(':school_id', $schoolId, PDO::PARAM_INT);
+        $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
+        $stmt->bindValue(':role', $role, PDO::PARAM_STR);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function deleteNotification(array $user, int $id): array
     {
         $schoolId = (int)($user['school_id'] ?? 0);
         $userId = (int)($user['id'] ?? 0);
@@ -827,12 +870,12 @@ class StudentService extends BaseService
         $pdo = $this->repo->getPdo();
 
         $stmt = $pdo->prepare("
-            SELECT * FROM dashboard_notifications
-            WHERE school_id = :school_id AND (user_id = :user_id OR (user_role = :role AND user_id IS NULL))
-            ORDER BY id DESC
+            DELETE FROM dashboard_notifications
+            WHERE id = :id AND school_id = :school_id AND (user_id = :user_id OR (user_role = :role AND user_id IS NULL))
         ");
-        $stmt->execute([':school_id' => $schoolId, ':user_id' => $userId, ':role' => $role]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $stmt->execute([':id' => $id, ':school_id' => $schoolId, ':user_id' => $userId, ':role' => $role]);
+
+        return ['success' => true];
     }
 
     public function markAllNotificationsRead(array $user): array
@@ -908,6 +951,7 @@ class StudentService extends BaseService
         $student = $this->resolveStudent($user);
         $classId = (int) $student['class_id'];
         $schoolId = (int) ($user['school_id'] ?? 0);
+        $academicYearId = (int) ($student['academic_year_id'] ?? 0);
         $pdo = $this->repo->getPdo();
 
         $stmt = $pdo->prepare("
@@ -916,17 +960,23 @@ class StudentService extends BaseService
                    COALESCE(ecs.admit_card_published, 0) AS admit_card_published,
                    COALESCE(ecs.status, 'Draft') AS result_status
             FROM examinations e
-            JOIN examination_papers ep ON e.id = ep.exam_id
-            LEFT JOIN examination_class_status ecs ON e.id = ecs.exam_id AND ecs.class_id = :class_id_1
-            WHERE ep.class_id = :class_id_2 
-              AND e.school_id = :school_id 
-              AND (e.status = 'Published' OR COALESCE(ecs.scheme_published, 0) = 1 OR COALESCE(ecs.admit_card_published, 0) = 1 OR ecs.status = 'Published')
-            ORDER BY e.start_date ASC, e.id ASC
+            LEFT JOIN examination_class_status ecs ON e.id = ecs.exam_id AND ecs.class_id = :class_id
+            WHERE e.school_id = :school_id 
+              AND e.status = 'Published'
+              AND (e.academic_year_id = :ayid OR :ayid_check = 0 OR e.academic_year_id IS NULL)
+            ORDER BY 
+              CASE 
+                WHEN LOWER(e.name) LIKE '%quarterly%' THEN 1 
+                WHEN LOWER(e.name) LIKE '%half%' THEN 2 
+                WHEN LOWER(e.name) LIKE '%annual%' THEN 3 
+                ELSE 4 
+              END ASC, e.start_date ASC, e.id ASC
         ");
         $stmt->execute([
-            ':class_id_1' => $classId,
-            ':class_id_2' => $classId,
-            ':school_id' => $schoolId
+            ':class_id' => $classId,
+            ':school_id' => $schoolId,
+            ':ayid' => $academicYearId,
+            ':ayid_check' => $academicYearId
         ]);
         $exams = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
@@ -1043,12 +1093,10 @@ class StudentService extends BaseService
         $stmtExam = $pdo->prepare("
             SELECT e.name, e.start_date, e.end_date 
             FROM examinations e
-            LEFT JOIN examination_class_status ecs ON e.id = ecs.exam_id AND ecs.class_id = :class_id
-            WHERE e.id = :id AND e.school_id = :sid 
-              AND (e.status = 'Published' OR COALESCE(ecs.scheme_published, 0) = 1 OR COALESCE(ecs.admit_card_published, 0) = 1 OR ecs.status = 'Published')
+            WHERE e.id = :id AND e.school_id = :sid AND e.status = 'Published'
             LIMIT 1
         ");
-        $stmtExam->execute([':id' => $examId, ':sid' => $schoolId, ':class_id' => $classId]);
+        $stmtExam->execute([':id' => $examId, ':sid' => $schoolId]);
         $exam = $stmtExam->fetch(PDO::FETCH_ASSOC);
         if (!$exam) {
             throw new NotFoundException('Examination not found.');

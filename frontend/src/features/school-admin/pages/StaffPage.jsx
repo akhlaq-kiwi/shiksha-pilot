@@ -290,8 +290,10 @@ export default function StaffPage() {
   const [success, setSuccess] = useState('');
   const [formErrors, setFormErrors] = useState({});
 
-  const loadStaff = async () => {
-    setLoading(true);
+  const loadStaff = async (showLoading = false) => {
+    if (showLoading || staff.length === 0) {
+      setLoading(true);
+    }
     setError('');
     try {
       const data = await schoolService.getStaff({ date: getLocalDateStr() });
@@ -320,7 +322,7 @@ export default function StaffPage() {
   const { isReadOnly } = useAcademicYear();
 
   useEffect(() => {
-    loadStaff();
+    loadStaff(true);
     const fetchTimetableSettings = async () => {
       try {
         const settings = await schoolAdminService.getTimetableSettings();
@@ -354,7 +356,7 @@ export default function StaffPage() {
     fetchYears();
 
     const handleYearSwitch = () => {
-      loadStaff();
+      loadStaff(true);
       if (selectedTeacherId && view === 'details') {
         loadTeacherDetails(selectedTeacherId);
       }
@@ -363,7 +365,7 @@ export default function StaffPage() {
     return () => {
       window.removeEventListener('academic-year-switched', handleYearSwitch);
     };
-  }, [selectedTeacherId, view]);
+  }, []);
 
   useEffect(() => {
     if (selectedTeacherId && view === 'details') {
@@ -667,18 +669,25 @@ export default function StaffPage() {
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       console.error(err);
+      let fieldErrors = {};
+
       if (err.data && typeof err.data === 'object') {
-        const errors = { ...err.data };
-        if (errors.phone) {
-          errors.phone = "Phone number already exists. Please use a different mobile number.";
+        if (err.data.errors && typeof err.data.errors === 'object') {
+          fieldErrors = { ...err.data.errors };
+        } else {
+          fieldErrors = { ...err.data };
         }
-        setFormErrors(errors);
-      } else if (err.message && (err.message.includes('contact number') || err.message.includes('phone') || err.message.includes('registered') || err.message.includes('exists'))) {
-        setFormErrors({
-          phone: "Phone number already exists. Please use a different mobile number."
-        });
       }
-      setError(err.message || 'Failed to save teacher details.');
+
+      if (!fieldErrors.phone && err.message && (err.message.includes('contact number') || err.message.includes('phone') || err.message.includes('registered') || err.message.includes('exists') || err.message.includes('other school') || err.message.includes('inactive') || err.message.includes('Inactive'))) {
+        fieldErrors.phone = err.message;
+      }
+
+      setFormErrors(fieldErrors);
+
+      if (Object.keys(fieldErrors).length === 0) {
+        setError(err.message || 'Failed to save teacher details.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -1517,15 +1526,18 @@ export default function StaffPage() {
                           console.error(`[Validation Error] Teacher ${t.name} has assigned periods (${rawAssigned}) exceeding max allowed (${max}).`);
                           assigned = max;
                         }
+                        const isInactive = String(t.status || '').toUpperCase() === 'INACTIVE';
                         const isOccupied = assigned === max;
                         return (
                           <>
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold uppercase border ${
-                              isOccupied 
-                                ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
-                                : 'bg-green-500/10 text-green-600 border-green-500/20'
+                              isInactive
+                                ? 'bg-red-500/10 text-red-600 border-red-500/20'
+                                : isOccupied 
+                                  ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+                                  : 'bg-green-500/10 text-green-600 border-green-500/20'
                             }`}>
-                              {isOccupied ? 'Occupied' : 'Available'}
+                              {isInactive ? 'Inactive' : isOccupied ? 'Occupied' : 'Available'}
                             </span>
                             
                             <span className="text-[11px] text-text-muted font-bold font-sans">
@@ -1552,7 +1564,7 @@ export default function StaffPage() {
           <Button variant="secondary" onClick={() => setIsAddStaffOpen(false)}>Cancel</Button>
           <Button onClick={handleAddStaff} disabled={submitting}>{submitting ? 'Saving...' : (newStaff.id ? 'Save Changes' : 'Add Teacher')}</Button>
         </>}>
-        <div className="max-h-[70vh] overflow-y-auto pr-2 space-y-6 pt-2">
+        <div className="space-y-6 pt-2">
           
           {/* SECTION 1 — Teacher Photo upload only (no section heading) */}
           <div className="space-y-2 border-b border-border pb-4">
@@ -1616,7 +1628,7 @@ export default function StaffPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-1.5">
                 <label htmlFor="phone" className="text-xs font-bold text-text-secondary uppercase">Contact Number <span className="text-red-500">*</span></label>
-                <Input id="phone" name="phone" value={newStaff.phone} onChange={handleTextChange} placeholder="10-digit mobile number" required />
+                <Input id="phone" name="phone" value={newStaff.phone} onChange={handleTextChange} placeholder="10-digit mobile number" className={formErrors.phone ? 'border-red-500 ring-1 ring-red-500' : ''} required />
                 {formErrors.phone && <p className="text-[11px] text-red-500 font-semibold">{formErrors.phone}</p>}
               </div>
               
@@ -1999,7 +2011,7 @@ export default function StaffPage() {
                   ₹{(() => {
                     const isJoiningMonth = teacherDetails?.joining_month_proration && teacherDetails?.joining_month_proration.month === disburseMonth;
                     const amount = isJoiningMonth ? teacherDetails.joining_month_proration.payable_salary : (teacherDetails?.salary || 0);
-                    return parseFloat(amount).toLocaleString('en-IN');
+                    return Math.round(parseFloat(amount)).toLocaleString('en-IN');
                   })()}
                   {teacherDetails?.joining_month_proration && teacherDetails?.joining_month_proration.month === disburseMonth && ' (Prorated)'}
                 </span>
@@ -2253,7 +2265,7 @@ export default function StaffPage() {
                     <p>Payment Transaction ID: <span className="text-zinc-800 font-mono font-bold">TXN-SL-{String(selectedSlipPayment.id).padStart(5, '0')}</span></p>
                   </div>
                   <div className="text-right">
-                    <p>Slip Generated Date: <span className="text-zinc-800 font-bold">{formatDate(new Date().toISOString().split('T')[0])}</span></p>
+                    <p>Slip Generated Date: <span className="text-zinc-800 font-bold">{formatDate((() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })())}</span></p>
                     <p>Payment Status: <span className="text-green-600 font-bold uppercase">PAID</span></p>
                   </div>
                 </div>
@@ -2363,10 +2375,10 @@ export default function StaffPage() {
             <div className="p-3.5 bg-zinc-50 dark:bg-zinc-900 border border-border rounded-xl space-y-1">
               <p className="text-[11px] font-bold uppercase text-text-muted tracking-wider">Calculated Experience Tenure</p>
               <p className="text-sm font-bold text-indigo-600 dark:text-indigo-400">
-                {calculateExperience(effectiveJoiningDate, teacherDetails?.exit_date || new Date().toISOString().split('T')[0]) || '0 Days'}
+                {calculateExperience(effectiveJoiningDate, teacherDetails?.exit_date || (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })()) || '0 Days'}
               </p>
               <p className="text-[11px] text-text-muted italic">
-                From {formatDate(effectiveJoiningDate)} to {formatDate(teacherDetails?.exit_date || new Date().toISOString().split('T')[0])}
+                From {formatDate(effectiveJoiningDate)} to {formatDate(teacherDetails?.exit_date || (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })())}
               </p>
             </div>
           </div>
@@ -2440,13 +2452,13 @@ export default function StaffPage() {
               {/* Letter Body */}
               <div className="text-sm text-zinc-800 leading-relaxed space-y-6 pt-6 text-justify">
                 <p>
-                  This is to certify that <strong>Mr./Ms. {teacherDetails?.name}</strong>, son/daughter of <strong>Mr. {teacherDetails?.father_name || '—'}</strong>, was employed with <strong>{schoolProfile?.name || 'ABC Public School'}</strong> as a <strong>Teacher</strong> teaching the subject of <strong>{teacherDetails?.department || 'General'}</strong> from <strong>{formatDateFull(effectiveJoiningDate)}</strong> to <strong>{formatDateFull(teacherDetails?.exit_date || new Date().toISOString().split('T')[0])}</strong>.
+                  This is to certify that <strong>Mr./Ms. {teacherDetails?.name}</strong>, son/daughter of <strong>Mr. {teacherDetails?.father_name || '—'}</strong>, was employed with <strong>{schoolProfile?.name || 'ABC Public School'}</strong> as a <strong>Teacher</strong> teaching the subject of <strong>{teacherDetails?.department || 'General'}</strong> from <strong>{formatDateFull(effectiveJoiningDate)}</strong> to <strong>{formatDateFull(teacherDetails?.exit_date || (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })())}</strong>.
                 </p>
                 <p>
                   During his/her tenure of service, he/she carried out the assigned responsibilities sincerely, maintained professional conduct, demonstrated dedication toward students, and contributed positively to the academic environment of the school.
                 </p>
                 <p>
-                  His/Her total experience with our institution is calculated as <strong>{calculateExperience(effectiveJoiningDate, teacherDetails?.exit_date || new Date().toISOString().split('T')[0])}</strong>.
+                  His/Her total experience with our institution is calculated as <strong>{calculateExperience(effectiveJoiningDate, teacherDetails?.exit_date || (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })())}</strong>.
                 </p>
                 <p>
                   We highly appreciate his/her valuable services and contribution during the tenure and wish him/her success in all future endeavors.

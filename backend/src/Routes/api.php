@@ -12,6 +12,7 @@ use App\Domain\Teacher\Controllers\TeacherController;
 use App\Domain\Student\Controllers\StudentController;
 use App\Domain\SchoolAdmin\Controllers\LeaveRequestController;
 use App\Domain\Student\Controllers\VocabularyController;
+use App\Domain\Teacher\Controllers\HomeworkController;
 
 use App\Domain\Platform\Controllers\ReportCardTemplateController;
 
@@ -62,6 +63,7 @@ return function (App $app) {
     $app->get('/api/school/stats', [SchoolAdminController::class, 'getDashboardStats']);
     $app->get('/api/school/students', [SchoolAdminController::class, 'getStudents']);
     $app->get('/api/school/students/check-sr-no', [SchoolAdminController::class, 'checkSrNo']);
+    $app->get('/api/school/students/check-roll-no', [SchoolAdminController::class, 'checkRollNo']);
     $app->get('/api/school/students/{id}', [SchoolAdminController::class, 'getStudentById']);
     $app->get('/api/school/students/{student_id}/fees/receipt', [SchoolAdminController::class, 'getFeeReceipt']);
     $app->post('/api/school/students', [SchoolAdminController::class, 'createStudent']);
@@ -97,6 +99,13 @@ return function (App $app) {
     $app->post('/api/school/additional-fees/payments/{id}/pay', [SchoolAdminController::class, 'collectAdditionalFeePayment']);
     $app->post('/api/school/additional-fees/payments/{id}/revert', [SchoolAdminController::class, 'revertAdditionalFeePayment']);
 
+    // Transport Fee Management
+    $app->get('/api/school/transport-fees', [SchoolAdminController::class, 'getTransportFees']);
+    $app->post('/api/school/transport-fees', [SchoolAdminController::class, 'assignTransportFee']);
+    $app->put('/api/school/transport-fees/{id}', [SchoolAdminController::class, 'updateTransportFee']);
+    $app->delete('/api/school/transport-fees/{id}', [SchoolAdminController::class, 'deleteTransportFee']);
+    $app->put('/api/school/transport-fees/{id}/status', [SchoolAdminController::class, 'toggleTransportFeeStatus']);
+
     // Late Payment Penalty Management
     $app->get('/api/school/late-payment-penalty/stats', [SchoolAdminController::class, 'getLatePaymentPenaltyStats']);
     $app->get('/api/school/late-payment-penalty/config', [SchoolAdminController::class, 'getLatePaymentPenaltyConfig']);
@@ -110,6 +119,7 @@ return function (App $app) {
     $app->post('/api/school/finance-settings', [SchoolAdminController::class, 'saveFinanceSettings']);
 
 
+    $app->get('/api/school/master-catalog', [SchoolAdminController::class, 'getMasterCatalog']);
     $app->get('/api/school/classes', [SchoolAdminController::class, 'getClasses']);
     $app->post('/api/school/classes', [SchoolAdminController::class, 'createClass']);
     $app->put('/api/school/classes', [SchoolAdminController::class, 'updateClass']);
@@ -187,6 +197,7 @@ return function (App $app) {
     // Persisted Dashboard Notifications
     $app->get('/api/school/notifications', [SchoolAdminController::class, 'getNotifications']);
     $app->post('/api/school/notifications/{id}/read', [SchoolAdminController::class, 'markNotificationRead']);
+    $app->delete('/api/school/notifications/{id}', [SchoolAdminController::class, 'deleteNotification']);
 
     // Announcements Domain
     $app->get('/api/school/announcements', [SchoolAdminController::class, 'getAnnouncements']);
@@ -267,6 +278,9 @@ return function (App $app) {
     $app->get('/api/teacher/schedule/today', [TeacherController::class, 'getTodaySchedule']);
     $app->get('/api/teacher/salaries', [TeacherController::class, 'getSalaries']);
     $app->get('/api/teacher/salaries/receipt', [TeacherController::class, 'getSalarySlip']);
+    $app->get('/api/teacher/notifications', [TeacherController::class, 'getNotifications']);
+    $app->post('/api/teacher/notifications/{id}/read', [TeacherController::class, 'markNotificationRead']);
+    $app->delete('/api/teacher/notifications/{id}', [TeacherController::class, 'deleteNotification']);
 
     // Student / Parent Domain
     $app->get('/api/student/dashboard', [StudentController::class, 'getDashboard']);
@@ -285,6 +299,16 @@ return function (App $app) {
     $app->get('/api/student/notifications', [StudentController::class, 'getNotifications']);
     $app->post('/api/student/notifications/read-all', [StudentController::class, 'markAllNotificationsRead']);
     $app->post('/api/student/notifications/{id}/read', [StudentController::class, 'markNotificationRead']);
+    $app->delete('/api/student/notifications/{id}', [StudentController::class, 'deleteNotification']);
+
+    // Homework Module
+    $app->post('/api/homework/upload-attachment', [HomeworkController::class, 'uploadAttachment']);
+    $app->get('/api/teacher/homework', [HomeworkController::class, 'getTeacherHomework']);
+    $app->post('/api/teacher/homework', [HomeworkController::class, 'createHomework']);
+    $app->put('/api/teacher/homework/{id}', [HomeworkController::class, 'updateHomework']);
+    $app->delete('/api/teacher/homework/{id}', [HomeworkController::class, 'deleteHomework']);
+    $app->get('/api/student/homework', [HomeworkController::class, 'getStudentHomework']);
+    $app->get('/uploads/{filename:.+}', [HomeworkController::class, 'serveUpload']);
 
     // Word Builder Game endpoints
     $app->get('/api/student/game/word-builder/progress', [VocabularyController::class, 'getGameProgress']);

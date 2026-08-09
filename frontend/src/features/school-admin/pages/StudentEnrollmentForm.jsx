@@ -366,7 +366,10 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
           setFormData(prev => ({
             ...prev,
             academic_year_id: currentYear ? currentYear.id : (years[0]?.id || ''),
-            admission_date: new Date().toISOString().split('T')[0]
+            admission_date: (() => {
+              const d = new Date();
+              return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            })()
           }));
         }
       } catch (err) {
@@ -378,16 +381,32 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
     loadFormDependencies();
   }, [studentId]);
 
-  // Pre-fetch next available roll number for the class
+  // Helper to extract primitive roll_no from response
+  const extractRollNoNumber = (data) => {
+    if (data === null || data === undefined) return '';
+    if (typeof data === 'number' || typeof data === 'string') return String(data);
+    if (typeof data === 'object') {
+      if (data.next_roll_no !== undefined && data.next_roll_no !== null) {
+        return extractRollNoNumber(data.next_roll_no);
+      }
+      if (data.data !== undefined && data.data !== null) {
+        return extractRollNoNumber(data.data);
+      }
+    }
+    return '';
+  };
+
+  // Pre-fetch next available roll number for the class / section
   useEffect(() => {
     const fetchNextRollNo = async () => {
       if (formData.class_id && !studentId) {
         try {
           const res = await schoolService.getNextRollNo(formData.class_id);
-          if (res && res.next_roll_no) {
+          const nextVal = extractRollNoNumber(res);
+          if (nextVal) {
             setFormData(prev => ({
               ...prev,
-              roll_no: String(res.next_roll_no)
+              roll_no: nextVal
             }));
           }
         } catch (err) {
@@ -397,6 +416,7 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
     };
     fetchNextRollNo();
   }, [formData.class_id, studentId]);
+
 
   // Set default class fields from props for new student
   useEffect(() => {
@@ -838,30 +858,31 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
     setSubmitting(true);
     setErrors({});
 
-    const nameParts = splitName(formData.student_name);
-    const isSame = formData.same_as_current === 1;
-    const currentAddress = (formData.current_address_line_1 || '').trim() + 
-      (formData.current_address_line_2 ? ', ' + formData.current_address_line_2.trim() : '');
-    const permanentAddress = isSame 
-      ? currentAddress 
-      : ((formData.permanent_address_line_1 || '').trim() + 
-         (formData.permanent_address_line_2 ? ', ' + formData.permanent_address_line_2.trim() : ''));
-
-    const submitPayload = {
-      ...formData,
-      first_name: nameParts.first_name,
-      middle_name: nameParts.middle_name,
-      last_name: nameParts.last_name,
-      current_address_line: currentAddress,
-      permanent_address_line: permanentAddress,
-      permanent_city: isSame ? formData.current_city : formData.permanent_city,
-      permanent_state: isSame ? formData.current_state : formData.permanent_state,
-      permanent_country: isSame ? (formData.current_country || 'India') : (formData.permanent_country || 'India'),
-      permanent_pin_code: isSame ? formData.current_pin_code : formData.permanent_pin_code,
-      class_name: selectedClassName
-    };
-
     try {
+      const nameParts = splitName(formData.student_name);
+      const isSame = formData.same_as_current === 1;
+      const currentAddress = (formData.current_address_line_1 || '').trim() + 
+        (formData.current_address_line_2 ? ', ' + formData.current_address_line_2.trim() : '');
+      const permanentAddress = isSame 
+        ? currentAddress 
+        : ((formData.permanent_address_line_1 || '').trim() + 
+           (formData.permanent_address_line_2 ? ', ' + formData.permanent_address_line_2.trim() : ''));
+
+      const submitPayload = {
+        ...formData,
+        first_name: nameParts.first_name,
+        middle_name: nameParts.middle_name,
+        last_name: nameParts.last_name,
+        current_address_line: currentAddress,
+        permanent_address_line: permanentAddress,
+        permanent_city: isSame ? formData.current_city : formData.permanent_city,
+        permanent_state: isSame ? formData.current_state : formData.permanent_state,
+        permanent_country: isSame ? (formData.current_country || 'India') : (formData.permanent_country || 'India'),
+        permanent_pin_code: isSame ? formData.current_pin_code : formData.permanent_pin_code,
+        class_id: formData.class_id,
+        class_name: selectedClassName
+      };
+
       if (studentId) {
         await schoolService.updateStudent(studentId, submitPayload);
       } else {
@@ -870,11 +891,33 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
       onSuccess();
     } catch (err) {
       console.error(err);
+      let fieldErrors = {};
+
+      if (err.data && typeof err.data === 'object') {
+        if (err.data.errors && typeof err.data.errors === 'object') {
+          fieldErrors = { ...err.data.errors };
+        } else {
+          fieldErrors = { ...err.data };
+        }
+      }
+
+      if (err.message && (err.message.includes('registered') || err.message.includes('phone') || err.message.includes('contact') || err.message.includes('already') || err.message.includes('Admin'))) {
+        fieldErrors.student_mobile = fieldErrors.student_mobile || fieldErrors.phone || fieldErrors.parent_phone || fieldErrors.father_phone || err.message;
+      }
+
+      if (fieldErrors.phone || fieldErrors.parent_phone || fieldErrors.father_phone) {
+        fieldErrors.student_mobile = fieldErrors.student_mobile || fieldErrors.phone || fieldErrors.parent_phone || fieldErrors.father_phone;
+      }
+
       if (err.data && err.data.subscription_limit_reached) {
         setShowLimitReached({ limit: err.data.limit });
+      } else if (Object.keys(fieldErrors).length > 0) {
+        setErrors(fieldErrors);
+        setActiveTab(1); // Jump back to Basic Details tab so user sees the inline field error!
       } else if (err.message && err.message.includes('{')) {
         try {
           setErrors(JSON.parse(err.message));
+          setActiveTab(1);
         } catch {
           setErrors({ form: err.message });
         }
@@ -922,13 +965,11 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
         </button>
       </div>
 
-      {/*
-        Top-of-form summary with jump links. On a 4-tab, 1400+ line form a
-        field-level message can be scrolled hundreds of pixels out of view -
-        this makes every current error visible and actionable from one place,
-        whether it came from client validation or the server on submit.
-      */}
-      <FormErrorSummary errors={errors} title="Please fix the following before continuing" />
+      {errors.form && (
+        <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl text-xs font-semibold">
+          {errors.form}
+        </div>
+      )}
 
       {/* Tabs list (4 steps sequence) */}
       <div className="flex border-b border-border text-sm overflow-x-auto whitespace-nowrap scrollbar-none gap-4">
@@ -1156,9 +1197,10 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                       <Input id="roll_no"
                         name="roll_no"
                         value={formData.roll_no || ''}
-                        onChange={handleTextChange}
+                        onChange={handleNumericChange}
                         placeholder="e.g. 15"
                       />
+                      {errors.roll_no && <p className="text-[11px] text-red-500 font-semibold">{errors.roll_no}</p>}
                     </div>
                   </div>
 
@@ -1196,15 +1238,11 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
               <div className="space-y-6 animate-in fade-in duration-200">
                 <div>
                   <h3 className="text-sm font-bold text-text-primary uppercase tracking-wide border-b border-border pb-2 mb-4">Current Address</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4">
                     <div className="space-y-1.5">
-                      <label htmlFor="current_address_line_1" className="text-xs font-bold text-text-secondary uppercase">Address Line 1 <span className="text-red-500">*</span></label>
+                      <label htmlFor="current_address_line_1" className="text-xs font-bold text-text-secondary uppercase">Address <span className="text-red-500">*</span></label>
                       <Input id="current_address_line_1" name="current_address_line_1" value={formData.current_address_line_1} onChange={handleTextChange} placeholder="House no, street, locality..." required />
                       {errors.current_address_line_1 && <p className="text-[11px] text-red-500 font-semibold">{errors.current_address_line_1}</p>}
-                    </div>
-                    <div className="space-y-1.5">
-                      <label htmlFor="current_address_line_2" className="text-xs font-bold text-text-secondary uppercase">Address Line 2</label>
-                      <Input id="current_address_line_2" name="current_address_line_2" value={formData.current_address_line_2} onChange={handleTextChange} placeholder="Apartment, suite, unit, etc. (optional)" />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-3">
@@ -1253,15 +1291,11 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
 
                   {formData.same_as_current === 0 && (
                     <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 gap-4">
                         <div className="space-y-1.5">
-                          <label htmlFor="permanent_address_line_1" className="text-xs font-bold text-text-secondary uppercase">Permanent Address Line 1 <span className="text-red-500">*</span></label>
+                          <label htmlFor="permanent_address_line_1" className="text-xs font-bold text-text-secondary uppercase">Permanent Address <span className="text-red-500">*</span></label>
                           <Input id="permanent_address_line_1" name="permanent_address_line_1" value={formData.permanent_address_line_1} onChange={handleTextChange} placeholder="House no, street, locality..." required />
                           {errors.permanent_address_line_1 && <p className="text-[11px] text-red-500 font-semibold">{errors.permanent_address_line_1}</p>}
-                        </div>
-                        <div className="space-y-1.5">
-                          <label htmlFor="permanent_address_line_2" className="text-xs font-bold text-text-secondary uppercase">Permanent Address Line 2</label>
-                          <Input id="permanent_address_line_2" name="permanent_address_line_2" value={formData.permanent_address_line_2} onChange={handleTextChange} placeholder="Apartment, suite, unit, etc. (optional)" />
                         </div>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

@@ -108,14 +108,14 @@ export function OnboardingChecklist({ items = [], scopeKey = 'default', title = 
               >
                 <span
                   className={twMerge(
-                    'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border-2',
-                    item.done ? 'border-success-500 bg-success-500 text-white' : 'border-border-strong'
+                    'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border-2 transition-colors',
+                    item.done ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-zinc-300 dark:border-zinc-600 bg-transparent'
                   )}
                   aria-hidden="true"
                 >
-                  {item.done && <Check className="h-3 w-3" strokeWidth={3} />}
+                  {item.done && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
                 </span>
-                <span className={twMerge('text-body-md', item.done && 'line-through')}>
+                <span className={twMerge('text-body-md transition-colors', item.done ? 'text-text-primary font-medium' : 'text-text-secondary')}>
                   {item.label}
                 </span>
               </button>

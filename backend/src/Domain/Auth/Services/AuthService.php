@@ -54,18 +54,75 @@ class AuthService extends BaseService
 
         if ($user === null) {
             $this->logAuditDirect(['email' => $phone, 'role' => 'Guest'], 'Security', 'Failed Login Attempt', 'Failed login attempt for unregistered phone number ' . $phone);
-            throw new \App\Shared\Exceptions\ValidationException(['phone' => 'Mobile No not found']);
+            throw new \App\Shared\Exceptions\ValidationException(
+                ['phone' => 'No account found with this mobile number.'],
+                'No account found with this mobile number.'
+            );
         }
 
         if (!password_verify($password, (string) ($user['password'] ?? ''))) {
             $this->logAuditDirect($user, 'Security', 'Failed Login Attempt', 'Failed login attempt for user "' . ($user['name'] ?? $user['email']) . '"');
-            throw new \App\Shared\Exceptions\ValidationException(['password' => 'Incorrect password']);
+            throw new \App\Shared\Exceptions\ValidationException(
+                ['password' => 'Incorrect password. Please try again.'],
+                'Incorrect password. Please try again.'
+            );
         }
 
-        if (($user['status'] ?? '') !== 'ACTIVE' || (isset($user['school_id']) && $user['school_id'] !== null && ($user['school_status'] ?? '') !== 'ACTIVE')) {
-            $this->logAuditDirect($user, 'Security', 'Failed Login Attempt', 'Failed login attempt for inactive user "' . ($user['name'] ?? $user['email']) . '"');
-            throw new \App\Shared\Exceptions\ValidationException(['phone' => 'Account is inactive. Please contact admin.']);
+        $role = strtoupper($user['role'] ?? '');
+        $schoolId = isset($user['school_id']) ? (int)$user['school_id'] : 0;
+        $pdo = $this->repo->getPdo();
+
+        $isInactive = (($user['status'] ?? '') !== 'ACTIVE');
+
+        if ($schoolId > 0 && ($user['school_status'] ?? '') !== 'ACTIVE') {
+            $isInactive = true;
         }
+
+        // For Teacher/Staff role: check if staff profile in school is inactive or exit_date set
+        if (!$isInactive && ($role === 'TEACHER' || $role === 'STAFF') && $schoolId > 0) {
+            $stmtStaff = $pdo->prepare("
+                SELECT status, exit_date FROM staff 
+                WHERE school_id = :sid AND phone = :phone 
+                ORDER BY id DESC LIMIT 1
+            ");
+            $stmtStaff->execute([':sid' => $schoolId, ':phone' => $phone]);
+            $staffRow = $stmtStaff->fetch(\PDO::FETCH_ASSOC);
+            if ($staffRow) {
+                $sStatus = strtoupper((string)($staffRow['status'] ?? ''));
+                if ($sStatus !== 'ACTIVE' || !empty($staffRow['exit_date'])) {
+                    $isInactive = true;
+                }
+            }
+        }
+
+        // For Student/Parent role: check if all matching student profiles are inactive
+        if (!$isInactive && ($role === 'STUDENT' || $role === 'PARENT') && $schoolId > 0) {
+            $stmtStu = $pdo->prepare("
+                SELECT COUNT(*) FROM students 
+                WHERE school_id = :sid 
+                  AND (parent_phone = :p1 OR father_phone = :p2 OR student_mobile = :p3)
+                  AND (status IS NULL OR UPPER(status) = 'ACTIVE')
+                  AND exit_date IS NULL
+            ");
+            $stmtStu->execute([':sid' => $schoolId, ':p1' => $phone, ':p2' => $phone, ':p3' => $phone]);
+            $activeStuCount = (int)$stmtStu->fetchColumn();
+            if ($activeStuCount === 0) {
+                $isInactive = true;
+            }
+        }
+
+        if ($isInactive) {
+            $stmtOff = $pdo->prepare("UPDATE users SET status = 'INACTIVE' WHERE id = :id");
+            $stmtOff->execute([':id' => $user['id']]);
+
+            $this->logAuditDirect($user, 'Security', 'Failed Login Attempt', 'Failed login attempt for inactive user "' . ($user['name'] ?? $user['email']) . '"');
+            throw new \App\Shared\Exceptions\ValidationException(
+                ['phone' => 'Your account marked as Inactive Please contact Academy management'],
+                'Your account marked as Inactive Please contact Academy management'
+            );
+        }
+
+
 
         // Apply Login Matrix restrictions based on clientType
         $role = strtoupper($user['role'] ?? '');
@@ -139,15 +196,26 @@ class AuthService extends BaseService
             throw new \App\Shared\Exceptions\NotFoundException('User not found.');
         }
 
-        // Strictly verify current password for mobile roles (TEACHER / STUDENT)
-        if ($currentPassword !== null || $role === 'TEACHER' || $role === 'STUDENT') {
-            if ($currentPassword === null || !password_verify($currentPassword, (string) ($user['password'] ?? ''))) {
-                throw new \App\Shared\Exceptions\ValidationException(['current_password' => 'Incorrect current password.']);
+        // Strictly verify current password for mobile roles
+        if ($currentPassword !== null || in_array($role, ['TEACHER', 'STUDENT', 'PARENT', 'SCHOOL_ADMIN'], true)) {
+            if ($currentPassword === null || trim((string)$currentPassword) === '') {
+                throw new \App\Shared\Exceptions\ValidationException(['current_password' => 'Current password is required.']);
+            }
+            if (!password_verify($currentPassword, (string) ($user['password'] ?? ''))) {
+                throw new \App\Shared\Exceptions\ValidationException(['current_password' => 'Current password is incorrect.'], 'Current password is incorrect.');
             }
         }
 
+        if (empty(trim($newPassword))) {
+            throw new \App\Shared\Exceptions\ValidationException(['new_password' => 'New password is required.']);
+        }
+
+        if ($currentPassword !== null && password_verify($newPassword, (string) ($user['password'] ?? ''))) {
+            throw new \App\Shared\Exceptions\ValidationException(['new_password' => 'New password must be different from current password.']);
+        }
+
         if (strlen($newPassword) < 6) {
-            throw new \App\Shared\Exceptions\ValidationException(['password' => 'Password must be at least 6 characters.']);
+            throw new \App\Shared\Exceptions\ValidationException(['new_password' => 'New password must be at least 6 characters.']);
         }
 
         $this->repo->updatePassword($userId, $newPassword);

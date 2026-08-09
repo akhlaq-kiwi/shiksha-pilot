@@ -22,6 +22,10 @@ import 'package:school_hub/main.dart';
 import 'package:school_hub/services/exam_service.dart';
 import 'package:school_hub/screens/exam_list_screen.dart';
 import 'package:school_hub/screens/achievements_screen.dart';
+import 'package:school_hub/screens/homework_list_screen.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:school_hub/screens/user_profile_screen.dart';
+import 'package:school_hub/widgets/change_password_dialog.dart';
 
 class LauncherFeature {
   final String name;
@@ -109,6 +113,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       icon: Icons.menu_book_rounded,
       color: Colors.indigo,
       allowedRoles: ['PARENT', 'TEACHER', 'STUDENT'],
+      isAvailable: true,
     ),
     LauncherFeature(
       name: 'Timetable',
@@ -305,7 +310,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _syncProfileDetails(String token) async {
     try {
-      final authService = AuthService(baseUrl: 'http://10.55.253.71:8000');
+      final authService = AuthService(baseUrl: widget.leaveService.baseUrl);
       final profile = await authService.fetchProfile(token);
       
       final latestPhoto = (profile['photo_path'] as String?) ?? (profile['staff_photo_path'] as String?) ?? '';
@@ -386,13 +391,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (token.isEmpty) return;
       final baseUrl = widget.leaveService.baseUrl;
 
-      final isSchoolStaff = widget.userRole.toUpperCase() == 'TEACHER' || 
-                            widget.userRole.toUpperCase() == 'SCHOOL_ADMIN' || 
-                            widget.userRole.toUpperCase() == 'PRINCIPAL';
-
-      final path = isSchoolStaff 
-          ? '/api/school/notifications' 
-          : '/api/student/notifications';
+      final roleUpper = widget.userRole.toUpperCase();
+      final String path;
+      final bool isSchoolStaff;
+      if (roleUpper == 'TEACHER') {
+        path = '/api/teacher/notifications';
+        isSchoolStaff = true;
+      } else if (roleUpper == 'SCHOOL_ADMIN' || roleUpper == 'PRINCIPAL' || roleUpper == 'SUPER_ADMIN') {
+        path = '/api/school/notifications';
+        isSchoolStaff = true;
+      } else {
+        path = '/api/student/notifications';
+        isSchoolStaff = false;
+      }
 
       final uri = Uri.parse('$baseUrl$path');
 
@@ -416,18 +427,29 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           });
         }
 
-        // Show push notification toast banner for the latest unread notification
         if (data.isNotEmpty) {
-          final latestNotif = data.first;
-          final int latestId = latestNotif['id'] is int 
-              ? latestNotif['id'] 
-              : int.parse(latestNotif['id'].toString());
-          final isUnread = latestNotif['is_read'] == 0 || latestNotif['is_read'] == false || latestNotif['is_read'] == '0';
+          int lastNotifiedId = prefs.getInt('last_notified_id_${widget.userRole}') ?? 0;
+          int maxId = lastNotifiedId;
 
-          final lastNotifiedId = prefs.getInt('last_notified_id_${widget.userRole}') ?? 0;
-          if (isUnread && latestId > lastNotifiedId) {
-            await prefs.setInt('last_notified_id_${widget.userRole}', latestId);
-            await NotificationHelper.showNotification(latestNotif);
+          final unreadNotifs = data.where((n) {
+            final isUnread = n['is_read'] == 0 || n['is_read'] == false || n['is_read'] == '0';
+            final int nId = n['id'] is int ? n['id'] : int.parse(n['id'].toString());
+            return isUnread && nId > lastNotifiedId;
+          }).toList();
+
+          unreadNotifs.sort((a, b) {
+            final int aId = a['id'] is int ? a['id'] : int.parse(a['id'].toString());
+            final int bId = b['id'] is int ? b['id'] : int.parse(b['id'].toString());
+            return aId.compareTo(bId);
+          });
+
+          if (unreadNotifs.isNotEmpty) {
+            for (final notif in unreadNotifs) {
+              final int nId = notif['id'] is int ? notif['id'] : int.parse(notif['id'].toString());
+              if (nId > maxId) maxId = nId;
+              await NotificationHelper.showNotification(notif);
+            }
+            await prefs.setInt('last_notified_id_${widget.userRole}', maxId);
           }
         }
       }
@@ -458,7 +480,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               final titleLower = title.toString().toLowerCase();
               final msgLower = message.toString().toLowerCase();
 
-              if (titleLower.contains('leave') || msgLower.contains('leave')) {
+              final isLeaveApprovalOrReqNotif = titleLower.contains('approve') || titleLower.contains('reject') || msgLower.contains('approve') || msgLower.contains('reject') || titleLower.contains('request') || msgLower.contains('request');
+              final isHolidayNotif = titleLower.contains('holiday') || msgLower.contains('holiday');
+              if (titleLower.contains('leave') || msgLower.contains('leave') || isHolidayNotif) {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -466,6 +490,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       leaveService: widget.leaveService,
                       userRole: widget.userRole,
                       selectedStudentId: _activeStudentId,
+                      initialTabIndex: isLeaveApprovalOrReqNotif ? 1 : 0,
                     ),
                   ),
                 ).then((_) => _loadSessionInfo());
@@ -478,6 +503,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       token: widget.leaveService.token,
                       userRole: widget.userRole,
                       selectedStudentId: _activeStudentId,
+                    ),
+                  ),
+                );
+              } else if (titleLower.contains('homework') || msgLower.contains('homework') || titleLower.contains('assignment') || msgLower.contains('assignment')) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => HomeworkListScreen(
+                      userRole: widget.userRole,
+                      selectedStudentId: _activeStudentId,
+                      baseUrl: widget.leaveService.baseUrl,
                     ),
                   ),
                 );
@@ -632,362 +668,47 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   void _showChangePasswordDialog() {
-    final _formKey = GlobalKey<FormState>();
-    final _currentPasswordController = TextEditingController();
-    final _newPasswordController = TextEditingController();
-    final _confirmPasswordController = TextEditingController();
-    bool _isUpdating = false;
-    String _errorText = '';
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: const Text(
-                'Change Password',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-              ),
-              content: Form(
-                key: _formKey,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      TextFormField(
-                        controller: _currentPasswordController,
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Current Password',
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Current password is required';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _newPasswordController,
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                          labelText: 'New Password',
-                          hintText: 'Min 6 chars, 1 uppercase, 1 digit',
-                          hintStyle: TextStyle(fontSize: 11),
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'New password is required';
-                          }
-                          if (value.length < 6) {
-                            return 'At least 6 characters required';
-                          }
-                          bool hasUppercase = value.contains(RegExp(r'[A-Z]'));
-                          bool hasDigits = value.contains(RegExp(r'[0-9]'));
-                          bool hasAlpha = value.contains(RegExp(r'[a-zA-Z]'));
-                          if (!hasUppercase || !hasDigits || !hasAlpha) {
-                            return 'Must contain 1 uppercase, 1 digit & 1 letter';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _confirmPasswordController,
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Confirm Password',
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Confirm password is required';
-                          }
-                          if (value != _newPasswordController.text) {
-                            return 'Passwords do not match';
-                          }
-                          return null;
-                        },
-                      ),
-                      if (_errorText.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          _errorText,
-                          style: const TextStyle(color: Colors.red, fontSize: 12),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: _isUpdating ? null : () => Navigator.pop(context),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: _isUpdating
-                      ? null
-                      : () async {
-                          if (_formKey.currentState!.validate()) {
-                            setDialogState(() {
-                              _isUpdating = true;
-                              _errorText = '';
-                            });
-
-                            try {
-                              final prefs = await SharedPreferences.getInstance();
-                              final token = prefs.getString('auth_token') ?? '';
-                              final authService = AuthService(baseUrl: 'http://10.55.253.71:8000');
-                              await authService.changePassword(
-                                token,
-                                _currentPasswordController.text,
-                                _newPasswordController.text,
-                              );
-
-                              if (context.mounted) {
-                                Navigator.pop(context);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Password updated successfully!'),
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
-                              }
-                            } catch (e) {
-                              setDialogState(() {
-                                _isUpdating = false;
-                                _errorText = e.toString().replaceAll('Exception:', '').trim();
-                              });
-                            }
-                          }
-                        },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.indigo,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: _isUpdating
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text('Update'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
+    ChangePasswordDialog.show(context, baseUrl: widget.leaveService.baseUrl);
   }
 
-  void _showProfilePopup() {
-    showDialog(
-      context: context,
-      barrierColor: Colors.black.withOpacity(0.2),
-      builder: (BuildContext context) {
-        // Resolve profile image
-        String photoUrl = '';
-        if (widget.userRole.toUpperCase() == 'PARENT') {
-          final active = _children.firstWhere(
-            (c) => c['id'] == _activeStudentId,
-            orElse: () => null,
-          );
-          if (active != null) {
-            photoUrl = active['photo_path'] ?? '';
-          }
-        } else {
-          photoUrl = _userPhoto;
-        }
+  void _navigateToProfileScreen() {
+    String photoUrl = '';
+    if (widget.userRole.toUpperCase() == 'PARENT' || widget.userRole.toUpperCase() == 'STUDENT') {
+      final active = _children.firstWhere(
+        (c) => c['id'] == _activeStudentId,
+        orElse: () => null,
+      );
+      if (active != null) {
+        photoUrl = active['photo_path'] ?? '';
+      }
+    } else {
+      photoUrl = _userPhoto;
+    }
 
-        Widget avatarChild;
-        if (photoUrl.isNotEmpty) {
-          final fullUrl = photoUrl.startsWith('http') ? photoUrl : 'http://10.55.253.71:8000' + photoUrl;
-          avatarChild = ClipOval(
-            child: Image.network(
-              fullUrl,
-              width: 54,
-              height: 54,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return Icon(Icons.person, size: 30, color: Colors.indigo.shade800);
-              },
-            ),
-          );
-        } else {
-          avatarChild = Icon(Icons.person, size: 30, color: Colors.indigo.shade800);
-        }
+    final fullPhotoUrl = photoUrl.isNotEmpty
+        ? (photoUrl.startsWith('http') ? photoUrl : '${widget.leaveService.baseUrl}$photoUrl')
+        : '';
 
-        return Dialog(
-          alignment: Alignment.topRight,
-          insetPadding: const EdgeInsets.only(top: 60, right: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: Container(
-            width: 260,
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Header (Profile Avatar and Name only!)
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 27,
-                      backgroundColor: Colors.indigo.shade50,
-                      child: avatarChild,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        _userName,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                const Divider(height: 1),
-                const SizedBox(height: 12),
-
-                // Switch child list (if PARENT and multiple children), placed ABOVE Change Password!
-                if (widget.userRole.toUpperCase() == 'PARENT' && _children.length > 1) ...[
-                  const Text(
-                    'SWITCH STUDENT',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.grey,
-                      letterSpacing: 1.0,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 180),
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: _children.length,
-                      itemBuilder: (context, index) {
-                        final child = _children[index];
-                        final childId = child['id'] as int;
-                        final isCurrent = childId == _activeStudentId;
-                        final childName = child['name'] ?? '';
-                        
-                        return Container(
-                          margin: const EdgeInsets.symmetric(vertical: 2),
-                          decoration: BoxDecoration(
-                            color: isCurrent ? Colors.indigo.shade50.withOpacity(0.4) : Colors.transparent,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(8),
-                            onTap: () async {
-                              Navigator.pop(context); // Close popup dialog
-                              await _handleSwitchStudent(childId);
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.child_care_rounded,
-                                    size: 16,
-                                    color: isCurrent ? Colors.indigo.shade800 : Colors.grey.shade600,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      childName,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-                                        color: isCurrent ? Colors.indigo.shade800 : Colors.black87,
-                                      ),
-                                    ),
-                                  ),
-                                  if (isCurrent)
-                                    Icon(Icons.check, size: 14, color: Colors.indigo.shade800),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Divider(height: 1),
-                  const SizedBox(height: 12),
-                ],
-
-                // Action Menu: Change Password (above Logout)
-                InkWell(
-                  borderRadius: BorderRadius.circular(8),
-                  onTap: () {
-                    Navigator.pop(context); // Close profile popup
-                    _showChangePasswordDialog();
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-                    child: Row(
-                      children: const [
-                        Icon(Icons.lock_open_rounded, size: 18, color: Colors.black54),
-                        SizedBox(width: 12),
-                        Text(
-                          'Change Password',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black87),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 4),
-
-                // Action Menu: Log Out
-                InkWell(
-                  borderRadius: BorderRadius.circular(8),
-                  onTap: () {
-                    Navigator.pop(context); // Close profile popup
-                    _handleLogout();
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-                    child: Row(
-                      children: [
-                        Icon(Icons.logout_rounded, size: 18, color: Colors.red.shade600),
-                        const SizedBox(width: 12),
-                        Text(
-                          'Log Out',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.red.shade600),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => UserProfileScreen(
+          userName: _userName,
+          userRole: widget.userRole,
+          schoolName: _schoolName,
+          userPhone: _userPhone,
+          photoUrl: fullPhotoUrl,
+          children: _children,
+          activeStudentId: _activeStudentId,
+          onSwitchChild: (newId) {
+            setState(() {
+              _activeStudentId = newId;
+              _resolveActiveStudentName();
+            });
+            _fetchUnreadNotificationsCount();
+          },
+        ),
+      ),
     );
   }
 
@@ -1001,6 +722,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               leaveService: widget.leaveService,
               userRole: widget.userRole,
               selectedStudentId: _activeStudentId,
+              initialTabIndex: 0, // Always open Official Holidays on normal icon click
             ),
           ),
         ).then((_) => _loadSessionInfo()); // reload details in case anything changed
@@ -1041,13 +763,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
         ).then((_) => _fetchUnreadNotificationsCount());
-      } else if (feature.name == 'Salary') {
+      } else if (feature.name == 'Salary' || feature.name == 'Staff Salary' || feature.name == 'Salaries') {
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('auth_token') ?? widget.leaveService.token;
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => SalaryCardScreen(
               baseUrl: widget.leaveService.baseUrl,
-              token: widget.leaveService.token,
+              token: token,
             ),
           ),
         );
@@ -1079,6 +803,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
         ).then((_) => _fetchUnreadNotificationsCount());
+      } else if (feature.name == 'Homework') {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => HomeworkListScreen(
+              userRole: widget.userRole,
+              selectedStudentId: _activeStudentId,
+              baseUrl: widget.leaveService.baseUrl,
+            ),
+          ),
+        );
       } else if (feature.name == 'Timetable') {
         Navigator.push(
           context,
@@ -1166,30 +901,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ),
                     const SizedBox(width: 12),
                     GestureDetector(
-                      onTap: () {
-                        String photoUrl = '';
-                        if (widget.userRole.toUpperCase() == 'PARENT') {
-                          final active = _children.firstWhere(
-                            (c) => c['id'] == _activeStudentId,
-                            orElse: () => null,
-                          );
-                          if (active != null) {
-                            photoUrl = active['photo_path'] ?? '';
-                          }
-                        } else {
-                          photoUrl = _userPhoto;
-                        }
-
-                        if (photoUrl.isNotEmpty) {
-                          final fullUrl = photoUrl.startsWith('http') ? photoUrl : 'http://10.55.253.71:8000' + photoUrl;
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => FullScreenImageScreen(imageUrl: fullUrl),
-                            ),
-                          );
-                        }
-                      },
+                      onTap: _navigateToProfileScreen,
                       child: Hero(
                         tag: 'user_profile_icon',
                         child: CircleAvatar(
@@ -1198,7 +910,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           child: Builder(
                             builder: (context) {
                               String photoUrl = '';
-                              if (widget.userRole.toUpperCase() == 'PARENT') {
+                              if (widget.userRole.toUpperCase() == 'PARENT' || widget.userRole.toUpperCase() == 'STUDENT') {
                                 final active = _children.firstWhere(
                                   (c) => c['id'] == _activeStudentId,
                                   orElse: () => null,
@@ -1211,16 +923,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                               }
 
                               if (photoUrl.isNotEmpty) {
-                                final fullUrl = photoUrl.startsWith('http') ? photoUrl : 'http://10.55.253.71:8000' + photoUrl;
+                                final fullUrl = photoUrl.startsWith('http') ? photoUrl : '${widget.leaveService.baseUrl}$photoUrl';
                                 return ClipOval(
-                                  child: Image.network(
-                                    fullUrl,
+                                  child: CachedNetworkImage(
+                                    imageUrl: fullUrl,
                                     width: 48,
                                     height: 48,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return Icon(Icons.person, size: 28, color: Colors.indigo.shade800);
-                                    },
+                                    placeholder: (context, url) => Icon(Icons.person, size: 28, color: Colors.indigo.shade800),
+                                    errorWidget: (context, url, error) => Icon(Icons.person, size: 28, color: Colors.indigo.shade800),
                                   ),
                                 );
                               }

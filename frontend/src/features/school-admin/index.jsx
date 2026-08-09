@@ -56,52 +56,23 @@ import AppSidebar from '../../common/components/AppSidebar';
  * label changes, or renaming a menu item would silently revoke a teacher's
  * access to that page.
  */
-const NAV_GROUPS = [
-  {
-    label: 'Overview',
-    items: [
-      { path: '/school-admin', label: 'Dashboard', permissionKey: 'Dashboard', icon: LayoutDashboard, exact: true },
-    ],
-  },
-  {
-    label: 'Academics',
-    items: [
-      { path: '/school-admin/classes',    label: 'Classes',      permissionKey: 'Classes',      icon: Users },
-      { path: '/school-admin/timetable',  label: 'Timetable',    permissionKey: 'Timetable',    icon: Clock },
-      { path: '/school-admin/attendance', label: 'Attendance',   permissionKey: 'Attendance',   icon: ClipboardCheck },
-      { path: '/school-admin/exams',      label: 'Examinations', permissionKey: 'Examinations', icon: FileText },
-    ],
-  },
-  {
-    label: 'People',
-    items: [
-      { path: '/school-admin/staff',          label: 'Teachers',      permissionKey: 'Teachers',      icon: UserCog },
-      { path: '/school-admin/leave-requests', label: 'Leave requests', permissionKey: 'Manage Leaves', icon: FileText },
-      { path: '/school-admin/achievements',   label: 'Achievements',  permissionKey: 'Achievements',  icon: Trophy },
-    ],
-  },
-  {
-    label: 'Finance',
-    items: [
-      // Renamed for distinguishability; permissionKey preserves the stored value.
-      { path: '/school-admin/finance',            label: 'Fee collection',   permissionKey: 'Fees Portal',        icon: DollarSign },
-      { path: '/school-admin/fee-follow-ups',     label: 'Fee follow-up',    permissionKey: 'Fee Follow-up',      icon: PhoneCall },
-      { path: '/school-admin/financial-reports',  label: 'Reports',          permissionKey: 'Financial Reports',  icon: FileText },
-      { path: '/school-admin/finance-management', label: 'Accounts & payroll', permissionKey: 'Finance Management', icon: Landmark },
-    ],
-  },
-  {
-    label: 'School',
-    items: [
-      { path: '/school-admin/announcements',   label: 'Announcements',    permissionKey: 'Announcements',     icon: Megaphone },
-      { path: '/school-admin/audits-settings', label: 'Settings',         permissionKey: 'Audits & Settings', icon: Settings },
-      { path: '/school-admin/security',        label: 'Security',         permissionKey: 'Security',          icon: Shield },
-    ],
-  },
+const NAV_ITEMS = [
+  { path: '/school-admin',                    label: 'Dashboard',         permissionKey: 'Dashboard',          icon: LayoutDashboard, exact: true },
+  { path: '/school-admin/staff',              label: 'Teachers',          permissionKey: 'Teachers',           icon: UserCog },
+  { path: '/school-admin/classes',            label: 'Classes',           permissionKey: 'Classes',            icon: Users },
+  { path: '/school-admin/finance',            label: 'Fee collection',    permissionKey: 'Fees Portal',        icon: DollarSign },
+  { path: '/school-admin/financial-reports',  label: 'Financial report',  permissionKey: 'Financial Reports',  icon: FileText },
+  { path: '/school-admin/finance-management', label: 'Accounts & payroll', permissionKey: 'Finance Management', icon: Landmark },
+  { path: '/school-admin/fee-follow-ups',     label: 'Fee follow-up',     permissionKey: 'Fee Follow-up',      icon: PhoneCall },
+  { path: '/school-admin/timetable',          label: 'Timetable',         permissionKey: 'Timetable',          icon: Clock },
+  { path: '/school-admin/attendance',         label: 'Attendance',        permissionKey: 'Attendance',         icon: ClipboardCheck },
+  { path: '/school-admin/announcements',       label: 'Announcements',     permissionKey: 'Announcements',      icon: Megaphone },
+  { path: '/school-admin/leave-requests',     label: 'Leave requests',    permissionKey: 'Manage Leaves',      icon: FileText },
+  { path: '/school-admin/exams',              label: 'Examinations',      permissionKey: 'Examinations',       icon: FileText },
+  { path: '/school-admin/achievements',       label: 'Achievements',     permissionKey: 'Achievements',       icon: Trophy },
+  { path: '/school-admin/audits-settings',     label: 'Settings',          permissionKey: 'Audits & Settings',  icon: Settings },
+  { path: '/school-admin/security',            label: 'Security',          permissionKey: 'Security',           icon: Shield },
 ];
-
-/** Flat list retained for route guards and redirects. */
-const NAV_ITEMS = NAV_GROUPS.flatMap((g) => g.items);
 
 // Onboarding content screen when no active academic year is present
 function OnboardingScreen() {
@@ -131,7 +102,7 @@ function OnboardingScreen() {
 
 // ─── Portal Root ──────────────────────────────────────────────────────────────
 
-function ContactSuperAdminDialog({ isOpen, onClose }) {
+export function ContactSuperAdminDialog({ isOpen, onClose, message, description }) {
   const toast = useToast();
 
   const handleCopy = (text, type) => {
@@ -144,7 +115,7 @@ function ContactSuperAdminDialog({ isOpen, onClose }) {
       isOpen={isOpen}
       onClose={onClose}
       title="Contact Super Admin"
-      description="Get in touch with support to activate or renew subscription plans."
+      description={description !== undefined ? description : ""}
       className="max-w-md animate-in fade-in zoom-in-95 duration-200"
       footer={
         <div className="flex justify-end w-full">
@@ -156,8 +127,7 @@ function ContactSuperAdminDialog({ isOpen, onClose }) {
     >
       <div className="space-y-4 text-sm mt-3">
         <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed font-medium">
-          To purchase or renew a subscription plan, please contact the ShikshaPilot Super Admin using any of the methods below.
-          Our team will assist you with plan activation and account renewal.
+          {message || "Please get in touch with the ShikshaPilot Support Team using any of the contact methods below for assistance with report card template assignment, account setup, or queries."}
         </p>
 
         <div className="bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-xl border border-border space-y-3">
@@ -245,44 +215,65 @@ function SubscriptionExpiredScreen({ profile }) {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Fetching plans...</p>
             </div>
-          ) : plans.length === 0 ? (
-            <div className="py-12 border border-border bg-surface rounded-2xl text-text-muted text-sm font-semibold max-w-lg mx-auto space-y-1.5 p-6">
-              <p className="text-text-primary font-bold">No subscription plans are currently available.</p>
-              <p className="text-xs font-medium">Please contact the Super Admin for assistance.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto text-left">
-              {plans.map(p => (
-                <Card key={p.id} className="shadow-sm border-border bg-surface flex flex-col justify-between p-6 rounded-2xl min-h-[350px] relative hover:shadow-md transition-all duration-200">
-                  <div className="space-y-4">
-                    <div className="border-b border-border/60 pb-4">
-                      <h4 className="text-base font-bold text-text-primary font-display">{p.name}</h4>
-                      <p className="text-2xl font-bold text-text-primary tracking-tight mt-1">
-                        ₹{parseFloat(p.price).toLocaleString('en-IN')}
-                        <span className="text-xs font-bold text-text-secondary tracking-normal">/{p.duration_unit}</span>
-                      </p>
-                      <p className="text-[11px] text-primary font-bold uppercase mt-2.5 block">
-                        {p.student_limit ? `Up to ${p.student_limit.toLocaleString()} Students` : 'Unlimited Students'}
-                      </p>
+          ) : (() => {
+            const availablePlans = (plans || []).filter(p => parseFloat(p.price || 0) > 0);
+            if (availablePlans.length === 0) {
+              return (
+                <div className="py-12 border border-border bg-surface rounded-2xl text-text-muted text-sm font-semibold max-w-lg mx-auto space-y-1.5 p-6">
+                  <p className="text-text-primary font-bold">No subscription plans are currently available.</p>
+                  <p className="text-xs font-medium">Please contact the Super Admin for assistance.</p>
+                </div>
+              );
+            }
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto text-left">
+                {availablePlans.map(p => (
+                  <Card key={p.id} className="shadow-sm border-border bg-surface flex flex-col justify-between p-6 rounded-2xl min-h-[350px] relative hover:shadow-md transition-all duration-200">
+                    <div className="space-y-4">
+                      <div className="border-b border-border/60 pb-4">
+                        <h4 className="text-base font-bold text-text-primary font-display">{p.name}</h4>
+                        <div className="flex items-center justify-between mt-1">
+                          <span className="text-2xl font-bold text-text-primary tracking-tight">
+                            ₹{parseFloat(p.price).toLocaleString('en-IN')}
+                          </span>
+                          <span className="text-xs font-bold text-text-secondary bg-zinc-100 dark:bg-zinc-800/80 px-2.5 py-1 rounded-lg">
+                            {(() => {
+                              const v = parseInt(p.duration_value, 10) || 1;
+                              const u = (p.duration_unit || 'month').toLowerCase();
+                              if (u === 'month' || u === 'months') {
+                                if (v === 12) return 'Validity 1 Year';
+                                return `Validity ${v} Month${v > 1 ? 's' : ''}`;
+                              }
+                              if (u === 'year' || u === 'years') {
+                                return `Validity ${v} Year${v > 1 ? 's' : ''}`;
+                              }
+                              return `Validity ${v} ${p.duration_unit}`;
+                            })()}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-primary font-bold uppercase mt-2.5 block">
+                          {p.student_limit ? `Up to ${p.student_limit.toLocaleString()} Students` : 'Unlimited Students'}
+                        </p>
+                      </div>
+
+                      <div className="text-xs text-text-secondary leading-relaxed font-medium whitespace-pre-line break-words">
+                        {p.description || 'No plan description provided.'}
+                      </div>
                     </div>
 
-                    <p className="text-xs text-text-secondary leading-relaxed font-medium">
-                      {p.description}
-                    </p>
-                  </div>
-
-                  <div className="pt-6">
-                    <Button 
-                      className="w-full font-bold bg-amber-600 hover:bg-amber-700 text-white flex items-center justify-center gap-1.5 shadow-sm text-xs py-2 rounded-xl"
-                      onClick={() => setContactOpen(true)}
-                    >
-                      CONTACT SUPER ADMIN
-                    </Button>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
+                    <div className="pt-6">
+                      <Button 
+                        className="w-full font-bold bg-amber-600 hover:bg-amber-700 text-white flex items-center justify-center gap-1.5 shadow-sm text-xs py-2 rounded-xl"
+                        onClick={() => setContactOpen(true)}
+                      >
+                        CONTACT SUPER ADMIN
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            );
+          })()}
         </div>
       </div>
 
@@ -370,11 +361,6 @@ export default function SchoolAdminPortal() {
   };
 
   const visibleNavItems = NAV_ITEMS.filter(isPermitted);
-
-  /** Grouped nav with empty groups dropped, for the sidebar. */
-  const visibleNavGroups = NAV_GROUPS
-    .map((group) => ({ ...group, items: group.items.filter(isPermitted) }))
-    .filter((group) => group.items.length > 0);
 
   // URL route guard access logic
   const currentItem = NAV_ITEMS.find(item => {
@@ -586,7 +572,7 @@ export default function SchoolAdminPortal() {
 
       {/* Sidebar — shared across portals; groups on desktop, drawer on mobile */}
       <AppSidebar
-        groups={visibleNavGroups}
+        items={visibleNavItems}
         isActive={(item) => isActive(item.path, item.exact)}
         onNavigate={(path) => nav(path)}
         title={role === 'TEACHER' ? 'Teacher menu' : 'School admin menu'}

@@ -12,6 +12,14 @@ import { useToast } from '../../../common/components/Toast';
 import { DropdownMenu, DropdownItem } from '../../../common/ui/DropdownMenu';
 import { Dialog } from '../../../common/ui/dialog';
 
+const getTodayLocalDateString = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export default function AttendancePage() {
   const { isReadOnly, currentYear } = useAcademicYear();
   const toast = useToast();
@@ -24,7 +32,7 @@ export default function AttendancePage() {
   const [loadingClasses, setLoadingClasses] = useState(true);
   const [selectedClassName, setSelectedClassName] = useState('');
   const [selectedSection, setSelectedSection] = useState('');
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(getTodayLocalDateString());
 
   // Daily state
   const [students, setStudents] = useState([]);
@@ -83,7 +91,7 @@ export default function AttendancePage() {
 
   const handleDateChange = (e) => {
     const val = e.target.value;
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getTodayLocalDateString();
     const minDate = currentYear?.start_date || '';
     
     if (minDate && val < minDate) {
@@ -116,21 +124,23 @@ export default function AttendancePage() {
       setAttendanceRecords(attData || []);
 
       const map = {};
+      // 1. Initialize default 'Present' for all students
+      (stData || []).forEach(s => {
+        map[s.id] = 'Present';
+      });
+
+      // 2. Override with saved attendance from DB
       if (attData && attData.length > 0) {
         attData.forEach(r => {
           map[r.student_id] = r.status;
         });
-        setAttendanceMap(map);
         setIsCompletedMode(true);
-        setIsEditing(false);
       } else {
-        stData.forEach(s => {
-          map[s.id] = 'Present';
-        });
-        setAttendanceMap(map);
         setIsCompletedMode(false);
-        setIsEditing(false);
       }
+
+      setAttendanceMap(map);
+      setIsEditing(false);
     } catch (err) {
       console.error(err);
       toast.error('Failed to load daily attendance data.');
@@ -199,21 +209,21 @@ export default function AttendancePage() {
     if (!activeClass) return;
     setSavingAttendance(true);
     try {
-      await Promise.all(
-        students.map(s => {
-          return schoolService.markAttendance({
-            student_id: s.id,
-            class_id: activeClass.id,
-            date: selectedDate,
-            status: attendanceMap[s.id] || 'Present'
-          });
-        })
-      );
+      const records = students.map(s => ({
+        student_id: s.id,
+        status: attendanceMap[s.id] || 'Present'
+      }));
+
+      await schoolService.markAttendance({
+        class_id: activeClass.id,
+        date: selectedDate,
+        records: records
+      });
       toast.success('Attendance saved successfully.', 'Success');
       await loadDailyData();
     } catch (err) {
       console.error(err);
-      toast.error('Failed to save student attendance.');
+      toast.error(err.message || 'Failed to save student attendance.');
     } finally {
       setSavingAttendance(false);
     }
@@ -271,6 +281,9 @@ export default function AttendancePage() {
   const reportYear = getYearForReportMonth();
 
   const getFilteredReportRecords = () => {
+    if (selectedReportMonth === 'all' || String(selectedReportMonth) === 'all') {
+      return reportAttendance;
+    }
     return reportAttendance.filter(r => {
       const d = new Date(r.date);
       const m = d.getMonth() + 1;
@@ -314,7 +327,7 @@ export default function AttendancePage() {
   // Holidays list sorted chronologically
   const sortedHolidays = [...holidays].sort((a, b) => new Date(a.date) - new Date(b.date));
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getTodayLocalDateString();
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -399,16 +412,17 @@ export default function AttendancePage() {
                   value={selectedDate} 
                   onChange={handleDateChange} 
                   min={currentYear?.start_date || ''}
-                  max={new Date().toISOString().split('T')[0]}
+                  max={getTodayLocalDateString()}
                   className="h-9" 
                 />
               </div>
             )}
 
             {activeTab === 'report' && (
-              <div className="flex-1 min-w-[120px] space-y-1.5">
+              <div className="flex-1 min-w-[140px] space-y-1.5">
                 <label className="text-xs font-bold text-text-secondary uppercase">Month</label>
                 <Select value={selectedReportMonth} onChange={e => setSelectedReportMonth(e.target.value)}>
+                  <option value="all">All Months</option>
                   {Array.from({ length: 12 }, (_, i) => i + 1).map(m => {
                     const monthName = new Date(2026, m - 1).toLocaleString('default', { month: 'long' });
                     return <option key={m} value={m}>{monthName}</option>;
@@ -652,14 +666,14 @@ export default function AttendancePage() {
               <TableBody>
                 {reportRows.map(row => (
                   <TableRow key={row.student.id}>
-                    <TableCell className="font-semibold text-text-primary">{row.student.name}</TableCell>
-                    <TableCell className="text-xs text-text-secondary">{row.student.roll_no || '—'}</TableCell>
-                    <TableCell className="text-center font-mono text-xs">{totalWorkingDays}</TableCell>
-                    <TableCell className="text-center font-semibold text-emerald-600 dark:text-emerald-400 font-mono text-xs">{row.present}</TableCell>
-                    <TableCell className="text-center font-semibold text-red-500 font-mono text-xs">{row.absent}</TableCell>
-                    <TableCell className="text-center font-semibold text-amber-500 font-mono text-xs">{row.leave}</TableCell>
+                    <TableCell className="font-bold text-sm text-text-primary">{row.student.name}</TableCell>
+                    <TableCell className="text-sm font-bold text-text-secondary font-mono">{row.student.roll_no || '—'}</TableCell>
+                    <TableCell className="text-center font-mono text-sm font-bold text-text-primary">{totalWorkingDays}</TableCell>
+                    <TableCell className="text-center font-bold text-emerald-600 dark:text-emerald-400 font-mono text-sm">{row.present}</TableCell>
+                    <TableCell className="text-center font-bold text-red-500 font-mono text-sm">{row.absent}</TableCell>
+                    <TableCell className="text-center font-bold text-amber-500 font-mono text-sm">{row.leave}</TableCell>
                     <TableCell className="text-right">
-                      <span className={`font-bold text-xs ${
+                      <span className={`font-bold text-sm ${
                         row.percentage >= 75
                           ? 'text-emerald-600 dark:text-emerald-400'
                           : row.percentage >= 50

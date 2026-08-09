@@ -23,10 +23,12 @@ $pass   = getenv('DB_PASS') ?: 'admin123';
 ob_implicit_flush(true);
 try {
     try {
-        $pdo = new PDO("mysql:host={$host};dbname={$dbname};charset=utf8mb4", $user, $pass, [
+        $pdoOptions = [
             PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        ]);
+            PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true,
+        ];
+        $pdo = new PDO("mysql:host={$host};dbname={$dbname};charset=utf8mb4", $user, $pass, $pdoOptions);
         echo "Connected to database '{$dbname}'.\n";
     } catch (PDOException $e) {
         // If DB doesn't exist (SQLSTATE[HY000] [1049] Unknown database)
@@ -35,14 +37,12 @@ try {
             echo "Database '{$dbname}' does not exist. Attempting to create it...\n";
             $tempPdo = new PDO("mysql:host={$host};charset=utf8mb4", $user, $pass, [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true,
             ]);
             $tempPdo->exec("CREATE DATABASE IF NOT EXISTS `{$dbname}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;");
             echo "Created database '{$dbname}'.\n";
             
-            $pdo = new PDO("mysql:host={$host};dbname={$dbname};charset=utf8mb4", $user, $pass, [
-                PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            ]);
+            $pdo = new PDO("mysql:host={$host};dbname={$dbname};charset=utf8mb4", $user, $pass, $pdoOptions);
         } else {
             throw $e;
         }
@@ -50,7 +50,8 @@ try {
 
     // Check if migrations table exists
     $stmtTable = $pdo->query("SHOW TABLES LIKE 'migrations'");
-    $migrationsTableExists = $stmtTable->rowCount() > 0;
+    $migrationsTableExists = (bool) $stmtTable->fetch();
+    $stmtTable->closeCursor();
 
     if (!$migrationsTableExists) {
         // Create migrations table
@@ -65,7 +66,8 @@ try {
 
         // Check if this is an existing database by checking if 'users' table exists
         $stmtUsers = $pdo->query("SHOW TABLES LIKE 'users'");
-        $isExistingDatabase = $stmtUsers->rowCount() > 0;
+        $isExistingDatabase = (bool) $stmtUsers->fetch();
+        $stmtUsers->closeCursor();
 
         if ($isExistingDatabase) {
             echo "Existing database detected. Pre-populating current migrations as applied...\n";
@@ -76,12 +78,15 @@ try {
             foreach ($files as $file) {
                 $filename = basename($file);
                 $stmtInsertMig->execute([':name' => $filename]);
+                $stmtInsertMig->closeCursor();
             }
         }
     }
 
     // Fetch all executed migrations
-    $executedMigrations = $pdo->query("SELECT migration_name FROM migrations")->fetchAll(PDO::FETCH_COLUMN);
+    $stmtMig = $pdo->query("SELECT migration_name FROM migrations");
+    $executedMigrations = $stmtMig->fetchAll(PDO::FETCH_COLUMN);
+    $stmtMig->closeCursor();
 
     // Discover and run all migration files in numeric order
     $migrationDir = __DIR__ . '/Migrations';
@@ -103,6 +108,7 @@ try {
             // Record empty migration as executed
             $stmtInsert = $pdo->prepare("INSERT INTO migrations (migration_name) VALUES (:name)");
             $stmtInsert->execute([':name' => $filename]);
+            $stmtInsert->closeCursor();
             continue;
         }
 
@@ -114,7 +120,10 @@ try {
 
         foreach ($statements as $statement) {
             try {
-                $pdo->exec($statement);
+                $stmt = $pdo->prepare($statement);
+                $stmt->execute();
+                $stmt->closeCursor();
+            } catch (PDOException $e) {
             } catch (PDOException $e) {
                 // $e->getCode() is the SQLSTATE string; MySQL-specific error number is in errorInfo[1]
                 // Ignorable: 1050 table exists, 1060 duplicate column, 1061 duplicate key name, 1062 duplicate entry

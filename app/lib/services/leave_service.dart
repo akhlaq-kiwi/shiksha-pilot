@@ -39,11 +39,12 @@ class LeaveService {
     required String reason,
     int? studentId,
     File? attachment,
+    String? attachmentPath,
   }) async {
-    String? attachmentPath;
+    String? finalAttachmentPath = attachmentPath;
 
-    if (attachment != null) {
-      attachmentPath = await _uploadAttachment(attachment);
+    if (finalAttachmentPath == null && attachment != null) {
+      finalAttachmentPath = await uploadAttachment(attachment);
     }
 
     final body = {
@@ -52,7 +53,7 @@ class LeaveService {
       'to_date': toDate,
       'reason': reason,
       if (studentId != null) 'student_id': studentId,
-      if (attachmentPath != null) 'attachment_path': attachmentPath,
+      if (finalAttachmentPath != null) 'attachment_path': finalAttachmentPath,
     };
 
     final uri = Uri.parse('$baseUrl/api/school/leave-requests');
@@ -75,7 +76,7 @@ class LeaveService {
     }
   }
 
-  Future<String> _uploadAttachment(File file) async {
+  Future<String> uploadAttachment(File file) async {
     final uri = Uri.parse('$baseUrl/api/school/leave-requests/upload');
     final request = http.MultipartRequest('POST', uri);
     

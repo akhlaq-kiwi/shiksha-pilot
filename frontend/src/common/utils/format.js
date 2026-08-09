@@ -79,6 +79,16 @@ export function formatPercent(value, { maximumFractionDigits = 0 } = {}) {
   return `${formatNumber(n, { maximumFractionDigits })}%`;
 }
 
+/** YYYY-MM-DD in Local Timezone (preserves local midnight boundary without UTC shift) */
+export function getLocalDateString(dateInput = new Date()) {
+  const d = dateInput instanceof Date ? dateInput : new Date(dateInput);
+  if (Number.isNaN(d.getTime())) return '';
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 /** 13 Jul 2026 */
 export function formatShortDate(dateInput) {
   const { locale } = tenantConfig();
@@ -88,7 +98,7 @@ export function formatShortDate(dateInput) {
   try {
     return d.toLocaleDateString(locale, { day: '2-digit', month: 'short', year: 'numeric' });
   } catch {
-    return d.toISOString().split('T')[0];
+    return getLocalDateString(d);
   }
 }
 
@@ -103,7 +113,7 @@ export function formatLongDate(dateInput) {
       weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
     });
   } catch {
-    return d.toISOString().split('T')[0];
+    return getLocalDateString(d);
   }
 }
 

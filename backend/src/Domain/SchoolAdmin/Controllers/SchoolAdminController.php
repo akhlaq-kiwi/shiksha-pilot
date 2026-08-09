@@ -138,19 +138,33 @@ class SchoolAdminController extends BaseController
 
         $uploadedFiles = $request->getUploadedFiles();
         if (empty($uploadedFiles)) {
-            return $this->error($response, 'No files uploaded', 400);
+            return $this->error($response, 'No file was uploaded.', 400);
         }
 
         $fileKey = array_key_first($uploadedFiles);
         $uploadedFile = $uploadedFiles[$fileKey];
 
-        if ($uploadedFile->getError() !== UPLOAD_ERR_OK) {
-            return $this->error($response, 'Failed to upload file', 400);
+        $errorCode = $uploadedFile->getError();
+        if ($errorCode !== UPLOAD_ERR_OK) {
+            $errMsgs = [
+                UPLOAD_ERR_INI_SIZE   => 'The uploaded file exceeds the upload_max_filesize directive in php.ini.',
+                UPLOAD_ERR_FORM_SIZE  => 'The uploaded file exceeds the MAX_FILE_SIZE directive in the HTML form.',
+                UPLOAD_ERR_PARTIAL    => 'The uploaded file was only partially uploaded.',
+                UPLOAD_ERR_NO_FILE    => 'No file was uploaded.',
+                UPLOAD_ERR_NO_TMP_DIR => 'Missing a temporary folder on the server.',
+                UPLOAD_ERR_CANT_WRITE => 'Failed to write file to disk.',
+                UPLOAD_ERR_EXTENSION  => 'A PHP extension stopped the file upload.'
+            ];
+            $msg = $errMsgs[$errorCode] ?? 'Failed to upload file (Error code: ' . $errorCode . ')';
+            return $this->error($response, $msg, 400);
         }
 
-        $url = $this->service->handleFileUpload($uploadedFile);
-
-        return $this->success($response, ['url' => $url], 'File uploaded successfully');
+        try {
+            $url = $this->service->handleFileUpload($uploadedFile);
+            return $this->success($response, ['url' => $url], 'File uploaded successfully');
+        } catch (\Throwable $e) {
+            return $this->error($response, 'File save error: ' . $e->getMessage(), 500);
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -213,6 +227,16 @@ class SchoolAdminController extends BaseController
         $this->requireRole($user, ['SCHOOL_ADMIN']);
 
         $data = $this->service->getClasses($user);
+
+        return $this->success($response, $data);
+    }
+
+    public function getMasterCatalog(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'TEACHER', 'PRINCIPAL', 'SUPER_ADMIN']);
+
+        $data = $this->service->getMasterCatalog();
 
         return $this->success($response, $data);
     }
@@ -303,24 +327,24 @@ class SchoolAdminController extends BaseController
         return $this->success($response, $result, 'Holiday created successfully');
     }
 
-    public function updateHoliday(Request $request, Response $response): Response
+    public function updateHoliday(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
         $this->requireRole($user, ['SCHOOL_ADMIN']);
 
-        $id = (int)$request->getAttribute('id');
+        $id = (int)($args['id'] ?? 0);
         $body = RequestParser::body($request);
         $result = $this->service->updateHoliday($user, $id, $body);
 
         return $this->success($response, $result, 'Holiday updated successfully');
     }
 
-    public function deleteHoliday(Request $request, Response $response): Response
+    public function deleteHoliday(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
         $this->requireRole($user, ['SCHOOL_ADMIN']);
 
-        $id = (int)$request->getAttribute('id');
+        $id = (int)($args['id'] ?? 0);
         $result = $this->service->deleteHoliday($user, $id);
 
         return $this->success($response, $result, 'Holiday deleted successfully');
@@ -1136,7 +1160,10 @@ class SchoolAdminController extends BaseController
         $this->requireRole($user, ['SCHOOL_ADMIN']);
 
         $body   = RequestParser::body($request);
-        $result = $this->service->deleteClass($user, $body);
+        $query  = RequestParser::query($request);
+        $data   = array_merge($query, $body);
+
+        $result = $this->service->deleteClass($user, $data);
 
         return $this->success($response, $result, 'Class deleted');
     }
@@ -1161,6 +1188,32 @@ class SchoolAdminController extends BaseController
         $result = $this->service->deleteSection($user, $body);
 
         return $this->success($response, $result, 'Section deleted');
+    }
+
+    public function getNextRollNo(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $classId = (int)($args['class_id'] ?? 0);
+        $nextRollNo = $this->service->getNextRollNo($user, $classId);
+
+        return $this->success($response, ['next_roll_no' => $nextRollNo]);
+    }
+
+    public function checkRollNo(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $params = RequestParser::query($request);
+        $classId = isset($params['class_id']) ? (int)$params['class_id'] : 0;
+        $rollNo = (string)($params['roll_no'] ?? '');
+        $excludeId = isset($params['exclude_id']) && $params['exclude_id'] !== '' ? (int)$params['exclude_id'] : null;
+
+        $exists = $this->service->checkRollNoExists($user, $classId, $rollNo, $excludeId);
+
+        return $this->success($response, ['exists' => $exists]);
     }
 
     public function deleteFeePayment(Request $request, Response $response, array $args): Response
@@ -1243,17 +1296,6 @@ class SchoolAdminController extends BaseController
         $data = $this->service->lockClassFeeConfiguration($user, $body);
 
         return $this->success($response, $data, 'Class fee configuration locked successfully');
-    }
-
-    public function getNextRollNo(Request $request, Response $response, array $args): Response
-    {
-        $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
-
-        $classId = (int)($args['class_id'] ?? 0);
-        $data = $this->service->getNextRollNo($user, $classId);
-
-        return $this->success($response, $data);
     }
 
     public function getStaffPayments(Request $request, Response $response): Response
@@ -1370,7 +1412,7 @@ class SchoolAdminController extends BaseController
 
         $response->getBody()->write($excelData);
         return $response
-            ->withHeader('Content-Type', 'application/vnd.ms-excel')
+            ->withHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
             ->withHeader('Content-Disposition', 'attachment; filename="' . $filename . '"')
             ->withHeader('Pragma', 'no-cache')
             ->withHeader('Expires', '0');
@@ -1785,18 +1827,25 @@ class SchoolAdminController extends BaseController
     public function getNotifications(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
-        $data = $this->service->getNotifications($user);
+        $queryParams = $request->getQueryParams();
+        $data = $this->service->getNotifications($user, $queryParams);
         return $this->success($response, $data);
     }
 
     public function markNotificationRead(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
         $id = (int)$args['id'];
         $data = $this->service->markNotificationRead($user, $id);
         return $this->success($response, $data, 'Notification marked as read');
+    }
+
+    public function deleteNotification(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $id = (int)$args['id'];
+        $data = $this->service->deleteNotification($user, $id);
+        return $this->success($response, $data, 'Notification deleted successfully');
     }
 
     public function getCredentials(Request $request, Response $response, array $args): Response

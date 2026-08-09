@@ -112,6 +112,7 @@ export function ToastProvider({ children }) {
   toast.error   = (message, title) => toast({ type: 'error',   title, message });
   toast.warning = (message, title) => toast({ type: 'warning', title, message });
   toast.info    = (message, title) => toast({ type: 'info',    title, message });
+  toast.show    = (type, title, message) => toast({ type: type || 'info', title, message });
 
   return (
     <ToastContext.Provider value={toast}>

@@ -220,7 +220,7 @@ class SimplePdf
             $academicYear = $fields['Academic Year'] ?? '2026-2027';
             $paymentDate = $fields['Payment Date'] ?? '—';
             $paymentMode = $fields['Mode of Payment'] ?? '—';
-            $billingMonths = $fields['Billing Month'] ?? $fields['Billing Months'] ?? $fields['Description'] ?? '—';
+            $billingMonths = $fields['Month'] ?? $fields['Months'] ?? $fields['Billing Month'] ?? $fields['Billing Months'] ?? $fields['Description'] ?? '—';
             
             // Whole numbers formatting for Amount Paid (strip INR/Rs labels)
             $amountPaid = $fields['Total Amount'] ?? '—';
@@ -396,7 +396,7 @@ class SimplePdf
             $stream .= "1 0 0 1 145 450 Tm\n";
             $stream .= "(" . $this->escape($paymentDate) . ") Tj\n";
 
-            $descLabel = (count($rawMonths) > 1) ? "Billing Months:" : "Description:";
+            $descLabel = isset($fields['Month']) ? "Month:" : (isset($fields['Months']) ? "Months:" : (isset($fields['Description']) ? "Description:" : ((count($rawMonths) > 1) ? "Billing Months:" : "Billing Month:")));
             $stream .= "/F2 9 Tf\n";
             $stream .= "1 0 0 1 310 450 Tm\n";
             $stream .= "(" . $this->escape($descLabel) . ") Tj\n";

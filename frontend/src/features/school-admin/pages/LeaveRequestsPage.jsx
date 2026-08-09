@@ -182,13 +182,13 @@ export default function LeaveRequestsPage() {
         name: newLeaveTitle.trim(),
         date: newLeaveDate
       });
-      toast.show('success', 'Success', 'Holiday created successfully.');
+      toast.success('Holiday created successfully.', 'Success');
       setNewLeaveTitle('');
       setNewLeaveDate('');
       loadHolidays();
     } catch (err) {
       console.error(err);
-      const errMsg = err.response?.data?.message || 'Failed to create holiday.';
+      const errMsg = err.message || 'Failed to create holiday.';
       setHolidayFormError(errMsg);
     } finally {
       setSavingHoliday(false);
@@ -218,12 +218,12 @@ export default function LeaveRequestsPage() {
         name: editName.trim(),
         date: editDate
       });
-      toast.show('success', 'Success', 'Holiday updated successfully.');
+      toast.success('Holiday updated successfully.', 'Success');
       setEditingHolidayId(null);
       loadHolidays();
     } catch (err) {
       console.error(err);
-      const errMsg = err.response?.data?.message || 'Failed to update holiday.';
+      const errMsg = err.message || 'Failed to update holiday.';
       setEditError(errMsg);
     }
   };
@@ -237,12 +237,12 @@ export default function LeaveRequestsPage() {
     setDeletingHoliday(true);
     try {
       await schoolService.deleteHoliday(holidayToDelete.id);
-      toast.show('success', 'Success', 'Holiday deleted successfully.');
+      toast.success('Holiday deleted successfully.', 'Success');
       setHolidayToDelete(null);
       loadHolidays();
     } catch (err) {
       console.error(err);
-      toast.show('error', 'Error', 'Failed to delete holiday.');
+      toast.error(err.message || 'Failed to delete holiday.', 'Error');
     } finally {
       setDeletingHoliday(false);
     }
@@ -353,7 +353,8 @@ export default function LeaveRequestsPage() {
   };
 
   // Holidays dates sort
-  const todayStr = new Date().toISOString().split('T')[0];
+  const dToday = new Date();
+  const todayStr = `${dToday.getFullYear()}-${String(dToday.getMonth() + 1).padStart(2, '0')}-${String(dToday.getDate()).padStart(2, '0')}`;
   const sortedHolidays = [...holidays].sort((a, b) => a.date.localeCompare(b.date));
 
   return (

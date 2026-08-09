@@ -26,10 +26,7 @@ WHERE NOT EXISTS (
 );
 
 INSERT IGNORE INTO grade_configurations (school_id, min_percentage, max_percentage, grade, grade_point, remark) VALUES
-(1, 91.00, 100.00, 'A+', 10, 'Outstanding'),
-(1, 81.00, 90.00, 'A', 9, 'Excellent'),
-(1, 71.00, 80.00, 'B+', 8, 'Very Good'),
-(1, 61.00, 70.00, 'B', 7, 'Good'),
-(1, 51.00, 60.00, 'C', 6, 'Average'),
-(1, 41.00, 50.00, 'D', 5, 'Pass'),
-(1, 0.00, 40.00, 'F', 0, 'Fail');
+(1, 75.00, 100.00, 'A', 10, 'Excellent'),
+(1, 60.00, 74.99, 'B', 8, 'Good'),
+(1, 40.00, 59.99, 'C', 6, 'Average'),
+(1, 0.00, 39.99, 'D', 0, 'Fail');

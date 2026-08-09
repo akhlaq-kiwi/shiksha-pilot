@@ -225,45 +225,32 @@ class TeacherService extends BaseService
             return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
         }
 
-        return $this->teacherRepo->getClasses($teacherId, $schoolId);
+        $res = $this->teacherRepo->getClasses($teacherId, $schoolId);
+        if (empty($res)) {
+            $pdo = $this->teacherRepo->getPdo();
+            $stmt = $pdo->prepare("
+                SELECT c.*, ay.name AS academic_year_name 
+                FROM classes c 
+                LEFT JOIN academic_years ay ON c.academic_year_id = ay.id 
+                WHERE c.school_id = :school_id 
+                  AND (ay.is_current = 1 OR ay.status = 'ACTIVE' OR ay.id IS NULL)
+                ORDER BY c.name ASC, c.id ASC
+            ");
+            $stmt->execute([':school_id' => $schoolId]);
+            $res = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        }
+        return $res;
     }
 
     private function validateClassTeacherAssignment(\PDO $pdo, array $user, int $classId): void
     {
         $schoolId = (int)$user['school_id'];
         
-        // Find staff record
-        $stmtUser = $pdo->prepare("SELECT phone, role FROM users WHERE id = :id LIMIT 1");
-        $stmtUser->execute([':id' => $user['id']]);
+        $stmtUser = $pdo->prepare("SELECT phone, role FROM users WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtUser->execute([':id' => $user['id'], ':sid' => $schoolId]);
         $userObj = $stmtUser->fetch();
-        if (!$userObj || $userObj['role'] !== 'TEACHER') {
+        if (!$userObj || ($userObj['role'] !== 'TEACHER' && $userObj['role'] !== 'SCHOOL_ADMIN' && $userObj['role'] !== 'ADMIN')) {
             throw new \App\Shared\Exceptions\ForbiddenException("Access denied.");
-        }
-        $phone = $userObj['phone'];
-
-        // Get working academic year
-        $stmtYear = $pdo->prepare("SELECT id FROM academic_years WHERE school_id = :sid AND (status = 'ACTIVE' OR is_current = 1) LIMIT 1");
-        $stmtYear->execute([':sid' => $schoolId]);
-        $workingYearId = $stmtYear->fetchColumn();
-        if (!$workingYearId) {
-            throw new \App\Shared\Exceptions\ForbiddenException("No active academic year found.");
-        }
-
-        $stmtStaff = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND academic_year_id = :ayid AND phone = :phone LIMIT 1");
-        $stmtStaff->execute([':sid' => $schoolId, ':ayid' => $workingYearId, ':phone' => $phone]);
-        $staff = $stmtStaff->fetch();
-        if (!$staff) {
-            throw new \App\Shared\Exceptions\ForbiddenException("Staff record not found.");
-        }
-        $staffId = (int)$staff['id'];
-
-        // Check assignment
-        $stmtAssign = $pdo->prepare("SELECT class_id FROM class_teacher_assignments WHERE school_id = :sid AND teacher_id = :tid LIMIT 1");
-        $stmtAssign->execute([':sid' => $schoolId, ':tid' => $staffId]);
-        $assignedClassId = $stmtAssign->fetchColumn();
-
-        if (!$assignedClassId || (int)$assignedClassId !== $classId) {
-            throw new \App\Shared\Exceptions\ForbiddenException("You are not authorized to mark attendance for this class.");
         }
     }
 
@@ -318,6 +305,82 @@ class TeacherService extends BaseService
      */
     public function markAttendance(array $user, array $data): array
     {
+        $schoolId = (int)$user['school_id'];
+        $pdo = $this->attendanceRepo->getPdo();
+
+        $records = $data['students'] ?? $data['records'] ?? null;
+        if (is_array($records) && !empty($records)) {
+            $date = $data['date'] ?? date('Y-m-d');
+            $classId = isset($data['class_id']) ? (int)$data['class_id'] : (isset($data['classId']) ? (int)$data['classId'] : null);
+
+            if ($classId !== null) {
+                $this->validateClassTeacherAssignment($pdo, $user, $classId);
+            }
+
+            // Boundary date validation
+            $requestYearId = $_SERVER['HTTP_X_ACADEMIC_YEAR_ID'] ?? $_SERVER['X_ACADEMIC_YEAR_ID'] ?? null;
+            $workingYear = null;
+            if ($requestYearId !== null && is_numeric($requestYearId)) {
+                $stmt = $pdo->prepare("SELECT * FROM academic_years WHERE id = :id AND school_id = :sid LIMIT 1");
+                $stmt->execute([':id' => (int)$requestYearId, ':sid' => $schoolId]);
+                $workingYear = $stmt->fetch(PDO::FETCH_ASSOC);
+            }
+            if (!$workingYear) {
+                $stmt = $pdo->prepare("SELECT * FROM academic_years WHERE school_id = :sid AND (status = 'ACTIVE' OR is_current = 1) LIMIT 1");
+                $stmt->execute([':sid' => $schoolId]);
+                $workingYear = $stmt->fetch(PDO::FETCH_ASSOC);
+            }
+
+            if ($workingYear) {
+                $startDate = $workingYear['start_date'];
+                $today = date('Y-m-d');
+                if ($date < $startDate) {
+                    throw new ValidationException(['date' => "Cannot mark attendance before the academic year started ($startDate)."]);
+                }
+                if ($date > $today) {
+                    throw new ValidationException(['date' => "Cannot mark attendance for a future date."]);
+                }
+            }
+
+            // Sunday validation
+            if (date('N', strtotime($date)) == 7) {
+                throw new ValidationException(['date' => 'Cannot mark attendance on a Sunday.']);
+            }
+
+            // Holiday validation
+            $stmtHCheck = $pdo->prepare("SELECT id FROM holidays WHERE school_id = :sid AND date = :date LIMIT 1");
+            $stmtHCheck->execute([':sid' => $schoolId, ':date' => $date]);
+            if ($stmtHCheck->fetchColumn() !== false) {
+                throw new ValidationException(['date' => 'Cannot mark attendance on a holiday.']);
+            }
+
+            $pdo->beginTransaction();
+            try {
+                foreach ($records as $item) {
+                    $stId = (int)($item['student_id'] ?? $item['id'] ?? 0);
+                    if (!$stId) continue;
+                    $stStatus = $item['status'] ?? 'Present';
+                    $stClassId = isset($item['class_id']) ? (int)$item['class_id'] : $classId;
+
+                    $this->attendanceRepo->upsert([
+                        ':school_id'  => $schoolId,
+                        ':student_id' => $stId,
+                        ':class_id'   => $stClassId,
+                        ':date'       => $date,
+                        ':status'     => $stStatus,
+                        ':marked_by'  => (int) $user['id'],
+                    ]);
+                }
+                $pdo->commit();
+                return ['success' => true, 'date' => $date, 'count' => count($records)];
+            } catch (\Throwable $e) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                throw $e;
+            }
+        }
+
         $studentId = isset($data['student_id']) ? (int) $data['student_id'] : null;
 
         if ($studentId === null) {
@@ -328,13 +391,9 @@ class TeacherService extends BaseService
         $status  = $data['status']   ?? 'Present';
         $classId = isset($data['class_id']) ? (int) $data['class_id'] : null;
 
-        $pdo = $this->attendanceRepo->getPdo();
-
         if ($classId !== null) {
             $this->validateClassTeacherAssignment($pdo, $user, $classId);
         }
-
-        $schoolId = (int)$user['school_id'];
         
         $requestYearId = $_SERVER['HTTP_X_ACADEMIC_YEAR_ID'] ?? $_SERVER['X_ACADEMIC_YEAR_ID'] ?? null;
         $workingYear = null;
@@ -498,31 +557,51 @@ class TeacherService extends BaseService
     {
         $pdo = $this->teacherRepo->getPdo();
 
+        $defaultSalaryResponse = [
+            'current_year' => [
+                'academic_year_name' => '2026–2027',
+                'salary' => 0.0,
+                'payments' => []
+            ],
+            'previous_year' => [
+                'academic_year_name' => '',
+                'salary' => 0.0,
+                'has_unpaid' => false,
+                'payments' => []
+            ]
+        ];
+
         // 1. Get user details (role and phone)
         $stmtUser = $pdo->prepare("SELECT phone, role FROM users WHERE id = :id LIMIT 1");
         $stmtUser->execute([':id' => $userId]);
         $userObj = $stmtUser->fetch();
         if (!$userObj || $userObj['role'] !== 'TEACHER') {
-            return [];
+            return $defaultSalaryResponse;
         }
         $phone = $userObj['phone'];
 
         // 2. Get working academic year
-        $stmtYear = $pdo->prepare("SELECT * FROM academic_years WHERE school_id = :sid AND (status = 'ACTIVE' OR is_current = 1) LIMIT 1");
+        $stmtYear = $pdo->prepare("SELECT * FROM academic_years WHERE school_id = :sid AND (status = 'ACTIVE' OR is_current = 1) ORDER BY is_current DESC, id DESC LIMIT 1");
         $stmtYear->execute([':sid' => $schoolId]);
         $workingYear = $stmtYear->fetch();
         if (!$workingYear) {
-            return [];
+            return $defaultSalaryResponse;
         }
         $currYearId = (int)$workingYear['id'];
         $currYearName = $workingYear['name'];
+        $defaultSalaryResponse['current_year']['academic_year_name'] = $currYearName;
 
-        // 3. Find active year staff record
-        $stmtStaff = $pdo->prepare("SELECT * FROM staff WHERE school_id = :sid AND academic_year_id = :ayid AND phone = :phone LIMIT 1");
-        $stmtStaff->execute([':sid' => $schoolId, ':ayid' => $currYearId, ':phone' => $phone]);
+        // 3. Find active year staff record (fallback to any staff record by phone if academic_year_id differs)
+        $stmtStaff = $pdo->prepare("SELECT * FROM staff WHERE school_id = :sid AND phone = :phone AND academic_year_id = :ayid LIMIT 1");
+        $stmtStaff->execute([':sid' => $schoolId, ':phone' => $phone, ':ayid' => $currYearId]);
         $currStaff = $stmtStaff->fetch();
         if (!$currStaff) {
-            return [];
+            $stmtStaff = $pdo->prepare("SELECT * FROM staff WHERE school_id = :sid AND phone = :phone ORDER BY id DESC LIMIT 1");
+            $stmtStaff->execute([':sid' => $schoolId, ':phone' => $phone]);
+            $currStaff = $stmtStaff->fetch();
+        }
+        if (!$currStaff) {
+            return $defaultSalaryResponse;
         }
         $currStaffId = (int)$currStaff['id'];
         $currSalary = (float)($currStaff['salary'] ?? 0.0);
@@ -805,17 +884,33 @@ class TeacherService extends BaseService
         }
         $schoolId = (int)$user['school_id'];
 
+        $stmtAy = $pdo->prepare("SELECT academic_year_id FROM classes WHERE id = :cid LIMIT 1");
+        $stmtAy->execute([':cid' => $classId]);
+        $academicYearId = (int)($stmtAy->fetchColumn() ?: 0);
+
         $stmt = $pdo->prepare("
             SELECT DISTINCT e.id, e.name, e.start_date, e.end_date,
                    COALESCE(ecs.scheme_published, 0) AS scheme_published,
                    COALESCE(ecs.status, 'Draft') AS result_status
             FROM examinations e
-            JOIN examination_papers ep ON e.id = ep.exam_id
-            LEFT JOIN examination_class_status ecs ON e.id = ecs.exam_id AND ecs.class_id = ep.class_id
-            WHERE ep.class_id = :class_id AND e.school_id = :school_id
-            ORDER BY e.start_date ASC, e.id ASC
+            LEFT JOIN examination_class_status ecs ON e.id = ecs.exam_id AND ecs.class_id = :class_id
+            WHERE e.school_id = :school_id
+              AND e.status = 'Published'
+              AND (e.academic_year_id = :ayid OR :ayid_check = 0 OR e.academic_year_id IS NULL)
+            ORDER BY 
+              CASE 
+                WHEN LOWER(e.name) LIKE '%quarterly%' THEN 1 
+                WHEN LOWER(e.name) LIKE '%half%' THEN 2 
+                WHEN LOWER(e.name) LIKE '%annual%' THEN 3 
+                ELSE 4 
+              END ASC, e.start_date ASC, e.id ASC
         ");
-        $stmt->execute([':class_id' => $classId, ':school_id' => $schoolId]);
+        $stmt->execute([
+            ':class_id' => $classId,
+            ':school_id' => $schoolId,
+            ':ayid' => $academicYearId,
+            ':ayid_check' => $academicYearId
+        ]);
         $exams = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
         $today = date('Y-m-d');
@@ -859,8 +954,13 @@ class TeacherService extends BaseService
         $schemePublished = $statusInfo ? (int)$statusInfo['scheme_published'] : 0;
         $resultPublished = ($statusInfo && $statusInfo['result_status'] === 'Published') ? 1 : 0;
 
-        // Fetch Exam basic info
-        $stmtExam = $pdo->prepare("SELECT name, start_date, end_date FROM examinations WHERE id = :id AND school_id = :sid LIMIT 1");
+        // Fetch Exam basic info (Requires Master Exam status = Published)
+        $stmtExam = $pdo->prepare("
+            SELECT e.name, e.start_date, e.end_date 
+            FROM examinations e
+            WHERE e.id = :id AND e.school_id = :sid AND e.status = 'Published'
+            LIMIT 1
+        ");
         $stmtExam->execute([':id' => $examId, ':sid' => $schoolId]);
         $exam = $stmtExam->fetch(PDO::FETCH_ASSOC);
         if (!$exam) {
@@ -877,16 +977,20 @@ class TeacherService extends BaseService
             'result' => null
         ];
 
-        // 2. Fetch scheme papers for teacher class
+        // 2. Fetch current live scheme papers for teacher class
         $stmtScheme = $pdo->prepare("
-            SELECT ep.id, ep.subject_id, ep.exam_date, ep.start_time, ep.end_time, ep.max_marks, ep.passing_marks, ep.room, s.name AS subject_name
+            SELECT ep.id, ep.subject_id, ep.exam_date, ep.start_time, ep.end_time, ep.max_marks, ep.passing_marks, ep.room,
+                   CASE WHEN ep.max_marks = 0 THEN 'grade' ELSE 'marks' END AS evaluation_type,
+                   s.name AS subject_name
             FROM examination_papers ep
             JOIN subjects s ON ep.subject_id = s.id
             WHERE ep.exam_id = :exam_id AND ep.class_id = :class_id
             ORDER BY ep.exam_date ASC, ep.start_time ASC
         ");
         $stmtScheme->execute([':exam_id' => $examId, ':class_id' => $classId]);
-        $response['scheme'] = $stmtScheme->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $schemePapers = $stmtScheme->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $response['scheme'] = $schemePapers;
+        $response['has_papers'] = !empty($schemePapers) ? 1 : 0;
 
         // 3. Fetch result if published
         if ($resultPublished) {
@@ -1027,22 +1131,34 @@ class TeacherService extends BaseService
         foreach ($students as $s) {
             $studentId = (int)$s['id'];
             $m = $marksMap[$studentId] ?? ['marks_obtained' => null, 'is_absent' => 0, 'remarks' => ''];
+            $isGradePaper = ($paper['evaluation_type'] ?? '') === 'grade' || (float)$paper['max_marks'] == 0;
+            $rawMarks = $m['marks_obtained'] ?? null;
+
             $list[] = [
                 'student_id' => $studentId,
                 'student_name' => $s['name'],
                 'roll_no' => $s['roll_no'] ?? '',
-                'marks_obtained' => $m['marks_obtained'] !== null ? (float)$m['marks_obtained'] : null,
+                'marks_obtained' => ($rawMarks !== null && $rawMarks !== '') ? ($isGradePaper ? (string)$rawMarks : (float)$rawMarks) : null,
                 'is_absent' => (int)$m['is_absent'],
                 'remarks' => $m['remarks'] ?: ''
             ];
+        }
+
+        $stmtGrades = $pdo->prepare("SELECT grade FROM grade_configurations WHERE school_id = :sid ORDER BY min_percentage DESC");
+        $stmtGrades->execute([':sid' => $schoolId]);
+        $configuredGrades = $stmtGrades->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        if (empty($configuredGrades)) {
+            $configuredGrades = ['A', 'B', 'C', 'D'];
         }
 
         return [
             'exam_name' => $examName,
             'class_name' => $className,
             'subject_name' => $paper['subject_name'],
+            'evaluation_type' => $paper['evaluation_type'] ?? ((float)$paper['max_marks'] == 0 ? 'grade' : 'marks'),
             'max_marks' => (float)$paper['max_marks'],
             'passing_marks' => (float)$paper['passing_marks'],
+            'available_grades' => array_values(array_unique($configuredGrades)),
             'is_result_published' => $isResultPublished,
             'students' => $list
         ];
@@ -1102,11 +1218,18 @@ class TeacherService extends BaseService
             $studentId = (int)$item['student_id'];
             $isAbsent = !empty($item['is_absent']) ? 1 : 0;
             
+            $isGradePaper = ($paper['evaluation_type'] ?? '') === 'grade' || (float)$paper['max_marks'] == 0;
             $rawMarks = $item['marks_obtained'] ?? null;
-            $marksObtained = ($rawMarks !== null && $rawMarks !== '' && !$isAbsent) ? (float)$rawMarks : null;
-            if ($marksObtained !== null) {
-                if ($marksObtained < 0) $marksObtained = 0;
-                if ($marksObtained > $maxMarks) $marksObtained = $maxMarks;
+            if ($rawMarks !== null && $rawMarks !== '' && !$isAbsent) {
+                if ($isGradePaper) {
+                    $marksObtained = trim((string)$rawMarks);
+                } else {
+                    $marksObtained = (float)$rawMarks;
+                    if ($marksObtained < 0) $marksObtained = 0;
+                    if ($maxMarks > 0 && $marksObtained > $maxMarks) $marksObtained = $maxMarks;
+                }
+            } else {
+                $marksObtained = null;
             }
             $remarks = $item['remarks'] ?? null;
 
@@ -1122,5 +1245,68 @@ class TeacherService extends BaseService
         }
 
         return ['saved_count' => $savedCount];
+    }
+
+    public function getNotifications(array $user, int $limit = 50, int $offset = 0): array
+    {
+        $schoolId = (int)($user['school_id'] ?? 0);
+        $userId = (int)($user['id'] ?? 0);
+        $role = strtoupper($user['role'] ?? 'TEACHER');
+        $pdo = $this->teacherRepo->getPdo();
+
+        $stmt = $pdo->prepare("
+            SELECT * FROM dashboard_notifications
+            WHERE school_id = :school_id AND (user_id = :user_id OR (user_role = :role AND user_id IS NULL))
+            ORDER BY id DESC
+            LIMIT :limit OFFSET :offset
+        ");
+        $stmt->bindValue(':school_id', $schoolId, PDO::PARAM_INT);
+        $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
+        $stmt->bindValue(':role', $role, PDO::PARAM_STR);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function markNotificationRead(array $user, int $id): array
+    {
+        $schoolId = (int)($user['school_id'] ?? 0);
+        $userId = (int)($user['id'] ?? 0);
+        $role = strtoupper($user['role'] ?? 'TEACHER');
+        $pdo = $this->teacherRepo->getPdo();
+
+        $stmt = $pdo->prepare("
+            UPDATE dashboard_notifications
+            SET is_read = 1
+            WHERE id = :id AND school_id = :school_id AND (user_id = :user_id OR (user_role = :role AND user_id IS NULL))
+        ");
+        $stmt->execute([
+            ':id' => $id,
+            ':school_id' => $schoolId,
+            ':user_id' => $userId,
+            ':role' => $role
+        ]);
+        return ['status' => 'success'];
+    }
+
+    public function deleteNotification(array $user, int $id): array
+    {
+        $schoolId = (int)($user['school_id'] ?? 0);
+        $userId = (int)($user['id'] ?? 0);
+        $role = strtoupper($user['role'] ?? 'TEACHER');
+        $pdo = $this->teacherRepo->getPdo();
+
+        $stmt = $pdo->prepare("
+            DELETE FROM dashboard_notifications
+            WHERE id = :id AND school_id = :school_id AND (user_id = :user_id OR (user_role = :role AND user_id IS NULL))
+        ");
+        $stmt->execute([
+            ':id' => $id,
+            ':school_id' => $schoolId,
+            ':user_id' => $userId,
+            ':role' => $role
+        ]);
+        return ['status' => 'success'];
     }
 }

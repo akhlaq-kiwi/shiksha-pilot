@@ -75,12 +75,13 @@ export function DropdownMenu({ trigger, children, align = 'right' }) {
           style={{
             position: 'fixed',
             top: `${coords.top + 4}px`,
-            left: align === 'right' ? `${coords.right}px` : `${coords.left}px`,
-            transform: align === 'right' ? 'translateX(-100%)' : 'none',
+            ...(align === 'right'
+              ? { right: `${Math.max(0, window.innerWidth - coords.right)}px` }
+              : { left: `${coords.left}px` }),
           }}
           className={twMerge(
             clsx(
-              "bg-surface-overlay border border-border rounded-xl shadow-lg py-1 z-[9999] animate-slide-in-top min-w-[140px] text-body-sm"
+              "bg-white dark:bg-slate-900 border border-border rounded-xl shadow-xl py-1 z-[9999] animate-in fade-in zoom-in-95 duration-100 min-w-[150px] text-body-sm"
             )
           )}
         >
@@ -106,17 +107,21 @@ export function DropdownMenu({ trigger, children, align = 'right' }) {
   );
 }
 
-export function DropdownItem({ children, className, onClick, destructive = false, ...props }) {
+export function DropdownItem({ children, className, onClick, destructive = false, disabled = false, title, ...props }) {
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      title={title}
       className={twMerge(
         clsx(
           "block w-full text-left px-4 py-2 font-medium transition-colors text-body-md whitespace-nowrap rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/50",
-          destructive 
-            ? "text-danger-700 hover:bg-danger-50" 
-            : "text-text-primary hover:bg-secondary/80",
+          disabled 
+            ? "opacity-40 cursor-not-allowed text-text-muted hover:bg-transparent" 
+            : destructive 
+              ? "text-danger-700 hover:bg-danger-50 cursor-pointer" 
+              : "text-text-primary hover:bg-secondary/80 cursor-pointer",
           className
         )
       )}

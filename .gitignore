@@ -31,3 +31,5 @@ scratch/add_teachers_for_user.php
 backend/public/uploads/*
 app/android/app/google-services.json
 backend/config/firebase-service-account.json
+*.apk
+app-release.apk

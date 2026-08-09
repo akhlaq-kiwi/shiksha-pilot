@@ -63,6 +63,10 @@ export const schoolService = {
     return this.getStaff().then(list => (list || []).filter(s => s.status === 'ACTIVE' && (s.assigned_periods || 0) < (s.max_periods || 8)));
   },
 
+  getMasterCatalog() {
+    return apiClient.get('/api/school/master-catalog');
+  },
+
   getClasses() {
     return apiClient.get('/api/school/classes');
   },
@@ -72,7 +76,7 @@ export const schoolService = {
   },
 
   deleteClass(className) {
-    return apiClient.delete('/api/school/classes', { data: { name: className } });
+    return apiClient.delete(`/api/school/classes?name=${encodeURIComponent(className)}`, { body: { name: className } });
   },
 
   deleteSection(classId) {
@@ -313,6 +317,12 @@ export const schoolService = {
     return apiClient.get(`/api/school/classes/${classId}/next-roll-no`);
   },
 
+  checkRollNo(classId, rollNo, excludeId = null) {
+    let url = `/api/school/students/check-roll-no?class_id=${classId}&roll_no=${encodeURIComponent(rollNo)}`;
+    if (excludeId) url += `&exclude_id=${excludeId}`;
+    return apiClient.get(url);
+  },
+
   getStaffPayments(params) {
     return apiClient.get(buildUrl('/api/school/staff-payments', params));
   },
@@ -393,24 +403,24 @@ export const schoolService = {
     return apiClient.get('/api/school/additional-fees/payments');
   },
 
-  getTransportFees() {
-    return Promise.resolve([]);
+  getTransportFees(params = {}) {
+    return apiClient.get(buildUrl('/api/school/transport-fees', params));
   },
 
-  assignTransportFee() {
-    return Promise.resolve({});
+  assignTransportFee(data = {}) {
+    return apiClient.post('/api/school/transport-fees', data);
   },
 
-  updateTransportFee() {
-    return Promise.resolve({});
+  updateTransportFee(id, data = {}) {
+    return apiClient.put(`/api/school/transport-fees/${id}`, data);
   },
 
-  deleteTransportFee() {
-    return Promise.resolve({});
+  deleteTransportFee(id) {
+    return apiClient.delete(`/api/school/transport-fees/${id}`);
   },
 
-  toggleTransportFeeStatus() {
-    return Promise.resolve({});
+  toggleTransportFeeStatus(id, data = {}) {
+    return apiClient.put(`/api/school/transport-fees/${id}/status`, data);
   },
 
   collectAdditionalFeePayment(id, data = {}) {

@@ -140,7 +140,7 @@ foreach ($queue as $row) {
             ");
             $stmtInc->execute([':appid' => $applicationId]);
         } else {
-            $penalty = round($due * $percentage / 100, 2);
+            $penalty = round($due * $percentage / 100);
             
             if ($penalty <= 0) {
                 // Skip student
@@ -432,27 +432,41 @@ function getMonthsDueUpToCurrent(string $startDateStr, string $endDateStr, strin
 {
     $academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
     
-    if ($status === 'Archived') {
+    if (strcasecmp((string)$status, 'Archived') === 0) {
         return $academicMonths;
     }
 
     try {
         $now = new \DateTime();
+        $today = new \DateTime($now->format('Y-m-d'));
         $startDate = new \DateTime($startDateStr);
         $endDate = new \DateTime($endDateStr);
         
-        if ($now > $endDate) {
+        if ($today > $endDate) {
             return $academicMonths;
         }
         
-        $currentMonthName = $now->format('F');
-        $idx = array_search($currentMonthName, $academicMonths);
-        if ($idx === false) {
-            return $academicMonths;
+        if ($today < $startDate) {
+            return [];
         }
         
-        return array_slice($academicMonths, 0, $idx + 1);
-    } catch (\Exception $e) {
+        $dueMonths = [];
+        $curr = clone $startDate;
+        $curr->setDate((int)$curr->format('Y'), (int)$curr->format('m'), 1);
+        
+        $cutoff = min($today, $endDate);
+        $cutoffMonthStr = $cutoff->format('Y-m');
+        
+        while ($curr->format('Y-m') <= $cutoffMonthStr) {
+            $mName = $curr->format('F');
+            if (in_array($mName, $academicMonths, true) && !in_array($mName, $dueMonths, true)) {
+                $dueMonths[] = $mName;
+            }
+            $curr->modify('+1 month');
+        }
+        
+        return !empty($dueMonths) ? $dueMonths : $academicMonths;
+    } catch (\Throwable $e) {
         return $academicMonths;
     }
 }

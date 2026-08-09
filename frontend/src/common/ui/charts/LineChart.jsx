@@ -37,7 +37,7 @@ export const LineChart = ({
 
   const stroke = `var(--chart-${series})`;
   const width = 1000;
-  const topY = 24;
+  const topY = 42;
   const bottomY = height - 45;
   const paddingX = 40;
   const usableH = bottomY - topY;
@@ -75,7 +75,7 @@ export const LineChart = ({
   }
 
   return (
-    <div className={twMerge('w-full overflow-hidden', className)}>
+    <div className={twMerge('w-full pt-2 overflow-visible', className)}>
       <div className="relative w-full" style={{ height }}>
         {/* Value never conveyed by the drawing alone. */}
         <table className="sr-only">

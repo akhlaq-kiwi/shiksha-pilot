@@ -8,7 +8,10 @@ import '../screens/leave_list_screen.dart';
 import '../screens/timetable_screen.dart';
 import '../screens/notification_center_screen.dart';
 import '../screens/fees_card_screen.dart';
+import '../screens/exam_list_screen.dart';
+import '../screens/homework_list_screen.dart';
 import '../services/leave_service.dart';
+import '../services/exam_service.dart';
 import '../main.dart';
 
 class NotificationHelper {
@@ -44,64 +47,23 @@ class NotificationHelper {
               return;
             }
 
-            final title = (notif['title'] ?? '').toString().toLowerCase();
-            final message = (notif['message'] ?? '').toString().toLowerCase();
-            final link = (notif['link'] ?? '').toString().toLowerCase();
-            
-            SharedPreferences.getInstance().then((prefs) {
-              final token = prefs.getString('auth_token') ?? '';
-              final userRole = prefs.getString('user_role') ?? '';
-              final studentId = prefs.getInt('selected_student_id');
-              final baseUrl = prefs.getString('base_url') ?? 'http://10.55.253.71:8000';
-              if (token.isEmpty || userRole.isEmpty) return;
+            final prefs = await SharedPreferences.getInstance();
+            final token = prefs.getString('auth_token') ?? '';
+            final userRole = prefs.getString('user_role') ?? '';
+            final studentId = prefs.getInt('selected_student_id');
+            final baseUrl = prefs.getString('base_url') ?? 'https://app.shikshapilot.com';
 
-              final leaveService = LeaveService(baseUrl: baseUrl, token: token);
-              
-              // Parse studentId from link if present for deep linking
-              int? notifStudentId;
-              try {
-                final cleanLink = link.startsWith('http') ? link : 'http://localhost$link';
-                final uri = Uri.parse(cleanLink);
-                final idStr = uri.queryParameters['student_id'] ?? uri.queryParameters['studentId'];
-                if (idStr != null) {
-                  notifStudentId = int.tryParse(idStr);
-                }
-              } catch (e) {
-                debugPrint('Failed to parse student_id from notification link: $e');
-              }
-
-              Widget targetScreen;
-              if (link.contains('fees') || title.contains('fee') || message.contains('fee')) {
-                targetScreen = FeesCardScreen(
-                  baseUrl: baseUrl,
-                  token: token,
-                  studentId: notifStudentId ?? studentId,
-                );
-              } else if (link.contains('leaves') || title.contains('leave') || message.contains('leave')) {
-                targetScreen = LeaveListScreen(
-                  leaveService: leaveService,
-                  userRole: userRole,
-                  selectedStudentId: notifStudentId ?? studentId,
-                );
-              } else if (link.contains('timetable') || title.contains('timetable') || message.contains('timetable')) {
-                targetScreen = TimetableScreen(
-                  baseUrl: leaveService.baseUrl,
-                  token: leaveService.token,
-                  userRole: userRole,
-                  selectedStudentId: notifStudentId ?? studentId,
-                );
-              } else {
-                targetScreen = NotificationCenterScreen(
-                  baseUrl: leaveService.baseUrl,
-                  token: leaveService.token,
-                  studentId: notifStudentId ?? studentId,
-                );
-              }
-
-              MyApp.navigatorKey.currentState?.push(
-                MaterialPageRoute(builder: (context) => targetScreen),
+            // Unauthenticated deep linking redirect to login
+            if (token.isEmpty || userRole.isEmpty) {
+              await prefs.setString('pending_notification_payload', payload);
+              MyApp.navigatorKey.currentState?.pushAndRemoveUntil(
+                MaterialPageRoute(builder: (context) => const LoginScreen()),
+                (route) => false,
               );
-            });
+              return;
+            }
+
+            navigateToTarget(notif, baseUrl, token, userRole, studentId);
           } catch (e) {
             debugPrint('Error deep linking from notification: $e');
           }
@@ -114,6 +76,79 @@ class NotificationHelper {
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>()
         ?.requestNotificationsPermission();
+  }
+
+  static void navigateToTarget(
+    dynamic notif,
+    String baseUrl,
+    String token,
+    String userRole,
+    int? studentId,
+  ) {
+    final title = (notif['title'] ?? '').toString().toLowerCase();
+    final message = (notif['message'] ?? '').toString().toLowerCase();
+    final link = (notif['link'] ?? '').toString().toLowerCase();
+
+    final leaveService = LeaveService(baseUrl: baseUrl, token: token);
+
+    int? notifStudentId;
+    try {
+      final cleanLink = link.startsWith('http') ? link : 'http://localhost$link';
+      final uri = Uri.parse(cleanLink);
+      final idStr = uri.queryParameters['student_id'] ?? uri.queryParameters['studentId'];
+      if (idStr != null) {
+        notifStudentId = int.tryParse(idStr);
+      }
+    } catch (e) {
+      debugPrint('Failed to parse student_id from notification link: $e');
+    }
+
+    Widget targetScreen;
+    if (link.contains('exam') || title.contains('exam') || message.contains('exam') || link.contains('examination') || title.contains('examination') || message.contains('examination')) {
+      final examService = ExamService(baseUrl: baseUrl, token: token);
+      targetScreen = ExamListScreen(
+        examService: examService,
+        userRole: userRole,
+        selectedStudentId: notifStudentId ?? studentId,
+      );
+    } else if (link.contains('fees') || title.contains('fee') || message.contains('fee')) {
+      targetScreen = FeesCardScreen(
+        baseUrl: baseUrl,
+        token: token,
+        studentId: notifStudentId ?? studentId,
+      );
+    } else if (link.contains('leaves') || title.contains('leave') || message.contains('leave') || title.contains('holiday') || message.contains('holiday')) {
+      final isLeaveReqNotif = title.contains('approve') || title.contains('reject') || message.contains('approve') || message.contains('reject') || title.contains('request') || message.contains('request');
+      targetScreen = LeaveListScreen(
+        leaveService: leaveService,
+        userRole: userRole,
+        selectedStudentId: notifStudentId ?? studentId,
+        initialTabIndex: isLeaveReqNotif ? 1 : 0,
+      );
+    } else if (link.contains('timetable') || title.contains('timetable') || message.contains('timetable')) {
+      targetScreen = TimetableScreen(
+        baseUrl: leaveService.baseUrl,
+        token: leaveService.token,
+        userRole: userRole,
+        selectedStudentId: notifStudentId ?? studentId,
+      );
+    } else if (link.contains('homework') || title.contains('homework') || message.contains('homework') || link.contains('assignment') || title.contains('assignment') || message.contains('assignment')) {
+      targetScreen = HomeworkListScreen(
+        baseUrl: baseUrl,
+        userRole: userRole,
+        selectedStudentId: notifStudentId ?? studentId,
+      );
+    } else {
+      targetScreen = NotificationCenterScreen(
+        baseUrl: leaveService.baseUrl,
+        token: leaveService.token,
+        studentId: notifStudentId ?? studentId,
+      );
+    }
+
+    MyApp.navigatorKey.currentState?.push(
+      MaterialPageRoute(builder: (context) => targetScreen),
+    );
   }
 
   static Future<void> showDownloadNotification({
@@ -160,7 +195,8 @@ class NotificationHelper {
     final prefs = await SharedPreferences.getInstance();
     final schoolName = prefs.getString('school_name') ?? 'Shiksha Pilot School Hub';
 
-    final title = schoolName;
+    final rawTitle = (notif['title'] ?? '').toString().trim();
+    final title = rawTitle.isNotEmpty ? rawTitle : schoolName;
     final message = notif['message'] ?? '';
 
     final int id = notif['id'] is int 

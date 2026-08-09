@@ -1,6 +1,16 @@
 import 'dart:convert';
 import 'package:school_hub/services/http_service.dart' as http;
 
+class AuthValidationException implements Exception {
+  final Map<String, String> fieldErrors;
+  final String message;
+
+  AuthValidationException(this.fieldErrors, [this.message = 'Validation failed']);
+
+  @override
+  String toString() => message;
+}
+
 class AuthService {
   final String baseUrl;
 
@@ -22,14 +32,21 @@ class AuthService {
       return resData['data']; // Contains 'token' and 'user' map
     } else {
       if (resData['data'] != null && resData['data'] is Map) {
-        final errors = resData['data'] as Map<String, dynamic>;
-        if (errors.containsKey('phone')) {
-          throw Exception(errors['phone']);
-        } else if (errors.containsKey('password')) {
-          throw Exception(errors['password']);
+        Map<String, dynamic> errorsMap = Map<String, dynamic>.from(resData['data'] as Map);
+        if (errorsMap['errors'] != null && errorsMap['errors'] is Map) {
+          errorsMap = Map<String, dynamic>.from(errorsMap['errors'] as Map);
+        }
+        if (errorsMap.containsKey('phone') && errorsMap['phone'] != null) {
+          throw Exception(errorsMap['phone'].toString());
+        } else if (errorsMap.containsKey('password') && errorsMap['password'] != null) {
+          throw Exception(errorsMap['password'].toString());
         }
       }
-      throw Exception(resData['message'] ?? 'Login failed. Please check credentials.');
+      final msg = resData['message'] as String?;
+      if (msg != null && msg.isNotEmpty && msg != 'Validation failed.') {
+        throw Exception(msg);
+      }
+      throw Exception('Login failed. Please check your mobile number and password.');
     }
   }
 
@@ -49,6 +66,23 @@ class AuthService {
 
     final resData = json.decode(response.body);
     if (response.statusCode != 200) {
+      final Map<String, String> errorsMap = {};
+      if (resData['data'] != null && resData['data'] is Map) {
+        final Map<String, dynamic> rawData = resData['data'];
+        Map<String, dynamic> sourceMap = rawData;
+        if (rawData['errors'] != null && rawData['errors'] is Map) {
+          sourceMap = rawData['errors'] as Map<String, dynamic>;
+        }
+        sourceMap.forEach((key, value) {
+          if (value != null && value is! Map) {
+            errorsMap[key] = value.toString();
+          }
+        });
+      }
+      if (errorsMap.isNotEmpty) {
+        final msg = errorsMap['current_password'] ?? resData['message'] ?? 'Validation failed';
+        throw AuthValidationException(errorsMap, msg);
+      }
       throw Exception(resData['message'] ?? 'Failed to change password.');
     }
   }
