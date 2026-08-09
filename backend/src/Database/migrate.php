@@ -83,6 +83,27 @@ try {
         }
     }
 
+    // Ensure critical tables exist even if migration tracking table was pre-populated on an existing DB
+    $stmtDeviceTokens = $pdo->query("SHOW TABLES LIKE 'device_tokens'");
+    if (!$stmtDeviceTokens->fetch()) {
+        $stmtDeviceTokens->closeCursor();
+        $file009 = __DIR__ . '/Migrations/009_create_push_notifications.sql';
+        if (file_exists($file009)) {
+            $sql009 = file_get_contents($file009);
+            $statements009 = array_filter(array_map('trim', explode(';', $sql009)), fn(string $s) => $s !== '');
+            foreach ($statements009 as $st) {
+                try {
+                    $pdo->exec($st);
+                } catch (\Exception $e) {
+                    // Ignore table/column exists errors
+                }
+            }
+            echo "Created missing 'device_tokens' table.\n";
+        }
+    } else {
+        $stmtDeviceTokens->closeCursor();
+    }
+
     // Fetch all executed migrations
     $stmtMig = $pdo->query("SELECT migration_name FROM migrations");
     $executedMigrations = $stmtMig->fetchAll(PDO::FETCH_COLUMN);
