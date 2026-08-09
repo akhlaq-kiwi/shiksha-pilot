@@ -74,11 +74,13 @@ jobs:
           mkdir -p "$TEMP_DIR/api"
           cp -r backend/src "$TEMP_DIR/api/"
           cp -r backend/public "$TEMP_DIR/api/"
+          if [ -d "backend/config" ]; then
+            cp -r backend/config "$TEMP_DIR/api/"
+          fi
           cp backend/composer.json "$TEMP_DIR/api/"
           cp backend/composer.lock "$TEMP_DIR/api/"
 
-          # Backend .env assembled entirely from secrets — nothing sensitive
-          # ever touches the repo or the workflow file itself.
+          # Backend .env assembled entirely from secrets
           cat > "$TEMP_DIR/api/.env" <<EOF
           APP_ENV=production
           APP_DEBUG=false
@@ -97,6 +99,19 @@ jobs:
           SMTP_PASS=${{ secrets.PROD_SMTP_PASS }}
           SMTP_FROM_NAME=${{ secrets.PROD_SMTP_FROM_NAME }}
           EOF
+
+          # Create config directory if not present
+          mkdir -p "$TEMP_DIR/api/config"
+
+          # 1. Decode base64 secret into config/firebase-service-account.json if present
+          if [ -n "${{ secrets.PROD_FIREBASE_SERVICE_ACCOUNT_B64 }}" ]; then
+            echo "${{ secrets.PROD_FIREBASE_SERVICE_ACCOUNT_B64 }}" | base64 --decode > "$TEMP_DIR/api/config/firebase-service-account.json"
+          # 2. Or write raw JSON secret if provided directly
+          elif [ -n "${{ secrets.PROD_FIREBASE_SERVICE_ACCOUNT_JSON }}" ]; then
+            cat << 'JSON_EOF' > "$TEMP_DIR/api/config/firebase-service-account.json"
+${{ secrets.PROD_FIREBASE_SERVICE_ACCOUNT_JSON }}
+JSON_EOF
+          fi
 
           # Root .htaccess for frontend client-side routing
           cat > "$TEMP_DIR/.htaccess" <<'EOF'
