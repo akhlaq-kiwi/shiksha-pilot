@@ -55,6 +55,12 @@ use App\Domain\Student\Controllers\StudentController;
 use App\Domain\Student\Services\VocabularyService;
 use App\Domain\Student\Controllers\VocabularyController;
 
+// ── Shared: Push notifications ────────────────────────────────────────────────
+use App\Shared\Notifications\FcmClient;
+use App\Shared\Notifications\PushDispatcher;
+use App\Shared\Notifications\DeviceTokenService;
+use App\Shared\Notifications\DeviceTokenController;
+
 /**
  * Load a .env file if it exists, exporting each KEY=VALUE pair via putenv().
  * Lines starting with '#' and empty lines are ignored.
@@ -338,6 +344,30 @@ class App
                 return new HomeworkController(
                     $c->get(TokenService::class),
                     $c->get(HomeworkService::class),
+                );
+            },
+
+            // ── Shared: Push notifications ───────────────────────────────
+            FcmClient::class => function ($c) {
+                return new FcmClient($c->get(Connection::class)->getPdo());
+            },
+
+            PushDispatcher::class => function ($c) {
+                return new PushDispatcher(
+                    $c->get(Connection::class)->getPdo(),
+                    $c->get(FcmClient::class),
+                );
+            },
+
+            DeviceTokenService::class => function ($c) {
+                return new DeviceTokenService($c->get(Connection::class)->getPdo());
+            },
+
+            DeviceTokenController::class => function ($c) {
+                return new DeviceTokenController(
+                    $c->get(TokenService::class),
+                    $c->get(DeviceTokenService::class),
+                    $c->get(PushDispatcher::class),
                 );
             },
         ]);

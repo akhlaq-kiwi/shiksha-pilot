@@ -84,7 +84,15 @@ jobs:
           SMTP_USER=${{ secrets.QA_SMTP_USER }}
           SMTP_PASS=${{ secrets.QA_SMTP_PASS }}
           SMTP_FROM_NAME=${{ secrets.QA_SMTP_FROM_NAME }}
+
+          FIREBASE_SERVICE_ACCOUNT_JSON=${{ secrets.QA_FIREBASE_SERVICE_ACCOUNT_JSON }}
           EOF
+
+          # Automatically decode base64 service account JSON file into config/ if secret is provided
+          if [ -n "${{ secrets.QA_FIREBASE_SERVICE_ACCOUNT_B64 }}" ]; then
+            mkdir -p "$TEMP_DIR/api/config"
+            echo "${{ secrets.QA_FIREBASE_SERVICE_ACCOUNT_B64 }}" | base64 --decode > "$TEMP_DIR/api/config/firebase-service-account.json"
+          fi
 
           # Root .htaccess for frontend client-side routing
           cat > "$TEMP_DIR/.htaccess" <<'EOF'

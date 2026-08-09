@@ -10,6 +10,7 @@ import 'screens/home_screen.dart';
 import 'services/leave_service.dart';
 import 'services/auth_service.dart';
 import 'services/notification_helper.dart';
+import 'services/push_notification_service.dart';
 
 const String fetchNotificationsTask = "com.shikshapilot.schoolhub.fetchNotifications";
 
@@ -94,14 +95,24 @@ void callbackDispatcher() {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await NotificationHelper.init();
+
+  // Firebase push is the primary delivery path. Never awaited in a way that
+  // can block startup — a device without Play Services still has to open.
+  await PushNotificationService.init();
+
   await Workmanager().initialize(
     callbackDispatcher,
     isInDebugMode: false,
   );
+  // The poll is now a safety net, not the delivery mechanism: it catches
+  // anything a push missed (permission revoked, token rotated while offline,
+  // FCM dropped a low-priority message). Every device polling every 15 minutes
+  // was, on shared hosting, the single largest source of idle API load — at
+  // 6 hours it costs ~1/24th of that while still guaranteeing nothing is lost.
   await Workmanager().registerPeriodicTask(
     "1",
     fetchNotificationsTask,
-    frequency: const Duration(minutes: 15),
+    frequency: const Duration(hours: 6),
     existingWorkPolicy: ExistingPeriodicWorkPolicy.replace,
   );
   runApp(const MyApp());
@@ -187,7 +198,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
     final role = prefs.getString('user_role');
-    final baseUrl = prefs.getString('base_url') ?? 'https://qa.shikshapilot.com';
+    final baseUrl = prefs.getString('base_url') ?? 'http://192.168.0.3:2002';
     await prefs.setString('base_url', baseUrl);
 
     if (token != null && role != null) {
@@ -280,12 +291,12 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Container(
-                    width: 120,
-                    height: 120,
-                    decoration: const BoxDecoration(
+                    width: 130,
+                    height: 130,
+                    decoration: BoxDecoration(
                       color: Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [
+                      borderRadius: BorderRadius.circular(28),
+                      boxShadow: const [
                         BoxShadow(
                           color: Colors.black26,
                           blurRadius: 20,
@@ -293,13 +304,12 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                         )
                       ],
                     ),
-                    child: ClipOval(
-                      child: Image.asset(
-                        'assets/images/logo.png',
-                        width: 120,
-                        height: 120,
-                        fit: BoxFit.cover,
-                      ),
+                    padding: const EdgeInsets.all(16),
+                    child: Image.asset(
+                      'assets/images/logo.png',
+                      width: 98,
+                      height: 98,
+                      fit: BoxFit.contain,
                     ),
                   ),
                   const SizedBox(height: 32),
@@ -366,10 +376,10 @@ class _LoginScreenState extends State<LoginScreen> {
         });
       }
     } else {
-      await prefs.setString('base_url', 'https://qa.shikshapilot.com');
+      await prefs.setString('base_url', 'http://192.168.0.3:2002');
       if (mounted) {
         setState(() {
-          _serverUrlController.text = 'https://qa.shikshapilot.com';
+          _serverUrlController.text = 'http://192.168.0.3:2002';
         });
       }
     }
@@ -414,6 +424,11 @@ class _LoginScreenState extends State<LoginScreen> {
       await prefs.setString('user_phone', (user['phone'] as String?) ?? '');
       await prefs.setString('school_name', ((user['school_name'] as String?) ?? 'Shiksha Pilot Academy').toUpperCase());
       await prefs.setString('user_photo', (user['staff_photo_path'] as String?) ?? '');
+
+      // Register this device now that we have a token to authenticate with,
+      // and subscribe to the role topics the server hands back. Not awaited —
+      // push registration must never delay getting the user into the app.
+      PushNotificationService.registerDevice();
 
       final leaveService = LeaveService(baseUrl: activeBaseUrl, token: token);
 

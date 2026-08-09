@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Accent applied to the small icon in the notification tray. Matches the
+         Scholar Indigo brand primary used by AppColors in the Flutter app. -->
+    <color name="notification_color">#3F51B5</color>
+</resources>

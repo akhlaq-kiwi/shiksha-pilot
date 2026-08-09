@@ -27,6 +27,14 @@ scratch/*
 scratch/add_teachers_for_user.php
 .env
 .qa.env
+
+# Firebase service-account keys — these can send push to every user, so they
+# must never be committed.
+service-account*.json
+**/firebase-adminsdk-*.json
+**/firebase-service-account*.json
+backend/config/firebase-service-account.json
+
 .builds/
 backend/public/uploads/*
 *.apk

@@ -7,6 +7,8 @@ namespace App\Domain\Teacher\Services;
 use App\Shared\BaseService;
 use App\Shared\Exceptions\ValidationException;
 use App\Shared\Exceptions\NotFoundException;
+use App\Shared\Notifications\NotificationCatalog;
+use App\Shared\Notifications\PushDispatcher;
 use Psr\Log\LoggerInterface;
 use PDO;
 
@@ -401,9 +403,12 @@ class HomeworkService extends BaseService
         $message = "New homework assigned" . ($className ? " for $className" : "") . ". Tap to view.";
         $link = '/homework';
 
+        $eventKey = 'HOMEWORK_ASSIGNED';
+        $category = NotificationCatalog::categoryFor($eventKey);
+
         $stmtIns = $this->pdo->prepare("
-            INSERT INTO dashboard_notifications (school_id, user_id, user_role, title, message, link, is_read)
-            VALUES (:sid, :uid, :role, :title, :msg, :link, 0)
+            INSERT INTO dashboard_notifications (school_id, user_id, user_role, title, message, link, category, event_key, is_read)
+            VALUES (:sid, :uid, :role, :title, :msg, :link, :cat, :ekey, 0)
         ");
 
         if (!empty($targetUsers)) {
@@ -415,26 +420,29 @@ class HomeworkService extends BaseService
                     ':title' => $title,
                     ':msg' => $message,
                     ':link' => $link,
+                    ':cat' => $category,
+                    ':ekey' => $eventKey,
                 ]);
+                PushDispatcher::pushOnly(
+                    $this->pdo, $schoolId, (string) $u['role'], (int) $u['user_id'],
+                    $eventKey, $title, $message, $link
+                );
             }
         } else {
             // Broadcast fallback only if no specific user mapping is found
-            $stmtIns->execute([
-                ':sid' => $schoolId,
-                ':uid' => null,
-                ':role' => 'STUDENT',
-                ':title' => $title,
-                ':msg' => $message,
-                ':link' => $link,
-            ]);
-            $stmtIns->execute([
-                ':sid' => $schoolId,
-                ':uid' => null,
-                ':role' => 'PARENT',
-                ':title' => $title,
-                ':msg' => $message,
-                ':link' => $link,
-            ]);
+            foreach (['STUDENT', 'PARENT'] as $role) {
+                $stmtIns->execute([
+                    ':sid' => $schoolId,
+                    ':uid' => null,
+                    ':role' => $role,
+                    ':title' => $title,
+                    ':msg' => $message,
+                    ':link' => $link,
+                    ':cat' => $category,
+                    ':ekey' => $eventKey,
+                ]);
+                PushDispatcher::pushOnly($this->pdo, $schoolId, $role, null, $eventKey, $title, $message, $link);
+            }
         }
     }
 }

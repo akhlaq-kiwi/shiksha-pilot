@@ -14,6 +14,8 @@ use App\Domain\SchoolAdmin\Repositories\StudentRepository;
 use App\Shared\BaseService;
 use App\Shared\Exceptions\NotFoundException;
 use App\Shared\Exceptions\ValidationException;
+use App\Shared\Notifications\NotificationCatalog;
+use App\Shared\Notifications\PushDispatcher;
 use PDO;
 use Psr\Log\LoggerInterface;
 
@@ -1375,7 +1377,7 @@ class SchoolAdminService extends BaseService
 
         if ($admissionFee !== null && $admissionFee > 0) {
             $this->syncAdmissionFeePayment($pdo, $schoolId, $id, $academicYearId, $admissionFee);
-            $this->sendStudentNotification($pdo, $schoolId, $id, "Admission Fee Added", "Your admission fee has been added to your fee account. Please check your Fees section.");
+            $this->sendStudentNotification($pdo, $schoolId, $id, "Admission Fee Added", "Your admission fee has been added to your fee account. Please check your Fees section.", 'FEE_ADMISSION_ADDED');
         }
 
         $this->syncExistingAnnualFeePayment($pdo, $schoolId, $id, (int)$classId, $academicYearId, $studentCategory);
@@ -1806,7 +1808,7 @@ class SchoolAdminService extends BaseService
                 ':ftid' => $targetTypeId,
                 ':amt' => $targetAmount
             ]);
-            $this->sendStudentNotification($pdo, $schoolId, $studentId, "Annual Fee Added", "An annual fee of Rs. {$targetAmount} has been added to your fee account.");
+            $this->sendStudentNotification($pdo, $schoolId, $studentId, "Annual Fee Added", "An annual fee of Rs. {$targetAmount} has been added to your fee account.", 'FEE_ANNUAL_ADDED');
         }
     }
 
@@ -4627,9 +4629,14 @@ class SchoolAdminService extends BaseService
             $stu = $stmtS->fetch(PDO::FETCH_ASSOC);
 
             if ($stu) {
+                $achEventKey = str_contains($title, 'Attendance')
+                    ? 'ACHIEVEMENT_ATTENDANCE_AWARD'
+                    : 'ACHIEVEMENT_ACADEMIC_TOPPER';
+                $achCategory = NotificationCatalog::categoryFor($achEventKey);
+
                 $stmtInsNotif = $pdo->prepare("
-                    INSERT INTO dashboard_notifications (school_id, user_role, title, message, link, is_read)
-                    VALUES (:sid, :role, :title, :msg, '/achievements', 0)
+                    INSERT INTO dashboard_notifications (school_id, user_role, title, message, link, category, event_key, is_read)
+                    VALUES (:sid, :role, :title, :msg, '/achievements', :category, :event_key, 0)
                 ");
 
                 // Notify student role
@@ -4637,16 +4644,24 @@ class SchoolAdminService extends BaseService
                     ':sid' => $schoolId,
                     ':role' => 'STUDENT',
                     ':title' => $title,
-                    ':msg' => $message
+                    ':msg' => $message,
+                    ':category' => $achCategory,
+                    ':event_key' => $achEventKey,
                 ]);
 
                 // Notify parent role
+                $parentMessage = "Child: {$studentName} - " . $message;
                 $stmtInsNotif->execute([
                     ':sid' => $schoolId,
                     ':role' => 'PARENT',
                     ':title' => $title,
-                    ':msg' => "Child: {$studentName} - " . $message
+                    ':msg' => $parentMessage,
+                    ':category' => $achCategory,
+                    ':event_key' => $achEventKey,
                 ]);
+
+                PushDispatcher::pushOnly($pdo, $schoolId, 'STUDENT', null, $achEventKey, $title, $message, '/achievements');
+                PushDispatcher::pushOnly($pdo, $schoolId, 'PARENT', null, $achEventKey, $title, $parentMessage, '/achievements');
             }
         } catch (\Exception $e) {
             // Ignore notification failures
@@ -6185,7 +6200,7 @@ class SchoolAdminService extends BaseService
         }
 
         foreach ($monthsToPay as $m) {
-            $this->sendStudentNotification($pdo, $schoolId, $studentId, "Monthly Fee Deposited", "Your {$m} fee payment has been successfully recorded.");
+            $this->sendStudentNotification($pdo, $schoolId, $studentId, "Monthly Fee Deposited", "Your {$m} fee payment has been successfully recorded.", 'FEE_PAYMENT_RECORDED');
         }
 
         $this->syncFollowUpStatus($pdo, $studentId, $schoolId);
@@ -7360,7 +7375,8 @@ class SchoolAdminService extends BaseService
             $schoolId, 
             $studentId, 
             "Fee Payment Reverted", 
-            "A previously recorded fee payment has been reverted by your school. Please review your updated fee status."
+            "A previously recorded fee payment has been reverted by your school. Please review your updated fee status.",
+            'FEE_PAYMENT_REVERTED'
         );
 
         // 4. Perform deletion
@@ -10079,7 +10095,8 @@ Only approve the settlement after reviewing all financial records.
                     $schoolId, 
                     $s['student_id'], 
                     "Annual Fee Added", 
-                    "An annual fee has been added to your fee account. Please check your Fees section for details."
+                    "An annual fee has been added to your fee account. Please check your Fees section for details.",
+                    'FEE_ANNUAL_ADDED'
                 );
             }
 
@@ -10229,7 +10246,7 @@ Only approve the settlement after reviewing all financial records.
             $pay['fee_type_id'] = (int)$pay['fee_type_id'];
             $pay['amount'] = (float)$pay['amount'];
 
-            $this->sendStudentNotification($pdo, $schoolId, $pay['student_id'], "Additional Fee Deposited", "{$pay['fee_name']} have been successfully recorded.");
+            $this->sendStudentNotification($pdo, $schoolId, $pay['student_id'], "Additional Fee Deposited", "{$pay['fee_name']} have been successfully recorded.", 'FEE_PAYMENT_RECORDED');
             $this->syncFollowUpStatus($pdo, $pay['student_id'], $schoolId);
         }
 
@@ -10300,7 +10317,8 @@ Only approve the settlement after reviewing all financial records.
                 $schoolId, 
                 $studentId, 
                 "Fee Payment Reverted", 
-                "Your {$feeName} payment has been reverted by the school."
+                "Your {$feeName} payment has been reverted by the school.",
+                'FEE_PAYMENT_REVERTED'
             );
         }
 
@@ -11144,8 +11162,8 @@ Only approve the settlement after reviewing all financial records.
             $message = "{$holidayName} has been added.\n{$formattedDate}";
 
             $stmtNotif = $pdo->prepare("
-                INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, is_read)
-                VALUES (:sid, :role, :uid, :title, :msg, :link, 0)
+                INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, category, event_key, is_read)
+                VALUES (:sid, :role, :uid, :title, :msg, :link, :category, 'HOLIDAY_ANNOUNCED', 0)
             ");
 
             foreach ($usersToNotify as $utn) {
@@ -11164,8 +11182,17 @@ Only approve the settlement after reviewing all financial records.
                     ':uid' => $utn['id'],
                     ':title' => $title,
                     ':msg' => $message,
-                    ':link' => $link
+                    ':link' => $link,
+                    ':category' => NotificationCatalog::categoryFor('HOLIDAY_ANNOUNCED'),
                 ]);
+            }
+
+            // A holiday is identical for everyone, so one topic message per
+            // role replaces what would otherwise be one request per user —
+            // and a whole school's worth of users is exactly the case where
+            // per-token fan-out would fall over.
+            foreach (['TEACHER', 'STUDENT', 'PARENT'] as $hRole) {
+                PushDispatcher::pushOnly($pdo, $schoolId, $hRole, null, 'HOLIDAY_ANNOUNCED', $title, $message, '/leaves');
             }
         }
 
@@ -11609,16 +11636,18 @@ Only approve the settlement after reviewing all financial records.
             ]);
             if ((int)$stmtCheck->fetchColumn() === 0) {
                 $stmtIns = $pdo->prepare("
-                    INSERT INTO dashboard_notifications (school_id, user_role, title, message, link, is_read)
-                    VALUES (:sid, :role, :title, :msg, :link, 0)
+                    INSERT INTO dashboard_notifications (school_id, user_role, title, message, link, category, event_key, is_read)
+                    VALUES (:sid, :role, :title, :msg, :link, :category, 'EXAM_SCHEDULED', 0)
                 ");
                 $stmtIns->execute([
                     ':sid' => $schoolId,
                     ':role' => $role,
                     ':title' => $title,
                     ':msg' => $message,
-                    ':link' => $link
+                    ':link' => $link,
+                    ':category' => NotificationCatalog::categoryFor('EXAM_SCHEDULED'),
                 ]);
+                PushDispatcher::pushOnly($pdo, (int) $schoolId, $role, null, 'EXAM_SCHEDULED', $title, $message, $link);
             }
         }
     }
@@ -12310,6 +12339,19 @@ Only approve the settlement after reviewing all financial records.
             $message = 'Your admit card has been reverted to draft. Please stay tuned for updates.';
         }
 
+        // Map the publish action to a catalog event key. The title of these
+        // notifications is the exam name, so the type is the only stable
+        // signal for what actually happened.
+        $eventKeyByType = [
+            'SCHEME'               => 'EXAM_SCHEME_PUBLISHED',
+            'ADMIT_CARD'           => 'EXAM_ADMIT_CARD_PUBLISHED',
+            'RESULT'               => 'EXAM_RESULT_PUBLISHED',
+            'UNPUBLISH_SCHEME'     => 'EXAM_SCHEME_UNPUBLISHED',
+            'UNPUBLISH_ADMIT_CARD' => 'EXAM_ADMIT_CARD_UNPUBLISHED',
+        ];
+        $eventKey = $eventKeyByType[$type] ?? 'EXAM_SCHEDULED';
+        $category = NotificationCatalog::categoryFor($eventKey);
+
         // Get student and parent user IDs in the class (Deduplicated)
         $stmtUsers = $pdo->prepare("
             SELECT DISTINCT u.id AS user_id, u.role
@@ -12343,8 +12385,8 @@ Only approve the settlement after reviewing all financial records.
         ");
 
         $stmtInsert = $pdo->prepare("
-            INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, is_read)
-            VALUES (:school_id, :role, :user_id, :title, :message, :link, 0)
+            INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, category, event_key, is_read)
+            VALUES (:school_id, :role, :user_id, :title, :message, :link, :category, :event_key, 0)
         ");
 
         foreach ($studentParentUsers as $u) {
@@ -12362,8 +12404,13 @@ Only approve the settlement after reviewing all financial records.
                     ':user_id'   => $userId,
                     ':title'     => $title,
                     ':message'   => $message,
-                    ':link'      => $link
+                    ':link'      => $link,
+                    ':category'  => $category,
+                    ':event_key' => $eventKey,
                 ]);
+                // Admit cards and results name a specific student's outcome,
+                // so they are sent per-token rather than to the role topic.
+                PushDispatcher::pushOnly($pdo, $schoolId, (string) $u['role'], $userId, $eventKey, $title, $message, $link);
             }
         }
 
@@ -12374,8 +12421,8 @@ Only approve the settlement after reviewing all financial records.
               AND created_at >= NOW() - INTERVAL 1 MINUTE
         ");
         $stmtBroad = $pdo->prepare("
-            INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, is_read)
-            VALUES (:school_id, :role, NULL, :title, :message, :link, 0)
+            INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, category, event_key, is_read)
+            VALUES (:school_id, :role, NULL, :title, :message, :link, :category, :event_key, 0)
         ");
         foreach (['STUDENT', 'TEACHER'] as $bRole) {
             $stmtCheckBroad->execute([
@@ -12390,8 +12437,11 @@ Only approve the settlement after reviewing all financial records.
                     ':role'      => $bRole,
                     ':title'     => $title,
                     ':message'   => $message,
-                    ':link'      => $link
+                    ':link'      => $link,
+                    ':category'  => $category,
+                    ':event_key' => $eventKey,
                 ]);
+                PushDispatcher::pushOnly($pdo, $schoolId, $bRole, null, $eventKey, $title, $message, $link);
             }
         }
     }
@@ -13726,12 +13776,18 @@ Only approve the settlement after reviewing all financial records.
             $stmtNotifCheck->execute([':sid' => $schoolId, ':msg' => $likeMsg]);
             if ((int)$stmtNotifCheck->fetchColumn() === 0) {
                 $stmtInsNotif = $pdo->prepare("
-                    INSERT INTO dashboard_notifications (school_id, user_role, title, message, link)
-                    VALUES (:sid, 'SCHOOL_ADMIN', 'Fee Follow-up Due Today', :msg, :link)
+                    INSERT INTO dashboard_notifications (school_id, user_role, title, message, link, category, event_key)
+                    VALUES (:sid, 'SCHOOL_ADMIN', 'Fee Follow-up Due Today', :msg, :link, :category, 'FEE_FOLLOWUP_DUE_TODAY')
                 ");
                 $msg = "{$d['student_name']} (Class {$d['class_name']}) - ₹" . number_format((float)$d['pending_amount'], 2) . " Pending\nPromise Date: " . date('d M Y', strtotime($d['promised_date']));
                 $link = "/school-admin/fee-follow-ups?id=" . $d['id'];
-                $stmtInsNotif->execute([':sid' => $schoolId, ':msg' => $msg, ':link' => $link]);
+                $stmtInsNotif->execute([
+                    ':sid' => $schoolId,
+                    ':msg' => $msg,
+                    ':link' => $link,
+                    ':category' => NotificationCatalog::categoryFor('FEE_FOLLOWUP_DUE_TODAY'),
+                ]);
+                PushDispatcher::pushOnly($pdo, $schoolId, 'SCHOOL_ADMIN', null, 'FEE_FOLLOWUP_DUE_TODAY', 'Fee Follow-up Due Today', $msg, $link);
             }
         }
 
@@ -13759,12 +13815,18 @@ Only approve the settlement after reviewing all financial records.
             $stmtNotifCheck->execute([':sid' => $schoolId, ':msg' => $likeMsg]);
             if ((int)$stmtNotifCheck->fetchColumn() === 0) {
                 $stmtInsNotif = $pdo->prepare("
-                    INSERT INTO dashboard_notifications (school_id, user_role, title, message, link)
-                    VALUES (:sid, 'SCHOOL_ADMIN', 'Overdue Fee Follow-up', :msg, :link)
+                    INSERT INTO dashboard_notifications (school_id, user_role, title, message, link, category, event_key)
+                    VALUES (:sid, 'SCHOOL_ADMIN', 'Overdue Fee Follow-up', :msg, :link, :category, 'FEE_FOLLOWUP_OVERDUE')
                 ");
                 $msg = "Student Name: {$o['student_name']}\nPending Amount: ₹" . number_format((float)$o['pending_amount'], 2) . "\nDays Overdue: {$daysOverdue} days";
                 $link = "/school-admin/fee-follow-ups?id=" . $o['id'];
-                $stmtInsNotif->execute([':sid' => $schoolId, ':msg' => $msg, ':link' => $link]);
+                $stmtInsNotif->execute([
+                    ':sid' => $schoolId,
+                    ':msg' => $msg,
+                    ':link' => $link,
+                    ':category' => NotificationCatalog::categoryFor('FEE_FOLLOWUP_OVERDUE'),
+                ]);
+                PushDispatcher::pushOnly($pdo, $schoolId, 'SCHOOL_ADMIN', null, 'FEE_FOLLOWUP_OVERDUE', 'Overdue Fee Follow-up', $msg, $link);
             }
         }
 
@@ -14664,7 +14726,7 @@ Only approve the settlement after reviewing all financial records.
         ];
     }
 
-    private function sendStudentNotification(PDO $pdo, int $schoolId, int $studentId, string $title, string $message): void
+    private function sendStudentNotification(PDO $pdo, int $schoolId, int $studentId, string $title, string $message, string $eventKey = 'FEE_ANNUAL_ADDED'): void
     {
         // 1. Get student and parent information
         $stmtInfo = $pdo->prepare("SELECT email, parent_phone, father_phone, guardian_phone, student_mobile FROM students WHERE id = :stid LIMIT 1");
@@ -14693,17 +14755,21 @@ Only approve the settlement after reviewing all financial records.
             $studentUserId = $stmtStudentUser->fetchColumn();
 
             if ($studentUserId) {
+                $studentLink = "/student/fees?student_id=" . $studentId;
                 $stmtInsert = $pdo->prepare("
-                    INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, is_read)
-                    VALUES (:school_id, 'STUDENT', :user_id, :title, :message, :link, 0)
+                    INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, category, event_key, is_read)
+                    VALUES (:school_id, 'STUDENT', :user_id, :title, :message, :link, :category, :event_key, 0)
                 ");
                 $stmtInsert->execute([
                     ':school_id' => $schoolId,
                     ':user_id' => $studentUserId,
                     ':title' => $title,
                     ':message' => $message,
-                    ':link' => "/student/fees?student_id=" . $studentId
+                    ':link' => $studentLink,
+                    ':category' => NotificationCatalog::categoryFor($eventKey),
+                    ':event_key' => $eventKey,
                 ]);
+                PushDispatcher::pushOnly($pdo, $schoolId, 'STUDENT', (int) $studentUserId, $eventKey, $title, $message, $studentLink);
             }
         }
 
@@ -14719,9 +14785,10 @@ Only approve the settlement after reviewing all financial records.
             $parentUserIds = $stmtParentUser->fetchAll(PDO::FETCH_COLUMN) ?: [];
 
             if (!empty($parentUserIds)) {
+                $parentLink = "/parent/fees?student_id=" . $studentId;
                 $stmtInsert = $pdo->prepare("
-                    INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, is_read)
-                    VALUES (:school_id, 'PARENT', :user_id, :title, :message, :link, 0)
+                    INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, category, event_key, is_read)
+                    VALUES (:school_id, 'PARENT', :user_id, :title, :message, :link, :category, :event_key, 0)
                 ");
                 foreach ($parentUserIds as $parentUserId) {
                     $stmtInsert->execute([
@@ -14729,8 +14796,11 @@ Only approve the settlement after reviewing all financial records.
                         ':user_id' => $parentUserId,
                         ':title' => $title,
                         ':message' => $message,
-                        ':link' => "/parent/fees?student_id=" . $studentId
+                        ':link' => $parentLink,
+                        ':category' => NotificationCatalog::categoryFor($eventKey),
+                        ':event_key' => $eventKey,
                     ]);
+                    PushDispatcher::pushOnly($pdo, $schoolId, 'PARENT', (int) $parentUserId, $eventKey, $title, $message, $parentLink);
                 }
             }
         }
@@ -15301,16 +15371,21 @@ Only approve the settlement after reviewing all financial records.
         }
 
         $stmtNotif = $pdo->prepare("
-            INSERT INTO dashboard_notifications (school_id, user_role, title, message, link, is_read)
-            VALUES (:sch, :role, :title, :msg, '/notice', 0)
+            INSERT INTO dashboard_notifications (school_id, user_role, title, message, link, category, event_key, is_read)
+            VALUES (:sch, :role, :title, :msg, '/notice', :category, 'ANNOUNCEMENT_PUBLISHED', 0)
         ");
         foreach ($rolesToNotify as $role) {
             $stmtNotif->execute([
                 ':sch' => $schoolId,
                 ':role' => $role,
                 ':title' => $subject,
-                ':msg' => $plainText
+                ':msg' => $plainText,
+                ':category' => NotificationCatalog::categoryFor('ANNOUNCEMENT_PUBLISHED'),
             ]);
+            PushDispatcher::pushOnly(
+                $pdo, (int) $schoolId, $role, null,
+                'ANNOUNCEMENT_PUBLISHED', (string) $subject, $plainText, '/notice'
+            );
         }
     }
 

@@ -3,7 +3,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../services/leave_service.dart';
-import '../services/auth_service.dart';
+import '../services/push_notification_service.dart';
+import '../services/notification_helper.dart';
 import '../main.dart';
 import '../widgets/change_password_dialog.dart';
 import 'full_screen_image_screen.dart';
@@ -30,6 +31,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _userPhone = '';
   String _userPhoto = '';
   bool _notificationsEnabled = true;
+  bool _sendingTestPush = false;
   String _currentTheme = 'Light Mode';
   
   List<dynamic> _children = [];
@@ -143,6 +145,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 2),
           backgroundColor: Colors.indigo.shade800,
+        ),
+      );
+    }
+  }
+
+  Future<void> _sendTestPushNotification() async {
+    setState(() {
+      _sendingTestPush = true;
+    });
+
+    await NotificationHelper.init();
+    final success = await PushNotificationService.sendTestPush();
+
+    if (mounted) {
+      setState(() {
+        _sendingTestPush = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            success
+                ? '✅ Test push notification sent successfully!'
+                : '⚠️ Test push dispatch failed. Check server configuration.',
+          ),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+          backgroundColor: success ? Colors.green.shade800 : Colors.red.shade800,
         ),
       );
     }
@@ -668,8 +698,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         const Divider(height: 1, indent: 56),
                         _buildSettingsTile(
                           icon: Icons.notifications_active_outlined,
-                          title: 'Notifications',
-                          subtitle: 'Toggle push alerts',
+                          title: 'Push Notifications',
+                          subtitle: _notificationsEnabled ? 'Push alerts enabled' : 'Push alerts disabled',
                           trailing: Switch(
                             value: _notificationsEnabled,
                             onChanged: (val) async {
@@ -678,10 +708,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               setState(() {
                                 _notificationsEnabled = val;
                               });
+                              if (val) {
+                                await PushNotificationService.registerDevice();
+                              } else {
+                                await PushNotificationService.unregisterDevice();
+                              }
                             },
                             activeColor: Colors.indigo,
                           ),
                         ),
+                        if (_notificationsEnabled) ...[
+                          const Divider(height: 1, indent: 56),
+                          _buildSettingsTile(
+                            icon: Icons.send_to_mobile_rounded,
+                            title: 'Send Test Push Notification',
+                            subtitle: 'Verify FCM push alerts on this device',
+                            trailing: _sendingTestPush
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                            onTap: _sendingTestPush ? null : _sendTestPushNotification,
+                          ),
+                        ],
                         if ((widget.userRole.toUpperCase() == 'STUDENT' || widget.userRole.toUpperCase() == 'PARENT') && _children.length > 1) ...[
                           const Divider(height: 1, indent: 56),
                           _buildSettingsTile(

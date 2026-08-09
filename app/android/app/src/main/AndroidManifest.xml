@@ -32,7 +32,32 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Required for firebase_messaging to deliver the tap that
+                 cold-starts the app (getInitialMessage / onMessageOpenedApp).
+                 Without it, tapping a notification opens the app but the
+                 message is never handed to Dart, so the deep link is lost. -->
+            <intent-filter>
+                <action android:name="FLUTTER_NOTIFICATION_CLICK"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+            </intent-filter>
         </activity>
+
+        <!-- Notification tray appearance for FCM messages. The icon must be a
+             white-on-transparent silhouette; a full-colour drawable renders as
+             a grey square on Android 5+. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/notification_color" />
+        <!-- Fallback channel for any message that arrives without a channel_id.
+             Every message we send sets one from the notification category, so
+             this only catches messages composed outside our backend (e.g. a
+             test send from the Firebase console). -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="SYSTEM" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
