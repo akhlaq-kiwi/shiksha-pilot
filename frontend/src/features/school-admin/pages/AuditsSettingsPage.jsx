@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Plus, CheckCircle2, ChevronRight, UserCog, Users, ShieldAlert, Award, FileSpreadsheet, ArrowLeft, RefreshCw, Check, Lock, Save, Trash2, Loader2, AlertTriangle, X } from 'lucide-react';
+import { Plus, CheckCircle2, ChevronRight, UserCog, Users, ShieldAlert, Award, FileSpreadsheet, ArrowLeft, RefreshCw, Check, Lock, Save, Trash2, Loader2, AlertTriangle, X, Download } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
@@ -11,6 +11,7 @@ import { apiClient } from '../../../common/services/apiClient';
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 import { schoolAdminService } from '../../../common/services/schoolAdminService';
 import { getClassIndex } from '../../../common/constants/predefinedClasses';
+import html2pdf from 'html2pdf.js';
 
 export default function AuditsSettingsPage({ onYearsUpdated }) {
   const location = useLocation();
@@ -241,6 +242,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
   // Class Fee Configuration States
   const [selectedClassId, setSelectedClassId] = useState('');
   const [showSelectClassNotice, setShowSelectClassNotice] = useState(true);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   useEffect(() => {
     setShowSelectClassNotice(true);
@@ -611,6 +613,162 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
 
     fetchConfig();
   }, [selectedClassId, academicYears, uniqueClassGroups, classes]);
+
+  const handleDownloadFeeStructurePdf = async () => {
+    try {
+      setDownloadingPdf(true);
+      const activeYear = currentYear || academicYears.find(y => y.is_current) || academicYears[0];
+      const yearName = activeYear ? activeYear.name : '2026-2027';
+
+      let startYr = '2026';
+      let endYr = '2027';
+      const yearMatch = yearName.match(/(\d{4})\s*[-–—]\s*(\d{4})/);
+      if (yearMatch) {
+        startYr = yearMatch[1];
+        endYr = yearMatch[2];
+      }
+
+      const headerTitle = `FEE STRUCTURE FOR ${startYr} - ${endYr}`;
+      const headerSubtitle = `(Applicable from 1st April to 31st March ${endYr})`;
+
+      // Fetch all classes & configurations dynamically
+      const [allClasses, allConfigs] = await Promise.all([
+        schoolService.getClasses(),
+        activeYear ? schoolService.getClassFeeConfigurations({ academic_year_id: activeYear.id }) : Promise.resolve([])
+      ]);
+
+      const classList = allClasses || classes || [];
+      const configList = allConfigs || [];
+
+      // Group classes by unique class name to get one row per class
+      const classMap = new Map();
+      classList.forEach(c => {
+        if (!c.name) return;
+        if (!classMap.has(c.name)) {
+          classMap.set(c.name, c);
+        }
+      });
+
+      // Sort classes in logical order (Playgroup, Nursery, LKG, UKG, Class 1... Class 12)
+      const sortedClasses = Array.from(classMap.values()).sort((a, b) => {
+        const idxA = getClassIndex(a.name);
+        const idxB = getClassIndex(b.name);
+        if (idxA !== idxB) return idxA - idxB;
+        return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+      });
+
+      // Calculate annual fee for each class
+      const rowsData = sortedClasses.map((cls, index) => {
+        const cfg = configList.find(c => {
+          if (String(c.class_id) === String(cls.id)) return true;
+          const foundCls = classList.find(l => String(l.id) === String(c.class_id));
+          return foundCls && foundCls.name === cls.name;
+        });
+
+        let annualFee = 0;
+        if (cfg) {
+          if (cfg.mode === 'SAME') {
+            const monthlyVal = parseFloat(cfg.monthly_fees?.April || cfg.same_amount || 0);
+            annualFee = Math.round(monthlyVal * 12);
+          } else if (cfg.monthly_fees) {
+            const sum = Object.values(cfg.monthly_fees).reduce((acc, val) => acc + (parseFloat(val) || 0), 0);
+            annualFee = Math.round(sum);
+          }
+        }
+
+        return {
+          sNo: index + 1,
+          className: cls.name,
+          amountFormatted: `₹${annualFee.toLocaleString('en-IN')}`
+        };
+      });
+
+      const totalRows = rowsData.length;
+
+      // Dynamic sizing calculation to guarantee ONE SINGLE PAGE layout
+      let fontSize = '13px';
+      let padding = '10px 16px';
+      let titleSize = '20px';
+      let subtitleSize = '12px';
+
+      if (totalRows > 20) {
+        fontSize = '8.5px';
+        padding = '4px 8px';
+        titleSize = '15px';
+        subtitleSize = '9.5px';
+      } else if (totalRows > 15) {
+        fontSize = '10px';
+        padding = '6px 10px';
+        titleSize = '17px';
+        subtitleSize = '10.5px';
+      } else if (totalRows > 10) {
+        fontSize = '11.5px';
+        padding = '8px 12px';
+        titleSize = '18.5px';
+        subtitleSize = '11.5px';
+      }
+
+      const pdfHtml = `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #0F172A; width: 100%; box-sizing: border-box; padding: 24px 28px; background: #ffffff;">
+          <div style="text-align: center; margin-bottom: 24px;">
+            <h1 style="font-size: ${titleSize}; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; color: #0F172A; margin: 0 0 6px 0; font-family: inherit;">
+              ${headerTitle}
+            </h1>
+            <p style="font-size: ${subtitleSize}; font-weight: 600; color: #475569; margin: 0; font-family: inherit;">
+              ${headerSubtitle}
+            </p>
+          </div>
+
+          <table style="width: 100%; border-collapse: collapse; margin: 0 auto; background: #ffffff; border: 1px solid #CBD5E1; box-sizing: border-box;">
+            <thead>
+              <tr style="background-color: #0F172A; color: #FFFFFF;">
+                <th style="width: 15%; padding: ${padding}; font-size: ${fontSize}; font-weight: 700; text-align: center; border: 1px solid #1E293B; text-transform: uppercase; letter-spacing: 0.5px;">S. No.</th>
+                <th style="width: 55%; padding: ${padding}; font-size: ${fontSize}; font-weight: 700; text-align: left; border: 1px solid #1E293B; text-transform: uppercase; letter-spacing: 0.5px;">Class</th>
+                <th style="width: 30%; padding: ${padding}; font-size: ${fontSize}; font-weight: 700; text-align: right; border: 1px solid #1E293B; text-transform: uppercase; letter-spacing: 0.5px;">Amount (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsData.map((r, idx) => `
+                <tr style="background-color: ${idx % 2 === 1 ? '#F8FAFC' : '#FFFFFF'};">
+                  <td style="padding: ${padding}; font-size: ${fontSize}; font-weight: 600; text-align: center; color: #334155; border: 1px solid #E2E8F0;">${r.sNo}</td>
+                  <td style="padding: ${padding}; font-size: ${fontSize}; font-weight: 700; text-align: left; color: #0F172A; border: 1px solid #E2E8F0;">${r.className}</td>
+                  <td style="padding: ${padding}; font-size: ${fontSize}; font-weight: 700; text-align: right; color: #0F172A; border: 1px solid #E2E8F0; font-family: inherit;">${r.amountFormatted}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+
+      const tempContainer = document.createElement('div');
+      tempContainer.style.position = 'absolute';
+      tempContainer.style.left = '-9999px';
+      tempContainer.style.top = '-9999px';
+      tempContainer.style.width = '794px';
+      tempContainer.innerHTML = pdfHtml;
+      document.body.appendChild(tempContainer);
+
+      const filename = `Fee_Structure_${startYr}-${endYr}.pdf`;
+
+      const opt = {
+        margin: [10, 12, 10, 12],
+        filename: filename,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: [] }
+      };
+
+      await html2pdf().from(tempContainer).set(opt).save();
+
+      document.body.removeChild(tempContainer);
+    } catch (err) {
+      console.error('Error generating Fee Structure PDF:', err);
+      setFeeError('Failed to generate Fee Structure PDF.');
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
 
   const handleConfirmSaveConfig = () => {
     setFeeError('');
@@ -1135,8 +1293,22 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
 
       {/* Class Fee Configuration Panel */}
       <Card id="class-fee-config-panel" className="shadow-sm">
-        <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
+        <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-bold text-text-primary">Class Fee Configuration</CardTitle>
+          <Button
+            onClick={handleDownloadFeeStructurePdf}
+            disabled={downloadingPdf}
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs gap-1.5 font-bold border-border shadow-none hover:bg-zinc-100 dark:hover:bg-zinc-800"
+          >
+            {downloadingPdf ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+            ) : (
+              <Download className="h-3.5 w-3.5 text-primary" />
+            )}
+            <span>Download Fee Structure</span>
+          </Button>
         </CardHeader>
         <CardContent className="p-6 space-y-4">
           {feeError && (
