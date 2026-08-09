@@ -11105,7 +11105,7 @@ Only approve the settlement after reviewing all financial records.
                     $proratedAmt = $this->calculateProratedAmount($joiningDateStr, $monthlySalary, $targetMonthStr, true);
 
                     $res['is_prorated'] = true;
-                    $res['payable_salary'] = round($proratedAmt, 2);
+                    $res['payable_salary'] = round($proratedAmt);
                     $res['prorated_days'] = $remainingDays;
                     $res['total_days'] = $totalDays;
                     $res['label'] = 'Prorated Salary';
