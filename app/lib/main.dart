@@ -279,28 +279,14 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Container(
-                    width: 120,
-                    height: 120,
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black26,
-                          blurRadius: 20,
-                          offset: Offset(0, 10),
-                        )
-                      ],
-                    ),
-                    child: ClipOval(
-                      child: Image.asset(
-                        'assets/images/logo.png',
-                        width: 120,
-                        height: 120,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
+                  // logo_mark.png, not logo.png: the latter has an opaque white
+                  // plate baked in behind the artwork, which showed up as a
+                  // white square against this gradient.
+                  Image.asset(
+                    'assets/images/logo_mark.png',
+                    width: 140,
+                    height: 140,
+                    fit: BoxFit.contain,
                   ),
                   const SizedBox(height: 32),
                   const Text(
@@ -633,11 +619,12 @@ class _LoginScreenState extends State<LoginScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Logo
-              const Icon(
-                Icons.school_rounded,
-                size: 80,
-                color: Colors.white,
+              // The brand mark, replacing the generic graduation-cap icon that
+              // stood in for it before.
+              Image.asset(
+                'assets/images/logo_mark.png',
+                height: 96,
+                fit: BoxFit.contain,
               ),
               const SizedBox(height: 16),
               const Text(

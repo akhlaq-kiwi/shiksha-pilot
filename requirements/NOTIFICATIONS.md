@@ -231,7 +231,7 @@ if teachers report slow saves.
 1. In the project, click the **Android** icon.
 2. **Android package name** — must match exactly:
    ```
-   com.shikshapilot.schoolhub.school_hub
+   com.shikshapilot.app
    ```
 3. Download **`google-services.json`**.
 4. Place it at:

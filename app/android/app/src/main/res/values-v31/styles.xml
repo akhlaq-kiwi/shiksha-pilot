@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Android 12+ ignores windowBackground for the launch screen and draws its
+      own SplashScreen instead. Without these attributes it falls back to the
+      launcher icon on a default background, which is what produced the white
+      plate behind the mark. Pointing it at splash_icon (transparent art, sized
+      to the inner 192dp of a 288dp canvas so the circular mask can't clip it)
+      and setting the brand background gives the same look as the pre-12 screen.
+    -->
+    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowSplashScreenBackground">#3F51B5</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_icon</item>
+        <item name="android:windowBackground">@drawable/launch_background</item>
+    </style>
+    <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+    </style>
+</resources>

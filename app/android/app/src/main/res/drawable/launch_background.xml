@@ -1,14 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Modify this file to customize your launch splash screen -->
+<!-- Native launch screen shown while the Flutter engine boots (pre-Android 12;
+     Android 12+ uses the SplashScreen API configured in values-v31/styles.xml).
+     Brand indigo with the Shiksha Pilot mark centred, so the very first frame
+     is already branded instead of a bare colour. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <color android:color="#3F51B5" />
     </item>
-
-    <!-- You can insert your own image assets here -->
-    <!-- <item>
+    <item>
         <bitmap
             android:gravity="center"
             android:src="@mipmap/launch_image" />
-    </item> -->
+    </item>
 </layer-list>
