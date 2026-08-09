@@ -187,7 +187,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
     final role = prefs.getString('user_role');
-    final baseUrl = prefs.getString('base_url') ?? 'https://app.shikshapilot.com';
+    final baseUrl = prefs.getString('base_url') ?? 'https://qa.shikshapilot.com';
     await prefs.setString('base_url', baseUrl);
 
     if (token != null && role != null) {
@@ -366,10 +366,10 @@ class _LoginScreenState extends State<LoginScreen> {
         });
       }
     } else {
-      await prefs.setString('base_url', 'https://app.shikshapilot.com');
+      await prefs.setString('base_url', 'https://qa.shikshapilot.com');
       if (mounted) {
         setState(() {
-          _serverUrlController.text = 'https://app.shikshapilot.com';
+          _serverUrlController.text = 'https://qa.shikshapilot.com';
         });
       }
     }

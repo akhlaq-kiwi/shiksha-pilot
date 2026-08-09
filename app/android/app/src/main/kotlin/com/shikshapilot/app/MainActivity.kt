@@ -1,4 +1,4 @@
-package com.shikshapilot.schoolhub.school_hub
+package com.shikshapilot.app
 
 import android.content.Context
 import android.content.Intent
