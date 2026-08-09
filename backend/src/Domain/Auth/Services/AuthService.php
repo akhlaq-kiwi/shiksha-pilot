@@ -158,8 +158,8 @@ class AuthService extends BaseService
             }
         } else {
             // Mobile app login (anything not explicitly marked as web client type)
-            if ($role === 'SCHOOL_ADMIN' || $role === 'SUPER_ADMIN') {
-                $this->logAuditDirect($user, 'Security', 'Failed Login Attempt', 'Mobile login blocked: School/Super admin cannot log in to mobile app');
+            if ($role === 'SUPER_ADMIN') {
+                $this->logAuditDirect($user, 'Security', 'Failed Login Attempt', 'Mobile login blocked: Super admin cannot log in to mobile app');
                 throw new \App\Shared\Exceptions\ValidationException(['phone' => 'Invalid Credentials']);
             }
         }
