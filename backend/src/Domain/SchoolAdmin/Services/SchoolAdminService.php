@@ -10499,9 +10499,8 @@ Only approve the settlement after reviewing all financial records.
             $pay['fee_type_id'] = (int)$pay['fee_type_id'];
             $pay['amount'] = (float)$pay['amount'];
 
-            if (($pay['fee_name'] ?? '') !== 'Admission Fee') {
-                $this->sendStudentNotification($pdo, $schoolId, $pay['student_id'], "Additional Fee Deposited", "{$pay['fee_name']} have been successfully recorded.");
-            }
+            $feeName = $pay['fee_name'] ?? 'Fee';
+            $this->sendStudentNotification($pdo, $schoolId, $pay['student_id'], "Fee Deposited", "{$feeName} payment has been successfully recorded.");
             $this->syncFollowUpStatus($pdo, $pay['student_id'], $schoolId);
         }
 
