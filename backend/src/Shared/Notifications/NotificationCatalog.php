@@ -279,6 +279,14 @@ final class NotificationCatalog
             'link'     => '/school-admin/fee-follow-ups',
             'label'    => 'A fee follow-up is overdue',
         ],
+        'SALARY_DISBURSED' => [
+            'category' => self::CAT_FEES,
+            'delivery' => self::DELIVERY_PUSH,
+            'audience' => ['TEACHER'],
+            'priority' => 'high',
+            'link'     => '/teacher/salary',
+            'label'    => 'Salary has been disbursed',
+        ],
 
         // ---------------- ANNOUNCEMENT ----------------
         'ANNOUNCEMENT_PUBLISHED' => [

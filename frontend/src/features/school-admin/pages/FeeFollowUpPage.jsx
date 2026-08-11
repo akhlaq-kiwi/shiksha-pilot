@@ -217,6 +217,20 @@ export default function FeeFollowUpPage() {
       .catch(console.error);
   }, []);
 
+  // Handle pre-selected student from location.state if navigated from another page
+  useEffect(() => {
+    if (location.state?.student) {
+      handleStudentSelect(location.state.student);
+      setShowAddEditModal(true);
+    } else if (location.state?.student_id && studentsList.length > 0) {
+      const found = studentsList.find(s => s.id === Number(location.state.student_id));
+      if (found) {
+        handleStudentSelect(found);
+        setShowAddEditModal(true);
+      }
+    }
+  }, [location.state, studentsList]);
+
   // Update current Academic Year in filters when context loads
   useEffect(() => {
     if (currentYear?.id && !filters.academic_year_id) {

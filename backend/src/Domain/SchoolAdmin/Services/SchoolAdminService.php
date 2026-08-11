@@ -1870,7 +1870,6 @@ class SchoolAdminService extends BaseService
                 ':ftid' => $targetTypeId,
                 ':amt' => $targetAmount
             ]);
-            $this->sendStudentNotification($pdo, $schoolId, $studentId, "Annual Fee Added", "An annual fee of Rs. {$targetAmount} has been added to your fee account.");
         }
     }
 
@@ -10508,17 +10507,6 @@ Only approve the settlement after reviewing all financial records.
 
             $pdo->commit();
 
-            // Send notifications ONLY to eligible students who received the fee
-            foreach ($studentsToApply as $s) {
-                $this->sendStudentNotification(
-                    $pdo, 
-                    $schoolId, 
-                    $s['student_id'], 
-                    "Annual Fee Added", 
-                    "An annual fee has been added to your fee account. Please check your Fees section for details."
-                );
-            }
-
             $this->log('Annual Fee Created', [
                 'school_id' => $schoolId,
                 'academic_year_id' => $academicYearId,
@@ -11338,11 +11326,6 @@ Only approve the settlement after reviewing all financial records.
             VALUES (:sid, :student_id, :fee_type_id, :amount, 'Pending', :fee_month)
         ");
 
-        $stmtInsNotif = $pdo->prepare("
-            INSERT INTO dashboard_notifications (school_id, user_role, title, message)
-            VALUES (:sid, 'STUDENT', 'Transport Fee Generated', :msg)
-        ");
-
         $currentMonthStart = new \DateTime(date('Y-m-01'));
 
         foreach ($configs as $cfg) {
@@ -11395,12 +11378,6 @@ Only approve the settlement after reviewing all financial records.
                                 ':fee_type_id' => $typeId,
                                 ':amount' => $amount,
                                 ':fee_month' => $monthStr
-                            ]);
-
-                            $msg = "Transport Fee for {$monthStr} has been added to your fee ledger.";
-                            $stmtInsNotif->execute([
-                                ':sid' => $schoolId,
-                                ':msg' => $msg
                             ]);
                         }
                     } else {
@@ -14710,7 +14687,7 @@ Only approve the settlement after reviewing all financial records.
             WHERE afp.student_id = :student_id
               AND afp.school_id = :school_id
               AND afp.status = 'Pending'
-              AND (aft.academic_year_id = :academic_year_id OR aft.name = 'Previous Year Dues')
+              AND (aft.academic_year_id = :academic_year_id OR aft.academic_year_id IS NULL OR aft.name = 'Previous Year Dues')
         ");
         $stmtAddPending->execute([
             ':student_id' => $studentId,
