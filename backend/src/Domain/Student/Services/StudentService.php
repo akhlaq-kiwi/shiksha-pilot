@@ -1319,11 +1319,6 @@ class StudentService extends BaseService
             VALUES (:sid, :student_id, :fee_type_id, :amount, 'Pending', :fee_month)
         ");
 
-        $stmtInsNotif = $pdo->prepare("
-            INSERT INTO dashboard_notifications (school_id, user_role, title, message)
-            VALUES (:sid, 'STUDENT', 'Transport Fee Generated', :msg)
-        ");
-
         foreach ($configs as $cfg) {
             $studentId = (int)$cfg['student_id'];
             $monthlyFee = (float)$cfg['monthly_fee'];
@@ -1358,12 +1353,6 @@ class StudentService extends BaseService
                                 ':fee_type_id' => $typeId,
                                 ':amount' => $amount,
                                 ':fee_month' => $monthStr
-                            ]);
-
-                            $msg = "Transport Fee for {$monthStr} has been added to your fee ledger.";
-                            $stmtInsNotif->execute([
-                                ':sid' => $schoolId,
-                                ':msg' => $msg
                             ]);
                         }
                     }

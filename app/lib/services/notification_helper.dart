@@ -12,6 +12,7 @@ import '../screens/leave_list_screen.dart';
 import '../screens/timetable_screen.dart';
 import '../screens/notification_center_screen.dart';
 import '../screens/fees_card_screen.dart';
+import '../screens/salary_card_screen.dart';
 import '../screens/exam_list_screen.dart';
 import '../screens/homework_list_screen.dart';
 import '../services/leave_service.dart';
@@ -220,7 +221,12 @@ class NotificationHelper {
     }
 
     Widget targetScreen;
-    if (link.contains('exam') || title.contains('exam') || message.contains('exam') || link.contains('examination') || title.contains('examination') || message.contains('examination')) {
+    if (userRole.toUpperCase() == 'TEACHER' && (link.contains('salary') || title.contains('salary') || message.contains('salary') || eventKey == 'SALARY_DISBURSED')) {
+      targetScreen = SalaryCardScreen(
+        baseUrl: baseUrl,
+        token: token,
+      );
+    } else if (link.contains('exam') || title.contains('exam') || message.contains('exam') || link.contains('examination') || title.contains('examination') || message.contains('examination')) {
       final examService = ExamService(baseUrl: baseUrl, token: token);
       targetScreen = ExamListScreen(
         examService: examService,
@@ -350,6 +356,12 @@ class NotificationHelper {
           baseUrl: baseUrl,
           token: token,
           studentId: studentId,
+        );
+
+      case 'SALARY_DISBURSED':
+        return SalaryCardScreen(
+          baseUrl: baseUrl,
+          token: token,
         );
 
       case NotificationEvent.announcementPublished:
