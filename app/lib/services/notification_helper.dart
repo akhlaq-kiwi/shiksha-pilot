@@ -131,7 +131,7 @@ class NotificationHelper {
   /// The Android presentation for a category — shared by locally scheduled
   /// reminders and by pushes we render ourselves in the foreground, so both
   /// look identical to the ones Android's tray draws from an FCM payload.
-  static AndroidNotificationDetails androidDetailsFor(NotificationCategory category) {
+  static AndroidNotificationDetails androidDetailsFor(NotificationCategory category, {int? badgeCount}) {
     return AndroidNotificationDetails(
       category.id,
       category.name,
@@ -140,6 +140,8 @@ class NotificationHelper {
       priority: category.highImportance ? Priority.high : Priority.defaultPriority,
       playSound: true,
       enableVibration: true,
+      channelShowBadge: true,
+      number: badgeCount,
       icon: '@mipmap/ic_launcher',
       color: category.color,
       styleInformation: const BigTextStyleInformation(''),
@@ -401,7 +403,7 @@ class NotificationHelper {
     );
   }
 
-  static Future<void> showNotification(dynamic notif) async {
+  static Future<void> showNotification(dynamic notif, {int? badgeCount}) async {
     final prefs = await SharedPreferences.getInstance();
     final schoolName = prefs.getString('school_name') ?? 'Shiksha Pilot School Hub';
 
@@ -413,12 +415,9 @@ class NotificationHelper {
         ? notif['id'] 
         : int.tryParse(notif['id'].toString()) ?? DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
-    // Route through the category channel when the row carries one, so a
-    // notification arriving via the polling fallback looks and behaves exactly
-    // like the same notification arriving via push.
     final category = NotificationCategory.byId(notif['category']?.toString());
     final NotificationDetails platformChannelSpecifics =
-        NotificationDetails(android: androidDetailsFor(category));
+        NotificationDetails(android: androidDetailsFor(category, badgeCount: badgeCount));
 
     await _flutterLocalNotificationsPlugin.show(
       id: id,

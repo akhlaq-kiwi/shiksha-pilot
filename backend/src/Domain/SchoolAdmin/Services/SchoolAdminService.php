@@ -1329,6 +1329,8 @@ class SchoolAdminService extends BaseService
             $data['parent_phone'] ?? null
         ]);
 
+        $this->checkTeacherStudentPhoneConflict($pdo, $schoolId, [$parentPhone, $fatherPhone, $data['student_mobile'] ?? null], null, null);
+
         if (strcasecmp($status, 'ACTIVE') === 0 || strcasecmp($status, 'Active') === 0) {
             $this->checkActiveStudentPhoneConflictInOtherSchools($pdo, $schoolId, [$parentPhone, $fatherPhone, $data['student_mobile'] ?? null]);
         }
@@ -1618,6 +1620,8 @@ class SchoolAdminService extends BaseService
             $data['mother_phone'] ?? null,
             $data['parent_phone'] ?? null
         ]);
+
+        $this->checkTeacherStudentPhoneConflict($pdo, $schoolId, [$parentPhone, $fatherPhone, $data['student_mobile'] ?? null], null, $id);
 
         if (strcasecmp($status, 'ACTIVE') === 0 || strcasecmp($status, 'Active') === 0) {
             $this->checkActiveStudentPhoneConflictInOtherSchools($pdo, $schoolId, [$parentPhone, $fatherPhone, $data['student_mobile'] ?? null]);
@@ -2384,6 +2388,8 @@ class SchoolAdminService extends BaseService
         // 3. Status Mapping
         $status = !empty($data['exit_date']) ? 'Inactive' : 'ACTIVE';
 
+        $this->checkTeacherStudentPhoneConflict($pdo, $schoolId, $data['phone'], null, null);
+
         if (strcasecmp($status, 'ACTIVE') === 0) {
             $this->checkActiveStaffPhoneConflictInOtherSchools($pdo, $schoolId, $data['phone']);
         }
@@ -2514,6 +2520,8 @@ class SchoolAdminService extends BaseService
 
         // 3. Status Mapping
         $status = !empty($data['exit_date']) ? 'Inactive' : 'ACTIVE';
+
+        $this->checkTeacherStudentPhoneConflict($pdo, $schoolId, $data['phone'], $id, null);
 
         if (strcasecmp($status, 'ACTIVE') === 0) {
             $this->checkActiveStaffPhoneConflictInOtherSchools($pdo, $schoolId, $data['phone']);
@@ -2842,6 +2850,105 @@ class SchoolAdminService extends BaseService
             throw new ValidationException([
                 'phone' => $errMsg
             ]);
+        }
+    }
+
+    private function checkTeacherStudentPhoneConflict(PDO $pdo, int $schoolId, array|string $phones, ?int $excludeStaffId = null, ?int $excludeStudentId = null): void
+    {
+        $phoneList = is_array($phones) ? $phones : [$phones];
+        $validPhones = [];
+        foreach ($phoneList as $p) {
+            $cleaned = preg_replace('/[^0-9]/', '', (string)$p);
+            if (!empty($cleaned) && strlen($cleaned) >= 10) {
+                $validPhones[] = substr($cleaned, -10);
+            }
+        }
+        $validPhones = array_unique($validPhones);
+        if (empty($validPhones)) {
+            return;
+        }
+
+        foreach ($validPhones as $phone) {
+            // Check if phone matches any Student in the same school (when checking staff addition/update)
+            if ($excludeStaffId !== null || $excludeStudentId === null) {
+                $stmtStudent = $pdo->prepare("
+                    SELECT id, TRIM(CONCAT(first_name, ' ', COALESCE(last_name, ''))) AS student_name 
+                    FROM students 
+                    WHERE school_id = :sid 
+                      AND (
+                        RIGHT(REGEXP_REPLACE(parent_phone, '[^0-9]', ''), 10) = :phone
+                        OR RIGHT(REGEXP_REPLACE(father_phone, '[^0-9]', ''), 10) = :phone
+                        OR RIGHT(REGEXP_REPLACE(student_mobile, '[^0-9]', ''), 10) = :phone
+                        OR RIGHT(REGEXP_REPLACE(guardian_phone, '[^0-9]', ''), 10) = :phone
+                      )
+                      " . ($excludeStudentId !== null ? "AND id != {$excludeStudentId}" : "") . "
+                    LIMIT 1
+                ");
+                $stmtStudent->execute([':sid' => $schoolId, ':phone' => $phone]);
+                $studentMatch = $stmtStudent->fetch(PDO::FETCH_ASSOC);
+                if ($studentMatch) {
+                    $sName = $studentMatch['student_name'] ?? 'a student';
+                    $errMsg = "This mobile number is already registered to a student ({$sName}). Teacher and student mobile numbers cannot be the same.";
+                    throw new ValidationException(['phone' => $errMsg], $errMsg);
+                }
+
+                $stmtUserStudent = $pdo->prepare("
+                    SELECT name, role 
+                    FROM users 
+                    WHERE RIGHT(REGEXP_REPLACE(phone, '[^0-9]', ''), 10) = :phone 
+                      AND UPPER(role) IN ('STUDENT', 'PARENT')
+                    LIMIT 1
+                ");
+                $stmtUserStudent->execute([':phone' => $phone]);
+                $uMatch = $stmtUserStudent->fetch(PDO::FETCH_ASSOC);
+                if ($uMatch) {
+                    $errMsg = "This mobile number is already registered to a student/parent account ({$uMatch['name']}). Teacher and student mobile numbers cannot be the same.";
+                    throw new ValidationException(['phone' => $errMsg], $errMsg);
+                }
+            }
+
+            // Check if phone matches any Teacher/Staff in the same school (when checking student addition/update)
+            if ($excludeStudentId !== null || $excludeStaffId === null) {
+                $stmtStaff = $pdo->prepare("
+                    SELECT id, name, role 
+                    FROM staff 
+                    WHERE school_id = :sid 
+                      AND RIGHT(REGEXP_REPLACE(phone, '[^0-9]', ''), 10) = :phone
+                      " . ($excludeStaffId !== null ? "AND id != {$excludeStaffId}" : "") . "
+                    LIMIT 1
+                ");
+                $stmtStaff->execute([':sid' => $schoolId, ':phone' => $phone]);
+                $staffMatch = $stmtStaff->fetch(PDO::FETCH_ASSOC);
+                if ($staffMatch) {
+                    $stName = $staffMatch['name'] ?? 'a staff member';
+                    $errMsg = "This mobile number is already registered to teacher/staff ({$stName}). Student and teacher mobile numbers cannot be the same.";
+                    throw new ValidationException([
+                        'student_mobile' => $errMsg,
+                        'parent_phone' => $errMsg,
+                        'father_phone' => $errMsg,
+                        'phone' => $errMsg
+                    ], $errMsg);
+                }
+
+                $stmtUserStaff = $pdo->prepare("
+                    SELECT name, role 
+                    FROM users 
+                    WHERE RIGHT(REGEXP_REPLACE(phone, '[^0-9]', ''), 10) = :phone 
+                      AND UPPER(role) IN ('TEACHER', 'STAFF')
+                    LIMIT 1
+                ");
+                $stmtUserStaff->execute([':phone' => $phone]);
+                $uMatch = $stmtUserStaff->fetch(PDO::FETCH_ASSOC);
+                if ($uMatch) {
+                    $errMsg = "This mobile number is already registered to a teacher/staff account ({$uMatch['name']}). Student and teacher mobile numbers cannot be the same.";
+                    throw new ValidationException([
+                        'student_mobile' => $errMsg,
+                        'parent_phone' => $errMsg,
+                        'father_phone' => $errMsg,
+                        'phone' => $errMsg
+                    ], $errMsg);
+                }
+            }
         }
     }
 
@@ -10499,9 +10606,8 @@ Only approve the settlement after reviewing all financial records.
             $pay['fee_type_id'] = (int)$pay['fee_type_id'];
             $pay['amount'] = (float)$pay['amount'];
 
-            if (($pay['fee_name'] ?? '') !== 'Admission Fee') {
-                $this->sendStudentNotification($pdo, $schoolId, $pay['student_id'], "Additional Fee Deposited", "{$pay['fee_name']} have been successfully recorded.");
-            }
+            $feeName = $pay['fee_name'] ?? 'Fee';
+            $this->sendStudentNotification($pdo, $schoolId, $pay['student_id'], "Fee Deposited", "{$feeName} payment has been successfully recorded.");
             $this->syncFollowUpStatus($pdo, $pay['student_id'], $schoolId);
         }
 
@@ -15337,24 +15443,15 @@ Only approve the settlement after reviewing all financial records.
             $phone = $stmtUser->fetchColumn();
 
             if (!$phone) {
-                return ['role' => $role, 'permissions' => ['Achievements']];
+                return ['role' => $role, 'permissions' => []];
             }
 
-            // Get active year
-            $stmtYear = $pdo->prepare("SELECT id FROM academic_years WHERE school_id = :sid AND (status = 'ACTIVE' OR is_current = 1) LIMIT 1");
-            $stmtYear->execute([':sid' => $schoolId]);
-            $workingYearId = $stmtYear->fetchColumn();
-
-            if (!$workingYearId) {
-                return ['role' => $role, 'permissions' => ['Achievements']];
-            }
-
-            $stmtStaff = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND academic_year_id = :ayid AND phone = :phone LIMIT 1");
-            $stmtStaff->execute([':sid' => $schoolId, ':ayid' => $workingYearId, ':phone' => $phone]);
+            $stmtStaff = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND phone = :phone ORDER BY id DESC LIMIT 1");
+            $stmtStaff->execute([':sid' => $schoolId, ':phone' => $phone]);
             $staff = $stmtStaff->fetch();
 
             if (!$staff) {
-                return ['role' => $role, 'permissions' => ['Achievements']];
+                return ['role' => $role, 'permissions' => []];
             }
 
             $staffId = (int)$staff['id'];
@@ -15367,13 +15464,10 @@ Only approve the settlement after reviewing all financial records.
             ");
             $stmtPerms->execute([':sid' => $schoolId, ':tid' => $staffId]);
             $perms = $stmtPerms->fetchAll(\PDO::FETCH_COLUMN) ?: [];
-            if (!in_array('Achievements', $perms)) {
-                $perms[] = 'Achievements';
-            }
 
             return [
                 'role' => $role,
-                'permissions' => $perms
+                'permissions' => array_values(array_unique($perms))
             ];
         }
 

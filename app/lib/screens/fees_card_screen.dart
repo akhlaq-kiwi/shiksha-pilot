@@ -215,7 +215,7 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: const Text(
-          'Fees Dashboard',
+          'Fees Card',
           style: TextStyle(fontWeight: FontWeight.w900, color: Colors.black87),
         ),
         backgroundColor: Colors.white,

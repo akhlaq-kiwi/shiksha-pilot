@@ -57,6 +57,25 @@ async function request(endpoint, options = {}) {
     throw new Error(errorMsg || 'Unauthorized. Please log in.');
   }
 
+  if (response.status === 403) {
+    let errorMsg = '';
+    try {
+      const data = await response.clone().json();
+      errorMsg = data?.message || data?.error || '';
+    } catch (_) {}
+
+    if (errorMsg.includes('No role assigned') || errorMsg.includes('No menu permissions')) {
+      localStorage.removeItem('shiksha_pilot_token');
+      localStorage.removeItem('shiksha_pilot_role');
+      localStorage.removeItem('shiksha_pilot_user');
+      localStorage.removeItem('cached_school_profile');
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.replace('/login');
+      }
+      throw new Error(errorMsg || 'Access Denied. Permissions revoked.');
+    }
+  }
+
   // Handle PDF/blob/excel exports
   const contentType = response.headers.get('content-type');
   if (contentType && (contentType.includes('application/pdf') || contentType.includes('application/vnd.ms-excel') || contentType.includes('application/vnd.openxmlformats') || contentType.includes('spreadsheetml') || contentType.includes('application/octet-stream') || contentType.includes('excel'))) {

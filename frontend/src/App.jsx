@@ -71,7 +71,7 @@ export default function App() {
 
         <Route path="/teacher/*" element={
           <ProtectedRoute allowedRoles={['TEACHER']}>
-            <AppLayout><TeacherPortal /></AppLayout>
+            <Navigate to="/school-admin" replace />
           </ProtectedRoute>
         } />
 

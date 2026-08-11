@@ -140,10 +140,7 @@ class AuthService extends BaseService
                     SELECT 1 
                     FROM staff s 
                     WHERE s.phone = :phone AND s.school_id = :school_id
-                      AND (
-                        EXISTS (SELECT 1 FROM teacher_menu_permissions tmp WHERE tmp.teacher_id = s.id)
-                        OR EXISTS (SELECT 1 FROM class_teacher_assignments cta WHERE cta.teacher_id = s.id)
-                      )
+                      AND EXISTS (SELECT 1 FROM teacher_menu_permissions tmp WHERE tmp.teacher_id = s.id)
                     LIMIT 1
                 ");
                 $stmtAllowedCheck->execute([
@@ -152,8 +149,8 @@ class AuthService extends BaseService
                 ]);
                 $isAllowed = (bool)$stmtAllowedCheck->fetchColumn();
                 if (!$isAllowed) {
-                    $this->logAuditDirect($user, 'Security', 'Failed Login Attempt', 'Web login blocked: Teacher has no portal menu permissions or class assignments');
-                    throw new \App\Shared\Exceptions\ValidationException(['phone' => 'Invalid Credentials']);
+                    $this->logAuditDirect($user, 'Security', 'Failed Login Attempt', 'Web login blocked: Teacher has no portal menu permissions');
+                    throw new \App\Shared\Exceptions\ValidationException(['phone' => 'Invalid Credentials'], 'Invalid Credentials');
                 }
             }
         } else {

@@ -76,7 +76,7 @@ void callbackDispatcher() {
                 for (final notif in unreadNotifs) {
                   final int nId = notif['id'] is int ? notif['id'] : int.parse(notif['id'].toString());
                   if (nId > maxId) maxId = nId;
-                  await NotificationHelper.showNotification(notif);
+                  await NotificationHelper.showNotification(notif, badgeCount: unreadNotifs.length);
                 }
                 await prefs.setInt('last_notified_id_$userRole', maxId);
               }
