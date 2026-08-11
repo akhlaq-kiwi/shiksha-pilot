@@ -2373,14 +2373,24 @@ class SchoolAdminService extends BaseService
         $ayid = $workingYear ? (int)$workingYear['id'] : null;
 
         // 2. Uniqueness Checks
-        $stmtCheckContact = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND phone = :phone AND (academic_year_id = :ayid OR (academic_year_id IS NULL AND :ayid_null = 1)) LIMIT 1");
-        $stmtCheckContact->execute([':sid' => $schoolId, ':phone' => trim($data['phone']), ':ayid' => $ayid, ':ayid_null' => $ayid === null ? 1 : 0]);
+        if ($ayid !== null) {
+            $stmtCheckContact = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND phone = :phone AND (academic_year_id = :ayid OR academic_year_id IS NULL) LIMIT 1");
+            $stmtCheckContact->execute([':sid' => $schoolId, ':phone' => trim($data['phone']), ':ayid' => $ayid]);
+        } else {
+            $stmtCheckContact = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND phone = :phone LIMIT 1");
+            $stmtCheckContact->execute([':sid' => $schoolId, ':phone' => trim($data['phone'])]);
+        }
         if ($stmtCheckContact->fetchColumn() !== false) {
             throw new ValidationException(['phone' => 'This contact number is already registered.']);
         }
 
-        $stmtCheckEmail = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND email = :email AND (academic_year_id = :ayid OR (academic_year_id IS NULL AND :ayid_null = 1)) LIMIT 1");
-        $stmtCheckEmail->execute([':sid' => $schoolId, ':email' => trim($data['email']), ':ayid' => $ayid, ':ayid_null' => $ayid === null ? 1 : 0]);
+        if ($ayid !== null) {
+            $stmtCheckEmail = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND email = :email AND (academic_year_id = :ayid OR academic_year_id IS NULL) LIMIT 1");
+            $stmtCheckEmail->execute([':sid' => $schoolId, ':email' => trim($data['email']), ':ayid' => $ayid]);
+        } else {
+            $stmtCheckEmail = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND email = :email LIMIT 1");
+            $stmtCheckEmail->execute([':sid' => $schoolId, ':email' => trim($data['email'])]);
+        }
         if ($stmtCheckEmail->fetchColumn() !== false) {
             throw new ValidationException(['email' => 'This email address already exists.']);
         }
@@ -2506,14 +2516,24 @@ class SchoolAdminService extends BaseService
         $ayid = $member ? $member['academic_year_id'] : null;
 
         // 2. Uniqueness Checks
-        $stmtCheckContact = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND phone = :phone AND id != :id AND (academic_year_id = :ayid OR (academic_year_id IS NULL AND :ayid_null = 1)) LIMIT 1");
-        $stmtCheckContact->execute([':sid' => $schoolId, ':phone' => trim($data['phone']), ':id' => $id, ':ayid' => $ayid, ':ayid_null' => $ayid === null ? 1 : 0]);
+        if ($ayid !== null) {
+            $stmtCheckContact = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND phone = :phone AND id != :id AND (academic_year_id = :ayid OR academic_year_id IS NULL) LIMIT 1");
+            $stmtCheckContact->execute([':sid' => $schoolId, ':phone' => trim($data['phone']), ':id' => $id, ':ayid' => $ayid]);
+        } else {
+            $stmtCheckContact = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND phone = :phone AND id != :id LIMIT 1");
+            $stmtCheckContact->execute([':sid' => $schoolId, ':phone' => trim($data['phone']), ':id' => $id]);
+        }
         if ($stmtCheckContact->fetchColumn() !== false) {
             throw new ValidationException(['phone' => 'This contact number is already registered.']);
         }
 
-        $stmtCheckEmail = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND email = :email AND id != :id AND (academic_year_id = :ayid OR (academic_year_id IS NULL AND :ayid_null = 1)) LIMIT 1");
-        $stmtCheckEmail->execute([':sid' => $schoolId, ':email' => trim($data['email']), ':id' => $id, ':ayid' => $ayid, ':ayid_null' => $ayid === null ? 1 : 0]);
+        if ($ayid !== null) {
+            $stmtCheckEmail = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND email = :email AND id != :id AND (academic_year_id = :ayid OR academic_year_id IS NULL) LIMIT 1");
+            $stmtCheckEmail->execute([':sid' => $schoolId, ':email' => trim($data['email']), ':id' => $id, ':ayid' => $ayid]);
+        } else {
+            $stmtCheckEmail = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND email = :email AND id != :id LIMIT 1");
+            $stmtCheckEmail->execute([':sid' => $schoolId, ':email' => trim($data['email']), ':id' => $id]);
+        }
         if ($stmtCheckEmail->fetchColumn() !== false) {
             throw new ValidationException(['email' => 'This email address already exists.']);
         }
@@ -2876,15 +2896,15 @@ class SchoolAdminService extends BaseService
                     FROM students 
                     WHERE school_id = :sid 
                       AND (
-                        RIGHT(REGEXP_REPLACE(parent_phone, '[^0-9]', ''), 10) = :phone
-                        OR RIGHT(REGEXP_REPLACE(father_phone, '[^0-9]', ''), 10) = :phone
-                        OR RIGHT(REGEXP_REPLACE(student_mobile, '[^0-9]', ''), 10) = :phone
-                        OR RIGHT(REGEXP_REPLACE(guardian_phone, '[^0-9]', ''), 10) = :phone
+                        RIGHT(REGEXP_REPLACE(parent_phone, '[^0-9]', ''), 10) = :p1
+                        OR RIGHT(REGEXP_REPLACE(father_phone, '[^0-9]', ''), 10) = :p2
+                        OR RIGHT(REGEXP_REPLACE(student_mobile, '[^0-9]', ''), 10) = :p3
+                        OR RIGHT(REGEXP_REPLACE(guardian_phone, '[^0-9]', ''), 10) = :p4
                       )
                       " . ($excludeStudentId !== null ? "AND id != {$excludeStudentId}" : "") . "
                     LIMIT 1
                 ");
-                $stmtStudent->execute([':sid' => $schoolId, ':phone' => $phone]);
+                $stmtStudent->execute([':sid' => $schoolId, ':p1' => $phone, ':p2' => $phone, ':p3' => $phone, ':p4' => $phone]);
                 $studentMatch = $stmtStudent->fetch(PDO::FETCH_ASSOC);
                 if ($studentMatch) {
                     $sName = $studentMatch['student_name'] ?? 'a student';
@@ -8199,7 +8219,27 @@ class SchoolAdminService extends BaseService
             throw new ValidationException(['month' => 'Invalid payment month specified.']);
         }
 
-        if ($targetIndex > 0) {
+        // Calculate starting month index based on teacher's joining date
+        $startCheckIndex = 0;
+        if (!empty($staff['joining_date'])) {
+            try {
+                $joiningDate = new \DateTime($staff['joining_date']);
+                $joiningYM = $joiningDate->format('Y-m');
+
+                for ($k = 0; $k < count($monthsOrder); $k++) {
+                    $mStr = $this->getTargetMonthDateStr($workingYear, $monthsOrder[$k]);
+                    $mDate = new \DateTime($mStr);
+                    if ($mDate->format('Y-m') >= $joiningYM) {
+                        $startCheckIndex = $k;
+                        break;
+                    }
+                }
+            } catch (\Exception $e) {
+                $startCheckIndex = 0;
+            }
+        }
+
+        if ($targetIndex > $startCheckIndex) {
             // Fetch paid months for this teacher in the academic year
             $stmtPaid = $pdo->prepare("
                 SELECT payment_month FROM staff_payments 
@@ -8213,7 +8253,7 @@ class SchoolAdminService extends BaseService
             ]);
             $paidMonths = $stmtPaid->fetchAll(\PDO::FETCH_COLUMN);
 
-            for ($i = 0; $i < $targetIndex; $i++) {
+            for ($i = $startCheckIndex; $i < $targetIndex; $i++) {
                 $prevMonth = $monthsOrder[$i];
                 if (!in_array($prevMonth, $paidMonths, true)) {
                     throw new ValidationException(['month' => "Previous month's salary is still pending. Please complete earlier salary payments first."]);
