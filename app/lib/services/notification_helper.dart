@@ -15,6 +15,7 @@ import '../screens/fees_card_screen.dart';
 import '../screens/salary_card_screen.dart';
 import '../screens/exam_list_screen.dart';
 import '../screens/homework_list_screen.dart';
+import 'package:school_hub/services/http_service.dart' as http;
 import '../services/leave_service.dart';
 import '../services/exam_service.dart';
 import '../main.dart';
@@ -173,8 +174,57 @@ class NotificationHelper {
         'link': data['link'] ?? '',
         'event_key': data['event_key'] ?? '',
         'category': category.id,
+        'id': data['notification_id'] ?? data['id'] ?? '',
       }),
     );
+  }
+
+  static void _markNotificationAsRead(
+    dynamic notif,
+    String baseUrl,
+    String token,
+    String userRole,
+    int? studentId,
+  ) async {
+    try {
+      if (token.isEmpty || baseUrl.isEmpty) return;
+
+      int? notifId;
+      if (notif['id'] != null) {
+        notifId = int.tryParse(notif['id'].toString());
+      } else if (notif['notification_id'] != null) {
+        notifId = int.tryParse(notif['notification_id'].toString());
+      } else if (notif['notif_id'] != null) {
+        notifId = int.tryParse(notif['notif_id'].toString());
+      }
+
+      final String eventKey = (notif['event_key'] ?? '').toString();
+      final String link = (notif['link'] ?? '').toString();
+      final String title = (notif['title'] ?? notif['message'] ?? '').toString();
+
+      final isSchoolStaff = userRole.toUpperCase() == 'SCHOOL_ADMIN' || userRole.toUpperCase() == 'SUPER_ADMIN';
+      final path = isSchoolStaff 
+          ? '/api/school/notifications/${notifId ?? 0}/read'
+          : '/api/student/notifications/${notifId ?? 0}/read';
+
+      final uri = Uri.parse('$baseUrl$path');
+      final headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+        if (studentId != null) 'X-Student-Id': studentId.toString(),
+      };
+
+      final bodyPayload = json.encode({
+        'id': notifId,
+        'event_key': eventKey,
+        'link': link,
+        'title': title,
+      });
+
+      await http.post(uri, headers: headers, body: bodyPayload).catchError((_) => http.Response('', 500));
+    } catch (e) {
+      debugPrint('Failed to mark notification as read: $e');
+    }
   }
 
   static void navigateToTarget(
@@ -184,6 +234,9 @@ class NotificationHelper {
     String userRole,
     int? studentId,
   ) {
+    // Automatically mark the notification as read in the backend DB
+    _markNotificationAsRead(notif, baseUrl, token, userRole, studentId);
+
     final title = (notif['title'] ?? '').toString().toLowerCase();
     final message = (notif['message'] ?? '').toString().toLowerCase();
     final link = (notif['link'] ?? '').toString().toLowerCase();

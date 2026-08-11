@@ -60,13 +60,13 @@ final class PushDispatcher
         string $message,
         ?string $link = null
     ): void {
-        $this->insertRow($schoolId, $role, null, $eventKey, $title, $message, $link);
+        $notifId = $this->insertRow($schoolId, $role, null, $eventKey, $title, $message, $link);
 
-        $this->guard(function () use ($schoolId, $role, $eventKey, $title, $message, $link) {
+        $this->guard(function () use ($schoolId, $role, $eventKey, $title, $message, $link, $notifId) {
             $this->fcm->sendToTopic(
                 self::topicFor($schoolId, $role),
                 ['title' => $title, 'body' => $message],
-                $this->dataPayload($eventKey, $link),
+                $this->dataPayload($eventKey, $link, $notifId),
                 NotificationCatalog::priorityFor($eventKey)
             );
         });
@@ -85,11 +85,11 @@ final class PushDispatcher
         string $message,
         ?string $link = null
     ): void {
-        $this->insertRow($schoolId, $role, $userId, $eventKey, $title, $message, $link);
+        $notifId = $this->insertRow($schoolId, $role, $userId, $eventKey, $title, $message, $link);
 
-        $this->guard(function () use ($schoolId, $userId, $eventKey, $title, $message, $link) {
+        $this->guard(function () use ($schoolId, $userId, $eventKey, $title, $message, $link, $notifId) {
             $tokens = $this->activeTokensForUser($schoolId, $userId);
-            $this->fanOut($tokens, $eventKey, $title, $message, $link);
+            $this->fanOut($tokens, $eventKey, $title, $message, $link, $notifId);
         });
     }
 
@@ -200,7 +200,7 @@ final class PushDispatcher
         string $title,
         string $message,
         ?string $link
-    ): void {
+    ): int {
         $stmt = $this->pdo->prepare("
             INSERT INTO dashboard_notifications
                 (school_id, user_role, user_id, title, message, link, category, event_key, is_read)
@@ -216,14 +216,15 @@ final class PushDispatcher
             ':cat'   => NotificationCatalog::categoryFor($eventKey),
             ':ekey'  => $eventKey,
         ]);
+        return (int)$this->pdo->lastInsertId();
     }
 
     /** @param array<int,string> $tokens */
-    private function fanOut(array $tokens, string $eventKey, string $title, string $message, ?string $link): void
+    private function fanOut(array $tokens, string $eventKey, string $title, string $message, ?string $link, ?int $notifId = null): void
     {
         $priority     = NotificationCatalog::priorityFor($eventKey);
         $notification = ['title' => $title, 'body' => $message];
-        $data         = $this->dataPayload($eventKey, $link);
+        $data         = $this->dataPayload($eventKey, $link, $notifId);
         $dead         = [];
         $deadline     = microtime(true) + self::FANOUT_TIME_BUDGET;
         $sent         = 0;
@@ -249,15 +250,17 @@ final class PushDispatcher
         $this->deactivateTokens($dead);
     }
 
-    private function dataPayload(string $eventKey, ?string $link): array
+    private function dataPayload(string $eventKey, ?string $link, ?int $notifId = null): array
     {
         return [
-            'event_key' => $eventKey,
-            'category'  => NotificationCatalog::categoryFor($eventKey),
-            'link'      => $link ?? '',
+            'event_key'       => $eventKey,
+            'category'        => NotificationCatalog::categoryFor($eventKey),
+            'link'            => $link ?? '',
+            'notification_id' => $notifId ? (string)$notifId : '',
+            'id'              => $notifId ? (string)$notifId : '',
             // Lets the app open the right screen without re-deriving intent
             // from the notification copy, which is what it does today.
-            'click_action' => 'FLUTTER_NOTIFICATION_CLICK',
+            'click_action'    => 'FLUTTER_NOTIFICATION_CLICK',
         ];
     }
 

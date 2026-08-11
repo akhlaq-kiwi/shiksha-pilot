@@ -14920,17 +14920,50 @@ Only approve the settlement after reviewing all financial records.
         ];
     }
 
-    public function markNotificationRead(array $user, int $id): array
+    public function markNotificationRead(array $user, int $id, array $body = []): array
     {
         $schoolId = $this->getSchoolId($user);
+        $role = strtoupper($user['role'] ?? 'SCHOOL_ADMIN');
+        $userId = (int)($user['id'] ?? 0);
         $pdo = $this->classRepo->getPdo();
 
-        $stmt = $pdo->prepare("
-            UPDATE dashboard_notifications 
-            SET is_read = 1 
-            WHERE id = :id AND school_id = :sid
-        ");
-        $stmt->execute([':id' => $id, ':sid' => $schoolId]);
+        if ($id > 0) {
+            $stmt = $pdo->prepare("
+                UPDATE dashboard_notifications 
+                SET is_read = 1 
+                WHERE id = :id AND school_id = :sid
+            ");
+            $stmt->execute([':id' => $id, ':sid' => $schoolId]);
+        } else {
+            $eventKey = $body['event_key'] ?? '';
+            $link = $body['link'] ?? '';
+            $title = $body['title'] ?? '';
+
+            if (!empty($eventKey) || !empty($link) || !empty($title)) {
+                $query = "UPDATE dashboard_notifications SET is_read = 1 WHERE school_id = :sid AND is_read = 0";
+                $params = [':sid' => $schoolId];
+
+                if ($role !== 'SCHOOL_ADMIN' && $role !== 'SUPER_ADMIN') {
+                    $query .= " AND user_role = :role AND (user_id = :uid OR user_id IS NULL)";
+                    $params[':role'] = $role;
+                    $params[':uid'] = $userId;
+                }
+
+                if (!empty($eventKey)) {
+                    $query .= " AND event_key = :ekey";
+                    $params[':ekey'] = $eventKey;
+                } elseif (!empty($link)) {
+                    $query .= " AND link = :link";
+                    $params[':link'] = $link;
+                } elseif (!empty($title)) {
+                    $query .= " AND title = :title";
+                    $params[':title'] = $title;
+                }
+
+                $stmt = $pdo->prepare($query);
+                $stmt->execute($params);
+            }
+        }
 
         return ['success' => true];
     }

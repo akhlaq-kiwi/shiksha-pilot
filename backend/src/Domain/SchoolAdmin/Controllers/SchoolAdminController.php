@@ -1842,8 +1842,9 @@ class SchoolAdminController extends BaseController
     public function markNotificationRead(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $id = (int)$args['id'];
-        $data = $this->service->markNotificationRead($user, $id);
+        $id = (int)($args['id'] ?? 0);
+        $body = RequestParser::body($request);
+        $data = $this->service->markNotificationRead($user, $id, $body);
         return $this->success($response, $data, 'Notification marked as read');
     }
 
