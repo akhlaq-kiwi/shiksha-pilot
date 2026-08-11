@@ -618,8 +618,37 @@ class TeacherService extends BaseService
             $paymentsMap[$p['payment_month']] = $p;
         }
 
-        // Generate months structure
+        // Generate months structure starting from teacher joining month
         $allAcademicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+        $startMonthIndex = 0;
+        if (!empty($currStaff['joining_date'])) {
+            try {
+                $joiningDate = new \DateTime($currStaff['joining_date']);
+                $joiningYM = $joiningDate->format('Y-m');
+                $ayStartYear = (int)date('Y', strtotime($workingYear['start_date'] ?? date('Y-04-01')));
+
+                $monthMap = [
+                    'January' => '01', 'February' => '02', 'March' => '03',
+                    'April' => '04', 'May' => '05', 'June' => '06',
+                    'July' => '07', 'August' => '08', 'September' => '09',
+                    'October' => '10', 'November' => '11', 'December' => '12'
+                ];
+
+                foreach ($allAcademicMonths as $idx => $mName) {
+                    $mNum = $monthMap[$mName] ?? '01';
+                    $mYear = ($idx >= 9) ? ($ayStartYear + 1) : $ayStartYear;
+                    $targetYM = "{$mYear}-{$mNum}";
+                    if ($targetYM >= $joiningYM) {
+                        $startMonthIndex = $idx;
+                        break;
+                    }
+                }
+            } catch (\Exception $e) {
+                $startMonthIndex = 0;
+            }
+        }
+        $allAcademicMonths = array_slice($allAcademicMonths, $startMonthIndex);
+
         $currentPayments = [];
         foreach ($allAcademicMonths as $month) {
             if (isset($paymentsMap[$month])) {

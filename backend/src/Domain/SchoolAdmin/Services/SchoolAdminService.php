@@ -8299,6 +8299,25 @@ class SchoolAdminService extends BaseService
             ':payment_date' => $paymentDate
         ]);
 
+        // Create in-app notification for the teacher
+        if (!empty($staff['phone'])) {
+            $stmtUserPhone = $pdo->prepare("SELECT id FROM users WHERE phone = :phone LIMIT 1");
+            $stmtUserPhone->execute([':phone' => $staff['phone']]);
+            $teacherUserId = $stmtUserPhone->fetchColumn();
+
+            $stmtNotif = $pdo->prepare("
+                INSERT INTO dashboard_notifications 
+                    (school_id, user_id, user_role, title, message, event_key, category, is_read, created_at)
+                VALUES 
+                    (:sid, :uid, 'TEACHER', 'Salary Disbursed', :msg, 'SALARY_DISBURSED', 'Finance', 0, NOW())
+            ");
+            $stmtNotif->execute([
+                ':sid' => $schoolId,
+                ':uid' => $teacherUserId ?: null,
+                ':msg' => "Your salary for the month of {$month} has been disbursed."
+            ]);
+        }
+
         return ['success' => true, 'id' => (int)$pdo->lastInsertId()];
     }
 

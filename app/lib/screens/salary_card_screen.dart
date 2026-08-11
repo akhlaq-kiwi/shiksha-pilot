@@ -226,7 +226,7 @@ class _SalaryCardScreenState extends State<SalaryCardScreen> {
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: const Text(
-          'Salary Ledger',
+          'Salary Card',
           style: TextStyle(fontWeight: FontWeight.w900, color: Colors.black87),
         ),
         backgroundColor: Colors.white,

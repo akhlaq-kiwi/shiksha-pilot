@@ -196,58 +196,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _notifTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
       _fetchUnreadNotificationsCount();
     });
-    // Request ignoring battery optimizations so that WorkManager runs instantly in the background!
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkAndPromptBatteryOptimizations();
-    });
-  }
-
-  Future<void> _checkAndPromptBatteryOptimizations() async {
-    const platform = MethodChannel('com.shikshapilot.schoolhub/battery');
-    try {
-      final bool isIgnoring = await platform.invokeMethod('isIgnoringBatteryOptimizations');
-      if (!isIgnoring) {
-        if (mounted) {
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (context) => AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: const Row(
-                children: [
-                  Icon(Icons.battery_alert_rounded, color: Colors.orange),
-                  SizedBox(width: 8),
-                  Text('Background Alerts', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                ],
-              ),
-              content: const Text(
-                'Please disable battery optimization for this app to ensure push notifications and background alerts arrive instantly, even when the screen is locked.',
-                style: TextStyle(fontSize: 14),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Later'),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.indigo,
-                    foregroundColor: Colors.white,
-                  ),
-                  onPressed: () async {
-                    Navigator.pop(context);
-                    await platform.invokeMethod('requestIgnoreBatteryOptimizations');
-                  },
-                  child: const Text('Enable'),
-                ),
-              ],
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      debugPrint('Error checking battery optimizations: $e');
-    }
   }
 
   @override
@@ -449,7 +397,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             for (final notif in unreadNotifs) {
               final int nId = notif['id'] is int ? notif['id'] : int.parse(notif['id'].toString());
               if (nId > maxId) maxId = nId;
-              await NotificationHelper.showNotification(notif);
+              await NotificationHelper.showNotification(notif, badgeCount: count);
             }
             await prefs.setInt('last_notified_id_${widget.userRole}', maxId);
           }
