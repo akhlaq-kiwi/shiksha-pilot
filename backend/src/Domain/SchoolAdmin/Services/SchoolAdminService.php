@@ -5766,6 +5766,27 @@ class SchoolAdminService extends BaseService
                 }
             }
         }
+        $classId = (int)$data['class_id'];
+
+        // Check if already published & get previous teacher IDs before update
+        $isAlreadyPublished = false;
+        $prevTeacherIds = [];
+        if ($dayOfWeek) {
+            $stmtCheckAlready = $pdo->prepare("
+                SELECT COUNT(*) FROM timetable 
+                WHERE school_id = :sid AND class_id = :cid AND day_of_week = :day AND is_published = 1
+            ");
+            $stmtCheckAlready->execute([':sid' => $schoolId, ':cid' => $classId, ':day' => $dayOfWeek]);
+            $isAlreadyPublished = (int)$stmtCheckAlready->fetchColumn() > 0;
+
+            $stmtPrevTeachers = $pdo->prepare("
+                SELECT DISTINCT teacher_id FROM timetable 
+                WHERE school_id = :sid AND class_id = :cid AND day_of_week = :day AND teacher_id IS NOT NULL AND is_published = 1
+            ");
+            $stmtPrevTeachers->execute([':sid' => $schoolId, ':cid' => $classId, ':day' => $dayOfWeek]);
+            $prevTeacherIds = array_map('intval', $stmtPrevTeachers->fetchAll(PDO::FETCH_COLUMN) ?: []);
+        }
+
         if ($dayOfWeek) {
             $stmtPublish = $pdo->prepare("
                 UPDATE timetable 
@@ -5774,7 +5795,7 @@ class SchoolAdminService extends BaseService
             ");
             $stmtPublish->execute([
                 ':sid' => $schoolId,
-                ':cid' => $data['class_id'],
+                ':cid' => $classId,
                 ':day' => $dayOfWeek
             ]);
         } else {
@@ -5785,8 +5806,50 @@ class SchoolAdminService extends BaseService
             ");
             $stmtPublish->execute([
                 ':sid' => $schoolId,
-                ':cid' => $data['class_id']
+                ':cid' => $classId
             ]);
+        }
+
+        // Send Notifications for students and teachers
+        if ($dayOfWeek) {
+            $stmtNewTeachers = $pdo->prepare("
+                SELECT DISTINCT teacher_id FROM timetable 
+                WHERE school_id = :sid AND class_id = :cid AND day_of_week = :day AND teacher_id IS NOT NULL AND is_published = 1
+            ");
+            $stmtNewTeachers->execute([':sid' => $schoolId, ':cid' => $classId, ':day' => $dayOfWeek]);
+            $newTeacherIds = array_map('intval', $stmtNewTeachers->fetchAll(PDO::FETCH_COLUMN) ?: []);
+
+            $stmtClass = $pdo->prepare("SELECT name, section FROM classes WHERE id = :cid LIMIT 1");
+            $stmtClass->execute([':cid' => $classId]);
+            $classRow = $stmtClass->fetch(PDO::FETCH_ASSOC);
+            $className = $classRow ? trim(($classRow['name'] ?? '') . ' ' . ($classRow['section'] ?? '')) : "Class";
+
+            if (!$isAlreadyPublished) {
+                // First Time Publish
+                $studentMsg = "Timetable for {$className} ({$dayOfWeek}) has been published.";
+                $this->notifyClassStudents($pdo, $schoolId, $classId, "Timetable Published", $studentMsg);
+
+                foreach ($newTeacherIds as $tId) {
+                    $teacherMsg = "You have been assigned period(s) in {$className} for {$dayOfWeek}.";
+                    $this->notifyTeacherUser($pdo, $schoolId, $tId, "Timetable Assigned", $teacherMsg);
+                }
+            } else {
+                // Update / Re-publish
+                $studentMsg = "Timetable for {$className} ({$dayOfWeek}) has been updated.";
+                $this->notifyClassStudents($pdo, $schoolId, $classId, "Timetable Updated", $studentMsg);
+
+                foreach ($newTeacherIds as $tId) {
+                    $teacherMsg = "Your timetable schedule for {$className} ({$dayOfWeek}) has been updated.";
+                    $this->notifyTeacherUser($pdo, $schoolId, $tId, "Timetable Schedule Updated", $teacherMsg);
+                }
+
+                // Removed Teachers
+                $removedTeacherIds = array_diff($prevTeacherIds, $newTeacherIds);
+                foreach ($removedTeacherIds as $rId) {
+                    $removedMsg = "You have been replaced/removed from {$className} timetable for {$dayOfWeek}.";
+                    $this->notifyTeacherUser($pdo, $schoolId, $rId, "Timetable Schedule Changed", $removedMsg);
+                }
+            }
         }
     }
 
@@ -15144,6 +15207,106 @@ Only approve the settlement after reviewing all financial records.
                     ]);
                 }
             }
+        }
+    }
+
+    private function notifyClassStudents(PDO $pdo, int $schoolId, int $classId, string $title, string $message): void
+    {
+        $stmtStudents = $pdo->prepare("
+            SELECT s.email, s.parent_phone, s.father_phone, s.guardian_phone, s.student_mobile 
+            FROM students s 
+            WHERE s.school_id = :sid AND s.class_id = :cid AND (s.status = 'ACTIVE' OR s.status = 'Active')
+        ");
+        $stmtStudents->execute([':sid' => $schoolId, ':cid' => $classId]);
+        $rows = $stmtStudents->fetchAll(PDO::FETCH_ASSOC);
+
+        if (empty($rows)) {
+            return;
+        }
+
+        $emails = array_filter(array_column($rows, 'email'));
+        $phones = [];
+        foreach ($rows as $r) {
+            if (!empty($r['parent_phone'])) $phones[] = $r['parent_phone'];
+            if (!empty($r['father_phone'])) $phones[] = $r['father_phone'];
+            if (!empty($r['guardian_phone'])) $phones[] = $r['guardian_phone'];
+            if (!empty($r['student_mobile'])) $phones[] = $r['student_mobile'];
+        }
+        $phones = array_unique(array_filter($phones));
+
+        // Insert notifications for Student users
+        if (!empty($emails)) {
+            $placeholders = implode(',', array_fill(0, count($emails), '?'));
+            $stmtStudentUsers = $pdo->prepare("
+                SELECT id FROM users 
+                WHERE school_id = ? AND role = 'STUDENT' AND email IN ($placeholders)
+            ");
+            $stmtStudentUsers->execute(array_merge([$schoolId], array_values($emails)));
+            $studentUserIds = $stmtStudentUsers->fetchAll(PDO::FETCH_COLUMN) ?: [];
+
+            if (!empty($studentUserIds)) {
+                $stmtIns = $pdo->prepare("
+                    INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, category, event_key, is_read)
+                    VALUES (?, 'STUDENT', ?, ?, ?, '/timetable', 'TIMETABLE', 'TIMETABLE_UPDATED', 0)
+                ");
+                foreach ($studentUserIds as $uid) {
+                    $stmtIns->execute([$schoolId, $uid, $title, $message]);
+                }
+            }
+        }
+
+        // Insert notifications for Parent users
+        if (!empty($phones)) {
+            $placeholders = implode(',', array_fill(0, count($phones), '?'));
+            $stmtParentUsers = $pdo->prepare("
+                SELECT id FROM users 
+                WHERE school_id = ? AND role = 'PARENT' AND phone IN ($placeholders)
+            ");
+            $stmtParentUsers->execute(array_merge([$schoolId], array_values($phones)));
+            $parentUserIds = $stmtParentUsers->fetchAll(PDO::FETCH_COLUMN) ?: [];
+
+            if (!empty($parentUserIds)) {
+                $stmtIns = $pdo->prepare("
+                    INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, category, event_key, is_read)
+                    VALUES (?, 'PARENT', ?, ?, ?, '/timetable', 'TIMETABLE', 'TIMETABLE_UPDATED', 0)
+                ");
+                foreach ($parentUserIds as $uid) {
+                    $stmtIns->execute([$schoolId, $uid, $title, $message]);
+                }
+            }
+        }
+    }
+
+    private function notifyTeacherUser(PDO $pdo, int $schoolId, int $teacherId, string $title, string $message): void
+    {
+        $stmtStaff = $pdo->prepare("SELECT phone, email FROM staff WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtStaff->execute([':id' => $teacherId, ':sid' => $schoolId]);
+        $staff = $stmtStaff->fetch(PDO::FETCH_ASSOC);
+        if (!$staff) return;
+
+        $phone = $staff['phone'] ?? null;
+        $email = $staff['email'] ?? null;
+
+        $stmtUser = $pdo->prepare("
+            SELECT id FROM users 
+            WHERE school_id = :sid AND role = 'TEACHER' AND (
+                (phone IS NOT NULL AND phone = :phone) OR (email IS NOT NULL AND email = :email)
+            ) LIMIT 1
+        ");
+        $stmtUser->execute([':sid' => $schoolId, ':phone' => $phone, ':email' => $email]);
+        $userId = $stmtUser->fetchColumn();
+
+        if ($userId) {
+            $stmtIns = $pdo->prepare("
+                INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, category, event_key, is_read)
+                VALUES (:sid, 'TEACHER', :uid, :title, :msg, '/timetable', 'TIMETABLE', 'TIMETABLE_UPDATED', 0)
+            ");
+            $stmtIns->execute([
+                ':sid' => $schoolId,
+                ':uid' => $userId,
+                ':title' => $title,
+                ':msg' => $message
+            ]);
         }
     }
 

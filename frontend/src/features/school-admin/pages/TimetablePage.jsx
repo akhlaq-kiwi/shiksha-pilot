@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, ChevronLeft, ChevronRight, Plus, Edit, Trash2, ShieldAlert, CheckCircle2, Lock, MoreVertical, RefreshCw, UserPlus, Users, FileText, Download, Printer } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Plus, Edit, Trash2, ShieldAlert, CheckCircle2, Lock, MoreVertical, RefreshCw, UserPlus, Users, FileText, Download, Printer, Loader2 } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
 import { Input } from '../../../common/ui/input';
@@ -210,8 +210,10 @@ export default function TimetablePage() {
     }
   };
 
-  const loadTimetable = async () => {
-    setLoading(true);
+  const loadTimetable = async (silent = false) => {
+    if (!silent) {
+      setLoading(true);
+    }
     setError('');
     try {
       const data = await schoolAdminService.getTimetable({
@@ -229,7 +231,9 @@ export default function TimetablePage() {
       console.error(err);
       setError('Failed to load timetable.');
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
 
@@ -317,7 +321,7 @@ export default function TimetablePage() {
         ...prev,
         [dayName]: { subject_id: '', teacher_id: '' }
       }));
-      await loadTimetable();
+      await loadTimetable(true);
       await loadStaff(); // Reload workloads
     } catch (err) {
       console.error(err);
@@ -1148,7 +1152,15 @@ export default function TimetablePage() {
                             disabled={actionLoading === 'add-' + dayName}
                             className="w-full h-9 bg-primary hover:bg-primary/95 text-white font-bold rounded-lg shadow-sm transition-all flex items-center justify-center gap-1.5"
                           >
-                            <Plus className="h-4 w-4" /> Add Period
+                            {actionLoading === 'add-' + dayName ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin" /> Adding...
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="h-4 w-4" /> Add Period
+                              </>
+                            )}
                           </Button>
                         </div>
                       )}
