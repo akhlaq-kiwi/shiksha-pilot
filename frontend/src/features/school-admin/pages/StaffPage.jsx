@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Search, Edit, User, UserCog, Upload, AlertCircle, ArrowLeft, Check, Trash2, FileText, Download, Printer, MoreVertical, Lock, CheckCircle, AlertTriangle, CreditCard, ChevronDown, ChevronUp, Eye } from 'lucide-react';
+import { Plus, Search, Edit, User, UserCog, Upload, AlertCircle, ArrowLeft, Check, Trash2, FileText, Download, Printer, MoreVertical, Lock, CheckCircle, AlertTriangle, CreditCard, ChevronDown, ChevronUp, Eye, Loader2 } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
 import { Input } from '../../../common/ui/input';
@@ -212,6 +212,7 @@ export default function StaffPage() {
   const [staffSearch, setStaffSearch] = useState('');
   const [selectedDeptFilter, setSelectedDeptFilter] = useState('');
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [isExpLetterOpen, setIsExpLetterOpen] = useState(false);
   const [isExpOptionDialogOpen, setIsExpOptionDialogOpen] = useState(false);
   const [expLetterMode, setExpLetterMode] = useState('auto'); // 'auto' | 'custom'
@@ -411,6 +412,7 @@ export default function StaffPage() {
       return;
     }
 
+    setUploadingPhoto(true);
     const formData = new FormData();
     formData.append('file', file);
     
@@ -427,6 +429,8 @@ export default function StaffPage() {
     } catch (err) {
       console.error(err);
       setFormErrors(prev => ({ ...prev, photo: "Failed to upload photo." }));
+    } finally {
+      setUploadingPhoto(false);
     }
   };
 
@@ -1569,21 +1573,30 @@ export default function StaffPage() {
           {/* SECTION 1 — Teacher Photo upload only (no section heading) */}
           <div className="space-y-2 border-b border-border pb-4">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-full border border-border bg-zinc-50 dark:bg-zinc-900/50 flex items-center justify-center overflow-hidden flex-shrink-0">
-                <TeacherAvatar src={newStaff.photo_path} name={newStaff.name || 'Preview'} />
+              <div className="w-16 h-16 rounded-full border border-border bg-zinc-50 dark:bg-zinc-900/50 flex items-center justify-center overflow-hidden flex-shrink-0 relative">
+                {uploadingPhoto ? (
+                  <div className="flex flex-col items-center justify-center text-[9px] font-bold text-primary animate-pulse">
+                    <Loader2 className="h-4 w-4 animate-spin mb-0.5" />
+                    Loading...
+                  </div>
+                ) : (
+                  <TeacherAvatar src={newStaff.photo_path} name={newStaff.name || 'Preview'} />
+                )}
               </div>
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center gap-2">
-                  <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs font-bold text-text-secondary bg-surface hover:bg-zinc-50 cursor-pointer shadow-2xs transition-all">
-                    <Upload className="h-3.5 w-3.5" /> Upload Photo
+                  <label className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs font-bold text-text-secondary bg-surface hover:bg-zinc-50 cursor-pointer shadow-2xs transition-all ${uploadingPhoto ? 'opacity-50 pointer-events-none' : ''}`}>
+                    {uploadingPhoto ? <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" /> : <Upload className="h-3.5 w-3.5" />}
+                    {uploadingPhoto ? 'Uploading...' : 'Upload Photo'}
                     <input 
                       type="file" 
                       accept="image/jpeg,image/jpg,image/png" 
                       onChange={handlePhotoUpload} 
+                      disabled={uploadingPhoto}
                       className="hidden" 
                     />
                   </label>
-                  {newStaff.photo_path && (
+                  {newStaff.photo_path && !uploadingPhoto && (
                     <Button 
                       type="button" 
                       variant="destructive" 

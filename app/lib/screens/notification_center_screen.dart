@@ -9,6 +9,7 @@ import 'exam_list_screen.dart';
 import 'exam_detail_screen.dart';
 import '../services/exam_service.dart';
 import 'fees_card_screen.dart';
+import 'salary_card_screen.dart';
 import 'homework_list_screen.dart';
 
 class NotificationCenterScreen extends StatefulWidget {
@@ -408,6 +409,20 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                 };
                                 http.post(uri, headers: headers).catchError((_) => http.Response('', 500));
                               } catch (_) {}
+
+                              final isSalaryNotif = linkStr.contains('salary') || titleLower.contains('salary') || msgLower.contains('salary') || (notif['event_key'] ?? '').toString() == 'SALARY_DISBURSED';
+                              if (isSalaryNotif) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => SalaryCardScreen(
+                                      baseUrl: widget.baseUrl,
+                                      token: widget.token,
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
 
                               final isHomeworkNotif = linkStr.contains('homework') || titleLower.contains('homework') || msgLower.contains('homework') || linkStr.contains('assignment') || titleLower.contains('assignment') || msgLower.contains('assignment');
                               if (isHomeworkNotif) {
