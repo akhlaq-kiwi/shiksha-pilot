@@ -1,7 +1,7 @@
 export const ROLE_HOME = {
   SUPER_ADMIN:  '/super-admin',
   SCHOOL_ADMIN: '/school-admin',
-  TEACHER:      '/teacher',
+  TEACHER:      '/school-admin',
   STUDENT:      '/student',
   PARENT:       '/parent',
 };

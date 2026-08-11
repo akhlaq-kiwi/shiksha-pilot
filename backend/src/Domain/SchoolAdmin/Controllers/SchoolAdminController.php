@@ -907,6 +907,13 @@ class SchoolAdminController extends BaseController
     {
         $userRole = $user['role'] ?? '';
         if ($userRole === 'TEACHER') {
+            $uri = $_SERVER['REQUEST_URI'] ?? '';
+
+            // /api/school/my-permissions is always accessible to inspect active permissions
+            if (str_contains($uri, '/api/school/my-permissions')) {
+                return;
+            }
+
             // Retrieve teacher permissions
             $permsData = $this->service->getMyPermissions($user);
             $permissions = $permsData['permissions'] ?? [];

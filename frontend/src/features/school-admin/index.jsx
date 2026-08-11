@@ -57,20 +57,20 @@ import AppSidebar from '../../common/components/AppSidebar';
  * access to that page.
  */
 const NAV_ITEMS = [
-  { path: '/school-admin',                    label: 'Dashboard',         permissionKey: 'Dashboard',          icon: LayoutDashboard, exact: true },
-  { path: '/school-admin/staff',              label: 'Teachers',          permissionKey: 'Teachers',           icon: UserCog },
-  { path: '/school-admin/classes',            label: 'Classes',           permissionKey: 'Classes',            icon: Users },
-  { path: '/school-admin/finance',            label: 'Fee collection',    permissionKey: 'Fees Portal',        icon: DollarSign },
-  { path: '/school-admin/financial-reports',  label: 'Financial report',  permissionKey: 'Financial Reports',  icon: FileText },
-  { path: '/school-admin/finance-management', label: 'Accounts & payroll', permissionKey: 'Finance Management', icon: Landmark },
-  { path: '/school-admin/fee-follow-ups',     label: 'Fee follow-up',     permissionKey: 'Fee Follow-up',      icon: PhoneCall },
-  { path: '/school-admin/timetable',          label: 'Timetable',         permissionKey: 'Timetable',          icon: Clock },
-  { path: '/school-admin/attendance',         label: 'Attendance',        permissionKey: 'Attendance',         icon: ClipboardCheck },
-  { path: '/school-admin/announcements',       label: 'Announcements',     permissionKey: 'Announcements',      icon: Megaphone },
-  { path: '/school-admin/leave-requests',     label: 'Leave requests',    permissionKey: 'Manage Leaves',      icon: FileText },
-  { path: '/school-admin/exams',              label: 'Examinations',      permissionKey: 'Examinations',       icon: FileText },
-  { path: '/school-admin/achievements',       label: 'Achievements',     permissionKey: 'Achievements',       icon: Trophy },
-  { path: '/school-admin/audits-settings',     label: 'Settings',          permissionKey: 'Audits & Settings',  icon: Settings },
+  { path: '/school-admin',                    label: 'Dashboard',          permissionKey: 'Dashboard',          icon: LayoutDashboard, exact: true },
+  { path: '/school-admin/staff',              label: 'Teachers',           permissionKey: 'Teachers',           icon: UserCog },
+  { path: '/school-admin/classes',            label: 'Classes',            permissionKey: 'Classes',            icon: Users },
+  { path: '/school-admin/finance',            label: 'Fees Portal',        permissionKey: 'Fees Portal',        icon: DollarSign },
+  { path: '/school-admin/financial-reports',  label: 'Financial Reports',  permissionKey: 'Financial Reports',  icon: FileText },
+  { path: '/school-admin/finance-management', label: 'Finance Management', permissionKey: 'Finance Management', icon: Landmark },
+  { path: '/school-admin/fee-follow-ups',     label: 'Fee Follow-up',      permissionKey: 'Fee Follow-up',      icon: PhoneCall },
+  { path: '/school-admin/timetable',          label: 'Timetable',          permissionKey: 'Timetable',          icon: Clock },
+  { path: '/school-admin/attendance',         label: 'Attendance',         permissionKey: 'Attendance',         icon: ClipboardCheck },
+  { path: '/school-admin/announcements',       label: 'Announcements',      permissionKey: 'Announcements',      icon: Megaphone },
+  { path: '/school-admin/leave-requests',     label: 'Leave Requests',     permissionKey: 'Leave Requests',     icon: FileText },
+  { path: '/school-admin/exams',              label: 'Examinations',       permissionKey: 'Examinations',       icon: FileText },
+  { path: '/school-admin/achievements',       label: 'Achievements',      permissionKey: 'Achievements',       icon: Trophy },
+  { path: '/school-admin/audits-settings',     label: 'Audits & Settings',  permissionKey: 'Audits & Settings',  icon: Settings },
   { path: '/school-admin/security',            label: 'Security',          permissionKey: 'Security',           icon: Shield },
 ];
 
@@ -355,7 +355,6 @@ export default function SchoolAdminPortal() {
   // human-facing copy and must be free to change without affecting access.
   const isPermitted = (item) => {
     if (role !== 'TEACHER') return true;
-    if (item.permissionKey === 'Achievements') return true;
     if (loadingPermissions || permissions === null) return false;
     return permissions.includes(item.permissionKey);
   };
@@ -370,7 +369,6 @@ export default function SchoolAdminPortal() {
 
   const hasAccess = (() => {
     if (role !== 'TEACHER') return true;
-    if (currentItem && currentItem.permissionKey === 'Achievements') return true;
     if (loadingPermissions) return true;
     if (!currentItem) return true; // Profile pages, change-password are open to all logged in users
     if (permissions === null) return true;
@@ -399,14 +397,18 @@ export default function SchoolAdminPortal() {
             localStorage.removeItem('shiksha_pilot_role');
             localStorage.removeItem('shiksha_pilot_user');
             localStorage.removeItem('cached_school_profile');
-            setAccessRemoved(true);
+            window.location.href = '/login';
           } else {
             setPermissions(perms);
           }
         })
         .catch(err => {
           console.error("Failed to load user permissions", err);
-          setPermissions([]);
+          localStorage.removeItem('shiksha_pilot_token');
+          localStorage.removeItem('shiksha_pilot_role');
+          localStorage.removeItem('shiksha_pilot_user');
+          localStorage.removeItem('cached_school_profile');
+          window.location.href = '/login';
         })
         .finally(() => {
           setLoadingPermissions(false);
@@ -431,7 +433,7 @@ export default function SchoolAdminPortal() {
           localStorage.removeItem('shiksha_pilot_role');
           localStorage.removeItem('shiksha_pilot_user');
           localStorage.removeItem('cached_school_profile');
-          setAccessRemoved(true);
+          window.location.href = '/login';
           return;
         }
 
@@ -447,7 +449,7 @@ export default function SchoolAdminPortal() {
       }
     };
 
-    const interval = setInterval(fetchPermissions, 5000);
+    const interval = setInterval(fetchPermissions, 3000);
     return () => clearInterval(interval);
   }, [accessRemoved]);
 
@@ -461,6 +463,14 @@ export default function SchoolAdminPortal() {
       setLoadError(false);
     } catch (err) {
       console.error("Failed to load school profile in portal index", err);
+      if (role === 'TEACHER') {
+        localStorage.removeItem('shiksha_pilot_token');
+        localStorage.removeItem('shiksha_pilot_role');
+        localStorage.removeItem('shiksha_pilot_user');
+        localStorage.removeItem('cached_school_profile');
+        window.location.href = '/login';
+        return;
+      }
       setLoadError(true);
     } finally {
       setLoadingProfile(false);

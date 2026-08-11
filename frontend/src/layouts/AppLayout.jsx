@@ -359,9 +359,7 @@ const AppLayout = ({ children }) => {
                 <div className="relative" ref={dropdownRef}>
                   <button 
                     onClick={() => {
-                      if (role === 'TEACHER') {
-                        navigate('/teacher/settings');
-                      } else if (role === 'PARENT') {
+                      if (role === 'PARENT') {
                         navigate('/parent/settings');
                       } else if (role === 'STUDENT') {
                         navigate('/student/settings');
@@ -389,31 +387,44 @@ const AppLayout = ({ children }) => {
                   {/* Dropdown overlay */}
                   {isDropdownOpen && (
                     <div className="absolute right-0 top-10 w-48 bg-surface border border-border shadow-lg rounded-xl py-1.5 z-50 text-left text-xs animate-in fade-in slide-in-from-top-1 duration-100">
-                      <button 
-                        onClick={() => { setIsDropdownOpen(false); navigate('/school-admin/profile'); }}
-                        className="w-full px-4 py-2 hover:bg-secondary/80 flex items-center gap-2 font-bold text-text-primary text-left"
-                      >
-                        Profile
-                      </button>
-                      <button 
-                        onClick={() => { setIsDropdownOpen(false); navigate('/school-admin/profile/change-password'); }}
-                        className="w-full px-4 py-2 hover:bg-secondary/80 flex items-center gap-2 font-bold text-text-primary text-left"
-                      >
-                        Change Password
-                      </button>
-                      <button 
-                        onClick={() => { setIsDropdownOpen(false); navigate('/school-admin/profile/subscription'); }}
-                        className="w-full px-4 py-2 hover:bg-secondary/80 flex items-center gap-2 font-bold text-text-primary text-left"
-                      >
-                        Subscription Plans
-                      </button>
-                      <div className="border-t border-border my-1"></div>
-                      <button 
-                        onClick={() => { setIsDropdownOpen(false); handleLogout(); }}
-                        className="w-full px-4 py-2 hover:bg-secondary/80 flex items-center gap-2 font-bold text-red-600 text-left"
-                      >
-                        Sign Out
-                      </button>
+                      {role === 'TEACHER' ? (
+                        <button 
+                          onClick={() => { setIsDropdownOpen(false); handleLogout(); }}
+                          className="w-full px-4 py-2 hover:bg-secondary/80 flex items-center gap-2 font-bold text-red-600 text-left"
+                        >
+                          <LogOut className="w-4 h-4" />
+                          Sign Out
+                        </button>
+                      ) : (
+                        <>
+                          <button 
+                            onClick={() => { setIsDropdownOpen(false); navigate('/school-admin/profile'); }}
+                            className="w-full px-4 py-2 hover:bg-secondary/80 flex items-center gap-2 font-bold text-text-primary text-left"
+                          >
+                            Profile
+                          </button>
+                          <button 
+                            onClick={() => { setIsDropdownOpen(false); navigate('/school-admin/profile/change-password'); }}
+                            className="w-full px-4 py-2 hover:bg-secondary/80 flex items-center gap-2 font-bold text-text-primary text-left"
+                          >
+                            Change Password
+                          </button>
+                          <button 
+                            onClick={() => { setIsDropdownOpen(false); navigate('/school-admin/profile/subscription'); }}
+                            className="w-full px-4 py-2 hover:bg-secondary/80 flex items-center gap-2 font-bold text-text-primary text-left"
+                          >
+                            Subscription Plans
+                          </button>
+                          <div className="border-t border-border my-1"></div>
+                          <button 
+                            onClick={() => { setIsDropdownOpen(false); handleLogout(); }}
+                            className="w-full px-4 py-2 hover:bg-secondary/80 flex items-center gap-2 font-bold text-red-600 text-left"
+                          >
+                            <LogOut className="w-4 h-4" />
+                            Sign Out
+                          </button>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
