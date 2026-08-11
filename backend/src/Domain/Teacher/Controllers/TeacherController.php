@@ -257,8 +257,9 @@ class TeacherController extends BaseController
     {
         $user = $this->authenticate($request);
         $this->requireRole($user, 'TEACHER');
-        $id = (int)$args['id'];
-        $data = $this->service->markNotificationRead($user, $id);
+        $id = (int)($args['id'] ?? 0);
+        $body = RequestParser::body($request);
+        $data = $this->service->markNotificationRead($user, $id, $body);
         return $this->success($response, $data);
     }
 

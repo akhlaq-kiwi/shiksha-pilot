@@ -1550,4 +1550,49 @@ class StudentService extends BaseService
             'data' => $this->getGameProgress($user)
         ];
     }
+
+    public function markNotificationRead(array $user, int $id, array $body = []): array
+    {
+        $schoolId = (int)($user['school_id'] ?? 0);
+        $userId = (int)($user['id'] ?? 0);
+        $role = strtoupper($user['role'] ?? 'STUDENT');
+        $pdo = $this->studentRepo->getPdo();
+
+        if ($id > 0) {
+            $stmt = $pdo->prepare("
+                UPDATE dashboard_notifications
+                SET is_read = 1
+                WHERE id = :id AND school_id = :school_id
+            ");
+            $stmt->execute([
+                ':id' => $id,
+                ':school_id' => $schoolId,
+            ]);
+        } else {
+            $eventKey = $body['event_key'] ?? '';
+            $link = $body['link'] ?? '';
+            $title = $body['title'] ?? '';
+
+            if (!empty($eventKey) || !empty($link) || !empty($title)) {
+                $query = "UPDATE dashboard_notifications SET is_read = 1 WHERE school_id = :sid AND is_read = 0 AND (user_id = :uid OR (user_role = :role AND user_id IS NULL))";
+                $params = [':sid' => $schoolId, ':uid' => $userId, ':role' => $role];
+
+                if (!empty($eventKey)) {
+                    $query .= " AND event_key = :ekey";
+                    $params[':ekey'] = $eventKey;
+                } elseif (!empty($link)) {
+                    $query .= " AND link = :link";
+                    $params[':link'] = $link;
+                } elseif (!empty($title)) {
+                    $query .= " AND title = :title";
+                    $params[':title'] = $title;
+                }
+
+                $stmt = $pdo->prepare($query);
+                $stmt->execute($params);
+            }
+        }
+
+        return ['status' => 'success', 'success' => true];
+    }
 }
