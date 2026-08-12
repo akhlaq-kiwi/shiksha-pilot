@@ -1629,7 +1629,7 @@ class SchoolAdminService extends BaseService
         $this->checkTeacherStudentPhoneConflict($pdo, $schoolId, [$parentPhone, $fatherPhone, $data['student_mobile'] ?? null], null, $id, $isReactivating);
 
         if ($newStatus === 'ACTIVE') {
-            $this->checkActiveStudentPhoneConflictInOtherSchools($pdo, $schoolId, [$parentPhone, $fatherPhone, $data['student_mobile'] ?? null], $isReactivating);
+            $this->checkActiveStudentPhoneConflictInOtherSchools($pdo, $schoolId, [$parentPhone, $fatherPhone, $data['student_mobile'] ?? null], $isReactivating, $id);
             $this->checkActiveStudentEmailConflictInOtherSchools($pdo, $schoolId, [$data['student_email'] ?? null, $data['email'] ?? null], $id, $isReactivating);
         } else {
             if (!empty($parentPhone)) {
@@ -2770,7 +2770,8 @@ class SchoolAdminService extends BaseService
         PDO $pdo,
         int $currentSchoolId,
         array|string $phones,
-        bool $isReactivating = false
+        bool $isReactivating = false,
+        ?int $excludeStudentId = null
     ): void {
         $this->checkAdminOrSuperAdminPhoneConflict($pdo, $phones, $isReactivating);
 
@@ -2817,13 +2818,14 @@ class SchoolAdminService extends BaseService
                 WHERE s.school_id != :current_sid 
                   AND UPPER(s.status) = 'ACTIVE'
                   AND ({$colConditions})
+                  " . ($excludeStudentId !== null ? "AND s.id != {$excludeStudentId}" : "") . "
                 LIMIT 1
             ");
             $stmt->execute($queryParams);
             $conflict = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if (!$conflict) {
-                // Also check active user in another school
+                // Also check active non-student user in another school
                 $stmtUser = $pdo->prepare("
                     SELECT u.school_id, sch.name AS school_name
                     FROM users u
@@ -2906,9 +2908,9 @@ class SchoolAdminService extends BaseService
                     SELECT u.school_id, sch.name AS school_name
                     FROM users u
                     JOIN schools sch ON u.school_id = sch.id
-                    WHERE (u.school_id != :current_sid OR UPPER(u.role) NOT IN ('STUDENT', 'PARENT'))
-                      AND UPPER(u.status) = 'ACTIVE'
+                    WHERE UPPER(u.status) = 'ACTIVE'
                       AND LOWER(u.email) = :email
+                      AND NOT (u.school_id = :current_sid AND UPPER(u.role) IN ('STUDENT', 'PARENT'))
                     LIMIT 1
                 ");
                 $stmtUser->execute([':current_sid' => $currentSchoolId, ':email' => $email]);
@@ -2958,16 +2960,17 @@ class SchoolAdminService extends BaseService
         $conflict = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$conflict) {
-            // Also check active user in any school
+            // Also check active user in any school (excluding staff's own user record in current school)
             $stmtUser = $pdo->prepare("
                 SELECT u.school_id, sch.name AS school_name
                 FROM users u
                 JOIN schools sch ON u.school_id = sch.id
                 WHERE UPPER(u.status) = 'ACTIVE'
                   AND RIGHT(REGEXP_REPLACE(u.phone, '[^0-9]', ''), 10) = :phone
+                  AND NOT (u.school_id = :current_sid AND UPPER(u.role) IN ('TEACHER', 'STAFF'))
                 LIMIT 1
             ");
-            $stmtUser->execute([':phone' => $normPhone]);
+            $stmtUser->execute([':phone' => $normPhone, ':current_sid' => $currentSchoolId]);
             $conflict = $stmtUser->fetch(PDO::FETCH_ASSOC);
         }
 
@@ -2992,7 +2995,7 @@ class SchoolAdminService extends BaseService
         $email = strtolower(trim((string)$email));
         if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) return;
 
-        // Check active staff in any school
+        // Check active staff in any school (excluding current staff ID)
         $stmt = $pdo->prepare("
             SELECT st.school_id, sch.name AS school_name
             FROM staff st
@@ -3020,16 +3023,17 @@ class SchoolAdminService extends BaseService
         }
 
         if (!$conflict) {
-            // Check active user
+            // Check active user (excluding staff's own user record in current school)
             $stmtUser = $pdo->prepare("
                 SELECT u.school_id, sch.name AS school_name
                 FROM users u
                 JOIN schools sch ON u.school_id = sch.id
                 WHERE UPPER(u.status) = 'ACTIVE'
                   AND LOWER(u.email) = :email
+                  AND NOT (u.school_id = :current_sid AND UPPER(u.role) IN ('TEACHER', 'STAFF'))
                 LIMIT 1
             ");
-            $stmtUser->execute([':email' => $email]);
+            $stmtUser->execute([':email' => $email, ':current_sid' => $currentSchoolId]);
             $conflict = $stmtUser->fetch(PDO::FETCH_ASSOC);
         }
 
