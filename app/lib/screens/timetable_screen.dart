@@ -7,6 +7,7 @@ class TimetableScreen extends StatefulWidget {
   final String token;
   final String userRole;
   final int? selectedStudentId;
+  final DateTime? targetDate;
 
   const TimetableScreen({
     Key? key,
@@ -14,6 +15,7 @@ class TimetableScreen extends StatefulWidget {
     required this.token,
     required this.userRole,
     this.selectedStudentId,
+    this.targetDate,
   }) : super(key: key);
 
   @override
@@ -40,8 +42,8 @@ class _TimetableScreenState extends State<TimetableScreen> {
   void initState() {
     super.initState();
     _service = TimetableService(baseUrl: widget.baseUrl, token: widget.token);
-    _selectedDate = DateTime.now();
-    // If today is Sunday, default to Monday
+    _selectedDate = widget.targetDate ?? DateTime.now();
+    // If target day is Sunday, default to Monday
     if (_selectedDate.weekday == DateTime.sunday) {
       _selectedDate = _selectedDate.add(const Duration(days: 1));
     }
@@ -106,7 +108,8 @@ class _TimetableScreenState extends State<TimetableScreen> {
         _holidays = list;
       } catch (_) {}
 
-      if (widget.userRole.toUpperCase() == 'PARENT') {
+      final roleUpper = widget.userRole.toUpperCase();
+      if (roleUpper == 'PARENT' || roleUpper == 'STUDENT') {
         final res = await _service.getStudentTimetable(
           studentId: widget.selectedStudentId,
           date: dateStr,

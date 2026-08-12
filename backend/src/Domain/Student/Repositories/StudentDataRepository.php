@@ -209,8 +209,17 @@ class StudentDataRepository extends BaseRepository
      *
      * @return array<int, array<string, mixed>>
      */
-    public function getTimetable(int $classId, int $schoolId): array
+    public function getTimetable(int $classId, int $schoolId, ?string $date = null): array
     {
+        $targetDate = $date ?? date('Y-m-d');
+        try {
+            $dt = new \DateTime($targetDate);
+            $dayOfWeek = $dt->format('l');
+        } catch (\Exception $e) {
+            $dayOfWeek = date('l');
+            $targetDate = date('Y-m-d');
+        }
+
         $sql = "
             SELECT t.*,
                    s.name AS subject_name,
@@ -223,16 +232,74 @@ class StudentDataRepository extends BaseRepository
             LEFT JOIN period_configurations pc ON t.period_number = pc.period_number AND t.school_id = pc.school_id AND pc.end_date IS NULL
             WHERE t.class_id  = :class_id
               AND t.school_id = :school_id
-              AND t.end_date IS NULL
-            ORDER BY FIELD(t.day_of_week,
-                'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'
-            ), t.period_number
+              AND t.day_of_week = :day
+              AND t.is_published = 1
+              AND t.start_date <= :target_date
+              AND (t.end_date IS NULL OR t.end_date >= :target_date2)
+            ORDER BY t.period_number
         ";
 
         $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([':class_id' => $classId, ':school_id' => $schoolId]);
+        $stmt->execute([
+            ':class_id' => $classId,
+            ':school_id' => $schoolId,
+            ':day' => $dayOfWeek,
+            ':target_date' => $targetDate,
+            ':target_date2' => $targetDate
+        ]);
 
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $periods = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        $stmtBackup = $this->pdo->prepare("
+            SELECT b.backup_teacher_id, st.name AS backup_teacher_name
+            FROM timetable_backups b
+            JOIN staff st ON b.backup_teacher_id = st.id
+            WHERE b.timetable_id = :tid AND b.date = :date
+        ");
+
+        foreach ($periods as &$p) {
+            $stmtBackup->execute([':tid' => $p['id'], ':date' => $targetDate]);
+            $backup = $stmtBackup->fetch(PDO::FETCH_ASSOC);
+            if ($backup) {
+                $p['backup_teacher_id'] = (int)$backup['backup_teacher_id'];
+                $p['teacher_name'] = $backup['backup_teacher_name'];
+                $p['is_backup'] = true;
+            } else {
+                $p['is_backup'] = false;
+            }
+        }
+
+        $stmtConfig = $this->pdo->prepare("
+            SELECT * FROM period_configurations 
+            WHERE school_id = :sid AND end_date IS NULL 
+            ORDER BY period_number
+        ");
+        $stmtConfig->execute([':sid' => $schoolId]);
+        $configs = $stmtConfig->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        $periodsByNum = [];
+        foreach ($periods as $p) {
+            $periodsByNum[(int)$p['period_number']] = $p;
+        }
+
+        $finalSchedule = [];
+        foreach ($configs as $cfg) {
+            $pNum = (int)$cfg['period_number'];
+            if (isset($periodsByNum[$pNum])) {
+                $finalSchedule[] = $periodsByNum[$pNum];
+            } else {
+                $finalSchedule[] = [
+                    'is_free' => true,
+                    'period_number' => $pNum,
+                    'start_time' => $cfg['start_time'],
+                    'end_time' => $cfg['end_time'],
+                    'school_id' => $schoolId,
+                    'day_of_week' => $dayOfWeek
+                ];
+            }
+        }
+
+        return $finalSchedule;
     }
 
     /**

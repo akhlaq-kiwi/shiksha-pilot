@@ -244,6 +244,7 @@ class NotificationHelper {
     final leaveService = LeaveService(baseUrl: baseUrl, token: token);
 
     int? notifStudentId;
+    DateTime? notifDate;
     try {
       final cleanLink = link.startsWith('http') ? link : 'http://localhost$link';
       final uri = Uri.parse(cleanLink);
@@ -251,19 +252,18 @@ class NotificationHelper {
       if (idStr != null) {
         notifStudentId = int.tryParse(idStr);
       }
+      final dateStr = uri.queryParameters['date'] ?? notif['date'];
+      if (dateStr != null) {
+        notifDate = DateTime.tryParse(dateStr.toString());
+      }
     } catch (e) {
-      debugPrint('Failed to parse student_id from notification link: $e');
+      debugPrint('Failed to parse query params from notification link: $e');
     }
 
-    // Prefer the catalog's event_key when the notification carries one. The
-    // substring matching below is the legacy path — it stays as a fallback for
-    // rows written before event_key existed, but it cannot distinguish an exam
-    // result from an admit card (both are titled with the exam name), which is
-    // exactly why the key was introduced.
     final eventKey = (notif['event_key'] ?? '').toString();
     if (eventKey.isNotEmpty) {
       final routed = _screenForEvent(
-        eventKey, baseUrl, token, userRole, notifStudentId ?? studentId, leaveService,
+        eventKey, baseUrl, token, userRole, notifStudentId ?? studentId, leaveService, targetDate: notifDate,
       );
       if (routed != null) {
         MyApp.navigatorKey.currentState?.push(
@@ -306,6 +306,7 @@ class NotificationHelper {
         token: leaveService.token,
         userRole: userRole,
         selectedStudentId: notifStudentId ?? studentId,
+        targetDate: notifDate,
       );
     } else if (link.contains('homework') || title.contains('homework') || message.contains('homework') || link.contains('assignment') || title.contains('assignment') || message.contains('assignment')) {
       targetScreen = HomeworkListScreen(
@@ -338,8 +339,9 @@ class NotificationHelper {
     String token,
     String userRole,
     int? studentId,
-    LeaveService leaveService,
-  ) {
+    LeaveService leaveService, {
+    DateTime? targetDate,
+  }) {
     switch (eventKey) {
       case NotificationEvent.leaveRequestSubmitted:
       case NotificationEvent.leaveCancelledByApplicant:
@@ -383,6 +385,7 @@ class NotificationHelper {
           token: token,
           userRole: userRole,
           selectedStudentId: studentId,
+          targetDate: targetDate,
         );
 
       case NotificationEvent.examScheduled:
