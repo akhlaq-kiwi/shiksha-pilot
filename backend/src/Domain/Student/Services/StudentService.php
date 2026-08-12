@@ -37,49 +37,125 @@ class StudentService extends BaseService
     public function resolveStudent(array $user): array
     {
         $schoolId = (int) ($user['school_id'] ?? 0);
+        $role = strtoupper((string)($user['role'] ?? ''));
+        $reqStudentId = $_SERVER['HTTP_X_STUDENT_ID'] ?? $_GET['student_id'] ?? null;
 
-        if ($user['role'] === 'STUDENT') {
-            $email = $user['email'] ?? null;
-            if (empty($email) && isset($user['id'])) {
-                $stmt = $this->repo->getPdo()->prepare("SELECT email FROM users WHERE id = :id LIMIT 1");
-                $stmt->execute([':id' => $user['id']]);
-                $email = $stmt->fetchColumn() ?: '';
-            }
-            $student = $this->repo->findByUserEmail((string)$email, $schoolId);
-        } else {
-            // PARENT: match via phone stored on users.phone -> students.parent_phone
-            // Allow selecting a specific child via X-Student-Id header or query parameter
-            $reqStudentId = $_SERVER['HTTP_X_STUDENT_ID'] ?? $_GET['student_id'] ?? null;
+        $student = null;
+        $pdo = $this->repo->getPdo();
+
+        if ($role === 'STUDENT') {
+            // 1. If student_id is explicitly requested and belongs to school, use it
             if ($reqStudentId !== null && is_numeric($reqStudentId)) {
                 $student = $this->repo->findById((int)$reqStudentId);
-                // Ensure this student actually belongs to the parent
+                if ($student && (int)$student['school_id'] !== $schoolId) {
+                    $student = null;
+                }
+            }
+
+            // 2. Try to match by student email
+            if ($student === null) {
+                $email = $user['email'] ?? null;
+                if (empty($email) && isset($user['id'])) {
+                    $stmt = $pdo->prepare("SELECT email FROM users WHERE id = :id LIMIT 1");
+                    $stmt->execute([':id' => $user['id']]);
+                    $email = $stmt->fetchColumn() ?: '';
+                }
+                if (!empty($email)) {
+                    $student = $this->repo->findByUserEmail((string)$email, $schoolId);
+                }
+            }
+
+            // 3. Try to match by user phone -> student_mobile, parent_phone, father_phone, guardian_phone, or admission_no
+            if ($student === null) {
+                $phone = (string) ($user['phone'] ?? '');
+                if (empty($phone) && isset($user['id'])) {
+                    $stmt = $pdo->prepare("SELECT phone FROM users WHERE id = :id LIMIT 1");
+                    $stmt->execute([':id' => $user['id']]);
+                    $phone = $stmt->fetchColumn() ?: '';
+                }
+                if (!empty($phone)) {
+                    $stmt = $pdo->prepare("
+                        SELECT * FROM students 
+                        WHERE school_id = :school_id
+                          AND (
+                            student_mobile = :p1 OR 
+                            parent_phone = :p2 OR 
+                            father_phone = :p3 OR 
+                            guardian_phone = :p4 OR 
+                            admission_no = :p5
+                          )
+                        LIMIT 1
+                    ");
+                    $stmt->execute([
+                        ':p1' => $phone,
+                        ':p2' => $phone,
+                        ':p3' => $phone,
+                        ':p4' => $phone,
+                        ':p5' => $phone,
+                        ':school_id' => $schoolId
+                    ]);
+                    $student = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+                }
+            }
+
+            // 4. Try to match by user name -> student name in school
+            if ($student === null && !empty($user['name'])) {
+                $stmt = $pdo->prepare("
+                    SELECT * FROM students 
+                    WHERE school_id = :school_id AND LOWER(name) = LOWER(:name)
+                    LIMIT 1
+                ");
+                $stmt->execute([':school_id' => $schoolId, ':name' => trim($user['name'])]);
+                $student = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+            }
+        } else {
+            // PARENT role (or other role accessing student portal)
+            if ($reqStudentId !== null && is_numeric($reqStudentId)) {
+                $student = $this->repo->findById((int)$reqStudentId);
                 if ($student && (int)$student['school_id'] === $schoolId) {
                     $parentPhone = (string) ($user['phone'] ?? '');
-                    if ($student['parent_phone'] !== $parentPhone && 
+                    if (!empty($parentPhone) && 
+                        $student['parent_phone'] !== $parentPhone && 
                         $student['father_phone'] !== $parentPhone && 
                         $student['guardian_phone'] !== $parentPhone && 
                         $student['student_mobile'] !== $parentPhone) {
-                        $student = null; // Unauthorized access to another student
+                        // Unauthorized access to another student
+                        $student = null;
                     }
                 } else {
                     $student = null;
                 }
-            } else {
+            }
+            
+            if ($student === null) {
                 $parentPhone = (string) ($user['phone'] ?? '');
-                $stmt = $this->repo->getPdo()->prepare("
-                    SELECT * FROM students 
-                    WHERE (parent_phone = :phone1 OR father_phone = :phone2 OR guardian_phone = :phone3 OR student_mobile = :phone4)
-                      AND school_id = :school_id
-                    LIMIT 1
-                ");
-                $stmt->execute([
-                    ':phone1' => $parentPhone,
-                    ':phone2' => $parentPhone,
-                    ':phone3' => $parentPhone,
-                    ':phone4' => $parentPhone,
-                    ':school_id' => $schoolId
-                ]);
-                $student = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+                if (empty($parentPhone) && isset($user['id'])) {
+                    $stmt = $pdo->prepare("SELECT phone FROM users WHERE id = :id LIMIT 1");
+                    $stmt->execute([':id' => $user['id']]);
+                    $parentPhone = $stmt->fetchColumn() ?: '';
+                }
+                
+                if (!empty($parentPhone)) {
+                    $stmt = $pdo->prepare("
+                        SELECT * FROM students 
+                        WHERE school_id = :school_id
+                          AND (
+                            parent_phone = :phone1 OR 
+                            father_phone = :phone2 OR 
+                            guardian_phone = :phone3 OR 
+                            student_mobile = :phone4
+                          )
+                        LIMIT 1
+                    ");
+                    $stmt->execute([
+                        ':phone1' => $parentPhone,
+                        ':phone2' => $parentPhone,
+                        ':phone3' => $parentPhone,
+                        ':phone4' => $parentPhone,
+                        ':school_id' => $schoolId
+                    ]);
+                    $student = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+                }
             }
         }
 
