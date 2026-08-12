@@ -202,13 +202,13 @@ class StudentService extends BaseService
      * @param array<string, mixed> $user
      * @return array<int, array<string, mixed>>
      */
-    public function getTimetable(array $user): array
+    public function getTimetable(array $user, ?string $date = null): array
     {
         $student  = $this->resolveStudent($user);
         $classId  = (int) $student['class_id'];
         $schoolId = (int) ($user['school_id'] ?? 0);
 
-        return $this->repo->getTimetable($classId, $schoolId);
+        return $this->repo->getTimetable($classId, $schoolId, $date);
     }
 
     // -------------------------------------------------------------------------
