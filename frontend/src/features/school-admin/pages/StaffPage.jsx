@@ -551,11 +551,12 @@ export default function StaffPage() {
     if (!newStaff.phone || !/^[0-9]{10}$/.test(newStaff.phone.trim())) {
       errors.phone = "Contact number must be exactly 10 digits.";
     }
-    if (!newStaff.emergency_phone || !/^[0-9]{10}$/.test(newStaff.emergency_phone.trim())) {
-      errors.emergency_phone = "Emergency contact number must be exactly 10 digits.";
-    }
-    if (newStaff.emergency_phone.trim() === newStaff.phone.trim()) {
-      errors.emergency_phone = "Emergency contact number must be different from contact number.";
+    if (newStaff.emergency_phone && newStaff.emergency_phone.trim()) {
+      if (!/^[0-9]{10}$/.test(newStaff.emergency_phone.trim())) {
+        errors.emergency_phone = "Emergency contact number must be exactly 10 digits.";
+      } else if (newStaff.emergency_phone.trim() === newStaff.phone.trim()) {
+        errors.emergency_phone = "Emergency contact number must be different from contact number.";
+      }
     }
     if (!newStaff.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newStaff.email.trim())) {
       errors.email = "Invalid email address format.";
@@ -1637,18 +1638,12 @@ export default function StaffPage() {
               </div>
             </div>
 
-            {/* Row 2: Contact Number, Emergency Contact Number, Email */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Row 2: Contact Number, Email */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label htmlFor="phone" className="text-xs font-bold text-text-secondary uppercase">Contact Number <span className="text-red-500">*</span></label>
                 <Input id="phone" name="phone" value={newStaff.phone} onChange={handleTextChange} placeholder="10-digit mobile number" className={formErrors.phone ? 'border-red-500 ring-1 ring-red-500' : ''} required />
                 {formErrors.phone && <p className="text-[11px] text-red-500 font-semibold">{formErrors.phone}</p>}
-              </div>
-              
-              <div className="space-y-1.5">
-                <label htmlFor="emergency_phone" className="text-xs font-bold text-text-secondary uppercase">Emergency Contact Number <span className="text-red-500">*</span></label>
-                <Input id="emergency_phone" name="emergency_phone" value={newStaff.emergency_phone} onChange={handleTextChange} placeholder="Emergency number" required />
-                {formErrors.emergency_phone && <p className="text-[11px] text-red-500 font-semibold">{formErrors.emergency_phone}</p>}
               </div>
 
               <div className="space-y-1.5">

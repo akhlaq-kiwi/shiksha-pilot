@@ -2347,11 +2347,13 @@ class SchoolAdminService extends BaseService
         if (empty($data['phone']) || !preg_match('/^[0-9]{10}$/', trim($data['phone']))) {
             throw new ValidationException(['phone' => 'Contact number must be exactly 10 digits.']);
         }
-        if (empty($data['emergency_phone']) || !preg_match('/^[0-9]{10}$/', trim($data['emergency_phone']))) {
-            throw new ValidationException(['emergency_phone' => 'Emergency contact number must be exactly 10 digits.']);
-        }
-        if (trim($data['emergency_phone']) === trim($data['phone'])) {
-            throw new ValidationException(['emergency_phone' => 'Emergency contact number must be different from contact number.']);
+        if (!empty($data['emergency_phone'])) {
+            if (!preg_match('/^[0-9]{10}$/', trim($data['emergency_phone']))) {
+                throw new ValidationException(['emergency_phone' => 'Emergency contact number must be exactly 10 digits.']);
+            }
+            if (trim($data['emergency_phone']) === trim($data['phone'])) {
+                throw new ValidationException(['emergency_phone' => 'Emergency contact number must be different from contact number.']);
+            }
         }
         if (empty($data['email']) || !filter_var(trim($data['email']), FILTER_VALIDATE_EMAIL)) {
             throw new ValidationException(['email' => 'Invalid email address format.']);
@@ -2426,7 +2428,7 @@ class SchoolAdminService extends BaseService
             'photo_path'              => $data['photo_path'] ?? null,
             'father_name'             => $data['father_name'],
             'mother_name'             => $data['mother_name'],
-            'emergency_phone'         => $data['emergency_phone'],
+            'emergency_phone'         => !empty($data['emergency_phone']) ? $data['emergency_phone'] : null,
             'exit_date'               => !empty($data['exit_date']) ? $data['exit_date'] : null,
             'current_address_line'    => $data['current_address_line'] ?? null,
             'current_city'            => $data['current_city'] ?? null,
@@ -2492,11 +2494,13 @@ class SchoolAdminService extends BaseService
         if (empty($data['phone']) || !preg_match('/^[0-9]{10}$/', trim($data['phone']))) {
             throw new ValidationException(['phone' => 'Contact number must be exactly 10 digits.']);
         }
-        if (empty($data['emergency_phone']) || !preg_match('/^[0-9]{10}$/', trim($data['emergency_phone']))) {
-            throw new ValidationException(['emergency_phone' => 'Emergency contact number must be exactly 10 digits.']);
-        }
-        if (trim($data['emergency_phone']) === trim($data['phone'])) {
-            throw new ValidationException(['emergency_phone' => 'Emergency contact number must be different from contact number.']);
+        if (!empty($data['emergency_phone'])) {
+            if (!preg_match('/^[0-9]{10}$/', trim($data['emergency_phone']))) {
+                throw new ValidationException(['emergency_phone' => 'Emergency contact number must be exactly 10 digits.']);
+            }
+            if (trim($data['emergency_phone']) === trim($data['phone'])) {
+                throw new ValidationException(['emergency_phone' => 'Emergency contact number must be different from contact number.']);
+            }
         }
         if (empty($data['email']) || !filter_var(trim($data['email']), FILTER_VALIDATE_EMAIL)) {
             throw new ValidationException(['email' => 'Invalid email address format.']);
@@ -2574,7 +2578,7 @@ class SchoolAdminService extends BaseService
             'photo_path'              => $data['photo_path'] ?? null,
             'father_name'             => $data['father_name'],
             'mother_name'             => $data['mother_name'],
-            'emergency_phone'         => $data['emergency_phone'],
+            'emergency_phone'         => !empty($data['emergency_phone']) ? $data['emergency_phone'] : null,
             'exit_date'               => !empty($data['exit_date']) ? $data['exit_date'] : null,
             'current_address_line'    => $data['current_address_line'] ?? null,
             'current_city'            => $data['current_city'] ?? null,
