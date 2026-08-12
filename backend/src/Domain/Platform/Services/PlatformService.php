@@ -205,17 +205,19 @@ class PlatformService extends BaseService
 
         $errors = [];
 
-        // Check if email already exists in users table
-        $stmtEmail = $pdo->prepare("SELECT COUNT(*) FROM users WHERE email = :email");
-        $stmtEmail->execute([':email' => $data['contact_email']]);
+        // Check if email already exists in users table (active users)
+        $stmtEmail = $pdo->prepare("SELECT COUNT(*) FROM users WHERE LOWER(email) = :email AND UPPER(status) = 'ACTIVE'");
+        $stmtEmail->execute([':email' => strtolower(trim((string)$data['contact_email']))]);
         if ((int)$stmtEmail->fetchColumn() > 0) {
             $errors['contact_email'] = 'This email address is already registered. Please use a different email address.';
         }
 
-        // Check if admin phone already exists in users table
+        // Check if admin phone already exists in users table (active users)
         if (!empty($data['admin_phone'])) {
-            $stmtPhone = $pdo->prepare("SELECT COUNT(*) FROM users WHERE phone = :phone");
-            $stmtPhone->execute([':phone' => $data['admin_phone']]);
+            $cleaned = preg_replace('/[^0-9]/', '', (string)$data['admin_phone']);
+            $normPhone = strlen($cleaned) >= 10 ? substr($cleaned, -10) : $cleaned;
+            $stmtPhone = $pdo->prepare("SELECT COUNT(*) FROM users WHERE RIGHT(REGEXP_REPLACE(phone, '[^0-9]', ''), 10) = :phone AND UPPER(status) = 'ACTIVE'");
+            $stmtPhone->execute([':phone' => $normPhone]);
             if ((int)$stmtPhone->fetchColumn() > 0) {
                 $errors['admin_phone'] = 'Entered number already registered';
                 $errors['contact_phone'] = 'Entered number already registered';
