@@ -100,7 +100,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       name: 'Fees Card',
       icon: Icons.payments_rounded,
       color: Colors.green,
-      allowedRoles: ['PARENT', 'SCHOOL_ADMIN', 'PRINCIPAL'],
+      allowedRoles: ['PARENT', 'SCHOOL_ADMIN', 'PRINCIPAL', 'STUDENT'],
       isAvailable: true,
     ),
     LauncherFeature(
