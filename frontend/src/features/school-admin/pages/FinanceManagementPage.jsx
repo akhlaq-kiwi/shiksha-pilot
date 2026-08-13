@@ -242,8 +242,19 @@ export default function FinanceManagementPage() {
       setIsAnnualFeeModalOpen(false);
       await loadData();
     } catch (err) {
-      console.error(err);
-      setError(err?.response?.data?.message || err?.message || 'Failed to create annual fee.');
+      const errData = err?.data || err?.response?.data;
+      let errorMsg = 'Failed to create annual fee.';
+      if (errData?.errors && typeof errData.errors === 'object') {
+        const errorVals = Object.values(errData.errors).filter(Boolean);
+        if (errorVals.length > 0) {
+          errorMsg = errorVals.join(' ');
+        }
+      } else if (errData?.message && errData.message !== 'Validation failed.') {
+        errorMsg = errData.message;
+      } else if (err?.message && err.message !== 'Validation failed.') {
+        errorMsg = err.message;
+      }
+      setError(errorMsg);
       setIsAnnualFeeConfirmOpen(false);
     } finally {
       setAnnualFeeSubmitting(false);

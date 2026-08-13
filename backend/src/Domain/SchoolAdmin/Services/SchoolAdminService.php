@@ -10685,7 +10685,7 @@ Only approve the settlement after reviewing all financial records.
                 ':ayid' => $academicYearId
             ]);
             if ((int)$stmtDup->fetchColumn() > 0) {
-                throw new ValidationException(['duplicate' => 'Annual fee has already been applied to eligible students in the current session.']);
+                throw new ValidationException(['duplicate' => 'Annual Fees is already added it can not be add again']);
             }
         }
 
