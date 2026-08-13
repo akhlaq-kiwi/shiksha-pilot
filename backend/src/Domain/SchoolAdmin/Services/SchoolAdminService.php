@@ -2391,6 +2391,11 @@ class SchoolAdminService extends BaseService
             throw new ValidationException(['phone' => 'This contact number is already registered.']);
         }
 
+        // 3. Status Mapping
+        $status = !empty($data['exit_date']) ? 'Inactive' : ($data['status'] ?? 'ACTIVE');
+
+        $this->checkTeacherStudentPhoneConflict($pdo, $schoolId, $data['phone'], null, null);
+
         if (strcasecmp($status, 'ACTIVE') === 0) {
             $this->checkActiveStaffPhoneConflictInOtherSchools($pdo, $schoolId, $data['phone']);
         }
@@ -2521,6 +2526,14 @@ class SchoolAdminService extends BaseService
         if ($stmtCheckContact->fetchColumn() !== false) {
             throw new ValidationException(['phone' => 'This contact number is already registered.']);
         }
+
+        // 3. Status Mapping
+        $status = !empty($data['exit_date']) ? 'Inactive' : ($data['status'] ?? ($member['status'] ?? 'ACTIVE'));
+        $existingStatus = strtoupper($member['status'] ?? 'ACTIVE');
+        $newStatus = strtoupper($status);
+        $isReactivating = ($existingStatus === 'INACTIVE' && $newStatus === 'ACTIVE');
+
+        $this->checkTeacherStudentPhoneConflict($pdo, $schoolId, $data['phone'], $id, null, $isReactivating);
 
         if ($newStatus === 'ACTIVE') {
             $this->checkActiveStaffPhoneConflictInOtherSchools($pdo, $schoolId, $data['phone'], $id, $isReactivating);
