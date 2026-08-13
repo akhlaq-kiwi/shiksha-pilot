@@ -2355,8 +2355,10 @@ class SchoolAdminService extends BaseService
                 throw new ValidationException(['emergency_phone' => 'Emergency contact number must be different from contact number.']);
             }
         }
-        if (empty($data['email']) || !filter_var(trim($data['email']), FILTER_VALIDATE_EMAIL)) {
-            throw new ValidationException(['email' => 'Invalid email address format.']);
+        if (!empty($data['email'])) {
+            if (!filter_var(trim($data['email']), FILTER_VALIDATE_EMAIL)) {
+                throw new ValidationException(['email' => 'Invalid email address format.']);
+            }
         }
         if (empty($data['joining_date']) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', trim($data['joining_date']))) {
             throw new ValidationException(['joining_date' => 'Joining date is required.']);
@@ -2421,7 +2423,7 @@ class SchoolAdminService extends BaseService
             'role'                    => $data['role'] ?? 'Teacher',
             'department'              => $data['department'] ?? null,
             'phone'                   => $data['phone'],
-            'email'                   => $data['email'],
+            'email'                   => !empty($data['email']) ? $data['email'] : null,
             'status'                  => $status,
             'salary'                  => $data['salary'] ?? null,
             'joining_date'            => $data['joining_date'],
@@ -2502,8 +2504,10 @@ class SchoolAdminService extends BaseService
                 throw new ValidationException(['emergency_phone' => 'Emergency contact number must be different from contact number.']);
             }
         }
-        if (empty($data['email']) || !filter_var(trim($data['email']), FILTER_VALIDATE_EMAIL)) {
-            throw new ValidationException(['email' => 'Invalid email address format.']);
+        if (!empty($data['email'])) {
+            if (!filter_var(trim($data['email']), FILTER_VALIDATE_EMAIL)) {
+                throw new ValidationException(['email' => 'Invalid email address format.']);
+            }
         }
         if (empty($data['joining_date']) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', trim($data['joining_date']))) {
             throw new ValidationException(['joining_date' => 'Joining date is required.']);
@@ -2571,7 +2575,7 @@ class SchoolAdminService extends BaseService
             'role'                    => $data['role'] ?? 'Teacher',
             'department'              => $data['department'] ?? null,
             'phone'                   => $data['phone'],
-            'email'                   => $data['email'],
+            'email'                   => !empty($data['email']) ? $data['email'] : null,
             'status'                  => $status,
             'salary'                  => $data['salary'] ?? null,
             'joining_date'            => $data['joining_date'],
