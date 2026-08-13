@@ -551,16 +551,6 @@ export default function StaffPage() {
     if (!newStaff.phone || !/^[0-9]{10}$/.test(newStaff.phone.trim())) {
       errors.phone = "Contact number must be exactly 10 digits.";
     }
-    if (newStaff.emergency_phone && newStaff.emergency_phone.trim()) {
-      if (!/^[0-9]{10}$/.test(newStaff.emergency_phone.trim())) {
-        errors.emergency_phone = "Emergency contact number must be exactly 10 digits.";
-      } else if (newStaff.emergency_phone.trim() === newStaff.phone.trim()) {
-        errors.emergency_phone = "Emergency contact number must be different from contact number.";
-      }
-    }
-    if (!newStaff.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newStaff.email.trim())) {
-      errors.email = "Invalid email address format.";
-    }
     if (!newStaff.joining_date) {
       errors.joining_date = "Joining date is required.";
     }
@@ -1645,129 +1635,71 @@ export default function StaffPage() {
               </div>
             </div>
 
-            {/* Conditional grid depending on Edit vs Add */}
-            {newStaff.id ? (
-              <>
-                {/* Edit Mode: Row 3 (Joining Date, Exit Date, Parent Occupation) */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-1.5">
-                    <label htmlFor="joining_date" className="text-xs font-bold text-text-secondary uppercase">Joining Date <span className="text-red-500">*</span></label>
-                    <Input id="joining_date" 
-                      type="date" 
-                      name="joining_date"
-                      value={newStaff.joining_date} 
-                      onChange={handleTextChange} 
-                      onKeyDown={e => e.preventDefault()}
-                      className="cursor-pointer w-full" 
-                      required 
-                    />
-                    {formErrors.joining_date && <p className="text-[11px] text-red-500 font-semibold">{formErrors.joining_date}</p>}
-                  </div>
+            {/* Row 2: Joining Date, Exit Date, Salary, Subject */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="space-y-1.5">
+                <label htmlFor="joining_date" className="text-xs font-bold text-text-secondary uppercase">Joining Date <span className="text-red-500">*</span></label>
+                <Input id="joining_date" 
+                  type="date" 
+                  name="joining_date"
+                  value={newStaff.joining_date} 
+                  onChange={handleTextChange} 
+                  onKeyDown={e => e.preventDefault()}
+                  className="cursor-pointer w-full" 
+                  required 
+                />
+                {formErrors.joining_date && <p className="text-[11px] text-red-500 font-semibold">{formErrors.joining_date}</p>}
+              </div>
 
-                  <div className="space-y-1.5">
-                    <label htmlFor="exit_date" className="text-xs font-bold text-text-secondary uppercase">Exit Date</label>
-                    <Input id="exit_date" 
-                      type="date" 
-                      name="exit_date"
-                      value={newStaff.exit_date} 
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setNewStaff(prev => ({
-                          ...prev,
-                          exit_date: val,
-                          status: val ? 'Inactive' : 'ACTIVE'
-                        }));
-                      }} 
-                      onKeyDown={e => e.preventDefault()}
-                      className="cursor-pointer w-full text-red-500 font-bold" 
-                    />
-                    {formErrors.exit_date && <p className="text-[11px] text-red-500 font-semibold">{formErrors.exit_date}</p>}
-                  </div>
+              <div className="space-y-1.5">
+                <label htmlFor="exit_date" className="text-xs font-bold text-text-secondary uppercase">Exit Date</label>
+                <Input id="exit_date" 
+                  type="date" 
+                  name="exit_date"
+                  value={newStaff.exit_date} 
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setNewStaff(prev => ({
+                      ...prev,
+                      exit_date: val,
+                      status: val ? 'Inactive' : 'ACTIVE'
+                    }));
+                  }} 
+                  onKeyDown={e => e.preventDefault()}
+                  className="cursor-pointer w-full text-red-500 font-bold" 
+                />
+                {formErrors.exit_date && <p className="text-[11px] text-red-500 font-semibold">{formErrors.exit_date}</p>}
+              </div>
 
-                  <div className="space-y-1.5">
-                    <label htmlFor="salary" className="text-xs font-bold text-text-secondary uppercase">Salary <span className="text-red-500">*</span></label>
-                    <Input id="salary" 
-                      type="number" 
-                      name="salary" 
-                      value={newStaff.salary} 
-                      onChange={handleTextChange} 
-                      placeholder="e.g. 25000" 
-                      required 
-                    />
-                    {formErrors.salary && <p className="text-[11px] text-red-500 font-semibold">{formErrors.salary}</p>}
-                  </div>
-                </div>
+              <div className="space-y-1.5">
+                <label htmlFor="salary" className="text-xs font-bold text-text-secondary uppercase">Salary <span className="text-red-500">*</span></label>
+                <Input id="salary" 
+                  type="number" 
+                  name="salary" 
+                  value={newStaff.salary} 
+                  onChange={handleTextChange} 
+                  placeholder="e.g. 25000" 
+                  required 
+                />
+                {formErrors.salary && <p className="text-[11px] text-red-500 font-semibold">{formErrors.salary}</p>}
+              </div>
 
-                {/* Edit Mode: Row 4 (Subject, spacer, spacer) */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-1.5">
-                    <label htmlFor="subject" className="text-xs font-bold text-text-secondary uppercase font-display">Subject</label>
-                    <Input id="subject" 
-                      placeholder="e.g. English"
-                      value={newStaff.department || ''} 
-                      onChange={e => {
-                        const val = e.target.value;
-                        setNewStaff(p => ({ ...p, department: val }));
-                        if (formErrors.department) setFormErrors(prev => ({ ...prev, department: '' }));
-                      }}
-                      className={formErrors.department ? 'border-red-500 ring-1 ring-red-500' : ''}
-                      required 
-                    />
-                    {formErrors.department && <p className="text-[11px] text-red-500 font-semibold">{formErrors.department}</p>}
-                  </div>
-                  <div></div>
-                  <div></div>
-                </div>
-              </>
-            ) : (
-              <>
-                {/* Add Mode: Row 3 (Joining Date, Parent Occupation, Department) */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-1.5">
-                    <label htmlFor="joining_date" className="text-xs font-bold text-text-secondary uppercase">Joining Date <span className="text-red-500">*</span></label>
-                    <Input id="joining_date" 
-                      type="date" 
-                      name="joining_date"
-                      value={newStaff.joining_date} 
-                      onChange={handleTextChange} 
-                      onKeyDown={e => e.preventDefault()}
-                      className="cursor-pointer w-full" 
-                      required 
-                    />
-                    {formErrors.joining_date && <p className="text-[11px] text-red-500 font-semibold">{formErrors.joining_date}</p>}
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label htmlFor="salary" className="text-xs font-bold text-text-secondary uppercase">Salary <span className="text-red-500">*</span></label>
-                    <Input id="salary" 
-                      type="number" 
-                      name="salary" 
-                      value={newStaff.salary} 
-                      onChange={handleTextChange} 
-                      placeholder="e.g. 25000" 
-                      required 
-                    />
-                    {formErrors.salary && <p className="text-[11px] text-red-500 font-semibold">{formErrors.salary}</p>}
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label htmlFor="subject-2" className="text-xs font-bold text-text-secondary uppercase font-display">Subject</label>
-                    <Input id="subject-2" 
-                      placeholder="e.g. English"
-                      value={newStaff.department || ''} 
-                      onChange={e => {
-                        const val = e.target.value;
-                        setNewStaff(p => ({ ...p, department: val }));
-                        if (formErrors.department) setFormErrors(prev => ({ ...prev, department: '' }));
-                      }}
-                      className={formErrors.department ? 'border-red-500 ring-1 ring-red-500' : ''}
-                      required 
-                    />
-                    {formErrors.department && <p className="text-[11px] text-red-500 font-semibold">{formErrors.department}</p>}
-                  </div>
-                </div>
-              </>
-            )}
+              <div className="space-y-1.5">
+                <label htmlFor="subject" className="text-xs font-bold text-text-secondary uppercase font-display">Subject <span className="text-red-500">*</span></label>
+                <Input id="subject" 
+                  placeholder="e.g. English"
+                  value={newStaff.department || ''} 
+                  onChange={e => {
+                    const val = e.target.value;
+                    setNewStaff(p => ({ ...p, department: val }));
+                    if (formErrors.department) setFormErrors(prev => ({ ...prev, department: '' }));
+                  }}
+                  className={formErrors.department ? 'border-red-500 ring-1 ring-red-500' : ''}
+                  required 
+                />
+                {formErrors.department && <p className="text-[11px] text-red-500 font-semibold">{formErrors.department}</p>}
+              </div>
+            </div>
           </div>
 
           {/* Current Address */}
