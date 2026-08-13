@@ -2903,14 +2903,15 @@ class SchoolAdminService extends BaseService
             }
 
             if (!$conflict) {
-                // Check active user in another school or non-student/parent role
+                // Check active user in another school with non-student/parent role
                 $stmtUser = $pdo->prepare("
                     SELECT u.school_id, sch.name AS school_name
                     FROM users u
                     JOIN schools sch ON u.school_id = sch.id
-                    WHERE UPPER(u.status) = 'ACTIVE'
+                    WHERE u.school_id != :current_sid
+                      AND UPPER(u.status) = 'ACTIVE'
+                      AND UPPER(u.role) NOT IN ('STUDENT', 'PARENT')
                       AND LOWER(u.email) = :email
-                      AND NOT (u.school_id = :current_sid AND UPPER(u.role) IN ('STUDENT', 'PARENT'))
                     LIMIT 1
                 ");
                 $stmtUser->execute([':current_sid' => $currentSchoolId, ':email' => $email]);

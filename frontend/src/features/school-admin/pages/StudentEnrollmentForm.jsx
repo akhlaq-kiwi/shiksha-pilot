@@ -901,8 +901,16 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
         }
       }
 
-      if (err.message && (err.message.includes('registered') || err.message.includes('phone') || err.message.includes('contact') || err.message.includes('already') || err.message.includes('Admin'))) {
+      const msgLower = (err.message || '').toLowerCase();
+      const isEmailErr = msgLower.includes('email');
+      const isPhoneErr = msgLower.includes('phone') || msgLower.includes('contact') || msgLower.includes('mobile') || msgLower.includes('number') || msgLower.includes('admin');
+
+      if (isPhoneErr && !isEmailErr) {
         fieldErrors.student_mobile = fieldErrors.student_mobile || fieldErrors.phone || fieldErrors.parent_phone || fieldErrors.father_phone || err.message;
+      }
+
+      if (isEmailErr) {
+        fieldErrors.student_email = fieldErrors.student_email || fieldErrors.email || err.message;
       }
 
       if (fieldErrors.phone || fieldErrors.parent_phone || fieldErrors.father_phone) {
