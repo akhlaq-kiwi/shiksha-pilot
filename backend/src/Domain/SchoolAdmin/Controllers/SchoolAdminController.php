@@ -977,7 +977,7 @@ class SchoolAdminController extends BaseController
 
             // Document Upload endpoint permission mapping
             if (str_contains($uri, '/api/school/upload')) {
-                if (in_array('Classes', $permissions, true) || in_array('Leave Requests', $permissions, true)) {
+                if (in_array('Classes', $permissions, true) || in_array('Leave Requests', $permissions, true) || in_array('Teachers', $permissions, true)) {
                     return;
                 }
                 throw new \App\Shared\Exceptions\ForbiddenException('Access Denied. Upload permission required.');
