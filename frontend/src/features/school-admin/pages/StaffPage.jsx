@@ -639,6 +639,7 @@ export default function StaffPage() {
       emergency_phone: newStaff.emergency_phone.trim(),
       joining_date: newStaff.joining_date,
       exit_date: newStaff.exit_date || null,
+      status: newStaff.exit_date ? 'Inactive' : 'ACTIVE',
       current_address_line: newStaff.current_address_line.trim(),
       current_city: newStaff.current_city,
       current_state: newStaff.current_state,
@@ -1669,7 +1670,14 @@ export default function StaffPage() {
                       type="date" 
                       name="exit_date"
                       value={newStaff.exit_date} 
-                      onChange={handleTextChange} 
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setNewStaff(prev => ({
+                          ...prev,
+                          exit_date: val,
+                          status: val ? 'Inactive' : 'ACTIVE'
+                        }));
+                      }} 
                       onKeyDown={e => e.preventDefault()}
                       className="cursor-pointer w-full text-red-500 font-bold" 
                     />

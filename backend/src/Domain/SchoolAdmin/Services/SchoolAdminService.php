@@ -2528,7 +2528,8 @@ class SchoolAdminService extends BaseService
         }
 
         // 3. Status Mapping
-        $status = !empty($data['exit_date']) ? 'Inactive' : ($data['status'] ?? ($member['status'] ?? 'ACTIVE'));
+        $exitDate = !empty($data['exit_date']) ? trim((string)$data['exit_date']) : null;
+        $status = $exitDate !== null ? 'Inactive' : (!empty($data['status']) ? $data['status'] : 'ACTIVE');
         $existingStatus = strtoupper($member['status'] ?? 'ACTIVE');
         $newStatus = strtoupper($status);
         $isReactivating = ($existingStatus === 'INACTIVE' && $newStatus === 'ACTIVE');
