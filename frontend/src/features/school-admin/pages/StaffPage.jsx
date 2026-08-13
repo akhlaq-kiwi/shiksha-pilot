@@ -1617,8 +1617,8 @@ export default function StaffPage() {
           <div className="space-y-4 border-b border-border pb-4">
             <h3 className="text-sm font-bold text-text-primary tracking-tight font-display">Basic Details</h3>
             
-            {/* Row 1: Full Name, Father Name, Mother Name */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Row 1: Full Name, Father Name, Mother Name, Contact Number */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="space-y-1.5">
                 <label htmlFor="name" className="text-xs font-bold text-text-secondary uppercase">Full Name <span className="text-red-500">*</span></label>
                 <Input id="name" name="name" value={newStaff.name} onChange={handleTextChange} placeholder="e.g. Ms. Anita Sharma" required />
@@ -1636,20 +1636,11 @@ export default function StaffPage() {
                 <Input id="mother_name" name="mother_name" value={newStaff.mother_name} onChange={handleTextChange} placeholder="e.g. Shabana Begum" required />
                 {formErrors.mother_name && <p className="text-[11px] text-red-500 font-semibold">{formErrors.mother_name}</p>}
               </div>
-            </div>
 
-            {/* Row 2: Contact Number, Email */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label htmlFor="phone" className="text-xs font-bold text-text-secondary uppercase">Contact Number <span className="text-red-500">*</span></label>
                 <Input id="phone" name="phone" value={newStaff.phone} onChange={handleTextChange} placeholder="10-digit mobile number" className={formErrors.phone ? 'border-red-500 ring-1 ring-red-500' : ''} required />
                 {formErrors.phone && <p className="text-[11px] text-red-500 font-semibold">{formErrors.phone}</p>}
-              </div>
-
-              <div className="space-y-1.5">
-                <label htmlFor="email" className="text-xs font-bold text-text-secondary uppercase">Email Address <span className="text-red-500">*</span></label>
-                <Input id="email" name="email" type="email" value={newStaff.email} onChange={handleTextChange} placeholder="anita@school.com" required />
-                {formErrors.email && <p className="text-[11px] text-red-500 font-semibold">{formErrors.email}</p>}
               </div>
             </div>
 

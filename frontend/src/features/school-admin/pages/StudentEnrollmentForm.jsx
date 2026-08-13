@@ -1159,11 +1159,6 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                       {errors.student_mobile && <p className="text-[11px] text-red-500 font-semibold">{errors.student_mobile}</p>}
                     </div>
 
-                    <div className="space-y-1.5">
-                      <label htmlFor="student_email" className="text-xs font-bold text-text-secondary uppercase">Student Email</label>
-                      <Input id="student_email" type="email" name="student_email" value={formData.student_email} onChange={handleTextChange} placeholder="student@domain.com" />
-                      {errors.student_email && <p className="text-[11px] text-red-500 font-semibold">{errors.student_email}</p>}
-                    </div>
                     {isFirstYear && (
                       <div className="space-y-1.5">
                         <label htmlFor="sr_no" className="text-xs font-bold text-text-secondary uppercase">SR Number <span className="text-red-500">*</span></label>
@@ -1210,10 +1205,8 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                       />
                       {errors.roll_no && <p className="text-[11px] text-red-500 font-semibold">{errors.roll_no}</p>}
                     </div>
-                  </div>
 
-                  {studentId && (
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+                    {studentId && (
                       <div className="space-y-1.5 animate-in slide-in-from-left-1 duration-150">
                         <label htmlFor="exit_date" className="text-xs font-bold text-text-secondary uppercase">Exit Date</label>
                         <div className="relative">
@@ -1233,9 +1226,10 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                           />
                           <Calendar className="absolute right-3 top-2.5 h-4 w-4 text-text-muted pointer-events-none" />
                         </div>
+                        {errors.exit_date && <p className="text-[11px] text-red-500 font-semibold">{errors.exit_date}</p>}
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
                 </div>
               </div>
