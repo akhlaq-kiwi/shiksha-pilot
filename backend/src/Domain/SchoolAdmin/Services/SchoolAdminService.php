@@ -1334,7 +1334,6 @@ class SchoolAdminService extends BaseService
 
         if (strcasecmp($status, 'ACTIVE') === 0 || strcasecmp($status, 'Active') === 0) {
             $this->checkActiveStudentPhoneConflictInOtherSchools($pdo, $schoolId, [$parentPhone, $fatherPhone, $data['student_mobile'] ?? null]);
-            $this->checkActiveStudentEmailConflictInOtherSchools($pdo, $schoolId, [$data['student_email'] ?? null, $data['email'] ?? null]);
         }
 
         $id = $this->studentRepo->create([
@@ -1630,7 +1629,6 @@ class SchoolAdminService extends BaseService
 
         if ($newStatus === 'ACTIVE') {
             $this->checkActiveStudentPhoneConflictInOtherSchools($pdo, $schoolId, [$parentPhone, $fatherPhone, $data['student_mobile'] ?? null], $isReactivating, $id);
-            $this->checkActiveStudentEmailConflictInOtherSchools($pdo, $schoolId, [$data['student_email'] ?? null, $data['email'] ?? null], $id, $isReactivating);
         } else {
             if (!empty($parentPhone)) {
                 $stmtUsersOff = $pdo->prepare("UPDATE users SET status = 'INACTIVE' WHERE school_id = :sid AND phone = :phone");
@@ -2393,25 +2391,8 @@ class SchoolAdminService extends BaseService
             throw new ValidationException(['phone' => 'This contact number is already registered.']);
         }
 
-        if ($ayid !== null) {
-            $stmtCheckEmail = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND email = :email AND (academic_year_id = :ayid OR academic_year_id IS NULL) LIMIT 1");
-            $stmtCheckEmail->execute([':sid' => $schoolId, ':email' => trim($data['email']), ':ayid' => $ayid]);
-        } else {
-            $stmtCheckEmail = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND email = :email LIMIT 1");
-            $stmtCheckEmail->execute([':sid' => $schoolId, ':email' => trim($data['email'])]);
-        }
-        if ($stmtCheckEmail->fetchColumn() !== false) {
-            throw new ValidationException(['email' => 'This email address already exists.']);
-        }
-
-        // 3. Status Mapping
-        $status = !empty($data['exit_date']) ? 'Inactive' : 'ACTIVE';
-
-        $this->checkTeacherStudentPhoneConflict($pdo, $schoolId, $data['phone'], null, null);
-
         if (strcasecmp($status, 'ACTIVE') === 0) {
             $this->checkActiveStaffPhoneConflictInOtherSchools($pdo, $schoolId, $data['phone']);
-            $this->checkActiveStaffEmailConflictInOtherSchools($pdo, $schoolId, $data['email']);
         }
 
         // 4. Save
@@ -2541,29 +2522,8 @@ class SchoolAdminService extends BaseService
             throw new ValidationException(['phone' => 'This contact number is already registered.']);
         }
 
-        if ($ayid !== null) {
-            $stmtCheckEmail = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND email = :email AND id != :id AND (academic_year_id = :ayid OR academic_year_id IS NULL) LIMIT 1");
-            $stmtCheckEmail->execute([':sid' => $schoolId, ':email' => trim($data['email']), ':id' => $id, ':ayid' => $ayid]);
-        } else {
-            $stmtCheckEmail = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND email = :email AND id != :id LIMIT 1");
-            $stmtCheckEmail->execute([':sid' => $schoolId, ':email' => trim($data['email']), ':id' => $id]);
-        }
-        if ($stmtCheckEmail->fetchColumn() !== false) {
-            throw new ValidationException(['email' => 'This email address already exists.']);
-        }
-
-        // 3. Status Mapping
-        $status = !empty($data['exit_date']) ? 'Inactive' : 'ACTIVE';
-
-        $existingStatus = strtoupper($member['status'] ?? 'ACTIVE');
-        $newStatus = strtoupper($status);
-        $isReactivating = ($existingStatus === 'INACTIVE' && $newStatus === 'ACTIVE');
-
-        $this->checkTeacherStudentPhoneConflict($pdo, $schoolId, $data['phone'], $id, null, $isReactivating);
-
         if ($newStatus === 'ACTIVE') {
             $this->checkActiveStaffPhoneConflictInOtherSchools($pdo, $schoolId, $data['phone'], $id, $isReactivating);
-            $this->checkActiveStaffEmailConflictInOtherSchools($pdo, $schoolId, $data['email'], $id, $isReactivating);
         } else {
             $stmtUsersOff = $pdo->prepare("UPDATE users SET status = 'INACTIVE' WHERE school_id = :sid AND phone = :phone");
             $stmtUsersOff->execute([':sid' => $schoolId, ':phone' => trim($data['phone'])]);
