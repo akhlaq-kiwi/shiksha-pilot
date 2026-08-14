@@ -2349,19 +2349,20 @@ export default function StaffPage() {
           {/* Printable Container in A4 Ratio */}
           <div 
             id="experience-letter-print-area" 
-            className="w-full max-w-[210mm] min-h-[280mm] bg-white p-8 sm:p-12 text-zinc-950 font-serif [font-variant-numeric:lining-nums_tabular-nums] shadow-lg rounded-sm border border-border flex flex-col justify-between select-text mx-auto my-2"
+            style={{ fontVariantNumeric: 'lining-nums tabular-nums' }}
+            className="w-full max-w-[210mm] min-h-[280mm] bg-white p-8 sm:p-12 text-zinc-950 font-serif shadow-lg rounded-sm border border-border flex flex-col justify-between select-text mx-auto my-2"
           >
             {/* Header / School details */}
             <div className="space-y-4">
               <div className="border-b-2 border-zinc-950 pb-4">
-                <div className="relative flex items-center justify-center min-h-[64px]">
-                  {/* School logo positioned 5px from left, aligned parallel with school name */}
-                  <div className="absolute left-[5px] top-0 flex items-center justify-center">
+                <div className="flex flex-col items-center justify-center text-center space-y-2.5">
+                  {/* Top Center Aligned School Logo */}
+                  <div className="flex items-center justify-center">
                     {schoolProfile?.logo_path ? (
                       <img 
                         src={schoolProfile.logo_path} 
                         alt="School Logo" 
-                        className="h-16 w-auto max-w-[110px] object-contain flex-shrink-0" 
+                        className="h-16 w-auto max-w-[120px] object-contain flex-shrink-0" 
                       />
                     ) : (
                       <div className="w-14 h-14 bg-zinc-950 text-white rounded-md flex items-center justify-center font-bold text-2xl font-display flex-shrink-0 shadow-2xs select-none">
@@ -2371,7 +2372,7 @@ export default function StaffPage() {
                   </div>
 
                   {/* Center aligned School Name & Subtitle */}
-                  <div className="text-center px-16">
+                  <div>
                     <h1 className="text-2xl font-bold font-display text-zinc-950 tracking-tight leading-none uppercase">{schoolProfile?.name || 'ABC Public School'}</h1>
                     <p className="text-[11px] font-sans font-bold text-zinc-500 mt-1 uppercase tracking-wider">Official Certificate of Service</p>
                   </div>
@@ -2391,7 +2392,7 @@ export default function StaffPage() {
               {/* Letter Body */}
               <div className="text-sm text-zinc-800 leading-relaxed space-y-6 pt-6 text-justify">
                 <p>
-                  This is to certify that <strong>Mr./Ms. {teacherDetails?.name}</strong>, son/daughter of <strong>Mr. {teacherDetails?.father_name || '—'}</strong>, was employed with <strong>{schoolProfile?.name || 'ABC Public School'}</strong> as a <strong>Teacher</strong> teaching the subject of <strong>{teacherDetails?.department || 'General'}</strong> from <strong>{formatDateFull(effectiveJoiningDate)}</strong> to <strong>{formatDateFull(teacherDetails?.exit_date || (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })())}</strong>.
+                  This is to certify that <strong>Mr./Ms. {teacherDetails?.name}</strong>, son/daughter of <strong>Mr. {teacherDetails?.father_name || '—'}</strong>, was employed with <strong>{schoolProfile?.name || 'ABC Public School'}</strong> as a <strong>Teacher</strong> from <strong>{formatDateFull(effectiveJoiningDate)}</strong> to <strong>{formatDateFull(teacherDetails?.exit_date || (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })())}</strong>.
                 </p>
                 <p>
                   During his/her tenure of service, he/she carried out the assigned responsibilities sincerely, maintained professional conduct, demonstrated dedication toward students, and contributed positively to the academic environment of the school.

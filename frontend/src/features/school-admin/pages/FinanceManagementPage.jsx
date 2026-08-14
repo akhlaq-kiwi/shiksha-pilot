@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { Landmark, Plus, Search, Calendar, Clock, Eye, Edit, Trash2, MoreVertical, X, AlertTriangle, User, ChevronDown, RefreshCw, Percent, Clipboard, CheckCircle, HelpCircle, FileSpreadsheet, FileText, FileDown, AlertCircle, Info } from 'lucide-react';
@@ -28,6 +28,22 @@ const formatDateFull = (dateStr) => {
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return dateStr;
   return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+};
+
+const formatClassColumnText = (assignedTo) => {
+  if (!assignedTo) return 'For All Classes';
+  const clean = String(assignedTo).trim().toLowerCase();
+  if (
+    clean === '' || 
+    clean === '—' || 
+    clean === '-' || 
+    clean === 'for all' || 
+    clean === 'for all classes' || 
+    clean === 'all'
+  ) {
+    return 'For All Classes';
+  }
+  return 'For Selected Classes';
 };
 
 const getLocalDateString = () => {
@@ -91,6 +107,23 @@ export default function FinanceManagementPage() {
   const [isLppRemoveConfirmOpen, setIsLppRemoveConfirmOpen] = useState(false);
 
   const [classes, setClasses] = useState([]);
+
+  // Deduplicate classes by class name so section rows are merged for fee allocations
+  const uniqueClasses = useMemo(() => {
+    const map = new Map();
+    (classes || []).forEach(c => {
+      if (c && c.name) {
+        const name = c.name.trim();
+        if (!map.has(name)) {
+          map.set(name, {
+            name: name,
+            ids: classes.filter(item => item && item.name && item.name.trim() === name).map(item => item.id)
+          });
+        }
+      }
+    });
+    return Array.from(map.values());
+  }, [classes]);
   const [academicYears, setAcademicYears] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [feeTypes, setFeeTypes] = useState([]);
@@ -191,7 +224,11 @@ export default function FinanceManagementPage() {
   const handleAnnualFeeModalOpen = () => {
     setAnnualFeeApplyType('school');
     setAnnualFeeAmount('');
-    setAnnualFeeClassAmountsMap({});
+    const initialMap = {};
+    uniqueClasses.forEach(uc => {
+      initialMap[uc.name] = '';
+    });
+    setAnnualFeeClassAmountsMap(initialMap);
     setAnnualFeeFormErrors({});
     setIsAnnualFeeConfirmOpen(false);
     setIsAnnualFeeModalOpen(true);
@@ -211,9 +248,9 @@ export default function FinanceManagementPage() {
       if (enteredAmounts.length === 0) {
         errors.classes = 'At least one class fee amount must be entered.';
       }
-      Object.entries(annualFeeClassAmountsMap).forEach(([cid, val]) => {
+      Object.entries(annualFeeClassAmountsMap).forEach(([cname, val]) => {
         if (val !== '' && parseFloat(val) < 0) {
-          errors[`class_${cid}`] = 'Amount cannot be negative.';
+          errors[`class_${cname}`] = 'Amount cannot be negative.';
         }
       });
     }
@@ -232,10 +269,22 @@ export default function FinanceManagementPage() {
     setSuccess('');
     setAnnualFeeSubmitting(true);
     try {
+      const classAmountsPayload = {};
+      if (annualFeeApplyType === 'classes') {
+        uniqueClasses.forEach(uc => {
+          const val = annualFeeClassAmountsMap[uc.name];
+          if (val && val.trim() !== '' && parseFloat(val) > 0) {
+            uc.ids.forEach(cid => {
+              classAmountsPayload[cid] = parseFloat(val);
+            });
+          }
+        });
+      }
+
       await schoolService.createAnnualFee({
         apply_type: annualFeeApplyType,
         amount: annualFeeAmount,
-        class_amounts: annualFeeClassAmountsMap
+        class_amounts: classAmountsPayload
       });
       setSuccess('Annual Fee created successfully.');
       setIsAnnualFeeConfirmOpen(false);
@@ -898,10 +947,10 @@ export default function FinanceManagementPage() {
     setFeeDescription('');
     setFeeSchoolAmount('');
     
-    // Auto-populate all classes map to empty string amounts
+    // Auto-populate unique classes map to empty string amounts
     const initialMap = {};
-    classes.forEach(c => {
-      initialMap[c.id] = '';
+    uniqueClasses.forEach(uc => {
+      initialMap[uc.name] = '';
     });
     setClassAmountsMap(initialMap);
 
@@ -919,7 +968,7 @@ export default function FinanceManagementPage() {
     setFeeDescription(ft.name);
     setFeeDueDate(ft.due_date);
     setFeeSchoolAmount(ft.amount);
-    setApplyType(ft.assigned_to === 'For All' ? 'school' : 'classes');
+    setApplyType((ft.assigned_to === 'For All' || ft.assigned_to === 'For All Classes') ? 'school' : 'classes');
     setFeeFormErrors({});
     setIsApplyFeeModalOpen(true);
   };
@@ -984,12 +1033,14 @@ export default function FinanceManagementPage() {
         const activeClassAmounts = {};
         let hasPositive = false;
         let hasInvalid = false;
-        Object.keys(classAmountsMap).forEach(classId => {
-          const val = classAmountsMap[classId];
+        uniqueClasses.forEach(uc => {
+          const val = classAmountsMap[uc.name];
           if (val && val.trim() !== '') {
             const amt = parseFloat(val);
             if (amt > 0) {
-              activeClassAmounts[classId] = amt;
+              uc.ids.forEach(cid => {
+                activeClassAmounts[cid] = amt;
+              });
               hasPositive = true;
             } else {
               hasInvalid = true;
@@ -1007,7 +1058,7 @@ export default function FinanceManagementPage() {
       }
     } else {
       // Editing Mode
-      if (editingFeeType.assigned_to === 'For All') {
+      if (editingFeeType.assigned_to === 'For All' || editingFeeType.assigned_to === 'For All Classes') {
         if (!feeSchoolAmount) {
           errors.amount = 'Fee amount is required.';
         } else if (parseFloat(feeSchoolAmount) <= 0) {
@@ -1407,7 +1458,7 @@ export default function FinanceManagementPage() {
                     {paginatedFees.map((ft) => (
                       <TableRow key={ft.id}>
                         <TableCell className="font-bold text-text-primary text-xs uppercase tracking-wider py-3.5 max-w-[200px] truncate">{ft.name}</TableCell>
-                        <TableCell className="text-xs text-text-secondary font-bold py-3.5 uppercase truncate max-w-[150px]">{ft.assigned_to}</TableCell>
+                        <TableCell className="text-xs text-text-secondary font-bold py-3.5 truncate max-w-[170px]">{formatClassColumnText(ft.assigned_to)}</TableCell>
                         <TableCell className="text-xs text-text-muted font-mono whitespace-nowrap py-3.5">{formatDateFull(ft.due_date)}</TableCell>
                         <TableCell className="text-xs text-text-primary font-bold font-sans py-3.5">{formatCurrency(ft.amount)}</TableCell>
                         <TableCell className="text-right py-3.5 relative whitespace-nowrap">
@@ -1449,7 +1500,7 @@ export default function FinanceManagementPage() {
                                 <Eye className="h-3.5 w-3.5 text-text-muted" /> View Details
                               </button>
                               
-                              {ft.category !== 'System Generated' && !isReadOnly && (
+                              {ft.category !== 'System Generated' && ft.name?.trim().toLowerCase() !== 'annual fee' && !isReadOnly && (
                                 <button 
                                   onClick={() => handleEditFeeTypeClick(ft)}
                                   className="w-full px-3 py-1.5 hover:bg-zinc-50 border-t border-border flex items-center gap-1.5 font-semibold text-zinc-700"
@@ -1458,7 +1509,7 @@ export default function FinanceManagementPage() {
                                 </button>
                               )}
                               
-                              {ft.category !== 'System Generated' && !isReadOnly && (
+                              {ft.category !== 'System Generated' && ft.name?.trim().toLowerCase() !== 'annual fee' && !isReadOnly && (
                                 <button 
                                   onClick={() => handleDeleteFeeTypeClick(ft)}
                                   className="w-full px-3 py-1.5 hover:bg-zinc-50 flex items-center gap-1.5 font-semibold text-red-600"
@@ -1993,15 +2044,15 @@ export default function FinanceManagementPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {classes.map(c => (
-                      <TableRow key={c.id}>
-                        <TableCell className="py-2 font-bold text-xs">{c.name}</TableCell>
+                    {uniqueClasses.map(uc => (
+                      <TableRow key={uc.name}>
+                        <TableCell className="py-2 font-bold text-xs">{uc.name}</TableCell>
                         <TableCell className="py-1">
-                          <Input id="class-dues-allocation" 
+                          <Input id={`class-dues-${uc.name}`} 
                             type="number" 
                             placeholder="Blank if none" 
-                            value={classAmountsMap[c.id] || ''} 
-                            onChange={e => setClassAmountsMap(prev => ({ ...prev, [c.id]: e.target.value }))}
+                            value={classAmountsMap[uc.name] || ''} 
+                            onChange={e => setClassAmountsMap(prev => ({ ...prev, [uc.name]: e.target.value }))}
                             className="h-7 text-xs w-full"
                           />
                         </TableCell>
@@ -2060,7 +2111,7 @@ export default function FinanceManagementPage() {
                 <p className="text-sm font-bold text-text-primary mt-0.5 uppercase">{viewingFeeType.name}</p>
               </div>
               <span className="inline-flex px-3 py-1 bg-zinc-100 text-zinc-950 dark:bg-zinc-800 dark:text-zinc-50 border border-border font-bold text-[11px] uppercase rounded-full tracking-wider">
-                {viewingFeeType.assigned_to}
+                {formatClassColumnText(viewingFeeType.assigned_to)}
               </span>
             </div>
 
@@ -2570,19 +2621,19 @@ export default function FinanceManagementPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {classes.map(cls => (
-                      <TableRow key={cls.id}>
-                        <TableCell className="font-medium">
-                          {cls.name} {cls.section ? `- ${cls.section}` : ''}
+                    {uniqueClasses.map(uc => (
+                      <TableRow key={uc.name}>
+                        <TableCell className="font-medium text-xs">
+                          {uc.name}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Input id="class-wise-fee-allocation"
+                          <Input id={`annual-fee-class-${uc.name}`}
                             type="number"
                             placeholder="0"
-                            value={annualFeeClassAmountsMap[cls.id] || ''}
+                            value={annualFeeClassAmountsMap[uc.name] || ''}
                             onChange={e => setAnnualFeeClassAmountsMap({
                               ...annualFeeClassAmountsMap,
-                              [cls.id]: e.target.value
+                              [uc.name]: e.target.value
                             })}
                             min="0"
                             step="any"
@@ -2603,8 +2654,8 @@ export default function FinanceManagementPage() {
       <Dialog
         isOpen={isAnnualFeeConfirmOpen}
         onClose={() => setIsAnnualFeeConfirmOpen(false)}
-        title="Create Annual Fee"
-        description="Please confirm annual fee creation for eligible students."
+        title="Confirm Annual Fee Application"
+        description="Please review the confirmation notice before applying Annual Fee."
         footer={
           <div className="flex justify-end gap-2.5">
             <Button variant="outline" onClick={() => setIsAnnualFeeConfirmOpen(false)}>
@@ -2614,15 +2665,23 @@ export default function FinanceManagementPage() {
               onClick={handleSaveAnnualFee} 
               disabled={annualFeeSubmitting}
             >
-              {annualFeeSubmitting ? 'Creating...' : 'Create Fee'}
+              {annualFeeSubmitting ? 'Applying...' : 'Confirm & Apply'}
             </Button>
           </div>
         }
       >
-        <div className="space-y-3 text-xs leading-relaxed text-text-secondary">
-          <p>This annual fee will be applied only to eligible students.</p>
-          <p>Students admitted during the current academic session will automatically be excluded.</p>
-          <p className="font-bold text-text-primary">Do you want to continue?</p>
+        <div className="space-y-3.5 text-xs leading-relaxed text-text-secondary">
+          <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 text-amber-900 dark:text-amber-200 rounded-xl space-y-1.5">
+            <div className="flex items-center gap-2 font-bold text-amber-800 dark:text-amber-300">
+              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
+              <span className="uppercase tracking-wider text-[11px]">Notice</span>
+            </div>
+            <p className="text-xs leading-relaxed font-medium">
+              Once added for this academic year, Annual Fee cannot be edited or deleted.
+            </p>
+          </div>
+          <p>Annual Fee will be applied only to eligible existing students. New admissions in the current academic session will automatically be excluded.</p>
+          <p className="font-bold text-text-primary">Are you sure you want to proceed?</p>
         </div>
       </Dialog>
 
