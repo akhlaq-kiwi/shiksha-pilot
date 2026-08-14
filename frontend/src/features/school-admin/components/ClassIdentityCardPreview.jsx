@@ -59,6 +59,49 @@ export default function ClassIdentityCardPreview({
   const schoolLogo = schoolProfile?.logo_path || null;
   const academicYearName = currentYear?.name || '2027–2028';
 
+  const chunkArray = (arr, size) => {
+    const chunks = [];
+    for (let i = 0; i < arr.length; i += size) {
+      chunks.push(arr.slice(i, i + size));
+    }
+    return chunks;
+  };
+
+  const studentChunks = chunkArray(sortedStudents, 6);
+
+  // Handle Single Multi-page PDF Export for Class ID Cards
+  const handleDownloadPDF = async (e) => {
+    if (e) e.preventDefault();
+    const container = printContainerRef.current;
+    if (!container || sortedStudents.length === 0) return;
+
+    setDownloading(true);
+    try {
+      const opt = {
+        margin: [4, 4, 4, 4],
+        filename: `${(classNameProp || 'Class').replace(/[^a-zA-Z0-9_-]/g, '_')}_Identity_Cards.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { 
+          scale: 3, 
+          useCORS: true, 
+          logging: false,
+          letterRendering: false,
+          scrollY: 0,
+          scrollX: 0
+        },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['css', 'legacy'] }
+      };
+
+      await html2pdf().set(opt).from(container).save();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to generate PDF document.');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   // Extract all active document stylesheets for isolated print iframe
   const getDocumentStylesHtml = () => {
     let stylesHtml = '';
