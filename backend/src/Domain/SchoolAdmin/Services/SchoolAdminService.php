@@ -1654,6 +1654,7 @@ class SchoolAdminService extends BaseService
             'gender' => $data['gender'],
             'blood_group' => $data['blood_group'] ?? null,
             'category' => $data['category'] ?? null,
+            'student_category' => array_key_exists('student_category', $data) ? (!empty($data['student_category']) ? trim((string)$data['student_category']) : null) : ($student['student_category'] ?? null),
             'religion' => $data['religion'] ?? null,
             'aadhaar_no' => $data['aadhaar_no'] ?? null,
             'student_mobile' => $data['student_mobile'] ?? null,
@@ -10273,10 +10274,27 @@ Only approve the settlement after reviewing all financial records.
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
         $workingYearId = $workingYear ? (int)$workingYear['id'] : null;
 
+        $stmtActiveClasses = $pdo->prepare("
+            SELECT COUNT(DISTINCT class_id) 
+            FROM students 
+            WHERE school_id = :sid AND status = 'ACTIVE'
+              " . ($workingYearId !== null ? "AND academic_year_id = :ayid" : "") . "
+        ");
+        $stmtActiveClassesParams = [':sid' => $schoolId];
+        if ($workingYearId !== null) {
+            $stmtActiveClassesParams[':ayid'] = $workingYearId;
+        }
+        $stmtActiveClasses->execute($stmtActiveClassesParams);
+        $activeClassesCount = (int)$stmtActiveClasses->fetchColumn();
+        if ($activeClassesCount <= 0) {
+            $activeClassesCount = $totalClassesCount;
+        }
+
         if ($workingYearId !== null) {
             $stmt = $pdo->prepare("
                 SELECT MIN(aft.id) as id, aft.name, MAX(aft.amount) as amount, aft.due_date, aft.academic_year_id,
                        MAX(aft.category) as category,
+                       COUNT(DISTINCT aft.id) as type_count,
                        COUNT(afp.id) as total_students,
                        SUM(CASE WHEN afp.status = 'Paid' THEN 1 ELSE 0 END) as collected_students,
                        SUM(CASE WHEN afp.status = 'Pending' THEN 1 ELSE 0 END) as pending_students,
@@ -10295,6 +10313,7 @@ Only approve the settlement after reviewing all financial records.
             $stmt = $pdo->prepare("
                 SELECT MIN(aft.id) as id, aft.name, MAX(aft.amount) as amount, aft.due_date, aft.academic_year_id,
                        MAX(aft.category) as category,
+                       COUNT(DISTINCT aft.id) as type_count,
                        COUNT(afp.id) as total_students,
                        SUM(CASE WHEN afp.status = 'Paid' THEN 1 ELSE 0 END) as collected_students,
                        SUM(CASE WHEN afp.status = 'Pending' THEN 1 ELSE 0 END) as pending_students,
@@ -10319,10 +10338,13 @@ Only approve the settlement after reviewing all financial records.
             JOIN additional_fee_payments afp ON afp.fee_type_id = aft.id
             JOIN students s ON s.id = afp.student_id
             JOIN classes c ON c.id = s.class_id
-            WHERE aft.name = :name AND aft.due_date = :due_date AND aft.academic_year_id = :ayid AND aft.school_id = :school_id
+            WHERE aft.name = :name 
+              AND ((aft.due_date = :due_date) OR (aft.due_date IS NULL AND :due_date_null IS NULL))
+              AND aft.academic_year_id = :ayid 
+              AND aft.school_id = :school_id
         ");
 
-        return array_map(function($t) use ($stmtClassAmounts, $totalClassesCount, $schoolId) {
+        return array_map(function($t) use ($stmtClassAmounts, $activeClassesCount, $schoolId) {
             $t['id'] = (int)$t['id'];
             $t['amount'] = (float)$t['amount'];
             $t['academic_year_id'] = (int)$t['academic_year_id'];
@@ -10338,6 +10360,7 @@ Only approve the settlement after reviewing all financial records.
             $stmtClassAmounts->execute([
                 ':name' => $t['name'],
                 ':due_date' => $t['due_date'],
+                ':due_date_null' => $t['due_date'],
                 ':ayid' => $t['academic_year_id'],
                 ':school_id' => $schoolId
             ]);
@@ -10349,14 +10372,18 @@ Only approve the settlement after reviewing all financial records.
             $t['class_amounts'] = $classAmounts;
 
             $classNames = array_column($classAmounts, 'class_name');
+            $typeCount = (int)($t['type_count'] ?? 1);
+            $classCount = count($classNames);
 
-            // Determine if assigned to Entire School or class names
-            if (empty($classNames)) {
-                $t['assigned_to'] = '—';
-            } elseif (count($classNames) >= $totalClassesCount || count($classNames) > 5) {
-                $t['assigned_to'] = 'For All';
+            // Determine if assigned to Entire School or Selected Classes
+            if ($typeCount > 1) {
+                $t['assigned_to'] = 'For Selected Classes';
+            } elseif ($activeClassesCount > 0 && $classCount >= $activeClassesCount) {
+                $t['assigned_to'] = 'For All Classes';
+            } elseif ($classCount === 0) {
+                $t['assigned_to'] = 'For All Classes';
             } else {
-                $t['assigned_to'] = implode(', ', $classNames);
+                $t['assigned_to'] = 'For Selected Classes';
             }
 
             return $t;
@@ -10566,36 +10593,17 @@ Only approve the settlement after reviewing all financial records.
             }
 
             // Query active students in current academic year
-            // ELIGIBILITY RULE: Annual Fee applies only to Existing Students (or auto-tracked prior session enrollments). New Admissions are excluded.
+            // ELIGIBILITY RULE: Annual Fee applies to active students in session (excluding explicit New Admissions).
             $stmtStudents = $pdo->prepare("
                 SELECT id, class_id FROM students 
                 WHERE school_id = :sid 
                   AND status = 'ACTIVE' 
                   AND academic_year_id = :ayid
-                  AND (
-                    student_category = 'Existing Student'
-                    OR (
-                      (student_category IS NULL OR student_category = '')
-                      AND (
-                        admission_date IS NULL 
-                        OR admission_date < :start_date 
-                        OR EXISTS (
-                          SELECT 1 FROM students prev 
-                          WHERE prev.school_id = :prev_sid 
-                            AND prev.academic_year_id < :prev_ayid 
-                            AND (prev.sr_no = students.sr_no OR (prev.student_email IS NOT NULL AND prev.student_email = students.student_email))
-                        )
-                      )
-                    )
-                  )
-                  AND (student_category IS NULL OR student_category != 'New Admission')
+                  AND (student_category IS NULL OR student_category = '' OR UPPER(student_category) != 'NEW ADMISSION')
             ");
             $stmtStudents->execute([
                 ':sid' => $schoolId,
-                ':prev_sid' => $schoolId,
-                ':ayid' => $academicYearId,
-                ':prev_ayid' => $academicYearId,
-                ':start_date' => $sessionStartDate
+                ':ayid' => $academicYearId
             ]);
             $studentRows = $stmtStudents->fetchAll(PDO::FETCH_ASSOC);
 
@@ -10628,31 +10636,12 @@ Only approve the settlement after reviewing all financial records.
                       AND class_id = :cid 
                       AND status = 'ACTIVE' 
                       AND academic_year_id = :ayid
-                      AND (
-                        student_category = 'Existing Student'
-                        OR (
-                          (student_category IS NULL OR student_category = '')
-                          AND (
-                            admission_date IS NULL 
-                            OR admission_date < :start_date 
-                            OR EXISTS (
-                              SELECT 1 FROM students prev 
-                              WHERE prev.school_id = :prev_sid 
-                                AND prev.academic_year_id < :prev_ayid 
-                                AND (prev.sr_no = students.sr_no OR (prev.student_email IS NOT NULL AND prev.student_email = students.student_email))
-                            )
-                          )
-                        )
-                      )
-                      AND (student_category IS NULL OR student_category != 'New Admission')
+                      AND (student_category IS NULL OR student_category = '' OR UPPER(student_category) != 'NEW ADMISSION')
                 ");
                 $stmtStudents->execute([
                     ':sid' => $schoolId,
-                    ':prev_sid' => $schoolId,
                     ':cid' => (int)$classId,
-                    ':ayid' => $academicYearId,
-                    ':prev_ayid' => $academicYearId,
-                    ':start_date' => $sessionStartDate
+                    ':ayid' => $academicYearId
                 ]);
                 $studentRows = $stmtStudents->fetchAll(PDO::FETCH_ASSOC);
 
@@ -10667,7 +10656,7 @@ Only approve the settlement after reviewing all financial records.
         }
 
         if (empty($studentsToApply)) {
-            throw new ValidationException(['students' => 'No eligible students found. Annual Fee is only applicable to Existing Students. All currently enrolled students are marked as New Admission.']);
+            throw new ValidationException(['students' => 'No active students found to apply Annual Fee.']);
         }
 
         // Duplicate Check Rule: check if Annual Fee is already applied in current academic year for any target student
@@ -10685,7 +10674,7 @@ Only approve the settlement after reviewing all financial records.
                 ':ayid' => $academicYearId
             ]);
             if ((int)$stmtDup->fetchColumn() > 0) {
-                throw new ValidationException(['duplicate' => 'Annual fee has already been applied to eligible students in the current session.']);
+                throw new ValidationException(['duplicate' => 'Annual Fees is already added it can not be add again']);
             }
         }
 
@@ -11088,18 +11077,21 @@ Only approve the settlement after reviewing all financial records.
         // Find all matching fee types with same name, due_date, and academic_year_id
         $stmtMatches = $pdo->prepare("
             SELECT id FROM additional_fee_types 
-            WHERE school_id = :sid AND name = :name AND due_date = :due_date AND academic_year_id = :ayid
+            WHERE school_id = :sid AND name = :name 
+              AND ((due_date = :due_date) OR (due_date IS NULL AND :due_date_null IS NULL)) 
+              AND academic_year_id = :ayid
         ");
         $stmtMatches->execute([
             ':sid' => $schoolId,
             ':name' => $ref['name'],
             ':due_date' => $ref['due_date'],
+            ':due_date_null' => $ref['due_date'],
             ':ayid' => $ref['academic_year_id']
         ]);
         $typeIds = $stmtMatches->fetchAll(PDO::FETCH_COLUMN);
 
         if (empty($typeIds)) {
-            return ['success' => true];
+            $typeIds = [(int)$id];
         }
 
         // Check if any payment is already collected
@@ -11110,7 +11102,7 @@ Only approve the settlement after reviewing all financial records.
         ");
         $stmtCheck->execute($typeIds);
         if ((int)$stmtCheck->fetchColumn() > 0) {
-            throw new ValidationException(['payments' => 'Cannot delete this additional fee because some students have already paid.']);
+            throw new ValidationException(['payments' => 'Cannot delete this fee because some students have already paid.']);
         }
 
         // Delete payments and types
