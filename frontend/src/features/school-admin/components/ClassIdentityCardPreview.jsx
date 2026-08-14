@@ -198,6 +198,39 @@ export default function ClassIdentityCardPreview({
 
   const studentChunks = chunkArray(sortedStudents, 6);
 
+  // Handle Single Multi-page PDF Export for Class ID Cards
+  const handleDownloadPDF = async (e) => {
+    if (e) e.preventDefault();
+    const container = printContainerRef.current;
+    if (!container || sortedStudents.length === 0) return;
+
+    setDownloading(true);
+    try {
+      const opt = {
+        margin: [4, 4, 4, 4],
+        filename: `${(classNameProp || 'Class').replace(/[^a-zA-Z0-9_-]/g, '_')}_Identity_Cards.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { 
+          scale: 3, 
+          useCORS: true, 
+          logging: false,
+          letterRendering: false,
+          scrollY: 0,
+          scrollX: 0
+        },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['css', 'legacy'] }
+      };
+
+      await html2pdf().set(opt).from(container).save();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to generate PDF document.');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   // Handle High-Resolution Image Export (PNG ZIP)
   const handleDownloadZip = async (e) => {
     if (e) e.preventDefault();
@@ -417,16 +450,26 @@ export default function ClassIdentityCardPreview({
           </div>
         </div>
 
-        {/* Action Buttons: Download PDF | Upload Signature | Print */}
+        {/* Action Buttons: Download PDF | Download Images (ZIP) | Upload Signature | Print */}
         <div className="flex items-center gap-3 self-end sm:self-center">
           <Button
             variant="outline"
-            onClick={handleDownloadZip}
+            onClick={handleDownloadPDF}
             disabled={downloading || sortedStudents.length === 0}
             className="font-bold text-xs gap-2 border-border hover:bg-zinc-50"
           >
             <Download className="h-4 w-4 text-emerald-600" />
-            {downloading ? 'Generating Cards...' : 'Download Identity Cards'}
+            {downloading ? 'Generating PDF...' : 'Download PDF'}
+          </Button>
+
+          <Button
+            variant="outline"
+            onClick={handleDownloadZip}
+            disabled={downloading || sortedStudents.length === 0}
+            className="font-bold text-xs gap-2 border-border hover:bg-zinc-50 text-text-secondary"
+          >
+            <Download className="h-4 w-4 text-blue-600" />
+            {downloading ? 'Generating Images...' : 'Download Images (ZIP)'}
           </Button>
 
           {/* Upload Signature button positioned directly next to Download PDF */}
@@ -487,11 +530,24 @@ export default function ClassIdentityCardPreview({
                   {chunk.map((s, idx) => {
                     const studentRoll = s.roll_no || s.roll || '-';
                     const studentAdmNo = s.sr_no || s.admission_no || `SR-${s.id}`;
-                    const sec = s.section && String(s.section).trim() !== '' ? String(s.section).trim() : null;
-                    const baseClassName = s.class_name || classNameProp;
-                    const classSecDisplay = sec && !baseClassName.includes(' - ' + sec) && !baseClassName.includes(' (' + sec + ')')
-                      ? `${baseClassName} (${sec})`
-                      : baseClassName;
+                    let sec = s.section && String(s.section).trim() !== '' ? String(s.section).trim() : null;
+                    let rawClassName = (s.class_name || classNameProp || '').trim();
+
+                    if (rawClassName.includes(' (')) {
+                      const parts = rawClassName.split(' (');
+                      rawClassName = parts[0].trim();
+                      if (!sec) {
+                        sec = parts[1].replace(')', '').trim();
+                      }
+                    } else if (rawClassName.includes(' - ')) {
+                      const parts = rawClassName.split(' - ');
+                      rawClassName = parts[0].trim();
+                      if (!sec) {
+                        sec = parts[1].trim();
+                      }
+                    }
+
+                    const classSecDisplay = sec ? `${rawClassName}/${sec}` : rawClassName;
 
                     return (
                       <div
@@ -537,74 +593,50 @@ export default function ClassIdentityCardPreview({
                   </div>
 
                   {/* Card Content Body */}
-                  <div className="p-3.5 bg-zinc-50/80 flex flex-col justify-between flex-1 gap-2">
-                    <div className="flex items-start gap-3.5">
+                  <div className="p-3.5 bg-[#f8f9fa] flex flex-col justify-between flex-1 gap-2" style={{ overflow: 'visible' }}>
+                    <div className="flex items-start gap-3.5" style={{ overflow: 'visible' }}>
                       {/* Left: Student Photo */}
-                      <div className="id-card-photo w-24 h-28 shrink-0 rounded-xl overflow-hidden border-2 border-zinc-300 bg-white shadow-2xs" style={{ width: '96px', height: '112px', flexShrink: 0 }}>
+                      <div className="id-card-photo w-24 h-28 shrink-0 rounded-xl overflow-hidden border-2 border-[#d4d4d8] bg-white shadow-2xs" style={{ width: '96px', height: '112px', flexShrink: 0 }}>
                         <IdCardAvatar src={s.photo_path} name={s.name} updatedAt={s.updated_at} />
                       </div>
 
                       {/* Right: Details Grid */}
-                      <div className="flex-1 min-w-0 space-y-1.5 text-left">
+                      <div className="flex-1 min-w-0 flex flex-col justify-between text-left gap-1" style={{ overflow: 'visible' }}>
                         {/* 1. Student Name */}
-                        <div>
-                          <span
-                            className="text-[7.5px] font-bold text-zinc-400 uppercase tracking-wider block"
-                            style={{ lineHeight: '1.3' }}
-                          >
+                        <div className="border-b border-[#e4e4e7] pb-1 flex flex-col" style={{ overflow: 'visible' }}>
+                          <span className="text-[7.5px] font-bold text-zinc-500 uppercase block" style={{ lineHeight: '1.4', overflow: 'visible', margin: 0, padding: 0 }}>
                             Student Name
                           </span>
-                          <h3
-                            className="text-xs font-bold text-zinc-900 uppercase font-display leading-snug truncate"
-                            style={{ lineHeight: '1.25' }}
-                          >
+                          <span className="text-xs font-bold text-zinc-950 uppercase block" style={{ lineHeight: '1.4', overflow: 'visible', whiteSpace: 'nowrap', margin: 0, padding: 0 }}>
                             {s.name || '—'}
-                          </h3>
+                          </span>
                         </div>
 
                         {/* 2. Father Name */}
-                        <div className="pt-1 border-t border-zinc-200/80">
-                          <span
-                            className="text-[7.5px] font-bold text-zinc-400 uppercase tracking-wider block"
-                            style={{ lineHeight: '1.3' }}
-                          >
+                        <div className="border-b border-[#e4e4e7] pb-1 flex flex-col" style={{ overflow: 'visible' }}>
+                          <span className="text-[7.5px] font-bold text-zinc-500 uppercase block" style={{ lineHeight: '1.4', overflow: 'visible', margin: 0, padding: 0 }}>
                             Father Name
                           </span>
-                          <span
-                            className="text-xs font-bold text-zinc-900 uppercase font-display block truncate"
-                            style={{ lineHeight: '1.25' }}
-                          >
+                          <span className="text-xs font-bold text-zinc-950 uppercase block" style={{ lineHeight: '1.4', overflow: 'visible', whiteSpace: 'nowrap', margin: 0, padding: 0 }}>
                             {s.father_name || s.fatherName || s.parent_name || '—'}
                           </span>
                         </div>
 
                         {/* 3. Class/Sec & 4. Mobile */}
-                        <div className="grid grid-cols-2 gap-x-2 gap-y-1 pt-1 border-t border-zinc-200/80">
-                          <div>
-                            <span
-                              className="text-[7.5px] font-bold text-zinc-400 uppercase tracking-wider block"
-                              style={{ lineHeight: '1.3' }}
-                            >
+                        <div className="flex items-start justify-between gap-2" style={{ overflow: 'visible' }}>
+                          <div className="min-w-0 flex-1 flex flex-col" style={{ overflow: 'visible' }}>
+                            <span className="text-[7.5px] font-bold text-zinc-500 uppercase block" style={{ lineHeight: '1.4', overflow: 'visible', margin: 0, padding: 0 }}>
                               Class/Sec
                             </span>
-                            <span
-                              className="text-xs font-bold text-zinc-900 uppercase block truncate"
-                              style={{ lineHeight: '1.25' }}
-                            >
+                            <span className="text-xs font-bold text-zinc-950 uppercase block" style={{ lineHeight: '1.4', overflow: 'visible', whiteSpace: 'nowrap', margin: 0, padding: 0 }}>
                               {classSecDisplay}
                             </span>
                           </div>
-                          <div>
-                            <span
-                              className="text-[7.5px] font-bold text-zinc-400 uppercase tracking-wider block"
-                              style={{ lineHeight: '1.3' }}
-                            >
+                          <div className="shrink-0 text-left flex flex-col" style={{ overflow: 'visible' }}>
+                            <span className="text-[7.5px] font-bold text-zinc-500 uppercase block" style={{ lineHeight: '1.4', overflow: 'visible', margin: 0, padding: 0 }}>
                               Mobile
                             </span>
-                            <span
-                              className="text-[13.5px] font-bold text-zinc-900 font-mono block truncate"
-                              style={{ lineHeight: '1.25' }}
-                            >
+                            <span className="text-[12.5px] font-bold text-zinc-950 font-mono block" style={{ lineHeight: '1.4', overflow: 'visible', whiteSpace: 'nowrap', margin: 0, padding: 0 }}>
                               {s.father_phone || s.parent_phone || s.student_mobile || s.guardian_phone || s.mobile || s.phone || '—'}
                             </span>
                           </div>
@@ -612,35 +644,17 @@ export default function ClassIdentityCardPreview({
                       </div>
                     </div>
 
-                    {/* 5. Add (Address + City at bottom separately) */}
+                    {/* 5. Address (Only Address shown, city is excluded) */}
                     {(() => {
                       const rawAddr = (s.current_address_line || s.address || s.permanent_address_line || s.current_address || '').trim();
-                      const rawCity = (s.current_city || s.city || s.permanent_city || '').trim();
-                      let formattedAddress = '—';
-                      if (rawAddr && rawCity) {
-                        if (rawAddr.toLowerCase().endsWith(rawCity.toLowerCase())) {
-                          formattedAddress = rawAddr;
-                        } else {
-                          formattedAddress = `${rawAddr}, ${rawCity}`;
-                        }
-                      } else if (rawAddr) {
-                        formattedAddress = rawAddr;
-                      } else if (rawCity) {
-                        formattedAddress = rawCity;
-                      }
+                      const formattedAddress = rawAddr || '—';
 
                       return (
-                        <div className="pt-1.5 border-t border-zinc-200/80 text-left">
-                          <span
-                            className="text-[7.5px] font-bold text-zinc-400 uppercase tracking-wider block"
-                            style={{ lineHeight: '1.3' }}
-                          >
+                        <div className="pt-1.5 border-t border-[#e4e4e7] text-left flex flex-col" style={{ overflow: 'visible' }}>
+                          <span className="text-[7.5px] font-bold text-zinc-500 uppercase block" style={{ lineHeight: '1.4', overflow: 'visible', margin: 0, padding: 0 }}>
                             Address
                           </span>
-                          <p
-                            className="text-xs font-bold text-zinc-900 leading-snug line-clamp-2 break-words"
-                            style={{ lineHeight: '1.25' }}
-                          >
+                          <p className="text-xs font-bold text-zinc-950 line-clamp-2 break-words" style={{ lineHeight: '1.4', overflow: 'visible', margin: 0, padding: 0 }}>
                             {formattedAddress}
                           </p>
                         </div>

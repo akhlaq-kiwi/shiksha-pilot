@@ -1164,6 +1164,12 @@ class SchoolAdminService extends BaseService
         if (!empty($data['aadhaar_no']) && !preg_match('/^[0-9]{12}$/', $data['aadhaar_no'])) {
             $errors['aadhaar_no'] = 'Aadhaar number must contain exactly 12 numeric digits.';
         }
+        if (!empty($data['current_address_line']) && mb_strlen(trim((string)$data['current_address_line'])) > 50) {
+            $errors['current_address_line'] = 'Address cannot exceed 50 characters.';
+        }
+        if (!empty($data['permanent_address_line']) && mb_strlen(trim((string)$data['permanent_address_line'])) > 50) {
+            $errors['permanent_address_line'] = 'Address cannot exceed 50 characters.';
+        }
 
         if (!empty($errors)) {
             throw new ValidationException($errors, 'Validation failed.');
@@ -1496,6 +1502,12 @@ class SchoolAdminService extends BaseService
         }
         if (!empty($data['aadhaar_no']) && !preg_match('/^[0-9]{12}$/', $data['aadhaar_no'])) {
             $errors['aadhaar_no'] = 'Aadhaar number must contain exactly 12 numeric digits.';
+        }
+        if (!empty($data['current_address_line']) && mb_strlen(trim((string)$data['current_address_line'])) > 50) {
+            $errors['current_address_line'] = 'Address cannot exceed 50 characters.';
+        }
+        if (!empty($data['permanent_address_line']) && mb_strlen(trim((string)$data['permanent_address_line'])) > 50) {
+            $errors['permanent_address_line'] = 'Address cannot exceed 50 characters.';
         }
 
         // Check/get active academic year
@@ -2376,6 +2388,12 @@ class SchoolAdminService extends BaseService
                 throw new ValidationException(['exit_date' => 'Exit date cannot be earlier than joining date.']);
             }
         }
+        if (!empty($data['current_address_line']) && mb_strlen(trim((string)$data['current_address_line'])) > 50) {
+            throw new ValidationException(['current_address_line' => 'Address cannot exceed 50 characters.']);
+        }
+        if (!empty($data['permanent_address_line']) && mb_strlen(trim((string)$data['permanent_address_line'])) > 50) {
+            throw new ValidationException(['permanent_address_line' => 'Address cannot exceed 50 characters.']);
+        }
 
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
         $ayid = $workingYear ? (int)$workingYear['id'] : null;
@@ -2512,6 +2530,12 @@ class SchoolAdminService extends BaseService
             if (strtotime($data['exit_date']) < strtotime($data['joining_date'])) {
                 throw new ValidationException(['exit_date' => 'Exit date cannot be earlier than joining date.']);
             }
+        }
+        if (!empty($data['current_address_line']) && mb_strlen(trim((string)$data['current_address_line'])) > 50) {
+            throw new ValidationException(['current_address_line' => 'Address cannot exceed 50 characters.']);
+        }
+        if (!empty($data['permanent_address_line']) && mb_strlen(trim((string)$data['permanent_address_line'])) > 50) {
+            throw new ValidationException(['permanent_address_line' => 'Address cannot exceed 50 characters.']);
         }
 
         $ayid = $member ? $member['academic_year_id'] : null;

@@ -565,6 +565,8 @@ export default function StaffPage() {
     // Address
     if (!newStaff.current_address_line || newStaff.current_address_line.trim() === '') {
       errors.current_address_line = "Current address is required.";
+    } else if (newStaff.current_address_line.trim().length > 50) {
+      errors.current_address_line = "Address cannot exceed 50 characters.";
     }
     if (!newStaff.current_state) {
       errors.current_state = "Current state is required.";
@@ -579,6 +581,8 @@ export default function StaffPage() {
     if (newStaff.same_as_current === 0) {
       if (!newStaff.permanent_address_line || newStaff.permanent_address_line.trim() === '') {
         errors.permanent_address_line = "Permanent address is required.";
+      } else if (newStaff.permanent_address_line.trim().length > 50) {
+        errors.permanent_address_line = "Address cannot exceed 50 characters.";
       }
       if (!newStaff.permanent_state) {
         errors.permanent_state = "Permanent state is required.";
@@ -1709,7 +1713,7 @@ export default function StaffPage() {
             <div className="space-y-4">
               <div className="space-y-1.5 w-full p-px">
                 <label htmlFor="current_address_line" className="text-xs font-bold text-text-secondary uppercase">Address Line <span className="text-red-500">*</span></label>
-                <Input id="current_address_line" name="current_address_line" value={newStaff.current_address_line} onChange={handleTextChange} placeholder="House no, street, locality..." required />
+                <Input id="current_address_line" name="current_address_line" value={newStaff.current_address_line} onChange={handleTextChange} placeholder="Max 50 characters allowed" maxLength={50} required />
                 {formErrors.current_address_line && <p className="text-[11px] text-red-500 font-semibold">{formErrors.current_address_line}</p>}
               </div>
 
@@ -1762,7 +1766,7 @@ export default function StaffPage() {
                   <h4 className="text-[11px] font-bold text-text-secondary uppercase tracking-tight">Permanent Address</h4>
                   <div className="space-y-1.5 w-full p-px">
                     <label htmlFor="permanent_address_line" className="text-xs font-bold text-text-secondary uppercase">Address Line <span className="text-red-500">*</span></label>
-                    <Input id="permanent_address_line" name="permanent_address_line" value={newStaff.permanent_address_line} onChange={handleTextChange} placeholder="House no, street, locality..." required />
+                    <Input id="permanent_address_line" name="permanent_address_line" value={newStaff.permanent_address_line} onChange={handleTextChange} placeholder="Max 50 characters allowed" maxLength={50} required />
                     {formErrors.permanent_address_line && <p className="text-[11px] text-red-500 font-semibold">{formErrors.permanent_address_line}</p>}
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
