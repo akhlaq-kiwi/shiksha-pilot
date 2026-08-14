@@ -1,11 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Download, Printer, User, PenTool } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { ArrowLeft, Download, Printer, User } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card } from '../../../common/ui/card';
-import { schoolService } from '../../../common/services/schoolService';
 import html2pdf from 'html2pdf.js';
-import JSZip from 'jszip';
-import html2canvas from 'html2canvas';
 
 // Self-healing Student Avatar with gender/initials fallback for ID Cards
 const IdCardAvatar = ({ src, name, updatedAt }) => {
@@ -46,15 +43,7 @@ export default function ClassIdentityCardPreview({
 }) {
   const [downloading, setDownloading] = useState(false);
   const [logoError, setLogoError] = useState(false);
-  const [signatureError, setSignatureError] = useState(false);
-  const [activeSignature, setActiveSignature] = useState(schoolProfile?.principal_signature_path || null);
-  const [uploadingSig, setUploadingSig] = useState(false);
   const printContainerRef = useRef(null);
-
-  useEffect(() => {
-    setActiveSignature(schoolProfile?.principal_signature_path || null);
-    setSignatureError(false);
-  }, [schoolProfile?.principal_signature_path]);
 
   // Sort students ascending by Roll Number (numerically parsed)
   const sortedStudents = [...students].sort((a, b) => {
@@ -69,240 +58,6 @@ export default function ClassIdentityCardPreview({
   const schoolName = schoolProfile?.name || 'SHIKSHA PILOT SCHOOL';
   const schoolLogo = schoolProfile?.logo_path || null;
   const academicYearName = currentYear?.name || '2027–2028';
-
-  // Smart Adaptive Ink Signature Extraction & Auto-Crop
-  const handleSignatureUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const ext = file.name.split('.').pop().toLowerCase();
-    if (!['png', 'jpg', 'jpeg'].includes(ext)) {
-      alert('Only PNG, JPG, and JPEG files are accepted.');
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      alert('File size must be less than 5MB.');
-      return;
-    }
-
-    setUploadingSig(true);
-    setSignatureError(false);
-    try {
-      const processedFile = await new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const img = new Image();
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = img.width;
-            canvas.height = img.height;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0);
-
-            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const data = imgData.data;
-            const len = data.length;
-
-            let sumLum = 0;
-            let maxLum = 0;
-            const luminances = new Float32Array(len / 4);
-
-            for (let i = 0; i < len; i += 4) {
-              const r = data[i], g = data[i + 1], b = data[i + 2];
-              const lum = r * 0.299 + g * 0.587 + b * 0.114;
-              luminances[i / 4] = lum;
-              sumLum += lum;
-              if (lum > maxLum) maxLum = lum;
-            }
-
-            const avgLum = sumLum / (len / 4);
-            const paperThreshold = Math.min(240, Math.max(avgLum * 0.88, maxLum * 0.72));
-
-            let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0;
-            let hasInk = false;
-
-            for (let i = 0; i < len; i += 4) {
-              const idx = i / 4;
-              const lum = luminances[idx];
-              const x = idx % canvas.width;
-              const y = Math.floor(idx / canvas.width);
-              const r = data[i], g = data[i + 1], b = data[i + 2];
-
-              const isPaper = lum >= paperThreshold || (r > 120 && g > 120 && b > 120 && Math.abs(r - g) < 25 && Math.abs(g - b) < 25 && lum > 140);
-
-              if (isPaper) {
-                data[i + 3] = 0; // Paper pixel -> Transparent
-              } else {
-                hasInk = true;
-                if (x < minX) minX = x;
-                if (x > maxX) maxX = x;
-                if (y < minY) minY = y;
-                if (y > maxY) maxY = y;
-
-                const contrastFactor = Math.max(0, (paperThreshold - lum) / paperThreshold);
-                data[i + 3] = Math.min(255, Math.round(contrastFactor * 255 * 1.8));
-              }
-            }
-
-            ctx.putImageData(imgData, 0, 0);
-
-            let finalCanvas = canvas;
-            if (hasInk && maxX > minX && maxY > minY) {
-              const cropW = maxX - minX + 1;
-              const cropH = maxY - minY + 1;
-              const cropCanvas = document.createElement('canvas');
-              cropCanvas.width = cropW;
-              cropCanvas.height = cropH;
-              const cropCtx = cropCanvas.getContext('2d');
-              cropCtx.drawImage(canvas, minX, minY, cropW, cropH, 0, 0, cropW, cropH);
-              finalCanvas = cropCanvas;
-            }
-
-            finalCanvas.toBlob((blob) => {
-              if (blob) {
-                const fileRes = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".png", { type: 'image/png' });
-                resolve(fileRes);
-              } else {
-                resolve(file);
-              }
-            }, 'image/png');
-          };
-          img.onerror = () => resolve(file);
-          img.src = event.target.result;
-        };
-        reader.onerror = () => resolve(file);
-        reader.readAsDataURL(file);
-      });
-
-      const formData = new FormData();
-      formData.append('signature', processedFile);
-
-      const updatedProfile = await schoolService.uploadPrincipalSignature(formData);
-      setActiveSignature(updatedProfile.principal_signature_path);
-      window.dispatchEvent(new CustomEvent('school-profile-updated', { detail: updatedProfile }));
-    } catch (err) {
-      console.error(err);
-      alert(err.message || 'Failed to extract & upload signature.');
-    } finally {
-      setUploadingSig(false);
-    }
-  };
-
-  const chunkArray = (arr, size) => {
-    const chunks = [];
-    for (let i = 0; i < arr.length; i += size) {
-      chunks.push(arr.slice(i, i + size));
-    }
-    return chunks;
-  };
-
-  const studentChunks = chunkArray(sortedStudents, 6);
-
-  // Handle Single Multi-page PDF Export for Class ID Cards
-  const handleDownloadPDF = async (e) => {
-    if (e) e.preventDefault();
-    const container = printContainerRef.current;
-    if (!container || sortedStudents.length === 0) return;
-
-    setDownloading(true);
-    try {
-      const opt = {
-        margin: [4, 4, 4, 4],
-        filename: `${(classNameProp || 'Class').replace(/[^a-zA-Z0-9_-]/g, '_')}_Identity_Cards.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { 
-          scale: 3, 
-          useCORS: true, 
-          logging: false,
-          letterRendering: false,
-          scrollY: 0,
-          scrollX: 0
-        },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['css', 'legacy'] }
-      };
-
-      await html2pdf().set(opt).from(container).save();
-    } catch (err) {
-      console.error(err);
-      alert('Failed to generate PDF document.');
-    } finally {
-      setDownloading(false);
-    }
-  };
-
-  // Handle High-Resolution Image Export (PNG ZIP)
-  const handleDownloadZip = async (e) => {
-    if (e) e.preventDefault();
-    const container = printContainerRef.current;
-    if (!container || sortedStudents.length === 0) return;
-
-    setDownloading(true);
-    try {
-      const zip = new JSZip();
-      const cardNodes = container.querySelectorAll('.id-card-wrapper');
-
-      for (let i = 0; i < sortedStudents.length; i++) {
-        const student = sortedStudents[i];
-        const cardNode = cardNodes[i];
-
-        if (!cardNode) continue;
-
-        // Render card at 3x scale for crisp 300 DPI high-resolution output
-        const canvas = await html2canvas(cardNode, {
-          scale: 3,
-          useCORS: true,
-          logging: false,
-          backgroundColor: null,
-          scrollY: 0,
-          scrollX: 0
-        });
-
-        // Add 24px safe margin around the card so borders and rounded corners are 100% visible and NEVER cropped
-        const padding = 24;
-        const paddedCanvas = document.createElement('canvas');
-        paddedCanvas.width = canvas.width + (padding * 2);
-        paddedCanvas.height = canvas.height + (padding * 2);
-        const ctx = paddedCanvas.getContext('2d');
-
-        // Fill solid white background
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, paddedCanvas.width, paddedCanvas.height);
-
-        // Draw card canvas centered with padding
-        ctx.drawImage(canvas, padding, padding);
-
-        // Convert to PNG base64 string
-        const dataUrl = paddedCanvas.toDataURL('image/png', 1.0);
-        const base64Data = dataUrl.replace(/^data:image\/png;base64,/, '');
-
-        // Naming convention: RollNo_StudentName.png
-        const rawRoll = student.roll_no || student.roll || student.sr_no || student.admission_no || `SR-${student.id || i + 1}`;
-        const cleanRoll = String(rawRoll).trim().replace(/[^a-zA-Z0-9_-]/g, '_');
-        const cleanName = String(student.name || 'Student').trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '');
-        const fileName = `${cleanRoll}_${cleanName}.png`;
-
-        zip.file(fileName, base64Data, { base64: true });
-      }
-
-      // Generate ZIP archive and trigger download
-      const zipContent = await zip.generateAsync({ type: 'blob' });
-      const zipFilename = `${classNameProp}_Student_Identity_Cards`.replace(/\s+/g, '_') + '.zip';
-
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(zipContent);
-      link.download = zipFilename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(link.href);
-    } catch (err) {
-      console.error('Error generating identity cards ZIP:', err);
-      alert('Failed to generate identity cards ZIP.');
-    } finally {
-      setDownloading(false);
-    }
-  };
 
   // Extract all active document stylesheets for isolated print iframe
   const getDocumentStylesHtml = () => {
@@ -395,13 +150,6 @@ export default function ClassIdentityCardPreview({
               object-fit: cover !important;
               border-radius: 12px !important;
             }
-            .id-card-signature-img {
-              height: 32px !important;
-              max-height: 32px !important;
-              max-width: 95px !important;
-              width: auto !important;
-              object-fit: contain !important;
-            }
           </style>
         </head>
         <body>
@@ -450,7 +198,7 @@ export default function ClassIdentityCardPreview({
           </div>
         </div>
 
-        {/* Action Buttons: Download PDF | Download Images (ZIP) | Upload Signature | Print */}
+        {/* Action Buttons: Download PDF | Print */}
         <div className="flex items-center gap-3 self-end sm:self-center">
           <Button
             variant="outline"
@@ -463,29 +211,6 @@ export default function ClassIdentityCardPreview({
           </Button>
 
           <Button
-            variant="outline"
-            onClick={handleDownloadZip}
-            disabled={downloading || sortedStudents.length === 0}
-            className="font-bold text-xs gap-2 border-border hover:bg-zinc-50 text-text-secondary"
-          >
-            <Download className="h-4 w-4 text-blue-600" />
-            {downloading ? 'Generating Images...' : 'Download Images (ZIP)'}
-          </Button>
-
-          {/* Upload Signature button positioned directly next to Download PDF */}
-          <label className="cursor-pointer inline-flex items-center justify-center rounded-lg text-xs font-bold transition-all border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 px-3.5 py-2 shadow-2xs gap-1.5 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800">
-            <PenTool className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-            <span>{uploadingSig ? 'Extracting...' : (activeSignature ? 'Change Signature' : 'Upload Signature')}</span>
-            <input
-              type="file"
-              accept=".png, .jpg, .jpeg"
-              onChange={handleSignatureUpload}
-              className="hidden"
-              disabled={uploadingSig}
-            />
-          </label>
-
-          <Button
             onClick={handlePrint}
             disabled={sortedStudents.length === 0}
             className="font-bold text-xs gap-2 bg-primary text-white hover:bg-primary/95"
@@ -494,14 +219,6 @@ export default function ClassIdentityCardPreview({
             Print
           </Button>
         </div>
-      </div>
-
-      {/* Guidance Note Banner */}
-      <div className="bg-amber-500/10 border border-amber-500/20 text-amber-900 dark:text-amber-200 px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2">
-        <PenTool className="h-4 w-4 text-amber-600 shrink-0" />
-        <span>
-          Please sign on a plain paper and upload. The paper background will be automatically removed, attaching only the extracted ink signature to all cards.
-        </span>
       </div>
 
       {/* Main Preview Container */}
