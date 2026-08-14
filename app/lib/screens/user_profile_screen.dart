@@ -12,6 +12,7 @@ class UserProfileScreen extends StatefulWidget {
   final List<dynamic> children;
   final int? activeStudentId;
   final Function(int)? onSwitchChild;
+  final String? baseUrl;
 
   const UserProfileScreen({
     Key? key,
@@ -23,6 +24,7 @@ class UserProfileScreen extends StatefulWidget {
     this.children = const [],
     this.activeStudentId,
     this.onSwitchChild,
+    this.baseUrl,
   }) : super(key: key);
 
   @override
@@ -31,11 +33,31 @@ class UserProfileScreen extends StatefulWidget {
 
 class _UserProfileScreenState extends State<UserProfileScreen> {
   int? _currentActiveChildId;
+  String _baseUrl = '';
 
   @override
   void initState() {
     super.initState();
     _currentActiveChildId = widget.activeStudentId;
+    _initBaseUrl();
+  }
+
+  Future<void> _initBaseUrl() async {
+    if (widget.baseUrl != null && widget.baseUrl!.isNotEmpty) {
+      if (mounted) {
+        setState(() {
+          _baseUrl = widget.baseUrl!;
+        });
+      }
+    } else {
+      final prefs = await SharedPreferences.getInstance();
+      final savedBaseUrl = prefs.getString('base_url') ?? '';
+      if (mounted) {
+        setState(() {
+          _baseUrl = savedBaseUrl;
+        });
+      }
+    }
   }
 
   Future<void> _handleLogout() async {
@@ -69,8 +91,20 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         : widget.userName;
 
     String photo = isStudentOrParent && activeStudent != null
-        ? (activeStudent['photo_path']?.toString() ?? widget.photoUrl)
+        ? (activeStudent['photo_path']?.toString() ?? activeStudent['photo']?.toString() ?? widget.photoUrl)
         : widget.photoUrl;
+
+    final effectiveBaseUrl = (widget.baseUrl != null && widget.baseUrl!.isNotEmpty)
+        ? widget.baseUrl!
+        : _baseUrl;
+
+    if (photo.isNotEmpty && !photo.startsWith('http')) {
+      if (effectiveBaseUrl.isNotEmpty) {
+        photo = photo.startsWith('/')
+            ? '$effectiveBaseUrl$photo'
+            : '$effectiveBaseUrl/$photo';
+      }
+    }
 
     // Student fields
     final String className = activeStudent?['class_name']?.toString() ?? '';
