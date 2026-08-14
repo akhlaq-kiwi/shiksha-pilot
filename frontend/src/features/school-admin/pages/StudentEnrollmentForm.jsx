@@ -760,13 +760,21 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
     }
     
     if (tabNum === 2) {
-      if (!formData.current_address_line_1) errs.current_address_line_1 = 'Current address is required';
+      if (!formData.current_address_line_1) {
+        errs.current_address_line_1 = 'Current address is required';
+      } else if (formData.current_address_line_1.length > 50) {
+        errs.current_address_line_1 = 'Address cannot exceed 50 characters.';
+      }
       if (!formData.current_city) errs.current_city = 'Current city is required';
       if (!formData.current_state) errs.current_state = 'Current state is required';
       if (!formData.current_pin_code) errs.current_pin_code = 'Current PIN Code is required';
 
       if (formData.same_as_current === 0) {
-        if (!formData.permanent_address_line_1) errs.permanent_address_line_1 = 'Permanent address is required.';
+        if (!formData.permanent_address_line_1) {
+          errs.permanent_address_line_1 = 'Permanent address is required.';
+        } else if (formData.permanent_address_line_1.length > 50) {
+          errs.permanent_address_line_1 = 'Address cannot exceed 50 characters.';
+        }
         if (!formData.permanent_city) errs.permanent_city = 'Permanent city is required.';
         if (!formData.permanent_state) errs.permanent_state = 'Permanent state is required.';
         if (!formData.permanent_pin_code) errs.permanent_pin_code = 'Permanent PIN Code is required.';
@@ -1243,7 +1251,7 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                   <div className="grid grid-cols-1 gap-4">
                     <div className="space-y-1.5">
                       <label htmlFor="current_address_line_1" className="text-xs font-bold text-text-secondary uppercase">Address <span className="text-red-500">*</span></label>
-                      <Input id="current_address_line_1" name="current_address_line_1" value={formData.current_address_line_1} onChange={handleTextChange} placeholder="House no, street, locality..." required />
+                      <Input id="current_address_line_1" name="current_address_line_1" value={formData.current_address_line_1} onChange={handleTextChange} placeholder="Max 50 characters allowed" maxLength={50} required />
                       {errors.current_address_line_1 && <p className="text-[11px] text-red-500 font-semibold">{errors.current_address_line_1}</p>}
                     </div>
                   </div>
@@ -1296,7 +1304,7 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                       <div className="grid grid-cols-1 gap-4">
                         <div className="space-y-1.5">
                           <label htmlFor="permanent_address_line_1" className="text-xs font-bold text-text-secondary uppercase">Permanent Address <span className="text-red-500">*</span></label>
-                          <Input id="permanent_address_line_1" name="permanent_address_line_1" value={formData.permanent_address_line_1} onChange={handleTextChange} placeholder="House no, street, locality..." required />
+                          <Input id="permanent_address_line_1" name="permanent_address_line_1" value={formData.permanent_address_line_1} onChange={handleTextChange} placeholder="Max 50 characters allowed" maxLength={50} required />
                           {errors.permanent_address_line_1 && <p className="text-[11px] text-red-500 font-semibold">{errors.permanent_address_line_1}</p>}
                         </div>
                       </div>
