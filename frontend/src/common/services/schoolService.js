@@ -297,6 +297,14 @@ export const schoolService = {
     return apiClient.post('/api/school/class-fee-configurations/lock', payload);
   },
 
+  getClassCourseFeeConfigurations(params = {}) {
+    return apiClient.get(buildUrl('/api/school/class-course-fee-configurations', params));
+  },
+
+  saveClassCourseFeeConfiguration(payload) {
+    return apiClient.post('/api/school/class-course-fee-configurations', payload);
+  },
+
   checkSrNoExists(params) {
     return apiClient.get(buildUrl('/api/school/students/check-sr-no', params));
   },

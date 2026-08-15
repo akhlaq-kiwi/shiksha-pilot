@@ -7,6 +7,7 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '.
 import { Input } from '../../../common/ui/input';
 import { Dialog } from '../../../common/ui/dialog';
 import { schoolService } from '../../../common/services/schoolService';
+import { schoolAdminService } from '../../../common/services/schoolAdminService';
 import { apiClient } from '../../../common/services/apiClient';
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 import { getClassIndex } from '../../../common/constants/predefinedClasses';
@@ -271,6 +272,32 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
     return () => clearTimeout(timer);
   }, [feeSuccess]);
 
+  // Course Fee Configuration States
+  const [courseSelectedClassId, setCourseSelectedClassId] = useState('');
+  const [showSelectCourseClassNotice, setShowSelectCourseClassNotice] = useState(true);
+  const [downloadingCoursePdf, setDownloadingCoursePdf] = useState(false);
+  const [courseConfiguredClassIds, setCourseConfiguredClassIds] = useState([]);
+  const [courseFeeAmount, setCourseFeeAmount] = useState('');
+  const [courseFeeError, setCourseFeeError] = useState('');
+  const [courseFeeSuccess, setCourseFeeSuccess] = useState('');
+  const [courseFeeSaving, setCourseFeeSaving] = useState(false);
+
+  useEffect(() => {
+    setShowSelectCourseClassNotice(true);
+    const timer = setTimeout(() => {
+      setShowSelectCourseClassNotice(false);
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!courseFeeSuccess) return;
+    const timer = setTimeout(() => {
+      setCourseFeeSuccess('');
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [courseFeeSuccess]);
+
   // Source Data for Wizard
   const [staff, setStaff] = useState([]);
   const [students, setStudents] = useState([]);
@@ -497,8 +524,22 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
     }
   };
 
+  const fetchConfiguredCourseClasses = async () => {
+    const activeYear = currentYear || academicYears.find(y => y.is_current);
+    if (!activeYear) return;
+    try {
+      const res = await schoolService.getClassCourseFeeConfigurations({
+        academic_year_id: activeYear.id
+      });
+      setCourseConfiguredClassIds((res || []).map(c => String(c.class_id)));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   useEffect(() => {
     fetchConfiguredClasses();
+    fetchConfiguredCourseClasses();
   }, [currentYear, academicYears]);
 
   // Group classes by unique Class Name so fee configuration applies class-wide across all sections
@@ -512,20 +553,59 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
       map.get(c.name).push(c);
     });
 
-    return Array.from(map.entries()).map(([className, items]) => {
-      const hasConfiguredName = (configuredClassIds || []).some(cid => {
-        const found = (classes || []).find(cl => String(cl.id) === String(cid));
-        return found && found.name === className;
-      });
+    return Array.from(map.entries())
+      .map(([className, items]) => {
+        const hasConfiguredName = (configuredClassIds || []).some(cid => {
+          const found = (classes || []).find(cl => String(cl.id) === String(cid));
+          return found && found.name === className;
+        });
 
-      return {
-        name: className,
-        primaryId: String(items[0].id),
-        allIds: items.map(item => String(item.id)),
-        isConfigured: items.some(item => configuredClassIds.includes(String(item.id))) || hasConfiguredName
-      };
-    });
+        return {
+          name: className,
+          primaryId: String(items[0].id),
+          allIds: items.map(item => String(item.id)),
+          isConfigured: items.some(item => configuredClassIds.includes(String(item.id))) || hasConfiguredName
+        };
+      })
+      .sort((a, b) => {
+        const idxA = getClassIndex(a.name);
+        const idxB = getClassIndex(b.name);
+        if (idxA !== idxB) return idxA - idxB;
+        return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+      });
   }, [classes, configuredClassIds]);
+
+  const uniqueCourseClassGroups = useMemo(() => {
+    const map = new Map();
+    (classes || []).forEach(c => {
+      if (!c.name) return;
+      if (!map.has(c.name)) {
+        map.set(c.name, []);
+      }
+      map.get(c.name).push(c);
+    });
+
+    return Array.from(map.entries())
+      .map(([className, items]) => {
+        const hasConfiguredName = (courseConfiguredClassIds || []).some(cid => {
+          const found = (classes || []).find(cl => String(cl.id) === String(cid));
+          return found && found.name === className;
+        });
+
+        return {
+          name: className,
+          primaryId: String(items[0].id),
+          allIds: items.map(item => String(item.id)),
+          isConfigured: items.some(item => courseConfiguredClassIds.includes(String(item.id))) || hasConfiguredName
+        };
+      })
+      .sort((a, b) => {
+        const idxA = getClassIndex(a.name);
+        const idxB = getClassIndex(b.name);
+        if (idxA !== idxB) return idxA - idxB;
+        return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+      });
+  }, [classes, courseConfiguredClassIds]);
 
   // Pre-select class from router state redirect if redirecting from Finance or StudentDetails
   useEffect(() => {
@@ -613,6 +693,224 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
     fetchConfig();
   }, [selectedClassId, academicYears, uniqueClassGroups, classes]);
 
+  const isCourseClassConfigured = useMemo(() => {
+    if (!courseSelectedClassId) return false;
+    const selectedGroup = uniqueCourseClassGroups.find(g => g.allIds.includes(String(courseSelectedClassId)));
+    return selectedGroup ? selectedGroup.isConfigured : false;
+  }, [courseSelectedClassId, uniqueCourseClassGroups]);
+
+  // Clear course fee amount input when selecting class (disappears amount if already configured)
+  useEffect(() => {
+    setCourseFeeAmount('');
+    setCourseFeeError('');
+  }, [courseSelectedClassId]);
+
+  const handleDownloadCourseFeeStructurePdf = async () => {
+    try {
+      setDownloadingCoursePdf(true);
+      const activeYear = currentYear || academicYears.find(y => y.is_current) || academicYears[0];
+      const yearName = activeYear ? activeYear.name : '2026-2027';
+
+      let startYr = '2026';
+      let endYr = '2027';
+      const yearMatch = yearName.match(/(\d{4})\s*[-–—]\s*(\d{4})/);
+      if (yearMatch) {
+        startYr = yearMatch[1];
+        endYr = yearMatch[2];
+      }
+
+      const [schoolRes, allClasses, allConfigs] = await Promise.all([
+        schoolService.getSchoolProfile().catch(() => null),
+        schoolService.getClasses(),
+        activeYear ? schoolService.getClassCourseFeeConfigurations({ academic_year_id: activeYear.id }) : Promise.resolve([])
+      ]);
+
+      const schoolName = schoolRes?.name || schoolRes?.data?.name || schoolRes?.school?.name || '';
+      const headerTitle = `COURSE FEE STRUCTURE FOR ${startYr} - ${endYr}`;
+      const headerSubtitle = `(Applicable for ${startYr} - ${endYr})`;
+
+      const classList = allClasses || classes || [];
+      const configList = allConfigs || [];
+
+      const classMap = new Map();
+      classList.forEach(c => {
+        if (!c.name) return;
+        if (!classMap.has(c.name)) {
+          classMap.set(c.name, c);
+        }
+      });
+
+      const sortedClasses = Array.from(classMap.values()).sort((a, b) => {
+        const idxA = getClassIndex(a.name);
+        const idxB = getClassIndex(b.name);
+        if (idxA !== idxB) return idxA - idxB;
+        return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+      });
+
+      const rowsData = sortedClasses.map((cls, index) => {
+        const cfg = configList.find(c => {
+          if (String(c.class_id) === String(cls.id)) return true;
+          const foundCls = classList.find(l => String(l.id) === String(c.class_id));
+          return foundCls && foundCls.name === cls.name;
+        });
+
+        const amountVal = cfg && cfg.amount !== undefined && cfg.amount !== null ? parseFloat(cfg.amount) : 0;
+
+        return {
+          sNo: String(index + 1),
+          className: cls.name,
+          amountFormatted: `Rs. ${Math.round(amountVal).toLocaleString('en-IN')}`
+        };
+      });
+
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const marginX = 15;
+      const printableWidth = pageWidth - (marginX * 2);
+
+      let currentY = 22;
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16);
+      doc.setTextColor(15, 23, 42);
+      doc.text(headerTitle, pageWidth / 2, currentY, { align: 'center' });
+      currentY += 6;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(71, 85, 105);
+      doc.text(headerSubtitle, pageWidth / 2, currentY, { align: 'center' });
+      currentY += 8;
+
+      const tableTopY = currentY;
+
+      const totalRows = rowsData.length;
+      const availableHeight = pageHeight - tableTopY - 15;
+      
+      const headerRowHeight = 9;
+      const maxDataRowHeight = 8.5;
+      const minDataRowHeight = 5;
+      
+      const dataRowHeight = Math.min(
+        maxDataRowHeight,
+        Math.max(minDataRowHeight, (availableHeight - headerRowHeight) / (totalRows + 1))
+      );
+
+      const fontSize = Math.min(10, Math.max(7.5, dataRowHeight * 1.05));
+
+      const colSNoWidth = 25;
+      const colAmountWidth = 55;
+      const colClassWidth = printableWidth - colSNoWidth - colAmountWidth;
+
+      const xSNo = marginX;
+      const xClass = marginX + colSNoWidth;
+      const xAmount = marginX + colSNoWidth + colClassWidth;
+
+      doc.setFillColor(15, 23, 42);
+      doc.rect(marginX, tableTopY, printableWidth, headerRowHeight, 'F');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9.5);
+      doc.setTextColor(255, 255, 255);
+
+      const headerTextY = tableTopY + (headerRowHeight / 2) + 1.2;
+      doc.text('S. NO.', xSNo + (colSNoWidth / 2), headerTextY, { align: 'center' });
+      doc.text('CLASS', xClass + 4, headerTextY, { align: 'left' });
+      doc.text('AMOUNT (Rs.)', xAmount + colAmountWidth - 4, headerTextY, { align: 'right' });
+
+      doc.setDrawColor(30, 41, 59);
+      doc.setLineWidth(0.2);
+      doc.rect(marginX, tableTopY, printableWidth, headerRowHeight);
+
+      doc.setFontSize(fontSize);
+
+      rowsData.forEach((row, idx) => {
+        const rowY = tableTopY + headerRowHeight + (idx * dataRowHeight);
+        const textY = rowY + (dataRowHeight / 2) + (fontSize * 0.12);
+
+        if (idx % 2 === 1) {
+          doc.setFillColor(248, 250, 252);
+          doc.rect(marginX, rowY, printableWidth, dataRowHeight, 'F');
+        }
+
+        doc.setDrawColor(203, 213, 225);
+        doc.setLineWidth(0.15);
+        
+        doc.rect(marginX, rowY, printableWidth, dataRowHeight);
+        doc.line(xClass, rowY, xClass, rowY + dataRowHeight);
+        doc.line(xAmount, rowY, xAmount, rowY + dataRowHeight);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(51, 65, 85);
+        doc.text(row.sNo, xSNo + (colSNoWidth / 2), textY, { align: 'center' });
+
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(15, 23, 42);
+        doc.text(row.className, xClass + 4, textY, { align: 'left' });
+
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(15, 23, 42);
+        doc.text(row.amountFormatted, xAmount + colAmountWidth - 4, textY, { align: 'right' });
+      });
+
+      doc.save(`Course_Fee_Structure_${startYr}-${endYr}.pdf`);
+
+    } catch (err) {
+      console.error('Error generating Course Fee Structure PDF:', err);
+      setCourseFeeError('Failed to generate Course Fee Structure PDF.');
+    } finally {
+      setDownloadingCoursePdf(false);
+    }
+  };
+
+  const handleConfirmSaveCourseConfig = async () => {
+    setCourseFeeError('');
+    setCourseFeeSuccess('');
+
+    if (!courseSelectedClassId) {
+      setCourseFeeError('Please select a class.');
+      return;
+    }
+
+    if (isCourseClassConfigured) {
+      setCourseFeeError('Course fee for this class is already configured.');
+      return;
+    }
+
+    if (courseFeeAmount === '' || isNaN(parseFloat(courseFeeAmount)) || parseFloat(courseFeeAmount) <= 0) {
+      setCourseFeeError('Please enter a valid positive course fee amount.');
+      return;
+    }
+
+    setCourseFeeSaving(true);
+    try {
+      const activeYear = currentYear || academicYears.find(y => y.is_current);
+      const selectedGroup = uniqueCourseClassGroups.find(g => g.allIds.includes(String(courseSelectedClassId)));
+
+      const payload = {
+        class_id: selectedGroup ? selectedGroup.primaryId : courseSelectedClassId,
+        academic_year_id: activeYear ? activeYear.id : null,
+        amount: parseFloat(courseFeeAmount)
+      };
+
+      const res = await schoolService.saveClassCourseFeeConfiguration(payload);
+      setCourseFeeSuccess(res.message || 'Course fee configuration saved successfully.');
+      setCourseFeeAmount(''); // Disappear the entered amount from the input field
+      await fetchConfiguredCourseClasses();
+    } catch (err) {
+      console.error(err);
+      setCourseFeeError(err.message || 'Failed to save course fee configuration.');
+    } finally {
+      setCourseFeeSaving(false);
+    }
+  };
+
   const handleDownloadFeeStructurePdf = async () => {
     try {
       setDownloadingPdf(true);
@@ -656,7 +954,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
         return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
       });
 
-      // Calculate annual fee for each class
+      // Calculate monthly fee for each class
       const rowsData = sortedClasses.map((cls, index) => {
         const cfg = configList.find(c => {
           if (String(c.class_id) === String(cls.id)) return true;
@@ -664,21 +962,22 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
           return foundCls && foundCls.name === cls.name;
         });
 
-        let annualFee = 0;
+        let monthlyFee = 0;
         if (cfg) {
           if (cfg.mode === 'SAME') {
-            const monthlyVal = parseFloat(cfg.monthly_fees?.April || cfg.same_amount || 0);
-            annualFee = Math.round(monthlyVal * 12);
+            monthlyFee = parseFloat(cfg.monthly_fees?.April || cfg.same_amount || 0);
           } else if (cfg.monthly_fees) {
-            const sum = Object.values(cfg.monthly_fees).reduce((acc, val) => acc + (parseFloat(val) || 0), 0);
-            annualFee = Math.round(sum);
+            const vals = Object.values(cfg.monthly_fees).map(val => parseFloat(val) || 0).filter(val => val > 0);
+            if (vals.length > 0) {
+              monthlyFee = vals[0];
+            }
           }
         }
 
         return {
           sNo: String(index + 1),
           className: cls.name,
-          amountFormatted: `Rs. ${annualFee.toLocaleString('en-IN')}`
+          amountFormatted: `Rs. ${Math.round(monthlyFee).toLocaleString('en-IN')}`
         };
       });
 
@@ -1420,6 +1719,114 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                 className="font-bold flex items-center gap-1.5 shadow-sm bg-primary"
               >
                 Save Fee Configuration
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Course Fee Configuration Panel */}
+      <Card id="course-fee-config-panel" className="shadow-sm">
+        <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-row items-center justify-between">
+          <CardTitle className="text-sm font-bold text-text-primary">Course Fee Configuration</CardTitle>
+          <Button
+            onClick={handleDownloadCourseFeeStructurePdf}
+            disabled={downloadingCoursePdf}
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs gap-1.5 font-bold border-border shadow-none hover:bg-zinc-100 dark:hover:bg-zinc-800"
+          >
+            {downloadingCoursePdf ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+            ) : (
+              <Download className="h-3.5 w-3.5 text-primary" />
+            )}
+            <span>Download Course Fee Structure</span>
+          </Button>
+        </CardHeader>
+        <CardContent className="p-6 space-y-4">
+          {courseFeeError && (
+            <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl text-xs font-semibold">
+              {courseFeeError}
+            </div>
+          )}
+
+          {courseFeeSuccess && (
+            <div className="p-3 bg-green-500/10 border border-green-500/20 text-green-600 rounded-xl text-xs font-semibold">
+              {courseFeeSuccess}
+            </div>
+          )}
+
+          {!courseSelectedClassId && showSelectCourseClassNotice && (
+            <div className="p-3.5 bg-primary/5 border border-primary/10 rounded-xl flex items-center gap-2.5 text-xs text-primary font-bold animate-in fade-in duration-300">
+              <ShieldAlert className="h-4 w-4 text-primary flex-shrink-0" />
+              <span>Please select a class to configure its course fee structure.</span>
+            </div>
+          )}
+
+          <div className="flex flex-col sm:flex-row items-start sm:items-end gap-6">
+            <div className="w-full sm:w-[240px]">
+              <label className="text-xs font-bold text-text-secondary uppercase block mb-2">Class *</label>
+              <select
+                value={courseSelectedClassId}
+                onChange={e => setCourseSelectedClassId(e.target.value)}
+                disabled={classes.length === 0}
+                className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs"
+              >
+                <option value="">Select Class</option>
+                {uniqueCourseClassGroups.map(group => (
+                  <option key={group.name} value={group.primaryId}>
+                    {group.name}
+                    {group.isConfigured ? ' (Configured)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="border-t border-border pt-4 mt-2 space-y-2 w-full sm:w-[240px]">
+            <label className="text-xs font-bold text-text-secondary uppercase block">Course Fee</label>
+            <div className="relative">
+              <span className="absolute left-3 top-2.5 text-xs text-text-muted">₹</span>
+              <Input
+                type="number"
+                placeholder="e.g. 1500"
+                value={courseFeeAmount}
+                onChange={e => setCourseFeeAmount(e.target.value)}
+                disabled={!courseSelectedClassId || isReadOnly || isCourseClassConfigured}
+                className="pl-7 text-xs font-semibold w-full"
+              />
+            </div>
+            <p className="text-[11px] text-text-muted">
+              {isCourseClassConfigured
+                ? "Course fee for this class has been configured."
+                : "Course fee is maintained separately from monthly academic fees."}
+            </p>
+          </div>
+
+          {isReadOnly ? (
+            <div className="mt-6 p-4 bg-zinc-100 border border-zinc-200 dark:bg-zinc-900/50 dark:border-zinc-800 rounded-xl flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center">
+                  <Lock className="h-4 w-4 text-zinc-500" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-text-primary font-display">Course Fee Configuration Locked</p>
+                  <p className="text-[11px] text-text-muted mt-0.5">Course fee configuration cannot be modified in an archived academic year.</p>
+                </div>
+              </div>
+              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-zinc-200 text-zinc-600 border border-zinc-300">
+                LOCKED
+              </span>
+            </div>
+          ) : (
+            <div className="mt-6 flex justify-end">
+              <Button 
+                onClick={handleConfirmSaveCourseConfig}
+                disabled={!courseSelectedClassId || courseFeeSaving || isCourseClassConfigured}
+                className="font-bold flex items-center gap-1.5 shadow-sm bg-primary text-white"
+              >
+                {courseFeeSaving ? 'Saving...' : isCourseClassConfigured ? 'Course Fee Configured' : 'Save Course Fee Configuration'}
               </Button>
             </div>
           )}

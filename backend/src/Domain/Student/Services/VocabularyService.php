@@ -178,8 +178,8 @@ class VocabularyService extends BaseService
                 $selectedWordIds[] = (int)$word['id'];
                 $lastCategory = $word['category'];
                 
-                // Hide synonyms/opposites for PG to Class 2
-                $isLowerClass = in_array($className, ['Play Group', 'Nursery', 'LKG', 'UKG', 'Class 1', 'Class 2']);
+                // Hide synonyms/opposites for Pre Nursery to Class 2
+                $isLowerClass = in_array($className, ['Pre Nursery', 'Play Group', 'Nursery', 'LKG', 'UKG', 'KG', 'Class 1', 'Class 2']);
                 if ($isLowerClass) {
                     $word['synonyms'] = null;
                     $word['opposites'] = null;

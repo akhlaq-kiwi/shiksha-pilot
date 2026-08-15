@@ -197,14 +197,14 @@ function seedVocabulary(\PDO $pdo) {
                 // Synonyms/Opposites (Only Class 3+)
                 $synonyms = null;
                 $opposites = null;
-                if (!in_array($className, ['Play Group', 'Nursery', 'LKG', 'UKG', 'Class 1', 'Class 2'])) {
+                if (!in_array($className, ['Pre Nursery', 'Play Group', 'Nursery', 'LKG', 'UKG', 'KG', 'Class 1', 'Class 2'])) {
                     $synonyms = json_encode([strtolower($wordSpelling) . '_syn']);
                     $opposites = json_encode([strtolower($wordSpelling) . '_opp']);
                 }
 
                 // Visual assets strategy
                 $img_path = null;
-                $isPrePrimary = in_array($className, ['Play Group', 'Nursery', 'LKG', 'UKG']);
+                $isPrePrimary = in_array($className, ['Pre Nursery', 'Play Group', 'Nursery', 'LKG', 'UKG', 'KG']);
                 $isEarlyPrimary = in_array($className, ['Class 1', 'Class 2']);
                 
                 if ($isPrePrimary || $isEarlyPrimary) {

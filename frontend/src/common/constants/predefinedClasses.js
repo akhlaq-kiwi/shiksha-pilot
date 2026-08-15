@@ -1,9 +1,10 @@
 export const PREDEFINED_CLASSES = [
   // Pre-Primary
-  { name: 'Play Group', category: 'Pre-Primary' },
+  { name: 'Pre Nursery', category: 'Pre-Primary' },
   { name: 'Nursery', category: 'Pre-Primary' },
   { name: 'Lower Kindergarten (LKG)', category: 'Pre-Primary' },
   { name: 'Upper Kindergarten (UKG)', category: 'Pre-Primary' },
+  { name: 'KG', category: 'Pre-Primary' },
   // Primary
   { name: 'Class 1', category: 'Primary' },
   { name: 'Class 2', category: 'Primary' },
@@ -45,19 +46,26 @@ export const getClassIndex = (className) => {
   if (!className) return -1;
   const cleanName = className.trim().toLowerCase();
   
+  // Legacy / Alias mapping for Play Group -> Pre Nursery
+  if (cleanName === 'play group' || cleanName === 'playgroup' || cleanName === 'pg') {
+    return PREDEFINED_CLASSES.findIndex(c => c.name === 'Pre Nursery');
+  }
+
   // Exact match
   const idx = PREDEFINED_CLASSES.findIndex(c => c.name.toLowerCase() === cleanName);
   if (idx !== -1) return idx;
 
-  // Short-name matching fallback (e.g., 'lkg' -> 'Lower Kindergarten (LKG)')
+  // Short-name matching fallbacks
   if (cleanName === 'lkg') return PREDEFINED_CLASSES.findIndex(c => c.name.includes('LKG'));
   if (cleanName === 'ukg') return PREDEFINED_CLASSES.findIndex(c => c.name.includes('UKG'));
+  if (cleanName === 'kg') return PREDEFINED_CLASSES.findIndex(c => c.name === 'KG');
+  if (cleanName === 'pre nursery' || cleanName === 'prenursery') return PREDEFINED_CLASSES.findIndex(c => c.name === 'Pre Nursery');
 
   // Numeric fallback
   const match = cleanName.match(/\d+/);
   if (match) {
     const num = parseInt(match[0], 10);
-    return 3 + num;
+    return 4 + num;
   }
   return -1;
 };
@@ -65,6 +73,9 @@ export const getClassIndex = (className) => {
 export const getShortClassName = (className) => {
   if (!className) return '';
   const clean = className.trim();
+  if (clean.toLowerCase() === 'play group' || clean.toLowerCase() === 'playgroup' || clean.toLowerCase() === 'pg') {
+    return 'Pre Nursery';
+  }
   if (clean.toLowerCase().includes('lower kindergarten') || clean.toLowerCase() === 'lkg') {
     return 'LKG';
   }

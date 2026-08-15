@@ -147,8 +147,8 @@ class SchoolAdminController extends BaseController
         $errorCode = $uploadedFile->getError();
         if ($errorCode !== UPLOAD_ERR_OK) {
             $errMsgs = [
-                UPLOAD_ERR_INI_SIZE   => 'The uploaded file exceeds the upload_max_filesize directive in php.ini.',
-                UPLOAD_ERR_FORM_SIZE  => 'The uploaded file exceeds the MAX_FILE_SIZE directive in the HTML form.',
+                UPLOAD_ERR_INI_SIZE   => 'File size exceeds 20MB maximum allowed limit.',
+                UPLOAD_ERR_FORM_SIZE  => 'File size exceeds 20MB maximum allowed limit.',
                 UPLOAD_ERR_PARTIAL    => 'The uploaded file was only partially uploaded.',
                 UPLOAD_ERR_NO_FILE    => 'No file was uploaded.',
                 UPLOAD_ERR_NO_TMP_DIR => 'Missing a temporary folder on the server.',
@@ -157,6 +157,10 @@ class SchoolAdminController extends BaseController
             ];
             $msg = $errMsgs[$errorCode] ?? 'Failed to upload file (Error code: ' . $errorCode . ')';
             return $this->error($response, $msg, 400);
+        }
+
+        if ($uploadedFile->getSize() > 20 * 1024 * 1024) {
+            return $this->error($response, 'File size exceeds 20MB maximum allowed limit.', 400);
         }
 
         try {
@@ -1292,6 +1296,31 @@ class SchoolAdminController extends BaseController
         $data = $this->service->saveClassFeeConfiguration($user, $body);
 
         return $this->success($response, $data, 'Class fee configuration saved');
+    }
+
+    public function getClassCourseFeeConfigurations(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'TEACHER', 'STAFF']);
+
+        $params = $request->getQueryParams();
+        $classId = isset($params['class_id']) && $params['class_id'] !== '' ? (int)$params['class_id'] : null;
+        $academicYearId = isset($params['academic_year_id']) && $params['academic_year_id'] !== '' ? (int)$params['academic_year_id'] : null;
+
+        $data = $this->service->getClassCourseFeeConfigurations($user, $classId, $academicYearId);
+
+        return $this->success($response, $data);
+    }
+
+    public function saveClassCourseFeeConfiguration(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body = RequestParser::body($request);
+        $data = $this->service->saveClassCourseFeeConfiguration($user, $body);
+
+        return $this->success($response, $data, 'Course fee configuration saved');
     }
 
     public function lockClassFeeConfiguration(Request $request, Response $response): Response

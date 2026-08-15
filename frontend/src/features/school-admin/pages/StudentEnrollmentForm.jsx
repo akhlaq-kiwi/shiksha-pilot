@@ -306,6 +306,14 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
     additional_docs_path: '',
   });
 
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }, []);
+
   useEffect(() => {
     const loadFormDependencies = async () => {
       setLoading(true);
@@ -708,7 +716,16 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
       if (!formData.father_name) errs.father_name = 'Father name is required';
       if (!formData.mother_name) errs.mother_name = 'Mother name is required';
       if (!formData.gender) errs.gender = 'Gender is required';
-      if (!formData.dob) errs.dob = 'Date of birth is required';
+      if (!formData.dob) {
+        errs.dob = 'Date of birth is required';
+      } else {
+        const selectedDob = new Date(formData.dob);
+        const today = new Date();
+        today.setHours(23, 59, 59, 999);
+        if (selectedDob > today) {
+          errs.dob = 'Date of birth cannot be a future date';
+        }
+      }
       
       // Dropdown Validations
       if (!formData.academic_year_id) {
@@ -1063,6 +1080,7 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                           value={formData.dob} 
                           onChange={handleTextChange} 
                           required 
+                          max={todayStr}
                           className="pr-10 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-10 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer text-text-primary"
                         />
                         <Calendar className="absolute right-3 top-2.5 h-4 w-4 text-text-muted pointer-events-none" />
