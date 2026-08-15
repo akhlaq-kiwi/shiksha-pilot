@@ -1143,6 +1143,11 @@ class SchoolAdminService extends BaseService
         }
         if (empty($data['dob'])) {
             $errors['dob'] = 'Date of birth is required';
+        } else {
+            $dobTime = strtotime($data['dob']);
+            if ($dobTime !== false && $dobTime > time()) {
+                $errors['dob'] = 'Date of birth cannot be a future date';
+            }
         }
         if (empty($data['class_id']) && empty($data['class_name'])) {
             $errors['class_id'] = 'Class ID is required.';
@@ -1482,6 +1487,11 @@ class SchoolAdminService extends BaseService
         }
         if (empty($data['dob'])) {
             $errors['dob'] = 'Date of birth is required';
+        } else {
+            $dobTime = strtotime($data['dob']);
+            if ($dobTime !== false && $dobTime > time()) {
+                $errors['dob'] = 'Date of birth cannot be a future date';
+            }
         }
         if (empty($data['class_name'])) {
             $errors['class_name'] = 'Class is required';
@@ -2033,7 +2043,16 @@ class SchoolAdminService extends BaseService
     {
         $directory = $this->getUploadsDirectory();
 
-        $extension = pathinfo($uploadedFile->getClientFilename(), PATHINFO_EXTENSION);
+        $extension = strtolower(pathinfo($uploadedFile->getClientFilename(), PATHINFO_EXTENSION));
+        $videoExts = ['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv', 'wmv', '3gp', 'm4v', 'ts', 'ogv'];
+        if (in_array($extension, $videoExts, true)) {
+            throw new ValidationException(['file' => 'Video files are not allowed. Please upload an image or document file.']);
+        }
+        $mimeType = strtolower($uploadedFile->getClientMediaType() ?? '');
+        if (str_starts_with($mimeType, 'video/')) {
+            throw new ValidationException(['file' => 'Video files are not allowed. Please upload an image or document file.']);
+        }
+
         $filename = sprintf('%s.%0.8s', bin2hex(random_bytes(8)), $extension);
         $uploadedFile->moveTo($directory . DIRECTORY_SEPARATOR . $filename);
         
@@ -3174,22 +3193,23 @@ class SchoolAdminService extends BaseService
     // -------------------------------------------------------------------------
 
     public const MASTER_CLASSES = [
-        ['id' => 1, 'name' => 'Play Group', 'category' => 'Pre-Primary'],
+        ['id' => 1, 'name' => 'Pre Nursery', 'category' => 'Pre-Primary'],
         ['id' => 2, 'name' => 'Nursery', 'category' => 'Pre-Primary'],
         ['id' => 3, 'name' => 'Lower Kindergarten (LKG)', 'category' => 'Pre-Primary'],
         ['id' => 4, 'name' => 'Upper Kindergarten (UKG)', 'category' => 'Pre-Primary'],
-        ['id' => 5, 'name' => 'Class 1', 'category' => 'Primary'],
-        ['id' => 6, 'name' => 'Class 2', 'category' => 'Primary'],
-        ['id' => 7, 'name' => 'Class 3', 'category' => 'Primary'],
-        ['id' => 8, 'name' => 'Class 4', 'category' => 'Primary'],
-        ['id' => 9, 'name' => 'Class 5', 'category' => 'Primary'],
-        ['id' => 10, 'name' => 'Class 6', 'category' => 'Middle'],
-        ['id' => 11, 'name' => 'Class 7', 'category' => 'Middle'],
-        ['id' => 12, 'name' => 'Class 8', 'category' => 'Middle'],
-        ['id' => 13, 'name' => 'Class 9', 'category' => 'Secondary'],
-        ['id' => 14, 'name' => 'Class 10', 'category' => 'Secondary'],
-        ['id' => 15, 'name' => 'Class 11', 'category' => 'Senior Secondary'],
-        ['id' => 16, 'name' => 'Class 12', 'category' => 'Senior Secondary'],
+        ['id' => 5, 'name' => 'KG', 'category' => 'Pre-Primary'],
+        ['id' => 6, 'name' => 'Class 1', 'category' => 'Primary'],
+        ['id' => 7, 'name' => 'Class 2', 'category' => 'Primary'],
+        ['id' => 8, 'name' => 'Class 3', 'category' => 'Primary'],
+        ['id' => 9, 'name' => 'Class 4', 'category' => 'Primary'],
+        ['id' => 10, 'name' => 'Class 5', 'category' => 'Primary'],
+        ['id' => 11, 'name' => 'Class 6', 'category' => 'Middle'],
+        ['id' => 12, 'name' => 'Class 7', 'category' => 'Middle'],
+        ['id' => 13, 'name' => 'Class 8', 'category' => 'Middle'],
+        ['id' => 14, 'name' => 'Class 9', 'category' => 'Secondary'],
+        ['id' => 15, 'name' => 'Class 10', 'category' => 'Secondary'],
+        ['id' => 16, 'name' => 'Class 11', 'category' => 'Senior Secondary'],
+        ['id' => 17, 'name' => 'Class 12', 'category' => 'Senior Secondary'],
     ];
 
     public const MASTER_SECTIONS = [
@@ -3232,7 +3252,10 @@ class SchoolAdminService extends BaseService
             if (strcasecmp($mc['name'], 'Upper Kindergarten (UKG)') === 0 && (strcasecmp($inputStr, 'ukg') === 0 || strcasecmp($inputStr, 'upper kindergarten') === 0)) {
                 return $mc;
             }
-            if (strcasecmp($mc['name'], 'Play Group') === 0 && strcasecmp($inputStr, 'pg') === 0) {
+            if (strcasecmp($mc['name'], 'Pre Nursery') === 0 && (strcasecmp($inputStr, 'pg') === 0 || strcasecmp($inputStr, 'play group') === 0 || strcasecmp($inputStr, 'playgroup') === 0 || strcasecmp($inputStr, 'pre nursery') === 0 || strcasecmp($inputStr, 'prenursery') === 0)) {
+                return $mc;
+            }
+            if (strcasecmp($mc['name'], 'KG') === 0 && (strcasecmp($inputStr, 'kg') === 0 || strcasecmp($inputStr, 'kindergarten') === 0)) {
                 return $mc;
             }
         }
@@ -7999,6 +8022,164 @@ class SchoolAdminService extends BaseService
         return $rows;
     }
 
+    public function getClassCourseFeeConfigurations(array $user, ?int $classId, ?int $academicYearId): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->feeRepo->getPdo();
+
+        // Run class-name auto-sync query so all sections of a class automatically share the course fee configuration
+        try {
+            $stmtSync = $pdo->prepare("
+                INSERT INTO class_course_fee_configurations (school_id, class_id, academic_year_id, amount)
+                SELECT c.school_id, c.id, cfg.academic_year_id, cfg.amount
+                FROM classes c
+                JOIN classes c_src ON c.school_id = c_src.school_id AND c.name COLLATE utf8mb4_unicode_ci = c_src.name COLLATE utf8mb4_unicode_ci
+                JOIN class_course_fee_configurations cfg ON c_src.id = cfg.class_id
+                WHERE c.school_id = :sid AND c.id != c_src.id
+                ON DUPLICATE KEY UPDATE amount = VALUES(amount)
+            ");
+            $stmtSync->execute([':sid' => $schoolId]);
+        } catch (\Throwable $e) {}
+
+        $query = "SELECT * FROM class_course_fee_configurations WHERE school_id = :school_id";
+        $params = [':school_id' => $schoolId];
+
+        if ($classId !== null) {
+            $query .= " AND class_id = :class_id";
+            $params[':class_id'] = $classId;
+        }
+
+        if ($academicYearId !== null) {
+            $query .= " AND academic_year_id = :academic_year_id";
+            $params[':academic_year_id'] = $academicYearId;
+        }
+
+        $stmt = $pdo->prepare($query);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($rows as &$row) {
+            $row['id'] = (int)$row['id'];
+            $row['class_id'] = (int)$row['class_id'];
+            $row['academic_year_id'] = (int)$row['academic_year_id'];
+            $row['amount'] = (float)$row['amount'];
+        }
+
+        return $rows;
+    }
+
+    public function saveClassCourseFeeConfiguration(array $user, array $data): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->feeRepo->getPdo();
+        $this->requireWritableAcademicYear($pdo, $schoolId);
+
+        $reqClassInput = $data['class_id'] ?? null;
+        if (empty($reqClassInput)) {
+            throw new ValidationException(['class_id' => 'Please select a class.']);
+        }
+
+        if (!isset($data['amount']) || $data['amount'] === '' || !is_numeric($data['amount']) || (float)$data['amount'] < 0) {
+            throw new ValidationException(['amount' => 'Please enter a valid non-negative course fee amount.']);
+        }
+
+        $amount = (float)$data['amount'];
+
+        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+        $workingYearId = $workingYear ? (int)$workingYear['id'] : null;
+
+        $academicYearId = !empty($data['academic_year_id']) ? (int)$data['academic_year_id'] : $workingYearId;
+
+        if ($academicYearId !== null) {
+            $stmtVerifyAY = $pdo->prepare("SELECT id FROM academic_years WHERE id = :ayid AND school_id = :sid LIMIT 1");
+            $stmtVerifyAY->execute([':ayid' => $academicYearId, ':sid' => $schoolId]);
+            $validAyId = $stmtVerifyAY->fetchColumn();
+            if (!$validAyId) {
+                if ($workingYearId !== null) {
+                    $academicYearId = $workingYearId;
+                } else {
+                    throw new ValidationException(['academic_year_id' => 'Invalid Academic Year for your school.']);
+                }
+            }
+        }
+
+        // Validate Class ID and verify that the class is added in the school
+        $classId = null;
+        $className = '';
+        if (is_numeric($reqClassInput)) {
+            $reqId = (int)$reqClassInput;
+            $stmtDirect = $pdo->prepare("SELECT id, name FROM classes WHERE id = :id AND school_id = :sid LIMIT 1");
+            $stmtDirect->execute([':id' => $reqId, ':sid' => $schoolId]);
+            $directClass = $stmtDirect->fetch(PDO::FETCH_ASSOC);
+
+            if ($directClass) {
+                $classId = (int)$directClass['id'];
+                $className = $directClass['name'];
+            } else {
+                $masterClass = $this->resolveMasterClass($reqId);
+                if ($masterClass) {
+                    $stmtMaster = $pdo->prepare("SELECT id, name FROM classes WHERE school_id = :sid AND LOWER(name) = LOWER(:name) LIMIT 1");
+                    $stmtMaster->execute([':sid' => $schoolId, ':name' => $masterClass['name']]);
+                    $foundClass = $stmtMaster->fetch(PDO::FETCH_ASSOC);
+                    if ($foundClass) {
+                        $classId = (int)$foundClass['id'];
+                        $className = $foundClass['name'];
+                    } else {
+                        throw new ValidationException(['class_id' => 'This class is not added in your Academy yet. Please add the class first.']);
+                    }
+                } else {
+                    throw new ValidationException(['class_id' => 'The selected class does not exist in master catalog.']);
+                }
+            }
+        } else {
+            $inputStr = trim((string)$reqClassInput);
+            $masterClass = $this->resolveMasterClass($inputStr);
+            if ($masterClass) {
+                $stmtMaster = $pdo->prepare("SELECT id, name FROM classes WHERE school_id = :sid AND LOWER(name) = LOWER(:name) LIMIT 1");
+                $stmtMaster->execute([':sid' => $schoolId, ':name' => $masterClass['name']]);
+                $foundClass = $stmtMaster->fetch(PDO::FETCH_ASSOC);
+                if ($foundClass) {
+                    $classId = (int)$foundClass['id'];
+                    $className = $foundClass['name'];
+                } else {
+                    throw new ValidationException(['class_id' => 'This class is not added in your Academy yet. Please add the class first.']);
+                }
+            } else {
+                throw new ValidationException(['class_id' => 'The selected class does not exist in master catalog.']);
+            }
+        }
+
+        // Get all class IDs sharing the same class name in this school so all sections sync
+        $stmtSameClasses = $pdo->prepare("SELECT id FROM classes WHERE school_id = :sid AND LOWER(name) = LOWER(:name)");
+        $stmtSameClasses->execute([':sid' => $schoolId, ':name' => $className]);
+        $allClassIds = $stmtSameClasses->fetchAll(PDO::FETCH_COLUMN);
+        if (empty($allClassIds)) {
+            $allClassIds = [$classId];
+        }
+
+        $stmtSave = $pdo->prepare("
+            INSERT INTO class_course_fee_configurations (school_id, class_id, academic_year_id, amount)
+            VALUES (:sid, :cid, :ayid, :amount)
+            ON DUPLICATE KEY UPDATE amount = VALUES(amount)
+        ");
+
+        foreach ($allClassIds as $cId) {
+            $stmtSave->execute([
+                ':sid' => $schoolId,
+                ':cid' => (int)$cId,
+                ':ayid' => $academicYearId,
+                ':amount' => $amount
+            ]);
+        }
+
+        return [
+            'class_id' => $classId,
+            'academic_year_id' => $academicYearId,
+            'amount' => $amount,
+            'message' => 'Course fee configuration saved successfully.'
+        ];
+    }
+
     public function saveClassFeeConfiguration(array $user, array $data): array
     {
         $schoolId = $this->getSchoolId($user);
@@ -10118,13 +10299,14 @@ Only approve the settlement after reviewing all financial records.
         $createdBy = (int)$user['id'];
         $payMethod = !empty($data['payment_method']) ? trim($data['payment_method']) : 'Cash';
         $refNo = !empty($data['reference_number']) ? trim($data['reference_number']) : null;
+        $billPath = !empty($data['bill_attachment_path']) ? trim($data['bill_attachment_path']) : null;
 
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
         $ayid = $workingYear ? (int)$workingYear['id'] : null;
 
         $stmt = $pdo->prepare("
-            INSERT INTO school_expenses (school_id, description, amount, created_by, expense_date, category, payment_method, reference_number, academic_year_id)
-            VALUES (:sid, :desc, :amount, :created_by, :expense_date, :cat, :pmethod, :ref, :ayid)
+            INSERT INTO school_expenses (school_id, description, amount, created_by, expense_date, category, payment_method, reference_number, academic_year_id, bill_attachment_path)
+            VALUES (:sid, :desc, :amount, :created_by, :expense_date, :cat, :pmethod, :ref, :ayid, :bill)
         ");
         $stmt->execute([
             ':sid' => $schoolId,
@@ -10135,7 +10317,8 @@ Only approve the settlement after reviewing all financial records.
             ':cat' => $category,
             ':pmethod' => $payMethod,
             ':ref' => $refNo,
-            ':ayid' => $ayid
+            ':ayid' => $ayid,
+            ':bill' => $billPath
         ]);
 
         $id = (int)$pdo->lastInsertId();
@@ -10217,10 +10400,13 @@ Only approve the settlement after reviewing all financial records.
         $expenseDate = trim($data['expense_date']);
         $payMethod = !empty($data['payment_method']) ? trim($data['payment_method']) : 'Cash';
         $refNo = !empty($data['reference_number']) ? trim($data['reference_number']) : null;
+        $billPath = array_key_exists('bill_attachment_path', $data)
+            ? (!empty($data['bill_attachment_path']) ? trim($data['bill_attachment_path']) : null)
+            : ($expense['bill_attachment_path'] ?? null);
 
         $stmt = $pdo->prepare("
             UPDATE school_expenses 
-            SET description = :desc, amount = :amount, expense_date = :expense_date, category = :cat, payment_method = :pmethod, reference_number = :ref
+            SET description = :desc, amount = :amount, expense_date = :expense_date, category = :cat, payment_method = :pmethod, reference_number = :ref, bill_attachment_path = :bill
             WHERE id = :id AND school_id = :sid
         ");
         $stmt->execute([
@@ -10231,7 +10417,8 @@ Only approve the settlement after reviewing all financial records.
             ':expense_date' => $expenseDate,
             ':cat' => $category,
             ':pmethod' => $payMethod,
-            ':ref' => $refNo
+            ':ref' => $refNo,
+            ':bill' => $billPath
         ]);
 
         return $this->getExpenseById($schoolId, $id);

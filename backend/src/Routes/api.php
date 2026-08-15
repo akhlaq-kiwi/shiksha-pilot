@@ -182,6 +182,9 @@ return function (App $app) {
     $app->post('/api/school/class-fee-configurations', [SchoolAdminController::class, 'saveClassFeeConfiguration']);
     $app->post('/api/school/class-fee-configurations/lock', [SchoolAdminController::class, 'lockClassFeeConfiguration']);
 
+    $app->get('/api/school/class-course-fee-configurations', [SchoolAdminController::class, 'getClassCourseFeeConfigurations']);
+    $app->post('/api/school/class-course-fee-configurations', [SchoolAdminController::class, 'saveClassCourseFeeConfiguration']);
+
     // Fee Follow-up System
     $app->get('/api/school/fee-follow-ups', [SchoolAdminController::class, 'getFeeFollowUps']);
     $app->post('/api/school/fee-follow-ups', [SchoolAdminController::class, 'createFeeFollowUp']);

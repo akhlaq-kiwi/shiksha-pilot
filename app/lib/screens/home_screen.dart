@@ -657,6 +657,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           photoUrl: fullPhotoUrl,
           children: _children,
           activeStudentId: _activeStudentId,
+          baseUrl: widget.leaveService.baseUrl,
           onSwitchChild: (newId) {
             setState(() {
               _activeStudentId = newId;

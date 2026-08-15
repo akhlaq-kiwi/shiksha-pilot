@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { createPortal } from 'react-dom';
-import { Landmark, Plus, Search, Calendar, Clock, Eye, Edit, Trash2, MoreVertical, X, AlertTriangle, User, ChevronDown, RefreshCw, Percent, Clipboard, CheckCircle, HelpCircle, FileSpreadsheet, FileText, FileDown, AlertCircle, Info } from 'lucide-react';
+import { Landmark, Plus, Search, Calendar, Clock, Eye, Edit, Trash2, MoreVertical, X, AlertTriangle, User, ChevronDown, RefreshCw, Percent, Clipboard, CheckCircle, HelpCircle, FileSpreadsheet, FileText, FileDown, AlertCircle, Info, Paperclip, Upload } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
 import { Button } from '../../../common/ui/button';
@@ -190,6 +190,10 @@ export default function FinanceManagementPage() {
   const [expenseAmount, setExpenseAmount] = useState('');
   const [expenseDate, setExpenseDate] = useState('');
   const [expenseSubmitting, setExpenseSubmitting] = useState(false);
+  const [expenseBillPath, setExpenseBillPath] = useState(null);
+  const [expenseBillUploading, setExpenseBillUploading] = useState(false);
+  const [expenseBillError, setExpenseBillError] = useState('');
+  const [previewingBillUrl, setPreviewingBillUrl] = useState(null);
 
   // Delete Expense Confirmation
   const [deletingExpenseId, setDeletingExpenseId] = useState(null);
@@ -862,13 +866,62 @@ export default function FinanceManagementPage() {
       setExpenseDesc(expenseToEdit.description || '');
       setExpenseAmount(expenseToEdit.amount || '');
       setExpenseDate(expenseToEdit.expense_date || '');
+      setExpenseBillPath(expenseToEdit.bill_attachment_path || null);
     } else {
       setEditingExpense(null);
       setExpenseDesc('');
       setExpenseAmount('');
       setExpenseDate(getLocalDateString());
+      setExpenseBillPath(null);
     }
+    setExpenseBillError('');
     setIsExpenseModalOpen(true);
+  };
+
+  const handleBillFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setExpenseBillError('');
+
+    const ext = file.name.split('.').pop()?.toLowerCase() || '';
+    const videoExtensions = ['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv', 'wmv', '3gp', 'm4v', 'ts', 'ogv'];
+    if (file.type.startsWith('video/') || videoExtensions.includes(ext)) {
+      setExpenseBillError('Video files are not allowed. Please upload an image or document bill.');
+      e.target.value = '';
+      return;
+    }
+
+    if (file.size > 20 * 1024 * 1024) {
+      setExpenseBillError('File size exceeds 20MB maximum allowed limit. Please choose a smaller file.');
+      e.target.value = '';
+      return;
+    }
+
+    setExpenseBillUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('document', file);
+      const res = await schoolService.uploadDocument(formData);
+      if (res && res.data && res.data.url) {
+        setExpenseBillPath(res.data.url);
+      } else if (res && res.url) {
+        setExpenseBillPath(res.url);
+      } else if (typeof res === 'string') {
+        setExpenseBillPath(res);
+      }
+    } catch (err) {
+      console.error(err);
+      const msg = err.message || '';
+      if (msg.includes('upload_max_filesize') || msg.includes('MAX_FILE_SIZE') || msg.includes('exceeds')) {
+        setExpenseBillError('File size exceeds 20MB maximum allowed limit. Please choose a smaller file.');
+      } else {
+        setExpenseBillError(msg || 'Failed to upload bill file.');
+      }
+    } finally {
+      setExpenseBillUploading(false);
+      e.target.value = '';
+    }
   };
 
   const handleSaveExpense = async (e) => {
@@ -894,7 +947,8 @@ export default function FinanceManagementPage() {
     const payload = {
       description: expenseDesc.trim(),
       amount: parseFloat(expenseAmount),
-      expense_date: expenseDate
+      expense_date: expenseDate,
+      bill_attachment_path: expenseBillPath
     };
 
     try {
@@ -1320,7 +1374,24 @@ export default function FinanceManagementPage() {
                   <TableBody>
                     {paginatedExpenses.map((e) => (
                       <TableRow key={e.id}>
-                        <TableCell className="text-xs font-semibold text-text-primary py-3.5 max-w-[300px] truncate">{e.description}</TableCell>
+                        <TableCell className="text-xs font-semibold text-text-primary py-3.5 max-w-[350px]">
+                          <div className="inline-flex items-center gap-1.5 max-w-full">
+                            <span className="truncate">{e.description}</span>
+                            {e.bill_attachment_path && (
+                              <button
+                                type="button"
+                                onClick={(ev) => {
+                                  ev.stopPropagation();
+                                  setPreviewingBillUrl(e.bill_attachment_path);
+                                }}
+                                className="inline-flex items-center justify-center p-1 rounded-md text-primary hover:text-primary/80 hover:bg-primary/10 transition-all shrink-0 cursor-pointer"
+                                title="View Bill Attachment"
+                              >
+                                <Paperclip className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell className="text-xs font-mono font-bold text-text-secondary py-3.5 whitespace-nowrap">{formatDateFull(e.expense_date)}</TableCell>
                         <TableCell className="text-xs font-bold font-sans text-red-500 py-3.5">{formatCurrency(e.amount)}</TableCell>
                         <TableCell className="text-right py-3.5 relative">
@@ -1903,7 +1974,130 @@ export default function FinanceManagementPage() {
               />
             </div>
           </div>
+
+          {/* Bill Attachment Upload Field */}
+          <div className="space-y-1.5 pt-1">
+            <label className="text-xs font-bold text-text-secondary uppercase flex items-center justify-between">
+              <span>Bill Attachment <span className="text-text-muted font-normal">(Optional)</span></span>
+              <span className="text-[10px] text-text-muted font-normal">Video files not allowed</span>
+            </label>
+
+            {expenseBillPath ? (
+              <div className="flex items-center justify-between p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+                <div className="flex items-center gap-2 min-w-0 pr-2">
+                  <Paperclip className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <span className="text-xs font-bold text-emerald-950 truncate max-w-[220px]">
+                    {expenseBillPath.split('/').pop()}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewingBillUrl(expenseBillPath)}
+                    className="p-1.5 text-emerald-700 hover:bg-emerald-500/20 rounded-md transition-all text-xs font-bold flex items-center gap-1"
+                    title="View Bill"
+                  >
+                    <Eye className="h-3.5 w-3.5" /> View
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setExpenseBillPath(null)}
+                    className="p-1.5 text-red-600 hover:bg-red-500/10 rounded-md transition-all text-xs font-bold"
+                    title="Remove Bill"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="relative">
+                <label className="flex items-center justify-center gap-2 p-3 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-primary/50 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-all text-xs font-semibold text-text-secondary">
+                  <Upload className="h-4 w-4 text-text-muted" />
+                  <span>{expenseBillUploading ? 'Uploading Bill...' : 'Choose Bill File (Images, PDF, Docs)'}</span>
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip"
+                    onChange={handleBillFileChange}
+                    disabled={expenseBillUploading}
+                  />
+                </label>
+              </div>
+            )}
+            {expenseBillError && (
+              <p className="text-[11px] text-red-500 font-semibold animate-in fade-in duration-150">
+                {expenseBillError}
+              </p>
+            )}
+          </div>
         </form>
+      </Dialog>
+
+      {/* Bill Preview Popup Dialog */}
+      <Dialog
+        isOpen={previewingBillUrl !== null}
+        onClose={() => setPreviewingBillUrl(null)}
+        title="Attached Bill Document"
+        description="Expense transaction bill attachment preview."
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setPreviewingBillUrl(null)}>Close</Button>
+            {previewingBillUrl && (
+              <a
+                href={previewingBillUrl.startsWith('http') ? previewingBillUrl : previewingBillUrl}
+                target="_blank"
+                rel="noreferrer"
+                download
+              >
+                <Button className="gap-1.5 font-bold">
+                  <FileDown className="h-4 w-4" /> Download File
+                </Button>
+              </a>
+            )}
+          </>
+        }
+      >
+        <div className="py-2 flex flex-col items-center justify-center min-h-[250px] max-h-[70vh] overflow-y-auto">
+          {(() => {
+            if (!previewingBillUrl) return null;
+            const cleanUrl = previewingBillUrl.startsWith('http') ? previewingBillUrl : previewingBillUrl;
+            const ext = cleanUrl.split('.').pop()?.toLowerCase() || '';
+            const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext);
+            const isPdf = ext === 'pdf';
+
+            if (isImage) {
+              return (
+                <img
+                  src={cleanUrl}
+                  alt="Bill Attachment"
+                  className="max-h-[60vh] max-w-full object-contain rounded-xl border border-border shadow-sm"
+                />
+              );
+            }
+
+            if (isPdf) {
+              return (
+                <iframe
+                  src={cleanUrl}
+                  title="Bill PDF Preview"
+                  className="w-full h-[60vh] rounded-xl border border-border"
+                />
+              );
+            }
+
+            return (
+              <div className="p-8 text-center space-y-3">
+                <FileText className="h-12 w-12 text-primary mx-auto opacity-70" />
+                <p className="text-xs font-bold text-text-primary">
+                  {previewingBillUrl.split('/').pop()}
+                </p>
+                <p className="text-xs text-text-secondary">
+                  Preview is not supported directly for this format ({ext.toUpperCase()}). Please click Download File below.
+                </p>
+              </div>
+            );
+          })()}
+        </div>
       </Dialog>
 
       {/* Delete Expense Confirmation */}

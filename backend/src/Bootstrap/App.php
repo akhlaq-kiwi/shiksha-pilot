@@ -113,6 +113,10 @@ class App
     public static function create(): SlimApp
     {
         date_default_timezone_set('Asia/Kolkata');
+        @ini_set('upload_max_filesize', '25M');
+        @ini_set('post_max_size', '30M');
+        @ini_set('memory_limit', '256M');
+
         // ── 1. Load .env for local development ───────────────────────────────
         loadEnvFile(dirname(__DIR__, 2) . '/.env');
 
