@@ -469,43 +469,63 @@ class LeaveRequestService extends BaseService
     private function resolveStudentsForUser(array $user): array
     {
         $schoolId = (int)($user['school_id'] ?? 0);
+        $phone = trim((string)($user['phone'] ?? ''));
+        $email = trim((string)($user['email'] ?? ''));
         $pdo = $this->repo->getPdo();
 
-        if ($user['role'] === 'STUDENT') {
-            $stmt = $pdo->prepare("
-                SELECT s.*, c.name as class_name, c.section as section_name FROM students s
-                LEFT JOIN classes c ON s.class_id = c.id
-                WHERE s.email = :email AND s.school_id = :sid
-            ");
-            $stmt->execute([':email' => $user['email'] ?? '', ':sid' => $schoolId]);
-            $students = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            if (empty($students) && !empty($user['phone'])) {
-                $stmt = $pdo->prepare("
-                    SELECT s.*, c.name as class_name, c.section as section_name FROM students s
-                    LEFT JOIN classes c ON s.class_id = c.id
-                    WHERE s.student_mobile = :phone AND s.school_id = :sid
-                ");
-                $stmt->execute([':phone' => $user['phone'], ':sid' => $schoolId]);
-                $students = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if (empty($phone) && isset($user['id'])) {
+            $stmt = $pdo->prepare("SELECT phone, email FROM users WHERE id = :id LIMIT 1");
+            $stmt->execute([':id' => $user['id']]);
+            $uRow = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($uRow) {
+                if (empty($phone)) $phone = trim((string)($uRow['phone'] ?? ''));
+                if (empty($email)) $email = trim((string)($uRow['email'] ?? ''));
             }
-            return $students;
-        } else {
-            // PARENT: match via phone (fallback to father_phone, guardian_phone, or student_mobile)
-            $stmt = $pdo->prepare("
-                SELECT s.*, c.name as class_name, c.section as section_name FROM students s
-                LEFT JOIN classes c ON s.class_id = c.id
-                WHERE (s.parent_phone = :phone1 OR s.father_phone = :phone2 OR s.guardian_phone = :phone3 OR s.student_mobile = :phone4) 
-                  AND s.school_id = :sid
-            ");
-            $stmt->execute([
-                ':phone1' => $user['phone'] ?? '',
-                ':phone2' => $user['phone'] ?? '',
-                ':phone3' => $user['phone'] ?? '',
-                ':phone4' => $user['phone'] ?? '',
-                ':sid' => $schoolId
-            ]);
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
+
+        if (empty($phone) || strlen($phone) < 10) {
+            if (!empty($email)) {
+                $stmt = $pdo->prepare("
+                    SELECT s.*, c.name as class_name, c.section as section_name 
+                    FROM students s
+                    LEFT JOIN classes c ON s.class_id = c.id
+                    WHERE s.school_id = :sid
+                      AND (s.status IS NULL OR UPPER(s.status) = 'ACTIVE')
+                      AND s.exit_date IS NULL
+                      AND LOWER(s.email) = LOWER(:email)
+                    ORDER BY s.id ASC
+                ");
+                $stmt->execute([':sid' => $schoolId, ':email' => $email]);
+                return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            }
+            return [];
+        }
+
+        $stmt = $pdo->prepare("
+            SELECT s.*, c.name as class_name, c.section as section_name 
+            FROM students s
+            LEFT JOIN classes c ON s.class_id = c.id
+            WHERE s.school_id = :sid
+              AND (s.status IS NULL OR UPPER(s.status) = 'ACTIVE')
+              AND s.exit_date IS NULL
+              AND (
+                (s.parent_phone = :p1 AND s.parent_phone IS NOT NULL AND s.parent_phone != '') OR
+                (s.father_phone = :p2 AND s.father_phone IS NOT NULL AND s.father_phone != '') OR
+                (s.guardian_phone = :p3 AND s.guardian_phone IS NOT NULL AND s.guardian_phone != '') OR
+                (s.student_mobile = :p4 AND s.student_mobile IS NOT NULL AND s.student_mobile != '')
+              )
+            ORDER BY s.id ASC
+        ");
+
+        $stmt->execute([
+            ':sid' => $schoolId,
+            ':p1'  => $phone,
+            ':p2'  => $phone,
+            ':p3'  => $phone,
+            ':p4'  => $phone
+        ]);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
     private function getAssignedClassIds(int $teacherId, int $schoolId): array

@@ -75,15 +75,15 @@ class StudentService extends BaseService
         }
 
         // 2. Default resolution by phone number
-        if ($student === null && !empty($userPhone)) {
+        if ($student === null && !empty($userPhone) && strlen($userPhone) >= 10) {
             $stmt = $pdo->prepare("
                 SELECT * FROM students 
                 WHERE school_id = :school_id
                   AND (
-                    student_mobile = :p1 OR 
-                    parent_phone = :p2 OR 
-                    father_phone = :p3 OR 
-                    guardian_phone = :p4
+                    (student_mobile = :p1 AND student_mobile IS NOT NULL AND student_mobile != '') OR 
+                    (parent_phone = :p2 AND parent_phone IS NOT NULL AND parent_phone != '') OR 
+                    (father_phone = :p3 AND father_phone IS NOT NULL AND father_phone != '') OR 
+                    (guardian_phone = :p4 AND guardian_phone IS NOT NULL AND guardian_phone != '')
                   )
                   AND (status IS NULL OR UPPER(status) = 'ACTIVE')
                   AND exit_date IS NULL
