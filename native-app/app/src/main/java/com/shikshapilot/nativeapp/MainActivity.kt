@@ -12,10 +12,12 @@ import com.shikshapilot.nativeapp.data.remote.RetrofitClient
 import com.shikshapilot.nativeapp.data.repository.UserRepository
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminAnnouncementsScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminAttendanceScreen
+import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminClassesScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminFinanceScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminLeaveRequestsScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminStaffScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminStudentsScreen
+import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminTimetableScreen
 import com.shikshapilot.nativeapp.features.studentparent.screens.StudentAnnouncementsScreen
 import com.shikshapilot.nativeapp.features.studentparent.screens.StudentAssignmentsScreen
 import com.shikshapilot.nativeapp.features.studentparent.screens.StudentAttendanceScreen
@@ -247,6 +249,18 @@ class MainActivity : ComponentActivity() {
                                 }
                                 "attendance", "att_exceptions" -> {
                                     SchoolAdminAttendanceScreen(
+                                        schoolName = schoolName,
+                                        onBack = { currentScreenId = "dashboard" }
+                                    )
+                                }
+                                "classes", "sections" -> {
+                                    SchoolAdminClassesScreen(
+                                        schoolName = schoolName,
+                                        onBack = { currentScreenId = "dashboard" }
+                                    )
+                                }
+                                "timetable" -> {
+                                    SchoolAdminTimetableScreen(
                                         schoolName = schoolName,
                                         onBack = { currentScreenId = "dashboard" }
                                     )

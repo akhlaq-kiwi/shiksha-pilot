@@ -76,8 +76,8 @@ fun SchoolAdminLeaveRequestsScreen(
                 applicant_name = "Bilal Ahmed",
                 applicant_role = "Teacher (Hindi)",
                 leave_type = "Medical Leave",
-                start_date = "2026-08-12",
-                end_date = "2026-08-14",
+                from_date = "2026-08-12",
+                to_date = "2026-08-14",
                 days = 3,
                 reason = "High fever & viral flu, doctor advised 3 days rest",
                 status = "PENDING"
@@ -87,8 +87,8 @@ fun SchoolAdminLeaveRequestsScreen(
                 applicant_name = "Sajeev Khanna",
                 applicant_role = "Teacher (English)",
                 leave_type = "Casual Leave",
-                start_date = "2026-08-18",
-                end_date = "2026-08-18",
+                from_date = "2026-08-18",
+                to_date = "2026-08-18",
                 days = 1,
                 reason = "Family function in home city",
                 status = "PENDING"
@@ -98,8 +98,8 @@ fun SchoolAdminLeaveRequestsScreen(
                 applicant_name = "Vikram Malhotra",
                 applicant_role = "Senior Physics Lecturer",
                 leave_type = "Earned Leave",
-                start_date = "2026-08-01",
-                end_date = "2026-08-02",
+                from_date = "2026-08-01",
+                to_date = "2026-08-02",
                 days = 2,
                 reason = "Attending CBSE Curriculum Workshop",
                 status = "APPROVED"
@@ -216,8 +216,8 @@ fun SchoolAdminLeaveRequestsScreen(
                                 val applicantName = leave.applicant_name ?: "Staff Member"
                                 val applicantRole = leave.applicant_role ?: "Faculty Member"
                                 val leaveTypeStr = leave.leave_type ?: "Casual Leave"
-                                val datesStr = if (!leave.start_date.isNullOrEmpty()) {
-                                    if (leave.start_date == leave.end_date) leave.start_date else "${leave.start_date} to ${leave.end_date}"
+                                val datesStr = if (!leave.from_date.isNullOrEmpty()) {
+                                    if (leave.from_date == leave.to_date) leave.from_date else "${leave.from_date} to ${leave.to_date}"
                                 } else "${leave.days ?: 1} Days"
 
                                 Box(

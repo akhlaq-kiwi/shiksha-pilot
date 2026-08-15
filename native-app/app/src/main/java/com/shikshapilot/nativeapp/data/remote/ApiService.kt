@@ -6,6 +6,7 @@ import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.HTTP
 import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.PUT
@@ -77,7 +78,16 @@ data class SchoolStatsResponseDto(
 data class ClassDto(
     val id: Int,
     val name: String,
-    val section: String? = null
+    val section: String? = null,
+    val stream: String? = null,
+    val school_id: Int? = null,
+    val academic_year_id: Int? = null,
+    // Joined from academic_years table (`SELECT c.*, ay.name AS academic_year_name`); the
+    // backend `classes` table itself has no student_count/class_teacher columns — a class row
+    // is one class+section combination, and per-section student counts/class-teacher assignment
+    // are not part of this endpoint's contract.
+    val academic_year_name: String? = null,
+    val created_at: String? = null
 )
 
 data class ClassesResponseDto(
@@ -85,8 +95,40 @@ data class ClassesResponseDto(
     val data: List<ClassDto> = emptyList()
 )
 
+// POST/PUT /api/school/classes body. Create resolves `class_id` (or `name`) + `sections` (list,
+// max 4) against the master catalog. Update requires `oldName` + `name` + `sections`.
+data class CreateClassRequestDto(
+    val class_id: String? = null,
+    val name: String,
+    val sections: List<String>? = null
+)
+
+data class UpdateClassRequestDto(
+    val oldName: String,
+    val name: String,
+    val sections: List<String>? = null
+)
+
+data class DeleteClassRequestDto(
+    val name: String,
+    val section: String? = null
+)
+
+data class NextRollNoResponseDto(
+    val status: String? = "success",
+    val data: NextRollNoDataDto? = null
+)
+
+data class NextRollNoDataDto(
+    val next_roll_no: Any? = null
+)
+
 data class TimetableItemDto(
     val id: Int? = null,
+    val class_id: Int? = null,
+    val subject_id: Int? = null,
+    val teacher_id: Int? = null,
+    val day_of_week: String? = null,
     val period_number: Int? = 1,
     val subject_name: String? = null,
     val teacher_name: String? = null,
@@ -94,6 +136,12 @@ data class TimetableItemDto(
     val end_time: String? = null,
     val room: String? = null,
     val class_name: String? = null,
+    val start_date: String? = null,
+    val end_date: String? = null,
+    val day_date: String? = null,
+    val backup_teacher_id: Int? = null,
+    val backup_teacher_name: String? = null,
+    val active_teacher_id: Int? = null,
     val is_backup: Boolean = false,
     val is_published: Int = 1,
     val is_free: Boolean = false
@@ -102,6 +150,39 @@ data class TimetableItemDto(
 data class TimetableResponseDto(
     val status: String? = "success",
     val data: JsonElement? = null
+)
+
+// GET /api/school/timetable with class_id + date returns an object keyed by day name
+// (`{"Monday": {"date":..., "day":..., "periods":[...]}, ...}`) — see
+// SchoolAdminService::getTimetable(). Without a date it returns a flat array of all periods
+// (all classes, school-wide) instead, so the school-admin screen always passes a date.
+data class TimetableDayScheduleDto(
+    val date: String? = null,
+    val day: String? = null,
+    val periods: List<TimetableItemDto> = emptyList()
+)
+
+// POST /api/school/timetable body (SchoolAdminService::addTimetablePeriod) — class/subject/
+// teacher/day_of_week/period_number are required; start_date defaults server-side to the
+// working academic year's start date if omitted.
+data class AddTimetablePeriodRequestDto(
+    val class_id: Int,
+    val subject_id: Int,
+    val teacher_id: Int,
+    val day_of_week: String,
+    val period_number: Int,
+    val start_time: String? = null,
+    val end_time: String? = null,
+    val room: String? = null,
+    val start_date: String? = null
+)
+
+// POST /api/school/timetable/publish body (SchoolAdminService::publishTimetable) — class_id
+// required; optional date/day_of_week to scope publishing to a specific day.
+data class PublishTimetableRequestDto(
+    val class_id: Int,
+    val date: String? = null,
+    val day_of_week: String? = null
 )
 
 data class StudentItemDto(
@@ -148,8 +229,10 @@ data class LeaveRequestItemDto(
     val applicant_name: String? = null,
     val applicant_role: String? = null,
     val leave_type: String? = "Casual Leave",
-    val start_date: String? = null,
-    val end_date: String? = null,
+    // Real `leave_requests` table columns are from_date/to_date, NOT start_date/end_date
+    // (see LeaveRequestRepository::findWithDetails() -> `SELECT lr.*, ...`).
+    val from_date: String? = null,
+    val to_date: String? = null,
     val days: Int? = 1,
     val reason: String? = null,
     val status: String? = "PENDING"
@@ -453,11 +536,54 @@ interface ApiService {
         @Header("Authorization") authHeader: String? = null
     ): Response<ClassesResponseDto>
 
+    @POST("api/school/classes")
+    suspend fun createClass(
+        @Body request: CreateClassRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
+    @PUT("api/school/classes")
+    suspend fun updateClass(
+        @Body request: UpdateClassRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
+    @HTTP(method = "DELETE", path = "api/school/classes", hasBody = true)
+    suspend fun deleteClass(
+        @Body request: DeleteClassRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
+    @GET("api/school/classes/{class_id}/next-roll-no")
+    suspend fun getNextRollNo(
+        @Path("class_id") classId: Int,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<NextRollNoResponseDto>
+
     @GET("api/school/timetable")
     suspend fun getTimetable(
         @Query("class_id") classId: Int,
-        @Query("date") date: String? = null
+        @Query("date") date: String? = null,
+        @Header("Authorization") authHeader: String? = null
     ): Response<TimetableResponseDto>
+
+    @POST("api/school/timetable")
+    suspend fun addTimetablePeriod(
+        @Body request: AddTimetablePeriodRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
+    @DELETE("api/school/timetable/{id}")
+    suspend fun deleteTimetablePeriod(
+        @Path("id") id: Int,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
+    @POST("api/school/timetable/publish")
+    suspend fun publishTimetable(
+        @Body request: PublishTimetableRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
 
     @GET("api/school/students")
     suspend fun getStudents(

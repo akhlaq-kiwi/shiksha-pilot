@@ -20,7 +20,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Class
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
@@ -60,6 +62,7 @@ import com.shikshapilot.nativeapp.ui.components.StickyTopBar
 import com.shikshapilot.nativeapp.ui.theme.CardBorder
 import com.shikshapilot.nativeapp.ui.theme.DarkCanvas
 import com.shikshapilot.nativeapp.ui.theme.FrostedCard
+import com.shikshapilot.nativeapp.ui.theme.InfoBlue
 import com.shikshapilot.nativeapp.ui.theme.OnlineGreen
 import com.shikshapilot.nativeapp.ui.theme.SunsetOrange
 import com.shikshapilot.nativeapp.ui.theme.TextPrimary
@@ -317,6 +320,28 @@ fun DashboardScreen(
                                 icon = Icons.Default.CreditCard,
                                 color = Color(0xFFEF4444),
                                 onClick = { onModuleClick("fee_defaulters") }
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            WebStatCard(
+                                modifier = Modifier.weight(1f),
+                                label = "Classes & Sections",
+                                value = "Manage",
+                                icon = Icons.Default.Class,
+                                color = InfoBlue,
+                                onClick = { onModuleClick("classes") }
+                            )
+                            WebStatCard(
+                                modifier = Modifier.weight(1f),
+                                label = "Timetable",
+                                value = "View & Publish",
+                                icon = Icons.Default.CalendarMonth,
+                                color = SunsetOrange,
+                                onClick = { onModuleClick("timetable") }
                             )
                         }
                     }

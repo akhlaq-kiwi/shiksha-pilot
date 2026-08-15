@@ -28,20 +28,17 @@ Found while doing the native-app parity inventory (see `native-app/PARITY_GAPS.m
   instead of the previous `title`/`content`/`target_audience`/`is_urgent`. No backend change was
   needed; this was purely a native-app DTO bug. Details of the original mismatch investigation kept
   below for reference.
-- **New finding — LeaveRequestItemDto date field-name mismatch (native-app only, found while building
-  TeacherLeaveScreen.kt, 2026-08-15):** `LeaveRequestItemDto` in `native-app/.../data/remote/ApiService.kt`
-  (used by `SchoolAdminLeaveRequestsScreen.kt` via `GET api/school/leave-requests`) declares
-  `start_date`/`end_date`, but the real `leave_requests` table columns (see
-  `backend/src/Database/Migrations/001_baseline_schema.sql` and
+- **LeaveRequestItemDto date field-name mismatch — RESOLVED (2026-08-15):** `LeaveRequestItemDto` in
+  `native-app/.../data/remote/ApiService.kt` (used by `SchoolAdminLeaveRequestsScreen.kt` via
+  `GET api/school/leave-requests`) declared `start_date`/`end_date`, but the real `leave_requests`
+  table columns (see `backend/src/Database/Migrations/001_baseline_schema.sql` and
   `backend/src/Domain/SchoolAdmin/Repositories/LeaveRequestRepository.php::findWithDetails()`, which does
-  `SELECT lr.*, ...`) are actually `from_date`/`to_date`. This means
-  `SchoolAdminLeaveRequestsScreen.kt`'s date rendering silently gets nulls from the real API (it currently
-  only "works" against its own hardcoded default/demo data). Not fixed here because
-  `SchoolAdminLeaveRequestsScreen.kt` predates this task and wasn't otherwise touched — fixing
-  `LeaveRequestItemDto`'s field names would require also updating that screen's rendering code. The new
-  `TeacherLeaveScreen.kt` added in this pass avoids the bug entirely by using a separate, correctly-named
-  `TeacherLeaveItemDto` (`from_date`/`to_date`) for `GET/POST api/school/leave-requests` instead of reusing
-  the mismatched `LeaveRequestItemDto`.
+  `SELECT lr.*, ...`) are actually `from_date`/`to_date`. Fixed by renaming the DTO's fields to
+  `from_date`/`to_date` and updating `SchoolAdminLeaveRequestsScreen.kt`'s demo data + date-rendering
+  logic (`datesStr`) to match, so leave request dates now render/submit correctly against the real API.
+  No backend change was needed; this was purely a native-app DTO bug. The existing `TeacherLeaveScreen.kt`
+  already used a separate, correctly-named `TeacherLeaveItemDto` (`from_date`/`to_date`) and needed no
+  change.
 - **New finding — Announcements DTO field-name mismatch (native-app only, not yet touched in backend):**
   `AnnouncementItemDto` in `native-app/.../data/remote/ApiService.kt` (used by school-admin's
   `GET/POST api/school/announcements`) declares fields `title`, `content`, `target_audience`,
@@ -60,3 +57,27 @@ Found while doing the native-app parity inventory (see `native-app/PARITY_GAPS.m
   (`GET api/student/announcements`), a separate, correctly-named `StudentAnnouncementItemDto`
   (`subject`/`description`/`audience`/`status`/`published_at`/`is_read`) was added instead of reusing
   the mismatched `AnnouncementItemDto`.
+- **New finding — no `GET /api/school/classes/sections` endpoint exists (native-app only, found while
+  building `SchoolAdminClassesScreen.kt`, 2026-08-15):** `backend/src/Routes/api.php` only registers
+  `DELETE /api/school/classes/sections` (`SchoolAdminController::deleteSection`) — there is no GET
+  route to list sections separately. `GET /api/school/classes` (`SchoolAdminController::getClasses` ->
+  `ClassRepository::findBySchool`, `SELECT c.*, ay.name AS academic_year_name FROM classes ...`)
+  already returns one row per class+section combination (the `classes` table has a `section` column
+  directly on each row, not a nested list), so the new native `SchoolAdminClassesScreen.kt` derives
+  sections/section-counts by grouping the `getClasses()` response by class `name` client-side instead
+  of calling a nonexistent sections endpoint. Also worth noting for anyone extending this further: the
+  `classes` table has no `student_count` or `class_teacher` column/join, so those "extend ClassDto"
+  ideas from the parity task description aren't backed by this endpoint's actual contract — a per-class
+  student count would need a separate `COUNT(*) FROM students WHERE class_id = ...` call (not added
+  here, out of scope for a view+publish-focused pass). Not a bug, just documenting the real contract
+  so it isn't re-investigated.
+- **New finding — full class create/update via `/api/school/classes` is a name+sections "master
+  catalog" operation, not simple per-row CRUD (native-app only, 2026-08-15):**
+  `SchoolAdminService::createClass`/`updateClass` resolve the submitted class `name` (or `class_id`)
+  and each of up to 4 `sections` against master Class/Section catalogs, then insert/update one
+  `classes` row per section (matching by old name/section on update). `deleteClass` requires a `name`
+  and refuses if any students are enrolled in that class across any section. Native's new
+  `SchoolAdminClassesScreen.kt` added the `createClass`/`updateClass`/`deleteClass`/`getNextRollNo`
+  DTOs and Retrofit methods to `ApiService.kt` to match this contract, but the screen itself is
+  currently view-only (list of classes grouped by name/sections) — add/edit/delete UI using these new
+  methods is a follow-up if the product wants full parity with the web admin's class management UI.
