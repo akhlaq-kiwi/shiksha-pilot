@@ -42,8 +42,8 @@ Each item: implement -> build verify -> commit -> push -> next.
 ## Medium-large
 - [ ] **Question Paper Designer** — `school-admin/pages/QuestionPaperDesignerPage.jsx`. Needs exact route
       confirmation in `ExamsController`/question-bank endpoints.
-- [ ] **Seating Plan Generator** — `school-admin/pages/SeatingPlanPage.jsx`.
-      API: `GET/POST /api/school/exams-new/{id}/seating-plan`, `.../preview`, `DELETE .../seating-plan`.
+- [x] **Seating Plan Generator** — done (commit dacd921): `SchoolAdminSeatingPlanScreen`. Wired into
+      the Education hub.
 
 ## Large
 - [ ] **Report Card Generation/Download (admin bulk + PDF)** — `report-card-templates/*` (4 templates) +
