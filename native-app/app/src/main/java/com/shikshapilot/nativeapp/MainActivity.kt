@@ -107,16 +107,46 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                var studentsClassFilter by remember { mutableStateOf<String?>(null) }
+                val openStudentsForClass: (String) -> Unit = { name ->
+                    studentsClassFilter = name
+                    navigateTo("students")
+                }
+
+                var showExitConfirm by remember { mutableStateOf(false) }
+
                 if (isLoggedIn) {
-                    // Single back on the dashboard root minimizes the app instead of killing the
-                    // activity (default Android behavior for a root screen with no back-stack).
+                    // Single back on the dashboard root asks for confirmation before backgrounding
+                    // the app, instead of silently minimizing (some OEM Android skins aggressively
+                    // kill backgrounded tasks, which made a silent minimize feel like the app closed).
                     BackHandler(enabled = true) {
                         if (backStack.size > 1) {
                             goBack()
                         } else {
-                            moveTaskToBack(true)
+                            showExitConfirm = true
                         }
                     }
+                }
+
+                if (showExitConfirm) {
+                    androidx.compose.material3.AlertDialog(
+                        onDismissRequest = { showExitConfirm = false },
+                        title = { androidx.compose.material3.Text("Exit ShikshaPilot?") },
+                        text = { androidx.compose.material3.Text("Are you sure you want to close the app?") },
+                        confirmButton = {
+                            androidx.compose.material3.TextButton(onClick = {
+                                showExitConfirm = false
+                                moveTaskToBack(true)
+                            }) {
+                                androidx.compose.material3.Text("Exit")
+                            }
+                        },
+                        dismissButton = {
+                            androidx.compose.material3.TextButton(onClick = { showExitConfirm = false }) {
+                                androidx.compose.material3.Text("Cancel")
+                            }
+                        }
+                    )
                 }
 
                 val performLogout: () -> Unit = {
@@ -353,7 +383,11 @@ class MainActivity : ComponentActivity() {
                                 "students", "admissions" -> {
                                     SchoolAdminStudentsScreen(
                                         schoolName = schoolName,
-                                        onBack = { goBack() }
+                                        classNameFilter = studentsClassFilter,
+                                        onBack = {
+                                            studentsClassFilter = null
+                                            goBack()
+                                        }
                                     )
                                 }
                                 "staff", "salary" -> {
@@ -427,7 +461,8 @@ class MainActivity : ComponentActivity() {
                                 "classes", "sections" -> {
                                     SchoolAdminClassesScreen(
                                         schoolName = schoolName,
-                                        onBack = { goBack() }
+                                        onBack = { goBack() },
+                                        onViewStudents = openStudentsForClass
                                     )
                                 }
                                 "timetable" -> {

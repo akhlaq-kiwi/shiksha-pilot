@@ -55,12 +55,13 @@ import com.shikshapilot.nativeapp.ui.theme.TextSecondary
 @Composable
 fun SchoolAdminStudentsScreen(
     schoolName: String = "Jamiya Kids Planet Academy",
+    classNameFilter: String? = null,
     onBack: () -> Unit = {},
     onNotificationClick: () -> Unit = {},
     onAvatarClick: () -> Unit = {}
 ) {
     var searchQuery by remember { mutableStateOf("") }
-    var studentsList by remember { mutableStateOf<List<StudentItemDto>>(emptyList()) }
+    var allStudents by remember { mutableStateOf<List<StudentItemDto>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
 
     // Live QA Server API Students Request
@@ -71,12 +72,20 @@ fun SchoolAdminStudentsScreen(
                 search = searchQuery.ifEmpty { null }
             )
             if (response.isSuccessful && response.body()?.data != null) {
-                studentsList = response.body()!!.data
+                allStudents = response.body()!!.data
             }
         } catch (e: Exception) {
             e.printStackTrace()
         } finally {
             isLoading = false
+        }
+    }
+
+    val studentsList = remember(allStudents, classNameFilter) {
+        if (classNameFilter.isNullOrBlank()) {
+            allStudents
+        } else {
+            allStudents.filter { it.class_name?.trim()?.equals(classNameFilter.trim(), ignoreCase = true) == true }
         }
     }
 
@@ -129,13 +138,13 @@ fun SchoolAdminStudentsScreen(
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Student Directory & Enrollment",
+                                text = if (classNameFilter.isNullOrBlank()) "Student Directory & Enrollment" else classNameFilter,
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = TextPrimary
                             )
                             Text(
-                                text = "${studentsList.size} Enrolled Students (QA Live API)",
+                                text = "${studentsList.size} Enrolled Students",
                                 fontSize = 11.5.sp,
                                 color = SunsetOrange
                             )

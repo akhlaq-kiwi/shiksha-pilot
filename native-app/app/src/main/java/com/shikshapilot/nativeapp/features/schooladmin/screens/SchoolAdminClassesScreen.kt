@@ -92,7 +92,8 @@ private const val SECTION_TYPE_COLOR = "Color Sections"
 @Composable
 fun SchoolAdminClassesScreen(
     schoolName: String = "Jamiya Kids Planet Academy",
-    onBack: () -> Unit = {}
+    onBack: () -> Unit = {},
+    onViewStudents: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -379,6 +380,7 @@ fun SchoolAdminClassesScreen(
                                             .clip(RoundedCornerShape(18.dp))
                                             .background(FrostedCard)
                                             .border(width = 1.dp, color = CardBorder, shape = RoundedCornerShape(18.dp))
+                                            .clickable { onViewStudents(className) }
                                             .padding(14.dp)
                                     ) {
                                         Row(
@@ -405,7 +407,7 @@ fun SchoolAdminClassesScreen(
 
                                             Column(modifier = Modifier.weight(1f)) {
                                                 Text(
-                                                    text = "Class $className",
+                                                    text = className,
                                                     fontSize = 15.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = TextPrimary
@@ -444,6 +446,14 @@ fun SchoolAdminClassesScreen(
                                                     expanded = menuForClass == className,
                                                     onDismissRequest = { menuForClass = null }
                                                 ) {
+                                                    DropdownMenuItem(
+                                                        text = { Text("View Students") },
+                                                        leadingIcon = { Icon(Icons.Default.Class, contentDescription = null) },
+                                                        onClick = {
+                                                            menuForClass = null
+                                                            onViewStudents(className)
+                                                        }
+                                                    )
                                                     DropdownMenuItem(
                                                         text = { Text("Manage Sections") },
                                                         leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
