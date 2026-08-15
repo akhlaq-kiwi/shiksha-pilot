@@ -12,11 +12,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -56,6 +59,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.shikshapilot.nativeapp.common.PredefinedClasses
 import com.shikshapilot.nativeapp.data.remote.ClassDto
 import com.shikshapilot.nativeapp.data.remote.CreateClassRequestDto
 import com.shikshapilot.nativeapp.data.remote.DeleteClassRequestDto
@@ -102,6 +106,7 @@ fun SchoolAdminClassesScreen(
     var isEditing by remember { mutableStateOf(false) }
     var editOldClassName by remember { mutableStateOf("") }
     var classNameInput by remember { mutableStateOf("") }
+    var selectedClassNames by remember { mutableStateOf<List<String>>(emptyList()) }
     var sectionTypeInput by remember { mutableStateOf(SECTION_TYPE_NONE) }
     var selectedSections by remember { mutableStateOf<List<String>>(emptyList()) }
     var formError by remember { mutableStateOf<String?>(null) }
@@ -133,11 +138,17 @@ fun SchoolAdminClassesScreen(
         classes.groupBy { it.name }.toSortedMap()
     }
 
+    val availablePredefinedClasses = remember(classes) {
+        val addedLower = classes.map { it.name.trim().lowercase() }.toSet()
+        PredefinedClasses.NAMES.filter { it.lowercase() !in addedLower }
+    }
+
     fun resetForm() {
         showFormDialog = false
         isEditing = false
         editOldClassName = ""
         classNameInput = ""
+        selectedClassNames = emptyList()
         sectionTypeInput = SECTION_TYPE_NONE
         selectedSections = emptyList()
         formError = null
@@ -164,34 +175,62 @@ fun SchoolAdminClassesScreen(
     }
 
     fun saveClass() {
-        val name = classNameInput.trim()
-        if (name.isEmpty()) {
-            formError = "Class name is required."
-            return
-        }
         if (selectedSections.size > 4) {
             formError = "Maximum 4 sections allowed."
+            return
+        }
+        if (isEditing) {
+            val name = classNameInput.trim()
+            if (name.isEmpty()) {
+                formError = "Class name is required."
+                return
+            }
+            isSaving = true
+            formError = null
+            scope.launch {
+                try {
+                    val response = RetrofitClient.apiService.updateClass(
+                        UpdateClassRequestDto(oldName = editOldClassName, name = name, sections = selectedSections)
+                    )
+                    if (response.isSuccessful) {
+                        Toast.makeText(context, "Class updated", Toast.LENGTH_SHORT).show()
+                        resetForm()
+                        reloadKey++
+                    } else {
+                        formError = "Failed to save class (code ${response.code()})"
+                    }
+                } catch (e: Exception) {
+                    formError = e.message ?: "Network error while saving class"
+                } finally {
+                    isSaving = false
+                }
+            }
+            return
+        }
+
+        if (selectedClassNames.isEmpty()) {
+            formError = "Please select at least one class."
             return
         }
         isSaving = true
         formError = null
         scope.launch {
             try {
-                val response = if (isEditing) {
-                    RetrofitClient.apiService.updateClass(
-                        UpdateClassRequestDto(oldName = editOldClassName, name = name, sections = selectedSections)
-                    )
-                } else {
-                    RetrofitClient.apiService.createClass(
+                val failed = mutableListOf<String>()
+                for (name in selectedClassNames) {
+                    val response = RetrofitClient.apiService.createClass(
                         CreateClassRequestDto(name = name, sections = selectedSections)
                     )
+                    if (!response.isSuccessful) failed.add(name)
                 }
-                if (response.isSuccessful) {
-                    Toast.makeText(context, if (isEditing) "Class updated" else "Class created", Toast.LENGTH_SHORT).show()
+                if (failed.isEmpty()) {
+                    val label = if (selectedClassNames.size == 1) "Class created" else "${selectedClassNames.size} classes created"
+                    Toast.makeText(context, label, Toast.LENGTH_SHORT).show()
                     resetForm()
                     reloadKey++
                 } else {
-                    formError = "Failed to save class (code ${response.code()})"
+                    formError = "Failed to create: ${failed.joinToString(", ")}"
+                    reloadKey++
                 }
             } catch (e: Exception) {
                 formError = e.message ?: "Network error while saving class"
@@ -467,27 +506,117 @@ fun SchoolAdminClassesScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    Text(text = "Class Name", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
-                    Spacer(modifier = Modifier.height(6.dp))
-                    OutlinedTextField(
-                        value = classNameInput,
-                        onValueChange = { if (!isEditing) classNameInput = it },
-                        enabled = !isEditing,
-                        modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("e.g. Class 5") },
-                        singleLine = true,
-                        shape = RoundedCornerShape(14.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = FrostedCard,
-                            unfocusedContainerColor = FrostedCard,
-                            disabledContainerColor = FrostedCard,
-                            focusedBorderColor = SunsetOrange,
-                            unfocusedBorderColor = CardBorder,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary,
-                            disabledTextColor = TextPrimary
+                    if (isEditing) {
+                        Text(text = "Class Name", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        OutlinedTextField(
+                            value = classNameInput,
+                            onValueChange = {},
+                            enabled = false,
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            shape = RoundedCornerShape(14.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                disabledContainerColor = FrostedCard,
+                                unfocusedBorderColor = CardBorder,
+                                disabledTextColor = TextPrimary
+                            )
                         )
-                    )
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(text = "Select Class(es)", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (selectedClassNames.isNotEmpty()) {
+                                    Text(
+                                        text = "${selectedClassNames.size} Selected",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = SunsetOrange,
+                                        modifier = Modifier.padding(end = 10.dp)
+                                    )
+                                }
+                                if (availablePredefinedClasses.isNotEmpty()) {
+                                    Text(
+                                        text = if (selectedClassNames.size == availablePredefinedClasses.size) "Deselect All" else "Select All",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = InfoBlue,
+                                        modifier = Modifier.clickable {
+                                            selectedClassNames = if (selectedClassNames.size == availablePredefinedClasses.size) {
+                                                emptyList()
+                                            } else {
+                                                availablePredefinedClasses
+                                            }
+                                            formError = null
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        if (availablePredefinedClasses.isEmpty()) {
+                            Text(
+                                text = "All standard classes have been added.",
+                                fontSize = 12.sp,
+                                color = TextSecondary,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 12.dp)
+                            )
+                        } else {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 220.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(FrostedCard)
+                                    .border(width = 1.dp, color = CardBorder, shape = RoundedCornerShape(14.dp))
+                                    .verticalScroll(rememberScrollState())
+                                    .padding(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                availablePredefinedClasses.forEach { name ->
+                                    val isSelected = selectedClassNames.contains(name)
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(if (isSelected) SunsetOrange.copy(alpha = 0.18f) else androidx.compose.ui.graphics.Color.Transparent)
+                                            .clickable {
+                                                selectedClassNames = if (isSelected) {
+                                                    selectedClassNames - name
+                                                } else {
+                                                    selectedClassNames + name
+                                                }
+                                                formError = null
+                                            }
+                                            .padding(horizontal = 10.dp, vertical = 10.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = name,
+                                            fontSize = 12.5.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isSelected) SunsetOrange else TextPrimary
+                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .size(18.dp)
+                                                .clip(CircleShape)
+                                                .background(if (isSelected) SunsetOrange else androidx.compose.ui.graphics.Color.Transparent)
+                                                .border(width = 1.dp, color = if (isSelected) SunsetOrange else CardBorder, shape = CircleShape)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(16.dp))
 
