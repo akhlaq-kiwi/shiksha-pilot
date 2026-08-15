@@ -4012,7 +4012,7 @@ class SchoolAdminService extends BaseService
                                 $oldStu['academic_year_id'] = $newYearId;
                                 $oldStu['status'] = 'ACTIVE';
                                 $oldStu['roll_no'] = $newRollNo;
-                                $oldStu['section'] = null;
+                                unset($oldStu['section']);
 
                                 $cols = array_keys($oldStu);
                                 $placeholders = array_map(fn($c) => ":{$c}", $cols);
@@ -15943,11 +15943,67 @@ Only approve the settlement after reviewing all financial records.
                 $c['assigned_teacher_name'] = null;
             }
         }
+        unset($c);
+
+        $this->sortClassesNaturally($classes);
 
         return [
             'classes' => $classes,
             'teachers' => $teachers
         ];
+    }
+
+    private function sortClassesNaturally(array &$classes): void
+    {
+        usort($classes, function ($a, $b) {
+            $nameA = trim((string)($a['name'] ?? ''));
+            $nameB = trim((string)($b['name'] ?? ''));
+            $secA  = trim((string)($a['section'] ?? ''));
+            $secB  = trim((string)($b['section'] ?? ''));
+
+            preg_match('/\d+/', $nameA, $matchA);
+            preg_match('/\d+/', $nameB, $matchB);
+
+            $numA = isset($matchA[0]) ? (int)$matchA[0] : null;
+            $numB = isset($matchB[0]) ? (int)$matchB[0] : null;
+
+            $getPrePrimaryRank = function ($name) {
+                $lower = strtolower($name);
+                if (str_contains($lower, 'play')) return 1;
+                if (str_contains($lower, 'nurs')) return 2;
+                if (str_contains($lower, 'lkg'))  return 3;
+                if (str_contains($lower, 'ukg'))  return 4;
+                if (str_contains($lower, 'kg'))   return 5;
+                if (str_contains($lower, 'prep')) return 6;
+                return 999;
+            };
+
+            $rankA = $getPrePrimaryRank($nameA);
+            $rankB = $getPrePrimaryRank($nameB);
+
+            if ($rankA !== 999 || $rankB !== 999) {
+                if ($rankA !== $rankB) {
+                    return $rankA <=> $rankB;
+                }
+            }
+
+            if ($numA !== null && $numB !== null) {
+                if ($numA !== $numB) {
+                    return $numA <=> $numB;
+                }
+            } elseif ($numA !== null && $numB === null) {
+                return 1;
+            } elseif ($numA === null && $numB !== null) {
+                return -1;
+            }
+
+            $cmpName = strnatcasecmp($nameA, $nameB);
+            if ($cmpName !== 0) {
+                return $cmpName;
+            }
+
+            return strnatcasecmp($secA, $secB);
+        });
     }
 
     public function saveClassTeacherAssignments(array $user, array $data): array

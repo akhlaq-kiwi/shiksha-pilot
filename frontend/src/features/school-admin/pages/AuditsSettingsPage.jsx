@@ -69,6 +69,52 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
     'Security'
   ];
 
+  const sortClassesNaturally = (classes) => {
+    const getPrePrimaryRank = (name) => {
+      const lower = (name || '').toLowerCase();
+      if (lower.includes('play')) return 1;
+      if (lower.includes('nurs')) return 2;
+      if (lower.includes('lkg')) return 3;
+      if (lower.includes('ukg')) return 4;
+      if (lower.includes('kg')) return 5;
+      if (lower.includes('prep')) return 6;
+      return 999;
+    };
+
+    return [...classes].sort((a, b) => {
+      const nameA = (a.name || '').trim();
+      const nameB = (b.name || '').trim();
+      const secA = (a.section || '').trim();
+      const secB = (b.section || '').trim();
+
+      const rankA = getPrePrimaryRank(nameA);
+      const rankB = getPrePrimaryRank(nameB);
+
+      if (rankA !== 999 || rankB !== 999) {
+        if (rankA !== rankB) return rankA - rankB;
+      }
+
+      const matchA = nameA.match(/\d+/);
+      const matchB = nameB.match(/\d+/);
+
+      const numA = matchA ? parseInt(matchA[0], 10) : null;
+      const numB = matchB ? parseInt(matchB[0], 10) : null;
+
+      if (numA !== null && numB !== null) {
+        if (numA !== numB) return numA - numB;
+      } else if (numA !== null && numB === null) {
+        return 1;
+      } else if (numA === null && numB !== null) {
+        return -1;
+      }
+
+      const cmpName = nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+      if (cmpName !== 0) return cmpName;
+
+      return secA.localeCompare(secB, undefined, { numeric: true, sensitivity: 'base' });
+    });
+  };
+
   const loadPermissionsAndAssignments = async () => {
     try {
       const [permData, assignData] = await Promise.all([
@@ -79,7 +125,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
       const teachers = permData.teachers || [];
       setTeachersWithPerms(teachers);
 
-      const clsList = assignData.classes || [];
+      const clsList = sortClassesNaturally(assignData.classes || []);
       setClassesWithTeachers(clsList);
       
       const localMap = {};

@@ -315,21 +315,35 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   void _resolveActiveStudentName() {
-    if (_children.isEmpty || _activeStudentId == null) return;
-    final active = _children.firstWhere(
-      (c) => c['id'] == _activeStudentId,
-      orElse: () => null,
-    );
-    if (active != null) {
-      setState(() {
-        _activeStudentName = active['name'] ?? '';
-        _activeStudentClass = active['class_name'] ?? '';
-      });
+    if (_children.isEmpty) return;
+    Map<String, dynamic>? active;
+    if (_activeStudentId != null) {
+      for (final child in _children) {
+        final cId = child['id'] is int ? child['id'] : int.parse(child['id'].toString());
+        if (cId == _activeStudentId) {
+          active = child as Map<String, dynamic>;
+          break;
+        }
+      }
+    }
+    active ??= Map<String, dynamic>.from(_children.first);
+    
+    final resolvedId = active['id'] is int ? active['id'] as int : int.parse(active['id'].toString());
+    if (_activeStudentId != resolvedId) {
+      _activeStudentId = resolvedId;
       SharedPreferences.getInstance().then((prefs) {
-        prefs.setString('user_name', active['name'] ?? '');
-        prefs.setString('user_photo', active['photo_path']?.toString() ?? '');
+        prefs.setInt('selected_student_id', resolvedId);
       });
     }
+
+    setState(() {
+      _activeStudentName = active!['name'] ?? '';
+      _activeStudentClass = active!['class_name'] ?? '';
+    });
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setString('user_name', active!['name'] ?? '');
+      prefs.setString('user_photo', active!['photo_path']?.toString() ?? '');
+    });
   }
 
   Future<void> _fetchUnreadNotificationsCount() async {
