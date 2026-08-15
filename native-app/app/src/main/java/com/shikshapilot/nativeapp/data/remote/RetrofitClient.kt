@@ -7,7 +7,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
-    private const val BASE_URL = "https://qa.shikshapilot.com/"
+    private const val BASE_URL = "https://app.shikshapilot.com/"
 
     var authToken: String? = null
 
