@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Class
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
@@ -47,9 +48,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.content.Context
 import com.shikshapilot.nativeapp.data.remote.ClassDto
 import com.shikshapilot.nativeapp.data.repository.SchoolAdminRepository
 import com.shikshapilot.nativeapp.data.repository.UserRepository
@@ -89,9 +92,16 @@ fun DashboardScreen(
     val adminStats by SchoolAdminRepository.stats.collectAsState()
     val classesList by SchoolAdminRepository.classesList.collectAsState()
     val currentTimetable by SchoolAdminRepository.currentTimetable.collectAsState()
+    val setupProgress by SchoolAdminRepository.setupProgress.collectAsState()
 
     var selectedClassDto by remember { mutableStateOf<ClassDto?>(null) }
     var isClassPickerExpanded by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("shikshapilot_prefs", Context.MODE_PRIVATE) }
+    var isSetupProgressDismissed by remember {
+        mutableStateOf(prefs.getBoolean("setup_progress_dismissed", false))
+    }
 
     // Live QA Server API Stats & Classes Refresh
     LaunchedEffect(Unit) {
@@ -101,6 +111,7 @@ fun DashboardScreen(
             selectedClassDto = classes.first()
             SchoolAdminRepository.fetchTimetableForClassFromApi(classes.first().id)
         }
+        SchoolAdminRepository.fetchSetupProgress()
     }
 
     // Dynamic Class Timetable Change Effect
@@ -117,13 +128,16 @@ fun DashboardScreen(
     val activeName = if (userName.isNotEmpty()) userName else cachedUser.name
 
     val onboardingTasks = listOf(
-        OnboardingTask("classes", "Add classes & sections", true),
-        OnboardingTask("finance", "Set up a fee structure", true),
-        OnboardingTask("staff", "Add teachers", true),
-        OnboardingTask("students", "Enrol students", true),
-        OnboardingTask("timetable", "Build the timetable", false),
-        OnboardingTask("exams", "Create an examination", false)
+        OnboardingTask("classes", "Add classes & sections", setupProgress.classesDone),
+        OnboardingTask("finance", "Set up a fee structure", setupProgress.financeDone),
+        OnboardingTask("staff", "Add teachers", setupProgress.staffDone),
+        OnboardingTask("students", "Enrol students", setupProgress.studentsDone),
+        OnboardingTask("timetable", "Build the timetable", setupProgress.timetableDone),
+        OnboardingTask("exams", "Create an examination", setupProgress.examsDone)
     )
+    val setupCompletedCount = onboardingTasks.count { it.isDone }
+    val setupTotalCount = onboardingTasks.size
+    val setupPercent = if (setupTotalCount > 0) (setupCompletedCount * 100) / setupTotalCount else 0
 
     // Dynamic Financial Charts Data Matching QA Server Response
     val feeCollectionChartData = if (adminStats.feeCollectionChart.isNotEmpty()) {
@@ -210,75 +224,91 @@ fun DashboardScreen(
                 ) {
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // WEB PARITY: Onboarding Checklist Widget
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(FrostedCard.copy(alpha = 0.9f))
-                            .border(width = 1.dp, color = CardBorder, shape = RoundedCornerShape(20.dp))
-                            .padding(16.dp)
-                    ) {
-                        Column {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column {
-                                    Text(
-                                        text = "School Setup Progress",
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = TextPrimary
-                                    )
-                                    Text(
-                                        text = "4 of 6 setup steps completed",
-                                        fontSize = 11.5.sp,
-                                        color = SunsetOrange
-                                    )
-                                }
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(SunsetOrange.copy(alpha = 0.18f))
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                    // WEB PARITY: Onboarding Checklist Widget (dismissible, driven by real setup state)
+                    if (!isSetupProgressDismissed && setupCompletedCount < setupTotalCount) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp)
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(FrostedCard.copy(alpha = 0.9f))
+                                .border(width = 1.dp, color = CardBorder, shape = RoundedCornerShape(20.dp))
+                                .padding(16.dp)
+                        ) {
+                            Column {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(text = "67% Done", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = SunsetOrange)
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                onboardingTasks.forEach { task ->
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable { onModuleClick(task.id) },
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            imageVector = if (task.isDone) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
-                                            contentDescription = "Done",
-                                            tint = if (task.isDone) OnlineGreen else TextSecondary,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
                                         Text(
-                                            text = task.title,
-                                            fontSize = 12.5.sp,
-                                            color = if (task.isDone) TextPrimary else TextSecondary,
-                                            fontWeight = if (task.isDone) FontWeight.Medium else FontWeight.Normal
+                                            text = "School Setup Progress",
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = TextPrimary
                                         )
+                                        Text(
+                                            text = "$setupCompletedCount of $setupTotalCount setup steps completed",
+                                            fontSize = 11.5.sp,
+                                            color = SunsetOrange
+                                        )
+                                    }
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(SunsetOrange.copy(alpha = 0.18f))
+                                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                        ) {
+                                            Text(text = "$setupPercent% Done", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = SunsetOrange)
+                                        }
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Dismiss setup progress",
+                                            tint = TextSecondary,
+                                            modifier = Modifier
+                                                .size(18.dp)
+                                                .clickable {
+                                                    isSetupProgressDismissed = true
+                                                    prefs.edit().putBoolean("setup_progress_dismissed", true).apply()
+                                                }
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    onboardingTasks.forEach { task ->
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable { onModuleClick(task.id) },
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                imageVector = if (task.isDone) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                                                contentDescription = "Done",
+                                                tint = if (task.isDone) OnlineGreen else TextSecondary,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = task.title,
+                                                fontSize = 12.5.sp,
+                                                color = if (task.isDone) TextPrimary else TextSecondary,
+                                                fontWeight = if (task.isDone) FontWeight.Medium else FontWeight.Normal
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
 
                     // WEB PARITY: 4 Primary Stat Cards Grid (API Dynamic QA Stats)
                     Column(

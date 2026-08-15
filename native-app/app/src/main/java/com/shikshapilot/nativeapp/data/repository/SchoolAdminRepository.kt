@@ -25,6 +25,18 @@ data class AdminDashboardStats(
     val salaryDisbursementChart: List<ChartMonthPointDto> = emptyList()
 )
 
+data class SetupProgress(
+    val classesDone: Boolean = false,
+    val financeDone: Boolean = false,
+    val staffDone: Boolean = false,
+    val studentsDone: Boolean = false,
+    val timetableDone: Boolean = false,
+    val examsDone: Boolean = false
+) {
+    val completedCount: Int get() = listOf(classesDone, financeDone, staffDone, studentsDone, timetableDone, examsDone).count { it }
+    val totalCount: Int get() = 6
+}
+
 data class StaffRecord(
     val id: String,
     val name: String,
@@ -83,6 +95,9 @@ object SchoolAdminRepository {
 
     private val _currentTimetable = MutableStateFlow<List<LiveTimetablePeriod>>(emptyList())
     val currentTimetable: StateFlow<List<LiveTimetablePeriod>> = _currentTimetable.asStateFlow()
+
+    private val _setupProgress = MutableStateFlow(SetupProgress())
+    val setupProgress: StateFlow<SetupProgress> = _setupProgress.asStateFlow()
 
     private val _staffList = MutableStateFlow(
         listOf(
@@ -242,6 +257,44 @@ object SchoolAdminRepository {
             e.printStackTrace()
             _currentTimetable.value = emptyList()
         }
+    }
+
+    suspend fun fetchSetupProgress() {
+        val classesDone = try {
+            val res = RetrofitClient.apiService.getClasses()
+            res.isSuccessful && !res.body()?.data.isNullOrEmpty()
+        } catch (e: Exception) { false }
+
+        val financeDone = try {
+            val res = RetrofitClient.apiService.getFeeStructures()
+            res.isSuccessful && !res.body()?.data.isNullOrEmpty()
+        } catch (e: Exception) { false }
+
+        val staffDone = try {
+            val res = RetrofitClient.apiService.getStaff()
+            res.isSuccessful && !res.body()?.data.isNullOrEmpty()
+        } catch (e: Exception) { _stats.value.totalStaff > 0 }
+
+        val studentsDone = try {
+            val res = RetrofitClient.apiService.getStudents()
+            res.isSuccessful && !res.body()?.data.isNullOrEmpty()
+        } catch (e: Exception) { _stats.value.totalStudents > 0 }
+
+        val timetableDone = _currentTimetable.value.isNotEmpty()
+
+        val examsDone = try {
+            val res = RetrofitClient.apiService.getSchoolExams()
+            res.isSuccessful && !res.body()?.data.isNullOrEmpty()
+        } catch (e: Exception) { false }
+
+        _setupProgress.value = SetupProgress(
+            classesDone = classesDone,
+            financeDone = financeDone,
+            staffDone = staffDone,
+            studentsDone = studentsDone,
+            timetableDone = timetableDone,
+            examsDone = examsDone
+        )
     }
 
     private fun formatMinsTo12Hr(totalMinutes: Int): String {
