@@ -205,6 +205,7 @@ fun StudentDashboardScreen(
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = RoundedCornerShape(16.dp))
+                                .clickable { onNavigate("student_attendance") }
                                 .padding(12.dp)
                         ) {
                             Column {
@@ -288,13 +289,27 @@ fun StudentDashboardScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    Text(
-                        text = "TODAY'S CLASS TIMETABLE (QA LIVE API)",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = TextSecondary,
-                        letterSpacing = 1.sp
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onNavigate("student_timetable") },
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "TODAY'S CLASS TIMETABLE (QA LIVE API)",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = TextSecondary,
+                            letterSpacing = 1.sp
+                        )
+                        Text(
+                            text = "View Full →",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = SunsetOrange
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(10.dp))
 

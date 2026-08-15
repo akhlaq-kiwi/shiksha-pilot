@@ -16,8 +16,13 @@ import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminFinanc
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminLeaveRequestsScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminStaffScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminStudentsScreen
+import com.shikshapilot.nativeapp.features.studentparent.screens.StudentAnnouncementsScreen
+import com.shikshapilot.nativeapp.features.studentparent.screens.StudentAssignmentsScreen
+import com.shikshapilot.nativeapp.features.studentparent.screens.StudentAttendanceScreen
 import com.shikshapilot.nativeapp.features.studentparent.screens.StudentDashboardScreen
 import com.shikshapilot.nativeapp.features.studentparent.screens.StudentFeesScreen
+import com.shikshapilot.nativeapp.features.studentparent.screens.StudentMaterialsScreen
+import com.shikshapilot.nativeapp.features.studentparent.screens.StudentTimetableScreen
 import com.shikshapilot.nativeapp.features.teacher.screens.TeacherAssignmentsScreen
 import com.shikshapilot.nativeapp.features.teacher.screens.TeacherAttendanceScreen
 import com.shikshapilot.nativeapp.features.teacher.screens.TeacherDashboardScreen
@@ -132,8 +137,32 @@ class MainActivity : ComponentActivity() {
                                         onBack = { currentScreenId = "dashboard" }
                                     )
                                 }
-                                "announcements", "student_assignments", "student_materials" -> {
-                                    SchoolAdminAnnouncementsScreen(
+                                "student_attendance" -> {
+                                    StudentAttendanceScreen(
+                                        schoolName = schoolName,
+                                        onBack = { currentScreenId = "dashboard" }
+                                    )
+                                }
+                                "student_assignments" -> {
+                                    StudentAssignmentsScreen(
+                                        schoolName = schoolName,
+                                        onBack = { currentScreenId = "dashboard" }
+                                    )
+                                }
+                                "student_materials" -> {
+                                    StudentMaterialsScreen(
+                                        schoolName = schoolName,
+                                        onBack = { currentScreenId = "dashboard" }
+                                    )
+                                }
+                                "student_timetable" -> {
+                                    StudentTimetableScreen(
+                                        schoolName = schoolName,
+                                        onBack = { currentScreenId = "dashboard" }
+                                    )
+                                }
+                                "announcements" -> {
+                                    StudentAnnouncementsScreen(
                                         schoolName = schoolName,
                                         onBack = { currentScreenId = "dashboard" }
                                     )

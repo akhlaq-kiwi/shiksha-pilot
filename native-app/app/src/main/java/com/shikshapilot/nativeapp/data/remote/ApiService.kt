@@ -256,6 +256,27 @@ data class StudentAttendanceResponseDto(
     val data: List<StudentAttendanceRecordDto> = emptyList()
 )
 
+// Note: the `announcements` table's real columns are subject/description/audience/status/
+// published_at (see backend/src/Domain/SchoolAdmin/Services/SchoolAdminService.php
+// getAnnouncements()/createAnnouncement()), NOT title/content/target_audience/is_urgent as
+// AnnouncementItemDto above assumes. StudentAnnouncementItemDto below uses the real field
+// names for the read-only student/parent notices endpoint.
+data class StudentAnnouncementItemDto(
+    val id: Int? = null,
+    val subject: String? = null,
+    val description: String? = null,
+    val audience: String? = null,
+    val status: String? = null,
+    val published_at: String? = null,
+    val created_at: String? = null,
+    val is_read: Int? = 0
+)
+
+data class StudentAnnouncementsResponseDto(
+    val status: String? = "success",
+    val data: List<StudentAnnouncementItemDto> = emptyList()
+)
+
 data class StudentFeeReceiptDto(
     val receipt_no: String,
     val amount: Double,
@@ -471,4 +492,9 @@ interface ApiService {
     suspend fun getStudentMaterials(
         @Header("Authorization") authHeader: String? = null
     ): Response<MaterialsResponseDto>
+
+    @GET("api/student/announcements")
+    suspend fun getStudentAnnouncements(
+        @Header("Authorization") authHeader: String? = null
+    ): Response<StudentAnnouncementsResponseDto>
 }
