@@ -23,6 +23,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.ArrowBackIos
+import androidx.compose.material.icons.filled.DirectionsBus
 import androidx.compose.material.icons.filled.EventBusy
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Receipt
@@ -69,16 +70,17 @@ private val financeModules = listOf(
     FinanceModuleItem("fee_collection", "Fee Collection", "Record payments & collection history", Icons.Default.Payments),
     FinanceModuleItem("fee_follow_up", "Fee Follow-Ups", "Track defaulters & payment commitments", Icons.Default.EventBusy),
     FinanceModuleItem("salary_disbursement", "Salary Disbursement", "Pay monthly staff salaries", Icons.Default.AccountBalanceWallet),
-    FinanceModuleItem("financial_reports", "Financial Reports", "Generate & review profit/loss reports", Icons.Default.Assessment)
+    FinanceModuleItem("financial_reports", "Financial Reports", "Generate & review profit/loss reports", Icons.Default.Assessment),
+    FinanceModuleItem("transport_fees", "Transport Fees", "Assign & manage student transport charges", Icons.Default.DirectionsBus)
 )
 
 /**
  * Finance module hub — repurposed from the old single generic finance stub into a menu that
  * links out to the dedicated finance screens (fee structures, fee collection, follow-ups,
- * salary disbursement, financial reports), matching how the web splits finance into ~8 pages
- * (frontend/src/features/school-admin/pages/Finance*.jsx). See native-app/PARITY_GAPS.md for
- * what's still deferred (additional/transport fees, late-payment penalty, expenses, finance
- * settings).
+ * salary disbursement, financial reports, transport fees), matching how the web splits finance
+ * into ~8 pages (frontend/src/features/school-admin/pages/Finance*.jsx). See
+ * native-app/MODULE_TODO.md for what's still deferred (additional fee/late-payment penalty
+ * config, expenses, finance settings).
  */
 @Composable
 fun SchoolAdminFinanceScreen(

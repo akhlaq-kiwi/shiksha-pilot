@@ -78,6 +78,45 @@ data class SchoolStatsResponseDto(
     val data: SchoolStatsDataDto? = null
 )
 
+// Transport Fees — GET/POST/PUT/DELETE api/school/transport-fees{,/{id}}, PUT .../{id}/status
+// (SchoolAdminController::getTransportFees/assignTransportFee/updateTransportFee/deleteTransportFee/
+// toggleTransportFeeStatus -> student_transport_fees table joined with students/classes).
+data class TransportFeeItemDto(
+    val id: Int,
+    val student_id: Int,
+    val monthly_fee: Double,
+    val start_date: String,
+    val status: String? = "Active",
+    val student_name: String? = null,
+    val sr_no: String? = null,
+    val roll_no: String? = null,
+    val class_name: String? = null,
+    val class_section: String? = null
+)
+
+data class TransportFeesResponseDto(
+    val status: String? = "success",
+    val message: String? = null,
+    val data: List<TransportFeeItemDto> = emptyList()
+)
+
+data class AssignTransportFeeRequestDto(
+    val student_id: Int,
+    val monthly_fee: Double,
+    val start_date: String,
+    val status: String = "Active"
+)
+
+data class UpdateTransportFeeRequestDto(
+    val monthly_fee: Double? = null,
+    val start_date: String? = null,
+    val status: String? = null
+)
+
+data class ToggleTransportFeeStatusRequestDto(
+    val status: String
+)
+
 data class ClassDto(
     val id: Int,
     val name: String,
@@ -2415,4 +2454,37 @@ interface ApiService {
         @Body request: Map<String, String> = emptyMap(),
         @Header("Authorization") authHeader: String? = null
     ): Response<TestPushResponseDto>
+
+    // --- Transport Fees ---
+    @GET("api/school/transport-fees")
+    suspend fun getTransportFees(
+        @Query("status") status: String? = null,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<TransportFeesResponseDto>
+
+    @POST("api/school/transport-fees")
+    suspend fun assignTransportFee(
+        @Body request: AssignTransportFeeRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
+    @PUT("api/school/transport-fees/{id}")
+    suspend fun updateTransportFee(
+        @Path("id") id: Int,
+        @Body request: UpdateTransportFeeRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
+    @DELETE("api/school/transport-fees/{id}")
+    suspend fun deleteTransportFee(
+        @Path("id") id: Int,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
+    @PUT("api/school/transport-fees/{id}/status")
+    suspend fun toggleTransportFeeStatus(
+        @Path("id") id: Int,
+        @Body request: ToggleTransportFeeStatusRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
 }

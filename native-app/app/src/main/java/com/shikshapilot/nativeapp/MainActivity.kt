@@ -38,6 +38,7 @@ import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminSecuri
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminStaffScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminStudentsScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminTimetableScreen
+import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminTransportFeesScreen
 import com.shikshapilot.nativeapp.features.studentparent.screens.NotificationPreferencesScreen
 import com.shikshapilot.nativeapp.features.studentparent.screens.ParentVocabularyReportScreen
 import com.shikshapilot.nativeapp.features.studentparent.screens.StudentAchievementsScreen
@@ -442,6 +443,12 @@ class MainActivity : ComponentActivity() {
                                 }
                                 "financial_reports" -> {
                                     SchoolAdminFinancialReportsScreen(
+                                        schoolName = schoolName,
+                                        onBack = { goBack() }
+                                    )
+                                }
+                                "transport_fees" -> {
+                                    SchoolAdminTransportFeesScreen(
                                         schoolName = schoolName,
                                         onBack = { goBack() }
                                     )
