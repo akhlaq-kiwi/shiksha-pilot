@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBackIos
+import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Class
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -94,7 +95,8 @@ private const val SECTION_TYPE_COLOR = "Color Sections"
 fun SchoolAdminClassesScreen(
     schoolName: String = "Jamiya Kids Planet Academy",
     onBack: () -> Unit = {},
-    onViewStudents: (String) -> Unit = {}
+    onViewStudents: (String) -> Unit = {},
+    onOpenIdentityCards: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -462,6 +464,14 @@ fun SchoolAdminClassesScreen(
                                                         onClick = {
                                                             menuForClass = null
                                                             openEditDialog(className, sections)
+                                                        }
+                                                    )
+                                                    DropdownMenuItem(
+                                                        text = { Text("Identity Cards") },
+                                                        leadingIcon = { Icon(Icons.Default.Badge, contentDescription = null) },
+                                                        onClick = {
+                                                            menuForClass = null
+                                                            onOpenIdentityCards(className)
                                                         }
                                                     )
                                                     DropdownMenuItem(

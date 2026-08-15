@@ -28,6 +28,7 @@ import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminEducat
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminCredentialsScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminExamsScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminExpensesScreen
+import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminIdentityCardsScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminFeeCollectionScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminFeeFollowUpScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminFeeStructureScreen
@@ -116,6 +117,12 @@ class MainActivity : ComponentActivity() {
                 val openStudentsForClass: (String) -> Unit = { name ->
                     studentsClassFilter = name
                     navigateTo("students")
+                }
+
+                var identityCardsClassName by remember { mutableStateOf<String?>(null) }
+                val openIdentityCardsForClass: (String) -> Unit = { name ->
+                    identityCardsClassName = name
+                    navigateTo("identity_cards")
                 }
 
                 var showExitConfirm by remember { mutableStateOf(false) }
@@ -497,7 +504,15 @@ class MainActivity : ComponentActivity() {
                                     SchoolAdminClassesScreen(
                                         schoolName = schoolName,
                                         onBack = { goBack() },
-                                        onViewStudents = openStudentsForClass
+                                        onViewStudents = openStudentsForClass,
+                                        onOpenIdentityCards = openIdentityCardsForClass
+                                    )
+                                }
+                                "identity_cards" -> {
+                                    SchoolAdminIdentityCardsScreen(
+                                        schoolName = schoolName,
+                                        classNameFilter = identityCardsClassName ?: "",
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "timetable" -> {
