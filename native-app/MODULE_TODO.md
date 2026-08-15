@@ -26,8 +26,14 @@ Each item: implement -> build verify -> commit -> push -> next.
       adding a new backend endpoint (out of scope — backend/ not to be modified). Not implemented.
 
 ## Small-medium
-- [ ] **Additional Fee / Late-Payment Penalty config** — `FinanceManagementPage.jsx` tabs `additional-fee`,
-      `late-payment-penalty`.
+- [x] **Late-Payment Penalty config** — done (commit 08a51ba): `SchoolAdminLatePaymentPenaltyScreen`
+      (stats + percentage/description/active config). Bulk "apply penalty now" run/history
+      (`late_payment_penalty_applications`) not implemented — config-only.
+- [ ] **Additional Fee Types** — `FinanceManagementPage.jsx` tab `additional-fee`. More complex than
+      originally estimated: `createAdditionalFeeType`/`updateAdditionalFeeType` support `apply_type`
+      'school' vs 'classes' with per-student amount overrides
+      (`backend/.../SchoolAdminService.php::createAdditionalFeeType`, ~line 10604). A school-wide-only
+      MVP (skip the class-targeted mode) would be a reasonable scope.
 - [ ] **Student Transfer Between Sections** — `ClassesPage.jsx` transfer dialog.
       API: `POST /api/school/classes/transfer-students`.
 
