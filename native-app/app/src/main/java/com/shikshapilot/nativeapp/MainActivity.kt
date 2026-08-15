@@ -3,8 +3,17 @@ package com.shikshapilot.nativeapp
 import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -78,13 +87,36 @@ class MainActivity : ComponentActivity() {
                 var userRole by remember { mutableStateOf(savedRole) }
                 var schoolName by remember { mutableStateOf(savedSchool) }
                 val initialScreenId = intent.getStringExtra("screen_id") ?: "dashboard"
-                var currentScreenId by remember { mutableStateOf(initialScreenId) }
 
-                val performLogout = {
+                // Real navigation back-stack so transitions can animate push/pop like native Android navigation
+                val backStack = remember { mutableStateListOf(initialScreenId) }
+                var isForwardNavigation by remember { mutableStateOf(true) }
+                val currentScreenId = backStack.last()
+
+                val navigateTo: (String) -> Unit = { targetId ->
+                    if (targetId != currentScreenId) {
+                        isForwardNavigation = true
+                        backStack.add(targetId)
+                    }
+                }
+                val goBack: () -> Unit = {
+                    if (backStack.size > 1) {
+                        isForwardNavigation = false
+                        backStack.removeAt(backStack.lastIndex)
+                    }
+                }
+
+                if (isLoggedIn) {
+                    BackHandler(enabled = backStack.size > 1) { goBack() }
+                }
+
+                val performLogout: () -> Unit = {
                     prefs.edit().clear().apply()
                     RetrofitClient.authToken = null
                     isLoggedIn = false
-                    currentScreenId = "dashboard"
+                    backStack.clear()
+                    backStack.add("dashboard")
+                    Unit
                 }
 
                 if (!isLoggedIn) {
@@ -109,79 +141,92 @@ class MainActivity : ComponentActivity() {
                         }
                     )
                 } else {
+                    AnimatedContent(
+                        targetState = currentScreenId,
+                        transitionSpec = {
+                            if (isForwardNavigation) {
+                                (slideInHorizontally(animationSpec = tween(280)) { fullWidth -> fullWidth } + fadeIn(tween(280))) togetherWith
+                                    (slideOutHorizontally(animationSpec = tween(280)) { fullWidth -> -fullWidth / 4 } + fadeOut(tween(280)))
+                            } else {
+                                (slideInHorizontally(animationSpec = tween(280)) { fullWidth -> -fullWidth / 4 } + fadeIn(tween(280))) togetherWith
+                                    (slideOutHorizontally(animationSpec = tween(280)) { fullWidth -> fullWidth } + fadeOut(tween(280)))
+                            }
+                        },
+                        label = "screen_stack_transition"
+                    ) { activeScreenId ->
                     when (userRole.uppercase()) {
                         "TEACHER" -> {
-                            when (currentScreenId) {
+                            when (activeScreenId) {
                                 "teacher_attendance" -> {
                                     TeacherAttendanceScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "teacher_assignments" -> {
                                     TeacherAssignmentsScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "teacher_materials" -> {
                                     TeacherMaterialsScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "teacher_classes" -> {
                                     TeacherClassesScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "teacher_leave" -> {
                                     TeacherLeaveScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "teacher_notifications" -> {
                                     TeacherNotificationsScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "teacher_salaries" -> {
                                     TeacherSalariesScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "teacher_exams" -> {
                                     TeacherExamsScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "teacher_vocabulary_report" -> {
                                     TeacherVocabularyReportScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "notification_preferences" -> {
                                     NotificationPreferencesScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "announcements" -> {
                                     SchoolAdminAnnouncementsScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "settings" -> {
                                     SettingsScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" },
+                                        onBack = { goBack() },
                                         onLogoutClick = performLogout
                                     )
                                 }
@@ -189,91 +234,91 @@ class MainActivity : ComponentActivity() {
                                     TeacherDashboardScreen(
                                         schoolName = schoolName,
                                         teacherPhone = savedPhone,
-                                        onNavigate = { targetId -> currentScreenId = targetId },
+                                        onNavigate = navigateTo,
                                         onLogoutClick = performLogout
                                     )
                                 }
                             }
                         }
                         "STUDENT", "PARENT" -> {
-                            when (currentScreenId) {
+                            when (activeScreenId) {
                                 "student_fees" -> {
                                     StudentFeesScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "student_attendance" -> {
                                     StudentAttendanceScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "student_assignments" -> {
                                     StudentAssignmentsScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "student_materials" -> {
                                     StudentMaterialsScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "student_timetable" -> {
                                     StudentTimetableScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "student_results" -> {
                                     StudentResultsScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "achievements" -> {
                                     StudentAchievementsScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "vocabulary" -> {
                                     if (userRole.uppercase() == "PARENT") {
                                         ParentVocabularyReportScreen(
                                             schoolName = schoolName,
-                                            onBack = { currentScreenId = "dashboard" }
+                                            onBack = { goBack() }
                                         )
                                     } else {
                                         StudentVocabularyScreen(
                                             schoolName = schoolName,
-                                            onBack = { currentScreenId = "dashboard" }
+                                            onBack = { goBack() }
                                         )
                                     }
                                 }
                                 "word_builder_game" -> {
                                     StudentWordBuilderScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "notification_preferences" -> {
                                     NotificationPreferencesScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "announcements" -> {
                                     StudentAnnouncementsScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "settings" -> {
                                     SettingsScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" },
+                                        onBack = { goBack() },
                                         onLogoutClick = performLogout
                                     )
                                 }
@@ -281,7 +326,7 @@ class MainActivity : ComponentActivity() {
                                     StudentDashboardScreen(
                                         schoolName = schoolName,
                                         studentPhone = savedPhone,
-                                        onNavigate = { targetId -> currentScreenId = targetId },
+                                        onNavigate = navigateTo,
                                         onLogoutClick = performLogout
                                     )
                                 }
@@ -289,126 +334,126 @@ class MainActivity : ComponentActivity() {
                         }
                         else -> {
                             // SCHOOL_ADMIN
-                            when (currentScreenId) {
+                            when (activeScreenId) {
                                 "notification_preferences" -> {
                                     NotificationPreferencesScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "students", "admissions" -> {
                                     SchoolAdminStudentsScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "staff", "salary" -> {
                                     SchoolAdminStaffScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "leaves", "leave_approve" -> {
                                     SchoolAdminLeaveRequestsScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "finance", "expenses", "fee_defaulters" -> {
                                     SchoolAdminFinanceScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" },
-                                        onNavigate = { targetId -> currentScreenId = targetId }
+                                        onBack = { goBack() },
+                                        onNavigate = navigateTo
                                     )
                                 }
                                 "fee_structure" -> {
                                     SchoolAdminFeeStructureScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "finance" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "fee_collection" -> {
                                     SchoolAdminFeeCollectionScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "finance" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "fee_follow_up" -> {
                                     SchoolAdminFeeFollowUpScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "finance" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "salary_disbursement" -> {
                                     SchoolAdminSalaryDisbursementScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "finance" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "financial_reports" -> {
                                     SchoolAdminFinancialReportsScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "finance" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "announcements", "broadcast_emergency" -> {
                                     SchoolAdminAnnouncementsScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "attendance", "att_exceptions" -> {
                                     SchoolAdminAttendanceScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "classes", "sections" -> {
                                     SchoolAdminClassesScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "timetable" -> {
                                     SchoolAdminTimetableScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "exams" -> {
                                     SchoolAdminExamsScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "security" -> {
                                     SchoolAdminSecurityScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "school_profile" -> {
                                     SchoolAdminProfileScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "academic_setup" -> {
                                     SchoolAdminAcademicSetupScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "credentials" -> {
                                     SchoolAdminCredentialsScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" }
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "settings" -> {
                                     SettingsScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" },
+                                        onBack = { goBack() },
                                         onLogoutClick = performLogout
                                     )
                                 }
@@ -417,13 +462,12 @@ class MainActivity : ComponentActivity() {
                                         roleName = userRole,
                                         schoolName = schoolName,
                                         onLogoutClick = performLogout,
-                                        onModuleClick = { screenId ->
-                                            currentScreenId = screenId
-                                        }
+                                        onModuleClick = navigateTo
                                     )
                                 }
                             }
                         }
+                    }
                     }
                 }
             }
