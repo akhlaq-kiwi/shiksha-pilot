@@ -113,9 +113,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         ? '$className - $sectionName'
         : className;
     final String rollNoDisplay = activeStudent?['roll_no']?.toString() ?? activeStudent?['roll_number']?.toString() ?? '—';
-    final String phoneDisplay = isStudentOrParent && activeStudent != null
-        ? (activeStudent['student_mobile']?.toString() ?? activeStudent['parent_phone']?.toString() ?? widget.userPhone)
-        : widget.userPhone;
+    final String phoneDisplay = widget.userPhone.trim().isNotEmpty
+        ? widget.userPhone
+        : (activeStudent?['parent_phone']?.toString() ?? activeStudent?['student_mobile']?.toString() ?? '—');
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
