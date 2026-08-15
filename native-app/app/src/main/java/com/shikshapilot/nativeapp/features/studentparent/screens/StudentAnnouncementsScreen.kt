@@ -102,7 +102,7 @@ fun StudentAnnouncementsScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -110,7 +110,7 @@ fun StudentAnnouncementsScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -121,28 +121,28 @@ fun StudentAnnouncementsScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Announcements & Notices",
-                                fontSize = 18.sp,
+                                fontSize = 15.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = TextPrimary
                             )
                             Text(
                                 text = "QA Server: GET /api/student/announcements",
-                                fontSize = 11.5.sp,
+                                fontSize = 10.sp,
                                 color = SunsetOrange
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     when {
                         isLoading -> {
@@ -152,12 +152,12 @@ fun StudentAnnouncementsScreen(
                         }
                         errorMessage != null -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         notices.isEmpty() -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = "No announcements have been posted yet.", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = "No announcements have been posted yet.", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         else -> {
@@ -177,23 +177,23 @@ fun StudentAnnouncementsScreen(
                                         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                                             Box(
                                                 modifier = Modifier
-                                                    .size(36.dp)
+                                                    .size(32.dp)
                                                     .clip(CircleShape)
                                                     .background(SunsetOrange.copy(alpha = 0.18f)),
                                                 contentAlignment = Alignment.Center
                                             ) {
-                                                Icon(imageVector = Icons.Default.Campaign, contentDescription = "Announcement", tint = SunsetOrange, modifier = Modifier.size(18.dp))
+                                                Icon(imageVector = Icons.Default.Campaign, contentDescription = "Announcement", tint = SunsetOrange, modifier = Modifier.size(20.dp))
                                             }
-                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Spacer(modifier = Modifier.width(10.dp))
                                             Column(modifier = Modifier.weight(1f)) {
-                                                Text(text = item.subject ?: "Announcement", fontSize = 14.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                                Text(text = item.subject ?: "Announcement", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                                                 if (!item.description.isNullOrBlank()) {
-                                                    Text(text = item.description, fontSize = 12.5.sp, color = TextSecondary)
+                                                    Text(text = item.description, fontSize = 10.5.sp, color = TextSecondary)
                                                 }
                                                 val meta = item.published_at ?: item.created_at
                                                 if (!meta.isNullOrBlank()) {
-                                                    Spacer(modifier = Modifier.height(4.dp))
-                                                    Text(text = meta, fontSize = 11.sp, color = TextSecondary)
+                                                    Spacer(modifier = Modifier.height(3.dp))
+                                                    Text(text = meta, fontSize = 9.5.sp, color = TextSecondary)
                                                 }
                                             }
                                         }

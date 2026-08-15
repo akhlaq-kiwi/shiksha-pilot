@@ -125,7 +125,7 @@ fun SchoolAdminFeeCollectionScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -133,7 +133,7 @@ fun SchoolAdminFeeCollectionScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -144,15 +144,15 @@ fun SchoolAdminFeeCollectionScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "Fee Collection", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
-                            Text(text = "QA Server: api/school/fee-payments, collection-history", fontSize = 11.sp, color = SunsetOrange)
+                            Text(text = "Fee Collection", fontSize = 15.5.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
+                            Text(text = "QA Server: api/school/fee-payments, collection-history", fontSize = 9.5.sp, color = SunsetOrange)
                         }
 
                         Box(
@@ -160,13 +160,13 @@ fun SchoolAdminFeeCollectionScreen(
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(SunsetOrange)
                                 .clickable { showRecordForm = !showRecordForm }
-                                .padding(horizontal = 12.dp, vertical = 8.dp)
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
                         ) {
-                            Text(text = "Record Payment", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text(text = "Record Payment", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -181,8 +181,8 @@ fun SchoolAdminFeeCollectionScreen(
                                 .padding(12.dp)
                         ) {
                             Column {
-                                Text(text = "Total Collected", fontSize = 11.sp, color = TextSecondary)
-                                Text(text = "₹ ${"%,.0f".format(totalCollected)}", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = OnlineGreen)
+                                Text(text = "Total Collected", fontSize = 9.5.sp, color = TextSecondary)
+                                Text(text = "₹ ${"%,.0f".format(totalCollected)}", fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = OnlineGreen)
                             }
                         }
                         Box(
@@ -194,13 +194,13 @@ fun SchoolAdminFeeCollectionScreen(
                                 .padding(12.dp)
                         ) {
                             Column {
-                                Text(text = "Today's Collection", fontSize = 11.sp, color = TextSecondary)
-                                Text(text = "₹ ${"%,.0f".format(todayCollection)}", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = SunsetOrange)
+                                Text(text = "Today's Collection", fontSize = 9.5.sp, color = TextSecondary)
+                                Text(text = "₹ ${"%,.0f".format(todayCollection)}", fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = SunsetOrange)
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     if (showRecordForm) {
                         Box(
@@ -212,8 +212,8 @@ fun SchoolAdminFeeCollectionScreen(
                                 .padding(14.dp)
                         ) {
                             Column {
-                                Text(text = "Record Fee Payment", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(text = "Record Fee Payment", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                Spacer(modifier = Modifier.height(6.dp))
                                 OutlinedTextField(
                                     value = studentIdInput,
                                     onValueChange = { studentIdInput = it },
@@ -221,7 +221,7 @@ fun SchoolAdminFeeCollectionScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary)
                                 )
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(6.dp))
                                 OutlinedTextField(
                                     value = feeMonthInput,
                                     onValueChange = { feeMonthInput = it },
@@ -229,7 +229,7 @@ fun SchoolAdminFeeCollectionScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary)
                                 )
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(6.dp))
                                 OutlinedTextField(
                                     value = amountInput,
                                     onValueChange = { amountInput = it },
@@ -237,7 +237,7 @@ fun SchoolAdminFeeCollectionScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary)
                                 )
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(6.dp))
                                 OutlinedTextField(
                                     value = paymentMethodInput,
                                     onValueChange = { paymentMethodInput = it },
@@ -245,7 +245,7 @@ fun SchoolAdminFeeCollectionScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary)
                                 )
-                                Spacer(modifier = Modifier.height(10.dp))
+                                Spacer(modifier = Modifier.height(8.dp))
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -286,21 +286,21 @@ fun SchoolAdminFeeCollectionScreen(
                                         .padding(vertical = 10.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text(text = if (isSaving) "Saving..." else "Record Payment", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                    Text(text = if (isSaving) "Saving..." else "Record Payment", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                 }
                             }
                         }
-                        Spacer(modifier = Modifier.height(14.dp))
+                        Spacer(modifier = Modifier.height(11.dp))
                     }
 
                     Text(
                         text = "COLLECTION HISTORY (QA LIVE API)",
-                        fontSize = 11.sp,
+                        fontSize = 9.5.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = TextSecondary,
                         letterSpacing = 1.sp
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     when {
                         isLoading -> {
@@ -310,12 +310,12 @@ fun SchoolAdminFeeCollectionScreen(
                         }
                         errorMessage != null -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         transactions.isEmpty() -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = "No fee collections recorded yet.", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = "No fee collections recorded yet.", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         else -> {
@@ -338,7 +338,7 @@ fun SchoolAdminFeeCollectionScreen(
                                         ) {
                                             Box(
                                                 modifier = Modifier
-                                                    .size(42.dp)
+                                                    .size(37.dp)
                                                     .clip(CircleShape)
                                                     .background(OnlineGreen.copy(alpha = 0.18f))
                                                     .border(width = 1.dp, color = OnlineGreen.copy(alpha = 0.4f), shape = CircleShape),
@@ -352,25 +352,25 @@ fun SchoolAdminFeeCollectionScreen(
                                                 )
                                             }
 
-                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Spacer(modifier = Modifier.width(10.dp))
 
                                             Column(modifier = Modifier.weight(1f)) {
-                                                Text(text = txn.student_name ?: "Student", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                                Text(text = txn.student_name ?: "Student", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                                                 Text(
                                                     text = "${txn.fee_name ?: ""} • ${txn.class_name ?: ""}",
-                                                    fontSize = 12.sp,
+                                                    fontSize = 10.sp,
                                                     color = TextSecondary
                                                 )
                                                 Text(
                                                     text = "Receipt: ${txn.receipt_no ?: "—"} • ${txn.payment_date ?: ""}",
-                                                    fontSize = 11.sp,
+                                                    fontSize = 9.5.sp,
                                                     color = TextSecondary
                                                 )
                                             }
 
                                             Text(
                                                 text = "₹ ${"%,.0f".format(txn.amount)}",
-                                                fontSize = 15.sp,
+                                                fontSize = 13.sp,
                                                 fontWeight = FontWeight.ExtraBold,
                                                 color = OnlineGreen
                                             )

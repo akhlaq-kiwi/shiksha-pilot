@@ -147,7 +147,7 @@ fun TeacherSalariesScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -155,7 +155,7 @@ fun TeacherSalariesScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -166,28 +166,28 @@ fun TeacherSalariesScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "My Salary",
-                                fontSize = 18.sp,
+                                fontSize = 15.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = TextPrimary
                             )
                             Text(
                                 text = "QA Server: GET /api/teacher/salaries",
-                                fontSize = 11.5.sp,
+                                fontSize = 10.sp,
                                 color = SunsetOrange
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(13.dp))
 
                     when {
                         isLoading -> {
@@ -197,12 +197,12 @@ fun TeacherSalariesScreen(
                         }
                         errorMessage != null -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         salaryData == null -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = "No salary records found.", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = "No salary records found.", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         else -> {
@@ -216,7 +216,7 @@ fun TeacherSalariesScreen(
 
                             if (allPayments.isEmpty()) {
                                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    Text(text = "No salary records found.", color = TextSecondary, fontSize = 13.sp)
+                                    Text(text = "No salary records found.", color = TextSecondary, fontSize = 11.sp)
                                 }
                             } else {
                                 LazyColumn(
@@ -244,19 +244,19 @@ fun TeacherSalariesScreen(
                                                 Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                                                     Box(
                                                         modifier = Modifier
-                                                            .size(40.dp)
+                                                            .size(35.dp)
                                                             .clip(CircleShape)
                                                             .background(SunsetOrange.copy(alpha = 0.18f)),
                                                         contentAlignment = Alignment.Center
                                                     ) {
-                                                        Icon(imageVector = Icons.Default.Payments, contentDescription = "Salary", tint = SunsetOrange, modifier = Modifier.size(18.dp))
+                                                        Icon(imageVector = Icons.Default.Payments, contentDescription = "Salary", tint = SunsetOrange, modifier = Modifier.size(20.dp))
                                                     }
-                                                    Spacer(modifier = Modifier.width(12.dp))
+                                                    Spacer(modifier = Modifier.width(10.dp))
                                                     Column {
-                                                        Text(text = "${payment.month ?: "-"} • $yearName", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                                                        Text(text = "₹${payment.salary ?: 0.0}", fontSize = 12.5.sp, color = TextSecondary)
+                                                        Text(text = "${payment.month ?: "-"} • $yearName", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                                        Text(text = "₹${payment.salary ?: 0.0}", fontSize = 10.5.sp, color = TextSecondary)
                                                         if (!payment.disbursed_date.isNullOrBlank()) {
-                                                            Text(text = "Paid on ${payment.disbursed_date}", fontSize = 10.5.sp, color = TextSecondary)
+                                                            Text(text = "Paid on ${payment.disbursed_date}", fontSize = 9.sp, color = TextSecondary)
                                                         }
                                                     }
                                                 }
@@ -267,13 +267,13 @@ fun TeacherSalariesScreen(
                                                             .clip(RoundedCornerShape(6.dp))
                                                             .background(statusColor.copy(alpha = 0.2f))
                                                             .border(width = 1.dp, color = statusColor, shape = RoundedCornerShape(6.dp))
-                                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                            .padding(horizontal = 5.dp, vertical = 2.dp)
                                                     ) {
-                                                        Text(text = payment.status ?: "Pending", fontSize = 9.5.sp, fontWeight = FontWeight.ExtraBold, color = statusColor)
+                                                        Text(text = payment.status ?: "Pending", fontSize = 8.sp, fontWeight = FontWeight.ExtraBold, color = statusColor)
                                                     }
 
                                                     if (canDownload) {
-                                                        Spacer(modifier = Modifier.height(6.dp))
+                                                        Spacer(modifier = Modifier.height(5.dp))
                                                         Box(
                                                             modifier = Modifier
                                                                 .clip(CircleShape)
@@ -286,7 +286,7 @@ fun TeacherSalariesScreen(
                                                                 imageVector = Icons.Default.Download,
                                                                 contentDescription = "Download Receipt",
                                                                 tint = if (downloadingId == payment.id) TextSecondary else SunsetOrange,
-                                                                modifier = Modifier.size(18.dp)
+                                                                modifier = Modifier.size(20.dp)
                                                             )
                                                         }
                                                     }

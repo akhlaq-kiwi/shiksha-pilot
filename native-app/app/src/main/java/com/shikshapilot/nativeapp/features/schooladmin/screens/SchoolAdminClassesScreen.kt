@@ -272,7 +272,7 @@ fun SchoolAdminClassesScreen(
                 onClick = { openAddDialog() },
                 containerColor = SunsetOrange
             ) {
-                Text(text = "+", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = androidx.compose.ui.graphics.Color.White)
+                Text(text = "+", fontSize = 18.5.sp, fontWeight = FontWeight.Bold, color = androidx.compose.ui.graphics.Color.White)
             }
         }
     ) { paddingValues ->
@@ -294,7 +294,7 @@ fun SchoolAdminClassesScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -302,7 +302,7 @@ fun SchoolAdminClassesScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -313,29 +313,29 @@ fun SchoolAdminClassesScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Classes & Sections",
-                                fontSize = 18.sp,
+                                fontSize = 15.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = TextPrimary
                             )
                             Text(
                                 text = "${grouped.size} Classes • ${classes.size} Sections",
-                                fontSize = 11.5.sp,
+                                fontSize = 10.sp,
                                 color = SunsetOrange
                             )
                         }
 
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -346,12 +346,12 @@ fun SchoolAdminClassesScreen(
                                 imageVector = Icons.Default.Refresh,
                                 contentDescription = "Refresh",
                                 tint = SunsetOrange,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     when {
                         isLoading -> {
@@ -361,12 +361,12 @@ fun SchoolAdminClassesScreen(
                         }
                         errorMessage != null -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         grouped.isEmpty() -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = "No classes registered. Tap + to add one.", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = "No classes registered. Tap + to add one.", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         else -> {
@@ -393,7 +393,7 @@ fun SchoolAdminClassesScreen(
                                         ) {
                                             Box(
                                                 modifier = Modifier
-                                                    .size(42.dp)
+                                                    .size(37.dp)
                                                     .clip(CircleShape)
                                                     .background(InfoBlue.copy(alpha = 0.18f))
                                                     .border(width = 1.dp, color = InfoBlue.copy(alpha = 0.4f), shape = CircleShape),
@@ -407,25 +407,25 @@ fun SchoolAdminClassesScreen(
                                                 )
                                             }
 
-                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Spacer(modifier = Modifier.width(10.dp))
 
                                             Column(modifier = Modifier.weight(1f)) {
                                                 Text(
                                                     text = className,
-                                                    fontSize = 15.sp,
+                                                    fontSize = 13.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = TextPrimary
                                                 )
                                                 Spacer(modifier = Modifier.height(2.dp))
                                                 Text(
                                                     text = if (sections.isNotEmpty()) "Sections: ${sections.joinToString(", ")}" else "No sections",
-                                                    fontSize = 12.sp,
+                                                    fontSize = 10.sp,
                                                     color = TextSecondary
                                                 )
                                                 if (!academicYearName.isNullOrBlank()) {
                                                     Text(
                                                         text = "Academic Year: $academicYearName",
-                                                        fontSize = 11.sp,
+                                                        fontSize = 9.5.sp,
                                                         color = TextSecondary
                                                     )
                                                 }
@@ -434,7 +434,7 @@ fun SchoolAdminClassesScreen(
                                             Box {
                                                 Box(
                                                     modifier = Modifier
-                                                        .size(32.dp)
+                                                        .size(28.dp)
                                                         .clip(CircleShape)
                                                         .clickable { menuForClass = className },
                                                     contentAlignment = Alignment.Center
@@ -515,7 +515,7 @@ fun SchoolAdminClassesScreen(
                     ) {
                         Text(
                             text = if (isEditing) "Manage Class Sections" else "Add Class",
-                            fontSize = 16.sp,
+                            fontSize = 13.5.sp,
                             fontWeight = FontWeight.Bold,
                             color = TextPrimary
                         )
@@ -527,16 +527,16 @@ fun SchoolAdminClassesScreen(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(13.dp))
 
                     if (isEditing) {
-                        Text(text = "Class Name", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(text = "Class Name", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
+                        Spacer(modifier = Modifier.height(5.dp))
                         OutlinedTextField(
                             value = classNameInput,
                             onValueChange = {},
                             enabled = false,
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
                             singleLine = true,
                             shape = RoundedCornerShape(14.dp),
                             colors = OutlinedTextFieldDefaults.colors(
@@ -551,12 +551,12 @@ fun SchoolAdminClassesScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(text = "Select Class(es)", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
+                            Text(text = "Select Class(es)", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 if (selectedClassNames.isNotEmpty()) {
                                     Text(
                                         text = "${selectedClassNames.size} Selected",
-                                        fontSize = 11.sp,
+                                        fontSize = 9.5.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = SunsetOrange,
                                         modifier = Modifier.padding(end = 10.dp)
@@ -565,7 +565,7 @@ fun SchoolAdminClassesScreen(
                                 if (availablePredefinedClasses.isNotEmpty()) {
                                     Text(
                                         text = if (selectedClassNames.size == availablePredefinedClasses.size) "Deselect All" else "Select All",
-                                        fontSize = 11.sp,
+                                        fontSize = 9.5.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = InfoBlue,
                                         modifier = Modifier.clickable {
@@ -580,12 +580,12 @@ fun SchoolAdminClassesScreen(
                                 }
                             }
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
 
                         if (availablePredefinedClasses.isEmpty()) {
                             Text(
                                 text = "All standard classes have been added.",
-                                fontSize = 12.sp,
+                                fontSize = 10.sp,
                                 color = TextSecondary,
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -618,19 +618,19 @@ fun SchoolAdminClassesScreen(
                                                 }
                                                 formError = null
                                             }
-                                            .padding(horizontal = 10.dp, vertical = 10.dp),
+                                            .padding(horizontal = 8.dp, vertical = 8.dp),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
                                             text = name,
-                                            fontSize = 12.5.sp,
+                                            fontSize = 10.5.sp,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                             color = if (isSelected) SunsetOrange else TextPrimary
                                         )
                                         Box(
                                             modifier = Modifier
-                                                .size(18.dp)
+                                                .size(20.dp)
                                                 .clip(CircleShape)
                                                 .background(if (isSelected) SunsetOrange else androidx.compose.ui.graphics.Color.Transparent)
                                                 .border(width = 1.dp, color = if (isSelected) SunsetOrange else CardBorder, shape = CircleShape)
@@ -641,10 +641,10 @@ fun SchoolAdminClassesScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(13.dp))
 
-                    Text(text = "Section Type (Optional)", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(text = "Section Type (Optional)", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
+                    Spacer(modifier = Modifier.height(5.dp))
 
                     var sectionTypeExpanded by remember { mutableStateOf(false) }
                     Box(modifier = Modifier.fillMaxWidth()) {
@@ -655,9 +655,9 @@ fun SchoolAdminClassesScreen(
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = RoundedCornerShape(14.dp))
                                 .clickable { sectionTypeExpanded = true }
-                                .padding(horizontal = 14.dp, vertical = 14.dp)
+                                .padding(horizontal = 11.dp, vertical = 11.dp)
                         ) {
-                            Text(text = sectionTypeInput, fontSize = 14.sp, color = TextPrimary)
+                            Text(text = sectionTypeInput, fontSize = 12.sp, color = TextPrimary)
                         }
                         DropdownMenu(
                             expanded = sectionTypeExpanded,
@@ -679,9 +679,9 @@ fun SchoolAdminClassesScreen(
                     }
 
                     if (sectionTypeInput != SECTION_TYPE_NONE) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(text = "Select Sections (Max 4)", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(text = "Select Sections (Max 4)", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
+                        Spacer(modifier = Modifier.height(6.dp))
 
                         val options = if (sectionTypeInput == SECTION_TYPE_ALPHABET) ALPHABET_SECTIONS else COLOR_SECTIONS
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -708,12 +708,12 @@ fun SchoolAdminClassesScreen(
                                                         selectedSections
                                                     }
                                                 }
-                                                .padding(horizontal = 10.dp, vertical = 10.dp),
+                                                .padding(horizontal = 8.dp, vertical = 8.dp),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Text(
                                                 text = sec,
-                                                fontSize = 12.5.sp,
+                                                fontSize = 10.5.sp,
                                                 fontWeight = if (isChecked) FontWeight.Bold else FontWeight.Medium,
                                                 color = if (isChecked) SunsetOrange else TextPrimary
                                             )
@@ -725,11 +725,11 @@ fun SchoolAdminClassesScreen(
                     }
 
                     if (formError != null) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(text = formError ?: "", fontSize = 11.5.sp, color = androidx.compose.ui.graphics.Color(0xFFEF4444))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(text = formError ?: "", fontSize = 10.sp, color = androidx.compose.ui.graphics.Color(0xFFEF4444))
                     }
 
-                    Spacer(modifier = Modifier.height(18.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -738,7 +738,7 @@ fun SchoolAdminClassesScreen(
                         TextButton(onClick = { resetForm() }) {
                             Text("Cancel", color = TextSecondary)
                         }
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Button(
                             onClick = { saveClass() },
                             enabled = !isSaving,
@@ -764,8 +764,8 @@ fun SchoolAdminClassesScreen(
                 Column {
                     Text("This will permanently remove the class and its sections. Classes with enrolled students cannot be deleted.")
                     if (deleteError != null) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(text = deleteError ?: "", color = androidx.compose.ui.graphics.Color(0xFFEF4444), fontSize = 12.sp)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(text = deleteError ?: "", color = androidx.compose.ui.graphics.Color(0xFFEF4444), fontSize = 10.sp)
                     }
                 }
             },

@@ -104,7 +104,7 @@ fun StudentResultsScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -112,7 +112,7 @@ fun StudentResultsScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -123,17 +123,17 @@ fun StudentResultsScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "Exams & Results", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
+                            Text(text = "Exams & Results", fontSize = 15.5.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
                             Text(
                                 text = "QA Server: GET /api/student/exams-new",
-                                fontSize = 11.5.sp,
+                                fontSize = 10.sp,
                                 color = SunsetOrange
                             )
                         }
@@ -143,17 +143,17 @@ fun StudentResultsScreen(
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(SunsetOrange)
                                 .clickable { showReportCards = true }
-                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                                .padding(horizontal = 8.dp, vertical = 5.dp)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(imageVector = Icons.Default.Description, contentDescription = "Report Cards", tint = Color.White, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(text = "Report Cards", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                Icon(imageVector = Icons.Default.Description, contentDescription = "Report Cards", tint = Color.White, modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(text = "Report Cards", fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(13.dp))
 
                     when {
                         isLoading -> {
@@ -163,12 +163,12 @@ fun StudentResultsScreen(
                         }
                         errorMessage != null -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         exams.isEmpty() -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = "No examinations found yet.", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = "No examinations found yet.", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         else -> {
@@ -197,24 +197,24 @@ fun StudentResultsScreen(
                                         ) {
                                             Box(
                                                 modifier = Modifier
-                                                    .size(40.dp)
+                                                    .size(35.dp)
                                                     .clip(CircleShape)
                                                     .background(SunsetOrange.copy(alpha = 0.18f)),
                                                 contentAlignment = Alignment.Center
                                             ) {
-                                                Icon(imageVector = Icons.Default.Assignment, contentDescription = "Exam", tint = SunsetOrange, modifier = Modifier.size(18.dp))
+                                                Icon(imageVector = Icons.Default.Assignment, contentDescription = "Exam", tint = SunsetOrange, modifier = Modifier.size(20.dp))
                                             }
-                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Spacer(modifier = Modifier.width(10.dp))
                                             Column(modifier = Modifier.weight(1f)) {
-                                                Text(text = exam.name, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                                Text(text = exam.name, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                                                 Spacer(modifier = Modifier.height(2.dp))
                                                 Text(
                                                     text = "${exam.start_date ?: "-"} to ${exam.end_date ?: "-"}",
-                                                    fontSize = 12.sp,
+                                                    fontSize = 10.sp,
                                                     color = TextSecondary
                                                 )
                                                 if (exam.result_published == 1) {
-                                                    Text(text = "Results Published", fontSize = 11.sp, color = OnlineGreen, fontWeight = FontWeight.Bold)
+                                                    Text(text = "Results Published", fontSize = 9.5.sp, color = OnlineGreen, fontWeight = FontWeight.Bold)
                                                 }
                                             }
                                             Box(
@@ -222,9 +222,9 @@ fun StudentResultsScreen(
                                                     .clip(RoundedCornerShape(6.dp))
                                                     .background(statusColor.copy(alpha = 0.2f))
                                                     .border(width = 1.dp, color = statusColor, shape = RoundedCornerShape(6.dp))
-                                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                                                    .padding(horizontal = 7.dp, vertical = 2.dp)
                                             ) {
-                                                Text(text = exam.status ?: "-", fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = statusColor)
+                                                Text(text = exam.status ?: "-", fontSize = 8.5.sp, fontWeight = FontWeight.ExtraBold, color = statusColor)
                                             }
                                         }
                                     }
@@ -274,17 +274,17 @@ private fun StudentExamDetailScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(FrostedCard)
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                    .padding(horizontal = 13.dp, vertical = 11.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBack) {
                     Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
                 }
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = exam.name, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                    Text(text = exam.name, fontSize = 15.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                     Text(
                         text = "QA Server: GET /api/student/exams-new/{id}/details",
-                        fontSize = 10.5.sp,
+                        fontSize = 9.sp,
                         color = SunsetOrange
                     )
                 }
@@ -298,12 +298,12 @@ private fun StudentExamDetailScreen(
                 }
                 errorMessage != null -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                        Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                     }
                 }
                 details == null -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(text = "No details available", color = TextSecondary, fontSize = 13.sp)
+                        Text(text = "No details available", color = TextSecondary, fontSize = 11.sp)
                     }
                 }
                 else -> {
@@ -313,7 +313,7 @@ private fun StudentExamDetailScreen(
                             Text(
                                 text = "Results/admit card restricted due to pending fee dues. Please clear outstanding dues to view.",
                                 color = WarningYellow,
-                                fontSize = 13.sp
+                                fontSize = 11.sp
                             )
                         }
                     } else {
@@ -322,12 +322,12 @@ private fun StudentExamDetailScreen(
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             item {
-                                Text(text = "Schedule", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = TextSecondary, letterSpacing = 1.sp)
+                                Text(text = "Schedule", fontSize = 9.5.sp, fontWeight = FontWeight.ExtraBold, color = TextSecondary, letterSpacing = 1.sp)
                             }
 
                             if (d.scheme.isNullOrEmpty()) {
                                 item {
-                                    Text(text = "Timetable not published yet.", color = TextSecondary, fontSize = 13.sp)
+                                    Text(text = "Timetable not published yet.", color = TextSecondary, fontSize = 11.sp)
                                 }
                             } else {
                                 items(d.scheme!!) { paper ->
@@ -340,10 +340,10 @@ private fun StudentExamDetailScreen(
                                             .padding(12.dp)
                                     ) {
                                         Column {
-                                            Text(text = paper.subject_name ?: "Subject", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                            Text(text = paper.subject_name ?: "Subject", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                                             Text(
                                                 text = "${paper.exam_date ?: "-"} • ${paper.start_time ?: ""}-${paper.end_time ?: ""} • Room ${paper.room ?: "-"}",
-                                                fontSize = 11.5.sp,
+                                                fontSize = 10.sp,
                                                 color = TextSecondary
                                             )
                                         }
@@ -352,9 +352,9 @@ private fun StudentExamDetailScreen(
                             }
 
                             if (d.admit_card != null) {
-                                item { Spacer(modifier = Modifier.height(4.dp)) }
+                                item { Spacer(modifier = Modifier.height(3.dp)) }
                                 item {
-                                    Text(text = "Admit Card", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = TextSecondary, letterSpacing = 1.sp)
+                                    Text(text = "Admit Card", fontSize = 9.5.sp, fontWeight = FontWeight.ExtraBold, color = TextSecondary, letterSpacing = 1.sp)
                                 }
                                 item {
                                     val admit = d.admit_card!!
@@ -367,18 +367,18 @@ private fun StudentExamDetailScreen(
                                             .padding(14.dp)
                                     ) {
                                         Column {
-                                            Text(text = "Seat ${admit.seat_number ?: "-"}", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = SunsetOrange)
-                                            Text(text = "Room: ${admit.room_name ?: "-"}  •  Bench: ${admit.bench_number ?: "-"}  •  ${admit.seat_position ?: ""}", fontSize = 12.sp, color = TextSecondary)
-                                            Text(text = "${admit.student_name ?: ""} • ${admit.class_name ?: ""} • Roll ${admit.roll_no ?: "-"}", fontSize = 12.sp, color = TextSecondary)
+                                            Text(text = "Seat ${admit.seat_number ?: "-"}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = SunsetOrange)
+                                            Text(text = "Room: ${admit.room_name ?: "-"}  •  Bench: ${admit.bench_number ?: "-"}  •  ${admit.seat_position ?: ""}", fontSize = 10.sp, color = TextSecondary)
+                                            Text(text = "${admit.student_name ?: ""} • ${admit.class_name ?: ""} • Roll ${admit.roll_no ?: "-"}", fontSize = 10.sp, color = TextSecondary)
                                         }
                                     }
                                 }
                             }
 
                             if (d.result_published == 1 && d.result != null) {
-                                item { Spacer(modifier = Modifier.height(4.dp)) }
+                                item { Spacer(modifier = Modifier.height(3.dp)) }
                                 item {
-                                    Text(text = "Result — ${d.result?.status ?: "-"}", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = TextSecondary, letterSpacing = 1.sp)
+                                    Text(text = "Result — ${d.result?.status ?: "-"}", fontSize = 9.5.sp, fontWeight = FontWeight.ExtraBold, color = TextSecondary, letterSpacing = 1.sp)
                                 }
                                 items(d.result!!.papers) { p ->
                                     Box(
@@ -394,10 +394,10 @@ private fun StudentExamDetailScreen(
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Text(text = p.subject_name ?: "Subject", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                            Text(text = p.subject_name ?: "Subject", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                                             Text(
                                                 text = if (p.is_absent == 1) "ABSENT" else "${p.marks_obtained?.toInt() ?: 0} / ${p.max_marks?.toInt() ?: 0}",
-                                                fontSize = 13.sp,
+                                                fontSize = 11.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = if (p.is_absent == 1) Color(0xFFEF4444) else OnlineGreen
                                             )
@@ -407,14 +407,14 @@ private fun StudentExamDetailScreen(
                                 item {
                                     Text(
                                         text = "Total: ${d.result?.total_marks_obtained?.toInt() ?: 0} / ${d.result?.total_max_marks?.toInt() ?: 0}",
-                                        fontSize = 13.sp,
+                                        fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = TextPrimary
                                     )
                                 }
                             } else if (d.scheme_published == 1) {
                                 item {
-                                    Text(text = "Results not published yet for this exam.", color = TextSecondary, fontSize = 13.sp)
+                                    Text(text = "Results not published yet for this exam.", color = TextSecondary, fontSize = 11.sp)
                                 }
                             }
                         }
@@ -463,17 +463,17 @@ private fun StudentReportCardsScreen(onBack: () -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(FrostedCard)
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                    .padding(horizontal = 13.dp, vertical = 11.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBack) {
                     Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
                 }
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = "Report Cards", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                    Text(text = "Report Cards", fontSize = 15.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                     Text(
                         text = "QA Server: GET /api/student/exams-new/report-cards",
-                        fontSize = 10.5.sp,
+                        fontSize = 9.sp,
                         color = SunsetOrange
                     )
                 }
@@ -487,12 +487,12 @@ private fun StudentReportCardsScreen(onBack: () -> Unit) {
                 }
                 errorMessage != null -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                        Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                     }
                 }
                 reportCards.isEmpty() -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(text = "No published report cards yet.", color = TextSecondary, fontSize = 13.sp)
+                        Text(text = "No published report cards yet.", color = TextSecondary, fontSize = 11.sp)
                     }
                 }
                 else -> {
@@ -516,19 +516,19 @@ private fun StudentReportCardsScreen(onBack: () -> Unit) {
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Column {
-                                        Text(text = card.exam_name ?: "Exam", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                                        Text(text = "${card.class_name ?: ""}-${card.class_section ?: ""} • ${card.academic_year_name ?: ""}", fontSize = 12.sp, color = TextSecondary)
-                                        Text(text = "Percentage: ${card.percentage ?: 0.0}%  •  Grade: ${card.grade ?: "-"}", fontSize = 12.sp, color = SunsetOrange)
+                                        Text(text = card.exam_name ?: "Exam", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                        Text(text = "${card.class_name ?: ""}-${card.class_section ?: ""} • ${card.academic_year_name ?: ""}", fontSize = 10.sp, color = TextSecondary)
+                                        Text(text = "Percentage: ${card.percentage ?: 0.0}%  •  Grade: ${card.grade ?: "-"}", fontSize = 10.sp, color = SunsetOrange)
                                     }
                                     Box(
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(6.dp))
                                             .background((if (card.result == "PASS") OnlineGreen else Color(0xFFEF4444)).copy(alpha = 0.2f))
-                                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                                            .padding(horizontal = 7.dp, vertical = 2.dp)
                                     ) {
                                         Text(
                                             text = card.result ?: "-",
-                                            fontSize = 10.sp,
+                                            fontSize = 8.5.sp,
                                             fontWeight = FontWeight.ExtraBold,
                                             color = if (card.result == "PASS") OnlineGreen else Color(0xFFEF4444)
                                         )
@@ -551,15 +551,15 @@ fun ReportCardDetailScreen(card: ReportCardDto, onBack: () -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(FrostedCard)
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                    .padding(horizontal = 13.dp, vertical = 11.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBack) {
                     Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
                 }
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = card.exam_name ?: "Report Card", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                    Text(text = card.school_name ?: "", fontSize = 11.sp, color = SunsetOrange)
+                    Text(text = card.exam_name ?: "Report Card", fontSize = 15.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                    Text(text = card.school_name ?: "", fontSize = 9.5.sp, color = SunsetOrange)
                 }
             }
 
@@ -577,19 +577,19 @@ fun ReportCardDetailScreen(card: ReportCardDto, onBack: () -> Unit) {
                             .padding(14.dp)
                     ) {
                         Column {
-                            Text(text = card.student_name ?: "", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                            Text(text = "Roll ${card.roll_no ?: "-"} • ${card.class_name ?: ""}-${card.class_section ?: ""}", fontSize = 12.sp, color = TextSecondary)
-                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(text = card.student_name ?: "", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                            Text(text = "Roll ${card.roll_no ?: "-"} • ${card.class_name ?: ""}-${card.class_section ?: ""}", fontSize = 10.sp, color = TextSecondary)
+                            Spacer(modifier = Modifier.height(5.dp))
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text(text = "Class Rank: ${card.class_rank ?: "-"}", fontSize = 12.sp, color = TextSecondary)
-                                Text(text = "Section Rank: ${card.section_rank ?: "-"}", fontSize = 12.sp, color = TextSecondary)
+                                Text(text = "Class Rank: ${card.class_rank ?: "-"}", fontSize = 10.sp, color = TextSecondary)
+                                Text(text = "Section Rank: ${card.section_rank ?: "-"}", fontSize = 10.sp, color = TextSecondary)
                             }
                         }
                     }
                 }
 
                 item {
-                    Text(text = "SUBJECT-WISE MARKS", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = TextSecondary, letterSpacing = 1.sp)
+                    Text(text = "SUBJECT-WISE MARKS", fontSize = 9.5.sp, fontWeight = FontWeight.ExtraBold, color = TextSecondary, letterSpacing = 1.sp)
                 }
 
                 items(card.subjects) { subject ->
@@ -607,12 +607,12 @@ fun ReportCardDetailScreen(card: ReportCardDto, onBack: () -> Unit) {
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column {
-                                Text(text = subject.subject_name ?: "Subject", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                                Text(text = "Grade: ${subject.grade ?: "-"}  •  ${subject.result ?: "-"}", fontSize = 11.sp, color = TextSecondary)
+                                Text(text = subject.subject_name ?: "Subject", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                Text(text = "Grade: ${subject.grade ?: "-"}  •  ${subject.result ?: "-"}", fontSize = 9.5.sp, color = TextSecondary)
                             }
                             Text(
                                 text = "${subject.marks_obtained} / ${subject.max_marks}",
-                                fontSize = 13.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = TextPrimary
                             )
@@ -630,11 +630,11 @@ fun ReportCardDetailScreen(card: ReportCardDto, onBack: () -> Unit) {
                             .padding(14.dp)
                     ) {
                         Column {
-                            Text(text = "Overall: ${card.total_obtained?.toInt() ?: 0} / ${card.total_max?.toInt() ?: 0}  (${card.percentage ?: 0.0}%)", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                            Text(text = "Grade: ${card.grade ?: "-"}  •  Result: ${card.result ?: "-"}", fontSize = 13.sp, color = SunsetOrange, fontWeight = FontWeight.Bold)
+                            Text(text = "Overall: ${card.total_obtained?.toInt() ?: 0} / ${card.total_max?.toInt() ?: 0}  (${card.percentage ?: 0.0}%)", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                            Text(text = "Grade: ${card.grade ?: "-"}  •  Result: ${card.result ?: "-"}", fontSize = 11.sp, color = SunsetOrange, fontWeight = FontWeight.Bold)
                             card.attendance?.let { att ->
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(text = "Attendance: ${att.present_days ?: 0}/${att.working_days ?: 0} days (${att.attendance_rate ?: 0.0}%)", fontSize = 12.sp, color = TextSecondary)
+                                Spacer(modifier = Modifier.height(3.dp))
+                                Text(text = "Attendance: ${att.present_days ?: 0}/${att.working_days ?: 0} days (${att.attendance_rate ?: 0.0}%)", fontSize = 10.sp, color = TextSecondary)
                             }
                         }
                     }

@@ -144,7 +144,7 @@ fun StudentTimetableScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -152,7 +152,7 @@ fun StudentTimetableScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -163,38 +163,38 @@ fun StudentTimetableScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Class Timetable",
-                                fontSize = 18.sp,
+                                fontSize = 15.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = TextPrimary
                             )
                             Text(
                                 text = "QA Server: GET /api/student/timetable",
-                                fontSize = 11.5.sp,
+                                fontSize = 10.sp,
                                 color = SunsetOrange
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     Text(
                         text = todayLabel.uppercase(),
-                        fontSize = 11.sp,
+                        fontSize = 9.5.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = TextSecondary,
                         letterSpacing = 1.sp
                     )
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     when {
                         isLoading -> {
@@ -204,12 +204,12 @@ fun StudentTimetableScreen(
                         }
                         errorMessage != null -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         periods.isEmpty() -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = "No periods are scheduled for this day.", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = "No periods are scheduled for this day.", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         else -> {
@@ -232,33 +232,33 @@ fun StudentTimetableScreen(
                                         ) {
                                             Box(
                                                 modifier = Modifier
-                                                    .size(40.dp)
+                                                    .size(35.dp)
                                                     .clip(CircleShape)
                                                     .background(InfoBlue.copy(alpha = 0.18f)),
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 Text(
                                                     text = "${item.period_number ?: '-'}",
-                                                    fontSize = 14.sp,
+                                                    fontSize = 12.sp,
                                                     fontWeight = FontWeight.ExtraBold,
                                                     color = InfoBlue
                                                 )
                                             }
-                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Spacer(modifier = Modifier.width(10.dp))
                                             Column(modifier = Modifier.weight(1f)) {
-                                                Text(text = item.subject_name ?: "Free Period", fontSize = 14.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                                                Text(text = item.teacher_name ?: "Faculty Member", fontSize = 11.5.sp, color = TextSecondary)
+                                                Text(text = item.subject_name ?: "Free Period", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                                Text(text = item.teacher_name ?: "Faculty Member", fontSize = 10.sp, color = TextSecondary)
                                                 if (!item.room.isNullOrBlank()) {
-                                                    Text(text = "Room: ${item.room}", fontSize = 11.sp, color = TextSecondary)
+                                                    Text(text = "Room: ${item.room}", fontSize = 9.5.sp, color = TextSecondary)
                                                 }
                                             }
                                             Column(horizontalAlignment = Alignment.End) {
                                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                                    Icon(imageVector = Icons.Default.Schedule, contentDescription = "Time", tint = SunsetOrange, modifier = Modifier.size(14.dp))
-                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Icon(imageVector = Icons.Default.Schedule, contentDescription = "Time", tint = SunsetOrange, modifier = Modifier.size(20.dp))
+                                                    Spacer(modifier = Modifier.width(3.dp))
                                                     Text(
                                                         text = listOfNotNull(item.start_time, item.end_time).joinToString(" - "),
-                                                        fontSize = 11.5.sp,
+                                                        fontSize = 10.sp,
                                                         fontWeight = FontWeight.SemiBold,
                                                         color = TextPrimary
                                                     )

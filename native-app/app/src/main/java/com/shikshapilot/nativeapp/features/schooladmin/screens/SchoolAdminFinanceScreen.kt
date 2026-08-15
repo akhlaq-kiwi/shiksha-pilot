@@ -137,7 +137,7 @@ fun SchoolAdminFinanceScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -145,7 +145,7 @@ fun SchoolAdminFinanceScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -156,28 +156,28 @@ fun SchoolAdminFinanceScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Finance",
-                                fontSize = 18.sp,
+                                fontSize = 15.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = TextPrimary
                             )
                             Text(
                                 text = "Fee structures, collection, follow-ups, salaries, reports",
-                                fontSize = 11.sp,
+                                fontSize = 9.5.sp,
                                 color = SunsetOrange
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -192,8 +192,8 @@ fun SchoolAdminFinanceScreen(
                                 .padding(12.dp)
                         ) {
                             Column {
-                                Text(text = "Collected (Academic Year)", fontSize = 11.sp, color = TextSecondary)
-                                Text(text = totalCollectedStr, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = OnlineGreen)
+                                Text(text = "Collected (Academic Year)", fontSize = 9.5.sp, color = TextSecondary)
+                                Text(text = totalCollectedStr, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = OnlineGreen)
                             }
                         }
 
@@ -206,23 +206,23 @@ fun SchoolAdminFinanceScreen(
                                 .padding(12.dp)
                         ) {
                             Column {
-                                Text(text = "Pending Dues", fontSize = 11.sp, color = TextSecondary)
-                                Text(text = pendingDuesStr, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFFEF4444))
+                                Text(text = "Pending Dues", fontSize = 9.5.sp, color = TextSecondary)
+                                Text(text = pendingDuesStr, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFFEF4444))
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(13.dp))
 
                     Text(
                         text = "FINANCE MODULES",
-                        fontSize = 11.sp,
+                        fontSize = 9.5.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = TextSecondary,
                         letterSpacing = 1.sp
                     )
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     LazyColumn(
                         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -244,7 +244,7 @@ fun SchoolAdminFinanceScreen(
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .size(42.dp)
+                                            .size(37.dp)
                                             .clip(CircleShape)
                                             .background(SunsetOrange.copy(alpha = 0.18f))
                                             .border(width = 1.dp, color = SunsetOrange.copy(alpha = 0.4f), shape = CircleShape),
@@ -258,18 +258,18 @@ fun SchoolAdminFinanceScreen(
                                         )
                                     }
 
-                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Spacer(modifier = Modifier.width(10.dp))
 
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(text = module.title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                                        Text(text = module.subtitle, fontSize = 12.sp, color = TextSecondary)
+                                        Text(text = module.title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                        Text(text = module.subtitle, fontSize = 10.sp, color = TextSecondary)
                                     }
 
                                     Icon(
                                         imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
                                         contentDescription = "Open",
                                         tint = TextSecondary,
-                                        modifier = Modifier.size(14.dp)
+                                        modifier = Modifier.size(20.dp)
                                     )
                                 }
                             }

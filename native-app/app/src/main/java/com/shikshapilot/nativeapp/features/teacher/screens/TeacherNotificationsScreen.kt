@@ -104,7 +104,7 @@ fun TeacherNotificationsScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -112,7 +112,7 @@ fun TeacherNotificationsScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -123,28 +123,28 @@ fun TeacherNotificationsScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Notifications",
-                                fontSize = 18.sp,
+                                fontSize = 15.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = TextPrimary
                             )
                             Text(
                                 text = "QA Server: GET /api/teacher/notifications",
-                                fontSize = 11.5.sp,
+                                fontSize = 10.sp,
                                 color = SunsetOrange
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(13.dp))
 
                     when {
                         isLoading -> {
@@ -154,12 +154,12 @@ fun TeacherNotificationsScreen(
                         }
                         errorMessage != null -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         notificationsList.isEmpty() -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = "You're all caught up. No notifications yet.", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = "You're all caught up. No notifications yet.", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         else -> {
@@ -203,30 +203,30 @@ fun TeacherNotificationsScreen(
                                         ) {
                                             Box(
                                                 modifier = Modifier
-                                                    .size(36.dp)
+                                                    .size(32.dp)
                                                     .clip(CircleShape)
                                                     .background(SunsetOrange.copy(alpha = 0.18f)),
                                                 contentAlignment = Alignment.Center
                                             ) {
-                                                Icon(imageVector = Icons.Default.Notifications, contentDescription = "Notification", tint = SunsetOrange, modifier = Modifier.size(18.dp))
+                                                Icon(imageVector = Icons.Default.Notifications, contentDescription = "Notification", tint = SunsetOrange, modifier = Modifier.size(20.dp))
                                             }
 
-                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Spacer(modifier = Modifier.width(10.dp))
 
                                             Column(modifier = Modifier.weight(1f)) {
                                                 Text(
                                                     text = item.title ?: "Notification",
-                                                    fontSize = 14.5.sp,
+                                                    fontSize = 12.5.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = TextPrimary
                                                 )
                                                 if (!item.message.isNullOrBlank()) {
                                                     Spacer(modifier = Modifier.height(2.dp))
-                                                    Text(text = item.message, fontSize = 12.5.sp, color = TextSecondary)
+                                                    Text(text = item.message, fontSize = 10.5.sp, color = TextSecondary)
                                                 }
                                                 if (!item.created_at.isNullOrBlank()) {
-                                                    Spacer(modifier = Modifier.height(4.dp))
-                                                    Text(text = item.created_at, fontSize = 10.5.sp, color = SunsetOrange, fontWeight = FontWeight.SemiBold)
+                                                    Spacer(modifier = Modifier.height(3.dp))
+                                                    Text(text = item.created_at, fontSize = 9.sp, color = SunsetOrange, fontWeight = FontWeight.SemiBold)
                                                 }
                                             }
 
@@ -235,7 +235,7 @@ fun TeacherNotificationsScreen(
                                                     imageVector = Icons.Default.Circle,
                                                     contentDescription = "Unread",
                                                     tint = SunsetOrange,
-                                                    modifier = Modifier.size(9.dp)
+                                                    modifier = Modifier.size(20.dp)
                                                 )
                                             }
                                         }

@@ -233,7 +233,7 @@ fun SchoolAdminTransportFeesScreen(
                 onClick = { resetForm(); showFormDialog = true },
                 containerColor = SunsetOrange
             ) {
-                Text(text = "+", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text(text = "+", fontSize = 18.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
             }
         }
     ) { paddingValues ->
@@ -255,7 +255,7 @@ fun SchoolAdminTransportFeesScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -263,7 +263,7 @@ fun SchoolAdminTransportFeesScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -274,28 +274,28 @@ fun SchoolAdminTransportFeesScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Transport Fees",
-                                fontSize = 18.sp,
+                                fontSize = 15.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = TextPrimary
                             )
                             Text(
                                 text = "${feesList.size} students assigned",
-                                fontSize = 11.5.sp,
+                                fontSize = 10.sp,
                                 color = SunsetOrange
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     when {
                         isLoading -> {
@@ -305,12 +305,12 @@ fun SchoolAdminTransportFeesScreen(
                         }
                         errorMessage != null -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         feesList.isEmpty() -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = "No transport fees assigned. Tap + to add one.", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = "No transport fees assigned. Tap + to add one.", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         else -> {
@@ -333,7 +333,7 @@ fun SchoolAdminTransportFeesScreen(
                                         ) {
                                             Box(
                                                 modifier = Modifier
-                                                    .size(42.dp)
+                                                    .size(37.dp)
                                                     .clip(CircleShape)
                                                     .background(SunsetOrange.copy(alpha = 0.18f))
                                                     .border(width = 1.dp, color = SunsetOrange.copy(alpha = 0.4f), shape = CircleShape),
@@ -347,24 +347,24 @@ fun SchoolAdminTransportFeesScreen(
                                                 )
                                             }
 
-                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Spacer(modifier = Modifier.width(10.dp))
 
                                             Column(modifier = Modifier.weight(1f)) {
                                                 Text(
                                                     text = item.student_name ?: "Student #${item.student_id}",
-                                                    fontSize = 15.sp,
+                                                    fontSize = 13.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = TextPrimary
                                                 )
                                                 Spacer(modifier = Modifier.height(2.dp))
                                                 Text(
                                                     text = "${item.class_name ?: ""}${if (item.class_section != null) "-${item.class_section}" else ""} • ₹${item.monthly_fee}/mo",
-                                                    fontSize = 12.sp,
+                                                    fontSize = 10.sp,
                                                     color = TextSecondary
                                                 )
                                                 Text(
                                                     text = "Since ${item.start_date}",
-                                                    fontSize = 11.sp,
+                                                    fontSize = 9.5.sp,
                                                     color = TextSecondary
                                                 )
                                             }
@@ -378,7 +378,7 @@ fun SchoolAdminTransportFeesScreen(
                                             Box {
                                                 Box(
                                                     modifier = Modifier
-                                                        .size(32.dp)
+                                                        .size(28.dp)
                                                         .clip(CircleShape)
                                                         .clickable { menuForId = item.id },
                                                     contentAlignment = Alignment.Center
@@ -436,16 +436,16 @@ fun SchoolAdminTransportFeesScreen(
                 Column {
                     Text(
                         text = if (isEditing) "Edit Transport Fee" else "Assign Transport Fee",
-                        fontSize = 16.sp,
+                        fontSize = 13.5.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
                     )
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(13.dp))
 
                     if (!isEditing) {
-                        Text(text = "Student", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(text = "Student", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
+                        Spacer(modifier = Modifier.height(5.dp))
                         var studentDropdownExpanded by remember { mutableStateOf(false) }
                         Box(modifier = Modifier.fillMaxWidth()) {
                             Box(
@@ -455,11 +455,11 @@ fun SchoolAdminTransportFeesScreen(
                                     .background(FrostedCard)
                                     .border(width = 1.dp, color = CardBorder, shape = RoundedCornerShape(14.dp))
                                     .clickable { studentDropdownExpanded = true }
-                                    .padding(horizontal = 14.dp, vertical = 14.dp)
+                                    .padding(horizontal = 11.dp, vertical = 11.dp)
                             ) {
                                 Text(
                                     text = selectedStudent?.let { "${it.name} (${it.class_name ?: ""}-${it.section ?: ""})" } ?: "Select a student",
-                                    fontSize = 14.sp,
+                                    fontSize = 12.sp,
                                     color = if (selectedStudent != null) TextPrimary else TextSecondary
                                 )
                             }
@@ -479,15 +479,15 @@ fun SchoolAdminTransportFeesScreen(
                                 }
                             }
                         }
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(13.dp))
                     }
 
-                    Text(text = "Monthly Fee", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(text = "Monthly Fee", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
+                    Spacer(modifier = Modifier.height(5.dp))
                     OutlinedTextField(
                         value = monthlyFeeInput,
                         onValueChange = { monthlyFeeInput = it },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
                         placeholder = { Text("e.g. 1500") },
                         singleLine = true,
                         shape = RoundedCornerShape(14.dp),
@@ -501,14 +501,14 @@ fun SchoolAdminTransportFeesScreen(
                         )
                     )
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(13.dp))
 
-                    Text(text = "Start Date", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(text = "Start Date", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
+                    Spacer(modifier = Modifier.height(5.dp))
                     OutlinedTextField(
                         value = startDateInput,
                         onValueChange = { startDateInput = it },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
                         placeholder = { Text("YYYY-MM-DD") },
                         singleLine = true,
                         shape = RoundedCornerShape(14.dp),
@@ -523,11 +523,11 @@ fun SchoolAdminTransportFeesScreen(
                     )
 
                     if (formError != null) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(text = formError ?: "", fontSize = 11.5.sp, color = Color(0xFFEF4444))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(text = formError ?: "", fontSize = 10.sp, color = Color(0xFFEF4444))
                     }
 
-                    Spacer(modifier = Modifier.height(18.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -536,7 +536,7 @@ fun SchoolAdminTransportFeesScreen(
                         TextButton(onClick = { resetForm() }) {
                             Text("Cancel", color = TextSecondary)
                         }
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Button(
                             onClick = { saveTransportFee() },
                             enabled = !isSaving,

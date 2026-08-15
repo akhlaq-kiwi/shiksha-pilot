@@ -234,24 +234,24 @@ fun SchoolAdminProfileScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                        .padding(horizontal = 13.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(36.dp)
+                            .size(32.dp)
                             .clip(CircleShape)
                             .background(FrostedCard)
                             .border(width = 1.dp, color = CardBorder, shape = CircleShape)
                             .clickable { onBack() },
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(imageVector = Icons.Default.ArrowBackIos, contentDescription = "Back", tint = TextPrimary, modifier = Modifier.size(16.dp))
+                        Icon(imageVector = Icons.Default.ArrowBackIos, contentDescription = "Back", tint = TextPrimary, modifier = Modifier.size(20.dp))
                     }
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "School Profile", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
-                        Text(text = "Logo, signature & school details", fontSize = 11.5.sp, color = SunsetOrange)
+                        Text(text = "School Profile", fontSize = 15.5.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
+                        Text(text = "Logo, signature & school details", fontSize = 10.sp, color = SunsetOrange)
                     }
                 }
 
@@ -263,7 +263,7 @@ fun SchoolAdminProfileScreen(
                     }
                     errorMessage != null -> {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                            Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                         }
                     }
                     else -> {
@@ -311,7 +311,7 @@ fun SchoolAdminProfileScreen(
                                 )
                             }
 
-                            Spacer(modifier = Modifier.height(16.dp))
+                            Spacer(modifier = Modifier.height(13.dp))
 
                             if (!profile?.active_plan.isNullOrBlank()) {
                                 Box(
@@ -323,13 +323,13 @@ fun SchoolAdminProfileScreen(
                                         .padding(12.dp)
                                 ) {
                                     Column {
-                                        Text(text = "Active Plan: ${profile?.active_plan}", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = OnlineGreen)
+                                        Text(text = "Active Plan: ${profile?.active_plan}", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = OnlineGreen)
                                         if (!profile?.subscription_expiry.isNullOrBlank()) {
-                                            Text(text = "Expires: ${profile?.subscription_expiry}", fontSize = 11.sp, color = TextSecondary)
+                                            Text(text = "Expires: ${profile?.subscription_expiry}", fontSize = 9.5.sp, color = TextSecondary)
                                         }
                                     }
                                 }
-                                Spacer(modifier = Modifier.height(16.dp))
+                                Spacer(modifier = Modifier.height(13.dp))
                             }
 
                             ProfileField(label = "School Name", value = name, onChange = { name = it })
@@ -344,7 +344,7 @@ fun SchoolAdminProfileScreen(
                             }
                             ProfileField(label = "Pin Code", value = pinCode, onChange = { pinCode = it })
 
-                            Spacer(modifier = Modifier.height(10.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
 
                             Box(
                                 modifier = Modifier
@@ -355,7 +355,7 @@ fun SchoolAdminProfileScreen(
                                     .padding(vertical = 14.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(text = if (isSaving) "Saving..." else "Save Profile", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                Text(text = if (isSaving) "Saving..." else "Save Profile", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             }
                         }
                     }
@@ -396,20 +396,20 @@ private fun UploadTile(
             .padding(12.dp)
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-            Icon(imageVector = if (label.contains("Logo")) Icons.Default.School else Icons.Default.Image, contentDescription = label, tint = SunsetOrange, modifier = Modifier.size(26.dp))
+            Icon(imageVector = if (label.contains("Logo")) Icons.Default.School else Icons.Default.Image, contentDescription = label, tint = SunsetOrange, modifier = Modifier.size(23.dp))
+            Spacer(modifier = Modifier.height(5.dp))
+            Text(text = label, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+            Text(text = if (hasFile) "Uploaded" else "Not set", fontSize = 9.sp, color = if (hasFile) OnlineGreen else TextSecondary)
             Spacer(modifier = Modifier.height(6.dp))
-            Text(text = label, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-            Text(text = if (hasFile) "Uploaded" else "Not set", fontSize = 10.5.sp, color = if (hasFile) OnlineGreen else TextSecondary)
-            Spacer(modifier = Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
                         .background(SunsetOrange.copy(alpha = 0.18f))
                         .clickable(enabled = !isUploading) { onUpload() }
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                        .padding(horizontal = 8.dp, vertical = 5.dp)
                 ) {
-                    Text(text = if (isUploading) "..." else "Upload", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = SunsetOrange)
+                    Text(text = if (isUploading) "..." else "Upload", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = SunsetOrange)
                 }
                 if (hasFile) {
                     Box(
@@ -417,9 +417,9 @@ private fun UploadTile(
                             .clip(RoundedCornerShape(8.dp))
                             .background(Color(0xFFEF4444).copy(alpha = 0.18f))
                             .clickable { onRemove() }
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                            .padding(horizontal = 8.dp, vertical = 5.dp)
                     ) {
-                        Text(text = "Remove", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFFEF4444))
+                        Text(text = "Remove", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFFEF4444))
                     }
                 }
             }

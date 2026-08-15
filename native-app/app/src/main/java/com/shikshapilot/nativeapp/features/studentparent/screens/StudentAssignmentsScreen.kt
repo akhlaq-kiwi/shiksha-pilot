@@ -131,7 +131,7 @@ fun StudentAssignmentsScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -139,7 +139,7 @@ fun StudentAssignmentsScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -150,38 +150,38 @@ fun StudentAssignmentsScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Homework & Assignments",
-                                fontSize = 18.sp,
+                                fontSize = 15.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = TextPrimary
                             )
                             Text(
                                 text = "QA Server: GET /api/student/assignments",
-                                fontSize = 11.5.sp,
+                                fontSize = 10.sp,
                                 color = SunsetOrange
                             )
                         }
                     }
 
                     if (overdueCount > 0) {
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = "$overdueCount assignment(s) overdue",
-                            fontSize = 12.sp,
+                            fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFFEF4444)
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     when {
                         isLoading -> {
@@ -191,12 +191,12 @@ fun StudentAssignmentsScreen(
                         }
                         errorMessage != null -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         sortedAssignments.isEmpty() -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = "No assignments have been posted yet.", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = "No assignments have been posted yet.", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         else -> {
@@ -226,22 +226,22 @@ fun StudentAssignmentsScreen(
                                             Row(modifier = Modifier.weight(1f)) {
                                                 Box(
                                                     modifier = Modifier
-                                                        .size(36.dp)
+                                                        .size(32.dp)
                                                         .clip(CircleShape)
                                                         .background(SunsetOrange.copy(alpha = 0.18f)),
                                                     contentAlignment = Alignment.Center
                                                 ) {
-                                                    Icon(imageVector = Icons.Default.Assignment, contentDescription = "Assignment", tint = SunsetOrange, modifier = Modifier.size(18.dp))
+                                                    Icon(imageVector = Icons.Default.Assignment, contentDescription = "Assignment", tint = SunsetOrange, modifier = Modifier.size(20.dp))
                                                 }
-                                                Spacer(modifier = Modifier.width(12.dp))
+                                                Spacer(modifier = Modifier.width(10.dp))
                                                 Column(modifier = Modifier.weight(1f)) {
-                                                    Text(text = item.title, fontSize = 14.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                                    Text(text = item.title, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                                                     val subjectClass = listOfNotNull(item.subject_name, item.class_name).joinToString(" • ")
                                                     if (subjectClass.isNotBlank()) {
-                                                        Text(text = subjectClass, fontSize = 11.5.sp, color = TextSecondary)
+                                                        Text(text = subjectClass, fontSize = 10.sp, color = TextSecondary)
                                                     }
                                                     if (!item.due_date.isNullOrBlank()) {
-                                                        Text(text = "Due: ${item.due_date}", fontSize = 11.5.sp, color = TextSecondary)
+                                                        Text(text = "Due: ${item.due_date}", fontSize = 10.sp, color = TextSecondary)
                                                     }
                                                 }
                                             }
@@ -252,9 +252,9 @@ fun StudentAssignmentsScreen(
                                                         .clip(RoundedCornerShape(20.dp))
                                                         .background(chipColor.copy(alpha = 0.18f))
                                                         .border(width = 1.dp, color = chipColor.copy(alpha = 0.5f), shape = RoundedCornerShape(20.dp))
-                                                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                                                        .padding(horizontal = 8.dp, vertical = 4.dp)
                                                 ) {
-                                                    Text(text = chipLabel, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = chipColor)
+                                                    Text(text = chipLabel, fontSize = 8.5.sp, fontWeight = FontWeight.Bold, color = chipColor)
                                                 }
                                             }
                                         }

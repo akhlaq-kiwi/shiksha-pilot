@@ -231,22 +231,22 @@ fun SchoolAdminEnrollStudentScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                        .padding(horizontal = 13.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(36.dp)
+                            .size(32.dp)
                             .clip(CircleShape)
                             .background(FrostedCard)
                             .border(width = 1.dp, color = CardBorder, shape = CircleShape)
                             .clickable { onBack() },
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(imageVector = Icons.Default.ArrowBackIos, contentDescription = "Back", tint = TextPrimary, modifier = Modifier.size(16.dp))
+                        Icon(imageVector = Icons.Default.ArrowBackIos, contentDescription = "Back", tint = TextPrimary, modifier = Modifier.size(20.dp))
                     }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(text = "Enroll New Student", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(text = "Enroll New Student", fontSize = 15.5.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
                 }
 
                 Column(
@@ -259,89 +259,89 @@ fun SchoolAdminEnrollStudentScreen(
 
                     FieldLabel("Class *")
                     ClassPicker(allClasses, selectedClass) { selectedClass = it }
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     FieldLabel("Category *")
                     ChoiceRow(listOf("New Admission", "Existing Student"), studentCategory) { studentCategory = it }
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     TwoFieldRow(
                         "SR No.", srNo, { srNo = it },
                         "Roll No.", rollNo, { rollNo = it }
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     TwoFieldRow(
                         "Admission Date (YYYY-MM-DD)", admissionDate, { admissionDate = it },
                         "Admission Fee", admissionFee, { admissionFee = it }
                     )
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
                     SectionHeader("Student Info")
 
                     TwoFieldRow(
                         "First Name *", firstName, { firstName = it },
                         "Middle Name", middleName, { middleName = it }
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     SingleField("Last Name *", lastName) { lastName = it }
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     FieldLabel("Gender *")
                     ChoiceRow(listOf("Male", "Female", "Other"), gender) { gender = it }
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     TwoFieldRow(
                         "Date of Birth (YYYY-MM-DD) *", dob, { dob = it },
                         "Blood Group", bloodGroup, { bloodGroup = it }
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     TwoFieldRow(
                         "Category (e.g. General/OBC/SC/ST)", category, { category = it },
                         "Religion", religion, { religion = it }
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     SingleField("Aadhaar No. (12 digits)", aadhaarNo) { aadhaarNo = it }
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     TwoFieldRow(
                         "Student Mobile", studentMobile, { studentMobile = it },
                         "Student Email", studentEmail, { studentEmail = it }
                     )
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
                     SectionHeader("Parent Info")
 
                     TwoFieldRow(
                         "Father Name", fatherName, { fatherName = it },
                         "Father Phone", fatherPhone, { fatherPhone = it }
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     TwoFieldRow(
                         "Mother Name", motherName, { motherName = it },
                         "Parent Occupation", parentOccupation, { parentOccupation = it }
                     )
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
                     SectionHeader("Current Address")
 
                     SingleField("Address Line", currentAddressLine) { currentAddressLine = it }
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     TwoFieldRow(
                         "City", currentCity, { currentCity = it },
                         "State", currentState, { currentState = it }
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     TwoFieldRow(
                         "Country", currentCountry, { currentCountry = it },
                         "Pin Code", currentPinCode, { currentPinCode = it }
                     )
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = "Permanent address same as current", fontSize = 12.5.sp, color = TextSecondary)
+                        Text(text = "Permanent address same as current", fontSize = 10.5.sp, color = TextSecondary)
                         Switch(
                             checked = sameAsCurrent,
                             onCheckedChange = { sameAsCurrent = it },
@@ -350,15 +350,15 @@ fun SchoolAdminEnrollStudentScreen(
                     }
 
                     if (!sameAsCurrent) {
-                        Spacer(modifier = Modifier.height(14.dp))
+                        Spacer(modifier = Modifier.height(11.dp))
                         SectionHeader("Permanent Address")
                         SingleField("Address Line", permanentAddressLine) { permanentAddressLine = it }
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                         TwoFieldRow(
                             "City", permanentCity, { permanentCity = it },
                             "State", permanentState, { permanentState = it }
                         )
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                         TwoFieldRow(
                             "Country", permanentCountry, { permanentCountry = it },
                             "Pin Code", permanentPinCode, { permanentPinCode = it }
@@ -366,11 +366,11 @@ fun SchoolAdminEnrollStudentScreen(
                     }
 
                     if (formError != null) {
-                        Spacer(modifier = Modifier.height(14.dp))
-                        Text(text = formError ?: "", fontSize = 12.sp, color = Color(0xFFEF4444))
+                        Spacer(modifier = Modifier.height(11.dp))
+                        Text(text = formError ?: "", fontSize = 10.sp, color = Color(0xFFEF4444))
                     }
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
                     Button(
                         onClick = { submit() },
                         enabled = !isSaving,
@@ -383,7 +383,7 @@ fun SchoolAdminEnrollStudentScreen(
                             Text("Enroll Student", fontWeight = FontWeight.Bold)
                         }
                     }
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(19.dp))
                 }
             }
         }
@@ -394,18 +394,18 @@ fun SchoolAdminEnrollStudentScreen(
 private fun SectionHeader(title: String) {
     Text(
         text = title.uppercase(),
-        fontSize = 11.sp,
+        fontSize = 9.5.sp,
         fontWeight = FontWeight.ExtraBold,
         color = SunsetOrange,
         letterSpacing = 1.sp
     )
-    Spacer(modifier = Modifier.height(10.dp))
+    Spacer(modifier = Modifier.height(8.dp))
 }
 
 @Composable
 private fun FieldLabel(text: String) {
-    Text(text = text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
-    Spacer(modifier = Modifier.height(6.dp))
+    Text(text = text, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
+    Spacer(modifier = Modifier.height(5.dp))
 }
 
 @Composable
@@ -414,7 +414,7 @@ private fun SingleField(label: String, value: String, onValueChange: (String) ->
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().height(48.dp),
         singleLine = true,
         colors = OutlinedTextFieldDefaults.colors(
             focusedContainerColor = FrostedCard, unfocusedContainerColor = FrostedCard,
@@ -435,7 +435,7 @@ private fun TwoFieldRow(
             OutlinedTextField(
                 value = value1,
                 onValueChange = onChange1,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().height(48.dp),
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = FrostedCard, unfocusedContainerColor = FrostedCard,
@@ -449,7 +449,7 @@ private fun TwoFieldRow(
             OutlinedTextField(
                 value = value2,
                 onValueChange = onChange2,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().height(48.dp),
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = FrostedCard, unfocusedContainerColor = FrostedCard,
@@ -472,9 +472,9 @@ private fun ChoiceRow(options: List<String>, selected: String, onSelect: (String
                     .background(if (isSelected) SunsetOrange.copy(alpha = 0.18f) else FrostedCard)
                     .border(width = 1.dp, color = if (isSelected) SunsetOrange else CardBorder, shape = RoundedCornerShape(10.dp))
                     .clickable { onSelect(option) }
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
             ) {
-                Text(text = option, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = if (isSelected) SunsetOrange else TextPrimary)
+                Text(text = option, fontSize = 10.sp, fontWeight = FontWeight.Medium, color = if (isSelected) SunsetOrange else TextPrimary)
             }
         }
     }
@@ -491,11 +491,11 @@ private fun ClassPicker(classes: List<ClassDto>, selected: ClassDto?, onSelect: 
                 .background(FrostedCard)
                 .border(width = 1.dp, color = CardBorder, shape = RoundedCornerShape(14.dp))
                 .clickable { expanded = true }
-                .padding(horizontal = 14.dp, vertical = 14.dp)
+                .padding(horizontal = 11.dp, vertical = 11.dp)
         ) {
             Text(
                 text = selected?.let { "${it.name}${it.section?.let { s -> " - $s" } ?: ""}" } ?: "Select a class",
-                fontSize = 14.sp,
+                fontSize = 12.sp,
                 color = if (selected != null) TextPrimary else TextSecondary
             )
         }

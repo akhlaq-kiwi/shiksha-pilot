@@ -66,22 +66,22 @@ fun StudentVocabularyScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                        .padding(horizontal = 13.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(36.dp)
+                            .size(32.dp)
                             .clip(CircleShape)
                             .background(FrostedCard)
                             .border(width = 1.dp, color = CardBorder, shape = CircleShape)
                             .clickable { onBack() },
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(imageVector = Icons.Default.ArrowBackIos, contentDescription = "Back", tint = TextPrimary, modifier = Modifier.size(16.dp))
+                        Icon(imageVector = Icons.Default.ArrowBackIos, contentDescription = "Back", tint = TextPrimary, modifier = Modifier.size(20.dp))
                     }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(text = "Vocabulary", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(text = "Vocabulary", fontSize = 15.5.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
                 }
 
                 TabRow(
@@ -93,7 +93,7 @@ fun StudentVocabularyScreen(
                         Tab(
                             selected = selectedTab == index,
                             onClick = { selectedTab = index },
-                            text = { Text(text = title, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+                            text = { Text(text = title, fontSize = 10.sp, fontWeight = FontWeight.Bold) }
                         )
                     }
                 }
@@ -170,10 +170,10 @@ private fun ChallengeTab(kind: String) {
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text(
             text = "QA Server: ${if (kind == "daily") "GET/POST /api/student/vocabulary/challenge/daily" else "GET/POST /api/student/vocabulary/challenge/weekly"}",
-            fontSize = 10.5.sp,
+            fontSize = 9.sp,
             color = SunsetOrange
         )
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         when {
             isLoading -> {
@@ -183,12 +183,12 @@ private fun ChallengeTab(kind: String) {
             }
             errorMessage != null -> {
                 Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                    Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                    Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                 }
             }
             challenge == null || challenge!!.words.isEmpty() -> {
                 Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                    Text(text = "No challenge words available right now.", color = TextSecondary, fontSize = 13.sp)
+                    Text(text = "No challenge words available right now.", color = TextSecondary, fontSize = 11.sp)
                 }
             }
             else -> {
@@ -202,17 +202,17 @@ private fun ChallengeTab(kind: String) {
                             .border(1.dp, OnlineGreen, RoundedCornerShape(14.dp))
                             .padding(12.dp)
                     ) {
-                        Text(text = "You've already completed today's ${kind} challenge. Come back tomorrow!", color = OnlineGreen, fontSize = 13.sp)
+                        Text(text = "You've already completed today's ${kind} challenge. Come back tomorrow!", color = OnlineGreen, fontSize = 11.sp)
                     }
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
 
                 Text(
                     text = "Reviewed ${seenWordIds.size} / ${c.words.size} words",
-                    fontSize = 12.sp,
+                    fontSize = 10.sp,
                     color = TextSecondary
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
                 LazyColumn(
                     modifier = Modifier.weight(1f),
@@ -227,11 +227,11 @@ private fun ChallengeTab(kind: String) {
                     }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 submitMessage?.let {
-                    Text(text = it, fontSize = 12.sp, color = SunsetOrange, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(text = it, fontSize = 10.sp, color = SunsetOrange, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(5.dp))
                 }
 
                 val allSeen = c.words.isNotEmpty() && c.words.all { it.id == null || seenWordIds.contains(it.id) }
@@ -263,20 +263,20 @@ private fun WordFlipCard(word: VocabularyWordDto, seen: Boolean, onFlip: () -> U
     ) {
         Column {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                Text(text = (word.word ?: "-").replaceFirstChar { it.uppercase() }, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                Text(text = (word.word ?: "-").replaceFirstChar { it.uppercase() }, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                 Spacer(modifier = Modifier.weight(1f))
-                if (seen) Icon(Icons.Default.CheckCircle, contentDescription = "Seen", tint = OnlineGreen, modifier = Modifier.size(16.dp))
+                if (seen) Icon(Icons.Default.CheckCircle, contentDescription = "Seen", tint = OnlineGreen, modifier = Modifier.size(20.dp))
             }
-            Text(text = word.part_of_speech ?: "", fontSize = 10.5.sp, color = SunsetOrange)
+            Text(text = word.part_of_speech ?: "", fontSize = 9.sp, color = SunsetOrange)
             if (flipped) {
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(text = word.english_meaning ?: "-", fontSize = 12.sp, color = TextSecondary)
+                Spacer(modifier = Modifier.height(5.dp))
+                Text(text = word.english_meaning ?: "-", fontSize = 10.sp, color = TextSecondary)
                 word.english_sentence?.let {
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text(text = "\"$it\"", fontSize = 11.5.sp, color = TextSecondary)
+                    Text(text = "\"$it\"", fontSize = 10.sp, color = TextSecondary)
                 }
             } else {
-                Text(text = "Tap to reveal meaning", fontSize = 11.sp, color = TextSecondary)
+                Text(text = "Tap to reveal meaning", fontSize = 9.5.sp, color = TextSecondary)
             }
         }
     }
@@ -312,8 +312,8 @@ private fun LeaderboardTab() {
 
     PullToRefreshWrapper(isRefreshing = isLoading, onRefresh = { refreshKey++ }) {
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text(text = "QA Server: GET /api/student/vocabulary/leaderboard", fontSize = 10.5.sp, color = SunsetOrange)
-        Spacer(modifier = Modifier.height(10.dp))
+        Text(text = "QA Server: GET /api/student/vocabulary/leaderboard", fontSize = 9.sp, color = SunsetOrange)
+        Spacer(modifier = Modifier.height(8.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("School", "Class", "Section").forEachIndexed { index, label ->
@@ -322,14 +322,14 @@ private fun LeaderboardTab() {
                         .clip(RoundedCornerShape(10.dp))
                         .background(if (selectedScope == index) SunsetOrange else FrostedCard)
                         .clickable { selectedScope = index }
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
                 ) {
-                    Text(text = label, fontSize = 11.5.sp, color = if (selectedScope == index) Color.White else TextSecondary, fontWeight = FontWeight.Bold)
+                    Text(text = label, fontSize = 10.sp, color = if (selectedScope == index) Color.White else TextSecondary, fontWeight = FontWeight.Bold)
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         val entries: List<LeaderboardEntryDto> = when (selectedScope) {
             0 -> data?.school_rankings.orEmpty()
@@ -345,12 +345,12 @@ private fun LeaderboardTab() {
             }
             errorMessage != null -> {
                 Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                    Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                    Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                 }
             }
             entries.isEmpty() -> {
                 Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                    Text(text = "No leaderboard entries yet.", color = TextSecondary, fontSize = 13.sp)
+                    Text(text = "No leaderboard entries yet.", color = TextSecondary, fontSize = 11.sp)
                 }
             }
             else -> {
@@ -365,12 +365,12 @@ private fun LeaderboardTab() {
                                 .padding(12.dp)
                         ) {
                             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                Text(text = "#${index + 1}", fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = SunsetOrange, modifier = Modifier.width(36.dp))
+                                Text(text = "#${index + 1}", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = SunsetOrange, modifier = Modifier.width(36.dp))
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(text = entry.name ?: "-", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                                    Text(text = "${entry.total_words_mastered ?: 0} words mastered", fontSize = 11.sp, color = TextSecondary)
+                                    Text(text = entry.name ?: "-", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                    Text(text = "${entry.total_words_mastered ?: 0} words mastered", fontSize = 9.5.sp, color = TextSecondary)
                                 }
-                                Text(text = "${entry.score ?: 0} pts", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = OnlineGreen)
+                                Text(text = "${entry.score ?: 0} pts", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = OnlineGreen)
                             }
                         }
                     }

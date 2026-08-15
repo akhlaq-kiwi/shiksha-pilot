@@ -103,7 +103,7 @@ fun SchoolAdminExamsScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -111,7 +111,7 @@ fun SchoolAdminExamsScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -122,22 +122,22 @@ fun SchoolAdminExamsScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Examinations",
-                                fontSize = 18.sp,
+                                fontSize = 15.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = TextPrimary
                             )
                             Text(
                                 text = "QA Server: GET /api/school/exams-new",
-                                fontSize = 11.5.sp,
+                                fontSize = 10.sp,
                                 color = SunsetOrange
                             )
                         }
@@ -147,17 +147,17 @@ fun SchoolAdminExamsScreen(
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(SunsetOrange)
                                 .clickable { showCreateDialog = true }
-                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                                .padding(horizontal = 8.dp, vertical = 5.dp)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.White, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(text = "New", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.White, modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(text = "New", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(13.dp))
 
                     when {
                         isLoading -> {
@@ -167,12 +167,12 @@ fun SchoolAdminExamsScreen(
                         }
                         errorMessage != null -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         exams.isEmpty() -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = "No examinations found. Tap New to create one.", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = "No examinations found. Tap New to create one.", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         else -> {
@@ -200,26 +200,26 @@ fun SchoolAdminExamsScreen(
                                         ) {
                                             Box(
                                                 modifier = Modifier
-                                                    .size(40.dp)
+                                                    .size(35.dp)
                                                     .clip(CircleShape)
                                                     .background(SunsetOrange.copy(alpha = 0.18f)),
                                                 contentAlignment = Alignment.Center
                                             ) {
-                                                Icon(imageVector = Icons.Default.Assignment, contentDescription = "Exam", tint = SunsetOrange, modifier = Modifier.size(18.dp))
+                                                Icon(imageVector = Icons.Default.Assignment, contentDescription = "Exam", tint = SunsetOrange, modifier = Modifier.size(20.dp))
                                             }
-                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Spacer(modifier = Modifier.width(10.dp))
                                             Column(modifier = Modifier.weight(1f)) {
-                                                Text(text = exam.name, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                                Text(text = exam.name, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                                                 Spacer(modifier = Modifier.height(2.dp))
                                                 Text(
                                                     text = "${exam.start_date ?: "-"} to ${exam.end_date ?: "-"}",
-                                                    fontSize = 12.sp,
+                                                    fontSize = 10.sp,
                                                     color = TextSecondary
                                                 )
                                                 if ((exam.papers_count ?: 0) > 0) {
                                                     Text(
                                                         text = "${exam.papers_count} paper(s) scheduled",
-                                                        fontSize = 11.sp,
+                                                        fontSize = 9.5.sp,
                                                         color = TextSecondary
                                                     )
                                                 }
@@ -229,9 +229,9 @@ fun SchoolAdminExamsScreen(
                                                     .clip(RoundedCornerShape(6.dp))
                                                     .background(statusColor.copy(alpha = 0.2f))
                                                     .border(width = 1.dp, color = statusColor, shape = RoundedCornerShape(6.dp))
-                                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                                                    .padding(horizontal = 7.dp, vertical = 2.dp)
                                             ) {
-                                                Text(text = exam.status ?: "Draft", fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = statusColor)
+                                                Text(text = exam.status ?: "Draft", fontSize = 8.5.sp, fontWeight = FontWeight.ExtraBold, color = statusColor)
                                             }
                                         }
                                     }
@@ -253,7 +253,7 @@ fun SchoolAdminExamsScreen(
                         .background(OnlineGreen)
                         .padding(14.dp)
                 ) {
-                    Text(msg, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Text(msg, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 }
             }
         }
@@ -289,7 +289,7 @@ private fun CreateExamDialog(
     AlertDialog(
         onDismissRequest = { if (!isSubmitting) onDismiss() },
         containerColor = FrostedCard,
-        title = { Text("Create Examination", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp) },
+        title = { Text("Create Examination", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.5.sp) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(
@@ -439,17 +439,17 @@ private fun SchoolAdminExamDetailScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(FrostedCard)
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                    .padding(horizontal = 13.dp, vertical = 11.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBack) {
                     Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
                 }
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = exam.name, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                    Text(text = exam.name, fontSize = 15.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                     Text(
                         text = "QA Server: GET /api/school/exams-new/{id}/class-status",
-                        fontSize = 10.5.sp,
+                        fontSize = 9.sp,
                         color = SunsetOrange
                     )
                 }
@@ -465,28 +465,28 @@ private fun SchoolAdminExamDetailScreen(
                         .padding(14.dp)
                 ) {
                     Column {
-                        Text(text = "Schedule", fontSize = 12.sp, color = TextSecondary, fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(text = "${exam.start_date ?: "-"}  →  ${exam.end_date ?: "-"}", fontSize = 14.sp, color = TextPrimary)
-                        Text(text = "Publish Date: ${exam.publish_date ?: "-"}", fontSize = 12.sp, color = TextSecondary)
+                        Text(text = "Schedule", fontSize = 10.sp, color = TextSecondary, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Text(text = "${exam.start_date ?: "-"}  →  ${exam.end_date ?: "-"}", fontSize = 12.sp, color = TextPrimary)
+                        Text(text = "Publish Date: ${exam.publish_date ?: "-"}", fontSize = 10.sp, color = TextSecondary)
                         if (!exam.description.isNullOrBlank()) {
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(text = exam.description, fontSize = 12.sp, color = TextSecondary)
+                            Spacer(modifier = Modifier.height(5.dp))
+                            Text(text = exam.description, fontSize = 10.sp, color = TextSecondary)
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(13.dp))
 
                 Text(
                     text = "CLASS-WISE RESULT STATUS",
-                    fontSize = 11.sp,
+                    fontSize = 9.5.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = TextSecondary,
                     letterSpacing = 1.sp
                 )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 when {
                     isLoading -> {
@@ -496,12 +496,12 @@ private fun SchoolAdminExamDetailScreen(
                     }
                     errorMessage != null -> {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                            Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                         }
                     }
                     classStatuses.isEmpty() -> {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text(text = "No classes found for this academic year.", color = TextSecondary, fontSize = 13.sp)
+                            Text(text = "No classes found for this academic year.", color = TextSecondary, fontSize = 11.sp)
                         }
                     }
                     else -> {
@@ -526,15 +526,15 @@ private fun SchoolAdminExamDetailScreen(
                                     ) {
                                         Column(modifier = Modifier.weight(1f)) {
                                             val className = if (!cls.section.isNullOrBlank()) "${cls.name}-${cls.section}" else cls.name
-                                            Text(text = className, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                            Text(text = className, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                                             Spacer(modifier = Modifier.height(2.dp))
                                             Box(
                                                 modifier = Modifier
                                                     .clip(RoundedCornerShape(6.dp))
                                                     .background(statusColor.copy(alpha = 0.2f))
-                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    .padding(horizontal = 5.dp, vertical = 2.dp)
                                             ) {
-                                                Text(text = cls.status ?: "Draft", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = statusColor)
+                                                Text(text = cls.status ?: "Draft", fontSize = 8.5.sp, fontWeight = FontWeight.Bold, color = statusColor)
                                             }
                                         }
                                         if (!isPublished) {
@@ -547,7 +547,7 @@ private fun SchoolAdminExamDetailScreen(
                                                 Text(
                                                     if (publishingClassId == cls.id) "Publishing..." else "Publish",
                                                     color = Color.White,
-                                                    fontSize = 12.sp
+                                                    fontSize = 10.sp
                                                 )
                                             }
                                         }

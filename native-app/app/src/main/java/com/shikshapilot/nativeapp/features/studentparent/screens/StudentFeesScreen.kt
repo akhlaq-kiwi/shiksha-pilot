@@ -122,7 +122,7 @@ fun StudentFeesScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     // Back Header Row
                     Row(
@@ -131,7 +131,7 @@ fun StudentFeesScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -142,28 +142,28 @@ fun StudentFeesScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Fee Card & Payment Receipts",
-                                fontSize = 18.sp,
+                                fontSize = 15.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = TextPrimary
                             )
                             Text(
                                 text = "QA Server: GET /api/student/fees",
-                                fontSize = 11.5.sp,
+                                fontSize = 10.sp,
                                 color = SunsetOrange
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     // Fee Summary Cards Row
                     Row(
@@ -179,8 +179,8 @@ fun StudentFeesScreen(
                                 .padding(12.dp)
                         ) {
                             Column {
-                                Text(text = "Total Paid", fontSize = 11.sp, color = TextSecondary)
-                                Text(text = currencyFormatter.format(paidAmount), fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = OnlineGreen)
+                                Text(text = "Total Paid", fontSize = 9.5.sp, color = TextSecondary)
+                                Text(text = currencyFormatter.format(paidAmount), fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = OnlineGreen)
                             }
                         }
 
@@ -193,13 +193,13 @@ fun StudentFeesScreen(
                                 .padding(12.dp)
                         ) {
                             Column {
-                                Text(text = "Pending Dues", fontSize = 11.sp, color = TextSecondary)
-                                Text(text = currencyFormatter.format(pendingAmount), fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFFEF4444))
+                                Text(text = "Pending Dues", fontSize = 9.5.sp, color = TextSecondary)
+                                Text(text = currencyFormatter.format(pendingAmount), fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFFEF4444))
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     // Pay Fee Button
                     Button(
@@ -213,23 +213,23 @@ fun StudentFeesScreen(
                         shape = RoundedCornerShape(14.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(imageVector = Icons.Default.AccountBalanceWallet, contentDescription = "Pay", tint = Color.White, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(text = "Pay Outstanding Dues (${currencyFormatter.format(pendingAmount)})", fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Icon(imageVector = Icons.Default.AccountBalanceWallet, contentDescription = "Pay", tint = Color.White, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(text = "Pay Outstanding Dues (${currencyFormatter.format(pendingAmount)})", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(13.dp))
 
                     Text(
                         text = "FEE PAYMENT RECEIPTS & HISTORY (QA LIVE API)",
-                        fontSize = 11.sp,
+                        fontSize = 9.5.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = TextSecondary,
                         letterSpacing = 1.sp
                     )
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     if (isLoading) {
                         Box(
@@ -265,7 +265,7 @@ fun StudentFeesScreen(
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             Box(
                                                 modifier = Modifier
-                                                    .size(40.dp)
+                                                    .size(35.dp)
                                                     .clip(CircleShape)
                                                     .background(OnlineGreen.copy(alpha = 0.18f)),
                                                 contentAlignment = Alignment.Center
@@ -273,17 +273,17 @@ fun StudentFeesScreen(
                                                 Icon(imageVector = Icons.Default.Receipt, contentDescription = "Receipt", tint = OnlineGreen, modifier = Modifier.size(20.dp))
                                             }
 
-                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Spacer(modifier = Modifier.width(10.dp))
 
                                             Column {
-                                                Text(text = "Receipt #${item.receipt_no}", fontSize = 14.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                                                Text(text = "${item.payment_method} • ${item.payment_date}", fontSize = 12.sp, color = TextSecondary)
+                                                Text(text = "Receipt #${item.receipt_no}", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                                Text(text = "${item.payment_method} • ${item.payment_date}", fontSize = 10.sp, color = TextSecondary)
                                             }
                                         }
 
                                         Column(horizontalAlignment = Alignment.End) {
-                                            Text(text = currencyFormatter.format(item.amount), fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = OnlineGreen)
-                                            Text(text = item.status, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = OnlineGreen)
+                                            Text(text = currencyFormatter.format(item.amount), fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = OnlineGreen)
+                                            Text(text = item.status, fontSize = 8.5.sp, fontWeight = FontWeight.Bold, color = OnlineGreen)
                                         }
                                     }
                                 }

@@ -135,27 +135,27 @@ fun NotificationPreferencesScreen(
                     onAvatarClick = onAvatarClick
                 )
 
-                Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp)) {
+                Column(modifier = Modifier.fillMaxSize().padding(horizontal = 13.dp, vertical = 10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
                                 .clickable { onBack() },
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(imageVector = Icons.Default.ArrowBackIos, contentDescription = "Back", tint = TextPrimary, modifier = Modifier.size(16.dp))
+                            Icon(imageVector = Icons.Default.ArrowBackIos, contentDescription = "Back", tint = TextPrimary, modifier = Modifier.size(20.dp))
                         }
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
                         Column {
-                            Text(text = "Notifications", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
-                            Text(text = "QA Server: GET /api/notifications/catalog", fontSize = 10.5.sp, color = SunsetOrange)
+                            Text(text = "Notifications", fontSize = 15.5.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
+                            Text(text = "QA Server: GET /api/notifications/catalog", fontSize = 9.sp, color = SunsetOrange)
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     Box(
                         modifier = Modifier
@@ -166,18 +166,18 @@ fun NotificationPreferencesScreen(
                             .padding(12.dp)
                     ) {
                         Row(verticalAlignment = Alignment.Top) {
-                            Icon(imageVector = Icons.Default.WarningAmber, contentDescription = "Warning", tint = WarningYellow, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Icon(imageVector = Icons.Default.WarningAmber, contentDescription = "Warning", tint = WarningYellow, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = "Real push delivery is NOT implemented yet — no Firebase/FCM project is configured in this app. " +
                                     "You can still view categories and register a placeholder device token against the live backend.",
-                                fontSize = 11.5.sp,
+                                fontSize = 10.sp,
                                 color = TextPrimary
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Button(
@@ -185,26 +185,26 @@ fun NotificationPreferencesScreen(
                             colors = ButtonDefaults.buttonColors(containerColor = SunsetOrange),
                             enabled = !registered
                         ) {
-                            Text(text = if (registered) "Registered" else "Register This Device", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text(text = if (registered) "Registered" else "Register This Device", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 10.sp)
                         }
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         OutlinedButton(onClick = { sendTestPush() }) {
-                            Text(text = "Send Test Push", fontSize = 12.sp, color = TextPrimary)
+                            Text(text = "Send Test Push", fontSize = 10.sp, color = TextPrimary)
                         }
                     }
 
                     registerMessage?.let {
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(text = it, fontSize = 11.5.sp, color = OnlineGreen)
+                        Spacer(modifier = Modifier.height(5.dp))
+                        Text(text = it, fontSize = 10.sp, color = OnlineGreen)
                     }
                     testPushMessage?.let {
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(text = it, fontSize = 11.5.sp, color = InfoBlue)
+                        Spacer(modifier = Modifier.height(5.dp))
+                        Text(text = it, fontSize = 10.sp, color = InfoBlue)
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
-                    Text(text = "NOTIFICATION CATEGORIES", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp, color = TextSecondary)
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
+                    Text(text = "NOTIFICATION CATEGORIES", fontSize = 9.5.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp, color = TextSecondary)
+                    Spacer(modifier = Modifier.height(6.dp))
 
                     when {
                         isLoading -> {
@@ -214,12 +214,12 @@ fun NotificationPreferencesScreen(
                         }
                         errorMessage != null -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         categories.isEmpty() -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = "No notification categories found.", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = "No notification categories found.", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         else -> {
@@ -237,10 +237,10 @@ fun NotificationPreferencesScreen(
                                     ) {
                                         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                             Column(modifier = Modifier.weight(1f)) {
-                                                Text(text = category, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                                Text(text = category, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                                                 Text(
                                                     text = "${eventsInCategory.size} event type(s) • e.g. ${eventsInCategory.values.firstOrNull()?.label ?: eventsInCategory.keys.firstOrNull() ?: "-"}",
-                                                    fontSize = 11.5.sp,
+                                                    fontSize = 10.sp,
                                                     color = TextSecondary
                                                 )
                                             }

@@ -221,24 +221,24 @@ fun StudentWordBuilderScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                        .padding(horizontal = 13.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(36.dp)
+                            .size(32.dp)
                             .clip(CircleShape)
                             .background(FrostedCard)
                             .border(width = 1.dp, color = CardBorder, shape = CircleShape)
                             .clickable { onBack() },
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(imageVector = Icons.Default.ArrowBackIos, contentDescription = "Back", tint = TextPrimary, modifier = Modifier.size(16.dp))
+                        Icon(imageVector = Icons.Default.ArrowBackIos, contentDescription = "Back", tint = TextPrimary, modifier = Modifier.size(20.dp))
                     }
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "Word Builder", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
-                        Text(text = "QA Server: GET/POST /api/student/game/word-builder/progress", fontSize = 10.sp, color = SunsetOrange)
+                        Text(text = "Word Builder", fontSize = 15.5.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
+                        Text(text = "QA Server: GET/POST /api/student/game/word-builder/progress", fontSize = 8.5.sp, color = SunsetOrange)
                     }
                     Box(
                         modifier = Modifier
@@ -258,15 +258,15 @@ fun StudentWordBuilderScreen(
                                     }
                                 }
                             }
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                            .padding(horizontal = 8.dp, vertical = 5.dp)
                     ) {
-                        Text(text = "Claim Daily", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text(text = "Claim Daily", fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     }
                 }
 
                 claimMessage?.let {
-                    Text(text = it, fontSize = 11.5.sp, color = OnlineGreen, modifier = Modifier.padding(horizontal = 16.dp))
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(text = it, fontSize = 10.sp, color = OnlineGreen, modifier = Modifier.padding(horizontal = 16.dp))
+                    Spacer(modifier = Modifier.height(3.dp))
                 }
 
                 when {
@@ -277,12 +277,12 @@ fun StudentWordBuilderScreen(
                     }
                     errorMessage != null -> {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                            Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                         }
                     }
                     activeWords().isEmpty() -> {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text(text = "No words available for your class right now.", color = TextSecondary, fontSize = 13.sp)
+                            Text(text = "No words available for your class right now.", color = TextSecondary, fontSize = 11.sp)
                         }
                     }
                     else -> {
@@ -299,9 +299,9 @@ fun StudentWordBuilderScreen(
                                 StatChip(label = "Streak", value = "$currentStreak", icon = Icons.Default.LocalFireDepartment)
                             }
 
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text(text = "Word ${wordIndex + 1} of ${activeWords().size}", fontSize = 12.sp, color = TextSecondary)
-                            Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(text = "Word ${wordIndex + 1} of ${activeWords().size}", fontSize = 10.sp, color = TextSecondary)
+                            Spacer(modifier = Modifier.height(3.dp))
 
                             Row {
                                 repeat(3) { i ->
@@ -309,12 +309,12 @@ fun StudentWordBuilderScreen(
                                         imageVector = if (i < lives) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                                         contentDescription = "life",
                                         tint = if (i < lives) Color(0xFFEF4444) else TextSecondary,
-                                        modifier = Modifier.size(18.dp).padding(end = 2.dp)
+                                        modifier = Modifier.size(20.dp).padding(end = 2.dp)
                                     )
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(16.dp))
+                            Spacer(modifier = Modifier.height(13.dp))
 
                             if (word != null) {
                                 // Assembled slots, wrapped in rows of up to 6
@@ -328,7 +328,7 @@ fun StudentWordBuilderScreen(
                                             Box(
                                                 modifier = Modifier
                                                     .padding(2.dp)
-                                                    .size(34.dp)
+                                                    .size(30.dp)
                                                     .clip(RoundedCornerShape(8.dp))
                                                     .background(if (letterIndex != null) SunsetOrange.copy(alpha = 0.25f) else FrostedCard)
                                                     .border(1.dp, if (letterIndex != null) SunsetOrange else CardBorder, RoundedCornerShape(8.dp)),
@@ -336,7 +336,7 @@ fun StudentWordBuilderScreen(
                                             ) {
                                                 Text(
                                                     text = letterIndex?.let { scrambled[it].toString() } ?: "",
-                                                    fontSize = 16.sp,
+                                                    fontSize = 13.5.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = TextPrimary
                                                 )
@@ -345,7 +345,7 @@ fun StudentWordBuilderScreen(
                                     }
                                 }
 
-                                Spacer(modifier = Modifier.height(24.dp))
+                                Spacer(modifier = Modifier.height(19.dp))
 
                                 // Scrambled letter tiles, wrapped in rows of up to 6
                                 scrambled.indices.chunked(6).forEach { rowIndices ->
@@ -358,7 +358,7 @@ fun StudentWordBuilderScreen(
                                             Box(
                                                 modifier = Modifier
                                                     .padding(4.dp)
-                                                    .size(40.dp)
+                                                    .size(35.dp)
                                                     .clip(RoundedCornerShape(10.dp))
                                                     .background(if (used) FrostedCard.copy(alpha = 0.4f) else SunsetOrange)
                                                     .clickable(enabled = !used && !wordDone) {
@@ -370,7 +370,7 @@ fun StudentWordBuilderScreen(
                                             ) {
                                                 Text(
                                                     text = scrambled[i].toString(),
-                                                    fontSize = 16.sp,
+                                                    fontSize = 13.5.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = if (used) TextSecondary else Color.White
                                                 )
@@ -379,16 +379,16 @@ fun StudentWordBuilderScreen(
                                     }
                                 }
 
-                                Spacer(modifier = Modifier.height(16.dp))
+                                Spacer(modifier = Modifier.height(13.dp))
 
                                 feedback?.let {
-                                    Text(text = it, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = if (feedbackIsError) Color(0xFFEF4444) else OnlineGreen)
-                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(text = it, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (feedbackIsError) Color(0xFFEF4444) else OnlineGreen)
+                                    Spacer(modifier = Modifier.height(6.dp))
                                 }
 
                                 if (showHint) {
-                                    Text(text = "Hint: ${word.english_meaning ?: "-"}", fontSize = 12.sp, color = TextSecondary)
-                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(text = "Hint: ${word.english_meaning ?: "-"}", fontSize = 10.sp, color = TextSecondary)
+                                    Spacer(modifier = Modifier.height(6.dp))
                                 }
 
                                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -399,7 +399,7 @@ fun StudentWordBuilderScreen(
                                         },
                                         enabled = !wordDone
                                     ) {
-                                        Text(text = "Hint (-2 coins)", fontSize = 11.5.sp, color = TextPrimary)
+                                        Text(text = "Hint (-2 coins)", fontSize = 10.sp, color = TextPrimary)
                                     }
                                     OutlinedButton(
                                         onClick = {
@@ -409,7 +409,7 @@ fun StudentWordBuilderScreen(
                                         },
                                         enabled = !wordDone
                                     ) {
-                                        Text(text = "Skip (-2 coins)", fontSize = 11.5.sp, color = TextPrimary)
+                                        Text(text = "Skip (-2 coins)", fontSize = 10.sp, color = TextPrimary)
                                     }
                                     if (wordDone) {
                                         Button(
@@ -421,11 +421,11 @@ fun StudentWordBuilderScreen(
                                     }
                                 }
 
-                                Spacer(modifier = Modifier.height(16.dp))
+                                Spacer(modifier = Modifier.height(13.dp))
                                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    Text(text = "Correct: $correctAnswers", fontSize = 11.5.sp, color = OnlineGreen)
-                                    Text(text = "Wrong: $wrongAnswers", fontSize = 11.5.sp, color = Color(0xFFEF4444))
-                                    Text(text = "Words learned: $totalWordsLearned", fontSize = 11.5.sp, color = TextSecondary)
+                                    Text(text = "Correct: $correctAnswers", fontSize = 10.sp, color = OnlineGreen)
+                                    Text(text = "Wrong: $wrongAnswers", fontSize = 10.sp, color = Color(0xFFEF4444))
+                                    Text(text = "Words learned: $totalWordsLearned", fontSize = 10.sp, color = TextSecondary)
                                 }
                             }
                         }
@@ -444,12 +444,12 @@ private fun StatChip(label: String, value: String, icon: androidx.compose.ui.gra
             .clip(RoundedCornerShape(10.dp))
             .background(FrostedCard)
             .border(1.dp, CardBorder, RoundedCornerShape(10.dp))
-            .padding(horizontal = 8.dp, vertical = 6.dp)
+            .padding(horizontal = 7.dp, vertical = 5.dp)
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(imageVector = icon, contentDescription = label, tint = SunsetOrange, modifier = Modifier.size(14.dp))
-            Text(text = value, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-            Text(text = label, fontSize = 9.sp, color = TextSecondary)
+            Icon(imageVector = icon, contentDescription = label, tint = SunsetOrange, modifier = Modifier.size(20.dp))
+            Text(text = value, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+            Text(text = label, fontSize = 8.sp, color = TextSecondary)
         }
     }
 }

@@ -171,7 +171,7 @@ fun SettingsScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     // Back Header Row
                     Row(
@@ -180,7 +180,7 @@ fun SettingsScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -191,28 +191,28 @@ fun SettingsScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Settings & Profile",
-                                fontSize = 18.sp,
+                                fontSize = 15.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = TextPrimary
                             )
                             Text(
                                 text = "GET /api/auth/profile",
-                                fontSize = 11.5.sp,
+                                fontSize = 10.sp,
                                 color = SunsetOrange
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(13.dp))
 
                     // Profile Card
                     Box(
@@ -227,7 +227,7 @@ fun SettingsScreen(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Box(
                                     modifier = Modifier
-                                        .size(56.dp)
+                                        .size(49.dp)
                                         .clip(CircleShape)
                                         .background(SunsetOrange.copy(alpha = 0.18f))
                                         .border(width = 1.dp, color = SunsetOrange.copy(alpha = 0.4f), shape = CircleShape),
@@ -237,22 +237,22 @@ fun SettingsScreen(
                                         imageVector = Icons.Default.Person,
                                         contentDescription = "Avatar",
                                         tint = SunsetOrange,
-                                        modifier = Modifier.size(28.dp)
+                                        modifier = Modifier.size(25.dp)
                                     )
                                 }
 
-                                Spacer(modifier = Modifier.width(14.dp))
+                                Spacer(modifier = Modifier.width(11.dp))
 
                                 Column {
                                     Text(
                                         text = userProfile.name,
-                                        fontSize = 17.sp,
+                                        fontSize = 14.5.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = TextPrimary
                                     )
                                     Text(
                                         text = userProfile.role.replace('_', ' '),
-                                        fontSize = 12.sp,
+                                        fontSize = 10.sp,
                                         color = SunsetOrange,
                                         fontWeight = FontWeight.SemiBold
                                     )
@@ -270,29 +270,29 @@ fun SettingsScreen(
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(16.dp))
+                            Spacer(modifier = Modifier.height(13.dp))
 
                             ProfileInfoRow(icon = Icons.Default.Phone, label = "Mobile", value = userProfile.phone)
-                            Spacer(modifier = Modifier.height(10.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
                             ProfileInfoRow(icon = Icons.Default.Email, label = "Email", value = userProfile.email)
-                            Spacer(modifier = Modifier.height(10.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
                             ProfileInfoRow(icon = Icons.Default.School, label = "School", value = userProfile.schoolName)
-                            Spacer(modifier = Modifier.height(10.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
                             ProfileInfoRow(icon = Icons.Default.Badge, label = "Status", value = userProfile.status)
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
                     Text(
                         text = "CHANGE PASSWORD",
-                        fontSize = 11.sp,
+                        fontSize = 9.5.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = TextSecondary,
                         letterSpacing = 1.sp
                     )
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     Box(
                         modifier = Modifier
@@ -311,7 +311,7 @@ fun SettingsScreen(
                                 onToggleVisibility = { isCurrentVisible = !isCurrentVisible }
                             )
 
-                            Spacer(modifier = Modifier.height(14.dp))
+                            Spacer(modifier = Modifier.height(11.dp))
 
                             PasswordField(
                                 label = "New Password",
@@ -321,7 +321,7 @@ fun SettingsScreen(
                                 onToggleVisibility = { isNewVisible = !isNewVisible }
                             )
 
-                            Spacer(modifier = Modifier.height(14.dp))
+                            Spacer(modifier = Modifier.height(11.dp))
 
                             PasswordField(
                                 label = "Confirm New Password",
@@ -331,7 +331,7 @@ fun SettingsScreen(
                                 onToggleVisibility = { isNewVisible = !isNewVisible }
                             )
 
-                            Spacer(modifier = Modifier.height(20.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
 
                             Button(
                                 onClick = { submitPasswordChange() },
@@ -351,16 +351,16 @@ fun SettingsScreen(
                                     )
                                 } else {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(imageVector = Icons.Default.Lock, contentDescription = "Change Password", tint = Color.White, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(text = "Update Password", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                        Icon(imageVector = Icons.Default.Lock, contentDescription = "Change Password", tint = Color.White, modifier = Modifier.size(20.dp))
+                                        Spacer(modifier = Modifier.width(5.dp))
+                                        Text(text = "Update Password", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                     }
                                 }
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
                     OutlinedButton(
                         onClick = onLogoutClick,
@@ -369,12 +369,12 @@ fun SettingsScreen(
                             .height(48.dp),
                         shape = RoundedCornerShape(14.dp)
                     ) {
-                        Icon(imageVector = Icons.Default.Logout, contentDescription = "Logout", tint = Color(0xFFEF4444), modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(text = "Log Out", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFFEF4444))
+                        Icon(imageVector = Icons.Default.Logout, contentDescription = "Logout", tint = Color(0xFFEF4444), modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text(text = "Log Out", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFEF4444))
                     }
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(19.dp))
                 }
             }
 
@@ -394,11 +394,11 @@ private fun ProfileInfoRow(
     value: String
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(imageVector = icon, contentDescription = label, tint = SunsetOrange, modifier = Modifier.size(16.dp))
-        Spacer(modifier = Modifier.width(10.dp))
+        Icon(imageVector = icon, contentDescription = label, tint = SunsetOrange, modifier = Modifier.size(20.dp))
+        Spacer(modifier = Modifier.width(8.dp))
         Column {
-            Text(text = label, fontSize = 10.5.sp, color = TextSecondary)
-            Text(text = value, fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+            Text(text = label, fontSize = 9.sp, color = TextSecondary)
+            Text(text = value, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
         }
     }
 }
@@ -414,7 +414,7 @@ private fun PasswordField(
     Column {
         Text(
             text = label,
-            fontSize = 12.sp,
+            fontSize = 10.sp,
             fontWeight = FontWeight.SemiBold,
             color = TextSecondary,
             modifier = Modifier.padding(bottom = 6.dp)
@@ -423,7 +423,7 @@ private fun PasswordField(
             value = value,
             onValueChange = onValueChange,
             modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Enter $label", color = TextSecondary, fontSize = 13.sp) },
+            placeholder = { Text("Enter $label", color = TextSecondary, fontSize = 11.sp) },
             leadingIcon = { Icon(Icons.Default.Lock, contentDescription = label, tint = SunsetOrange) },
             trailingIcon = {
                 IconButton(onClick = onToggleVisibility) {

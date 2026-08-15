@@ -93,7 +93,7 @@ fun TeacherAssignmentsScreen(
                     .fillMaxWidth()
                     .background(FrostedCard)
                     .statusBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                    .padding(horizontal = 13.dp, vertical = 11.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBack) {
@@ -102,13 +102,13 @@ fun TeacherAssignmentsScreen(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Teacher Assignments",
-                        fontSize = 18.sp,
+                        fontSize = 15.5.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
                     )
                     Text(
                         text = "QA Server: GET /api/teacher/assignments",
-                        fontSize = 11.sp,
+                        fontSize = 9.5.sp,
                         color = SunsetOrange
                     )
                 }
@@ -118,9 +118,9 @@ fun TeacherAssignmentsScreen(
                     shape = RoundedCornerShape(12.dp),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "Create", tint = Color.White, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("New", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.Add, contentDescription = "Create", tint = Color.White, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text("New", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
             }
 
@@ -136,7 +136,7 @@ fun TeacherAssignmentsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 16.dp),
-                    placeholder = { Text("Search assignments by title or class...", color = TextSecondary, fontSize = 13.sp) },
+                    placeholder = { Text("Search assignments by title or class...", color = TextSecondary, fontSize = 11.sp) },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = TextSecondary) },
                     shape = RoundedCornerShape(14.dp),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -156,7 +156,7 @@ fun TeacherAssignmentsScreen(
                     }
                 } else if (filteredAssignments.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("No assignments found", color = TextSecondary, fontSize = 14.sp)
+                        Text("No assignments found", color = TextSecondary, fontSize = 12.sp)
                     }
                 } else {
                     LazyColumn(
@@ -183,7 +183,7 @@ fun TeacherAssignmentsScreen(
                     .background(OnlineGreen)
                     .padding(14.dp)
             ) {
-                Text(msg, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Text(msg, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
             }
         }
 
@@ -193,7 +193,7 @@ fun TeacherAssignmentsScreen(
                 onDismissRequest = { if (!isSubmitting) showCreateModal = false },
                 containerColor = FrostedCard,
                 title = {
-                    Text("Create New Assignment", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text("Create New Assignment", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.5.sp)
                 },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -218,7 +218,7 @@ fun TeacherAssignmentsScreen(
                                 value = newDueDate,
                                 onValueChange = { newDueDate = it },
                                 label = { Text("Due Date", color = TextSecondary) },
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier.weight(1f).height(48.dp),
                                 singleLine = true,
                                 colors = OutlinedTextFieldDefaults.colors(focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary)
                             )
@@ -226,7 +226,7 @@ fun TeacherAssignmentsScreen(
                                 value = newMarks,
                                 onValueChange = { newMarks = it },
                                 label = { Text("Marks", color = TextSecondary) },
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier.weight(1f).height(48.dp),
                                 singleLine = true,
                                 colors = OutlinedTextFieldDefaults.colors(focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary)
                             )
@@ -300,7 +300,7 @@ fun AssignmentCard(item: AssignmentItemDto) {
             ) {
                 Text(
                     text = item.title,
-                    fontSize = 15.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextPrimary,
                     modifier = Modifier.weight(1f)
@@ -309,31 +309,31 @@ fun AssignmentCard(item: AssignmentItemDto) {
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
                         .background(InfoBlue.copy(alpha = 0.15f))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .padding(horizontal = 7.dp, vertical = 3.dp)
                 ) {
                     Text(
                         text = "ACTIVE",
-                        fontSize = 10.sp,
+                        fontSize = 8.5.sp,
                         fontWeight = FontWeight.Bold,
                         color = InfoBlue
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text("Class: ${item.class_name ?: "All Classes"}", fontSize = 12.sp, color = TextSecondary)
-                Text("Due: ${item.due_date ?: "2026-08-20"}", fontSize = 12.sp, color = SunsetOrange, fontWeight = FontWeight.Medium)
-                Text("Subject: ${item.subject_name ?: "General"}", fontSize = 12.sp, color = TextSecondary)
+                Text("Class: ${item.class_name ?: "All Classes"}", fontSize = 10.sp, color = TextSecondary)
+                Text("Due: ${item.due_date ?: "2026-08-20"}", fontSize = 10.sp, color = SunsetOrange, fontWeight = FontWeight.Medium)
+                Text("Subject: ${item.subject_name ?: "General"}", fontSize = 10.sp, color = TextSecondary)
             }
 
             item.description?.let { desc ->
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(desc, fontSize = 12.sp, color = TextSecondary)
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(desc, fontSize = 10.sp, color = TextSecondary)
             }
         }
     }

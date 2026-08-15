@@ -126,7 +126,7 @@ fun TeacherDashboardScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     // Portal Title Header Row
                     Row(
@@ -137,13 +137,13 @@ fun TeacherDashboardScreen(
                         Column {
                             Text(
                                 text = "Teacher Dashboard",
-                                fontSize = 20.sp,
+                                fontSize = 17.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = TextPrimary
                             )
                             Text(
                                 text = "QA Server: GET /api/teacher/dashboard",
-                                fontSize = 11.5.sp,
+                                fontSize = 10.sp,
                                 color = SunsetOrange
                             )
                         }
@@ -154,13 +154,13 @@ fun TeacherDashboardScreen(
                                 .background(SunsetOrange.copy(alpha = 0.2f))
                                 .border(width = 1.dp, color = SunsetOrange, shape = RoundedCornerShape(10.dp))
                                 .clickable { onLogoutClick() }
-                                .padding(horizontal = 10.dp, vertical = 5.dp)
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
-                            Text(text = "Logout", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = SunsetOrange)
+                            Text(text = "Logout", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = SunsetOrange)
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     // Stat Row
                     Row(
@@ -176,8 +176,8 @@ fun TeacherDashboardScreen(
                                 .padding(12.dp)
                         ) {
                             Column {
-                                Text(text = "Assigned Classes", fontSize = 11.sp, color = TextSecondary)
-                                Text(text = "${if (classesList.isNotEmpty()) classesList.size else 4}", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = SunsetOrange)
+                                Text(text = "Assigned Classes", fontSize = 9.5.sp, color = TextSecondary)
+                                Text(text = "${if (classesList.isNotEmpty()) classesList.size else 4}", fontSize = 13.5.sp, fontWeight = FontWeight.ExtraBold, color = SunsetOrange)
                             }
                         }
 
@@ -190,13 +190,13 @@ fun TeacherDashboardScreen(
                                 .padding(12.dp)
                         ) {
                             Column {
-                                Text(text = "Today's Periods", fontSize = 11.sp, color = TextSecondary)
-                                Text(text = "${scheduleList.size}", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = OnlineGreen)
+                                Text(text = "Today's Periods", fontSize = 9.5.sp, color = TextSecondary)
+                                Text(text = "${scheduleList.size}", fontSize = 13.5.sp, fontWeight = FontWeight.ExtraBold, color = OnlineGreen)
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     // Quick Actions Row
                     Row(
@@ -213,9 +213,9 @@ fun TeacherDashboardScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(imageVector = Icons.Default.CheckCircle, contentDescription = "Attendance", tint = Color.White, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(text = "Attendance", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                Icon(imageVector = Icons.Default.CheckCircle, contentDescription = "Attendance", tint = Color.White, modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(text = "Attendance", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             }
                         }
 
@@ -230,9 +230,9 @@ fun TeacherDashboardScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(imageVector = Icons.Default.Assignment, contentDescription = "Assignments", tint = TextPrimary, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(text = "Assignments", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                Icon(imageVector = Icons.Default.Assignment, contentDescription = "Assignments", tint = TextPrimary, modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(text = "Assignments", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                             }
                         }
 
@@ -247,14 +247,14 @@ fun TeacherDashboardScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(imageVector = Icons.Default.Book, contentDescription = "Materials", tint = TextPrimary, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(text = "Study Notes", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                Icon(imageVector = Icons.Default.Book, contentDescription = "Materials", tint = TextPrimary, modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(text = "Study Notes", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
 
                     // Second Quick Actions Row: Classes / Leave / Notifications / Salaries
                     Row(
@@ -271,7 +271,7 @@ fun TeacherDashboardScreen(
                                 .padding(vertical = 10.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(text = "Classes", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                            Text(text = "Classes", fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                         }
 
                         Box(
@@ -284,7 +284,7 @@ fun TeacherDashboardScreen(
                                 .padding(vertical = 10.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(text = "Leave", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                            Text(text = "Leave", fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                         }
 
                         Box(
@@ -297,7 +297,7 @@ fun TeacherDashboardScreen(
                                 .padding(vertical = 10.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(text = "Notifications", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                            Text(text = "Notifications", fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                         }
 
                         Box(
@@ -310,7 +310,7 @@ fun TeacherDashboardScreen(
                                 .padding(vertical = 10.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(text = "Salary", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                            Text(text = "Salary", fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                         }
 
                         Box(
@@ -323,11 +323,11 @@ fun TeacherDashboardScreen(
                                 .padding(vertical = 10.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(text = "Exams", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                            Text(text = "Exams", fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -343,7 +343,7 @@ fun TeacherDashboardScreen(
                                 .padding(vertical = 10.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(text = "Vocabulary Report", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                            Text(text = "Vocabulary Report", fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                         }
 
                         Box(
@@ -356,7 +356,7 @@ fun TeacherDashboardScreen(
                                 .padding(vertical = 10.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(text = "Notification Prefs", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                            Text(text = "Notification Prefs", fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                         }
 
                         Box(
@@ -369,21 +369,21 @@ fun TeacherDashboardScreen(
                                 .padding(vertical = 10.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(text = "Achievements", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                            Text(text = "Achievements", fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(13.dp))
 
                     Text(
                         text = "TODAY'S TEACHING SCHEDULE (QA LIVE API)",
-                        fontSize = 11.sp,
+                        fontSize = 9.5.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = TextSecondary,
                         letterSpacing = 1.sp
                     )
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     if (isLoading) {
                         Box(
@@ -427,7 +427,7 @@ fun TeacherDashboardScreen(
                                     ) {
                                         Box(
                                             modifier = Modifier
-                                                .size(40.dp)
+                                                .size(35.dp)
                                                 .clip(CircleShape)
                                                 .background(if (isFree) CardBorder else SunsetOrange.copy(alpha = 0.18f)),
                                             contentAlignment = Alignment.Center
@@ -440,23 +440,23 @@ fun TeacherDashboardScreen(
                                             )
                                         }
 
-                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Spacer(modifier = Modifier.width(10.dp))
 
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text(
                                                 text = "Period ${item.period_number}: $subjectStr",
-                                                fontSize = 14.5.sp,
+                                                fontSize = 12.5.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = TextPrimary
                                             )
                                             Text(
                                                 text = "$classStr • $roomStr",
-                                                fontSize = 12.sp,
+                                                fontSize = 10.sp,
                                                 color = TextSecondary
                                             )
                                             Text(
                                                 text = timeStr,
-                                                fontSize = 11.sp,
+                                                fontSize = 9.5.sp,
                                                 color = SunsetOrange,
                                                 fontWeight = FontWeight.SemiBold
                                             )
@@ -471,9 +471,9 @@ fun TeacherDashboardScreen(
                                                     .clickable {
                                                         onNavigate("teacher_attendance")
                                                     }
-                                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                                                    .padding(horizontal = 7.dp, vertical = 3.dp)
                                             ) {
-                                                Text(text = "Mark Att.", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = OnlineGreen)
+                                                Text(text = "Mark Att.", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = OnlineGreen)
                                             }
                                         }
                                     }

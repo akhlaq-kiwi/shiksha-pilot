@@ -106,7 +106,7 @@ fun TeacherClassesScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -114,7 +114,7 @@ fun TeacherClassesScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -125,28 +125,28 @@ fun TeacherClassesScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "My Classes",
-                                fontSize = 18.sp,
+                                fontSize = 15.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = TextPrimary
                             )
                             Text(
                                 text = "QA Server: GET /api/teacher/classes",
-                                fontSize = 11.5.sp,
+                                fontSize = 10.sp,
                                 color = SunsetOrange
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     when {
                         isLoading -> {
@@ -156,12 +156,12 @@ fun TeacherClassesScreen(
                         }
                         errorMessage != null -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         classesList.isEmpty() -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = "No classes are assigned to you yet.", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = "No classes are assigned to you yet.", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         else -> {
@@ -207,23 +207,23 @@ fun TeacherClassesScreen(
                                             Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                                                 Box(
                                                     modifier = Modifier
-                                                        .size(40.dp)
+                                                        .size(35.dp)
                                                         .clip(CircleShape)
                                                         .background(SunsetOrange.copy(alpha = 0.18f)),
                                                     contentAlignment = Alignment.Center
                                                 ) {
                                                     Icon(imageVector = Icons.Default.Class, contentDescription = "Class", tint = SunsetOrange, modifier = Modifier.size(20.dp))
                                                 }
-                                                Spacer(modifier = Modifier.width(12.dp))
+                                                Spacer(modifier = Modifier.width(10.dp))
                                                 Column {
-                                                    Text(text = "${item.name}$sectionStr", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                                    Text(text = "${item.name}$sectionStr", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                                                     Text(
                                                         text = when {
                                                             isCountLoading -> "Loading student count..."
                                                             count != null -> "$count students"
                                                             else -> "Tap to view student count"
                                                         },
-                                                        fontSize = 12.sp,
+                                                        fontSize = 10.sp,
                                                         color = TextSecondary
                                                     )
                                                 }

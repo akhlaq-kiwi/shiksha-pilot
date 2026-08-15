@@ -124,7 +124,7 @@ fun SchoolAdminFinancialReportsScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -132,7 +132,7 @@ fun SchoolAdminFinancialReportsScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -143,30 +143,30 @@ fun SchoolAdminFinancialReportsScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "Financial Reports", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
-                            Text(text = "${reports.size} reports • QA Live API", fontSize = 11.5.sp, color = SunsetOrange)
+                            Text(text = "Financial Reports", fontSize = 15.5.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
+                            Text(text = "${reports.size} reports • QA Live API", fontSize = 10.sp, color = SunsetOrange)
                         }
 
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(SunsetOrange)
                                 .clickable { showCreateForm = !showCreateForm },
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(imageVector = Icons.Default.Add, contentDescription = "Generate", tint = Color.White, modifier = Modifier.size(18.dp))
+                            Icon(imageVector = Icons.Default.Add, contentDescription = "Generate", tint = Color.White, modifier = Modifier.size(20.dp))
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     if (showCreateForm) {
                         Box(
@@ -178,8 +178,8 @@ fun SchoolAdminFinancialReportsScreen(
                                 .padding(14.dp)
                         ) {
                             Column {
-                                Text(text = "Generate New Report", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(text = "Generate New Report", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                Spacer(modifier = Modifier.height(6.dp))
                                 OutlinedTextField(
                                     value = fromDateInput,
                                     onValueChange = { fromDateInput = it },
@@ -187,7 +187,7 @@ fun SchoolAdminFinancialReportsScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary)
                                 )
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(6.dp))
                                 OutlinedTextField(
                                     value = toDateInput,
                                     onValueChange = { toDateInput = it },
@@ -195,7 +195,7 @@ fun SchoolAdminFinancialReportsScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary)
                                 )
-                                Spacer(modifier = Modifier.height(10.dp))
+                                Spacer(modifier = Modifier.height(8.dp))
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -230,11 +230,11 @@ fun SchoolAdminFinancialReportsScreen(
                                         .padding(vertical = 10.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text(text = if (isSaving) "Generating..." else "Generate Report", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                    Text(text = if (isSaving) "Generating..." else "Generate Report", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                 }
                             }
                         }
-                        Spacer(modifier = Modifier.height(14.dp))
+                        Spacer(modifier = Modifier.height(11.dp))
                     }
 
                     when {
@@ -245,12 +245,12 @@ fun SchoolAdminFinancialReportsScreen(
                         }
                         errorMessage != null -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         reports.isEmpty() -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = "No financial reports generated yet.", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = "No financial reports generated yet.", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         else -> {
@@ -279,7 +279,7 @@ fun SchoolAdminFinancialReportsScreen(
                                         ) {
                                             Box(
                                                 modifier = Modifier
-                                                    .size(42.dp)
+                                                    .size(37.dp)
                                                     .clip(CircleShape)
                                                     .background(InfoBlue.copy(alpha = 0.18f))
                                                     .border(width = 1.dp, color = InfoBlue.copy(alpha = 0.4f), shape = CircleShape),
@@ -288,14 +288,14 @@ fun SchoolAdminFinancialReportsScreen(
                                                 Icon(imageVector = Icons.Default.Assessment, contentDescription = "Report", tint = InfoBlue, modifier = Modifier.size(20.dp))
                                             }
 
-                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Spacer(modifier = Modifier.width(10.dp))
 
                                             Column(modifier = Modifier.weight(1f)) {
-                                                Text(text = r.report_id ?: "Report #${r.id}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                                                Text(text = "${r.from_date ?: ""} → ${r.to_date ?: ""}", fontSize = 12.sp, color = TextSecondary)
+                                                Text(text = r.report_id ?: "Report #${r.id}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                                Text(text = "${r.from_date ?: ""} → ${r.to_date ?: ""}", fontSize = 10.sp, color = TextSecondary)
                                                 Text(
                                                     text = "Collected ₹${"%,.0f".format(r.fees_collected)} • Salary ₹${"%,.0f".format(r.salary_paid)}",
-                                                    fontSize = 11.sp,
+                                                    fontSize = 9.5.sp,
                                                     color = TextSecondary
                                                 )
                                             }
@@ -303,7 +303,7 @@ fun SchoolAdminFinancialReportsScreen(
                                             Column(horizontalAlignment = Alignment.End) {
                                                 Text(
                                                     text = "₹ ${"%,.0f".format(r.profit_loss)}",
-                                                    fontSize = 14.sp,
+                                                    fontSize = 12.sp,
                                                     fontWeight = FontWeight.ExtraBold,
                                                     color = profitColor
                                                 )
@@ -311,9 +311,9 @@ fun SchoolAdminFinancialReportsScreen(
                                                     modifier = Modifier
                                                         .clip(RoundedCornerShape(8.dp))
                                                         .background(statusColor.copy(alpha = 0.18f))
-                                                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                                                        .padding(horizontal = 7.dp, vertical = 2.dp)
                                                 ) {
-                                                    Text(text = r.status ?: "Pending", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = statusColor)
+                                                    Text(text = r.status ?: "Pending", fontSize = 8.5.sp, fontWeight = FontWeight.Bold, color = statusColor)
                                                 }
                                             }
                                         }

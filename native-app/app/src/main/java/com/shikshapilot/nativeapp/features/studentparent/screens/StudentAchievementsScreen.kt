@@ -120,7 +120,7 @@ fun StudentAchievementsScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -128,7 +128,7 @@ fun StudentAchievementsScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -139,17 +139,17 @@ fun StudentAchievementsScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
                         Column {
-                            Text(text = "Achievements", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
-                            Text(text = "QA Server: GET /api/school/achievements", fontSize = 11.5.sp, color = SunsetOrange)
+                            Text(text = "Achievements", fontSize = 15.5.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
+                            Text(text = "QA Server: GET /api/school/achievements", fontSize = 10.sp, color = SunsetOrange)
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     val summary = achievementsData?.categories_summary
                     Row(
@@ -172,7 +172,7 @@ fun StudentAchievementsScreen(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     val filtered = achievementsData?.achievements.orEmpty()
                         .filter { it.category == selectedTab || it.feature_type == selectedTab }
@@ -186,12 +186,12 @@ fun StudentAchievementsScreen(
                         }
                         errorMessage != null -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         filtered.isEmpty() -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = "No achievements in this category yet.", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = "No achievements in this category yet.", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         else -> {
@@ -229,8 +229,8 @@ private fun AchievementTabChip(
             .padding(vertical = 10.dp, horizontal = 8.dp)
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-            Text(text = "$count", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = if (selected) Color.White else TextPrimary)
-            Text(text = label, fontSize = 10.5.sp, color = if (selected) Color.White else TextSecondary, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            Text(text = "$count", fontSize = 13.5.sp, fontWeight = FontWeight.ExtraBold, color = if (selected) Color.White else TextPrimary)
+            Text(text = label, fontSize = 9.sp, color = if (selected) Color.White else TextSecondary, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
         }
     }
 }
@@ -256,30 +256,30 @@ private fun AchievementCard(item: AchievementItemDto, onClick: () -> Unit) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(39.dp)
                     .clip(CircleShape)
                     .background(SunsetOrange.copy(alpha = 0.18f)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = medalEmoji(item.rank), fontSize = 20.sp)
+                Text(text = medalEmoji(item.rank), fontSize = 17.sp)
             }
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = item.student_name ?: "Student", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                Text(text = item.student_name ?: "Student", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                 Text(
                     text = "${item.class_name ?: "-"} • Roll ${item.roll_number ?: "-"}",
-                    fontSize = 12.sp,
+                    fontSize = 10.sp,
                     color = TextSecondary
                 )
                 Text(
                     text = "Rank #${item.rank ?: "-"} • ${item.level ?: "-"} level",
-                    fontSize = 11.5.sp,
+                    fontSize = 10.sp,
                     color = SunsetOrange
                 )
             }
             Text(
                 text = "${item.achievement_score?.let { "%.1f".format(it) } ?: "-"}${if (item.category == "attendance_champions") "%" else ""}",
-                fontSize = 16.sp,
+                fontSize = 13.5.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = OnlineGreen
             )
@@ -302,30 +302,30 @@ private fun AchievementDetailDialog(
         textContentColor = TextSecondary,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = medalEmoji(item.rank), fontSize = 22.sp)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(text = item.student_name ?: "Achievement", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text(text = medalEmoji(item.rank), fontSize = 18.5.sp)
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(text = item.student_name ?: "Achievement", fontSize = 13.5.sp, fontWeight = FontWeight.Bold)
             }
         },
         text = {
             Column {
-                Text(text = "${item.category_label ?: item.category ?: "-"}", fontSize = 12.sp, color = SunsetOrange, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(text = "${item.class_name ?: "-"} • Roll ${item.roll_number ?: "-"}", fontSize = 12.sp)
-                Text(text = "Rank #${item.rank ?: "-"} of the ${item.level ?: "-"} level", fontSize = 12.sp)
-                Text(text = "Score: ${item.achievement_score ?: "-"}", fontSize = 12.sp)
+                Text(text = "${item.category_label ?: item.category ?: "-"}", fontSize = 10.sp, color = SunsetOrange, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(text = "${item.class_name ?: "-"} • Roll ${item.roll_number ?: "-"}", fontSize = 10.sp)
+                Text(text = "Rank #${item.rank ?: "-"} of the ${item.level ?: "-"} level", fontSize = 10.sp)
+                Text(text = "Score: ${item.achievement_score ?: "-"}", fontSize = 10.sp)
 
                 if (showReportCard) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(text = "REPORT CARD", fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp, color = TextSecondary)
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(text = "REPORT CARD", fontSize = 8.5.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp, color = TextSecondary)
+                    Spacer(modifier = Modifier.height(5.dp))
                     when {
-                        isLoading -> Text(text = "Loading report card…", fontSize = 12.sp)
-                        reportCard == null -> Text(text = "Report card not available for this achievement.", fontSize = 12.sp)
+                        isLoading -> Text(text = "Loading report card…", fontSize = 10.sp)
+                        reportCard == null -> Text(text = "Report card not available for this achievement.", fontSize = 10.sp)
                         else -> {
-                            Text(text = reportCard.exam_name ?: "Exam", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                            Text(text = "Total: ${reportCard.total_obtained?.toInt() ?: 0} / ${reportCard.total_max?.toInt() ?: 0}  (${reportCard.percentage ?: 0.0}%)", fontSize = 12.sp)
-                            Text(text = "Grade: ${reportCard.grade ?: "-"} • ${reportCard.result ?: "-"}", fontSize = 12.sp)
+                            Text(text = reportCard.exam_name ?: "Exam", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                            Text(text = "Total: ${reportCard.total_obtained?.toInt() ?: 0} / ${reportCard.total_max?.toInt() ?: 0}  (${reportCard.percentage ?: 0.0}%)", fontSize = 10.sp)
+                            Text(text = "Grade: ${reportCard.grade ?: "-"} • ${reportCard.result ?: "-"}", fontSize = 10.sp)
                         }
                     }
                 }

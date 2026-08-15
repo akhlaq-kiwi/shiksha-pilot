@@ -173,7 +173,7 @@ fun SchoolAdminLatePaymentPenaltyScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -181,7 +181,7 @@ fun SchoolAdminLatePaymentPenaltyScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -192,28 +192,28 @@ fun SchoolAdminLatePaymentPenaltyScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Late-Payment Penalty",
-                                fontSize = 18.sp,
+                                fontSize = 15.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = TextPrimary
                             )
                             Text(
                                 text = academicSession ?: "No active academic session",
-                                fontSize = 11.5.sp,
+                                fontSize = 10.sp,
                                 color = SunsetOrange
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(13.dp))
 
                     if (isLoading) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -233,8 +233,8 @@ fun SchoolAdminLatePaymentPenaltyScreen(
                                     .padding(12.dp)
                             ) {
                                 Column {
-                                    Text(text = "Students with Dues", fontSize = 11.sp, color = TextSecondary)
-                                    Text(text = "$studentsHavingDue / $totalStudents", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
+                                    Text(text = "Students with Dues", fontSize = 9.5.sp, color = TextSecondary)
+                                    Text(text = "$studentsHavingDue / $totalStudents", fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
                                 }
                             }
 
@@ -247,22 +247,22 @@ fun SchoolAdminLatePaymentPenaltyScreen(
                                     .padding(12.dp)
                             ) {
                                 Column {
-                                    Text(text = "Total Outstanding", fontSize = 11.sp, color = TextSecondary)
-                                    Text(text = currencyFormatter.format(totalOutstandingDue), fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFFEF4444))
+                                    Text(text = "Total Outstanding", fontSize = 9.5.sp, color = TextSecondary)
+                                    Text(text = currencyFormatter.format(totalOutstandingDue), fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFFEF4444))
                                 }
                             }
                         }
 
                         if (lastAppliedDate != null) {
-                            Spacer(modifier = Modifier.height(10.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 text = "Last applied $lastAppliedDate${lastAppliedBy?.let { " by $it" } ?: ""}",
-                                fontSize = 11.sp,
+                                fontSize = 9.5.sp,
                                 color = TextSecondary
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(20.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
 
                         Box(
                             modifier = Modifier
@@ -278,7 +278,7 @@ fun SchoolAdminLatePaymentPenaltyScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(text = "Penalty Configuration", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                    Text(text = "Penalty Configuration", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                                     Switch(
                                         checked = isActive,
                                         onCheckedChange = { isActive = it },
@@ -286,14 +286,14 @@ fun SchoolAdminLatePaymentPenaltyScreen(
                                     )
                                 }
 
-                                Spacer(modifier = Modifier.height(14.dp))
+                                Spacer(modifier = Modifier.height(11.dp))
 
-                                Text(text = "Penalty Percentage (%)", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
-                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(text = "Penalty Percentage (%)", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
+                                Spacer(modifier = Modifier.height(5.dp))
                                 OutlinedTextField(
                                     value = percentageInput,
                                     onValueChange = { percentageInput = it },
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier.fillMaxWidth().height(48.dp),
                                     placeholder = { Text("e.g. 2.5") },
                                     singleLine = true,
                                     shape = RoundedCornerShape(14.dp),
@@ -307,10 +307,10 @@ fun SchoolAdminLatePaymentPenaltyScreen(
                                     )
                                 )
 
-                                Spacer(modifier = Modifier.height(14.dp))
+                                Spacer(modifier = Modifier.height(11.dp))
 
-                                Text(text = "Description (Optional)", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
-                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(text = "Description (Optional)", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
+                                Spacer(modifier = Modifier.height(5.dp))
                                 OutlinedTextField(
                                     value = descriptionInput,
                                     onValueChange = { descriptionInput = it },
@@ -327,7 +327,7 @@ fun SchoolAdminLatePaymentPenaltyScreen(
                                     )
                                 )
 
-                                Spacer(modifier = Modifier.height(18.dp))
+                                Spacer(modifier = Modifier.height(14.dp))
 
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                                     Button(
@@ -346,8 +346,8 @@ fun SchoolAdminLatePaymentPenaltyScreen(
                         }
 
                         if (errorMessage != null) {
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text(text = errorMessage ?: "", fontSize = 12.sp, color = Color(0xFFEF4444))
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(text = errorMessage ?: "", fontSize = 10.sp, color = Color(0xFFEF4444))
                         }
                     }
                 }

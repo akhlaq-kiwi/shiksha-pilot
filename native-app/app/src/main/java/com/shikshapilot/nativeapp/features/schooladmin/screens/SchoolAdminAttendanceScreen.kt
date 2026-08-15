@@ -116,7 +116,7 @@ fun SchoolAdminAttendanceScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     // Back Header Row
                     Row(
@@ -125,7 +125,7 @@ fun SchoolAdminAttendanceScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -136,28 +136,28 @@ fun SchoolAdminAttendanceScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Attendance & Leaderboard",
-                                fontSize = 18.sp,
+                                fontSize = 15.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = TextPrimary
                             )
                             Text(
                                 text = "QA Server: GET /api/school/attendance",
-                                fontSize = 11.5.sp,
+                                fontSize = 10.sp,
                                 color = SunsetOrange
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     // School overall stats card
                     Box(
@@ -174,31 +174,31 @@ fun SchoolAdminAttendanceScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column {
-                                Text(text = "School Attendance Today", fontSize = 12.sp, color = TextSecondary)
-                                Text(text = "100% Overall", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = OnlineGreen)
+                                Text(text = "School Attendance Today", fontSize = 10.sp, color = TextSecondary)
+                                Text(text = "100% Overall", fontSize = 17.sp, fontWeight = FontWeight.ExtraBold, color = OnlineGreen)
                             }
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(OnlineGreen.copy(alpha = 0.2f))
-                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    .padding(horizontal = 7.dp, vertical = 3.dp)
                             ) {
-                                Text(text = "All Classes Submitted", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = OnlineGreen)
+                                Text(text = "All Classes Submitted", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = OnlineGreen)
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(13.dp))
 
                     Text(
                         text = "CLASS-WISE ATTENDANCE BREAKDOWN (QA LIVE API)",
-                        fontSize = 11.sp,
+                        fontSize = 9.5.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = TextSecondary,
                         letterSpacing = 1.sp
                     )
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     if (isLoading) {
                         Box(
@@ -254,7 +254,7 @@ fun SchoolAdminAttendanceScreen(
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             Box(
                                                 modifier = Modifier
-                                                    .size(38.dp)
+                                                    .size(33.dp)
                                                     .clip(CircleShape)
                                                     .background(
                                                         if (item.isSubmitted) OnlineGreen.copy(alpha = 0.18f)
@@ -266,13 +266,13 @@ fun SchoolAdminAttendanceScreen(
                                                     imageVector = Icons.Default.DateRange,
                                                     contentDescription = "Attendance",
                                                     tint = if (item.isSubmitted) OnlineGreen else WarningYellow,
-                                                    modifier = Modifier.size(18.dp)
+                                                    modifier = Modifier.size(20.dp)
                                                 )
                                             }
-                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Spacer(modifier = Modifier.width(10.dp))
                                             Column {
-                                                Text(text = item.className, fontSize = 14.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                                                Text(text = "Teacher: ${item.teacherName}", fontSize = 11.5.sp, color = TextSecondary)
+                                                Text(text = item.className, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                                Text(text = "Teacher: ${item.teacherName}", fontSize = 10.sp, color = TextSecondary)
                                             }
                                         }
 
@@ -285,11 +285,11 @@ fun SchoolAdminAttendanceScreen(
                                             }
                                         ) {
                                             if (item.isSubmitted) {
-                                                Text(text = "${item.presentCount}/${item.totalStudents}", fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = OnlineGreen)
-                                                Text(text = "Submitted", fontSize = 10.sp, color = TextSecondary)
+                                                Text(text = "${item.presentCount}/${item.totalStudents}", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = OnlineGreen)
+                                                Text(text = "Submitted", fontSize = 8.5.sp, color = TextSecondary)
                                             } else {
-                                                Text(text = "Unsubmitted", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = WarningYellow)
-                                                Text(text = "Remind Teacher", fontSize = 10.sp, color = SunsetOrange, fontWeight = FontWeight.Bold)
+                                                Text(text = "Unsubmitted", fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = WarningYellow)
+                                                Text(text = "Remind Teacher", fontSize = 8.5.sp, color = SunsetOrange, fontWeight = FontWeight.Bold)
                                             }
                                         }
                                     }

@@ -166,7 +166,7 @@ fun SchoolAdminTimetableScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -174,7 +174,7 @@ fun SchoolAdminTimetableScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -185,22 +185,22 @@ fun SchoolAdminTimetableScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Timetable",
-                                fontSize = 18.sp,
+                                fontSize = 15.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = TextPrimary
                             )
                             Text(
                                 text = "View & Publish (QA Live API)",
-                                fontSize = 11.5.sp,
+                                fontSize = 10.sp,
                                 color = SunsetOrange
                             )
                         }
@@ -233,12 +233,12 @@ fun SchoolAdminTimetableScreen(
                                         }
                                     }
                                 }
-                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                                .padding(horizontal = 8.dp, vertical = 5.dp)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 if (isPublishing) {
                                     CircularProgressIndicator(
-                                        modifier = Modifier.size(14.dp),
+                                        modifier = Modifier.size(20.dp),
                                         color = Color.White,
                                         strokeWidth = 2.dp
                                     )
@@ -247,13 +247,13 @@ fun SchoolAdminTimetableScreen(
                                         imageVector = Icons.Default.CloudUpload,
                                         contentDescription = "Publish",
                                         tint = Color.White,
-                                        modifier = Modifier.size(16.dp)
+                                        modifier = Modifier.size(20.dp)
                                     )
                                 }
-                                Spacer(modifier = Modifier.width(4.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
                                 Text(
                                     text = "Publish",
-                                    fontSize = 12.sp,
+                                    fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White
                                 )
@@ -261,14 +261,14 @@ fun SchoolAdminTimetableScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     if (isLoadingClasses) {
                         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                             ThreeDotsLoader(dotSize = 8.dp, dotColor = SunsetOrange, spaceBetween = 6.dp, travelDistance = 6.dp)
                         }
                     } else if (classes.isEmpty()) {
-                        Text(text = "No classes have been set up yet.", color = TextSecondary, fontSize = 13.sp)
+                        Text(text = "No classes have been set up yet.", color = TextSecondary, fontSize = 11.sp)
                     } else {
                         Row(
                             modifier = Modifier
@@ -289,11 +289,11 @@ fun SchoolAdminTimetableScreen(
                                             shape = RoundedCornerShape(20.dp)
                                         )
                                         .clickable { selectedClass = cls }
-                                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                                        .padding(horizontal = 11.dp, vertical = 6.dp)
                                 ) {
                                     Text(
                                         text = label,
-                                        fontSize = 12.5.sp,
+                                        fontSize = 10.5.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = if (isSelected) Color.White else TextPrimary
                                     )
@@ -302,16 +302,16 @@ fun SchoolAdminTimetableScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     if (publishMessage != null) {
                         Text(
                             text = publishMessage ?: "",
                             color = OnlineGreen,
-                            fontSize = 12.5.sp,
+                            fontSize = 10.5.sp,
                             fontWeight = FontWeight.SemiBold
                         )
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                     }
 
                     when {
@@ -322,12 +322,12 @@ fun SchoolAdminTimetableScreen(
                         }
                         errorMessage != null -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         schedule.isEmpty() -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = "No timetable periods found for this class.", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = "No timetable periods found for this class.", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         else -> {
@@ -340,16 +340,16 @@ fun SchoolAdminTimetableScreen(
                                     Column(modifier = Modifier.fillMaxWidth()) {
                                         Text(
                                             text = "${day.uppercase()}${daySchedule?.date?.let { " • $it" } ?: ""}",
-                                            fontSize = 11.sp,
+                                            fontSize = 9.5.sp,
                                             fontWeight = FontWeight.ExtraBold,
                                             color = TextSecondary,
                                             letterSpacing = 1.sp
                                         )
-                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Spacer(modifier = Modifier.height(6.dp))
 
                                         val periods = daySchedule?.periods.orEmpty().sortedBy { it.period_number ?: 0 }
                                         if (periods.isEmpty()) {
-                                            Text(text = "No periods scheduled", color = TextSecondary, fontSize = 12.sp)
+                                            Text(text = "No periods scheduled", color = TextSecondary, fontSize = 10.sp)
                                         } else {
                                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                                 periods.forEach { item ->
@@ -367,23 +367,23 @@ fun SchoolAdminTimetableScreen(
                                                         ) {
                                                             Box(
                                                                 modifier = Modifier
-                                                                    .size(36.dp)
+                                                                    .size(32.dp)
                                                                     .clip(CircleShape)
                                                                     .background(InfoBlue.copy(alpha = 0.18f)),
                                                                 contentAlignment = Alignment.Center
                                                             ) {
                                                                 Text(
                                                                     text = "${item.period_number ?: '-'}",
-                                                                    fontSize = 13.sp,
+                                                                    fontSize = 11.sp,
                                                                     fontWeight = FontWeight.ExtraBold,
                                                                     color = InfoBlue
                                                                 )
                                                             }
-                                                            Spacer(modifier = Modifier.width(10.dp))
+                                                            Spacer(modifier = Modifier.width(8.dp))
                                                             Column(modifier = Modifier.weight(1f)) {
                                                                 Text(
                                                                     text = item.subject_name ?: "Free Period",
-                                                                    fontSize = 13.5.sp,
+                                                                    fontSize = 11.5.sp,
                                                                     fontWeight = FontWeight.Bold,
                                                                     color = TextPrimary
                                                                 )
@@ -393,7 +393,7 @@ fun SchoolAdminTimetableScreen(
                                                                     } else {
                                                                         item.teacher_name ?: "Faculty Member"
                                                                     },
-                                                                    fontSize = 11.sp,
+                                                                    fontSize = 9.5.sp,
                                                                     color = if (item.is_backup) SunsetOrange else TextSecondary
                                                                 )
                                                             }
@@ -403,12 +403,12 @@ fun SchoolAdminTimetableScreen(
                                                                         imageVector = Icons.Default.Schedule,
                                                                         contentDescription = "Time",
                                                                         tint = SunsetOrange,
-                                                                        modifier = Modifier.size(13.dp)
+                                                                        modifier = Modifier.size(20.dp)
                                                                     )
-                                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                                    Spacer(modifier = Modifier.width(3.dp))
                                                                     Text(
                                                                         text = listOfNotNull(item.start_time, item.end_time).joinToString(" - "),
-                                                                        fontSize = 11.sp,
+                                                                        fontSize = 9.5.sp,
                                                                         fontWeight = FontWeight.SemiBold,
                                                                         color = TextPrimary
                                                                     )

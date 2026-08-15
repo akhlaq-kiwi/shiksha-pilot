@@ -234,7 +234,7 @@ fun DashboardScreen(
                         .verticalScroll(rememberScrollState())
                         .padding(bottom = 24.dp)
                 ) {
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     // WEB PARITY: Onboarding Checklist Widget (dismissible, driven by real setup state)
                     if (!isSetupProgressDismissed && setupCompletedCount < setupTotalCount) {
@@ -256,13 +256,13 @@ fun DashboardScreen(
                                     Column {
                                         Text(
                                             text = "School Setup Progress",
-                                            fontSize = 15.sp,
+                                            fontSize = 13.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = TextPrimary
                                         )
                                         Text(
                                             text = "$setupCompletedCount of $setupTotalCount setup steps completed",
-                                            fontSize = 11.5.sp,
+                                            fontSize = 10.sp,
                                             color = SunsetOrange
                                         )
                                     }
@@ -271,17 +271,17 @@ fun DashboardScreen(
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(8.dp))
                                                 .background(SunsetOrange.copy(alpha = 0.18f))
-                                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                                .padding(horizontal = 7.dp, vertical = 3.dp)
                                         ) {
-                                            Text(text = "$setupPercent% Done", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = SunsetOrange)
+                                            Text(text = "$setupPercent% Done", fontSize = 9.5.sp, fontWeight = FontWeight.ExtraBold, color = SunsetOrange)
                                         }
-                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
                                         Icon(
                                             imageVector = Icons.Default.Close,
                                             contentDescription = "Dismiss setup progress",
                                             tint = TextSecondary,
                                             modifier = Modifier
-                                                .size(18.dp)
+                                                .size(20.dp)
                                                 .clickable {
                                                     isSetupProgressDismissed = true
                                                     prefs.edit().putBoolean("setup_progress_dismissed", true).apply()
@@ -290,7 +290,7 @@ fun DashboardScreen(
                                     }
                                 }
 
-                                Spacer(modifier = Modifier.height(12.dp))
+                                Spacer(modifier = Modifier.height(10.dp))
 
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                     onboardingTasks.forEach { task ->
@@ -304,12 +304,12 @@ fun DashboardScreen(
                                                 imageVector = if (task.isDone) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
                                                 contentDescription = "Done",
                                                 tint = if (task.isDone) OnlineGreen else TextSecondary,
-                                                modifier = Modifier.size(16.dp)
+                                                modifier = Modifier.size(20.dp)
                                             )
-                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
                                             Text(
                                                 text = task.title,
-                                                fontSize = 12.5.sp,
+                                                fontSize = 10.5.sp,
                                                 color = if (task.isDone) TextPrimary else TextSecondary,
                                                 fontWeight = if (task.isDone) FontWeight.Medium else FontWeight.Normal
                                             )
@@ -319,7 +319,7 @@ fun DashboardScreen(
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(13.dp))
                     }
 
                     // WEB PARITY: 4 Primary Stat Cards Grid (API Dynamic QA Stats)
@@ -374,7 +374,7 @@ fun DashboardScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(13.dp))
 
                     // WEB PARITY: Monthly Fee Collection Line Chart
                     Box(modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -387,7 +387,7 @@ fun DashboardScreen(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(13.dp))
 
                     // WEB PARITY: Salary Disbursement Line Chart
                     Box(modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -400,7 +400,7 @@ fun DashboardScreen(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(13.dp))
 
                     // WEB PARITY: Dynamic Today's Timetable Widget with QA Server Classes Selector
                     Box(
@@ -419,11 +419,11 @@ fun DashboardScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(imageVector = Icons.Default.Schedule, contentDescription = "Timetable", tint = SunsetOrange, modifier = Modifier.size(18.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Icon(imageVector = Icons.Default.Schedule, contentDescription = "Timetable", tint = SunsetOrange, modifier = Modifier.size(20.dp))
+                                    Spacer(modifier = Modifier.width(5.dp))
                                     Text(
                                         text = "Today's Timetable",
-                                        fontSize = 15.sp,
+                                        fontSize = 13.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = TextPrimary
                                     )
@@ -441,12 +441,12 @@ fun DashboardScreen(
                                             .background(SunsetOrange.copy(alpha = 0.18f))
                                             .border(width = 1.dp, color = SunsetOrange.copy(alpha = 0.4f), shape = RoundedCornerShape(10.dp))
                                             .clickable { isClassPickerExpanded = true }
-                                            .padding(horizontal = 10.dp, vertical = 5.dp),
+                                            .padding(horizontal = 8.dp, vertical = 4.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(text = currentClassName, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = SunsetOrange)
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Icon(imageVector = Icons.Default.ArrowDropDown, contentDescription = "Select Class", tint = SunsetOrange, modifier = Modifier.size(16.dp))
+                                        Text(text = currentClassName, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = SunsetOrange)
+                                        Spacer(modifier = Modifier.width(3.dp))
+                                        Icon(imageVector = Icons.Default.ArrowDropDown, contentDescription = "Select Class", tint = SunsetOrange, modifier = Modifier.size(20.dp))
                                     }
 
                                     DropdownMenu(
@@ -457,7 +457,7 @@ fun DashboardScreen(
                                         classesList.forEach { cls ->
                                             val displayName = if (cls.section != null) "${cls.name}-${cls.section}" else cls.name
                                             DropdownMenuItem(
-                                                text = { Text(text = displayName, color = TextPrimary, fontSize = 13.sp) },
+                                                text = { Text(text = displayName, color = TextPrimary, fontSize = 11.sp) },
                                                 onClick = {
                                                     selectedClassDto = cls
                                                     isClassPickerExpanded = false
@@ -468,7 +468,7 @@ fun DashboardScreen(
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(10.dp))
 
                             if (currentTimetable.isEmpty()) {
                                 Box(
@@ -485,18 +485,18 @@ fun DashboardScreen(
                                             imageVector = Icons.Default.Schedule,
                                             contentDescription = "No Timetable",
                                             tint = TextSecondary,
-                                            modifier = Modifier.size(24.dp)
+                                            modifier = Modifier.size(21.dp)
                                         )
-                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Spacer(modifier = Modifier.height(6.dp))
                                         Text(
                                             text = "No timetable has been published for today.",
-                                            fontSize = 13.sp,
+                                            fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = TextPrimary
                                         )
                                         Text(
                                             text = "Please publish today's timetable to view scheduled periods.",
-                                            fontSize = 11.5.sp,
+                                            fontSize = 10.sp,
                                             color = TextSecondary,
                                             modifier = Modifier.padding(top = 2.dp)
                                         )
@@ -529,17 +529,17 @@ fun DashboardScreen(
                                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                                         Text(
                                                             text = period.periodTitle,
-                                                            fontSize = 10.sp,
+                                                            fontSize = 8.5.sp,
                                                             fontWeight = FontWeight.ExtraBold,
                                                             color = if (period.isBreak) WarningYellow else SunsetOrange
                                                         )
                                                         if (period.isBackup) {
-                                                            Spacer(modifier = Modifier.width(6.dp))
+                                                            Spacer(modifier = Modifier.width(5.dp))
                                                             Box(
                                                                 modifier = Modifier
                                                                     .clip(RoundedCornerShape(4.dp))
                                                                     .background(WarningYellow.copy(alpha = 0.2f))
-                                                                    .padding(horizontal = 4.dp, vertical = 1.dp)
+                                                                    .padding(horizontal = 4.dp, vertical = 2.dp)
                                                             ) {
                                                                 Text(text = "BACKUP", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = WarningYellow)
                                                             }
@@ -547,19 +547,19 @@ fun DashboardScreen(
                                                     }
                                                     Text(
                                                         text = period.subject,
-                                                        fontSize = 13.5.sp,
+                                                        fontSize = 11.5.sp,
                                                         fontWeight = FontWeight.Bold,
                                                         color = TextPrimary
                                                     )
                                                     Text(
                                                         text = period.teacher,
-                                                        fontSize = 11.5.sp,
+                                                        fontSize = 10.sp,
                                                         color = TextSecondary
                                                     )
                                                 }
                                                 Text(
                                                     text = period.timeStr,
-                                                    fontSize = 11.sp,
+                                                    fontSize = 9.5.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = TextPrimary
                                                 )
@@ -571,7 +571,7 @@ fun DashboardScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(30.dp))
+                    Spacer(modifier = Modifier.height(24.dp))
                 }
             }
             }
@@ -632,7 +632,7 @@ private fun WebStatCard(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
-                    .size(38.dp)
+                    .size(33.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .background(color.copy(alpha = 0.18f))
                     .border(width = 1.dp, color = color.copy(alpha = 0.35f), shape = RoundedCornerShape(12.dp)),
@@ -641,11 +641,11 @@ private fun WebStatCard(
                 Icon(imageVector = icon, contentDescription = label, tint = color, modifier = Modifier.size(20.dp))
             }
 
-            Spacer(modifier = Modifier.width(10.dp))
+            Spacer(modifier = Modifier.width(8.dp))
 
             Column {
-                Text(text = label, fontSize = 11.sp, color = TextSecondary)
-                Text(text = value, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
+                Text(text = label, fontSize = 9.5.sp, color = TextSecondary)
+                Text(text = value, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
             }
         }
     }

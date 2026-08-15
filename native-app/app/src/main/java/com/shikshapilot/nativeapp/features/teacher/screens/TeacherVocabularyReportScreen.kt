@@ -83,27 +83,27 @@ fun TeacherVocabularyReportScreen(
                     onAvatarClick = onAvatarClick
                 )
 
-                Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp)) {
+                Column(modifier = Modifier.fillMaxSize().padding(horizontal = 13.dp, vertical = 10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
                                 .clickable { onBack() },
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(imageVector = Icons.Default.ArrowBackIos, contentDescription = "Back", tint = TextPrimary, modifier = Modifier.size(16.dp))
+                            Icon(imageVector = Icons.Default.ArrowBackIos, contentDescription = "Back", tint = TextPrimary, modifier = Modifier.size(20.dp))
                         }
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
                         Column {
-                            Text(text = "Vocabulary Report", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
-                            Text(text = "QA Server: GET /api/teacher/vocabulary/report", fontSize = 11.sp, color = SunsetOrange)
+                            Text(text = "Vocabulary Report", fontSize = 15.5.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
+                            Text(text = "QA Server: GET /api/teacher/vocabulary/report", fontSize = 9.5.sp, color = SunsetOrange)
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                         OutlinedTextField(
@@ -113,7 +113,7 @@ fun TeacherVocabularyReportScreen(
                             singleLine = true,
                             modifier = Modifier.weight(1f)
                         )
-                        Spacer(modifier = Modifier.width(10.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Button(
                             onClick = { load() },
                             colors = ButtonDefaults.buttonColors(containerColor = SunsetOrange)
@@ -122,7 +122,7 @@ fun TeacherVocabularyReportScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     when {
                         isLoading -> {
@@ -132,19 +132,19 @@ fun TeacherVocabularyReportScreen(
                         }
                         errorMessage != null -> {
                             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         report == null -> {
                             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                                Text(text = "Enter a class id and tap Load to view the vocabulary report.", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = "Enter a class id and tap Load to view the vocabulary report.", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         else -> {
                             val r = report!!
                             LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxSize()) {
                                 item {
-                                    Text(text = r.class_name ?: "Class", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                    Text(text = r.class_name ?: "Class", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                                 }
                                 item {
                                     Box(
@@ -152,46 +152,46 @@ fun TeacherVocabularyReportScreen(
                                             .border(1.dp, CardBorder, RoundedCornerShape(14.dp)).padding(12.dp)
                                     ) {
                                         Column {
-                                            Text(text = "Average Accuracy: ${r.summary?.average_accuracy ?: 0.0}%", fontSize = 13.sp, color = TextPrimary)
-                                            Text(text = "Average Stage: ${r.summary?.average_stage ?: 0.0}", fontSize = 13.sp, color = TextPrimary)
-                                            Text(text = "Words Learned: ${r.summary?.total_words_learned ?: 0}", fontSize = 13.sp, color = TextPrimary)
-                                            Text(text = "Words Mastered: ${r.summary?.total_words_mastered ?: 0}", fontSize = 13.sp, color = TextPrimary)
+                                            Text(text = "Average Accuracy: ${r.summary?.average_accuracy ?: 0.0}%", fontSize = 11.sp, color = TextPrimary)
+                                            Text(text = "Average Stage: ${r.summary?.average_stage ?: 0.0}", fontSize = 11.sp, color = TextPrimary)
+                                            Text(text = "Words Learned: ${r.summary?.total_words_learned ?: 0}", fontSize = 11.sp, color = TextPrimary)
+                                            Text(text = "Words Mastered: ${r.summary?.total_words_mastered ?: 0}", fontSize = 11.sp, color = TextPrimary)
                                         }
                                     }
                                 }
-                                item { Text(text = "WEAK CATEGORIES", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp, color = TextSecondary) }
+                                item { Text(text = "WEAK CATEGORIES", fontSize = 9.5.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp, color = TextSecondary) }
                                 items(r.weak_categories) { cat ->
                                     Box(
                                         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(FrostedCard)
                                             .border(1.dp, CardBorder, RoundedCornerShape(12.dp)).padding(10.dp)
                                     ) {
                                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                            Text(text = cat.category ?: "-", fontSize = 12.5.sp, color = TextPrimary)
-                                            Text(text = "✓${cat.correct ?: 0}  ✗${cat.wrong ?: 0}", fontSize = 12.5.sp, color = TextSecondary)
+                                            Text(text = cat.category ?: "-", fontSize = 10.5.sp, color = TextPrimary)
+                                            Text(text = "✓${cat.correct ?: 0}  ✗${cat.wrong ?: 0}", fontSize = 10.5.sp, color = TextSecondary)
                                         }
                                     }
                                 }
-                                item { Text(text = "DIFFICULT WORDS", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp, color = TextSecondary) }
+                                item { Text(text = "DIFFICULT WORDS", fontSize = 9.5.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp, color = TextSecondary) }
                                 items(r.difficult_words) { w ->
                                     Box(
                                         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(FrostedCard)
                                             .border(1.dp, CardBorder, RoundedCornerShape(12.dp)).padding(10.dp)
                                     ) {
                                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                            Text(text = w.word ?: "-", fontSize = 12.5.sp, color = TextPrimary)
-                                            Text(text = "${w.total_wrongs ?: 0} wrong attempts", fontSize = 12.sp, color = TextSecondary)
+                                            Text(text = w.word ?: "-", fontSize = 10.5.sp, color = TextPrimary)
+                                            Text(text = "${w.total_wrongs ?: 0} wrong attempts", fontSize = 10.sp, color = TextSecondary)
                                         }
                                     }
                                 }
-                                item { Text(text = "MOST ACTIVE STUDENTS", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp, color = TextSecondary) }
+                                item { Text(text = "MOST ACTIVE STUDENTS", fontSize = 9.5.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp, color = TextSecondary) }
                                 items(r.active_students) { s ->
                                     Box(
                                         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(FrostedCard)
                                             .border(1.dp, CardBorder, RoundedCornerShape(12.dp)).padding(10.dp)
                                     ) {
                                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                            Text(text = "${s.first_name ?: ""} ${s.last_name ?: ""}".trim(), fontSize = 12.5.sp, color = TextPrimary)
-                                            Text(text = "${s.score ?: 0} pts • ${s.total_words_learned ?: 0} words", fontSize = 12.sp, color = TextSecondary)
+                                            Text(text = "${s.first_name ?: ""} ${s.last_name ?: ""}".trim(), fontSize = 10.5.sp, color = TextPrimary)
+                                            Text(text = "${s.score ?: 0} pts • ${s.total_words_learned ?: 0} words", fontSize = 10.sp, color = TextSecondary)
                                         }
                                     }
                                 }

@@ -146,7 +146,7 @@ fun SchoolAdminLeaveRequestsScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     // Back Header Row
                     Row(
@@ -155,7 +155,7 @@ fun SchoolAdminLeaveRequestsScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -166,28 +166,28 @@ fun SchoolAdminLeaveRequestsScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Staff Leave Approvals",
-                                fontSize = 18.sp,
+                                fontSize = 15.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = TextPrimary
                             )
                             Text(
                                 text = "${leaveRequests.count { it.status == "PENDING" }} Pending Approvals (QA Live API)",
-                                fontSize = 11.5.sp,
+                                fontSize = 10.sp,
                                 color = SunsetOrange
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     // Dynamic Leave Request List
                     if (isLoading) {
@@ -207,7 +207,7 @@ fun SchoolAdminLeaveRequestsScreen(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(text = "No leave applications found", color = TextSecondary, fontSize = 14.sp)
+                            Text(text = "No leave applications found", color = TextSecondary, fontSize = 12.sp)
                         }
                     } else {
                         LazyColumn(
@@ -244,7 +244,7 @@ fun SchoolAdminLeaveRequestsScreen(
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 Box(
                                                     modifier = Modifier
-                                                        .size(36.dp)
+                                                        .size(32.dp)
                                                         .clip(CircleShape)
                                                         .background(WarningYellow.copy(alpha = 0.18f))
                                                         .border(width = 1.dp, color = WarningYellow.copy(alpha = 0.4f), shape = CircleShape),
@@ -254,20 +254,20 @@ fun SchoolAdminLeaveRequestsScreen(
                                                         imageVector = Icons.Default.Edit,
                                                         contentDescription = "Leave",
                                                         tint = WarningYellow,
-                                                        modifier = Modifier.size(18.dp)
+                                                        modifier = Modifier.size(20.dp)
                                                     )
                                                 }
-                                                Spacer(modifier = Modifier.width(10.dp))
+                                                Spacer(modifier = Modifier.width(8.dp))
                                                 Column {
                                                     Text(
                                                         text = applicantName,
-                                                        fontSize = 15.sp,
+                                                        fontSize = 13.sp,
                                                         fontWeight = FontWeight.Bold,
                                                         color = TextPrimary
                                                     )
                                                     Text(
                                                         text = applicantRole,
-                                                        fontSize = 11.5.sp,
+                                                        fontSize = 10.sp,
                                                         color = TextSecondary
                                                     )
                                                 }
@@ -283,11 +283,11 @@ fun SchoolAdminLeaveRequestsScreen(
                                                             else -> WarningYellow.copy(alpha = 0.2f)
                                                         }
                                                     )
-                                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                                                    .padding(horizontal = 7.dp, vertical = 2.dp)
                                             ) {
                                                 Text(
                                                     text = statusStr,
-                                                    fontSize = 10.sp,
+                                                    fontSize = 8.5.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = when (statusStr) {
                                                         "APPROVED" -> OnlineGreen
@@ -298,23 +298,23 @@ fun SchoolAdminLeaveRequestsScreen(
                                             }
                                         }
 
-                                        Spacer(modifier = Modifier.height(10.dp))
+                                        Spacer(modifier = Modifier.height(8.dp))
 
                                         Text(
                                             text = "$leaveTypeStr • $datesStr",
-                                            fontSize = 13.sp,
+                                            fontSize = 11.sp,
                                             fontWeight = FontWeight.SemiBold,
                                             color = TextPrimary
                                         )
                                         Text(
                                             text = "Reason: ${leave.reason ?: "Personal Leave"}",
-                                            fontSize = 12.sp,
+                                            fontSize = 10.sp,
                                             color = TextSecondary,
                                             modifier = Modifier.padding(top = 2.dp)
                                         )
 
                                         if (statusStr == "PENDING") {
-                                            Spacer(modifier = Modifier.height(12.dp))
+                                            Spacer(modifier = Modifier.height(10.dp))
 
                                             Row(
                                                 modifier = Modifier.fillMaxWidth(),
@@ -347,9 +347,9 @@ fun SchoolAdminLeaveRequestsScreen(
                                                     contentAlignment = Alignment.Center
                                                 ) {
                                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                                        Icon(imageVector = Icons.Default.Close, contentDescription = "Reject", tint = Color(0xFFEF4444), modifier = Modifier.size(16.dp))
-                                                        Spacer(modifier = Modifier.width(4.dp))
-                                                        Text(text = "Reject", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFFEF4444))
+                                                        Icon(imageVector = Icons.Default.Close, contentDescription = "Reject", tint = Color(0xFFEF4444), modifier = Modifier.size(20.dp))
+                                                        Spacer(modifier = Modifier.width(3.dp))
+                                                        Text(text = "Reject", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFFEF4444))
                                                     }
                                                 }
 
@@ -379,9 +379,9 @@ fun SchoolAdminLeaveRequestsScreen(
                                                     contentAlignment = Alignment.Center
                                                 ) {
                                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                                        Icon(imageVector = Icons.Default.Check, contentDescription = "Approve", tint = Color.White, modifier = Modifier.size(16.dp))
-                                                        Spacer(modifier = Modifier.width(4.dp))
-                                                        Text(text = "Approve", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                                        Icon(imageVector = Icons.Default.Check, contentDescription = "Approve", tint = Color.White, modifier = Modifier.size(20.dp))
+                                                        Spacer(modifier = Modifier.width(3.dp))
+                                                        Text(text = "Approve", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                                     }
                                                 }
                                             }

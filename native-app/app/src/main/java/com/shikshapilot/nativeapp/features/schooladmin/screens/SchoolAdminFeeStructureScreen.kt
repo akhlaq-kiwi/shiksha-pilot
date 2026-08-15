@@ -119,7 +119,7 @@ fun SchoolAdminFeeStructureScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -127,7 +127,7 @@ fun SchoolAdminFeeStructureScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -138,29 +138,29 @@ fun SchoolAdminFeeStructureScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Fee Structures",
-                                fontSize = 18.sp,
+                                fontSize = 15.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = TextPrimary
                             )
                             Text(
                                 text = "${structures.size} structures • QA Live API",
-                                fontSize = 11.5.sp,
+                                fontSize = 10.sp,
                                 color = SunsetOrange
                             )
                         }
 
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(SunsetOrange)
                                 .clickable { showCreateForm = !showCreateForm },
@@ -170,12 +170,12 @@ fun SchoolAdminFeeStructureScreen(
                                 imageVector = Icons.Default.Add,
                                 contentDescription = "Add",
                                 tint = androidx.compose.ui.graphics.Color.White,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     if (showCreateForm) {
                         Box(
@@ -187,8 +187,8 @@ fun SchoolAdminFeeStructureScreen(
                                 .padding(14.dp)
                         ) {
                             Column {
-                                Text(text = "New Fee Structure", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(text = "New Fee Structure", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                Spacer(modifier = Modifier.height(6.dp))
                                 OutlinedTextField(
                                     value = nameInput,
                                     onValueChange = { nameInput = it },
@@ -196,7 +196,7 @@ fun SchoolAdminFeeStructureScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary)
                                 )
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(6.dp))
                                 OutlinedTextField(
                                     value = amountInput,
                                     onValueChange = { amountInput = it },
@@ -204,7 +204,7 @@ fun SchoolAdminFeeStructureScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary)
                                 )
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(6.dp))
                                 OutlinedTextField(
                                     value = frequencyInput,
                                     onValueChange = { frequencyInput = it },
@@ -212,7 +212,7 @@ fun SchoolAdminFeeStructureScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary)
                                 )
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(6.dp))
                                 OutlinedTextField(
                                     value = classIdInput,
                                     onValueChange = { classIdInput = it },
@@ -220,7 +220,7 @@ fun SchoolAdminFeeStructureScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary)
                                 )
-                                Spacer(modifier = Modifier.height(10.dp))
+                                Spacer(modifier = Modifier.height(8.dp))
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -261,11 +261,11 @@ fun SchoolAdminFeeStructureScreen(
                                         .padding(vertical = 10.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text(text = if (isSaving) "Saving..." else "Save", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = androidx.compose.ui.graphics.Color.White)
+                                    Text(text = if (isSaving) "Saving..." else "Save", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = androidx.compose.ui.graphics.Color.White)
                                 }
                             }
                         }
-                        Spacer(modifier = Modifier.height(14.dp))
+                        Spacer(modifier = Modifier.height(11.dp))
                     }
 
                     when {
@@ -276,12 +276,12 @@ fun SchoolAdminFeeStructureScreen(
                         }
                         errorMessage != null -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         structures.isEmpty() -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = "No fee structures configured yet.", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = "No fee structures configured yet.", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         else -> {
@@ -304,7 +304,7 @@ fun SchoolAdminFeeStructureScreen(
                                         ) {
                                             Box(
                                                 modifier = Modifier
-                                                    .size(42.dp)
+                                                    .size(37.dp)
                                                     .clip(CircleShape)
                                                     .background(OnlineGreen.copy(alpha = 0.18f))
                                                     .border(width = 1.dp, color = OnlineGreen.copy(alpha = 0.4f), shape = CircleShape),
@@ -318,20 +318,20 @@ fun SchoolAdminFeeStructureScreen(
                                                 )
                                             }
 
-                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Spacer(modifier = Modifier.width(10.dp))
 
                                             Column(modifier = Modifier.weight(1f)) {
-                                                Text(text = fs.name, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                                Text(text = fs.name, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                                                 Text(
                                                     text = "${fs.frequency ?: "Monthly"}${fs.class_id?.let { " • Class ID $it" } ?: " • All classes"}",
-                                                    fontSize = 12.sp,
+                                                    fontSize = 10.sp,
                                                     color = TextSecondary
                                                 )
                                             }
 
                                             Text(
                                                 text = "₹ ${"%,.0f".format(fs.amount)}",
-                                                fontSize = 15.sp,
+                                                fontSize = 13.sp,
                                                 fontWeight = FontWeight.ExtraBold,
                                                 color = OnlineGreen
                                             )

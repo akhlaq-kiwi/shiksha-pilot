@@ -270,7 +270,7 @@ fun SchoolAdminStaffScreen(
                 onClick = { openAddDialog() },
                 containerColor = SunsetOrange
             ) {
-                Text(text = "+", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text(text = "+", fontSize = 18.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
             }
         }
     ) { paddingValues ->
@@ -292,7 +292,7 @@ fun SchoolAdminStaffScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     // Back & Header Row
                     Row(
@@ -301,7 +301,7 @@ fun SchoolAdminStaffScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -312,35 +312,35 @@ fun SchoolAdminStaffScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Staff Governance & Payroll",
-                                fontSize = 18.sp,
+                                fontSize = 15.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = TextPrimary
                             )
                             Text(
                                 text = "${staffList.size} Active Staff Members (QA Live API)",
-                                fontSize = 11.5.sp,
+                                fontSize = 10.sp,
                                 color = SunsetOrange
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     // Search Bar
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("Search by Staff Name or Department...", color = TextSecondary, fontSize = 13.5.sp) },
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        placeholder = { Text("Search by Staff Name or Department...", color = TextSecondary, fontSize = 11.5.sp) },
                         leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = SunsetOrange) },
                         singleLine = true,
                         shape = RoundedCornerShape(16.dp),
@@ -354,7 +354,7 @@ fun SchoolAdminStaffScreen(
                         )
                     )
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     // Dynamic Staff List
                     if (isLoading) {
@@ -374,7 +374,7 @@ fun SchoolAdminStaffScreen(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(text = "No staff records found", color = TextSecondary, fontSize = 14.sp)
+                            Text(text = "No staff records found", color = TextSecondary, fontSize = 12.sp)
                         }
                     } else {
                         LazyColumn(
@@ -408,7 +408,7 @@ fun SchoolAdminStaffScreen(
                                         ) {
                                             Box(
                                                 modifier = Modifier
-                                                    .size(42.dp)
+                                                    .size(37.dp)
                                                     .clip(CircleShape)
                                                     .background(SunsetOrange.copy(alpha = 0.18f))
                                                     .border(width = 1.dp, color = SunsetOrange.copy(alpha = 0.4f), shape = CircleShape),
@@ -418,39 +418,39 @@ fun SchoolAdminStaffScreen(
                                                     imageVector = Icons.Default.Groups,
                                                     contentDescription = "Staff",
                                                     tint = SunsetOrange,
-                                                    modifier = Modifier.size(22.dp)
+                                                    modifier = Modifier.size(20.dp)
                                                 )
                                             }
 
-                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Spacer(modifier = Modifier.width(10.dp))
 
                                             Column(modifier = Modifier.weight(1f)) {
                                                 Text(
                                                     text = staff.name,
-                                                    fontSize = 15.sp,
+                                                    fontSize = 13.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = TextPrimary
                                                 )
                                                 Text(
                                                     text = "$roleStr ($deptStr) • $phoneStr",
-                                                    fontSize = 12.sp,
+                                                    fontSize = 10.sp,
                                                     color = TextSecondary
                                                 )
                                             }
 
                                             Text(
                                                 text = salaryFormatted,
-                                                fontSize = 15.sp,
+                                                fontSize = 13.sp,
                                                 fontWeight = FontWeight.ExtraBold,
                                                 color = OnlineGreen
                                             )
 
-                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Spacer(modifier = Modifier.width(3.dp))
 
                                             Box {
                                                 Box(
                                                     modifier = Modifier
-                                                        .size(28.dp)
+                                                        .size(25.dp)
                                                         .clip(CircleShape)
                                                         .clickable { menuForStaffId = staff.id },
                                                     contentAlignment = Alignment.Center
@@ -459,7 +459,7 @@ fun SchoolAdminStaffScreen(
                                                         imageVector = Icons.Default.MoreVert,
                                                         contentDescription = "More options",
                                                         tint = TextSecondary,
-                                                        modifier = Modifier.size(18.dp)
+                                                        modifier = Modifier.size(20.dp)
                                                     )
                                                 }
                                                 DropdownMenu(
@@ -486,7 +486,7 @@ fun SchoolAdminStaffScreen(
                                             }
                                         }
 
-                                        Spacer(modifier = Modifier.height(10.dp))
+                                        Spacer(modifier = Modifier.height(8.dp))
 
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
@@ -497,11 +497,11 @@ fun SchoolAdminStaffScreen(
                                                 modifier = Modifier
                                                     .clip(RoundedCornerShape(6.dp))
                                                     .background(OnlineGreen.copy(alpha = 0.2f))
-                                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                                                    .padding(horizontal = 7.dp, vertical = 2.dp)
                                             ) {
                                                 Text(
                                                     text = "$empCode • ${staff.status ?: "ACTIVE"}",
-                                                    fontSize = 10.5.sp,
+                                                    fontSize = 9.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = OnlineGreen
                                                 )
@@ -516,19 +516,19 @@ fun SchoolAdminStaffScreen(
                                                     .clickable {
                                                         Toast.makeText(context, "Salary receipt generated for ${staff.name}", Toast.LENGTH_SHORT).show()
                                                     }
-                                                    .padding(horizontal = 10.dp, vertical = 5.dp)
+                                                    .padding(horizontal = 8.dp, vertical = 4.dp)
                                             ) {
                                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                                     Icon(
                                                         imageVector = Icons.Default.ReceiptLong,
                                                         contentDescription = "Pay",
                                                         tint = Color.White,
-                                                        modifier = Modifier.size(14.dp)
+                                                        modifier = Modifier.size(20.dp)
                                                     )
-                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Spacer(modifier = Modifier.width(3.dp))
                                                     Text(
                                                         text = "Disburse Salary",
-                                                        fontSize = 11.5.sp,
+                                                        fontSize = 10.sp,
                                                         fontWeight = FontWeight.Bold,
                                                         color = Color.White
                                                     )
@@ -564,7 +564,7 @@ fun SchoolAdminStaffScreen(
                     ) {
                         Text(
                             text = if (isEditing) "Edit Staff" else "Add Staff",
-                            fontSize = 16.sp,
+                            fontSize = 13.5.sp,
                             fontWeight = FontWeight.Bold,
                             color = TextPrimary
                         )
@@ -576,37 +576,37 @@ fun SchoolAdminStaffScreen(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     StaffFormField(label = "Name *", value = nameInput, onValueChange = { nameInput = it })
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     StaffFormField(label = "Father's Name *", value = fatherNameInput, onValueChange = { fatherNameInput = it })
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     StaffFormField(label = "Mother's Name *", value = motherNameInput, onValueChange = { motherNameInput = it })
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     StaffFormField(
                         label = "Phone (10 digits) *",
                         value = phoneInput,
                         onValueChange = { if (it.length <= 10 && it.all { c -> c.isDigit() }) phoneInput = it },
                         keyboardType = KeyboardType.Number
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     StaffFormField(label = "Email (optional)", value = emailInput, onValueChange = { emailInput = it }, keyboardType = KeyboardType.Email)
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     StaffFormField(label = "Role", value = roleInput, onValueChange = { roleInput = it })
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     StaffFormField(label = "Department (optional)", value = departmentInput, onValueChange = { departmentInput = it })
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     StaffFormField(label = "Joining Date (YYYY-MM-DD) *", value = joiningDateInput, onValueChange = { joiningDateInput = it })
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     StaffFormField(label = "Monthly Salary *", value = salaryInput, onValueChange = { salaryInput = it }, keyboardType = KeyboardType.Number)
 
                     if (formError != null) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(text = formError ?: "", fontSize = 11.5.sp, color = Color(0xFFEF4444))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(text = formError ?: "", fontSize = 10.sp, color = Color(0xFFEF4444))
                     }
 
-                    Spacer(modifier = Modifier.height(18.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -615,7 +615,7 @@ fun SchoolAdminStaffScreen(
                         TextButton(onClick = { resetForm() }) {
                             Text("Cancel", color = TextSecondary)
                         }
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Button(
                             onClick = { saveStaff() },
                             enabled = !isSaving,
@@ -663,12 +663,12 @@ private fun StaffFormField(
     keyboardType: KeyboardType = KeyboardType.Text
 ) {
     Column {
-        Text(text = label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
-        Spacer(modifier = Modifier.height(6.dp))
+        Text(text = label, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
+        Spacer(modifier = Modifier.height(5.dp))
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().height(48.dp),
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
             shape = RoundedCornerShape(14.dp),

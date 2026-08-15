@@ -130,17 +130,17 @@ fun TeacherMarksEntryScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(FrostedCard)
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                    .padding(horizontal = 13.dp, vertical = 11.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBack) {
                     Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
                 }
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = "Marks Entry: $subjectName", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                    Text(text = "Marks Entry: $subjectName", fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                     Text(
                         text = "QA Server: GET/POST /api/teacher/exams-new/{id}/marks-sheet",
-                        fontSize = 10.sp,
+                        fontSize = 8.5.sp,
                         color = SunsetOrange
                     )
                 }
@@ -154,12 +154,12 @@ fun TeacherMarksEntryScreen(
                 }
                 errorMessage != null -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                        Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                     }
                 }
                 sheet == null -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(text = "No data available", color = TextSecondary, fontSize = 13.sp)
+                        Text(text = "No data available", color = TextSecondary, fontSize = 11.sp)
                     }
                 }
                 else -> {
@@ -177,24 +177,24 @@ fun TeacherMarksEntryScreen(
                                 .padding(12.dp)
                         ) {
                             Column {
-                                Text(text = "${currentSheet.exam_name ?: "Exam"} • ${currentSheet.class_name ?: ""}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                Text(text = "${currentSheet.exam_name ?: "Exam"} • ${currentSheet.class_name ?: ""}", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                                 Text(
                                     text = if (isGrade) "Evaluation: Grade" else "Max Marks: ${currentSheet.max_marks?.toInt() ?: 0}  •  Passing: ${currentSheet.passing_marks?.toInt() ?: 0}",
-                                    fontSize = 11.5.sp,
+                                    fontSize = 10.sp,
                                     color = TextSecondary
                                 )
                                 if (isLocked) {
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(text = "Report card published — marks are locked.", fontSize = 11.sp, color = WarningYellow, fontWeight = FontWeight.Bold)
+                                    Spacer(modifier = Modifier.height(3.dp))
+                                    Text(text = "Report card published — marks are locked.", fontSize = 9.5.sp, color = WarningYellow, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
 
                         if (currentSheet.students.isEmpty()) {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = "No students found in this class.", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = "No students found in this class.", color = TextSecondary, fontSize = 11.sp)
                             }
                         } else {
                             LazyColumn(
@@ -217,7 +217,7 @@ fun TeacherMarksEntryScreen(
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(10.dp))
 
                             Button(
                                 onClick = { saveMarks() },
@@ -245,7 +245,7 @@ fun TeacherMarksEntryScreen(
                     .background(OnlineGreen)
                     .padding(14.dp)
             ) {
-                Text(msg, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Text(msg, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
             }
         }
     }
@@ -279,11 +279,11 @@ private fun StudentMarkRow(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = student.student_name ?: "Student", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                    Text(text = "Roll ${student.roll_no ?: "-"}", fontSize = 11.sp, color = TextSecondary)
+                    Text(text = student.student_name ?: "Student", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                    Text(text = "Roll ${student.roll_no ?: "-"}", fontSize = 9.5.sp, color = TextSecondary)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = "Absent", fontSize = 11.sp, color = TextSecondary)
+                    Text(text = "Absent", fontSize = 9.5.sp, color = TextSecondary)
                     Checkbox(
                         checked = isAbsent,
                         onCheckedChange = onAbsentChange,
@@ -293,7 +293,7 @@ private fun StudentMarkRow(
                 }
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(5.dp))
 
             if (!isAbsent) {
                 if (isGrade) {
@@ -308,9 +308,9 @@ private fun StudentMarkRow(
                                     .then(
                                         if (!isLocked) Modifier.clickable { onMarksChange(grade) } else Modifier
                                     )
-                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    .padding(horizontal = 8.dp, vertical = 5.dp)
                             ) {
-                                Text(text = grade, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (selected) Color.White else TextPrimary)
+                                Text(text = grade, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = if (selected) Color.White else TextPrimary)
                             }
                         }
                     }
@@ -318,7 +318,7 @@ private fun StudentMarkRow(
                     OutlinedTextField(
                         value = marksValue,
                         onValueChange = { v -> if (v.all { it.isDigit() || it == '.' }) onMarksChange(v) },
-                        label = { Text("Marks Obtained", color = TextSecondary, fontSize = 11.sp) },
+                        label = { Text("Marks Obtained", color = TextSecondary, fontSize = 9.5.sp) },
                         singleLine = true,
                         enabled = !isLocked,
                         modifier = Modifier.fillMaxWidth(),
@@ -326,13 +326,13 @@ private fun StudentMarkRow(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(5.dp))
             }
 
             OutlinedTextField(
                 value = remarksValue,
                 onValueChange = onRemarksChange,
-                label = { Text("Remarks (optional)", color = TextSecondary, fontSize = 11.sp) },
+                label = { Text("Remarks (optional)", color = TextSecondary, fontSize = 9.5.sp) },
                 singleLine = true,
                 enabled = !isLocked,
                 modifier = Modifier.fillMaxWidth(),

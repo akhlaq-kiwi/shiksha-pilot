@@ -109,7 +109,7 @@ fun StudentAttendanceScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -117,7 +117,7 @@ fun StudentAttendanceScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -128,28 +128,28 @@ fun StudentAttendanceScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "My Attendance",
-                                fontSize = 18.sp,
+                                fontSize = 15.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = TextPrimary
                             )
                             Text(
                                 text = "QA Server: GET /api/student/attendance",
-                                fontSize = 11.5.sp,
+                                fontSize = 10.sp,
                                 color = SunsetOrange
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     Box(
                         modifier = Modifier
@@ -167,39 +167,39 @@ fun StudentAttendanceScreen(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Box(
                                     modifier = Modifier
-                                        .size(40.dp)
+                                        .size(35.dp)
                                         .clip(CircleShape)
                                         .background(OnlineGreen.copy(alpha = 0.18f)),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(imageVector = Icons.Default.EventAvailable, contentDescription = "Attendance", tint = OnlineGreen, modifier = Modifier.size(20.dp))
                                 }
-                                Spacer(modifier = Modifier.width(12.dp))
+                                Spacer(modifier = Modifier.width(10.dp))
                                 Column {
-                                    Text(text = "Overall Attendance", fontSize = 12.sp, color = TextSecondary)
-                                    Text(text = "$presentCount / ${records.size} days present", fontSize = 12.sp, color = TextSecondary)
+                                    Text(text = "Overall Attendance", fontSize = 10.sp, color = TextSecondary)
+                                    Text(text = "$presentCount / ${records.size} days present", fontSize = 10.sp, color = TextSecondary)
                                 }
                             }
                             Text(
                                 text = "${"%.1f".format(attendancePercent)}%",
-                                fontSize = 22.sp,
+                                fontSize = 18.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = OnlineGreen
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(13.dp))
 
                     Text(
                         text = "ATTENDANCE HISTORY",
-                        fontSize = 11.sp,
+                        fontSize = 9.5.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = TextSecondary,
                         letterSpacing = 1.sp
                     )
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     when {
                         isLoading -> {
@@ -209,12 +209,12 @@ fun StudentAttendanceScreen(
                         }
                         errorMessage != null -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         records.isEmpty() -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = "No attendance records found yet.", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = "No attendance records found yet.", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         else -> {
@@ -237,9 +237,9 @@ fun StudentAttendanceScreen(
                                             horizontalArrangement = Arrangement.SpaceBetween
                                         ) {
                                             Column {
-                                                Text(text = item.date, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                                Text(text = item.date, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                                                 if (!item.remarks.isNullOrBlank()) {
-                                                    Text(text = item.remarks, fontSize = 11.5.sp, color = TextSecondary)
+                                                    Text(text = item.remarks, fontSize = 10.sp, color = TextSecondary)
                                                 }
                                             }
 
@@ -248,11 +248,11 @@ fun StudentAttendanceScreen(
                                                     .clip(RoundedCornerShape(20.dp))
                                                     .background(statusColor(item.status).copy(alpha = 0.18f))
                                                     .border(width = 1.dp, color = statusColor(item.status).copy(alpha = 0.5f), shape = RoundedCornerShape(20.dp))
-                                                    .padding(horizontal = 10.dp, vertical = 5.dp)
+                                                    .padding(horizontal = 8.dp, vertical = 4.dp)
                                             ) {
                                                 Text(
                                                     text = item.status.uppercase(),
-                                                    fontSize = 11.sp,
+                                                    fontSize = 9.5.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = statusColor(item.status)
                                                 )

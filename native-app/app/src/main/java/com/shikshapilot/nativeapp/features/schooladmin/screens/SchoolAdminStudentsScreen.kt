@@ -171,7 +171,7 @@ fun SchoolAdminStudentsScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     // Back & Title Row
                     Row(
@@ -180,7 +180,7 @@ fun SchoolAdminStudentsScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -191,22 +191,22 @@ fun SchoolAdminStudentsScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = if (classNameFilter.isNullOrBlank()) "Student Directory & Enrollment" else classNameFilter,
-                                fontSize = 18.sp,
+                                fontSize = 15.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = TextPrimary
                             )
                             Text(
                                 text = "${studentsList.size} Enrolled Students",
-                                fontSize = 11.5.sp,
+                                fontSize = 10.sp,
                                 color = SunsetOrange
                             )
                         }
@@ -221,25 +221,25 @@ fun SchoolAdminStudentsScreen(
                                         transferMode = !transferMode
                                         if (!transferMode) selectedIds = emptySet()
                                     }
-                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    .padding(horizontal = 8.dp, vertical = 5.dp)
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
                                         imageVector = Icons.Default.SwapHoriz,
                                         contentDescription = "Transfer",
                                         tint = if (transferMode) Color.White else TextPrimary,
-                                        modifier = Modifier.size(16.dp)
+                                        modifier = Modifier.size(20.dp)
                                     )
-                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Spacer(modifier = Modifier.width(3.dp))
                                     Text(
                                         text = "Transfer",
-                                        fontSize = 12.sp,
+                                        fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = if (transferMode) Color.White else TextPrimary
                                     )
                                 }
                             }
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                         }
 
                         // Enroll New Student Button
@@ -248,19 +248,19 @@ fun SchoolAdminStudentsScreen(
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(SunsetOrange)
                                 .clickable { onEnrollNewStudent() }
-                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                                .padding(horizontal = 8.dp, vertical = 5.dp)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     imageVector = Icons.Default.PersonAdd,
                                     contentDescription = "Add",
                                     tint = Color.White,
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier.size(20.dp)
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
                                 Text(
                                     text = "Enroll",
-                                    fontSize = 12.sp,
+                                    fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White
                                 )
@@ -268,14 +268,14 @@ fun SchoolAdminStudentsScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     // Search Bar
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("Search by Student Name, SR No., or Class...", color = TextSecondary, fontSize = 13.5.sp) },
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        placeholder = { Text("Search by Student Name, SR No., or Class...", color = TextSecondary, fontSize = 11.5.sp) },
                         leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = SunsetOrange) },
                         singleLine = true,
                         shape = RoundedCornerShape(16.dp),
@@ -290,7 +290,7 @@ fun SchoolAdminStudentsScreen(
                     )
 
                     if (transferMode && selectedIds.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -306,14 +306,14 @@ fun SchoolAdminStudentsScreen(
                         ) {
                             Text(
                                 text = "Transfer ${selectedIds.size} student(s)",
-                                fontSize = 13.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     // Dynamic Student List
                     if (isLoading) {
@@ -333,7 +333,7 @@ fun SchoolAdminStudentsScreen(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(text = "No student records found", color = TextSecondary, fontSize = 14.sp)
+                            Text(text = "No student records found", color = TextSecondary, fontSize = 12.sp)
                         }
                     } else {
                         LazyColumn(
@@ -369,13 +369,13 @@ fun SchoolAdminStudentsScreen(
                                                 imageVector = if (isSelected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
                                                 contentDescription = "Select",
                                                 tint = if (isSelected) SunsetOrange else TextSecondary,
-                                                modifier = Modifier.size(22.dp)
+                                                modifier = Modifier.size(20.dp)
                                             )
-                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Spacer(modifier = Modifier.width(8.dp))
                                         }
                                         Box(
                                             modifier = Modifier
-                                                .size(42.dp)
+                                                .size(37.dp)
                                                 .clip(CircleShape)
                                                 .background(SunsetOrange.copy(alpha = 0.18f))
                                                 .border(width = 1.dp, color = SunsetOrange.copy(alpha = 0.4f), shape = CircleShape),
@@ -383,13 +383,13 @@ fun SchoolAdminStudentsScreen(
                                         ) {
                                             Text(
                                                 text = student.name.take(1).uppercase(),
-                                                fontSize = 18.sp,
+                                                fontSize = 15.5.sp,
                                                 fontWeight = FontWeight.Black,
                                                 color = SunsetOrange
                                             )
                                         }
 
-                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Spacer(modifier = Modifier.width(10.dp))
 
                                         Column(modifier = Modifier.weight(1f)) {
                                             Row(
@@ -399,13 +399,13 @@ fun SchoolAdminStudentsScreen(
                                             ) {
                                                 Text(
                                                     text = student.name,
-                                                    fontSize = 15.sp,
+                                                    fontSize = 13.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = TextPrimary
                                                 )
                                                 Text(
                                                     text = srStr,
-                                                    fontSize = 11.sp,
+                                                    fontSize = 9.5.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = TextSecondary
                                                 )
@@ -415,22 +415,22 @@ fun SchoolAdminStudentsScreen(
 
                                             Text(
                                                 text = "$className • $rollStr • Father: $fatherStr",
-                                                fontSize = 12.sp,
+                                                fontSize = 10.sp,
                                                 color = TextSecondary
                                             )
 
-                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Spacer(modifier = Modifier.height(3.dp))
 
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 Box(
                                                     modifier = Modifier
                                                         .clip(RoundedCornerShape(6.dp))
                                                         .background(OnlineGreen.copy(alpha = 0.2f))
-                                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                        .padding(horizontal = 5.dp, vertical = 2.dp)
                                                 ) {
                                                     Text(
                                                         text = student.status ?: "ACTIVE",
-                                                        fontSize = 10.sp,
+                                                        fontSize = 8.5.sp,
                                                         fontWeight = FontWeight.Bold,
                                                         color = OnlineGreen
                                                     )
@@ -461,25 +461,25 @@ fun SchoolAdminStudentsScreen(
                 Column {
                     Text(
                         text = "Transfer ${selectedIds.size} Student(s)",
-                        fontSize = 16.sp,
+                        fontSize = 13.5.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = "Moving within $classNameFilter to a different section.",
-                        fontSize = 12.sp,
+                        fontSize = 10.sp,
                         color = TextSecondary
                     )
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(13.dp))
 
-                    Text(text = "Destination Section", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(text = "Destination Section", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
+                    Spacer(modifier = Modifier.height(5.dp))
                     OutlinedTextField(
                         value = destSectionInput,
                         onValueChange = { destSectionInput = it },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
                         placeholder = { Text("e.g. B") },
                         singleLine = true,
                         shape = RoundedCornerShape(14.dp),
@@ -494,11 +494,11 @@ fun SchoolAdminStudentsScreen(
                     )
 
                     if (transferError != null) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(text = transferError ?: "", fontSize = 11.5.sp, color = Color(0xFFEF4444))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(text = transferError ?: "", fontSize = 10.sp, color = Color(0xFFEF4444))
                     }
 
-                    Spacer(modifier = Modifier.height(18.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -507,7 +507,7 @@ fun SchoolAdminStudentsScreen(
                         TextButton(onClick = { if (!isTransferring) showTransferDialog = false }) {
                             Text("Cancel", color = TextSecondary)
                         }
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Button(
                             onClick = { submitTransfer() },
                             enabled = !isTransferring,

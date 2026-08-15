@@ -124,7 +124,7 @@ fun TeacherLeaveScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -132,7 +132,7 @@ fun TeacherLeaveScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -143,22 +143,22 @@ fun TeacherLeaveScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "My Leave Requests",
-                                fontSize = 18.sp,
+                                fontSize = 15.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = TextPrimary
                             )
                             Text(
                                 text = "QA Server: GET/POST /api/school/leave-requests",
-                                fontSize = 11.5.sp,
+                                fontSize = 10.sp,
                                 color = SunsetOrange
                             )
                         }
@@ -174,13 +174,13 @@ fun TeacherLeaveScreen(
                                     reason = ""
                                     showApplyDialog = true
                                 }
-                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                                .padding(horizontal = 8.dp, vertical = 5.dp)
                         ) {
-                            Text(text = "Apply", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text(text = "Apply", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(13.dp))
 
                     when {
                         isLoading -> {
@@ -190,12 +190,12 @@ fun TeacherLeaveScreen(
                         }
                         errorMessage != null -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         leavesList.isEmpty() -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = "You have not applied for any leave yet.", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = "You have not applied for any leave yet.", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         else -> {
@@ -226,29 +226,29 @@ fun TeacherLeaveScreen(
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
                                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                                    Icon(imageVector = Icons.Default.EventNote, contentDescription = "Leave", tint = SunsetOrange, modifier = Modifier.size(18.dp))
-                                                    Spacer(modifier = Modifier.width(8.dp))
-                                                    Text(text = item.leave_type, fontSize = 14.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                                    Icon(imageVector = Icons.Default.EventNote, contentDescription = "Leave", tint = SunsetOrange, modifier = Modifier.size(20.dp))
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Text(text = item.leave_type, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                                                 }
                                                 Box(
                                                     modifier = Modifier
                                                         .clip(RoundedCornerShape(6.dp))
                                                         .background(statusColor.copy(alpha = 0.2f))
                                                         .border(width = 1.dp, color = statusColor, shape = RoundedCornerShape(6.dp))
-                                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                        .padding(horizontal = 5.dp, vertical = 2.dp)
                                                 ) {
-                                                    Text(text = item.status ?: "PENDING", fontSize = 9.5.sp, fontWeight = FontWeight.ExtraBold, color = statusColor)
+                                                    Text(text = item.status ?: "PENDING", fontSize = 8.sp, fontWeight = FontWeight.ExtraBold, color = statusColor)
                                                 }
                                             }
 
-                                            Spacer(modifier = Modifier.height(6.dp))
-                                            Text(text = datesStr, fontSize = 12.sp, color = TextSecondary)
-                                            Spacer(modifier = Modifier.height(4.dp))
-                                            Text(text = item.reason, fontSize = 12.sp, color = TextSecondary)
+                                            Spacer(modifier = Modifier.height(5.dp))
+                                            Text(text = datesStr, fontSize = 10.sp, color = TextSecondary)
+                                            Spacer(modifier = Modifier.height(3.dp))
+                                            Text(text = item.reason, fontSize = 10.sp, color = TextSecondary)
 
                                             if (!item.reject_reason.isNullOrBlank()) {
-                                                Spacer(modifier = Modifier.height(4.dp))
-                                                Text(text = "Reason: ${item.reject_reason}", fontSize = 11.sp, color = Color(0xFFEF4444))
+                                                Spacer(modifier = Modifier.height(3.dp))
+                                                Text(text = "Reason: ${item.reject_reason}", fontSize = 9.5.sp, color = Color(0xFFEF4444))
                                             }
                                         }
                                     }
@@ -265,7 +265,7 @@ fun TeacherLeaveScreen(
                     onDismissRequest = { if (!isSubmitting) showApplyDialog = false },
                     containerColor = DarkCanvas,
                     title = {
-                        Text(text = "Apply for Leave", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                        Text(text = "Apply for Leave", fontSize = 15.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                     },
                     text = {
                         Column {
@@ -282,7 +282,7 @@ fun TeacherLeaveScreen(
                                     unfocusedTextColor = TextPrimary
                                 )
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
                             OutlinedTextField(
                                 value = fromDate,
                                 onValueChange = { fromDate = it },
@@ -296,7 +296,7 @@ fun TeacherLeaveScreen(
                                     unfocusedTextColor = TextPrimary
                                 )
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
                             OutlinedTextField(
                                 value = toDate,
                                 onValueChange = { toDate = it },
@@ -310,7 +310,7 @@ fun TeacherLeaveScreen(
                                     unfocusedTextColor = TextPrimary
                                 )
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
                             OutlinedTextField(
                                 value = reason,
                                 onValueChange = { reason = it },

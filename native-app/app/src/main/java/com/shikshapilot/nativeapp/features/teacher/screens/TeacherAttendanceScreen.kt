@@ -130,7 +130,7 @@ fun TeacherAttendanceScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     // Back Header Row
                     Row(
@@ -139,7 +139,7 @@ fun TeacherAttendanceScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -150,28 +150,28 @@ fun TeacherAttendanceScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Mark Class Attendance",
-                                fontSize = 18.sp,
+                                fontSize = 15.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = TextPrimary
                             )
                             Text(
                                 text = "QA Server: POST /api/teacher/attendance",
-                                fontSize = 11.5.sp,
+                                fontSize = 10.sp,
                                 color = SunsetOrange
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     if (isLoading) {
                         Box(
@@ -211,7 +211,7 @@ fun TeacherAttendanceScreen(
                                             ) {
                                                 Box(
                                                     modifier = Modifier
-                                                        .size(40.dp)
+                                                        .size(35.dp)
                                                         .clip(CircleShape)
                                                         .background(SunsetOrange.copy(alpha = 0.18f)),
                                                     contentAlignment = Alignment.Center
@@ -219,15 +219,15 @@ fun TeacherAttendanceScreen(
                                                     Icon(imageVector = Icons.Default.Person, contentDescription = "Student", tint = SunsetOrange, modifier = Modifier.size(20.dp))
                                                 }
 
-                                                Spacer(modifier = Modifier.width(12.dp))
+                                                Spacer(modifier = Modifier.width(10.dp))
 
                                                 Column(modifier = Modifier.weight(1f)) {
-                                                    Text(text = item.name, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                                                    Text(text = "$className • $srNo", fontSize = 12.sp, color = TextSecondary)
+                                                    Text(text = item.name, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                                    Text(text = "$className • $srNo", fontSize = 10.sp, color = TextSecondary)
                                                 }
                                             }
 
-                                            Spacer(modifier = Modifier.height(10.dp))
+                                            Spacer(modifier = Modifier.height(8.dp))
 
                                             // Status Chips Row
                                             Row(
@@ -244,7 +244,7 @@ fun TeacherAttendanceScreen(
                                                         .padding(vertical = 8.dp),
                                                     contentAlignment = Alignment.Center
                                                 ) {
-                                                    Text(text = "PRESENT", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (currentStatus == "PRESENT") Color.White else TextSecondary)
+                                                    Text(text = "PRESENT", fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = if (currentStatus == "PRESENT") Color.White else TextSecondary)
                                                 }
 
                                                 // Absent
@@ -257,7 +257,7 @@ fun TeacherAttendanceScreen(
                                                         .padding(vertical = 8.dp),
                                                     contentAlignment = Alignment.Center
                                                 ) {
-                                                    Text(text = "ABSENT", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (currentStatus == "ABSENT") Color.White else TextSecondary)
+                                                    Text(text = "ABSENT", fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = if (currentStatus == "ABSENT") Color.White else TextSecondary)
                                                 }
 
                                                 // Late
@@ -270,7 +270,7 @@ fun TeacherAttendanceScreen(
                                                         .padding(vertical = 8.dp),
                                                     contentAlignment = Alignment.Center
                                                 ) {
-                                                    Text(text = "LATE", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (currentStatus == "LATE") Color.Black else TextSecondary)
+                                                    Text(text = "LATE", fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = if (currentStatus == "LATE") Color.Black else TextSecondary)
                                                 }
                                             }
                                         }
@@ -278,7 +278,7 @@ fun TeacherAttendanceScreen(
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(10.dp))
 
                             // Submit Button
                             Button(
@@ -309,9 +309,9 @@ fun TeacherAttendanceScreen(
                                 enabled = !isSubmitting
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(imageVector = Icons.Default.CheckCircle, contentDescription = "Submit", tint = Color.White, modifier = Modifier.size(18.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(text = if (isSubmitting) "Submitting..." else "Submit Class Attendance", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                    Icon(imageVector = Icons.Default.CheckCircle, contentDescription = "Submit", tint = Color.White, modifier = Modifier.size(20.dp))
+                                    Spacer(modifier = Modifier.width(5.dp))
+                                    Text(text = if (isSubmitting) "Submitting..." else "Submit Class Attendance", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                 }
                             }
                         }

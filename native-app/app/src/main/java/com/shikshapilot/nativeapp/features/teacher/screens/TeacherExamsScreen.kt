@@ -95,7 +95,7 @@ fun TeacherExamsScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -103,7 +103,7 @@ fun TeacherExamsScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -114,23 +114,23 @@ fun TeacherExamsScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "My Class Exams", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
+                            Text(text = "My Class Exams", fontSize = 15.5.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
                             Text(
                                 text = "QA Server: GET /api/teacher/exams-new",
-                                fontSize = 11.5.sp,
+                                fontSize = 10.sp,
                                 color = SunsetOrange
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(13.dp))
 
                     when {
                         isLoading -> {
@@ -140,12 +140,12 @@ fun TeacherExamsScreen(
                         }
                         errorMessage != null -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         exams.isEmpty() -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = "No exams found for your class yet.", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = "No exams found for your class yet.", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         else -> {
@@ -174,24 +174,24 @@ fun TeacherExamsScreen(
                                         ) {
                                             Box(
                                                 modifier = Modifier
-                                                    .size(40.dp)
+                                                    .size(35.dp)
                                                     .clip(CircleShape)
                                                     .background(SunsetOrange.copy(alpha = 0.18f)),
                                                 contentAlignment = Alignment.Center
                                             ) {
-                                                Icon(imageVector = Icons.Default.Assignment, contentDescription = "Exam", tint = SunsetOrange, modifier = Modifier.size(18.dp))
+                                                Icon(imageVector = Icons.Default.Assignment, contentDescription = "Exam", tint = SunsetOrange, modifier = Modifier.size(20.dp))
                                             }
-                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Spacer(modifier = Modifier.width(10.dp))
                                             Column(modifier = Modifier.weight(1f)) {
-                                                Text(text = exam.name, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                                Text(text = exam.name, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                                                 Spacer(modifier = Modifier.height(2.dp))
                                                 Text(
                                                     text = "${exam.start_date ?: "-"} to ${exam.end_date ?: "-"}",
-                                                    fontSize = 12.sp,
+                                                    fontSize = 10.sp,
                                                     color = TextSecondary
                                                 )
                                                 if (exam.result_published == 1) {
-                                                    Text(text = "Results Published", fontSize = 11.sp, color = OnlineGreen, fontWeight = FontWeight.Bold)
+                                                    Text(text = "Results Published", fontSize = 9.5.sp, color = OnlineGreen, fontWeight = FontWeight.Bold)
                                                 }
                                             }
                                             Box(
@@ -199,9 +199,9 @@ fun TeacherExamsScreen(
                                                     .clip(RoundedCornerShape(6.dp))
                                                     .background(statusColor.copy(alpha = 0.2f))
                                                     .border(width = 1.dp, color = statusColor, shape = RoundedCornerShape(6.dp))
-                                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                                                    .padding(horizontal = 7.dp, vertical = 2.dp)
                                             ) {
-                                                Text(text = exam.status ?: "-", fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = statusColor)
+                                                Text(text = exam.status ?: "-", fontSize = 8.5.sp, fontWeight = FontWeight.ExtraBold, color = statusColor)
                                             }
                                         }
                                     }
@@ -267,17 +267,17 @@ private fun TeacherExamDetailScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(FrostedCard)
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                    .padding(horizontal = 13.dp, vertical = 11.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBack) {
                     Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
                 }
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = exam.name, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                    Text(text = exam.name, fontSize = 15.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                     Text(
                         text = "QA Server: GET /api/teacher/exams-new/{id}/details",
-                        fontSize = 10.5.sp,
+                        fontSize = 9.sp,
                         color = SunsetOrange
                     )
                 }
@@ -291,12 +291,12 @@ private fun TeacherExamDetailScreen(
                 }
                 errorMessage != null -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                        Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                     }
                 }
                 details == null -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(text = "No details available", color = TextSecondary, fontSize = 13.sp)
+                        Text(text = "No details available", color = TextSecondary, fontSize = 11.sp)
                     }
                 }
                 else -> {
@@ -304,17 +304,17 @@ private fun TeacherExamDetailScreen(
                     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
                         Text(
                             text = "EXAM TIMETABLE — TAP A SUBJECT TO ENTER MARKS",
-                            fontSize = 11.sp,
+                            fontSize = 9.5.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = TextSecondary,
                             letterSpacing = 1.sp
                         )
 
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
 
                         if (d.scheme.isEmpty()) {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = "No papers scheduled for your class yet.", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = "No papers scheduled for your class yet.", color = TextSecondary, fontSize = 11.sp)
                             }
                         } else {
                             LazyColumn(
@@ -337,10 +337,10 @@ private fun TeacherExamDetailScreen(
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Column {
-                                                Text(text = paper.subject_name ?: "Subject", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                                Text(text = paper.subject_name ?: "Subject", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                                                 Text(
                                                     text = "${paper.exam_date ?: "-"}  •  ${paper.evaluation_type?.replaceFirstChar { it.uppercase() } ?: "Marks"}",
-                                                    fontSize = 11.5.sp,
+                                                    fontSize = 10.sp,
                                                     color = TextSecondary
                                                 )
                                             }

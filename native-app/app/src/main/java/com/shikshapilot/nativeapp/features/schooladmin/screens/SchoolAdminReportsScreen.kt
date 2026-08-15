@@ -72,7 +72,7 @@ fun SchoolAdminReportsScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     // Back Header Row
                     Row(
@@ -81,7 +81,7 @@ fun SchoolAdminReportsScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -92,28 +92,28 @@ fun SchoolAdminReportsScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Audit Reports & Security",
-                                fontSize = 18.sp,
+                                fontSize = 15.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = TextPrimary
                             )
                             Text(
                                 text = "API: GET /api/school/financial-reports",
-                                fontSize = 11.5.sp,
+                                fontSize = 10.sp,
                                 color = SunsetOrange
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(13.dp))
 
                     LazyColumn(
                         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -135,20 +135,20 @@ fun SchoolAdminReportsScreen(
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Box(
                                         modifier = Modifier
-                                            .size(44.dp)
+                                            .size(39.dp)
                                             .clip(RoundedCornerShape(12.dp))
                                             .background(Color(0xFFA855F7).copy(alpha = 0.18f))
                                             .border(width = 1.dp, color = Color(0xFFA855F7).copy(alpha = 0.4f), shape = RoundedCornerShape(12.dp)),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Icon(imageVector = Icons.Default.InsertChart, contentDescription = "Reports", tint = Color(0xFFA855F7), modifier = Modifier.size(24.dp))
+                                        Icon(imageVector = Icons.Default.InsertChart, contentDescription = "Reports", tint = Color(0xFFA855F7), modifier = Modifier.size(21.dp))
                                     }
 
-                                    Spacer(modifier = Modifier.width(14.dp))
+                                    Spacer(modifier = Modifier.width(11.dp))
 
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(text = "Financial Audit Summary", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                                        Text(text = "Billed: ₹ 14.3L • Collected: ₹ 12.45L • Due: ₹ 1.85L", fontSize = 11.5.sp, color = TextSecondary)
+                                        Text(text = "Financial Audit Summary", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                        Text(text = "Billed: ₹ 14.3L • Collected: ₹ 12.45L • Due: ₹ 1.85L", fontSize = 10.sp, color = TextSecondary)
                                     }
                                 }
                             }
@@ -170,20 +170,20 @@ fun SchoolAdminReportsScreen(
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Box(
                                         modifier = Modifier
-                                            .size(44.dp)
+                                            .size(39.dp)
                                             .clip(RoundedCornerShape(12.dp))
                                             .background(OnlineGreen.copy(alpha = 0.18f))
                                             .border(width = 1.dp, color = OnlineGreen.copy(alpha = 0.4f), shape = RoundedCornerShape(12.dp)),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Icon(imageVector = Icons.Default.Shield, contentDescription = "Compliance", tint = OnlineGreen, modifier = Modifier.size(24.dp))
+                                        Icon(imageVector = Icons.Default.Shield, contentDescription = "Compliance", tint = OnlineGreen, modifier = Modifier.size(21.dp))
                                     }
 
-                                    Spacer(modifier = Modifier.width(14.dp))
+                                    Spacer(modifier = Modifier.width(11.dp))
 
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(text = "CBSE OASIS & U-DISE+ Compliance", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                                        Text(text = "All candidate profiles & <75% attendance risk list updated", fontSize = 11.5.sp, color = TextSecondary)
+                                        Text(text = "CBSE OASIS & U-DISE+ Compliance", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                        Text(text = "All candidate profiles & <75% attendance risk list updated", fontSize = 10.sp, color = TextSecondary)
                                     }
                                 }
                             }

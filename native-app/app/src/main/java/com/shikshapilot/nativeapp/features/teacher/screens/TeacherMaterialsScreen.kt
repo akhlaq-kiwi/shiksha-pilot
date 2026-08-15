@@ -79,7 +79,7 @@ fun TeacherMaterialsScreen(
                     .fillMaxWidth()
                     .background(FrostedCard)
                     .statusBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                    .padding(horizontal = 13.dp, vertical = 11.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBack) {
@@ -88,13 +88,13 @@ fun TeacherMaterialsScreen(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Study Notes & Materials",
-                        fontSize = 18.sp,
+                        fontSize = 15.5.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
                     )
                     Text(
                         text = "QA Server: GET /api/teacher/materials",
-                        fontSize = 11.sp,
+                        fontSize = 9.5.sp,
                         color = SunsetOrange
                     )
                 }
@@ -111,7 +111,7 @@ fun TeacherMaterialsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 16.dp),
-                    placeholder = { Text("Search materials by title or subject...", color = TextSecondary, fontSize = 13.sp) },
+                    placeholder = { Text("Search materials by title or subject...", color = TextSecondary, fontSize = 11.sp) },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = TextSecondary) },
                     shape = RoundedCornerShape(14.dp),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -131,7 +131,7 @@ fun TeacherMaterialsScreen(
                     }
                 } else if (filtered.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("No materials uploaded yet", color = TextSecondary, fontSize = 14.sp)
+                        Text("No materials uploaded yet", color = TextSecondary, fontSize = 12.sp)
                     }
                 } else {
                     LazyColumn(
@@ -164,7 +164,7 @@ fun MaterialCard(item: MaterialItemDto) {
         ) {
             Box(
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(39.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .background(SunsetOrange.copy(alpha = 0.15f)),
                 contentAlignment = Alignment.Center
@@ -172,20 +172,20 @@ fun MaterialCard(item: MaterialItemDto) {
                 Icon(Icons.Default.FileDownload, contentDescription = "File", tint = SunsetOrange)
             }
 
-            Spacer(modifier = Modifier.width(14.dp))
+            Spacer(modifier = Modifier.width(11.dp))
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = item.title,
-                    fontSize = 14.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextPrimary
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(3.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(item.subject_name ?: "General", fontSize = 11.sp, color = InfoBlue, fontWeight = FontWeight.Medium)
-                    Text("•", fontSize = 11.sp, color = TextSecondary)
-                    Text(item.class_name ?: "Class 1", fontSize = 11.sp, color = TextSecondary)
+                    Text(item.subject_name ?: "General", fontSize = 9.5.sp, color = InfoBlue, fontWeight = FontWeight.Medium)
+                    Text("•", fontSize = 9.5.sp, color = TextSecondary)
+                    Text(item.class_name ?: "Class 1", fontSize = 9.5.sp, color = TextSecondary)
                 }
             }
         }

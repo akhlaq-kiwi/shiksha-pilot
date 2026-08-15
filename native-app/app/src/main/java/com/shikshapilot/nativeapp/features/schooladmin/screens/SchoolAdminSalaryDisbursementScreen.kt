@@ -137,7 +137,7 @@ fun SchoolAdminSalaryDisbursementScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -145,7 +145,7 @@ fun SchoolAdminSalaryDisbursementScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -156,19 +156,19 @@ fun SchoolAdminSalaryDisbursementScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "Salary Disbursement", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
-                            Text(text = "${staffList.size} staff • QA Live API", fontSize = 11.5.sp, color = SunsetOrange)
+                            Text(text = "Salary Disbursement", fontSize = 15.5.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
+                            Text(text = "${staffList.size} staff • QA Live API", fontSize = 10.sp, color = SunsetOrange)
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     OutlinedTextField(
                         value = monthInput,
@@ -178,7 +178,7 @@ fun SchoolAdminSalaryDisbursementScreen(
                         colors = OutlinedTextFieldDefaults.colors(focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary)
                     )
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     when {
                         isLoading -> {
@@ -188,12 +188,12 @@ fun SchoolAdminSalaryDisbursementScreen(
                         }
                         errorMessage != null -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         staffList.isEmpty() -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = "No active staff found.", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = "No active staff found.", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         else -> {
@@ -217,7 +217,7 @@ fun SchoolAdminSalaryDisbursementScreen(
                                         ) {
                                             Box(
                                                 modifier = Modifier
-                                                    .size(42.dp)
+                                                    .size(37.dp)
                                                     .clip(CircleShape)
                                                     .background(SunsetOrange.copy(alpha = 0.18f))
                                                     .border(width = 1.dp, color = SunsetOrange.copy(alpha = 0.4f), shape = CircleShape),
@@ -226,12 +226,12 @@ fun SchoolAdminSalaryDisbursementScreen(
                                                 Icon(imageVector = Icons.Default.Person, contentDescription = "Staff", tint = SunsetOrange, modifier = Modifier.size(20.dp))
                                             }
 
-                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Spacer(modifier = Modifier.width(10.dp))
 
                                             Column(modifier = Modifier.weight(1f)) {
-                                                Text(text = s.name ?: "Staff", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                                                Text(text = s.designation ?: "", fontSize = 12.sp, color = TextSecondary)
-                                                Text(text = "Payable: ₹ ${"%,.0f".format(s.payable_salary)}", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = OnlineGreen)
+                                                Text(text = s.name ?: "Staff", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                                Text(text = s.designation ?: "", fontSize = 10.sp, color = TextSecondary)
+                                                Text(text = "Payable: ₹ ${"%,.0f".format(s.payable_salary)}", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = OnlineGreen)
                                             }
 
                                             if (isPaid) {
@@ -239,9 +239,9 @@ fun SchoolAdminSalaryDisbursementScreen(
                                                     modifier = Modifier
                                                         .clip(RoundedCornerShape(8.dp))
                                                         .background(OnlineGreen.copy(alpha = 0.18f))
-                                                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                                                        .padding(horizontal = 8.dp, vertical = 5.dp)
                                                 ) {
-                                                    Text(text = "Paid", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = OnlineGreen)
+                                                    Text(text = "Paid", fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = OnlineGreen)
                                                 }
                                             } else {
                                                 Box(
@@ -249,9 +249,9 @@ fun SchoolAdminSalaryDisbursementScreen(
                                                         .clip(RoundedCornerShape(8.dp))
                                                         .background(if (disbursingId == s.id) SunsetOrange.copy(alpha = 0.5f) else SunsetOrange)
                                                         .clickable(enabled = disbursingId != s.id) { disburse(s.id) }
-                                                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                                                        .padding(horizontal = 8.dp, vertical = 5.dp)
                                                 ) {
-                                                    Text(text = if (disbursingId == s.id) "..." else "Disburse", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                                    Text(text = if (disbursingId == s.id) "..." else "Disburse", fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                                 }
                                             }
                                         }

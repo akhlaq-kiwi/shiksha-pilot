@@ -151,27 +151,27 @@ fun SchoolAdminAcademicSetupScreen(
             Column(modifier = Modifier.fillMaxSize()) {
                 StickyTopBar(schoolName = schoolName, unreadNotificationCount = 2, onNotificationClick = {}, onAvatarClick = {})
 
-                Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp)) {
+                Column(modifier = Modifier.fillMaxSize().padding(horizontal = 13.dp, vertical = 10.dp)) {
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
                                 .clickable { onBack() },
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(imageVector = Icons.Default.ArrowBackIos, contentDescription = "Back", tint = TextPrimary, modifier = Modifier.size(16.dp))
+                            Icon(imageVector = Icons.Default.ArrowBackIos, contentDescription = "Back", tint = TextPrimary, modifier = Modifier.size(20.dp))
                         }
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "Academic Setup", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
-                            Text(text = "Years, holidays, subjects & grading", fontSize = 11.5.sp, color = SunsetOrange)
+                            Text(text = "Academic Setup", fontSize = 15.5.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
+                            Text(text = "Years, holidays, subjects & grading", fontSize = 10.sp, color = SunsetOrange)
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     Row(
                         modifier = Modifier
@@ -187,14 +187,14 @@ fun SchoolAdminAcademicSetupScreen(
                                     .background(if (selected) SunsetOrange else FrostedCard)
                                     .border(width = 1.dp, color = if (selected) SunsetOrange else CardBorder, shape = RoundedCornerShape(10.dp))
                                     .clickable { activeTab = idx }
-                                    .padding(horizontal = 14.dp, vertical = 8.dp)
+                                    .padding(horizontal = 11.dp, vertical = 6.dp)
                             ) {
-                                Text(text = label, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (selected) Color.White else TextSecondary)
+                                Text(text = label, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = if (selected) Color.White else TextSecondary)
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(5.dp))
 
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                         val addLabel = when (activeTab) { 0 -> "+ Add Year"; 1 -> "+ Add Holiday"; 2 -> "+ Add Subject"; else -> null }
@@ -210,14 +210,14 @@ fun SchoolAdminAcademicSetupScreen(
                                             2 -> showAddSubjectDialog = true
                                         }
                                     }
-                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
                             ) {
-                                Text(text = addLabel, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = OnlineGreen)
+                                Text(text = addLabel, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = OnlineGreen)
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
 
                     when {
                         isLoading -> {
@@ -227,7 +227,7 @@ fun SchoolAdminAcademicSetupScreen(
                         }
                         errorMessage != null -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         activeTab == 0 -> {
@@ -334,7 +334,7 @@ fun SchoolAdminAcademicSetupScreen(
             text = {
                 Column {
                     OutlinedTextField(value = nameInput, onValueChange = { nameInput = it }, label = { Text("Holiday name") }, modifier = Modifier.fillMaxWidth())
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     OutlinedTextField(value = dateInput, onValueChange = { dateInput = it }, label = { Text("Date (YYYY-MM-DD)") }, modifier = Modifier.fillMaxWidth())
                 }
             },
@@ -410,20 +410,20 @@ private fun AcademicYearCard(year: AcademicYearItemDto, onActivate: () -> Unit) 
     ) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                modifier = Modifier.size(38.dp).clip(CircleShape).background(SunsetOrange.copy(alpha = 0.18f)),
+                modifier = Modifier.size(33.dp).clip(CircleShape).background(SunsetOrange.copy(alpha = 0.18f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(imageVector = Icons.Default.CalendarMonth, contentDescription = "Year", tint = SunsetOrange, modifier = Modifier.size(18.dp))
+                Icon(imageVector = Icons.Default.CalendarMonth, contentDescription = "Year", tint = SunsetOrange, modifier = Modifier.size(20.dp))
             }
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = year.name ?: "Academic Year", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                Text(text = "${year.start_date ?: ""} to ${year.end_date ?: ""}", fontSize = 11.sp, color = TextSecondary)
-                Text(text = year.status ?: "", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = if (isCurrent) OnlineGreen else SunsetOrange)
+                Text(text = year.name ?: "Academic Year", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                Text(text = "${year.start_date ?: ""} to ${year.end_date ?: ""}", fontSize = 9.5.sp, color = TextSecondary)
+                Text(text = year.status ?: "", fontSize = 9.5.sp, fontWeight = FontWeight.SemiBold, color = if (isCurrent) OnlineGreen else SunsetOrange)
             }
             if (isCurrent) {
-                Box(modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(OnlineGreen.copy(alpha = 0.18f)).padding(horizontal = 10.dp, vertical = 6.dp)) {
-                    Text(text = "Active", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = OnlineGreen)
+                Box(modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(OnlineGreen.copy(alpha = 0.18f)).padding(horizontal = 8.dp, vertical = 5.dp)) {
+                    Text(text = "Active", fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = OnlineGreen)
                 }
             } else {
                 Box(
@@ -431,9 +431,9 @@ private fun AcademicYearCard(year: AcademicYearItemDto, onActivate: () -> Unit) 
                         .clip(RoundedCornerShape(8.dp))
                         .background(SunsetOrange)
                         .clickable { onActivate() }
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                        .padding(horizontal = 8.dp, vertical = 5.dp)
                 ) {
-                    Text(text = "Activate", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text(text = "Activate", fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 }
             }
         }
@@ -452,8 +452,8 @@ private fun HolidayCard(holiday: HolidayItemDto, onDelete: () -> Unit) {
     ) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = holiday.name ?: "Holiday", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                Text(text = holiday.date ?: "", fontSize = 12.sp, color = TextSecondary)
+                Text(text = holiday.name ?: "Holiday", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                Text(text = holiday.date ?: "", fontSize = 10.sp, color = TextSecondary)
             }
             Icon(
                 imageVector = Icons.Default.Delete,
@@ -477,16 +477,16 @@ private fun SubjectCard(subject: SubjectItemDto, onDelete: () -> Unit) {
     ) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                modifier = Modifier.size(34.dp).clip(CircleShape).background(SunsetOrange.copy(alpha = 0.18f)),
+                modifier = Modifier.size(30.dp).clip(CircleShape).background(SunsetOrange.copy(alpha = 0.18f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(imageVector = Icons.Default.MenuBook, contentDescription = "Subject", tint = SunsetOrange, modifier = Modifier.size(16.dp))
+                Icon(imageVector = Icons.Default.MenuBook, contentDescription = "Subject", tint = SunsetOrange, modifier = Modifier.size(20.dp))
             }
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = subject.name ?: "Subject", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                Text(text = subject.name ?: "Subject", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                 if (!subject.teacher_name.isNullOrBlank()) {
-                    Text(text = "Teacher: ${subject.teacher_name}", fontSize = 11.sp, color = TextSecondary)
+                    Text(text = "Teacher: ${subject.teacher_name}", fontSize = 9.5.sp, color = TextSecondary)
                 }
             }
             Icon(
@@ -511,15 +511,15 @@ private fun GradeConfigCard(grade: GradeConfigItemDto) {
     ) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                modifier = Modifier.size(34.dp).clip(CircleShape).background(SunsetOrange.copy(alpha = 0.18f)),
+                modifier = Modifier.size(30.dp).clip(CircleShape).background(SunsetOrange.copy(alpha = 0.18f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(imageVector = Icons.Default.Grade, contentDescription = "Grade", tint = SunsetOrange, modifier = Modifier.size(16.dp))
+                Icon(imageVector = Icons.Default.Grade, contentDescription = "Grade", tint = SunsetOrange, modifier = Modifier.size(20.dp))
             }
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = "Grade ${grade.grade ?: ""} • ${grade.remark ?: ""}", fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                Text(text = "${grade.min_percentage}% - ${grade.max_percentage}%  (GP ${grade.grade_point ?: 0.0})", fontSize = 11.5.sp, color = TextSecondary)
+                Text(text = "Grade ${grade.grade ?: ""} • ${grade.remark ?: ""}", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                Text(text = "${grade.min_percentage}% - ${grade.max_percentage}%  (GP ${grade.grade_point ?: 0.0})", fontSize = 10.sp, color = TextSecondary)
             }
         }
     }

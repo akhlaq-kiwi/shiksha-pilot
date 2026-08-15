@@ -139,7 +139,7 @@ fun SchoolAdminEducationScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -147,7 +147,7 @@ fun SchoolAdminEducationScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -158,28 +158,28 @@ fun SchoolAdminEducationScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Education",
-                                fontSize = 18.sp,
+                                fontSize = 15.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = TextPrimary
                             )
                             Text(
                                 text = "Academics & Timetable",
-                                fontSize = 11.5.sp,
+                                fontSize = 10.sp,
                                 color = SunsetOrange
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(13.dp))
 
                     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxSize()) {
                         items(modules) { module ->
@@ -198,7 +198,7 @@ fun SchoolAdminEducationScreen(
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .size(42.dp)
+                                            .size(37.dp)
                                             .clip(CircleShape)
                                             .background(module.iconColor.copy(alpha = 0.18f))
                                             .border(width = 1.dp, color = module.iconColor.copy(alpha = 0.4f), shape = CircleShape),
@@ -212,18 +212,18 @@ fun SchoolAdminEducationScreen(
                                         )
                                     }
 
-                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Spacer(modifier = Modifier.width(10.dp))
 
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
                                             text = module.title,
-                                            fontSize = 15.sp,
+                                            fontSize = 13.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = TextPrimary
                                         )
                                         Text(
                                             text = module.subtitle,
-                                            fontSize = 12.sp,
+                                            fontSize = 10.sp,
                                             color = TextSecondary
                                         )
                                     }
@@ -232,7 +232,7 @@ fun SchoolAdminEducationScreen(
                                         imageVector = Icons.Default.ArrowForwardIos,
                                         contentDescription = null,
                                         tint = TextSecondary,
-                                        modifier = Modifier.size(14.dp)
+                                        modifier = Modifier.size(20.dp)
                                     )
                                 }
                             }

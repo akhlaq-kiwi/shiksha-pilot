@@ -167,27 +167,27 @@ fun SchoolAdminCredentialsScreen(
             Column(modifier = Modifier.fillMaxSize()) {
                 StickyTopBar(schoolName = schoolName, unreadNotificationCount = 2, onNotificationClick = {}, onAvatarClick = {})
 
-                Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp)) {
+                Column(modifier = Modifier.fillMaxSize().padding(horizontal = 13.dp, vertical = 10.dp)) {
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
                                 .clickable { onBack() },
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(imageVector = Icons.Default.ArrowBackIos, contentDescription = "Back", tint = TextPrimary, modifier = Modifier.size(16.dp))
+                            Icon(imageVector = Icons.Default.ArrowBackIos, contentDescription = "Back", tint = TextPrimary, modifier = Modifier.size(20.dp))
                         }
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "Login Credentials", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
-                            Text(text = "Generate & view student/staff credentials", fontSize = 11.5.sp, color = SunsetOrange)
+                            Text(text = "Login Credentials", fontSize = 15.5.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
+                            Text(text = "Generate & view student/staff credentials", fontSize = 10.sp, color = SunsetOrange)
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     Row(
                         modifier = Modifier
@@ -208,12 +208,12 @@ fun SchoolAdminCredentialsScreen(
                                     .padding(vertical = 10.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(text = label, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = if (selected) Color.White else TextSecondary)
+                                Text(text = label, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = if (selected) Color.White else TextSecondary)
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     when {
                         isLoading -> {
@@ -223,7 +223,7 @@ fun SchoolAdminCredentialsScreen(
                         }
                         errorMessage != null -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         activeTab == 0 -> {
@@ -262,7 +262,7 @@ fun SchoolAdminCredentialsScreen(
                         dialogError != null -> Text(dialogError ?: "", color = Color(0xFFEF4444))
                         dialogCredentials?.phone != null -> {
                             Text("Phone: ${dialogCredentials?.phone}", color = TextPrimary)
-                            Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(3.dp))
                             Text("Password: ${dialogCredentials?.plain_password ?: "(hidden)"}", color = OnlineGreen, fontWeight = FontWeight.Bold)
                         }
                         else -> Text("No login credentials found for this profile yet. Tap Generate to create one.", color = TextSecondary)
@@ -297,19 +297,19 @@ private fun PersonRow(name: String, subtitle: String, onClick: () -> Unit) {
     ) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                modifier = Modifier.size(36.dp).clip(CircleShape).background(SunsetOrange.copy(alpha = 0.18f)),
+                modifier = Modifier.size(32.dp).clip(CircleShape).background(SunsetOrange.copy(alpha = 0.18f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(imageVector = Icons.Default.Person, contentDescription = "Person", tint = SunsetOrange, modifier = Modifier.size(18.dp))
+                Icon(imageVector = Icons.Default.Person, contentDescription = "Person", tint = SunsetOrange, modifier = Modifier.size(20.dp))
             }
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = name, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                Text(text = name, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                 if (subtitle.isNotBlank()) {
-                    Text(text = subtitle, fontSize = 11.5.sp, color = TextSecondary)
+                    Text(text = subtitle, fontSize = 10.sp, color = TextSecondary)
                 }
             }
-            Icon(imageVector = Icons.Default.Key, contentDescription = "Credentials", tint = TextSecondary, modifier = Modifier.size(18.dp))
+            Icon(imageVector = Icons.Default.Key, contentDescription = "Credentials", tint = TextSecondary, modifier = Modifier.size(20.dp))
         }
     }
 }

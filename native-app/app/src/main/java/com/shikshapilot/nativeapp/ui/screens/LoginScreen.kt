@@ -148,7 +148,7 @@ fun LoginScreen(
             // Light Orange Blurred Glow Spot shifted 20% higher up
             Box(
                 modifier = Modifier
-                    .size(400.dp)
+                    .size(352.dp)
                     .align(BiasAlignment(0f, -0.4f))
                     .background(
                         brush = Brush.radialGradient(
@@ -169,12 +169,12 @@ fun LoginScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                Spacer(modifier = Modifier.height(40.dp))
+                Spacer(modifier = Modifier.height(32.dp))
 
                 // Exact Logo Image Container
                 Box(
                     modifier = Modifier
-                        .size(88.dp)
+                        .size(77.dp)
                         .clip(RoundedCornerShape(24.dp))
                         .background(SunsetOrange.copy(alpha = 0.15f))
                         .border(width = 1.dp, color = SunsetOrange.copy(alpha = 0.4f), shape = RoundedCornerShape(24.dp)),
@@ -184,23 +184,23 @@ fun LoginScreen(
                         painter = painterResource(id = R.drawable.ic_launcher),
                         contentDescription = "ShikshaPilot Exact Logo",
                         modifier = Modifier
-                            .size(68.dp)
+                            .size(60.dp)
                             .clip(RoundedCornerShape(18.dp))
                     )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(13.dp))
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "Shiksha",
-                        fontSize = 28.sp,
+                        fontSize = 24.sp,
                         fontWeight = FontWeight.Black,
                         color = TextPrimary
                     )
                     Text(
                         text = "Pilot",
-                        fontSize = 28.sp,
+                        fontSize = 24.sp,
                         fontWeight = FontWeight.Black,
                         color = SunsetOrange
                     )
@@ -208,12 +208,12 @@ fun LoginScreen(
 
                 Text(
                     text = "Empowering Education & Governance",
-                    fontSize = 13.sp,
+                    fontSize = 11.sp,
                     color = TextSecondary,
                     modifier = Modifier.padding(top = 4.dp)
                 )
 
-                Spacer(modifier = Modifier.height(36.dp))
+                Spacer(modifier = Modifier.height(29.dp))
 
                 // Glassmorphic Login Card
                 Box(
@@ -227,13 +227,13 @@ fun LoginScreen(
                     Column(modifier = Modifier.fillMaxWidth()) {
                         Text(
                             text = "Welcome Back",
-                            fontSize = 22.sp,
+                            fontSize = 18.5.sp,
                             fontWeight = FontWeight.Bold,
                             color = TextPrimary
                         )
                         Text(
                             text = "Sign in to access your dashboard",
-                            fontSize = 13.sp,
+                            fontSize = 11.sp,
                             color = TextSecondary,
                             modifier = Modifier.padding(top = 4.dp, bottom = 20.dp)
                         )
@@ -241,7 +241,7 @@ fun LoginScreen(
                         // Mobile Number Input
                         Text(
                             text = "Mobile Number",
-                            fontSize = 12.sp,
+                            fontSize = 10.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = TextSecondary,
                             modifier = Modifier.padding(bottom = 6.dp)
@@ -254,7 +254,7 @@ fun LoginScreen(
                                 }
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            placeholder = { Text("Enter 10-digit mobile number", color = TextSecondary, fontSize = 14.sp) },
+                            placeholder = { Text("Enter 10-digit mobile number", color = TextSecondary, fontSize = 12.sp) },
                             leadingIcon = { Icon(Icons.Default.Phone, contentDescription = "Phone", tint = SunsetOrange) },
                             keyboardOptions = KeyboardOptions(
                                 keyboardType = KeyboardType.Number,
@@ -275,12 +275,12 @@ fun LoginScreen(
                             )
                         )
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(13.dp))
 
                         // Password Input
                         Text(
                             text = "Password",
-                            fontSize = 12.sp,
+                            fontSize = 10.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = TextSecondary,
                             modifier = Modifier.padding(bottom = 6.dp)
@@ -291,7 +291,7 @@ fun LoginScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .focusRequester(focusRequesterPassword),
-                            placeholder = { Text("Enter password", color = TextSecondary, fontSize = 14.sp) },
+                            placeholder = { Text("Enter password", color = TextSecondary, fontSize = 12.sp) },
                             leadingIcon = { Icon(Icons.Default.Lock, contentDescription = "Password", tint = SunsetOrange) },
                             trailingIcon = {
                                 IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
@@ -322,7 +322,7 @@ fun LoginScreen(
                             )
                         )
 
-                        Spacer(modifier = Modifier.height(24.dp))
+                        Spacer(modifier = Modifier.height(19.dp))
 
                         // Sunset Orange Login Button with 3 Dots Loader
                         Button(
@@ -344,7 +344,7 @@ fun LoginScreen(
                             } else {
                                 Text(
                                     text = "Sign In",
-                                    fontSize = 16.sp,
+                                    fontSize = 13.5.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White
                                 )
@@ -353,11 +353,11 @@ fun LoginScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(19.dp))
 
                 Text(
                     text = "© 2026 ShikshaPilot. All rights reserved.",
-                    fontSize = 11.sp,
+                    fontSize = 9.5.sp,
                     color = TextSecondary
                 )
             }

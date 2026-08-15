@@ -136,33 +136,33 @@ fun SchoolAdminReportCardsScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
                                 .clickable { onBack() },
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(imageVector = Icons.Default.ArrowBackIos, contentDescription = "Back", tint = TextPrimary, modifier = Modifier.size(16.dp))
+                            Icon(imageVector = Icons.Default.ArrowBackIos, contentDescription = "Back", tint = TextPrimary, modifier = Modifier.size(20.dp))
                         }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(text = "Report Cards", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(text = "Report Cards", fontSize = 15.5.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     if (isLoadingLists) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             ThreeDotsLoader(dotSize = 10.dp, dotColor = SunsetOrange, spaceBetween = 8.dp, travelDistance = 8.dp)
                         }
                     } else {
-                        Text(text = "Exam", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(text = "Exam", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
+                        Spacer(modifier = Modifier.height(5.dp))
                         var examExpanded by remember { mutableStateOf(false) }
                         Box(modifier = Modifier.fillMaxWidth()) {
                             Box(
@@ -172,9 +172,9 @@ fun SchoolAdminReportCardsScreen(
                                     .background(FrostedCard)
                                     .border(width = 1.dp, color = CardBorder, shape = RoundedCornerShape(14.dp))
                                     .clickable { examExpanded = true }
-                                    .padding(horizontal = 14.dp, vertical = 14.dp)
+                                    .padding(horizontal = 11.dp, vertical = 11.dp)
                             ) {
-                                Text(text = selectedExam?.name ?: "Select an exam", fontSize = 14.sp, color = if (selectedExam != null) TextPrimary else TextSecondary)
+                                Text(text = selectedExam?.name ?: "Select an exam", fontSize = 12.sp, color = if (selectedExam != null) TextPrimary else TextSecondary)
                             }
                             DropdownMenu(expanded = examExpanded, onDismissRequest = { examExpanded = false }, modifier = Modifier.heightIn(max = 300.dp)) {
                                 exams.forEach { exam ->
@@ -183,10 +183,10 @@ fun SchoolAdminReportCardsScreen(
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(14.dp))
+                        Spacer(modifier = Modifier.height(11.dp))
 
-                        Text(text = "Class", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(text = "Class", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
+                        Spacer(modifier = Modifier.height(5.dp))
                         var classExpanded by remember { mutableStateOf(false) }
                         Box(modifier = Modifier.fillMaxWidth()) {
                             Box(
@@ -196,11 +196,11 @@ fun SchoolAdminReportCardsScreen(
                                     .background(FrostedCard)
                                     .border(width = 1.dp, color = CardBorder, shape = RoundedCornerShape(14.dp))
                                     .clickable { classExpanded = true }
-                                    .padding(horizontal = 14.dp, vertical = 14.dp)
+                                    .padding(horizontal = 11.dp, vertical = 11.dp)
                             ) {
                                 Text(
                                     text = selectedClass?.let { "${it.name}${it.section?.let { s -> " - $s" } ?: ""}" } ?: "Select a class",
-                                    fontSize = 14.sp,
+                                    fontSize = 12.sp,
                                     color = if (selectedClass != null) TextPrimary else TextSecondary
                                 )
                             }
@@ -214,12 +214,12 @@ fun SchoolAdminReportCardsScreen(
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(13.dp))
 
                         when {
                             selectedExam == null || selectedClass == null -> {
                                 Box(modifier = Modifier.fillMaxWidth().padding(vertical = 30.dp), contentAlignment = Alignment.Center) {
-                                    Text(text = "Select an exam and a class to view report cards.", color = TextSecondary, fontSize = 13.sp)
+                                    Text(text = "Select an exam and a class to view report cards.", color = TextSecondary, fontSize = 11.sp)
                                 }
                             }
                             isLoadingCards -> {
@@ -229,12 +229,12 @@ fun SchoolAdminReportCardsScreen(
                             }
                             errorMessage != null -> {
                                 Box(modifier = Modifier.fillMaxWidth().padding(vertical = 30.dp), contentAlignment = Alignment.Center) {
-                                    Text(text = errorMessage ?: "", color = TextSecondary, fontSize = 13.sp)
+                                    Text(text = errorMessage ?: "", color = TextSecondary, fontSize = 11.sp)
                                 }
                             }
                             reportCards.isEmpty() -> {
                                 Box(modifier = Modifier.fillMaxWidth().padding(vertical = 30.dp), contentAlignment = Alignment.Center) {
-                                    Text(text = "No report cards available for this exam/class yet.", color = TextSecondary, fontSize = 13.sp)
+                                    Text(text = "No report cards available for this exam/class yet.", color = TextSecondary, fontSize = 11.sp)
                                 }
                             }
                             else -> {
@@ -252,19 +252,19 @@ fun SchoolAdminReportCardsScreen(
                                             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                                 Box(
                                                     modifier = Modifier
-                                                        .size(38.dp)
+                                                        .size(33.dp)
                                                         .clip(CircleShape)
                                                         .background(SunsetOrange.copy(alpha = 0.18f)),
                                                     contentAlignment = Alignment.Center
                                                 ) {
-                                                    Icon(imageVector = Icons.Default.Description, contentDescription = null, tint = SunsetOrange, modifier = Modifier.size(18.dp))
+                                                    Icon(imageVector = Icons.Default.Description, contentDescription = null, tint = SunsetOrange, modifier = Modifier.size(20.dp))
                                                 }
-                                                Spacer(modifier = Modifier.width(12.dp))
+                                                Spacer(modifier = Modifier.width(10.dp))
                                                 Column(modifier = Modifier.weight(1f)) {
-                                                    Text(text = card.student_name ?: "Student", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                                                    Text(text = "Roll ${card.roll_no ?: "-"}", fontSize = 11.5.sp, color = TextSecondary)
+                                                    Text(text = card.student_name ?: "Student", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                                    Text(text = "Roll ${card.roll_no ?: "-"}", fontSize = 10.sp, color = TextSecondary)
                                                 }
-                                                Icon(imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos, contentDescription = "Open", tint = TextSecondary, modifier = Modifier.size(14.dp))
+                                                Icon(imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos, contentDescription = "Open", tint = TextSecondary, modifier = Modifier.size(20.dp))
                                             }
                                         }
                                     }

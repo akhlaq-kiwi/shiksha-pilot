@@ -103,7 +103,7 @@ fun StudentMaterialsScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -111,7 +111,7 @@ fun StudentMaterialsScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -122,28 +122,28 @@ fun StudentMaterialsScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Learning Materials",
-                                fontSize = 18.sp,
+                                fontSize = 15.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = TextPrimary
                             )
                             Text(
                                 text = "QA Server: GET /api/student/materials",
-                                fontSize = 11.5.sp,
+                                fontSize = 10.sp,
                                 color = SunsetOrange
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     when {
                         isLoading -> {
@@ -153,12 +153,12 @@ fun StudentMaterialsScreen(
                         }
                         errorMessage != null -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         materials.isEmpty() -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = "No learning materials have been shared yet.", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = "No learning materials have been shared yet.", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         else -> {
@@ -192,19 +192,19 @@ fun StudentMaterialsScreen(
                                             Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                                                 Box(
                                                     modifier = Modifier
-                                                        .size(36.dp)
+                                                        .size(32.dp)
                                                         .clip(CircleShape)
                                                         .background(InfoBlue.copy(alpha = 0.18f)),
                                                     contentAlignment = Alignment.Center
                                                 ) {
-                                                    Icon(imageVector = Icons.Default.Book, contentDescription = "Material", tint = InfoBlue, modifier = Modifier.size(18.dp))
+                                                    Icon(imageVector = Icons.Default.Book, contentDescription = "Material", tint = InfoBlue, modifier = Modifier.size(20.dp))
                                                 }
-                                                Spacer(modifier = Modifier.width(12.dp))
+                                                Spacer(modifier = Modifier.width(10.dp))
                                                 Column(modifier = Modifier.weight(1f)) {
-                                                    Text(text = item.title, fontSize = 14.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                                    Text(text = item.title, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                                                     val subjectClass = listOfNotNull(item.subject_name, item.class_name).joinToString(" • ")
                                                     if (subjectClass.isNotBlank()) {
-                                                        Text(text = subjectClass, fontSize = 11.5.sp, color = TextSecondary)
+                                                        Text(text = subjectClass, fontSize = 10.sp, color = TextSecondary)
                                                     }
                                                 }
                                             }
@@ -214,7 +214,7 @@ fun StudentMaterialsScreen(
                                                     imageVector = Icons.Default.OpenInNew,
                                                     contentDescription = "Open",
                                                     tint = SunsetOrange,
-                                                    modifier = Modifier.size(18.dp)
+                                                    modifier = Modifier.size(20.dp)
                                                 )
                                             }
                                         }

@@ -20,6 +20,7 @@ fun ShikshaPilotTheme(
 ) {
     MaterialTheme(
         colorScheme = DarkColorScheme,
+        typography = CompactTypography,
         content = content
     )
 }

@@ -117,7 +117,7 @@ fun SchoolAdminSecurityScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -125,7 +125,7 @@ fun SchoolAdminSecurityScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -136,17 +136,17 @@ fun SchoolAdminSecurityScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "Security", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
-                            Text(text = "Audit logs & login history", fontSize = 11.5.sp, color = SunsetOrange)
+                            Text(text = "Security", fontSize = 15.5.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
+                            Text(text = "Audit logs & login history", fontSize = 10.sp, color = SunsetOrange)
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     Row(
                         modifier = Modifier
@@ -169,7 +169,7 @@ fun SchoolAdminSecurityScreen(
                             ) {
                                 Text(
                                     text = label,
-                                    fontSize = 12.5.sp,
+                                    fontSize = 10.5.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = if (selected) androidx.compose.ui.graphics.Color.White else TextSecondary
                                 )
@@ -177,7 +177,7 @@ fun SchoolAdminSecurityScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     when {
                         isLoading -> {
@@ -187,13 +187,13 @@ fun SchoolAdminSecurityScreen(
                         }
                         errorMessage != null -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         activeTab == 0 -> {
                             if (auditLogs.isEmpty()) {
                                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    Text(text = "No audit log entries found.", color = TextSecondary, fontSize = 13.sp)
+                                    Text(text = "No audit log entries found.", color = TextSecondary, fontSize = 11.sp)
                                 }
                             } else {
                                 LazyColumn(
@@ -209,7 +209,7 @@ fun SchoolAdminSecurityScreen(
                         else -> {
                             if (loginHistory.isEmpty()) {
                                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    Text(text = "No login history found.", color = TextSecondary, fontSize = 13.sp)
+                                    Text(text = "No login history found.", color = TextSecondary, fontSize = 11.sp)
                                 }
                             } else {
                                 LazyColumn(
@@ -243,28 +243,28 @@ private fun AuditLogCard(log: AuditLogItemDto) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
             Box(
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(32.dp)
                     .clip(CircleShape)
                     .background(SunsetOrange.copy(alpha = 0.18f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(imageVector = Icons.Default.Security, contentDescription = "Audit", tint = SunsetOrange, modifier = Modifier.size(18.dp))
+                Icon(imageVector = Icons.Default.Security, contentDescription = "Audit", tint = SunsetOrange, modifier = Modifier.size(20.dp))
             }
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = log.action ?: "Action", fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                Text(text = log.action ?: "Action", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                 if (!log.description.isNullOrBlank()) {
-                    Text(text = log.description, fontSize = 12.sp, color = TextSecondary)
+                    Text(text = log.description, fontSize = 10.sp, color = TextSecondary)
                 }
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(3.dp))
                 Row {
                     if (!log.module.isNullOrBlank()) {
-                        Text(text = log.module, fontSize = 11.sp, color = SunsetOrange, fontWeight = FontWeight.SemiBold)
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = log.module, fontSize = 9.5.sp, color = SunsetOrange, fontWeight = FontWeight.SemiBold)
+                        Spacer(modifier = Modifier.width(6.dp))
                     }
-                    Text(text = log.performed_by ?: log.user ?: "System", fontSize = 11.sp, color = TextSecondary)
+                    Text(text = log.performed_by ?: log.user ?: "System", fontSize = 9.5.sp, color = TextSecondary)
                 }
-                Text(text = log.formatted_date ?: log.created_at ?: "", fontSize = 10.5.sp, color = TextSecondary)
+                Text(text = log.formatted_date ?: log.created_at ?: "", fontSize = 9.sp, color = TextSecondary)
             }
         }
     }
@@ -284,27 +284,27 @@ private fun LoginHistoryCard(entry: LoginHistoryItemDto) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(32.dp)
                     .clip(CircleShape)
                     .background((if (isSuccess) OnlineGreen else androidx.compose.ui.graphics.Color(0xFFEF4444)).copy(alpha = 0.18f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(imageVector = Icons.Default.History, contentDescription = "Login", tint = if (isSuccess) OnlineGreen else androidx.compose.ui.graphics.Color(0xFFEF4444), modifier = Modifier.size(18.dp))
+                Icon(imageVector = Icons.Default.History, contentDescription = "Login", tint = if (isSuccess) OnlineGreen else androidx.compose.ui.graphics.Color(0xFFEF4444), modifier = Modifier.size(20.dp))
             }
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = entry.performed_by ?: entry.user ?: "Unknown user", fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                Text(text = entry.formatted_date ?: entry.created_at ?: "", fontSize = 11.sp, color = TextSecondary)
+                Text(text = entry.performed_by ?: entry.user ?: "Unknown user", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                Text(text = entry.formatted_date ?: entry.created_at ?: "", fontSize = 9.5.sp, color = TextSecondary)
             }
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
                     .background((if (isSuccess) OnlineGreen else androidx.compose.ui.graphics.Color(0xFFEF4444)).copy(alpha = 0.18f))
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                    .padding(horizontal = 8.dp, vertical = 5.dp)
             ) {
                 Text(
                     text = entry.status ?: "—",
-                    fontSize = 11.sp,
+                    fontSize = 9.5.sp,
                     fontWeight = FontWeight.Bold,
                     color = if (isSuccess) OnlineGreen else androidx.compose.ui.graphics.Color(0xFFEF4444)
                 )

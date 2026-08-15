@@ -112,7 +112,7 @@ fun SchoolAdminIdentityCardsScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -120,7 +120,7 @@ fun SchoolAdminIdentityCardsScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -131,28 +131,28 @@ fun SchoolAdminIdentityCardsScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "$classNameFilter — Identity Cards",
-                                fontSize = 16.sp,
+                                fontSize = 13.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = TextPrimary
                             )
                             Text(
                                 text = "${students.size} students",
-                                fontSize = 11.5.sp,
+                                fontSize = 10.sp,
                                 color = SunsetOrange
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     when {
                         isLoading -> {
@@ -162,7 +162,7 @@ fun SchoolAdminIdentityCardsScreen(
                         }
                         students.isEmpty() -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = "No active students found in $classNameFilter.", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = "No active students found in $classNameFilter.", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         else -> {
@@ -202,13 +202,13 @@ private fun IdentityCard(student: StudentItemDto, schoolName: String, className:
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Color(0xFF115E45))
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                    .padding(horizontal = 11.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text(text = schoolName.uppercase(), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFCD34D))
-                    Text(text = "STUDENT IDENTITY CARD", fontSize = 7.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFFD1FAE5))
+                    Text(text = schoolName.uppercase(), fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFCD34D))
+                    Text(text = "STUDENT IDENTITY CARD", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color(0xFFD1FAE5))
                 }
             }
 
@@ -228,24 +228,24 @@ private fun IdentityCard(student: StudentItemDto, schoolName: String, className:
                     contentAlignment = Alignment.Center
                 ) {
                     if (initials.isNotBlank()) {
-                        Text(text = initials, fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color(0xFF52525B))
+                        Text(text = initials, fontSize = 13.5.sp, fontWeight = FontWeight.Black, color = Color(0xFF52525B))
                     } else {
                         Icon(imageVector = Icons.Default.Person, contentDescription = null, tint = Color(0xFF52525B))
                     }
                 }
 
-                Spacer(modifier = Modifier.width(14.dp))
+                Spacer(modifier = Modifier.width(11.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
                     IdCardField(label = "Student Name", value = student.name)
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(3.dp))
                     IdCardField(label = "Father Name", value = student.father_name ?: "—")
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(3.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         IdCardField(label = "Class/Sec", value = classSecDisplay, modifier = Modifier.weight(1f))
                         IdCardField(label = "Mobile", value = mobile)
                     }
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(3.dp))
                     IdCardField(label = "SR No.", value = student.sr_no ?: "SR-${student.id}")
                 }
             }
@@ -256,7 +256,7 @@ private fun IdentityCard(student: StudentItemDto, schoolName: String, className:
 @Composable
 private fun IdCardField(label: String, value: String, modifier: Modifier = Modifier) {
     Column(modifier = modifier) {
-        Text(text = label.uppercase(), fontSize = 7.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFF71717A))
-        Text(text = value.uppercase(), fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFF09090B))
+        Text(text = label.uppercase(), fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color(0xFF71717A))
+        Text(text = value.uppercase(), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF09090B))
     }
 }

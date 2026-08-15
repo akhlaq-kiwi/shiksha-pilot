@@ -188,7 +188,7 @@ fun SchoolAdminFeeFollowUpScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -196,7 +196,7 @@ fun SchoolAdminFeeFollowUpScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -207,19 +207,19 @@ fun SchoolAdminFeeFollowUpScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "Fee Follow-Ups", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
-                            Text(text = "Pending $pendingCount • Due Today $dueTodayCount • Overdue $overdueCount", fontSize = 11.sp, color = SunsetOrange)
+                            Text(text = "Fee Follow-Ups", fontSize = 15.5.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
+                            Text(text = "Pending $pendingCount • Due Today $dueTodayCount • Overdue $overdueCount", fontSize = 9.5.sp, color = SunsetOrange)
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     when {
                         isLoading -> {
@@ -229,12 +229,12 @@ fun SchoolAdminFeeFollowUpScreen(
                         }
                         errorMessage != null -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         items.isEmpty() -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = "No fee follow-ups pending.", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = "No fee follow-ups pending.", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         else -> {
@@ -261,7 +261,7 @@ fun SchoolAdminFeeFollowUpScreen(
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 Box(
                                                     modifier = Modifier
-                                                        .size(42.dp)
+                                                        .size(37.dp)
                                                         .clip(CircleShape)
                                                         .background(statusColor.copy(alpha = 0.18f))
                                                         .border(width = 1.dp, color = statusColor.copy(alpha = 0.4f), shape = CircleShape),
@@ -269,36 +269,36 @@ fun SchoolAdminFeeFollowUpScreen(
                                                 ) {
                                                     Icon(imageVector = Icons.Default.EventBusy, contentDescription = "Follow up", tint = statusColor, modifier = Modifier.size(20.dp))
                                                 }
-                                                Spacer(modifier = Modifier.width(12.dp))
+                                                Spacer(modifier = Modifier.width(10.dp))
                                                 Column(modifier = Modifier.weight(1f)) {
-                                                    Text(text = f.student_name ?: "Student", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                                                    Text(text = "${f.class_name ?: ""} • Promise: ${f.promised_date ?: "—"}", fontSize = 12.sp, color = TextSecondary)
-                                                    Text(text = "Pending: ₹ ${"%,.0f".format(f.pending_amount)}", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFFEF4444))
+                                                    Text(text = f.student_name ?: "Student", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                                    Text(text = "${f.class_name ?: ""} • Promise: ${f.promised_date ?: "—"}", fontSize = 10.sp, color = TextSecondary)
+                                                    Text(text = "Pending: ₹ ${"%,.0f".format(f.pending_amount)}", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFFEF4444))
                                                 }
                                                 Box(
                                                     modifier = Modifier
                                                         .clip(RoundedCornerShape(8.dp))
                                                         .background(statusColor.copy(alpha = 0.18f))
-                                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                                        .padding(horizontal = 7.dp, vertical = 3.dp)
                                                 ) {
-                                                    Text(text = f.status ?: "PENDING", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = statusColor)
+                                                    Text(text = f.status ?: "PENDING", fontSize = 8.5.sp, fontWeight = FontWeight.Bold, color = statusColor)
                                                 }
                                             }
 
                                             if (f.status != "COMPLETED") {
-                                                Spacer(modifier = Modifier.height(10.dp))
+                                                Spacer(modifier = Modifier.height(8.dp))
                                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                                     Box(
                                                         modifier = Modifier
                                                             .clip(RoundedCornerShape(8.dp))
                                                             .background(InfoBlue)
                                                             .clickable(enabled = actioningId != f.id) { markContacted(f.id) }
-                                                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                                                            .padding(horizontal = 8.dp, vertical = 5.dp)
                                                     ) {
                                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                                            Icon(imageVector = Icons.Default.Call, contentDescription = "Contacted", tint = Color.White, modifier = Modifier.size(12.dp))
-                                                            Spacer(modifier = Modifier.width(4.dp))
-                                                            Text(text = "Contacted", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                                            Icon(imageVector = Icons.Default.Call, contentDescription = "Contacted", tint = Color.White, modifier = Modifier.size(20.dp))
+                                                            Spacer(modifier = Modifier.width(3.dp))
+                                                            Text(text = "Contacted", fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                                         }
                                                     }
                                                     Box(
@@ -308,23 +308,23 @@ fun SchoolAdminFeeFollowUpScreen(
                                                             .clickable(enabled = actioningId != f.id) {
                                                                 expandedId = if (expandedId == f.id) null else f.id
                                                             }
-                                                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                                                            .padding(horizontal = 8.dp, vertical = 5.dp)
                                                     ) {
-                                                        Text(text = "Extend", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                                        Text(text = "Extend", fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                                     }
                                                     Box(
                                                         modifier = Modifier
                                                             .clip(RoundedCornerShape(8.dp))
                                                             .background(Color(0xFF22C55E))
                                                             .clickable(enabled = actioningId != f.id) { markCompleted(f.id) }
-                                                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                                                            .padding(horizontal = 8.dp, vertical = 5.dp)
                                                     ) {
-                                                        Text(text = "Completed", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                                        Text(text = "Completed", fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                                     }
                                                 }
 
                                                 if (expandedId == f.id) {
-                                                    Spacer(modifier = Modifier.height(8.dp))
+                                                    Spacer(modifier = Modifier.height(6.dp))
                                                     OutlinedTextField(
                                                         value = extendDateInput,
                                                         onValueChange = { extendDateInput = it },
@@ -332,7 +332,7 @@ fun SchoolAdminFeeFollowUpScreen(
                                                         modifier = Modifier.fillMaxWidth(),
                                                         colors = OutlinedTextFieldDefaults.colors(focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary)
                                                     )
-                                                    Spacer(modifier = Modifier.height(6.dp))
+                                                    Spacer(modifier = Modifier.height(5.dp))
                                                     Box(
                                                         modifier = Modifier
                                                             .fillMaxWidth()
@@ -342,7 +342,7 @@ fun SchoolAdminFeeFollowUpScreen(
                                                             .padding(vertical = 8.dp),
                                                         contentAlignment = Alignment.Center
                                                     ) {
-                                                        Text(text = "Confirm Extension", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                                        Text(text = "Confirm Extension", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                                     }
                                                 }
                                             }

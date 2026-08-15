@@ -58,7 +58,7 @@ fun StickyTopBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+                .padding(horizontal = 14.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Left Side: Brand Logo + Vertically Centered School Name & Powered By text
@@ -69,8 +69,8 @@ fun StickyTopBar(
                 // ShikshaPilot Exact Logo Icon
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(9.dp))
                         .background(SunsetOrange.copy(alpha = 0.15f))
                         .border(width = 1.dp, color = SunsetOrange.copy(alpha = 0.35f), shape = RoundedCornerShape(10.dp)),
                     contentAlignment = Alignment.Center
@@ -78,11 +78,11 @@ fun StickyTopBar(
                     Image(
                         painter = painterResource(id = R.drawable.ic_launcher),
                         contentDescription = "Logo",
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
 
-                Spacer(modifier = Modifier.width(10.dp))
+                Spacer(modifier = Modifier.width(8.dp))
 
                 // Vertically Centered Column
                 Column(
@@ -91,10 +91,10 @@ fun StickyTopBar(
                     // School Name on Top
                     Text(
                         text = schoolName.uppercase(),
-                        fontSize = 15.5.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Black,
                         color = TextPrimary,
-                        lineHeight = 16.sp,
+                        lineHeight = 14.sp,
                         maxLines = 1
                     )
                     
@@ -104,18 +104,18 @@ fun StickyTopBar(
                     ) {
                         Text(
                             text = "Powered by ",
-                            fontSize = 10.5.sp,
+                            fontSize = 9.sp,
                             fontStyle = FontStyle.Italic,
                             color = TextSecondary,
-                            lineHeight = 12.sp
+                            lineHeight = 11.sp
                         )
                         Text(
                             text = "ShikshaPilot",
-                            fontSize = 10.5.sp,
+                            fontSize = 9.sp,
                             fontStyle = FontStyle.Italic,
                             fontWeight = FontWeight.Bold,
                             color = SunsetOrange,
-                            lineHeight = 12.sp
+                            lineHeight = 11.sp
                         )
                     }
                 }
@@ -130,34 +130,34 @@ fun StickyTopBar(
                         .background(Color.White.copy(alpha = 0.08f))
                         .border(width = 1.dp, color = CardBorder, shape = RoundedCornerShape(14.dp))
                         .clickable { onNotificationClick() }
-                        .padding(9.dp)
+                        .padding(7.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Notifications,
                         contentDescription = "Notifications",
                         tint = TextPrimary,
-                        modifier = Modifier.size(22.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                     if (unreadNotificationCount > 0) {
                         Box(
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
                                 .offset(x = 4.dp, y = (-4).dp)
-                                .size(16.dp)
+                                .size(14.dp)
                                 .background(Color(0xFFEF4444), shape = CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = unreadNotificationCount.toString(),
                                 color = Color.White,
-                                fontSize = 9.sp,
+                                fontSize = 8.sp,
                                 fontWeight = FontWeight.Black
                             )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(8.dp))
 
                 // Right-Aligned Profile Avatar with Online Status Dot
                 Box(
@@ -167,7 +167,7 @@ fun StickyTopBar(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(42.dp)
+                            .size(34.dp)
                             .background(SunsetOrange.copy(alpha = 0.2f), shape = CircleShape)
                             .border(width = 1.dp, color = SunsetOrange.copy(alpha = 0.5f), shape = CircleShape),
                         contentAlignment = Alignment.Center
@@ -176,7 +176,7 @@ fun StickyTopBar(
                             imageVector = Icons.Default.Person,
                             contentDescription = "Profile",
                             tint = TextPrimary,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(19.dp)
                         )
                     }
 
@@ -184,7 +184,7 @@ fun StickyTopBar(
                     Box(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
-                            .size(11.dp)
+                            .size(9.dp)
                             .background(OnlineGreen, shape = CircleShape)
                             .border(width = 2.dp, color = DarkCanvas, shape = CircleShape)
                     )

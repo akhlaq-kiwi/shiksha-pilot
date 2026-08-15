@@ -195,7 +195,7 @@ fun SchoolAdminAdditionalFeesScreen(
                 onClick = { resetForm(); showFormDialog = true },
                 containerColor = SunsetOrange
             ) {
-                Text(text = "+", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text(text = "+", fontSize = 18.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
             }
         }
     ) { paddingValues ->
@@ -217,7 +217,7 @@ fun SchoolAdminAdditionalFeesScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -225,7 +225,7 @@ fun SchoolAdminAdditionalFeesScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -236,28 +236,28 @@ fun SchoolAdminAdditionalFeesScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Additional Fees",
-                                fontSize = 18.sp,
+                                fontSize = 15.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = TextPrimary
                             )
                             Text(
                                 text = "${feeTypesList.size} fee type(s)",
-                                fontSize = 11.5.sp,
+                                fontSize = 10.sp,
                                 color = SunsetOrange
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     when {
                         isLoading -> {
@@ -267,12 +267,12 @@ fun SchoolAdminAdditionalFeesScreen(
                         }
                         errorMessage != null -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         feeTypesList.isEmpty() -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = "No additional fees yet. Tap + to apply one.", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = "No additional fees yet. Tap + to apply one.", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         else -> {
@@ -295,7 +295,7 @@ fun SchoolAdminAdditionalFeesScreen(
                                         ) {
                                             Box(
                                                 modifier = Modifier
-                                                    .size(42.dp)
+                                                    .size(37.dp)
                                                     .clip(CircleShape)
                                                     .background(SunsetOrange.copy(alpha = 0.18f))
                                                     .border(width = 1.dp, color = SunsetOrange.copy(alpha = 0.4f), shape = CircleShape),
@@ -309,23 +309,23 @@ fun SchoolAdminAdditionalFeesScreen(
                                                 )
                                             }
 
-                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Spacer(modifier = Modifier.width(10.dp))
 
                                             Column(modifier = Modifier.weight(1f)) {
-                                                Text(text = item.name, fontSize = 14.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                                Text(text = item.name, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                                                 Spacer(modifier = Modifier.height(2.dp))
                                                 Text(
                                                     text = "${currencyFormatter.format(item.amount)} • ${item.assigned_to ?: "For All Classes"}",
-                                                    fontSize = 12.sp,
+                                                    fontSize = 10.sp,
                                                     color = TextSecondary
                                                 )
                                                 if (!item.due_date.isNullOrBlank()) {
-                                                    Text(text = "Due ${item.due_date}", fontSize = 11.sp, color = TextSecondary)
+                                                    Text(text = "Due ${item.due_date}", fontSize = 9.5.sp, color = TextSecondary)
                                                 }
-                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Spacer(modifier = Modifier.height(3.dp))
                                                 Text(
                                                     text = "Collected ${item.collected_students}/${item.total_students} • ${currencyFormatter.format(item.collected_amount)} of ${currencyFormatter.format(item.total_amount)}",
-                                                    fontSize = 11.sp,
+                                                    fontSize = 9.5.sp,
                                                     color = OnlineGreen
                                                 )
                                             }
@@ -333,7 +333,7 @@ fun SchoolAdminAdditionalFeesScreen(
                                             Box {
                                                 Box(
                                                     modifier = Modifier
-                                                        .size(32.dp)
+                                                        .size(28.dp)
                                                         .clip(CircleShape)
                                                         .clickable { menuForId = item.id },
                                                     contentAlignment = Alignment.Center
@@ -384,18 +384,18 @@ fun SchoolAdminAdditionalFeesScreen(
                 Column {
                     Text(
                         text = "Apply Additional Fee",
-                        fontSize = 16.sp,
+                        fontSize = 13.5.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(5.dp))
                     Text(
                         text = "Applies to every active student this academic year.",
-                        fontSize = 11.5.sp,
+                        fontSize = 10.sp,
                         color = TextSecondary
                     )
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(13.dp))
 
                     OutlinedTextField(
                         value = nameInput,
@@ -411,11 +411,11 @@ fun SchoolAdminAdditionalFeesScreen(
                             unfocusedTextColor = TextPrimary
                         )
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = amountInput,
                         onValueChange = { amountInput = it },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
                         placeholder = { Text("Amount per student") },
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
@@ -427,11 +427,11 @@ fun SchoolAdminAdditionalFeesScreen(
                             unfocusedTextColor = TextPrimary
                         )
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = dueDateInput,
                         onValueChange = { dueDateInput = it },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
                         placeholder = { Text("Due Date (YYYY-MM-DD)") },
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
@@ -445,11 +445,11 @@ fun SchoolAdminAdditionalFeesScreen(
                     )
 
                     if (formError != null) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(text = formError ?: "", fontSize = 11.5.sp, color = Color(0xFFEF4444))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(text = formError ?: "", fontSize = 10.sp, color = Color(0xFFEF4444))
                     }
 
-                    Spacer(modifier = Modifier.height(18.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -458,7 +458,7 @@ fun SchoolAdminAdditionalFeesScreen(
                         TextButton(onClick = { resetForm() }) {
                             Text("Cancel", color = TextSecondary)
                         }
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Button(
                             onClick = { saveFeeType() },
                             enabled = !isSaving,

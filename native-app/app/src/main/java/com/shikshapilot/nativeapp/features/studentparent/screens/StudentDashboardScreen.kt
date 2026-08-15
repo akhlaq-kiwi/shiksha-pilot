@@ -129,7 +129,7 @@ fun StudentDashboardScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     // Portal Title Header Row
                     Row(
@@ -140,13 +140,13 @@ fun StudentDashboardScreen(
                         Column {
                             Text(
                                 text = "Student & Parent Portal",
-                                fontSize = 20.sp,
+                                fontSize = 17.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = TextPrimary
                             )
                             Text(
                                 text = "QA Server: GET /api/student/dashboard",
-                                fontSize = 11.5.sp,
+                                fontSize = 10.sp,
                                 color = SunsetOrange
                             )
                         }
@@ -157,13 +157,13 @@ fun StudentDashboardScreen(
                                 .background(SunsetOrange.copy(alpha = 0.2f))
                                 .border(width = 1.dp, color = SunsetOrange, shape = RoundedCornerShape(10.dp))
                                 .clickable { onLogoutClick() }
-                                .padding(horizontal = 10.dp, vertical = 5.dp)
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
-                            Text(text = "Logout", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = SunsetOrange)
+                            Text(text = "Logout", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = SunsetOrange)
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     // Outstanding Fee Warning Banner
                     Box(
@@ -181,10 +181,10 @@ fun StudentDashboardScreen(
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(imageVector = Icons.Default.AccountBalanceWallet, contentDescription = "Fee", tint = WarningYellow, modifier = Modifier.size(20.dp))
-                                Spacer(modifier = Modifier.width(10.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Column {
-                                    Text(text = "Fee Payment Due", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                                    Text(text = "Pending Dues: ₹ 9,777", fontSize = 11.5.sp, color = WarningYellow, fontWeight = FontWeight.SemiBold)
+                                    Text(text = "Fee Payment Due", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                    Text(text = "Pending Dues: ₹ 9,777", fontSize = 10.sp, color = WarningYellow, fontWeight = FontWeight.SemiBold)
                                 }
                             }
 
@@ -193,14 +193,14 @@ fun StudentDashboardScreen(
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(SunsetOrange)
                                     .clickable { onNavigate("student_fees") }
-                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    .padding(horizontal = 8.dp, vertical = 5.dp)
                             ) {
-                                Text(text = "Pay Fees", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                Text(text = "Pay Fees", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     // Stat Cards Row
                     Row(
@@ -217,8 +217,8 @@ fun StudentDashboardScreen(
                                 .padding(12.dp)
                         ) {
                             Column {
-                                Text(text = "Attendance", fontSize = 11.sp, color = TextSecondary)
-                                Text(text = "95% Present", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = OnlineGreen)
+                                Text(text = "Attendance", fontSize = 9.5.sp, color = TextSecondary)
+                                Text(text = "95% Present", fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = OnlineGreen)
                             }
                         }
 
@@ -231,13 +231,13 @@ fun StudentDashboardScreen(
                                 .padding(12.dp)
                         ) {
                             Column {
-                                Text(text = "Assignments", fontSize = 11.sp, color = TextSecondary)
-                                Text(text = "3 Pending", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = SunsetOrange)
+                                Text(text = "Assignments", fontSize = 9.5.sp, color = TextSecondary)
+                                Text(text = "3 Pending", fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = SunsetOrange)
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     // Quick Actions Row
                     Row(
@@ -254,9 +254,9 @@ fun StudentDashboardScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(imageVector = Icons.Default.AccountBalanceWallet, contentDescription = "Fees", tint = Color.White, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(text = "Fee Cards", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                Icon(imageVector = Icons.Default.AccountBalanceWallet, contentDescription = "Fees", tint = Color.White, modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(text = "Fee Cards", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             }
                         }
 
@@ -271,9 +271,9 @@ fun StudentDashboardScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(imageVector = Icons.Default.Assignment, contentDescription = "Homework", tint = TextPrimary, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(text = "Homework", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                Icon(imageVector = Icons.Default.Assignment, contentDescription = "Homework", tint = TextPrimary, modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(text = "Homework", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                             }
                         }
 
@@ -288,14 +288,14 @@ fun StudentDashboardScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(imageVector = Icons.Default.Book, contentDescription = "Resources", tint = TextPrimary, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(text = "Materials", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                Icon(imageVector = Icons.Default.Book, contentDescription = "Resources", tint = TextPrimary, modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(text = "Materials", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -312,14 +312,14 @@ fun StudentDashboardScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(imageVector = Icons.Default.Assignment, contentDescription = "Results", tint = TextPrimary, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(text = "Results", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                Icon(imageVector = Icons.Default.Assignment, contentDescription = "Results", tint = TextPrimary, modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(text = "Results", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -336,9 +336,9 @@ fun StudentDashboardScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(imageVector = Icons.Default.EmojiEvents, contentDescription = "Achievements", tint = TextPrimary, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(text = "Achievements", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                Icon(imageVector = Icons.Default.EmojiEvents, contentDescription = "Achievements", tint = TextPrimary, modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(text = "Achievements", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                             }
                         }
                         Box(
@@ -352,14 +352,14 @@ fun StudentDashboardScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(imageVector = Icons.Default.MenuBook, contentDescription = "Vocabulary", tint = TextPrimary, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(text = "Vocabulary", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                Icon(imageVector = Icons.Default.MenuBook, contentDescription = "Vocabulary", tint = TextPrimary, modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(text = "Vocabulary", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -376,9 +376,9 @@ fun StudentDashboardScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(imageVector = Icons.Default.Extension, contentDescription = "Word Builder", tint = TextPrimary, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(text = "Word Builder", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                Icon(imageVector = Icons.Default.Extension, contentDescription = "Word Builder", tint = TextPrimary, modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(text = "Word Builder", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                             }
                         }
                         Box(
@@ -392,14 +392,14 @@ fun StudentDashboardScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(imageVector = Icons.Default.Notifications, contentDescription = "Notifications", tint = TextPrimary, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(text = "Notifications", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                Icon(imageVector = Icons.Default.Notifications, contentDescription = "Notifications", tint = TextPrimary, modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(text = "Notifications", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -416,14 +416,14 @@ fun StudentDashboardScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(imageVector = Icons.Default.EventNote, contentDescription = "Leave", tint = TextPrimary, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(text = "Leave", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                Icon(imageVector = Icons.Default.EventNote, contentDescription = "Leave", tint = TextPrimary, modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(text = "Leave", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(13.dp))
 
                     Row(
                         modifier = Modifier
@@ -434,20 +434,20 @@ fun StudentDashboardScreen(
                     ) {
                         Text(
                             text = "TODAY'S CLASS TIMETABLE (QA LIVE API)",
-                            fontSize = 11.sp,
+                            fontSize = 9.5.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = TextSecondary,
                             letterSpacing = 1.sp
                         )
                         Text(
                             text = "View Full →",
-                            fontSize = 11.sp,
+                            fontSize = 9.5.sp,
                             fontWeight = FontWeight.Bold,
                             color = SunsetOrange
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     if (isLoading) {
                         Box(
@@ -486,7 +486,7 @@ fun StudentDashboardScreen(
                                     ) {
                                         Box(
                                             modifier = Modifier
-                                                .size(40.dp)
+                                                .size(35.dp)
                                                 .clip(CircleShape)
                                                 .background(SunsetOrange.copy(alpha = 0.18f)),
                                             contentAlignment = Alignment.Center
@@ -494,12 +494,12 @@ fun StudentDashboardScreen(
                                             Icon(imageVector = Icons.Default.Schedule, contentDescription = "Period", tint = SunsetOrange, modifier = Modifier.size(20.dp))
                                         }
 
-                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Spacer(modifier = Modifier.width(10.dp))
 
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text(text = "Period ${item.period_number}: $subjectStr", fontSize = 14.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                                            Text(text = "Teacher: $teacherStr • $roomStr", fontSize = 12.sp, color = TextSecondary)
-                                            Text(text = timeStr, fontSize = 11.sp, color = SunsetOrange, fontWeight = FontWeight.SemiBold)
+                                            Text(text = "Period ${item.period_number}: $subjectStr", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                            Text(text = "Teacher: $teacherStr • $roomStr", fontSize = 10.sp, color = TextSecondary)
+                                            Text(text = timeStr, fontSize = 9.5.sp, color = SunsetOrange, fontWeight = FontWeight.SemiBold)
                                         }
                                     }
                                 }

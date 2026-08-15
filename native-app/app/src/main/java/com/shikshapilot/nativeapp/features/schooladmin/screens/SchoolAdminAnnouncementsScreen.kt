@@ -142,7 +142,7 @@ fun SchoolAdminAnnouncementsScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     // Back Header Row
                     Row(
@@ -151,7 +151,7 @@ fun SchoolAdminAnnouncementsScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
@@ -162,22 +162,22 @@ fun SchoolAdminAnnouncementsScreen(
                                 imageVector = Icons.Default.ArrowBackIos,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Announcements & Broadcasts",
-                                fontSize = 18.sp,
+                                fontSize = 15.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = TextPrimary
                             )
                             Text(
                                 text = "QA Server: POST /api/school/announcements",
-                                fontSize = 11.5.sp,
+                                fontSize = 10.sp,
                                 color = SunsetOrange
                             )
                         }
@@ -188,17 +188,17 @@ fun SchoolAdminAnnouncementsScreen(
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(Color(0xFFEF4444))
                                 .clickable { showBroadcastDialog = true }
-                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                                .padding(horizontal = 8.dp, vertical = 5.dp)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(imageVector = Icons.Default.Campaign, contentDescription = "Broadcast", tint = Color.White, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(text = "Broadcast", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                Icon(imageVector = Icons.Default.Campaign, contentDescription = "Broadcast", tint = Color.White, modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(text = "Broadcast", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(13.dp))
 
                     if (isLoading) {
                         Box(
@@ -243,39 +243,39 @@ fun SchoolAdminAnnouncementsScreen(
                                         ) {
                                             Text(
                                                 text = item.subject,
-                                                fontSize = 15.sp,
+                                                fontSize = 13.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = TextPrimary,
                                                 modifier = Modifier.weight(1f, fill = false)
                                             )
 
                                             if (isEmergency) {
-                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Spacer(modifier = Modifier.width(5.dp))
                                                 Box(
                                                     modifier = Modifier
                                                         .clip(RoundedCornerShape(6.dp))
                                                         .background(Color(0xFFEF4444).copy(alpha = 0.2f))
                                                         .border(width = 1.dp, color = Color(0xFFEF4444), shape = RoundedCornerShape(6.dp))
-                                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                        .padding(horizontal = 5.dp, vertical = 2.dp)
                                                 ) {
-                                                    Text(text = "EMERGENCY", fontSize = 9.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFFEF4444))
+                                                    Text(text = "EMERGENCY", fontSize = 8.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFFEF4444))
                                                 }
                                             }
                                         }
 
-                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Spacer(modifier = Modifier.height(3.dp))
 
                                         Text(
                                             text = item.description,
-                                            fontSize = 12.5.sp,
+                                            fontSize = 10.5.sp,
                                             color = TextSecondary
                                         )
 
-                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Spacer(modifier = Modifier.height(6.dp))
 
                                         Text(
                                             text = "$audienceStr • $dateStr",
-                                            fontSize = 10.5.sp,
+                                            fontSize = 9.sp,
                                             color = SunsetOrange,
                                             fontWeight = FontWeight.SemiBold
                                         )
@@ -296,7 +296,7 @@ fun SchoolAdminAnnouncementsScreen(
                     title = {
                         Text(
                             text = "Send Emergency Broadcast",
-                            fontSize = 18.sp,
+                            fontSize = 15.5.sp,
                             fontWeight = FontWeight.Bold,
                             color = TextPrimary
                         )
@@ -305,10 +305,10 @@ fun SchoolAdminAnnouncementsScreen(
                         Column {
                             Text(
                                 text = "Instant SMS / WhatsApp / Push alert blast to all staff and parents.",
-                                fontSize = 12.sp,
+                                fontSize = 10.sp,
                                 color = TextSecondary
                             )
-                            Spacer(modifier = Modifier.height(10.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
                             OutlinedTextField(
                                 value = broadcastTitle,
                                 onValueChange = { broadcastTitle = it },
@@ -322,7 +322,7 @@ fun SchoolAdminAnnouncementsScreen(
                                     unfocusedTextColor = TextPrimary
                                 )
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
                             OutlinedTextField(
                                 value = broadcastMsg,
                                 onValueChange = { broadcastMsg = it },

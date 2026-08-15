@@ -54,7 +54,7 @@ fun StickyBottomBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = 12.dp, vertical = 5.dp),
             horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -121,7 +121,7 @@ private fun BottomNavItem(
         modifier = Modifier
             .clip(RoundedCornerShape(14.dp))
             .clickable { onClick() }
-            .padding(horizontal = 14.dp, vertical = 6.dp),
+            .padding(horizontal = 10.dp, vertical = 4.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -133,7 +133,7 @@ private fun BottomNavItem(
                     imageVector = icon,
                     contentDescription = label,
                     tint = if (isSelected) activeColor else inactiveColor,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(20.dp)
                 )
 
                 // Notification Badge
@@ -142,14 +142,14 @@ private fun BottomNavItem(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
                             .offset(x = 6.dp, y = (-4).dp)
-                            .size(15.dp)
+                            .size(13.dp)
                             .background(Color(0xFFEF4444), shape = CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = badgeCount.toString(),
                             color = Color.White,
-                            fontSize = 8.5.sp,
+                            fontSize = 7.5.sp,
                             fontWeight = FontWeight.Black
                         )
                     }
@@ -158,10 +158,10 @@ private fun BottomNavItem(
 
             Text(
                 text = label,
-                fontSize = 11.sp,
+                fontSize = 9.5.sp,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                 color = if (isSelected) TextPrimary else inactiveColor,
-                modifier = Modifier.padding(top = 2.dp)
+                modifier = Modifier.padding(top = 1.dp)
             )
         }
     }

@@ -239,25 +239,25 @@ fun SchoolAdminSeatingPlanScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 13.dp, vertical = 10.dp)
                 ) {
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
                                 .clickable { onBack() },
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(imageVector = Icons.Default.ArrowBackIos, contentDescription = "Back", tint = TextPrimary, modifier = Modifier.size(16.dp))
+                            Icon(imageVector = Icons.Default.ArrowBackIos, contentDescription = "Back", tint = TextPrimary, modifier = Modifier.size(20.dp))
                         }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(text = "Seating Plan", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(text = "Seating Plan", fontSize = 15.5.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     if (isLoadingLists) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -266,8 +266,8 @@ fun SchoolAdminSeatingPlanScreen(
                     } else {
                         LazyColumn(verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.fillMaxSize()) {
                             item {
-                                Text(text = "Exam", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
-                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(text = "Exam", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
+                                Spacer(modifier = Modifier.height(5.dp))
                                 var examExpanded by remember { mutableStateOf(false) }
                                 Box(modifier = Modifier.fillMaxWidth()) {
                                     Box(
@@ -277,9 +277,9 @@ fun SchoolAdminSeatingPlanScreen(
                                             .background(FrostedCard)
                                             .border(width = 1.dp, color = CardBorder, shape = RoundedCornerShape(14.dp))
                                             .clickable { examExpanded = true }
-                                            .padding(horizontal = 14.dp, vertical = 14.dp)
+                                            .padding(horizontal = 11.dp, vertical = 11.dp)
                                     ) {
-                                        Text(text = selectedExam?.name ?: "Select an exam", fontSize = 14.sp, color = if (selectedExam != null) TextPrimary else TextSecondary)
+                                        Text(text = selectedExam?.name ?: "Select an exam", fontSize = 12.sp, color = if (selectedExam != null) TextPrimary else TextSecondary)
                                     }
                                     DropdownMenu(expanded = examExpanded, onDismissRequest = { examExpanded = false }, modifier = Modifier.heightIn(max = 300.dp)) {
                                         exams.forEach { exam ->
@@ -298,7 +298,7 @@ fun SchoolAdminSeatingPlanScreen(
                             } else if (selectedExam != null && existingAllocations.isNotEmpty()) {
                                 item {
                                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                        Text(text = "${existingAllocations.size} students seated", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = OnlineGreen)
+                                        Text(text = "${existingAllocations.size} students seated", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = OnlineGreen)
                                         TextButton(onClick = { doDeletePlan() }, enabled = !isDeleting) {
                                             Text(if (isDeleting) "Deleting..." else "Delete Plan", color = Color(0xFFEF4444))
                                         }
@@ -314,12 +314,12 @@ fun SchoolAdminSeatingPlanScreen(
                                             .padding(14.dp)
                                     ) {
                                         Column {
-                                            Text(text = room, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                                            Spacer(modifier = Modifier.height(6.dp))
+                                            Text(text = room, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                            Spacer(modifier = Modifier.height(5.dp))
                                             seats.sortedWith(compareBy({ it.bench_number ?: 0 }, { it.seat_position ?: "" })).forEach { seat ->
                                                 Text(
                                                     text = "Bench ${seat.bench_number ?: "-"}${seat.seat_position?.let { " ($it)" } ?: ""}: ${seat.student_name ?: "—"} (${seat.class_name ?: ""}, Roll ${seat.roll_no ?: "-"})",
-                                                    fontSize = 11.5.sp,
+                                                    fontSize = 10.sp,
                                                     color = TextSecondary
                                                 )
                                             }
@@ -328,8 +328,8 @@ fun SchoolAdminSeatingPlanScreen(
                                 }
                             } else if (selectedExam != null) {
                                 item {
-                                    Text(text = "Select Classes", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
-                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(text = "Select Classes", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
+                                    Spacer(modifier = Modifier.height(6.dp))
                                     Column(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -348,7 +348,7 @@ fun SchoolAdminSeatingPlanScreen(
                                             ) {
                                                 Text(
                                                     text = "${cls.name}${cls.section?.let { " - $it" } ?: ""}",
-                                                    fontSize = 12.5.sp,
+                                                    fontSize = 10.5.sp,
                                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                                     color = if (isSelected) SunsetOrange else TextPrimary
                                                 )
@@ -356,14 +356,14 @@ fun SchoolAdminSeatingPlanScreen(
                                         }
                                     }
 
-                                    Spacer(modifier = Modifier.height(14.dp))
+                                    Spacer(modifier = Modifier.height(11.dp))
 
-                                    Text(text = "Students Per Bench", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
-                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(text = "Students Per Bench", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
+                                    Spacer(modifier = Modifier.height(5.dp))
                                     OutlinedTextField(
                                         value = studentsPerBenchInput,
                                         onValueChange = { studentsPerBenchInput = it },
-                                        modifier = Modifier.fillMaxWidth(),
+                                        modifier = Modifier.fillMaxWidth().height(48.dp),
                                         singleLine = true,
                                         colors = OutlinedTextFieldDefaults.colors(
                                             focusedContainerColor = FrostedCard,
@@ -375,19 +375,19 @@ fun SchoolAdminSeatingPlanScreen(
                                         )
                                     )
 
-                                    Spacer(modifier = Modifier.height(14.dp))
+                                    Spacer(modifier = Modifier.height(11.dp))
 
                                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                        Text(text = "Rooms", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
+                                        Text(text = "Rooms", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
                                         Text(
                                             text = "+ Add Room",
-                                            fontSize = 11.5.sp,
+                                            fontSize = 10.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = SunsetOrange,
                                             modifier = Modifier.clickable { rooms = rooms + RoomInput("Room ${rooms.size + 1}", "10") }
                                         )
                                     }
-                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Spacer(modifier = Modifier.height(6.dp))
                                     rooms.forEachIndexed { index, room ->
                                         Row(
                                             modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
@@ -398,7 +398,7 @@ fun SchoolAdminSeatingPlanScreen(
                                                 onValueChange = { newName ->
                                                     rooms = rooms.toMutableList().also { it[index] = it[index].copy(name = newName) }
                                                 },
-                                                modifier = Modifier.weight(1f),
+                                                modifier = Modifier.weight(1f).height(48.dp),
                                                 singleLine = true,
                                                 placeholder = { Text("Room name") },
                                                 colors = OutlinedTextFieldDefaults.colors(
@@ -410,7 +410,7 @@ fun SchoolAdminSeatingPlanScreen(
                                                     unfocusedTextColor = TextPrimary
                                                 )
                                             )
-                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
                                             OutlinedTextField(
                                                 value = room.benchCount,
                                                 onValueChange = { newCount ->
@@ -429,7 +429,7 @@ fun SchoolAdminSeatingPlanScreen(
                                                 )
                                             )
                                             if (rooms.size > 1) {
-                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Spacer(modifier = Modifier.width(5.dp))
                                                 Icon(
                                                     imageVector = Icons.Default.Close,
                                                     contentDescription = "Remove",
@@ -444,7 +444,7 @@ fun SchoolAdminSeatingPlanScreen(
 
                                     if (previewResult != null) {
                                         val p = previewResult!!
-                                        Spacer(modifier = Modifier.height(10.dp))
+                                        Spacer(modifier = Modifier.height(8.dp))
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxWidth()
@@ -456,21 +456,21 @@ fun SchoolAdminSeatingPlanScreen(
                                             Column {
                                                 Text(
                                                     text = if (p.enough_benches) "Enough benches available" else "Not enough benches",
-                                                    fontSize = 13.sp,
+                                                    fontSize = 11.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = if (p.enough_benches) OnlineGreen else Color(0xFFEF4444)
                                                 )
-                                                Text(text = "${p.total_students} students • ${p.required_benches} required • ${p.available_benches} available", fontSize = 11.5.sp, color = TextSecondary)
+                                                Text(text = "${p.total_students} students • ${p.required_benches} required • ${p.available_benches} available", fontSize = 10.sp, color = TextSecondary)
                                             }
                                         }
                                     }
 
                                     if (actionError != null) {
-                                        Spacer(modifier = Modifier.height(10.dp))
-                                        Text(text = actionError ?: "", fontSize = 11.5.sp, color = Color(0xFFEF4444))
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(text = actionError ?: "", fontSize = 10.sp, color = Color(0xFFEF4444))
                                     }
 
-                                    Spacer(modifier = Modifier.height(14.dp))
+                                    Spacer(modifier = Modifier.height(11.dp))
 
                                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                         Button(
@@ -502,7 +502,7 @@ fun SchoolAdminSeatingPlanScreen(
                             } else {
                                 item {
                                     Box(modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp), contentAlignment = Alignment.Center) {
-                                        Text(text = "Select an exam to configure its seating plan.", color = TextSecondary, fontSize = 13.sp)
+                                        Text(text = "Select an exam to configure its seating plan.", color = TextSecondary, fontSize = 11.sp)
                                     }
                                 }
                             }

@@ -290,7 +290,7 @@ fun SchoolAdminMenuDrawer(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 8.dp)
+                .padding(horizontal = 16.dp, vertical = 6.dp)
         ) {
             // Header: School Admin Role Badge & Title
             Row(
@@ -301,13 +301,13 @@ fun SchoolAdminMenuDrawer(
                 Column {
                     Text(
                         text = "School Admin Navigation",
-                        fontSize = 20.sp,
+                        fontSize = 17.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
                     )
                     Text(
                         text = "$adminName • $schoolName",
-                        fontSize = 12.sp,
+                        fontSize = 10.sp,
                         color = SunsetOrange,
                         fontWeight = FontWeight.Medium
                     )
@@ -315,7 +315,7 @@ fun SchoolAdminMenuDrawer(
 
                 Box(
                     modifier = Modifier
-                        .size(32.dp)
+                        .size(28.dp)
                         .clip(CircleShape)
                         .background(FrostedCard)
                         .clickable { onDismiss() },
@@ -325,12 +325,12 @@ fun SchoolAdminMenuDrawer(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Close",
                         tint = TextSecondary,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(13.dp))
 
             // Navigation Menu List grouped by features
             LazyColumn(
@@ -341,7 +341,7 @@ fun SchoolAdminMenuDrawer(
                     item {
                         Text(
                             text = catName.uppercase(),
-                            fontSize = 11.sp,
+                            fontSize = 9.5.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = TextSecondary,
                             letterSpacing = 1.sp,
@@ -371,7 +371,7 @@ fun SchoolAdminMenuDrawer(
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .size(42.dp)
+                                        .size(37.dp)
                                         .clip(RoundedCornerShape(12.dp))
                                         .background(menuItem.iconColor.copy(alpha = 0.18f))
                                         .border(width = 1.dp, color = menuItem.iconColor.copy(alpha = 0.35f), shape = RoundedCornerShape(12.dp)),
@@ -381,11 +381,11 @@ fun SchoolAdminMenuDrawer(
                                         imageVector = menuItem.icon,
                                         contentDescription = menuItem.title,
                                         tint = menuItem.iconColor,
-                                        modifier = Modifier.size(22.dp)
+                                        modifier = Modifier.size(20.dp)
                                     )
                                 }
 
-                                Spacer(modifier = Modifier.width(14.dp))
+                                Spacer(modifier = Modifier.width(11.dp))
 
                                 Column(modifier = Modifier.weight(1f)) {
                                     Row(
@@ -395,7 +395,7 @@ fun SchoolAdminMenuDrawer(
                                     ) {
                                         Text(
                                             text = menuItem.title,
-                                            fontSize = 14.5.sp,
+                                            fontSize = 12.5.sp,
                                             fontWeight = if (menuItem.isSelected) FontWeight.ExtraBold else FontWeight.Bold,
                                             color = if (menuItem.isSelected) SunsetOrange else TextPrimary,
                                             modifier = Modifier.weight(1f, fill = false),
@@ -403,7 +403,7 @@ fun SchoolAdminMenuDrawer(
                                         )
 
                                         if (menuItem.badgeText != null) {
-                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Spacer(modifier = Modifier.width(5.dp))
                                             Box(
                                                 modifier = Modifier
                                                     .clip(RoundedCornerShape(6.dp))
@@ -416,11 +416,11 @@ fun SchoolAdminMenuDrawer(
                                                         color = if (menuItem.isUrgent) Color(0xFFEF4444) else SunsetOrange.copy(alpha = 0.5f),
                                                         shape = RoundedCornerShape(6.dp)
                                                     )
-                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    .padding(horizontal = 5.dp, vertical = 2.dp)
                                             ) {
                                                 Text(
                                                     text = menuItem.badgeText,
-                                                    fontSize = 9.sp,
+                                                    fontSize = 8.sp,
                                                     fontWeight = FontWeight.ExtraBold,
                                                     color = if (menuItem.isUrgent) Color(0xFFEF4444) else SunsetOrange,
                                                     maxLines = 1
@@ -431,19 +431,19 @@ fun SchoolAdminMenuDrawer(
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text(
                                         text = menuItem.subtitle,
-                                        fontSize = 11.5.sp,
+                                        fontSize = 10.sp,
                                         color = TextSecondary,
                                         maxLines = 2
                                     )
                                 }
 
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
 
                                 Icon(
                                     imageVector = Icons.Default.ArrowForwardIos,
                                     contentDescription = "Navigate",
                                     tint = if (menuItem.isSelected) SunsetOrange else TextSecondary,
-                                    modifier = Modifier.size(14.dp)
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
                         }

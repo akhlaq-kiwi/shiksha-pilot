@@ -82,27 +82,27 @@ fun ParentVocabularyReportScreen(
                     onAvatarClick = onAvatarClick
                 )
 
-                Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp)) {
+                Column(modifier = Modifier.fillMaxSize().padding(horizontal = 13.dp, vertical = 10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(FrostedCard)
                                 .border(width = 1.dp, color = CardBorder, shape = CircleShape)
                                 .clickable { onBack() },
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(imageVector = Icons.Default.ArrowBackIos, contentDescription = "Back", tint = TextPrimary, modifier = Modifier.size(16.dp))
+                            Icon(imageVector = Icons.Default.ArrowBackIos, contentDescription = "Back", tint = TextPrimary, modifier = Modifier.size(20.dp))
                         }
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
                         Column {
-                            Text(text = "Child's Vocabulary Report", fontSize = 17.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
-                            Text(text = "QA Server: GET /api/parent/vocabulary/report", fontSize = 10.5.sp, color = SunsetOrange)
+                            Text(text = "Child's Vocabulary Report", fontSize = 14.5.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
+                            Text(text = "QA Server: GET /api/parent/vocabulary/report", fontSize = 9.sp, color = SunsetOrange)
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(11.dp))
 
                     when {
                         isLoading -> {
@@ -112,19 +112,19 @@ fun ParentVocabularyReportScreen(
                         }
                         errorMessage != null -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = errorMessage ?: "Something went wrong", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         report == null -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = "No vocabulary data available.", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = "No vocabulary data available.", color = TextSecondary, fontSize = 11.sp)
                             }
                         }
                         else -> {
                             val r = report!!
                             LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxSize()) {
                                 item {
-                                    Text(text = "${r.student_name ?: "-"} • ${r.student_class ?: "-"}", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                    Text(text = "${r.student_name ?: "-"} • ${r.student_class ?: "-"}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                                 }
                                 item {
                                     Box(
@@ -132,24 +132,24 @@ fun ParentVocabularyReportScreen(
                                             .border(1.dp, CardBorder, RoundedCornerShape(14.dp)).padding(12.dp)
                                     ) {
                                         Column {
-                                            Text(text = "Score: ${r.stats?.score ?: 0}  •  Coins: ${r.stats?.coins ?: 0}", fontSize = 13.sp, color = TextPrimary)
-                                            Text(text = "Level: ${r.stats?.current_level ?: 1}", fontSize = 13.sp, color = TextPrimary)
-                                            Text(text = "Words Learned: ${r.stats?.total_words_learned ?: 0}  •  Mastered: ${r.stats?.total_words_mastered ?: 0}", fontSize = 13.sp, color = TextPrimary)
-                                            Text(text = "Accuracy: ${r.stats?.accuracy_percent ?: 0.0}%", fontSize = 13.sp, color = TextPrimary)
-                                            Text(text = "Current Streak: ${r.stats?.current_streak ?: 0}  •  Longest: ${r.stats?.longest_streak ?: 0}", fontSize = 13.sp, color = TextPrimary)
-                                            Text(text = "Daily Practice Days: ${r.stats?.daily_practice_days ?: 0}", fontSize = 13.sp, color = TextPrimary)
+                                            Text(text = "Score: ${r.stats?.score ?: 0}  •  Coins: ${r.stats?.coins ?: 0}", fontSize = 11.sp, color = TextPrimary)
+                                            Text(text = "Level: ${r.stats?.current_level ?: 1}", fontSize = 11.sp, color = TextPrimary)
+                                            Text(text = "Words Learned: ${r.stats?.total_words_learned ?: 0}  •  Mastered: ${r.stats?.total_words_mastered ?: 0}", fontSize = 11.sp, color = TextPrimary)
+                                            Text(text = "Accuracy: ${r.stats?.accuracy_percent ?: 0.0}%", fontSize = 11.sp, color = TextPrimary)
+                                            Text(text = "Current Streak: ${r.stats?.current_streak ?: 0}  •  Longest: ${r.stats?.longest_streak ?: 0}", fontSize = 11.sp, color = TextPrimary)
+                                            Text(text = "Daily Practice Days: ${r.stats?.daily_practice_days ?: 0}", fontSize = 11.sp, color = TextPrimary)
                                         }
                                     }
                                 }
-                                item { Text(text = "CATEGORY PERFORMANCE", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp, color = TextSecondary) }
+                                item { Text(text = "CATEGORY PERFORMANCE", fontSize = 9.5.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp, color = TextSecondary) }
                                 items(r.category_performance) { cat ->
                                     Box(
                                         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(FrostedCard)
                                             .border(1.dp, CardBorder, RoundedCornerShape(12.dp)).padding(10.dp)
                                     ) {
                                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                            Text(text = cat.category ?: "-", fontSize = 12.5.sp, color = TextPrimary)
-                                            Text(text = "✓${cat.correct ?: 0}  ✗${cat.wrong ?: 0}", fontSize = 12.5.sp, color = TextSecondary)
+                                            Text(text = cat.category ?: "-", fontSize = 10.5.sp, color = TextPrimary)
+                                            Text(text = "✓${cat.correct ?: 0}  ✗${cat.wrong ?: 0}", fontSize = 10.5.sp, color = TextSecondary)
                                         }
                                     }
                                 }
