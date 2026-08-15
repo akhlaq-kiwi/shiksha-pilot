@@ -430,13 +430,24 @@ data class PublishTimetableRequestDto(
 
 // New student enrollment — POST api/school/students (SchoolAdminService::createStudent).
 // class_id must be a `classes` table row id (each row is one class+section combination) —
-// see native-app's ClassDto. Only first_name/last_name/gender/dob/class_id are required
-// server-side; everything else is optional.
+// see native-app's ClassDto. Full field set matches the web's StudentEnrollmentForm.jsx
+// (Student Info / Academic Info / Parent Info / Address sections) minus document uploads
+// (photo/birth-cert/aadhaar/transfer-cert/report-card — not implemented, matching this app's
+// existing pattern of deferring file-upload flows).
 data class CreateStudentRequestDto(
+    // Student Info
     val first_name: String,
+    val middle_name: String? = null,
     val last_name: String,
     val gender: String,
     val dob: String,
+    val blood_group: String? = null,
+    val category: String? = null,
+    val religion: String? = null,
+    val aadhaar_no: String? = null,
+    val student_mobile: String? = null,
+    val student_email: String? = null,
+    // Academic Info
     val class_id: Int,
     // Required only for a school's first academic year (SchoolAdminService::createStudent,
     // ~line 1259 "SR number logic") — auto-generated for later years, but the native app can't
@@ -446,8 +457,25 @@ data class CreateStudentRequestDto(
     // Required; backend accepts "Existing Student" or "New Admission".
     val student_category: String,
     val roll_no: String? = null,
+    val admission_date: String? = null,
+    val admission_fee: Double? = null,
+    // Parent Info
     val father_name: String? = null,
-    val student_mobile: String? = null
+    val father_phone: String? = null,
+    val mother_name: String? = null,
+    val parent_occupation: String? = null,
+    // Address (current_address_line/permanent_address_line each capped at 50 chars server-side)
+    val current_address_line: String? = null,
+    val current_city: String? = null,
+    val current_state: String? = null,
+    val current_country: String? = null,
+    val current_pin_code: String? = null,
+    val permanent_address_line: String? = null,
+    val permanent_city: String? = null,
+    val permanent_state: String? = null,
+    val permanent_country: String? = null,
+    val permanent_pin_code: String? = null,
+    val same_as_current: Int = 0
 )
 
 data class StudentItemDto(

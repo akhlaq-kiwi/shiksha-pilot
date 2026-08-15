@@ -25,6 +25,7 @@ import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminAnnoun
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminAttendanceScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminClassesScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminEducationScreen
+import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminEnrollStudentScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminCredentialsScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminExamsScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminExpensesScreen
@@ -407,7 +408,15 @@ class MainActivity : ComponentActivity() {
                                         onBack = {
                                             studentsClassFilter = null
                                             goBack()
-                                        }
+                                        },
+                                        onEnrollNewStudent = { navigateTo("enroll_student") }
+                                    )
+                                }
+                                "enroll_student" -> {
+                                    SchoolAdminEnrollStudentScreen(
+                                        schoolName = schoolName,
+                                        preselectClassName = studentsClassFilter,
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "staff", "salary" -> {
