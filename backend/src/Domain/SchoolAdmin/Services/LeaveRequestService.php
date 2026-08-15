@@ -632,8 +632,8 @@ class LeaveRequestService extends BaseService
 
         // 1. Creator user
         if ($createdBy > 0) {
-            $stmt = $pdo->prepare("SELECT id, role FROM users WHERE id = :id LIMIT 1");
-            $stmt->execute([':id' => $createdBy]);
+            $stmt = $pdo->prepare("SELECT id, role FROM users WHERE id = :id AND school_id = :sid LIMIT 1");
+            $stmt->execute([':id' => $createdBy, ':sid' => $schoolId]);
             $creator = $stmt->fetch(PDO::FETCH_ASSOC);
             if ($creator) {
                 $recipients[] = [
@@ -663,7 +663,7 @@ class LeaveRequestService extends BaseService
                         $conds[] = "email = :email";
                         $params[':email'] = $email;
                     }
-                    $sql = "SELECT id, role FROM users WHERE school_id = :sid AND (UPPER(role) = 'TEACHER') AND (" . implode(' OR ', $conds) . ")";
+                    $sql = "SELECT id, role FROM users WHERE school_id = :sid AND UPPER(role) = 'TEACHER' AND (" . implode(' OR ', $conds) . ")";
                     $stmtUser = $pdo->prepare($sql);
                     $stmtUser->execute($params);
                     $teachers = $stmtUser->fetchAll(PDO::FETCH_ASSOC);
@@ -681,7 +681,7 @@ class LeaveRequestService extends BaseService
             }
         }
 
-        // 3. If STUDENT leave request, resolve student & parent user accounts
+        // 3. If STUDENT leave request, resolve specific student & parent user accounts ONLY
         if (($leave['applicant_role'] ?? '') === 'STUDENT' && !empty($leave['student_id'])) {
             $studentId = (int)$leave['student_id'];
             $stmtSt = $pdo->prepare("
@@ -692,53 +692,95 @@ class LeaveRequestService extends BaseService
             $stmtSt->execute([':id' => $studentId]);
             $st = $stmtSt->fetch(PDO::FETCH_ASSOC);
             if ($st) {
-                $phones = array_values(array_filter(array_map('trim', [
-                    $st['student_mobile'] ?? '',
+                $parentPhones = array_values(array_filter(array_map('trim', [
                     $st['parent_phone'] ?? '',
                     $st['father_phone'] ?? '',
                     $st['guardian_phone'] ?? ''
                 ])));
-                $emails = array_values(array_filter(array_map('trim', [
-                    $st['email'] ?? '',
-                    $st['student_email'] ?? ''
+                $studentPhones = array_values(array_filter(array_map('trim', [
+                    $st['student_mobile'] ?? ''
+                ])));
+                $studentEmails = array_values(array_filter(array_map('trim', [
+                    $st['student_email'] ?? '',
+                    $st['email'] ?? ''
                 ])));
 
-                if (!empty($phones) || !empty($emails)) {
-                    $conditions = [];
-                    $params = [':sid' => $schoolId];
+                // A. Match PARENT user accounts
+                if (!empty($parentPhones) || !empty($studentEmails)) {
+                    $pConds = [];
+                    $pParams = [':sid' => $schoolId];
 
-                    if (!empty($phones)) {
-                        $phonePlaceholders = [];
-                        foreach ($phones as $idx => $ph) {
-                            $key = ":ph_$idx";
-                            $phonePlaceholders[] = "phone = $key";
-                            $params[$key] = $ph;
+                    if (!empty($parentPhones)) {
+                        $pPlaceholders = [];
+                        foreach ($parentPhones as $idx => $ph) {
+                            $k = ":pph_$idx";
+                            $pPlaceholders[] = "phone = $k";
+                            $pParams[$k] = $ph;
                         }
-                        $conditions[] = "(" . implode(' OR ', $phonePlaceholders) . ")";
+                        $pConds[] = "(" . implode(' OR ', $pPlaceholders) . ")";
+                    }
+                    if (!empty($studentEmails)) {
+                        $ePlaceholders = [];
+                        foreach ($studentEmails as $idx => $em) {
+                            $k = ":pem_$idx";
+                            $ePlaceholders[] = "email = $k";
+                            $pParams[$k] = $em;
+                        }
+                        $pConds[] = "(" . implode(' OR ', $ePlaceholders) . ")";
                     }
 
-                    if (!empty($emails)) {
-                        $emailPlaceholders = [];
-                        foreach ($emails as $idx => $em) {
-                            $key = ":em_$idx";
-                            $emailPlaceholders[] = "email = $key";
-                            $params[$key] = $em;
-                        }
-                        $conditions[] = "(" . implode(' OR ', $emailPlaceholders) . ")";
-                    }
-
-                    $sql = "SELECT id, role FROM users WHERE school_id = :sid AND (UPPER(role) IN ('STUDENT','PARENT')) AND (" . implode(' OR ', $conditions) . ")";
-                    $stmtUsers = $pdo->prepare($sql);
-                    $stmtUsers->execute($params);
-                    $users = $stmtUsers->fetchAll(PDO::FETCH_ASSOC);
-                    foreach ($users as $u) {
-                        $uId = (int)$u['id'];
-                        if (!isset($addedUserIds[$uId])) {
+                    $sqlParent = "SELECT id, role FROM users WHERE school_id = :sid AND UPPER(role) = 'PARENT' AND (" . implode(' OR ', $pConds) . ")";
+                    $stmtP = $pdo->prepare($sqlParent);
+                    $stmtP->execute($pParams);
+                    $parents = $stmtP->fetchAll(PDO::FETCH_ASSOC);
+                    foreach ($parents as $p) {
+                        $pId = (int)$p['id'];
+                        if (!isset($addedUserIds[$pId])) {
                             $recipients[] = [
-                                'user_id' => $uId,
-                                'role' => $u['role']
+                                'user_id' => $pId,
+                                'role' => $p['role']
                             ];
-                            $addedUserIds[$uId] = true;
+                            $addedUserIds[$pId] = true;
+                        }
+                    }
+                }
+
+                // B. Match STUDENT user account ONLY if student_mobile or student_email matches specifically for THIS student
+                if (!empty($studentPhones) || !empty($studentEmails)) {
+                    $sConds = [];
+                    $sParams = [':sid' => $schoolId];
+
+                    if (!empty($studentPhones)) {
+                        $sPlaceholders = [];
+                        foreach ($studentPhones as $idx => $sph) {
+                            $k = ":sph_$idx";
+                            $sPlaceholders[] = "phone = $k";
+                            $sParams[$k] = $sph;
+                        }
+                        $sConds[] = "(" . implode(' OR ', $sPlaceholders) . ")";
+                    }
+                    if (!empty($studentEmails)) {
+                        $sePlaceholders = [];
+                        foreach ($studentEmails as $idx => $sem) {
+                            $k = ":sem_$idx";
+                            $sePlaceholders[] = "email = $k";
+                            $sParams[$k] = $sem;
+                        }
+                        $sConds[] = "(" . implode(' OR ', $sePlaceholders) . ")";
+                    }
+
+                    $sqlStudent = "SELECT id, role FROM users WHERE school_id = :sid AND UPPER(role) = 'STUDENT' AND (" . implode(' OR ', $sConds) . ")";
+                    $stmtS = $pdo->prepare($sqlStudent);
+                    $stmtS->execute($sParams);
+                    $students = $stmtS->fetchAll(PDO::FETCH_ASSOC);
+                    foreach ($students as $s) {
+                        $sId = (int)$s['id'];
+                        if (!isset($addedUserIds[$sId])) {
+                            $recipients[] = [
+                                'user_id' => $sId,
+                                'role' => $s['role']
+                            ];
+                            $addedUserIds[$sId] = true;
                         }
                     }
                 }
