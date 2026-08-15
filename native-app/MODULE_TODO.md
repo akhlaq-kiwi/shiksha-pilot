@@ -16,10 +16,14 @@ Each item: implement -> build verify -> commit -> push -> next.
 ## Small
 - [x] **Transport Fee Management** — done (commit d089cfb): `SchoolAdminTransportFeesScreen`, wired
       into the Finance hub.
-- [ ] **School Expenses Tracking** — `FinanceManagementPage.jsx` tab `expenses` (incl. bill upload).
-      API: `GET/POST/PUT/DELETE /api/school/expenses{,/{id}}`.
-- [ ] **Parent "My Children" switcher** — student-parent sidebar `id: 'parent'`, parent-only. Multi-child
-      list/switch view.
+- [x] **School Expenses Tracking** — done (commit 78af1e8): `SchoolAdminExpensesScreen`, wired into
+      the Finance hub. Bill attachment upload deferred (not implemented).
+- [x] **Parent "My Children" switcher — DESCOPED (2026-08-16).** Investigated: web's entire
+      `ParentPage`/child-switcher UI (`frontend/src/features/student-parent/index.jsx`) runs on
+      hardcoded `MOCK_CHILDREN`/`MOCK_DATA` — there is no real backend endpoint that lists a parent's
+      linked children (`resolveStudentsForUser` in `LeaveRequestService.php` is a private helper, not
+      an exposed route). Building this in native-app would mean either faking data to match a mock, or
+      adding a new backend endpoint (out of scope — backend/ not to be modified). Not implemented.
 
 ## Small-medium
 - [ ] **Additional Fee / Late-Payment Penalty config** — `FinanceManagementPage.jsx` tabs `additional-fee`,
