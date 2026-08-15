@@ -203,6 +203,16 @@ data class SaveLatePaymentPenaltyConfigRequestDto(
     val status: String = "Active"
 )
 
+// Student transfer between sections — POST api/school/classes/transfer-students
+// (SchoolAdminController::transferStudents -> SchoolAdminService::transferStudents). Moves the
+// given students from their current class/section to `destination_section` within the same
+// `class_name` (e.g. Class 5-A -> Class 5-B); the destination section must already exist.
+data class TransferStudentsRequestDto(
+    val class_name: String,
+    val destination_section: String,
+    val student_ids: List<Int>
+)
+
 data class ClassDto(
     val id: Int,
     val name: String,
@@ -2620,6 +2630,12 @@ interface ApiService {
 
     @DELETE("api/school/late-payment-penalty/config")
     suspend fun deleteLatePaymentPenaltyConfig(
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
+    @POST("api/school/classes/transfer-students")
+    suspend fun transferStudents(
+        @Body request: TransferStudentsRequestDto,
         @Header("Authorization") authHeader: String? = null
     ): Response<JsonElement>
 }
