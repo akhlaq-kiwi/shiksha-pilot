@@ -70,13 +70,17 @@ class TeacherService extends BaseService
             return [];
         }
 
-        $stmtStaff = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND academic_year_id = :ayid AND phone = :phone LIMIT 1");
-        $stmtStaff->execute([':sid' => $schoolId, ':ayid' => $workingYearId, ':phone' => $phone]);
-        $staff = $stmtStaff->fetch();
-        if (!$staff) {
+        $stmtStaff = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND phone = :phone");
+        $stmtStaff->execute([':sid' => $schoolId, ':phone' => $phone]);
+        $staffIds = array_map('intval', $stmtStaff->fetchAll(PDO::FETCH_COLUMN) ?: []);
+        if (empty($staffIds) && isset($userObj['id'])) {
+            $staffIds = [(int)$userObj['id']];
+        }
+        if (empty($staffIds)) {
             return [];
         }
-        $staffId = (int)$staff['id'];
+
+        $inStaffIds = implode(',', $staffIds);
 
         // 1. Get the teacher's own scheduled periods for this weekday
         $stmtOwn = $pdo->prepare("
@@ -86,12 +90,16 @@ class TeacherService extends BaseService
             LEFT JOIN classes c ON t.class_id = c.id
             LEFT JOIN subjects s ON t.subject_id = s.id
             LEFT JOIN period_configurations pc ON t.period_number = pc.period_number AND t.school_id = pc.school_id AND pc.end_date IS NULL
-            WHERE t.teacher_id = :teacher_id
+            WHERE t.teacher_id IN ({$inStaffIds})
               AND t.day_of_week = :day
-              AND t.end_date IS NULL
-              AND t.is_published = 1
+              AND (t.start_date IS NULL OR t.start_date <= :tdate1)
+              AND (t.end_date IS NULL OR t.end_date >= :tdate2)
+              AND (
+                t.is_published = 1 OR 
+                EXISTS (SELECT 1 FROM timetable t2 WHERE t2.class_id = t.class_id AND t2.day_of_week = t.day_of_week AND t2.is_published = 1)
+              )
         ");
-        $stmtOwn->execute([':teacher_id' => $staffId, ':day' => $weekday]);
+        $stmtOwn->execute([':day' => $weekday, ':tdate1' => $targetDate, ':tdate2' => $targetDate]);
         $ownPeriods = $stmtOwn->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
         // 2. Fetch backups where this teacher is assigned as a backup on this date
@@ -103,12 +111,12 @@ class TeacherService extends BaseService
             LEFT JOIN classes c ON t.class_id = c.id
             LEFT JOIN subjects s ON t.subject_id = s.id
             LEFT JOIN period_configurations pc ON t.period_number = pc.period_number AND t.school_id = pc.school_id AND pc.end_date IS NULL
-            WHERE tb.backup_teacher_id = :teacher_id
+            WHERE tb.backup_teacher_id IN ({$inStaffIds})
               AND tb.date = :date
-              AND t.end_date IS NULL
-              AND t.is_published = 1
+              AND (t.start_date IS NULL OR t.start_date <= :tdate1)
+              AND (t.end_date IS NULL OR t.end_date >= :tdate2)
         ");
-        $stmtBackup->execute([':teacher_id' => $staffId, ':date' => $targetDate]);
+        $stmtBackup->execute([':date' => $targetDate, ':tdate1' => $targetDate, ':tdate2' => $targetDate]);
         $backupPeriods = $stmtBackup->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
         // 3. Find if any of their own periods are replaced on this date

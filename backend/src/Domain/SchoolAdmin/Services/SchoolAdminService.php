@@ -5655,9 +5655,15 @@ class SchoolAdminService extends BaseService
             }
         }
 
+        // Check if day is already published for this class
+        $stmtIsPub = $pdo->prepare("SELECT 1 FROM timetable WHERE class_id = :cid AND day_of_week = :day AND school_id = :sid AND is_published = 1 LIMIT 1");
+        $stmtIsPub->execute([':cid' => $data['class_id'], ':day' => $data['day_of_week'], ':sid' => $schoolId]);
+        $isPub = (bool)$stmtIsPub->fetchColumn();
+        $isPublishedVal = $isPub ? 1 : 0;
+
         $stmtInsert = $pdo->prepare("
-            INSERT INTO timetable (school_id, class_id, subject_id, teacher_id, day_of_week, period_number, start_date)
-            VALUES (:sid, :cid, :subid, :tid, :day, :pnum, :start_date)
+            INSERT INTO timetable (school_id, class_id, subject_id, teacher_id, day_of_week, period_number, start_date, is_published)
+            VALUES (:sid, :cid, :subid, :tid, :day, :pnum, :start_date, :is_published)
         ");
         $stmtInsert->execute([
             ':sid' => $schoolId,
@@ -5666,7 +5672,8 @@ class SchoolAdminService extends BaseService
             ':tid' => $data['teacher_id'],
             ':day' => $data['day_of_week'],
             ':pnum' => $data['period_number'],
-            ':start_date' => $startDate
+            ':start_date' => $startDate,
+            ':is_published' => $isPublishedVal
         ]);
         $newId = (int)$pdo->lastInsertId();
         
