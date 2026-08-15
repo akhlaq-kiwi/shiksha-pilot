@@ -1338,6 +1338,334 @@ data class GenerateCredentialsResponseDto(
     val data: CredentialsDto? = null
 )
 
+// -----------------------------------------------------------------------------------------
+// Achievements + Vocabulary/Word-Builder game + Notification preferences DTOs — verified
+// against backend/src/Domain/SchoolAdmin/SchoolAdminService.php (getAchievements /
+// getAchievementReportCard), backend/src/Domain/Vocabulary/VocabularyService.php, and
+// backend/src/Shared/Notifications/{DeviceTokenController,DeviceTokenService,NotificationCatalog}.php.
+// -----------------------------------------------------------------------------------------
+
+data class AchievementCategorySummaryDto(
+    val count: Int? = 0,
+    val label: String? = null,
+    val description: String? = null
+)
+
+data class AchievementCategoriesSummaryDto(
+    val attendance_champions: AchievementCategorySummaryDto? = null,
+    val academic_excellence: AchievementCategorySummaryDto? = null
+)
+
+data class AchievementItemDto(
+    val id: Int? = null,
+    val school_id: Int? = null,
+    val academic_year_id: Int? = null,
+    val feature_type: String? = null,
+    val category: String? = null,
+    val category_label: String? = null,
+    val class_id: Int? = null,
+    val student_id: Int? = null,
+    val student_name: String? = null,
+    val student_photo: String? = null,
+    val class_name: String? = null,
+    val roll_number: String? = null,
+    val achievement_score: Double? = null,
+    val rank: Int? = null,
+    val level: String? = null,
+    val metadata: JsonElement? = null,
+    val created_at: String? = null
+)
+
+data class AchievementClassDto(
+    val id: Int? = null,
+    val name: String? = null,
+    val section: String? = null
+)
+
+data class AchievementAcademicYearDto(
+    val id: Int? = null,
+    val name: String? = null,
+    val status: String? = null,
+    val is_current: Boolean? = null
+)
+
+data class AchievementsDataDto(
+    val academic_year_id: Int? = null,
+    val categories_summary: AchievementCategoriesSummaryDto? = null,
+    val achievements: List<AchievementItemDto> = emptyList(),
+    val classes: List<AchievementClassDto> = emptyList(),
+    val academic_years: List<AchievementAcademicYearDto> = emptyList()
+)
+
+data class AchievementsResponseDto(
+    val status: String? = "success",
+    val data: AchievementsDataDto? = null
+)
+
+// Achievement report card reuses the shared ReportCardDto shape (SchoolAdminService::getReportCards).
+data class AchievementReportCardResponseDto(
+    val status: String? = "success",
+    val data: ReportCardDto? = null
+)
+
+data class VocabularyWordDto(
+    val id: Int? = null,
+    val mapping_id: Int? = null,
+    val word: String? = null,
+    val part_of_speech: String? = null,
+    val english_meaning: String? = null,
+    val hindi_meaning: String? = null,
+    val english_sentence: String? = null,
+    val hindi_sentence: String? = null,
+    val category: String? = null,
+    val phonics: String? = null,
+    val synonyms: List<String>? = null,
+    val opposites: List<String>? = null,
+    val image_path: String? = null,
+    val audio_path: String? = null,
+    val cefr_level: String? = null,
+    val tags: String? = null
+)
+
+data class GameProgressDto(
+    val coins: Int? = 0,
+    val score: Int? = 0,
+    val current_level: Int? = 1,
+    val current_stage: Int? = 1,
+    val current_streak: Int? = 0,
+    val highest_streak: Int? = 0,
+    val correct_answers: Int? = 0,
+    val wrong_answers: Int? = 0,
+    val total_play_time: Int? = 0,
+    val total_words_learned: Int? = 0,
+    val total_words_mastered: Int? = 0,
+    val accuracy_percent: Double? = 0.0,
+    val last_login_reward_date: String? = null
+)
+
+data class GameProgressDataDto(
+    val progress: GameProgressDto? = null,
+    val active_words: List<VocabularyWordDto> = emptyList(),
+    val learned_words: List<String> = emptyList(),
+    val student_class: String? = null
+)
+
+data class GameProgressResponseDto(
+    val status: String? = "success",
+    val data: GameProgressDataDto? = null
+)
+
+data class PlayedWordDto(
+    val word_id: Int,
+    val is_correct: Boolean
+)
+
+data class SyncGameProgressRequestDto(
+    val coins: Int? = null,
+    val score: Int? = null,
+    val current_level: Int? = null,
+    val current_streak: Int? = null,
+    val highest_streak: Int? = null,
+    val correct_answers: Int? = null,
+    val wrong_answers: Int? = null,
+    val total_play_time: Int? = null,
+    val played_words: List<PlayedWordDto>? = null
+)
+
+data class ClaimDailyProgressDto(
+    val coins: Int? = null,
+    val last_login_reward_date: String? = null
+)
+
+// VocabularyService::claimDailyLogin (StudentService.php) returns either
+// {success:false, message, progress:{coins,last_login_reward_date}} when already claimed today,
+// or {success:true, message, data:<getGameProgress result>} on a fresh claim.
+data class ClaimDailyInnerDto(
+    val success: Boolean? = null,
+    val message: String? = null,
+    val progress: ClaimDailyProgressDto? = null,
+    val data: GameProgressDataDto? = null
+)
+
+data class ClaimDailyResponseDto(
+    val status: String? = "success",
+    val data: ClaimDailyInnerDto? = null
+)
+
+data class VocabChallengeDto(
+    val completed: Boolean? = false,
+    val words: List<VocabularyWordDto> = emptyList()
+)
+
+data class VocabChallengeResponseDto(
+    val status: String? = "success",
+    val data: VocabChallengeDto? = null
+)
+
+data class ChallengeSubmitResultDto(
+    val success: Boolean? = null,
+    val message: String? = null
+)
+
+data class ChallengeSubmitResponseDto(
+    val status: String? = "success",
+    val data: ChallengeSubmitResultDto? = null
+)
+
+data class LeaderboardEntryDto(
+    val id: Int? = null,
+    val name: String? = null,
+    val score: Int? = 0,
+    val total_words_mastered: Int? = 0
+)
+
+data class VocabLeaderboardDataDto(
+    val school_rankings: List<LeaderboardEntryDto> = emptyList(),
+    val class_rankings: List<LeaderboardEntryDto> = emptyList(),
+    val section_rankings: List<LeaderboardEntryDto> = emptyList()
+)
+
+data class VocabLeaderboardResponseDto(
+    val status: String? = "success",
+    val data: VocabLeaderboardDataDto? = null
+)
+
+data class VocabAchievementBadgeDto(
+    val key: String? = null,
+    val title: String? = null,
+    val desc: String? = null,
+    val points: Int? = 0,
+    val unlocked: Boolean? = false,
+    val unlocked_at: String? = null
+)
+
+// VocabularyService::getAchievements returns a plain array (not wrapped in an object key).
+data class VocabAchievementsResponseDto(
+    val status: String? = "success",
+    val data: List<VocabAchievementBadgeDto> = emptyList()
+)
+
+data class VocabCategoryPerformanceDto(
+    val category: String? = null,
+    val correct: Int? = 0,
+    val wrong: Int? = 0
+)
+
+data class ParentVocabStatsDto(
+    val score: Int? = 0,
+    val coins: Int? = 0,
+    val current_level: Int? = 1,
+    val total_words_learned: Int? = 0,
+    val total_words_mastered: Int? = 0,
+    val accuracy_percent: Double? = 0.0,
+    val current_streak: Int? = 0,
+    val longest_streak: Int? = 0,
+    val daily_practice_days: Int? = 0
+)
+
+data class ParentVocabReportDataDto(
+    val stats: ParentVocabStatsDto? = null,
+    val category_performance: List<VocabCategoryPerformanceDto> = emptyList(),
+    val student_name: String? = null,
+    val student_class: String? = null
+)
+
+data class ParentVocabReportResponseDto(
+    val status: String? = "success",
+    val data: ParentVocabReportDataDto? = null
+)
+
+data class TeacherVocabSummaryDto(
+    val average_accuracy: Double? = 0.0,
+    val average_stage: Double? = 0.0,
+    val total_words_learned: Int? = 0,
+    val total_words_mastered: Int? = 0
+)
+
+data class TeacherVocabDifficultWordDto(
+    val word: String? = null,
+    val total_wrongs: Int? = 0
+)
+
+data class TeacherVocabActiveStudentDto(
+    val first_name: String? = null,
+    val last_name: String? = null,
+    val score: Int? = 0,
+    val total_words_learned: Int? = 0
+)
+
+data class TeacherVocabReportDataDto(
+    val class_name: String? = null,
+    val summary: TeacherVocabSummaryDto? = null,
+    val weak_categories: List<VocabCategoryPerformanceDto> = emptyList(),
+    val difficult_words: List<TeacherVocabDifficultWordDto> = emptyList(),
+    val active_students: List<TeacherVocabActiveStudentDto> = emptyList()
+)
+
+data class TeacherVocabReportResponseDto(
+    val status: String? = "success",
+    val data: TeacherVocabReportDataDto? = null
+)
+
+// --- Notifications catalog + device registration + preferences (Shared/Notifications/*) ---
+
+data class NotificationEventDto(
+    val category: String? = null,
+    val delivery: String? = null,
+    val audience: List<String>? = null,
+    val priority: String? = null,
+    val link: String? = null,
+    val label: String? = null
+)
+
+data class NotificationCatalogDataDto(
+    val events: Map<String, NotificationEventDto> = emptyMap()
+)
+
+data class NotificationCatalogResponseDto(
+    val status: String? = "success",
+    val data: NotificationCatalogDataDto? = null
+)
+
+data class DeviceRegisterRequestDto(
+    val token: String,
+    val platform: String? = "android",
+    val app_version: String? = null
+)
+
+data class DeviceRegisterResultDto(
+    val topics: List<String>? = null
+)
+
+data class DeviceRegisterResponseDto(
+    val status: String? = "success",
+    val message: String? = null,
+    val data: DeviceRegisterResultDto? = null
+)
+
+data class DeviceUnregisterRequestDto(
+    val token: String
+)
+
+data class DeviceUnregisterResultDto(
+    val deactivated: Boolean? = null
+)
+
+data class DeviceUnregisterResponseDto(
+    val status: String? = "success",
+    val data: DeviceUnregisterResultDto? = null
+)
+
+data class TestPushResultDto(
+    val sent: Boolean? = null,
+    val timestamp: String? = null
+)
+
+data class TestPushResponseDto(
+    val status: String? = "success",
+    val data: TestPushResultDto? = null
+)
+
 interface ApiService {
 
     // Auth
@@ -1926,4 +2254,109 @@ interface ApiService {
         @Body request: GenerateCredentialsRequestDto,
         @Header("Authorization") authHeader: String? = null
     ): Response<GenerateCredentialsResponseDto>
+
+    // --- Achievements (SchoolAdminService::getAchievements/getAchievementReportCard) ---
+    @GET("api/school/achievements")
+    suspend fun getAchievements(
+        @Query("academic_year_id") academicYearId: Int? = null,
+        @Query("category") category: String? = null,
+        @Query("class_id") classId: Int? = null,
+        @Query("level") level: String? = null,
+        @Query("search") search: String? = null,
+        @Query("sort") sort: String? = null,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<AchievementsResponseDto>
+
+    @GET("api/school/achievements/{id}/report-card")
+    suspend fun getAchievementReportCard(
+        @Path("id") id: Int,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<AchievementReportCardResponseDto>
+
+    // --- Vocabulary / Word Builder game (VocabularyService.php / StudentService::claimDailyLogin) ---
+    @GET("api/student/vocabulary/achievements")
+    suspend fun getVocabAchievements(
+        @Header("Authorization") authHeader: String? = null
+    ): Response<VocabAchievementsResponseDto>
+
+    @GET("api/student/vocabulary/challenge/daily")
+    suspend fun getDailyChallenge(
+        @Header("Authorization") authHeader: String? = null
+    ): Response<VocabChallengeResponseDto>
+
+    @POST("api/student/vocabulary/challenge/daily")
+    suspend fun submitDailyChallenge(
+        @Body request: Map<String, String> = emptyMap(),
+        @Header("Authorization") authHeader: String? = null
+    ): Response<ChallengeSubmitResponseDto>
+
+    @GET("api/student/vocabulary/challenge/weekly")
+    suspend fun getWeeklyChallenge(
+        @Header("Authorization") authHeader: String? = null
+    ): Response<VocabChallengeResponseDto>
+
+    @POST("api/student/vocabulary/challenge/weekly")
+    suspend fun submitWeeklyChallenge(
+        @Body request: Map<String, String> = emptyMap(),
+        @Header("Authorization") authHeader: String? = null
+    ): Response<ChallengeSubmitResponseDto>
+
+    @GET("api/student/vocabulary/leaderboard")
+    suspend fun getVocabLeaderboard(
+        @Header("Authorization") authHeader: String? = null
+    ): Response<VocabLeaderboardResponseDto>
+
+    @GET("api/student/game/word-builder/progress")
+    suspend fun getWordBuilderProgress(
+        @Header("Authorization") authHeader: String? = null
+    ): Response<GameProgressResponseDto>
+
+    @POST("api/student/game/word-builder/progress")
+    suspend fun syncWordBuilderProgress(
+        @Body request: SyncGameProgressRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<GameProgressResponseDto>
+
+    @POST("api/student/game/word-builder/claim-daily")
+    suspend fun claimDailyLogin(
+        @Body request: Map<String, String> = emptyMap(),
+        @Header("Authorization") authHeader: String? = null
+    ): Response<ClaimDailyResponseDto>
+
+    // --- Teacher / Parent read-only vocabulary reports ---
+    @GET("api/teacher/vocabulary/report")
+    suspend fun getTeacherVocabularyReport(
+        @Query("class_id") classId: Int,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<TeacherVocabReportResponseDto>
+
+    @GET("api/parent/vocabulary/report")
+    suspend fun getParentVocabularyReport(
+        @Query("student_id") studentId: Int? = null,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<ParentVocabReportResponseDto>
+
+    // --- Notification catalog + device registration (Shared/Notifications/*) ---
+    @GET("api/notifications/catalog")
+    suspend fun getNotificationCatalog(
+        @Header("Authorization") authHeader: String? = null
+    ): Response<NotificationCatalogResponseDto>
+
+    @POST("api/notifications/device")
+    suspend fun registerDevice(
+        @Body request: DeviceRegisterRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<DeviceRegisterResponseDto>
+
+    @HTTP(method = "DELETE", path = "api/notifications/device", hasBody = true)
+    suspend fun unregisterDevice(
+        @Body request: DeviceUnregisterRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<DeviceUnregisterResponseDto>
+
+    @POST("api/notifications/test-push")
+    suspend fun testPush(
+        @Body request: Map<String, String> = emptyMap(),
+        @Header("Authorization") authHeader: String? = null
+    ): Response<TestPushResponseDto>
 }

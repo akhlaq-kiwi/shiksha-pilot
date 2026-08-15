@@ -28,6 +28,9 @@ import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminSecuri
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminStaffScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminStudentsScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminTimetableScreen
+import com.shikshapilot.nativeapp.features.studentparent.screens.NotificationPreferencesScreen
+import com.shikshapilot.nativeapp.features.studentparent.screens.ParentVocabularyReportScreen
+import com.shikshapilot.nativeapp.features.studentparent.screens.StudentAchievementsScreen
 import com.shikshapilot.nativeapp.features.studentparent.screens.StudentAnnouncementsScreen
 import com.shikshapilot.nativeapp.features.studentparent.screens.StudentAssignmentsScreen
 import com.shikshapilot.nativeapp.features.studentparent.screens.StudentAttendanceScreen
@@ -36,6 +39,8 @@ import com.shikshapilot.nativeapp.features.studentparent.screens.StudentFeesScre
 import com.shikshapilot.nativeapp.features.studentparent.screens.StudentMaterialsScreen
 import com.shikshapilot.nativeapp.features.studentparent.screens.StudentResultsScreen
 import com.shikshapilot.nativeapp.features.studentparent.screens.StudentTimetableScreen
+import com.shikshapilot.nativeapp.features.studentparent.screens.StudentVocabularyScreen
+import com.shikshapilot.nativeapp.features.studentparent.screens.StudentWordBuilderScreen
 import com.shikshapilot.nativeapp.features.teacher.screens.TeacherAssignmentsScreen
 import com.shikshapilot.nativeapp.features.teacher.screens.TeacherAttendanceScreen
 import com.shikshapilot.nativeapp.features.teacher.screens.TeacherClassesScreen
@@ -45,6 +50,7 @@ import com.shikshapilot.nativeapp.features.teacher.screens.TeacherLeaveScreen
 import com.shikshapilot.nativeapp.features.teacher.screens.TeacherMaterialsScreen
 import com.shikshapilot.nativeapp.features.teacher.screens.TeacherNotificationsScreen
 import com.shikshapilot.nativeapp.features.teacher.screens.TeacherSalariesScreen
+import com.shikshapilot.nativeapp.features.teacher.screens.TeacherVocabularyReportScreen
 import com.shikshapilot.nativeapp.ui.screens.DashboardScreen
 import com.shikshapilot.nativeapp.ui.screens.LoginScreen
 import com.shikshapilot.nativeapp.ui.screens.SettingsScreen
@@ -154,6 +160,18 @@ class MainActivity : ComponentActivity() {
                                         onBack = { currentScreenId = "dashboard" }
                                     )
                                 }
+                                "teacher_vocabulary_report" -> {
+                                    TeacherVocabularyReportScreen(
+                                        schoolName = schoolName,
+                                        onBack = { currentScreenId = "dashboard" }
+                                    )
+                                }
+                                "notification_preferences" -> {
+                                    NotificationPreferencesScreen(
+                                        schoolName = schoolName,
+                                        onBack = { currentScreenId = "dashboard" }
+                                    )
+                                }
                                 "announcements" -> {
                                     SchoolAdminAnnouncementsScreen(
                                         schoolName = schoolName,
@@ -215,6 +233,37 @@ class MainActivity : ComponentActivity() {
                                         onBack = { currentScreenId = "dashboard" }
                                     )
                                 }
+                                "achievements" -> {
+                                    StudentAchievementsScreen(
+                                        schoolName = schoolName,
+                                        onBack = { currentScreenId = "dashboard" }
+                                    )
+                                }
+                                "vocabulary" -> {
+                                    if (userRole.uppercase() == "PARENT") {
+                                        ParentVocabularyReportScreen(
+                                            schoolName = schoolName,
+                                            onBack = { currentScreenId = "dashboard" }
+                                        )
+                                    } else {
+                                        StudentVocabularyScreen(
+                                            schoolName = schoolName,
+                                            onBack = { currentScreenId = "dashboard" }
+                                        )
+                                    }
+                                }
+                                "word_builder_game" -> {
+                                    StudentWordBuilderScreen(
+                                        schoolName = schoolName,
+                                        onBack = { currentScreenId = "dashboard" }
+                                    )
+                                }
+                                "notification_preferences" -> {
+                                    NotificationPreferencesScreen(
+                                        schoolName = schoolName,
+                                        onBack = { currentScreenId = "dashboard" }
+                                    )
+                                }
                                 "announcements" -> {
                                     StudentAnnouncementsScreen(
                                         schoolName = schoolName,
@@ -241,6 +290,12 @@ class MainActivity : ComponentActivity() {
                         else -> {
                             // SCHOOL_ADMIN
                             when (currentScreenId) {
+                                "notification_preferences" -> {
+                                    NotificationPreferencesScreen(
+                                        schoolName = schoolName,
+                                        onBack = { currentScreenId = "dashboard" }
+                                    )
+                                }
                                 "students", "admissions" -> {
                                     SchoolAdminStudentsScreen(
                                         schoolName = schoolName,

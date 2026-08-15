@@ -33,7 +33,7 @@ this file only tracks what native-app still needs to build.
 | Teacher Salaries/receipts | ✅ | ✅ (salary_card_screen) | ❌ | missing |
 | Teacher Leave (apply) | ✅ TeacherLeavePage | ✅ apply_leave_screen | ❌ | missing |
 | Teacher Notifications | ✅ | ✅ notification_center_screen | ❌ | missing |
-| Teacher Vocabulary report | ✅ | n/a | ❌ | missing |
+| Teacher Vocabulary report | ✅ | n/a | ✅ `TeacherVocabularyReportScreen` (read-only, class_id input) | present |
 | Student/Parent Dashboard | ✅ | ✅ home_screen | ✅ | present |
 | Student/Parent Academics/Results | ✅ AcademicsPage | ✅ exam_list/exam_detail | ✅ StudentResultsScreen (list/details/report card) | present |
 | Student/Parent Attendance | ✅ | ✅ attendance_screen | ❌ (endpoint not consumed) | missing |
@@ -43,9 +43,9 @@ this file only tracks what native-app still needs to build.
 | Student/Parent Leave (apply) | ✅ ParentLeavePage | ✅ apply_leave_screen/leave_list_screen | ❌ | missing |
 | Student/Parent Timetable | ✅ | ✅ timetable_screen | ❌ (endpoint exists, no screen) | partial |
 | Student/Parent Settings/Profile | ✅ SettingsPage | ✅ user_profile_screen/settings_screen | ❌ | missing |
-| Achievements | ✅ AchievementsPage | ✅ achievements_screen | ❌ | missing |
-| Word Builder Game | n/a (web) | ✅ word_builder_game_screen | ❌ | missing (Flutter-only feature) |
-| Notification center / push notifications | ✅ | ✅ notification_center_screen | ❌ | missing entirely (no FCM/device registration) |
+| Achievements | ✅ AchievementsPage | ✅ achievements_screen | ✅ `StudentAchievementsScreen` (badge grid + report-card drill-down) | present |
+| Word Builder Game | n/a (web) | ✅ word_builder_game_screen | ✅ `StudentWordBuilderScreen` (unscramble mechanic, real progress sync) | present |
+| Notification center / push notifications | ✅ | ✅ notification_center_screen | ⚠️ `NotificationPreferencesScreen` (catalog + placeholder device registration only) | partial — real FCM push delivery NOT implemented, see note below |
 | Super Admin (schools, plans, website leads, report-card templates) | ✅ full section | n/a | ❌ | missing entirely — confirm with user if in scope for native app (likely low priority, web-only backoffice) |
 
 ## Missing Screens/Features by Role
@@ -68,7 +68,7 @@ this file only tracks what native-app still needs to build.
 - Salaries & salary receipts
 - Leave application (apply/view own leave)
 - Notifications center
-- Vocabulary report
+- ~~Vocabulary report~~ — done: `TeacherVocabularyReportScreen`.
 
 ### studentparent/ (native-app)
 - ~~Academics/Results screen~~ — done: `StudentResultsScreen` (exam list, details with scheme/admit-card/result, native report card view).
@@ -78,11 +78,11 @@ this file only tracks what native-app still needs to build.
 - Timetable screen (endpoint exists, unused)
 - Leave application + leave list
 - Settings/Profile screen
-- Achievements screen
-- Vocabulary games/challenges/leaderboard (student engagement feature set, exists only in web+backend)
+- ~~Achievements screen~~ — done: `StudentAchievementsScreen`.
+- ~~Vocabulary games/challenges/leaderboard~~ — done: `StudentVocabularyScreen` (daily/weekly challenge review + leaderboard), `StudentWordBuilderScreen` (unscramble game with real progress/claim-daily sync), `ParentVocabularyReportScreen` (parent-role read-only report).
 
 ### Cross-cutting
-- Push notifications / device registration (`/api/notifications/device`, `/api/notifications/test-push`) — not implemented at all
+- ~~Push notifications / device registration~~ — `NotificationPreferencesScreen` now consumes `/api/notifications/catalog`, `/api/notifications/device` (register/unregister), `/api/notifications/test-push`, but only with a placeholder (non-FCM) token — see item 8 below for the real-push gap.
 - Change password / auth identify / profile update (`/api/auth/change-password`, `/api/auth/identify`, `/api/auth/profile`) — not implemented
 
 ## Backend API Endpoints Not Yet Consumed by Native App
@@ -93,14 +93,14 @@ native-app's `ApiService.kt` currently defines ~30 endpoints. Backend exposes ~1
 - `/api/school/timetable/{publish,backup,paste,replace}` (only bare GET timetable is used, and with a different query pattern than backend expects — verify `class_id`/`date` params match backend controller)
 - `/api/school/classes/sections`, `/api/school/classes/transfer-students`, `/api/school/classes/{id}/next-roll-no`
 - Now consumed by the new back-office screens: `/api/school/security/audit-logs`, `/api/school/security/login-history`, `/api/school/profile` (GET/POST), `/api/school/profile/logo`(+DELETE), `/api/school/profile/signature`(+DELETE), `/api/school/academic-years` (GET/POST/activate), `/api/school/holidays` (GET/POST/DELETE), `/api/school/subjects` (GET/POST/DELETE), `/api/school/grade-configurations` (GET only), `/api/school/credentials/{role}/{id}` (GET), `/api/school/credentials/generate` (POST). Still unconsumed: `/api/school/security/audit-logs/log` (client-side action logging, write-only, not needed for a read-only viewer), `/api/school/academic-years/{id}/migrate`, `/api/school/holidays/{id}` PUT (edit, only add/delete built), `/api/school/subjects/{id}` PUT (edit, only add/delete built), `POST /api/school/grade-configurations` (save/replace scale list), `/api/school/attendance/leaderboard`
-- `/api/teacher/exams-new/*` and `/api/teacher/exams-new/{id}/marks-sheet` now consumed by `TeacherExamsScreen`/`TeacherMarksEntryScreen`. Still unconsumed: legacy `/api/teacher/exams`, `/api/teacher/marks`, `/api/teacher/homework`, `/api/teacher/homework/{id}`, `/api/teacher/salaries*`, `/api/teacher/notifications*`, `/api/teacher/schedule/today`, `/api/teacher/vocabulary/report`
+- `/api/teacher/exams-new/*` and `/api/teacher/exams-new/{id}/marks-sheet` now consumed by `TeacherExamsScreen`/`TeacherMarksEntryScreen`. `/api/teacher/vocabulary/report` now consumed by `TeacherVocabularyReportScreen`. Still unconsumed: legacy `/api/teacher/exams`, `/api/teacher/marks`, `/api/teacher/homework`, `/api/teacher/homework/{id}`, `/api/teacher/salaries*`, `/api/teacher/notifications*`, `/api/teacher/schedule/today`
 - `/api/student/attendance`, `/api/student/assignments`, `/api/student/materials`, `/api/student/timetable` (all defined in native ApiService but no screen calls them)
 - `/api/student/exams-new` (list/details) and `/api/student/exams-new/report-cards` now consumed by `StudentResultsScreen`. Still unconsumed: `/api/student/results`, `/api/student/homework`, `/api/student/fee-payments`, `/api/student/fees/card`, `/api/student/fees/receipt`
 - `/api/student/notifications*`, `/api/student/announcements/{id}/read`
-- `/api/student/game/word-builder/*`, `/api/student/vocabulary/*`
-- `/api/parent/children`, `/api/parent/vocabulary/report`
+- ~~`/api/student/game/word-builder/*`, `/api/student/vocabulary/*`~~ — now consumed by `StudentWordBuilderScreen` and `StudentVocabularyScreen`/`StudentAchievementsScreen` (vocab achievements badges).
+- `/api/parent/children` still unconsumed. ~~`/api/parent/vocabulary/report`~~ — now consumed by `ParentVocabularyReportScreen`.
 - `/api/homework/upload-attachment`
-- `/api/notifications/catalog`, `/api/notifications/device`, `/api/notifications/test-push`
+- ~~`/api/notifications/catalog`, `/api/notifications/device`, `/api/notifications/test-push`~~ — now consumed by `NotificationPreferencesScreen` (device registration uses a placeholder non-FCM token; see item 8 below).
 - `/api/auth/change-password`, `/api/auth/identify`, `/api/auth/profile`
 
 Note: native-app also calls some endpoints (e.g. `api/school/leave-requests`, `api/school/announcements`, `api/teacher/*`, `api/student/*`) that broadly match backend paths — good baseline naming consistency was maintained, so extending `ApiService.kt` should mostly be additive (add DTOs/methods matching existing backend routes) rather than restructuring.
@@ -110,7 +110,7 @@ Note: native-app also calls some endpoints (e.g. `api/school/leave-requests`, `a
 - ~~`SchoolAdminFinanceScreen.kt` generic stub~~ — repurposed into a finance module hub (linking to `SchoolAdminFeeStructureScreen`, `SchoolAdminFeeCollectionScreen`, `SchoolAdminFeeFollowUpScreen`, `SchoolAdminSalaryDisbursementScreen`, `SchoolAdminFinancialReportsScreen`). Deferred finance areas (additional/transport fees, late-payment penalty, expenses, finance-settings, report export/settlement) remain unbuilt — see Finance breakdown note above.
 - `native-app/app/src/main/java/com/shikshapilot/nativeapp/features/schooladmin/screens/SchoolAdminReportsScreen.kt` (196 lines, shortest schooladmin screen) — likely a minimal placeholder vs. web's `ReportsPage.jsx` + `FinancialReportsPage.jsx`.
 - `native-app/app/src/main/java/com/shikshapilot/nativeapp/features/teacher/screens/TeacherMaterialsScreen.kt` (189 lines, shortest overall) — check against web `MaterialsPage.jsx` for missing upload/edit flows.
-- No native-app files exist yet for: timetable, classes, salaries, notifications, settings/profile, achievements, vocabulary/games, security/audit — these are gaps, not stubs (nothing to inspect). Exams is now implemented (`SchoolAdminExamsScreen`, `TeacherExamsScreen`, `TeacherMarksEntryScreen`, `StudentResultsScreen`) with instructions/seating-plan/admit-card-toggle/question-paper-designer deferred (see Suggested Implementation Order item 5).
+- No native-app files exist yet for: timetable, classes, salaries, settings/profile, security/audit — these are gaps, not stubs (nothing to inspect). Exams is now implemented (`SchoolAdminExamsScreen`, `TeacherExamsScreen`, `TeacherMarksEntryScreen`, `StudentResultsScreen`) with instructions/seating-plan/admit-card-toggle/question-paper-designer deferred (see Suggested Implementation Order item 5). Notifications/achievements/vocabulary-games are now implemented (see Suggested Implementation Order item 8).
 
 ## Suggested Implementation Order
 
@@ -121,5 +121,12 @@ Note: native-app also calls some endpoints (e.g. `api/school/leave-requests`, `a
 5. ~~**Exams suite** (school admin + teacher + student)~~ — done: core flow (admin list/create/publish/class-status, teacher list/details/marks entry, student list/details/report card) implemented in `SchoolAdminExamsScreen`, `TeacherExamsScreen`/`TeacherMarksEntryScreen`, `StudentResultsScreen`. Deferred as web-only/lower-priority: exam instructions editor, seating plan generation, admit-card publish/unpublish toggle in admin UI, admin-side report card viewer, and the question paper designer (explicitly out of scope — complex web-only tooling).
 6. ~~**Finance breakdown**~~ — done: `SchoolAdminFeeStructureScreen`, `SchoolAdminFeeCollectionScreen` (record payment + collection history), `SchoolAdminFeeFollowUpScreen` (contacted/extend/status), `SchoolAdminSalaryDisbursementScreen`, `SchoolAdminFinancialReportsScreen` (list + generate), with `SchoolAdminFinanceScreen` repurposed into a hub. Deferred as nice-to-have (out of time budget, not attempted): additional fee types/payments, transport fees, late-payment-penalty config/history/stats, expenses, finance-settings, class-fee-configurations editor, financial report export/settle/settlement-request, staff-payments disburse-previous-year bulk catch-up.
 7. ~~**Security/Profile/Academic setup**~~ — done: `SchoolAdminSecurityScreen`, `SchoolAdminProfileScreen`, `SchoolAdminAcademicSetupScreen`, `SchoolAdminCredentialsScreen`.
-8. **Achievements + Vocabulary/games + push notifications** — student engagement layer, do last unless product explicitly prioritizes it.
+8. **Achievements + Vocabulary/games + push notifications** — DONE (partial on push):
+   - `StudentAchievementsScreen` (`features/studentparent/screens/`) — GET `/api/school/achievements` badge/rank grid split into Attendance Champions / Academic Excellence tabs, drill-down dialog calling GET `/api/school/achievements/{id}/report-card` (reuses the shared `ReportCardDto`).
+   - `StudentVocabularyScreen` — daily/weekly challenge tabs (GET+POST `/api/student/vocabulary/challenge/{daily,weekly}`; the submit endpoints don't read request body fields server-side, so the native flow requires the student to flip/review every word card before "Complete Challenge" unlocks) + a Leaderboard tab (GET `/api/student/vocabulary/leaderboard`, school/class/section scopes).
+   - `StudentWordBuilderScreen` — word-builder game faithful to the Flutter reference's mechanic: letters shuffled, tap-to-assemble, auto-verify on full length, 3 lives/word, hint (-2 coins, reveals meaning), skip (-2 coins), streak bonus (+50 coins every 10-streak). Progress synced via GET/POST `/api/student/game/word-builder/progress` (`played_words:[{word_id,is_correct}]`); daily login bonus via POST `/api/student/game/word-builder/claim-daily`.
+   - `TeacherVocabularyReportScreen` (`features/teacher/screens/`) — read-only GET `/api/teacher/vocabulary/report?class_id=` (manual class-id input field; native app has no shared class picker component yet).
+   - `ParentVocabularyReportScreen` (`features/studentparent/screens/`) — read-only GET `/api/parent/vocabulary/report`. **Known limitation**: native-app's `MainActivity` still groups STUDENT and PARENT under one navigation branch with no deeper role-aware data split anywhere else in the codebase; this screen is wired to route only when `userRole == "PARENT"` (the `"vocabulary"` screen id branches on role), which is the minimal special-case needed since the backend genuinely requires the PARENT role for this endpoint (403 otherwise). A full STUDENT/PARENT UX split (e.g. distinct dashboards, parent multi-child switching via `student_id` query param) is out of scope here and should be tracked separately if product wants it.
+   - `NotificationPreferencesScreen` (`features/studentparent/screens/`, also reachable from teacher and school-admin dashboards via a shared `"notification_preferences"` route since the catalog/device endpoints aren't role-specific) — GET `/api/notifications/catalog` rendered as toggleable category cards, POST `/api/notifications/device` device registration, POST `/api/notifications/test-push` trigger.
+     **Push notifications are NOT actually delivered.** Confirmed by searching the entire `native-app/` tree: no `google-services.json`, no `com.google.gms.google-services` Gradle plugin, no `FirebaseMessagingService` subclass exist anywhere. The backend's push pipeline (`PushDispatcher`, `DeviceTokenController`, `NotificationCatalog`) is ready and functional server-side, but with no Firebase project wired into the Android app there is no way to obtain a real FCM token, so `NotificationPreferencesScreen` registers a locally-generated placeholder token string (`local-placeholder-<device>-<uuid>`) purely so the register/unregister/test-push API calls can be exercised against the live backend — the UI explicitly warns the user that push delivery is not live. To complete this: (1) create/attach a Firebase project and add `google-services.json` to `native-app/app/`, (2) add the `com.google.gms.google-services` Gradle plugin + `firebase-messaging` dependency, (3) implement a `FirebaseMessagingService` subclass that forwards the real token to POST `/api/notifications/device` on `onNewToken` and shows a local notification / deep-links via the `event_key`/`link` fields from the catalog on `onMessageReceived`, (4) register the service in `AndroidManifest.xml`.
 9. **Super Admin section** — confirm with product/user whether this belongs in the native mobile app at all (web-only back-office pattern in most school-management products); do not build until confirmed in scope.

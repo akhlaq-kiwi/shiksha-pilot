@@ -324,6 +324,39 @@ fun TeacherDashboardScreen(
                         }
                     }
 
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(FrostedCard)
+                                .border(width = 1.dp, color = CardBorder, shape = RoundedCornerShape(12.dp))
+                                .clickable { onNavigate("teacher_vocabulary_report") }
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(text = "Vocabulary Report", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(FrostedCard)
+                                .border(width = 1.dp, color = CardBorder, shape = RoundedCornerShape(12.dp))
+                                .clickable { onNavigate("notification_preferences") }
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(text = "Notification Prefs", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Text(

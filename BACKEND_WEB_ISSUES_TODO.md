@@ -81,3 +81,25 @@ Found while doing the native-app parity inventory (see `native-app/PARITY_GAPS.m
   DTOs and Retrofit methods to `ApiService.kt` to match this contract, but the screen itself is
   currently view-only (list of classes grouped by name/sections) — add/edit/delete UI using these new
   methods is a follow-up if the product wants full parity with the web admin's class management UI.
+- **New finding — vocabulary/word-builder challenge endpoints award rewards unconditionally with no
+  answer validation (native-app research, 2026-08-15):** `VocabularyService::submitDailyChallenge`
+  and `submitWeeklyChallenge` (backed by `POST /api/student/vocabulary/challenge/{daily,weekly}`)
+  don't read any fields from the request body at all — calling either endpoint always grants the
+  full reward (+50 coins/+100 XP daily, +100 coins/+250 XP/`WEEKLY_CHAMPION` badge weekly) with no
+  server-side check that the student actually reviewed or answered the challenge words correctly.
+  Any authenticated student can repeatedly call these endpoints (subject only to the once-per-day
+  completion flag) to farm rewards without doing the activity. Native-app's new
+  `StudentVocabularyScreen.kt` mitigates this client-side only (requires flipping every word card
+  before enabling the "Complete Challenge" button), which is not a real security boundary. Worth a
+  backend follow-up: either accept and validate submitted answers, or accept this as an intentionally
+  low-stakes gamification reward (not a security-sensitive resource) — flagging so it's a conscious
+  decision rather than an oversight.
+- **New finding — `GET /api/student/vocabulary/achievements` returns a bare JSON array under `data`,
+  inconsistent with every other endpoint's object-shaped `data` (native-app research, 2026-08-15):**
+  `VocabularyService::getAchievements` returns a plain list of 8 fixed badge definitions
+  (`[{key,title,desc,points,unlocked,unlocked_at}, ...]`) as the `data` payload, whereas essentially
+  every other endpoint in `backend/src/Routes/api.php` wraps list data in a named object key (e.g.
+  `{achievements:[...], classes:[...], ...}` for `/api/school/achievements`, or `{events:{...}}` for
+  the notification catalog). Not a bug — the native Kotlin DTO (`VocabAchievementsResponseDto`) was
+  written to match this exact shape — but flagging the inconsistency in case a future refactor wants
+  to normalize all list endpoints to the same envelope shape for easier generic client handling.
