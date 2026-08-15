@@ -14,10 +14,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -38,8 +38,7 @@ import com.shikshapilot.nativeapp.ui.theme.TextSecondary
 
 @Composable
 fun StickyBottomBar(
-    activeTab: String = "home", // "home", "actions", "notifications", "profile"
-    unreadNotificationCount: Int = 2,
+    activeTab: String = "home", // "home", "education", "finance", "settings"
     onTabSelected: (String) -> Unit
 ) {
     Column(
@@ -67,31 +66,31 @@ fun StickyBottomBar(
                 onClick = { onTabSelected("home") }
             )
 
-            // 2. ACTIONS TAB (Triggers Categorized Action Sheet)
+            // 2. EDUCATION TAB (Classes, Timetable, Exams, Attendance, Academic Setup)
             BottomNavItem(
-                icon = Icons.Default.GridView,
-                label = "Actions",
-                isSelected = activeTab == "actions",
+                icon = Icons.Default.MenuBook,
+                label = "Education",
+                isSelected = activeTab == "education",
                 badgeCount = 0,
-                onClick = { onTabSelected("actions") }
+                onClick = { onTabSelected("education") }
             )
 
-            // 3. NOTIFICATIONS TAB (Triggers Notifications Sheet)
+            // 3. FINANCE TAB
             BottomNavItem(
-                icon = Icons.Default.Notifications,
-                label = "Alerts",
-                isSelected = activeTab == "notifications",
-                badgeCount = unreadNotificationCount,
-                onClick = { onTabSelected("notifications") }
+                icon = Icons.Default.AccountBalanceWallet,
+                label = "Finance",
+                isSelected = activeTab == "finance",
+                badgeCount = 0,
+                onClick = { onTabSelected("finance") }
             )
 
-            // 4. PROFILE TAB (Triggers Profile Sheet)
+            // 4. SETTINGS TAB
             BottomNavItem(
-                icon = Icons.Default.Person,
-                label = "Profile",
-                isSelected = activeTab == "profile",
+                icon = Icons.Default.Settings,
+                label = "Settings",
+                isSelected = activeTab == "settings",
                 badgeCount = 0,
-                onClick = { onTabSelected("profile") }
+                onClick = { onTabSelected("settings") }
             )
         }
     }

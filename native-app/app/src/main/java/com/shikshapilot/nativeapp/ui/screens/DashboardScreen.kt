@@ -168,13 +168,19 @@ fun DashboardScreen(
         containerColor = DarkCanvas,
         bottomBar = {
             StickyBottomBar(
-                activeTab = activeSheet ?: "home",
-                unreadNotificationCount = 2,
+                activeTab = if (activeSheet == "education") "education" else "home",
                 onTabSelected = { tab ->
-                    if (tab == "home") {
-                        activeSheet = null
-                    } else {
-                        activeSheet = tab
+                    when (tab) {
+                        "education" -> activeSheet = "education"
+                        "finance" -> {
+                            activeSheet = null
+                            onModuleClick("finance")
+                        }
+                        "settings" -> {
+                            activeSheet = null
+                            onModuleClick("settings")
+                        }
+                        else -> activeSheet = null
                     }
                 }
             )
@@ -614,8 +620,8 @@ fun DashboardScreen(
                 )
             }
 
-            // Role-Based Actions Navigation Drawer
-            if (activeSheet == "actions") {
+            // Education Hub: Classes, Timetable, Exams, Attendance, Academic Setup
+            if (activeSheet == "education") {
                 if (activeRole.uppercase() == "SCHOOL_ADMIN") {
                     SchoolAdminMenuDrawer(
                         activeScreenId = "dashboard",

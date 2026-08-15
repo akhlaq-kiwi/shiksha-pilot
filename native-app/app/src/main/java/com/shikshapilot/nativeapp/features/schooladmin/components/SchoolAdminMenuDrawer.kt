@@ -19,8 +19,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.Campaign
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Class
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Edit
@@ -93,6 +96,54 @@ fun SchoolAdminMenuDrawer(
             isSelected = activeScreenId == "dashboard"
         ),
 
+        // Academics & Timetable
+        SchoolAdminMenuItem(
+            id = "classes",
+            title = "Classes & Sections",
+            subtitle = "Manage classes, sections & subject mapping",
+            category = "Academics & Timetable",
+            icon = Icons.Default.Class,
+            iconColor = InfoBlue,
+            isSelected = activeScreenId == "classes"
+        ),
+        SchoolAdminMenuItem(
+            id = "timetable",
+            title = "Timetable",
+            subtitle = "Build, view & publish the class timetable",
+            category = "Academics & Timetable",
+            icon = Icons.Default.CalendarMonth,
+            iconColor = SunsetOrange,
+            isSelected = activeScreenId == "timetable"
+        ),
+        SchoolAdminMenuItem(
+            id = "exams",
+            title = "Examinations",
+            subtitle = "Create, manage & publish examinations",
+            category = "Academics & Timetable",
+            icon = Icons.Default.Assignment,
+            iconColor = InfoBlue,
+            isSelected = activeScreenId == "exams"
+        ),
+        SchoolAdminMenuItem(
+            id = "attendance",
+            title = "Attendance & Leaderboard",
+            subtitle = "Daily marking, missing class exceptions & leaderboard",
+            category = "Academics & Timetable",
+            icon = Icons.Default.DateRange,
+            iconColor = WarningYellow,
+            badgeText = "94% Today",
+            isSelected = activeScreenId == "attendance"
+        ),
+        SchoolAdminMenuItem(
+            id = "academic_setup",
+            title = "Academic Setup",
+            subtitle = "Academic years, subjects & grading configuration",
+            category = "Academics & Timetable",
+            icon = Icons.Default.School,
+            iconColor = WarningYellow,
+            isSelected = activeScreenId == "academic_setup"
+        ),
+
         // Operations & Communication
         SchoolAdminMenuItem(
             id = "announcements",
@@ -104,16 +155,6 @@ fun SchoolAdminMenuDrawer(
             badgeText = "URGENT",
             isUrgent = true,
             isSelected = activeScreenId == "announcements"
-        ),
-        SchoolAdminMenuItem(
-            id = "attendance",
-            title = "Attendance & Leaderboard",
-            subtitle = "Daily marking, missing class exceptions & leaderboard",
-            category = "Operations & Communications",
-            icon = Icons.Default.DateRange,
-            iconColor = WarningYellow,
-            badgeText = "94% Today",
-            isSelected = activeScreenId == "attendance"
         ),
 
         // Staff & Payroll
