@@ -110,7 +110,7 @@ Note: native-app also calls some endpoints (e.g. `api/school/leave-requests`, `a
 - `native-app/app/src/main/java/com/shikshapilot/nativeapp/features/schooladmin/screens/SchoolAdminFinanceScreen.kt` (311 lines) — covers only one generic finance view; backend/web split finance into ~8 dedicated pages/endpoints.
 - `native-app/app/src/main/java/com/shikshapilot/nativeapp/features/schooladmin/screens/SchoolAdminReportsScreen.kt` (196 lines, shortest schooladmin screen) — likely a minimal placeholder vs. web's `ReportsPage.jsx` + `FinancialReportsPage.jsx`.
 - `native-app/app/src/main/java/com/shikshapilot/nativeapp/features/teacher/screens/TeacherMaterialsScreen.kt` (189 lines, shortest overall) — check against web `MaterialsPage.jsx` for missing upload/edit flows.
-- No native-app files exist yet for: exams, timetable, classes, salaries, notifications, settings/profile, achievements, vocabulary/games, security/audit — these are gaps, not stubs (nothing to inspect).
+- No native-app files exist yet for: timetable, classes, salaries, notifications, settings/profile, achievements, vocabulary/games, security/audit — these are gaps, not stubs (nothing to inspect). Exams is now implemented (`SchoolAdminExamsScreen`, `TeacherExamsScreen`, `TeacherMarksEntryScreen`, `StudentResultsScreen`) with instructions/seating-plan/admit-card-toggle/question-paper-designer deferred (see Suggested Implementation Order item 5).
 
 ## Suggested Implementation Order
 
