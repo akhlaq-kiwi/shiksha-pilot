@@ -229,18 +229,20 @@ class StudentDataRepository extends BaseRepository
             FROM timetable t
             LEFT JOIN subjects s ON t.subject_id = s.id
             LEFT JOIN staff    st ON t.teacher_id  = st.id
-            LEFT JOIN period_configurations pc ON t.period_number = pc.period_number AND t.school_id = pc.school_id AND pc.end_date IS NULL
+            LEFT JOIN period_configurations pc ON (
+                t.period_number = pc.period_number OR 
+                CAST(t.period_number AS UNSIGNED) = CAST(pc.period_number AS UNSIGNED)
+            ) AND t.school_id = pc.school_id AND pc.end_date IS NULL
             WHERE t.class_id  = :class_id
               AND t.school_id = :school_id
-              AND t.day_of_week = :day
-              AND (t.start_date IS NULL OR t.start_date <= :target_date)
+              AND LOWER(t.day_of_week) = LOWER(:day)
               AND (t.end_date IS NULL OR t.end_date >= :target_date2)
               AND (
                 t.is_published = 1 OR 
                 EXISTS (
                     SELECT 1 FROM timetable t2 
                     WHERE t2.class_id = t.class_id 
-                      AND t2.day_of_week = t.day_of_week 
+                      AND LOWER(t2.day_of_week) = LOWER(t.day_of_week) 
                       AND t2.is_published = 1
                 )
               )
@@ -252,7 +254,6 @@ class StudentDataRepository extends BaseRepository
             ':class_id' => $classId,
             ':school_id' => $schoolId,
             ':day' => $dayOfWeek,
-            ':target_date' => $targetDate,
             ':target_date2' => $targetDate
         ]);
 
@@ -287,12 +288,21 @@ class StudentDataRepository extends BaseRepository
 
         $periodsByNum = [];
         foreach ($periods as $p) {
-            $periodsByNum[(int)$p['period_number']] = $p;
+            $pNumKey = (int)preg_replace('/[^0-9]/', '', (string)($p['period_number'] ?? ''));
+            if ($pNumKey <= 0) {
+                $pNumKey = (int)($p['period_number'] ?? 0);
+            }
+            if ($pNumKey > 0) {
+                $periodsByNum[$pNumKey] = $p;
+            }
         }
 
         $finalSchedule = [];
         foreach ($configs as $cfg) {
-            $pNum = (int)$cfg['period_number'];
+            $pNum = (int)preg_replace('/[^0-9]/', '', (string)($cfg['period_number'] ?? ''));
+            if ($pNum <= 0) {
+                $pNum = (int)($cfg['period_number'] ?? 0);
+            }
             if (isset($periodsByNum[$pNum])) {
                 $finalSchedule[] = $periodsByNum[$pNum];
             } else {
