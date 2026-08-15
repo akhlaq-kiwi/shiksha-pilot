@@ -219,12 +219,49 @@ data class StaffItemDto(
     val email: String? = null,
     val status: String? = "ACTIVE",
     val salary: Double? = 0.0,
-    val photo_path: String? = null
+    val photo_path: String? = null,
+    val father_name: String? = null,
+    val mother_name: String? = null,
+    val joining_date: String? = null,
+    val exit_date: String? = null
 )
 
 data class StaffResponseDto(
     val status: String? = "success",
     val data: List<StaffItemDto> = emptyList()
+)
+
+data class CreateStaffRequestDto(
+    val name: String,
+    val father_name: String,
+    val mother_name: String,
+    val phone: String,
+    val joining_date: String,
+    val salary: Double,
+    val role: String? = "Teacher",
+    val department: String? = null,
+    val email: String? = null,
+    val status: String? = null,
+    val exit_date: String? = null
+)
+
+data class UpdateStaffRequestDto(
+    val name: String,
+    val father_name: String,
+    val mother_name: String,
+    val phone: String,
+    val joining_date: String,
+    val salary: Double,
+    val role: String? = "Teacher",
+    val department: String? = null,
+    val email: String? = null,
+    val status: String? = null,
+    val exit_date: String? = null
+)
+
+data class StaffDetailsResponseDto(
+    val status: String? = "success",
+    val data: StaffItemDto? = null
 )
 
 data class LeaveRequestItemDto(
@@ -1767,6 +1804,25 @@ interface ApiService {
         @Header("Authorization") authHeader: String? = null,
         @Query("search") search: String? = null
     ): Response<StaffResponseDto>
+
+    @POST("api/school/staff")
+    suspend fun createStaff(
+        @Body request: CreateStaffRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<StaffDetailsResponseDto>
+
+    @PUT("api/school/staff/{id}")
+    suspend fun updateStaff(
+        @Path("id") id: Int,
+        @Body request: UpdateStaffRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<StaffDetailsResponseDto>
+
+    @GET("api/school/staff/{id}")
+    suspend fun getStaffDetails(
+        @Path("id") id: Int,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<StaffDetailsResponseDto>
 
     @GET("api/school/leave-requests")
     suspend fun getSchoolLeaveRequests(
