@@ -27,6 +27,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -36,6 +37,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -62,16 +64,20 @@ import com.shikshapilot.nativeapp.ui.theme.TextPrimary
 import com.shikshapilot.nativeapp.ui.theme.TextSecondary
 import kotlinx.coroutines.launch
 
-// Matches the <select> options in web's StudentEnrollmentForm.jsx exactly.
+// Matches the real web <select> options exactly (verified live against the running web app
+// at localhost:2003/school-admin — GENDER/BLOOD GROUP/CATEGORY/STUDENT CATEGORY selects).
+private val GENDERS = listOf("Male", "Female", "Other")
 private val BLOOD_GROUPS = listOf("A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-")
-private val STUDENT_CATEGORIES = listOf("General", "OBC", "SC", "ST")
+private val CATEGORIES = listOf("General", "OBC", "SC", "ST")
+private val STUDENT_CATEGORIES = listOf("Existing Student", "New Admission")
+
+private val WIZARD_STEPS = listOf("Basic Details", "Address", "Document Uploads", "Review & Submit")
 
 /**
- * Full-screen student enrollment form matching web's StudentEnrollmentForm.jsx sections
- * (Student Info / Academic Info / Parent Info / Address), against POST api/school/students
- * (SchoolAdminService::createStudent). Document uploads (photo/birth-cert/aadhaar/transfer-cert/
- * report-card) are not implemented — those are file-picker flows out of scope here, matching this
- * app's existing pattern of deferring upload UI (see BACKEND_WEB_ISSUES_TODO.md/PARITY_GAPS.md).
+ * Student enrollment as a 4-step wizard, matching the real web StudentEnrollmentForm exactly
+ * (verified twice against the running web app: once walking the empty form to capture every
+ * validation message, once with a full valid submission through to POST api/school/students).
+ * Steps: 1. Basic Details, 2. Address, 3. Document Uploads, 4. Review & Submit.
  */
 @Composable
 fun SchoolAdminEnrollStudentScreen(
@@ -83,46 +89,41 @@ fun SchoolAdminEnrollStudentScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var allClasses by remember { mutableStateOf<List<ClassDto>>(emptyList()) }
-    var selectedClass by remember { mutableStateOf<ClassDto?>(null) }
+    var step by remember { mutableIntStateOf(1) }
 
-    // Student Info
-    var firstName by remember { mutableStateOf("") }
-    var middleName by remember { mutableStateOf("") }
-    var lastName by remember { mutableStateOf("") }
-    var gender by remember { mutableStateOf("Male") }
+    var allClasses by remember { mutableStateOf<List<ClassDto>>(emptyList()) }
+    var sectionsForClass by remember { mutableStateOf<List<ClassDto>>(emptyList()) }
+    var selectedSection by remember { mutableStateOf<ClassDto?>(null) }
+
+    // Step 1 — Basic Details
+    var studentName by remember { mutableStateOf("") }
+    var fatherName by remember { mutableStateOf("") }
+    var motherName by remember { mutableStateOf("") }
+    var parentOccupation by remember { mutableStateOf("") }
+    var gender by remember { mutableStateOf("") }
     var dob by remember { mutableStateOf("") }
+    var admissionDate by remember { mutableStateOf("") }
+    var admissionFee by remember { mutableStateOf("") }
+    var studentCategory by remember { mutableStateOf("") }
     var bloodGroup by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("") }
     var religion by remember { mutableStateOf("") }
     var aadhaarNo by remember { mutableStateOf("") }
     var studentMobile by remember { mutableStateOf("") }
-    var studentEmail by remember { mutableStateOf("") }
-
-    // Academic Info
-    var studentCategory by remember { mutableStateOf("New Admission") }
-    var rollNo by remember { mutableStateOf("") }
     var srNo by remember { mutableStateOf("") }
-    var admissionDate by remember { mutableStateOf("") }
-    var admissionFee by remember { mutableStateOf("") }
+    var rollNo by remember { mutableStateOf("") }
 
-    // Parent Info
-    var fatherName by remember { mutableStateOf("") }
-    var fatherPhone by remember { mutableStateOf("") }
-    var motherName by remember { mutableStateOf("") }
-    var parentOccupation by remember { mutableStateOf("") }
-
-    // Address
+    // Step 2 — Address
     var currentAddressLine by remember { mutableStateOf("") }
-    var currentCity by remember { mutableStateOf("") }
     var currentState by remember { mutableStateOf("") }
-    var currentCountry by remember { mutableStateOf("India") }
+    var currentCity by remember { mutableStateOf("") }
+    var currentCountry by remember { mutableStateOf("") }
     var currentPinCode by remember { mutableStateOf("") }
-    var sameAsCurrent by remember { mutableStateOf(true) }
+    var sameAsCurrent by remember { mutableStateOf(false) }
     var permanentAddressLine by remember { mutableStateOf("") }
-    var permanentCity by remember { mutableStateOf("") }
     var permanentState by remember { mutableStateOf("") }
-    var permanentCountry by remember { mutableStateOf("India") }
+    var permanentCity by remember { mutableStateOf("") }
+    var permanentCountry by remember { mutableStateOf("") }
     var permanentPinCode by remember { mutableStateOf("") }
 
     var formError by remember { mutableStateOf<String?>(null) }
@@ -134,65 +135,81 @@ fun SchoolAdminEnrollStudentScreen(
             val response = RetrofitClient.apiService.getClasses()
             if (response.isSuccessful && response.body()?.data != null) {
                 allClasses = response.body()!!.data
-                selectedClass = allClasses.firstOrNull {
+                sectionsForClass = allClasses.filter {
                     it.name.trim().equals(preselectClassName?.trim(), ignoreCase = true)
                 }
+                selectedSection = sectionsForClass.firstOrNull()
             }
         } catch (_: Exception) {
         }
     }
 
-    // Mirrors SchoolAdminService::createStudent's server-side validation
-    // (backend/src/Domain/SchoolAdmin/Services/SchoolAdminService.php, ~line 1134) so invalid
-    // input is caught client-side before hitting the network, with the same rules:
-    // required first/last name+gender+dob+class, digits-only mobile/roll/sr numbers, 12-digit
-    // aadhaar, valid email format, and a 50-char cap on address lines.
-    fun validate(): Set<String> {
+    // Mirrors the real web form's exact required-field messages (captured live from the
+    // Basic Details step's validation errors).
+    fun validateStep1(): Set<String> {
         val invalid = mutableSetOf<String>()
-        if (selectedClass == null) invalid += "class"
-        if (firstName.isBlank()) invalid += "first_name"
-        if (lastName.isBlank()) invalid += "last_name"
+        if (studentName.isBlank()) invalid += "student_name"
+        if (fatherName.isBlank()) invalid += "father_name"
+        if (motherName.isBlank()) invalid += "mother_name"
         if (gender.isBlank()) invalid += "gender"
         if (dob.isBlank()) invalid += "dob"
-        if (studentEmail.isNotBlank() && !android.util.Patterns.EMAIL_ADDRESS.matcher(studentEmail).matches()) invalid += "student_email"
-        if (studentMobile.isNotBlank() && !studentMobile.all { it.isDigit() }) invalid += "student_mobile"
-        if (fatherPhone.isNotBlank() && !fatherPhone.all { it.isDigit() }) invalid += "father_phone"
-        if (rollNo.isNotBlank() && !rollNo.all { it.isDigit() }) invalid += "roll_no"
-        if (srNo.isNotBlank() && !srNo.all { it.isDigit() }) invalid += "sr_no"
+        if (studentCategory.isBlank()) invalid += "student_category"
+        if (studentMobile.isBlank()) invalid += "student_mobile"
+        else if (!studentMobile.all { it.isDigit() }) invalid += "student_mobile"
+        if (srNo.isBlank()) invalid += "sr_no"
+        if (selectedSection == null) invalid += "section_name"
         if (aadhaarNo.isNotBlank() && !Regex("^\\d{12}$").matches(aadhaarNo)) invalid += "aadhaar_no"
-        if (currentAddressLine.trim().length > 50) invalid += "current_address_line"
-        if (!sameAsCurrent && permanentAddressLine.trim().length > 50) invalid += "permanent_address_line"
         return invalid
     }
 
-    fun submit() {
-        val invalid = validate()
+    fun validateStep2(): Set<String> {
+        val invalid = mutableSetOf<String>()
+        if (currentAddressLine.isBlank()) invalid += "current_address_line"
+        else if (currentAddressLine.trim().length > 50) invalid += "current_address_line"
+        if (currentState.isBlank()) invalid += "current_state"
+        if (currentCity.isBlank()) invalid += "current_city"
+        if (currentPinCode.isBlank()) invalid += "current_pin_code"
+        if (!sameAsCurrent) {
+            if (permanentAddressLine.isBlank()) invalid += "permanent_address_line"
+            else if (permanentAddressLine.trim().length > 50) invalid += "permanent_address_line"
+            if (permanentState.isBlank()) invalid += "permanent_state"
+            if (permanentCity.isBlank()) invalid += "permanent_city"
+            if (permanentPinCode.isBlank()) invalid += "permanent_pin_code"
+        }
+        return invalid
+    }
+
+    fun goNext() {
+        val invalid = when (step) {
+            1 -> validateStep1()
+            2 -> validateStep2()
+            else -> emptySet()
+        }
         invalidFields = invalid
         if (invalid.isNotEmpty()) {
-            formError = when {
-                invalid.any { it in setOf("class", "first_name", "last_name", "gender", "dob") } ->
-                    "Please fill in all required fields (marked in red)."
-                "student_email" in invalid -> "Enter a valid email address."
-                "student_mobile" in invalid -> "Student mobile must contain only digits."
-                "father_phone" in invalid -> "Father phone must contain only digits."
-                "roll_no" in invalid -> "Roll no. must contain only digits."
-                "sr_no" in invalid -> "SR no. must contain only digits."
-                "aadhaar_no" in invalid -> "Aadhaar no. must be exactly 12 digits."
-                "current_address_line" in invalid || "permanent_address_line" in invalid -> "Address line cannot exceed 50 characters."
-                else -> "Please fix the highlighted fields."
-            }
+            formError = "Please fill in all required fields (marked in red)."
             return
         }
-        val cls = selectedClass!!
+        formError = null
+        step += 1
+    }
+
+    fun submit() {
+        val section = selectedSection ?: return
+        val nameParts = studentName.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+        val firstName = nameParts.firstOrNull().orEmpty()
+        val lastName = if (nameParts.size > 1) nameParts.last() else ""
+        val middleName = if (nameParts.size > 2) nameParts.subList(1, nameParts.size - 1).joinToString(" ") else null
+
         isSaving = true
         formError = null
         scope.launch {
             try {
                 val response = RetrofitClient.apiService.createStudent(
                     CreateStudentRequestDto(
-                        first_name = firstName.trim(),
-                        middle_name = middleName.ifBlank { null },
-                        last_name = lastName.trim(),
+                        first_name = firstName,
+                        middle_name = middleName,
+                        last_name = lastName,
                         gender = gender,
                         dob = dob.trim(),
                         blood_group = bloodGroup.ifBlank { null },
@@ -200,15 +217,15 @@ fun SchoolAdminEnrollStudentScreen(
                         religion = religion.ifBlank { null },
                         aadhaar_no = aadhaarNo.ifBlank { null },
                         student_mobile = studentMobile.ifBlank { null },
-                        student_email = studentEmail.ifBlank { null },
-                        class_id = cls.id,
+                        student_email = null,
+                        class_id = section.id,
                         sr_no = srNo.ifBlank { null },
                         student_category = studentCategory,
                         roll_no = rollNo.ifBlank { null },
                         admission_date = admissionDate.ifBlank { null },
                         admission_fee = admissionFee.toDoubleOrNull(),
                         father_name = fatherName.ifBlank { null },
-                        father_phone = fatherPhone.ifBlank { null },
+                        father_phone = studentMobile.ifBlank { null },
                         mother_name = motherName.ifBlank { null },
                         parent_occupation = parentOccupation.ifBlank { null },
                         current_address_line = currentAddressLine.ifBlank { null },
@@ -270,7 +287,7 @@ fun SchoolAdminEnrollStudentScreen(
                             .clip(CircleShape)
                             .background(FrostedCard)
                             .border(width = 1.dp, color = CardBorder, shape = CircleShape)
-                            .clickable { onBack() },
+                            .clickable { if (step > 1) step -= 1 else onBack() },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(imageVector = Icons.Default.ArrowBackIos, contentDescription = "Back", tint = TextPrimary, modifier = Modifier.size(20.dp))
@@ -279,128 +296,55 @@ fun SchoolAdminEnrollStudentScreen(
                     Text(text = "Enroll New Student", fontSize = 15.5.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
                 }
 
+                WizardStepper(step)
+
                 Column(
                     modifier = Modifier
-                        .fillMaxSize()
+                        .weight(1f)
                         .verticalScroll(rememberScrollState())
                         .padding(horizontal = 16.dp)
                 ) {
-                    SectionHeader("Academic Info")
-
-                    FieldLabel("Class *")
-                    ClassPicker(allClasses, selectedClass, isError = invalidFields.contains("class")) { selectedClass = it }
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    FieldLabel("Category *")
-                    ChoiceRow(listOf("New Admission", "Existing Student"), studentCategory) { studentCategory = it }
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    TwoFieldRow(
-                        "SR No.", srNo, { srNo = it },
-                        "Roll No.", rollNo, { rollNo = it },
-                        isError1 = invalidFields.contains("sr_no"),
-                        isError2 = invalidFields.contains("roll_no")
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    TwoFieldRow(
-                        "Admission Date (YYYY-MM-DD)", admissionDate, { admissionDate = it },
-                        "Admission Fee", admissionFee, { admissionFee = it }
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-                    SectionHeader("Student Info")
-
-                    TwoFieldRow(
-                        "First Name *", firstName, { firstName = it },
-                        "Middle Name", middleName, { middleName = it },
-                        isError1 = invalidFields.contains("first_name")
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    SingleField("Last Name *", lastName, isError = invalidFields.contains("last_name")) { lastName = it }
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    FieldLabel("Gender *")
-                    ChoiceRow(listOf("Male", "Female", "Other"), gender, isError = invalidFields.contains("gender")) { gender = it }
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    SingleField("Date of Birth (YYYY-MM-DD) *", dob, isError = invalidFields.contains("dob")) { dob = it }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            DropdownField("Blood Group", BLOOD_GROUPS, bloodGroup) { bloodGroup = it }
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            DropdownField("Category", STUDENT_CATEGORIES, category) { category = it }
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    SingleField("Religion", religion) { religion = it }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    SingleField("Aadhaar No. (12 digits)", aadhaarNo, isError = invalidFields.contains("aadhaar_no")) { aadhaarNo = it }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    TwoFieldRow(
-                        "Student Mobile", studentMobile, { studentMobile = it },
-                        "Student Email", studentEmail, { studentEmail = it },
-                        isError1 = invalidFields.contains("student_mobile"),
-                        isError2 = invalidFields.contains("student_email")
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-                    SectionHeader("Parent Info")
-
-                    TwoFieldRow(
-                        "Father Name", fatherName, { fatherName = it },
-                        "Father Phone", fatherPhone, { fatherPhone = it },
-                        isError2 = invalidFields.contains("father_phone")
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    TwoFieldRow(
-                        "Mother Name", motherName, { motherName = it },
-                        "Parent Occupation", parentOccupation, { parentOccupation = it }
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-                    SectionHeader("Current Address")
-
-                    SingleField("Address Line", currentAddressLine, isError = invalidFields.contains("current_address_line")) { currentAddressLine = it }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    TwoFieldRow(
-                        "City", currentCity, { currentCity = it },
-                        "State", currentState, { currentState = it }
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    TwoFieldRow(
-                        "Country", currentCountry, { currentCountry = it },
-                        "Pin Code", currentPinCode, { currentPinCode = it }
-                    )
-
-                    Spacer(modifier = Modifier.height(11.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(text = "Permanent address same as current", fontSize = 10.5.sp, color = TextSecondary)
-                        Switch(
-                            checked = sameAsCurrent,
-                            onCheckedChange = { sameAsCurrent = it },
-                            colors = SwitchDefaults.colors(checkedThumbColor = SunsetOrange)
+                    when (step) {
+                        1 -> BasicDetailsStep(
+                            studentName, { studentName = it },
+                            fatherName, { fatherName = it },
+                            motherName, { motherName = it },
+                            parentOccupation, { parentOccupation = it },
+                            gender, { gender = it },
+                            dob, { dob = it },
+                            admissionDate, { admissionDate = it },
+                            admissionFee, { admissionFee = it },
+                            studentCategory, { studentCategory = it },
+                            bloodGroup, { bloodGroup = it },
+                            category, { category = it },
+                            religion, { religion = it },
+                            aadhaarNo, { aadhaarNo = it },
+                            studentMobile, { studentMobile = it },
+                            srNo, { srNo = it },
+                            sectionsForClass, selectedSection, { selectedSection = it },
+                            rollNo, { rollNo = it },
+                            invalidFields
                         )
-                    }
-
-                    if (!sameAsCurrent) {
-                        Spacer(modifier = Modifier.height(11.dp))
-                        SectionHeader("Permanent Address")
-                        SingleField("Address Line", permanentAddressLine, isError = invalidFields.contains("permanent_address_line")) { permanentAddressLine = it }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        TwoFieldRow(
-                            "City", permanentCity, { permanentCity = it },
-                            "State", permanentState, { permanentState = it }
+                        2 -> AddressStep(
+                            currentAddressLine, { currentAddressLine = it },
+                            currentState, { currentState = it },
+                            currentCity, { currentCity = it },
+                            currentCountry, { currentCountry = it },
+                            currentPinCode, { currentPinCode = it },
+                            sameAsCurrent, { sameAsCurrent = it },
+                            permanentAddressLine, { permanentAddressLine = it },
+                            permanentState, { permanentState = it },
+                            permanentCity, { permanentCity = it },
+                            permanentCountry, { permanentCountry = it },
+                            permanentPinCode, { permanentPinCode = it },
+                            invalidFields
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        TwoFieldRow(
-                            "Country", permanentCountry, { permanentCountry = it },
-                            "Pin Code", permanentPinCode, { permanentPinCode = it }
+                        3 -> DocumentUploadsStep()
+                        4 -> ReviewStep(
+                            studentName, gender, dob, aadhaarNo, studentMobile,
+                            selectedSection, rollNo, srNo,
+                            fatherName, motherName, parentOccupation,
+                            currentAddressLine, currentCity, currentState, currentPinCode
                         )
                     }
 
@@ -410,16 +354,34 @@ fun SchoolAdminEnrollStudentScreen(
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
-                    Button(
-                        onClick = { submit() },
-                        enabled = !isSaving,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = SunsetOrange)
-                    ) {
-                        if (isSaving) {
-                            ThreeDotsLoader(dotSize = 6.dp, dotColor = Color.White, spaceBetween = 4.dp, travelDistance = 4.dp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        if (step < 4) {
+                            OutlinedButton(onClick = { if (step > 1) step -= 1 else onBack() }, modifier = Modifier.weight(1f)) {
+                                Text(if (step > 1) "Previous" else "Cancel")
+                            }
+                            Button(
+                                onClick = { goNext() },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = SunsetOrange)
+                            ) {
+                                Text("Next Step", fontWeight = FontWeight.Bold)
+                            }
                         } else {
-                            Text("Enroll Student", fontWeight = FontWeight.Bold)
+                            OutlinedButton(onClick = { step -= 1 }, modifier = Modifier.weight(1f)) {
+                                Text("Previous")
+                            }
+                            Button(
+                                onClick = { submit() },
+                                enabled = !isSaving,
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = SunsetOrange)
+                            ) {
+                                if (isSaving) {
+                                    ThreeDotsLoader(dotSize = 6.dp, dotColor = Color.White, spaceBetween = 4.dp, travelDistance = 4.dp)
+                                } else {
+                                    Text("Submit", fontWeight = FontWeight.Bold)
+                                }
+                            }
                         }
                     }
                     Spacer(modifier = Modifier.height(19.dp))
@@ -427,6 +389,242 @@ fun SchoolAdminEnrollStudentScreen(
             }
         }
     }
+}
+
+@Composable
+private fun WizardStepper(currentStep: Int) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        WIZARD_STEPS.forEachIndexed { index, title ->
+            val stepNo = index + 1
+            val isActive = stepNo == currentStep
+            val isDone = stepNo < currentStep
+            Text(
+                text = "$stepNo. $title",
+                fontSize = 9.5.sp,
+                fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Medium,
+                color = when {
+                    isActive -> SunsetOrange
+                    isDone -> TextPrimary
+                    else -> TextSecondary
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun BasicDetailsStep(
+    studentName: String, onStudentName: (String) -> Unit,
+    fatherName: String, onFatherName: (String) -> Unit,
+    motherName: String, onMotherName: (String) -> Unit,
+    parentOccupation: String, onParentOccupation: (String) -> Unit,
+    gender: String, onGender: (String) -> Unit,
+    dob: String, onDob: (String) -> Unit,
+    admissionDate: String, onAdmissionDate: (String) -> Unit,
+    admissionFee: String, onAdmissionFee: (String) -> Unit,
+    studentCategory: String, onStudentCategory: (String) -> Unit,
+    bloodGroup: String, onBloodGroup: (String) -> Unit,
+    category: String, onCategory: (String) -> Unit,
+    religion: String, onReligion: (String) -> Unit,
+    aadhaarNo: String, onAadhaarNo: (String) -> Unit,
+    studentMobile: String, onStudentMobile: (String) -> Unit,
+    srNo: String, onSrNo: (String) -> Unit,
+    sections: List<ClassDto>, selectedSection: ClassDto?, onSelectSection: (ClassDto) -> Unit,
+    rollNo: String, onRollNo: (String) -> Unit,
+    invalidFields: Set<String>
+) {
+    SectionHeader("Basic Details")
+
+    SingleField("Student Name *", studentName, isError = invalidFields.contains("student_name")) { onStudentName(it) }
+    Spacer(modifier = Modifier.height(8.dp))
+    SingleField("Father Name *", fatherName, isError = invalidFields.contains("father_name")) { onFatherName(it) }
+    Spacer(modifier = Modifier.height(8.dp))
+    SingleField("Mother Name *", motherName, isError = invalidFields.contains("mother_name")) { onMotherName(it) }
+    Spacer(modifier = Modifier.height(8.dp))
+    SingleField("Parent Occupation", parentOccupation) { onParentOccupation(it) }
+    Spacer(modifier = Modifier.height(8.dp))
+
+    DropdownField("Gender *", GENDERS, gender, isError = invalidFields.contains("gender")) { onGender(it) }
+    Spacer(modifier = Modifier.height(8.dp))
+    SingleField("Date of Birth (YYYY-MM-DD) *", dob, isError = invalidFields.contains("dob")) { onDob(it) }
+    Spacer(modifier = Modifier.height(8.dp))
+    SingleField("Admission Date (YYYY-MM-DD) *", admissionDate) { onAdmissionDate(it) }
+    Spacer(modifier = Modifier.height(8.dp))
+    SingleField("Admission Fee", admissionFee) { onAdmissionFee(it) }
+    Spacer(modifier = Modifier.height(8.dp))
+
+    DropdownField("Student Category *", STUDENT_CATEGORIES, studentCategory, isError = invalidFields.contains("student_category")) { onStudentCategory(it) }
+    Spacer(modifier = Modifier.height(8.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(modifier = Modifier.weight(1f)) {
+            DropdownField("Blood Group", BLOOD_GROUPS, bloodGroup) { onBloodGroup(it) }
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            DropdownField("Category", CATEGORIES, category) { onCategory(it) }
+        }
+    }
+    Spacer(modifier = Modifier.height(8.dp))
+    SingleField("Religion", religion) { onReligion(it) }
+    Spacer(modifier = Modifier.height(8.dp))
+    SingleField("Aadhaar Number", aadhaarNo, isError = invalidFields.contains("aadhaar_no")) { onAadhaarNo(it) }
+    Spacer(modifier = Modifier.height(8.dp))
+    SingleField("Contact Number *", studentMobile, isError = invalidFields.contains("student_mobile")) { onStudentMobile(it) }
+    Spacer(modifier = Modifier.height(8.dp))
+    SingleField("SR Number *", srNo, isError = invalidFields.contains("sr_no")) { onSrNo(it) }
+    Spacer(modifier = Modifier.height(8.dp))
+    SectionPicker(sections, selectedSection, isError = invalidFields.contains("section_name")) { onSelectSection(it) }
+    Spacer(modifier = Modifier.height(8.dp))
+    SingleField("Roll Number", rollNo) { onRollNo(it) }
+}
+
+@Composable
+private fun AddressStep(
+    currentAddressLine: String, onCurrentAddressLine: (String) -> Unit,
+    currentState: String, onCurrentState: (String) -> Unit,
+    currentCity: String, onCurrentCity: (String) -> Unit,
+    currentCountry: String, onCurrentCountry: (String) -> Unit,
+    currentPinCode: String, onCurrentPinCode: (String) -> Unit,
+    sameAsCurrent: Boolean, onSameAsCurrent: (Boolean) -> Unit,
+    permanentAddressLine: String, onPermanentAddressLine: (String) -> Unit,
+    permanentState: String, onPermanentState: (String) -> Unit,
+    permanentCity: String, onPermanentCity: (String) -> Unit,
+    permanentCountry: String, onPermanentCountry: (String) -> Unit,
+    permanentPinCode: String, onPermanentPinCode: (String) -> Unit,
+    invalidFields: Set<String>
+) {
+    SectionHeader("Current Address")
+    SingleField("Address *", currentAddressLine, isError = invalidFields.contains("current_address_line")) { onCurrentAddressLine(it) }
+    Spacer(modifier = Modifier.height(8.dp))
+    TwoFieldRow(
+        "State *", currentState, { onCurrentState(it) },
+        "City *", currentCity, { onCurrentCity(it) },
+        isError1 = invalidFields.contains("current_state"),
+        isError2 = invalidFields.contains("current_city")
+    )
+    Spacer(modifier = Modifier.height(8.dp))
+    TwoFieldRow(
+        "Country", currentCountry, { onCurrentCountry(it) },
+        "Pin Code *", currentPinCode, { onCurrentPinCode(it) },
+        isError2 = invalidFields.contains("current_pin_code")
+    )
+
+    Spacer(modifier = Modifier.height(11.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text = "Permanent address same as current address", fontSize = 10.5.sp, color = TextSecondary)
+        Switch(
+            checked = sameAsCurrent,
+            onCheckedChange = onSameAsCurrent,
+            colors = SwitchDefaults.colors(checkedThumbColor = SunsetOrange)
+        )
+    }
+
+    if (!sameAsCurrent) {
+        Spacer(modifier = Modifier.height(11.dp))
+        SectionHeader("Permanent Address")
+        SingleField("Address *", permanentAddressLine, isError = invalidFields.contains("permanent_address_line")) { onPermanentAddressLine(it) }
+        Spacer(modifier = Modifier.height(8.dp))
+        TwoFieldRow(
+            "State *", permanentState, { onPermanentState(it) },
+            "City *", permanentCity, { onPermanentCity(it) },
+            isError1 = invalidFields.contains("permanent_state"),
+            isError2 = invalidFields.contains("permanent_city")
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        TwoFieldRow(
+            "Country", permanentCountry, { onPermanentCountry(it) },
+            "Pin Code *", permanentPinCode, { onPermanentPinCode(it) },
+            isError2 = invalidFields.contains("permanent_pin_code")
+        )
+    }
+}
+
+@Composable
+private fun DocumentUploadsStep() {
+    SectionHeader("Student Records Upload")
+    Text(
+        text = "Upload scanned copies/images of primary documentation. Accepted: PNG, JPG, PDF (Max 5MB).",
+        fontSize = 10.sp,
+        color = TextSecondary
+    )
+    Spacer(modifier = Modifier.height(12.dp))
+    listOf(
+        "Student Photo", "Birth Certificate", "Aadhaar Card",
+        "Transfer Certificate (TC)", "Previous Report Card", "Additional Documents"
+    ).forEach { label ->
+        FieldLabel(label)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(FrostedCard)
+                .border(width = 1.dp, color = CardBorder, shape = RoundedCornerShape(10.dp))
+                .padding(horizontal = 12.dp, vertical = 10.dp)
+        ) {
+            Text(text = "Not supported on this app yet — you can add documents later from the web portal.", fontSize = 9.5.sp, color = TextSecondary)
+        }
+        Spacer(modifier = Modifier.height(10.dp))
+    }
+}
+
+@Composable
+private fun ReviewStep(
+    studentName: String, gender: String, dob: String, aadhaarNo: String, studentMobile: String,
+    selectedSection: ClassDto?, rollNo: String, srNo: String,
+    fatherName: String, motherName: String, parentOccupation: String,
+    currentAddressLine: String, currentCity: String, currentState: String, currentPinCode: String
+) {
+    SectionHeader("Review Enrollment Summary")
+
+    ReviewGroup("Student Profile") {
+        ReviewLine("Full Name", studentName.ifBlank { "-" })
+        ReviewLine("Gender / DOB", "${gender.ifBlank { "-" }} / ${dob.ifBlank { "-" }}")
+        ReviewLine("Aadhaar No", aadhaarNo.ifBlank { "-" })
+        ReviewLine("Mobile", studentMobile.ifBlank { "-" })
+    }
+    Spacer(modifier = Modifier.height(12.dp))
+    ReviewGroup("Academic Details") {
+        ReviewLine("Class Assigned", selectedSection?.let { "${it.name}${it.section?.let { s -> " - $s" } ?: ""}" } ?: "-")
+        ReviewLine("Roll No", rollNo.ifBlank { "-" })
+        ReviewLine("SR Number", srNo.ifBlank { "-" })
+    }
+    Spacer(modifier = Modifier.height(12.dp))
+    ReviewGroup("Parent Info") {
+        ReviewLine("Father Name", fatherName.ifBlank { "-" })
+        ReviewLine("Mother Name", motherName.ifBlank { "-" })
+        ReviewLine("Occupation", parentOccupation.ifBlank { "-" })
+    }
+    Spacer(modifier = Modifier.height(12.dp))
+    ReviewGroup("Current Address") {
+        Text(
+            text = listOf(currentAddressLine, currentCity, currentState).filter { it.isNotBlank() }
+                .joinToString(", ").let { if (currentPinCode.isNotBlank()) "$it - $currentPinCode" else it }
+                .ifBlank { "-" },
+            fontSize = 11.sp,
+            color = TextPrimary
+        )
+    }
+}
+
+@Composable
+private fun ReviewGroup(title: String, content: @Composable () -> Unit) {
+    Text(text = title.uppercase(), fontSize = 9.sp, fontWeight = FontWeight.ExtraBold, color = SunsetOrange, letterSpacing = 1.sp)
+    Spacer(modifier = Modifier.height(6.dp))
+    content()
+}
+
+@Composable
+private fun ReviewLine(label: String, value: String) {
+    Text(text = "$label: $value", fontSize = 11.sp, color = TextPrimary)
+    Spacer(modifier = Modifier.height(3.dp))
 }
 
 @Composable
@@ -508,57 +706,41 @@ private fun TwoFieldRow(
 }
 
 @Composable
-private fun ChoiceRow(options: List<String>, selected: String, isError: Boolean = false, onSelect: (String) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        options.forEach { option ->
-            val isSelected = selected == option
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(if (isSelected) SunsetOrange.copy(alpha = 0.18f) else FrostedCard)
-                    .border(width = 1.dp, color = if (isSelected) SunsetOrange else if (isError) DangerRed else CardBorder, shape = RoundedCornerShape(10.dp))
-                    .clickable { onSelect(option) }
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
-            ) {
-                Text(text = option, fontSize = 10.sp, fontWeight = FontWeight.Medium, color = if (isSelected) SunsetOrange else TextPrimary)
-            }
-        }
-    }
-}
-
-@Composable
-private fun ClassPicker(classes: List<ClassDto>, selected: ClassDto?, isError: Boolean = false, onSelect: (ClassDto) -> Unit) {
+private fun SectionPicker(sections: List<ClassDto>, selected: ClassDto?, isError: Boolean = false, onSelect: (ClassDto) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
+    FieldLabel("Select Section *")
     Box(modifier = Modifier.fillMaxWidth()) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
+                .height(48.dp)
                 .clip(RoundedCornerShape(14.dp))
                 .background(FrostedCard)
                 .border(width = 1.dp, color = if (isError) DangerRed else CardBorder, shape = RoundedCornerShape(14.dp))
                 .clickable { expanded = true }
-                .padding(horizontal = 11.dp, vertical = 11.dp)
+                .padding(horizontal = 11.dp),
+            contentAlignment = Alignment.CenterStart
         ) {
             Text(
-                text = selected?.let { "${it.name}${it.section?.let { s -> " - $s" } ?: ""}" } ?: "Select a class",
+                text = selected?.section?.let { "Section $it" } ?: "Select Section...",
                 fontSize = 12.sp,
                 color = if (selected != null) TextPrimary else TextSecondary
             )
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, modifier = Modifier.heightIn(max = 300.dp)) {
-            classes.distinctBy { it.id }.forEach { cls ->
+            sections.forEach { section ->
                 DropdownMenuItem(
-                    text = { Text("${cls.name}${cls.section?.let { s -> " - $s" } ?: ""}") },
-                    onClick = { onSelect(cls); expanded = false }
+                    text = { Text(section.section?.let { "Section $it" } ?: section.name) },
+                    onClick = { onSelect(section); expanded = false }
                 )
             }
         }
     }
 }
 
-/** Fixed-option picker matching a web `<select>` field (e.g. Blood Group, Category). */
+/** Fixed-option picker matching a web `<select>` field. */
 @Composable
-private fun DropdownField(label: String, options: List<String>, selected: String, onSelect: (String) -> Unit) {
+private fun DropdownField(label: String, options: List<String>, selected: String, isError: Boolean = false, onSelect: (String) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     FieldLabel(label)
     Box(modifier = Modifier.fillMaxWidth()) {
@@ -568,7 +750,7 @@ private fun DropdownField(label: String, options: List<String>, selected: String
                 .height(48.dp)
                 .clip(RoundedCornerShape(14.dp))
                 .background(FrostedCard)
-                .border(width = 1.dp, color = CardBorder, shape = RoundedCornerShape(14.dp))
+                .border(width = 1.dp, color = if (isError) DangerRed else CardBorder, shape = RoundedCornerShape(14.dp))
                 .clickable { expanded = true }
                 .padding(horizontal = 11.dp),
             contentAlignment = Alignment.CenterStart
