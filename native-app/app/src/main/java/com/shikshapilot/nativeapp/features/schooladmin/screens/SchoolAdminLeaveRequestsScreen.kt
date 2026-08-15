@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.sp
 import com.shikshapilot.nativeapp.data.remote.LeaveRequestItemDto
 import com.shikshapilot.nativeapp.data.remote.RetrofitClient
 import com.shikshapilot.nativeapp.data.remote.UpdateLeaveStatusRequestDto
+import com.shikshapilot.nativeapp.ui.components.PullToRefreshWrapper
 import com.shikshapilot.nativeapp.ui.components.StickyTopBar
 import com.shikshapilot.nativeapp.ui.components.ThreeDotsLoader
 import com.shikshapilot.nativeapp.ui.theme.CardBorder
@@ -68,6 +69,7 @@ fun SchoolAdminLeaveRequestsScreen(
     val scope = rememberCoroutineScope()
     var leaveRequests by remember { mutableStateOf<List<LeaveRequestItemDto>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var refreshKey by remember { mutableStateOf(0) }
 
     val defaultLeaves = remember {
         listOf(
@@ -107,7 +109,7 @@ fun SchoolAdminLeaveRequestsScreen(
         )
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(refreshKey) {
         isLoading = true
         try {
             val response = RetrofitClient.apiService.getSchoolLeaveRequests()
@@ -132,6 +134,7 @@ fun SchoolAdminLeaveRequestsScreen(
                 .padding(paddingValues)
                 .background(DarkCanvas)
         ) {
+            PullToRefreshWrapper(isRefreshing = isLoading, onRefresh = { refreshKey++ }) {
             Column(modifier = Modifier.fillMaxSize()) {
                 StickyTopBar(
                     schoolName = schoolName,
@@ -389,6 +392,7 @@ fun SchoolAdminLeaveRequestsScreen(
                         }
                     }
                 }
+            }
             }
         }
     }

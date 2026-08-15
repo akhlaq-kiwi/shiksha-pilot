@@ -48,6 +48,7 @@ import com.shikshapilot.nativeapp.data.remote.ClassDto
 import com.shikshapilot.nativeapp.data.remote.PublishTimetableRequestDto
 import com.shikshapilot.nativeapp.data.remote.RetrofitClient
 import com.shikshapilot.nativeapp.data.remote.TimetableDayScheduleDto
+import com.shikshapilot.nativeapp.ui.components.PullToRefreshWrapper
 import com.shikshapilot.nativeapp.ui.components.StickyTopBar
 import com.shikshapilot.nativeapp.ui.components.ThreeDotsLoader
 import com.shikshapilot.nativeapp.ui.theme.CardBorder
@@ -104,12 +105,13 @@ fun SchoolAdminTimetableScreen(
     var isPublishing by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var publishMessage by remember { mutableStateOf<String?>(null) }
+    var refreshKey by remember { mutableStateOf(0) }
 
     val todayDate = remember {
         SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(java.util.Date())
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(refreshKey) {
         isLoadingClasses = true
         try {
             val response = RetrofitClient.apiService.getClasses()
@@ -126,7 +128,7 @@ fun SchoolAdminTimetableScreen(
         }
     }
 
-    LaunchedEffect(selectedClass) {
+    LaunchedEffect(selectedClass, refreshKey) {
         val cls = selectedClass ?: return@LaunchedEffect
         isLoadingTimetable = true
         errorMessage = null
@@ -152,6 +154,7 @@ fun SchoolAdminTimetableScreen(
                 .padding(paddingValues)
                 .background(DarkCanvas)
         ) {
+            PullToRefreshWrapper(isRefreshing = isLoadingClasses || isLoadingTimetable, onRefresh = { refreshKey++ }) {
             Column(modifier = Modifier.fillMaxSize()) {
                 StickyTopBar(
                     schoolName = schoolName,
@@ -422,6 +425,7 @@ fun SchoolAdminTimetableScreen(
                         }
                     }
                 }
+            }
             }
         }
     }

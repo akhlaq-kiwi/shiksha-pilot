@@ -23,6 +23,7 @@ import com.shikshapilot.nativeapp.data.remote.ReportCardDto
 import com.shikshapilot.nativeapp.data.remote.RetrofitClient
 import com.shikshapilot.nativeapp.data.remote.StudentExamDetailsDto
 import com.shikshapilot.nativeapp.data.remote.StudentExamListItemDto
+import com.shikshapilot.nativeapp.ui.components.PullToRefreshWrapper
 import com.shikshapilot.nativeapp.ui.components.StickyTopBar
 import com.shikshapilot.nativeapp.ui.components.ThreeDotsLoader
 import com.shikshapilot.nativeapp.ui.theme.*
@@ -91,6 +92,7 @@ fun StudentResultsScreen(
                 .padding(paddingValues)
                 .background(DarkCanvas)
         ) {
+            PullToRefreshWrapper(isRefreshing = isLoading, onRefresh = { loadExams() }) {
             Column(modifier = Modifier.fillMaxSize()) {
                 StickyTopBar(
                     schoolName = schoolName,
@@ -231,6 +233,7 @@ fun StudentResultsScreen(
                         }
                     }
                 }
+            }
             }
         }
     }

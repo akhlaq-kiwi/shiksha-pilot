@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.sp
 import com.shikshapilot.nativeapp.data.remote.ApplyLeaveRequestDto
 import com.shikshapilot.nativeapp.data.remote.RetrofitClient
 import com.shikshapilot.nativeapp.data.remote.TeacherLeaveItemDto
+import com.shikshapilot.nativeapp.ui.components.PullToRefreshWrapper
 import com.shikshapilot.nativeapp.ui.components.StickyTopBar
 import com.shikshapilot.nativeapp.ui.components.ThreeDotsLoader
 import com.shikshapilot.nativeapp.ui.theme.CardBorder
@@ -81,6 +82,7 @@ fun TeacherLeaveScreen(
     var fromDate by remember { mutableStateOf("") }
     var toDate by remember { mutableStateOf("") }
     var reason by remember { mutableStateOf("") }
+    var refreshKey by remember { mutableStateOf(0) }
 
     fun loadLeaves() {
         scope.launch {
@@ -101,7 +103,7 @@ fun TeacherLeaveScreen(
         }
     }
 
-    LaunchedEffect(Unit) { loadLeaves() }
+    LaunchedEffect(refreshKey) { loadLeaves() }
 
     Scaffold(containerColor = DarkCanvas) { paddingValues ->
         Box(
@@ -110,6 +112,7 @@ fun TeacherLeaveScreen(
                 .padding(paddingValues)
                 .background(DarkCanvas)
         ) {
+            PullToRefreshWrapper(isRefreshing = isLoading, onRefresh = { refreshKey++ }) {
             Column(modifier = Modifier.fillMaxSize()) {
                 StickyTopBar(
                     schoolName = schoolName,
@@ -254,6 +257,7 @@ fun TeacherLeaveScreen(
                         }
                     }
                 }
+            }
             }
 
             if (showApplyDialog) {

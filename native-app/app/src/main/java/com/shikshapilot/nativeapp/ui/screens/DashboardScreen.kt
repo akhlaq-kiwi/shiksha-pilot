@@ -60,6 +60,7 @@ import com.shikshapilot.nativeapp.ui.components.ChartPointData
 import com.shikshapilot.nativeapp.ui.components.MonthlyLineChartCard
 import com.shikshapilot.nativeapp.ui.components.NotificationsSheet
 import com.shikshapilot.nativeapp.ui.components.ProfileOptionsSheet
+import com.shikshapilot.nativeapp.ui.components.PullToRefreshWrapper
 import com.shikshapilot.nativeapp.ui.components.StickyBottomBar
 import com.shikshapilot.nativeapp.ui.components.StickyTopBar
 import com.shikshapilot.nativeapp.ui.theme.CardBorder
@@ -101,8 +102,12 @@ fun DashboardScreen(
         mutableStateOf(prefs.getBoolean("setup_progress_dismissed", false))
     }
 
+    var isLoading by remember { mutableStateOf(true) }
+    var refreshKey by remember { mutableStateOf(0) }
+
     // Live QA Server API Stats & Classes Refresh
-    LaunchedEffect(Unit) {
+    LaunchedEffect(refreshKey) {
+        isLoading = true
         SchoolAdminRepository.fetchSchoolStats()
         val classes = SchoolAdminRepository.fetchClassesFromApi()
         if (classes.isNotEmpty()) {
@@ -110,6 +115,7 @@ fun DashboardScreen(
             SchoolAdminRepository.fetchTimetableForClassFromApi(classes.first().id)
         }
         SchoolAdminRepository.fetchSetupProgress()
+        isLoading = false
     }
 
     // Dynamic Class Timetable Change Effect
@@ -211,6 +217,7 @@ fun DashboardScreen(
                 .padding(paddingValues)
                 .background(DarkCanvas)
         ) {
+            PullToRefreshWrapper(isRefreshing = isLoading, onRefresh = { refreshKey++ }) {
             Column(modifier = Modifier.fillMaxSize()) {
                 // 1. STICKY TOP BAR
                 StickyTopBar(
@@ -566,6 +573,7 @@ fun DashboardScreen(
 
                     Spacer(modifier = Modifier.height(30.dp))
                 }
+            }
             }
 
             // Notifications Bottom Sheet Modal

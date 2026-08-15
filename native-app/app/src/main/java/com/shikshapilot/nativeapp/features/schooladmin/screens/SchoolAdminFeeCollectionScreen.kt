@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.sp
 import com.shikshapilot.nativeapp.data.remote.CollectionHistoryItemDto
 import com.shikshapilot.nativeapp.data.remote.CreateFeePaymentRequestDto
 import com.shikshapilot.nativeapp.data.remote.RetrofitClient
+import com.shikshapilot.nativeapp.ui.components.PullToRefreshWrapper
 import com.shikshapilot.nativeapp.ui.components.StickyTopBar
 import com.shikshapilot.nativeapp.ui.components.ThreeDotsLoader
 import com.shikshapilot.nativeapp.ui.theme.CardBorder
@@ -112,6 +113,7 @@ fun SchoolAdminFeeCollectionScreen(
                 .padding(paddingValues)
                 .background(DarkCanvas)
         ) {
+            PullToRefreshWrapper(isRefreshing = isLoading, onRefresh = { reloadKey++ }) {
             Column(modifier = Modifier.fillMaxSize()) {
                 StickyTopBar(
                     schoolName = schoolName,
@@ -379,6 +381,7 @@ fun SchoolAdminFeeCollectionScreen(
                         }
                     }
                 }
+            }
             }
         }
     }

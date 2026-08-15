@@ -23,6 +23,7 @@ import com.shikshapilot.nativeapp.data.remote.AchievementItemDto
 import com.shikshapilot.nativeapp.data.remote.AchievementsDataDto
 import com.shikshapilot.nativeapp.data.remote.ReportCardDto
 import com.shikshapilot.nativeapp.data.remote.RetrofitClient
+import com.shikshapilot.nativeapp.ui.components.PullToRefreshWrapper
 import com.shikshapilot.nativeapp.ui.components.StickyTopBar
 import com.shikshapilot.nativeapp.ui.components.ThreeDotsLoader
 import com.shikshapilot.nativeapp.ui.theme.*
@@ -107,6 +108,7 @@ fun StudentAchievementsScreen(
                 .padding(paddingValues)
                 .background(DarkCanvas)
         ) {
+            PullToRefreshWrapper(isRefreshing = isLoading, onRefresh = { load() }) {
             Column(modifier = Modifier.fillMaxSize()) {
                 StickyTopBar(
                     schoolName = schoolName,
@@ -204,6 +206,7 @@ fun StudentAchievementsScreen(
                         }
                     }
                 }
+            }
             }
         }
     }

@@ -62,6 +62,7 @@ import com.shikshapilot.nativeapp.data.remote.CreateStaffRequestDto
 import com.shikshapilot.nativeapp.data.remote.RetrofitClient
 import com.shikshapilot.nativeapp.data.remote.StaffItemDto
 import com.shikshapilot.nativeapp.data.remote.UpdateStaffRequestDto
+import com.shikshapilot.nativeapp.ui.components.PullToRefreshWrapper
 import com.shikshapilot.nativeapp.ui.components.StickyTopBar
 import com.shikshapilot.nativeapp.ui.components.ThreeDotsLoader
 import com.shikshapilot.nativeapp.ui.theme.CardBorder
@@ -279,6 +280,7 @@ fun SchoolAdminStaffScreen(
                 .padding(paddingValues)
                 .background(DarkCanvas)
         ) {
+            PullToRefreshWrapper(isRefreshing = isLoading, onRefresh = { reloadKey++ }) {
             Column(modifier = Modifier.fillMaxSize()) {
                 StickyTopBar(
                     schoolName = schoolName,
@@ -539,6 +541,7 @@ fun SchoolAdminStaffScreen(
                         }
                     }
                 }
+            }
             }
         }
     }

@@ -23,6 +23,7 @@ import com.shikshapilot.nativeapp.data.remote.SaveMarkItemDto
 import com.shikshapilot.nativeapp.data.remote.SaveMarksSheetRequestDto
 import com.shikshapilot.nativeapp.data.remote.TeacherMarksSheetDto
 import com.shikshapilot.nativeapp.data.remote.TeacherMarksSheetStudentDto
+import com.shikshapilot.nativeapp.ui.components.PullToRefreshWrapper
 import com.shikshapilot.nativeapp.ui.components.ThreeDotsLoader
 import com.shikshapilot.nativeapp.ui.theme.*
 import kotlinx.coroutines.launch
@@ -46,6 +47,7 @@ fun TeacherMarksEntryScreen(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
     var toastMessage by remember { mutableStateOf<String?>(null) }
+    var refreshKey by remember { mutableStateOf(0) }
 
     // Per-student editable state, keyed by student_id
     val marksState = remember { mutableStateMapOf<Int, String>() }
@@ -81,7 +83,7 @@ fun TeacherMarksEntryScreen(
         }
     }
 
-    LaunchedEffect(examId, subjectId) { loadSheet() }
+    LaunchedEffect(examId, subjectId, refreshKey) { loadSheet() }
 
     if (toastMessage != null) {
         LaunchedEffect(toastMessage) {
@@ -122,6 +124,7 @@ fun TeacherMarksEntryScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize().background(DarkCanvas)) {
+        PullToRefreshWrapper(isRefreshing = isLoading, onRefresh = { refreshKey++ }) {
         Column(modifier = Modifier.fillMaxSize()) {
             Row(
                 modifier = Modifier
@@ -229,6 +232,7 @@ fun TeacherMarksEntryScreen(
                     }
                 }
             }
+        }
         }
 
         toastMessage?.let { msg ->

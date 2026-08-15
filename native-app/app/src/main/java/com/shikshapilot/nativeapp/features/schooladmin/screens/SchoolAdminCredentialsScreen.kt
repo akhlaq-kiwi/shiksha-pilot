@@ -47,6 +47,7 @@ import com.shikshapilot.nativeapp.data.remote.GenerateCredentialsRequestDto
 import com.shikshapilot.nativeapp.data.remote.RetrofitClient
 import com.shikshapilot.nativeapp.data.remote.StaffItemDto
 import com.shikshapilot.nativeapp.data.remote.StudentItemDto
+import com.shikshapilot.nativeapp.ui.components.PullToRefreshWrapper
 import com.shikshapilot.nativeapp.ui.components.StickyTopBar
 import com.shikshapilot.nativeapp.ui.components.ThreeDotsLoader
 import com.shikshapilot.nativeapp.ui.theme.CardBorder
@@ -82,6 +83,7 @@ fun SchoolAdminCredentialsScreen(
     var staff by remember { mutableStateOf<List<StaffItemDto>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var refreshKey by remember { mutableStateOf(0) }
 
     var selectedRole by remember { mutableStateOf<String?>(null) }
     var selectedId by remember { mutableStateOf<Int?>(null) }
@@ -90,7 +92,7 @@ fun SchoolAdminCredentialsScreen(
     var dialogCredentials by remember { mutableStateOf<CredentialsDto?>(null) }
     var dialogError by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(activeTab) {
+    LaunchedEffect(activeTab, refreshKey) {
         isLoading = true
         errorMessage = null
         try {
@@ -161,6 +163,7 @@ fun SchoolAdminCredentialsScreen(
                 .padding(paddingValues)
                 .background(DarkCanvas)
         ) {
+            PullToRefreshWrapper(isRefreshing = isLoading, onRefresh = { refreshKey++ }) {
             Column(modifier = Modifier.fillMaxSize()) {
                 StickyTopBar(schoolName = schoolName, unreadNotificationCount = 2, onNotificationClick = {}, onAvatarClick = {})
 
@@ -243,6 +246,7 @@ fun SchoolAdminCredentialsScreen(
                         }
                     }
                 }
+            }
             }
         }
     }

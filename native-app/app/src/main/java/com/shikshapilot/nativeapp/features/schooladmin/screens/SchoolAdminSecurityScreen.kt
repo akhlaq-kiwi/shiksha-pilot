@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.sp
 import com.shikshapilot.nativeapp.data.remote.AuditLogItemDto
 import com.shikshapilot.nativeapp.data.remote.LoginHistoryItemDto
 import com.shikshapilot.nativeapp.data.remote.RetrofitClient
+import com.shikshapilot.nativeapp.ui.components.PullToRefreshWrapper
 import com.shikshapilot.nativeapp.ui.components.StickyTopBar
 import com.shikshapilot.nativeapp.ui.components.ThreeDotsLoader
 import com.shikshapilot.nativeapp.ui.theme.CardBorder
@@ -69,8 +70,9 @@ fun SchoolAdminSecurityScreen(
     var loginHistory by remember { mutableStateOf<List<LoginHistoryItemDto>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var refreshKey by remember { mutableStateOf(0) }
 
-    LaunchedEffect(activeTab) {
+    LaunchedEffect(activeTab, refreshKey) {
         isLoading = true
         errorMessage = null
         try {
@@ -103,6 +105,7 @@ fun SchoolAdminSecurityScreen(
                 .padding(paddingValues)
                 .background(DarkCanvas)
         ) {
+            PullToRefreshWrapper(isRefreshing = isLoading, onRefresh = { refreshKey++ }) {
             Column(modifier = Modifier.fillMaxSize()) {
                 StickyTopBar(
                     schoolName = schoolName,
@@ -221,6 +224,7 @@ fun SchoolAdminSecurityScreen(
                         }
                     }
                 }
+            }
             }
         }
     }

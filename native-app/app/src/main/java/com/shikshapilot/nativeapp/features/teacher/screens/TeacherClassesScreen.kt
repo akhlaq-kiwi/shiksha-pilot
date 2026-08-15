@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.shikshapilot.nativeapp.data.remote.ClassDto
 import com.shikshapilot.nativeapp.data.remote.RetrofitClient
+import com.shikshapilot.nativeapp.ui.components.PullToRefreshWrapper
 import com.shikshapilot.nativeapp.ui.components.StickyTopBar
 import com.shikshapilot.nativeapp.ui.components.ThreeDotsLoader
 import com.shikshapilot.nativeapp.ui.theme.CardBorder
@@ -62,13 +63,14 @@ fun TeacherClassesScreen(
     var classesList by remember { mutableStateOf<List<ClassDto>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var refreshKey by remember { mutableStateOf(0) }
 
     // Lazily-fetched student counts per class id (backend does not return this on the
     // classes list itself, so it is resolved on demand via api/teacher/students?class_id=).
     val studentCounts = remember { mutableStateMapOf<Int, Int>() }
     val loadingCounts = remember { mutableStateMapOf<Int, Boolean>() }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(Unit, refreshKey) {
         isLoading = true
         errorMessage = null
         try {
@@ -92,6 +94,7 @@ fun TeacherClassesScreen(
                 .padding(paddingValues)
                 .background(DarkCanvas)
         ) {
+            PullToRefreshWrapper(isRefreshing = isLoading, onRefresh = { refreshKey++ }) {
             Column(modifier = Modifier.fillMaxSize()) {
                 StickyTopBar(
                     schoolName = schoolName,
@@ -232,6 +235,7 @@ fun TeacherClassesScreen(
                         }
                     }
                 }
+            }
             }
         }
     }

@@ -46,6 +46,7 @@ import androidx.core.content.FileProvider
 import com.shikshapilot.nativeapp.data.remote.RetrofitClient
 import com.shikshapilot.nativeapp.data.remote.TeacherSalaryPaymentDto
 import com.shikshapilot.nativeapp.data.remote.TeacherSalariesDataDto
+import com.shikshapilot.nativeapp.ui.components.PullToRefreshWrapper
 import com.shikshapilot.nativeapp.ui.components.StickyTopBar
 import com.shikshapilot.nativeapp.ui.components.ThreeDotsLoader
 import com.shikshapilot.nativeapp.ui.theme.CardBorder
@@ -75,8 +76,9 @@ fun TeacherSalariesScreen(
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var downloadingId by remember { mutableStateOf<Int?>(null) }
+    var refreshKey by remember { mutableStateOf(0) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(Unit, refreshKey) {
         isLoading = true
         errorMessage = null
         try {
@@ -133,6 +135,7 @@ fun TeacherSalariesScreen(
                 .padding(paddingValues)
                 .background(DarkCanvas)
         ) {
+            PullToRefreshWrapper(isRefreshing = isLoading, onRefresh = { refreshKey++ }) {
             Column(modifier = Modifier.fillMaxSize()) {
                 StickyTopBar(
                     schoolName = schoolName,
@@ -296,6 +299,7 @@ fun TeacherSalariesScreen(
                         }
                     }
                 }
+            }
             }
         }
     }

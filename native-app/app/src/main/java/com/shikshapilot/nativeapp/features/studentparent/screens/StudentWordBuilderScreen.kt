@@ -24,6 +24,7 @@ import com.shikshapilot.nativeapp.data.remote.PlayedWordDto
 import com.shikshapilot.nativeapp.data.remote.RetrofitClient
 import com.shikshapilot.nativeapp.data.remote.SyncGameProgressRequestDto
 import com.shikshapilot.nativeapp.data.remote.VocabularyWordDto
+import com.shikshapilot.nativeapp.ui.components.PullToRefreshWrapper
 import com.shikshapilot.nativeapp.ui.components.StickyTopBar
 import com.shikshapilot.nativeapp.ui.components.ThreeDotsLoader
 import com.shikshapilot.nativeapp.ui.theme.*
@@ -208,6 +209,7 @@ fun StudentWordBuilderScreen(
                 .padding(paddingValues)
                 .background(DarkCanvas)
         ) {
+            PullToRefreshWrapper(isRefreshing = isLoading, onRefresh = { load() }) {
             Column(modifier = Modifier.fillMaxSize()) {
                 StickyTopBar(
                     schoolName = schoolName,
@@ -429,6 +431,7 @@ fun StudentWordBuilderScreen(
                         }
                     }
                 }
+            }
             }
         }
     }

@@ -40,6 +40,7 @@ import com.google.gson.Gson
 import com.google.gson.JsonArray
 import com.shikshapilot.nativeapp.data.remote.RetrofitClient
 import com.shikshapilot.nativeapp.data.remote.TimetableItemDto
+import com.shikshapilot.nativeapp.ui.components.PullToRefreshWrapper
 import com.shikshapilot.nativeapp.ui.components.StickyTopBar
 import com.shikshapilot.nativeapp.ui.components.ThreeDotsLoader
 import com.shikshapilot.nativeapp.ui.theme.CardBorder
@@ -100,12 +101,13 @@ fun StudentTimetableScreen(
     var periods by remember { mutableStateOf<List<TimetableItemDto>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var refreshKey by remember { mutableStateOf(0) }
 
     val todayLabel = remember {
         SimpleDateFormat("EEEE, dd MMM yyyy", Locale.getDefault()).format(java.util.Date())
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(refreshKey) {
         isLoading = true
         errorMessage = null
         try {
@@ -130,6 +132,7 @@ fun StudentTimetableScreen(
                 .padding(paddingValues)
                 .background(DarkCanvas)
         ) {
+            PullToRefreshWrapper(isRefreshing = isLoading, onRefresh = { refreshKey++ }) {
             Column(modifier = Modifier.fillMaxSize()) {
                 StickyTopBar(
                     schoolName = schoolName,
@@ -268,6 +271,7 @@ fun StudentTimetableScreen(
                         }
                     }
                 }
+            }
             }
         }
     }

@@ -24,6 +24,7 @@ import com.shikshapilot.nativeapp.data.remote.ExamClassStatusItemDto
 import com.shikshapilot.nativeapp.data.remote.ExamItemDto
 import com.shikshapilot.nativeapp.data.remote.PublishExamRequestDto
 import com.shikshapilot.nativeapp.data.remote.RetrofitClient
+import com.shikshapilot.nativeapp.ui.components.PullToRefreshWrapper
 import com.shikshapilot.nativeapp.ui.components.StickyTopBar
 import com.shikshapilot.nativeapp.ui.components.ThreeDotsLoader
 import com.shikshapilot.nativeapp.ui.theme.*
@@ -90,6 +91,7 @@ fun SchoolAdminExamsScreen(
                 .padding(paddingValues)
                 .background(DarkCanvas)
         ) {
+            PullToRefreshWrapper(isRefreshing = isLoading, onRefresh = { loadExams() }) {
             Column(modifier = Modifier.fillMaxSize()) {
                 StickyTopBar(
                     schoolName = schoolName,
@@ -238,6 +240,7 @@ fun SchoolAdminExamsScreen(
                         }
                     }
                 }
+            }
             }
 
             toastMessage?.let { msg ->

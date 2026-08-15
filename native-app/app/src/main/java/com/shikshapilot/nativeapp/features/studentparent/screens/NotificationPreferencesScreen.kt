@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.sp
 import com.shikshapilot.nativeapp.data.remote.DeviceRegisterRequestDto
 import com.shikshapilot.nativeapp.data.remote.NotificationEventDto
 import com.shikshapilot.nativeapp.data.remote.RetrofitClient
+import com.shikshapilot.nativeapp.ui.components.PullToRefreshWrapper
 import com.shikshapilot.nativeapp.ui.components.StickyTopBar
 import com.shikshapilot.nativeapp.ui.components.ThreeDotsLoader
 import com.shikshapilot.nativeapp.ui.theme.*
@@ -58,11 +59,12 @@ fun NotificationPreferencesScreen(
     var registered by remember { mutableStateOf(false) }
     var registerMessage by remember { mutableStateOf<String?>(null) }
     var testPushMessage by remember { mutableStateOf<String?>(null) }
+    var refreshKey by remember { mutableStateOf(0) }
 
     // Placeholder token — NOT a real FCM registration token, since Firebase isn't wired up yet.
     val placeholderToken = remember { "local-placeholder-${Build.MODEL}-${UUID.randomUUID()}" }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(refreshKey) {
         scope.launch {
             isLoading = true
             errorMessage = null
@@ -124,6 +126,7 @@ fun NotificationPreferencesScreen(
                 .padding(paddingValues)
                 .background(DarkCanvas)
         ) {
+            PullToRefreshWrapper(isRefreshing = isLoading, onRefresh = { refreshKey++ }) {
             Column(modifier = Modifier.fillMaxSize()) {
                 StickyTopBar(
                     schoolName = schoolName,
@@ -255,6 +258,7 @@ fun NotificationPreferencesScreen(
                         }
                     }
                 }
+            }
             }
         }
     }

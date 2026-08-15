@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.shikshapilot.nativeapp.data.remote.AnnouncementItemDto
 import com.shikshapilot.nativeapp.data.remote.RetrofitClient
+import com.shikshapilot.nativeapp.ui.components.PullToRefreshWrapper
 import com.shikshapilot.nativeapp.ui.components.StickyTopBar
 import com.shikshapilot.nativeapp.ui.components.ThreeDotsLoader
 import com.shikshapilot.nativeapp.ui.theme.CardBorder
@@ -69,6 +70,7 @@ fun SchoolAdminAnnouncementsScreen(
     val scope = rememberCoroutineScope()
     var announcementsList by remember { mutableStateOf<List<AnnouncementItemDto>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var refreshKey by remember { mutableStateOf(0) }
 
     var showBroadcastDialog by remember { mutableStateOf(false) }
     var broadcastTitle by remember { mutableStateOf("") }
@@ -103,7 +105,7 @@ fun SchoolAdminAnnouncementsScreen(
         )
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(refreshKey) {
         isLoading = true
         try {
             val response = RetrofitClient.apiService.getAnnouncements()
@@ -128,6 +130,7 @@ fun SchoolAdminAnnouncementsScreen(
                 .padding(paddingValues)
                 .background(DarkCanvas)
         ) {
+            PullToRefreshWrapper(isRefreshing = isLoading, onRefresh = { refreshKey++ }) {
             Column(modifier = Modifier.fillMaxSize()) {
                 StickyTopBar(
                     schoolName = schoolName,
@@ -282,6 +285,7 @@ fun SchoolAdminAnnouncementsScreen(
                         }
                     }
                 }
+            }
             }
 
             // Emergency Broadcast Dialog Modal

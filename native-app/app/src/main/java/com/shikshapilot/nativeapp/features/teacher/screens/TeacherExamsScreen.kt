@@ -22,6 +22,7 @@ import com.shikshapilot.nativeapp.data.remote.RetrofitClient
 import com.shikshapilot.nativeapp.data.remote.TeacherExamDetailsDto
 import com.shikshapilot.nativeapp.data.remote.TeacherExamListItemDto
 import com.shikshapilot.nativeapp.data.remote.TeacherExamPaperDto
+import com.shikshapilot.nativeapp.ui.components.PullToRefreshWrapper
 import com.shikshapilot.nativeapp.ui.components.StickyTopBar
 import com.shikshapilot.nativeapp.ui.components.ThreeDotsLoader
 import com.shikshapilot.nativeapp.ui.theme.*
@@ -44,6 +45,7 @@ fun TeacherExamsScreen(
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var selectedExam by remember { mutableStateOf<TeacherExamListItemDto?>(null) }
+    var refreshKey by remember { mutableStateOf(0) }
 
     fun loadExams() {
         scope.launch {
@@ -64,7 +66,7 @@ fun TeacherExamsScreen(
         }
     }
 
-    LaunchedEffect(Unit) { loadExams() }
+    LaunchedEffect(refreshKey) { loadExams() }
 
     if (selectedExam != null) {
         TeacherExamDetailScreen(
@@ -81,6 +83,7 @@ fun TeacherExamsScreen(
                 .padding(paddingValues)
                 .background(DarkCanvas)
         ) {
+            PullToRefreshWrapper(isRefreshing = isLoading, onRefresh = { refreshKey++ }) {
             Column(modifier = Modifier.fillMaxSize()) {
                 StickyTopBar(
                     schoolName = schoolName,
@@ -208,6 +211,7 @@ fun TeacherExamsScreen(
                     }
                 }
             }
+            }
         }
     }
 }
@@ -222,6 +226,7 @@ private fun TeacherExamDetailScreen(
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var selectedPaper by remember { mutableStateOf<TeacherExamPaperDto?>(null) }
+    var refreshKey by remember { mutableStateOf(0) }
 
     fun loadDetails() {
         scope.launch {
@@ -242,7 +247,7 @@ private fun TeacherExamDetailScreen(
         }
     }
 
-    LaunchedEffect(exam.id) { loadDetails() }
+    LaunchedEffect(exam.id, refreshKey) { loadDetails() }
 
     if (selectedPaper != null) {
         val paper = selectedPaper!!
@@ -256,6 +261,7 @@ private fun TeacherExamDetailScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize().background(DarkCanvas)) {
+        PullToRefreshWrapper(isRefreshing = isLoading, onRefresh = { refreshKey++ }) {
         Column(modifier = Modifier.fillMaxSize()) {
             Row(
                 modifier = Modifier
@@ -346,6 +352,7 @@ private fun TeacherExamDetailScreen(
                         }
                     }
                 }
+            }
             }
         }
     }

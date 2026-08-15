@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.shikshapilot.nativeapp.data.remote.MaterialItemDto
 import com.shikshapilot.nativeapp.data.remote.RetrofitClient
+import com.shikshapilot.nativeapp.ui.components.PullToRefreshWrapper
 import com.shikshapilot.nativeapp.ui.theme.*
 import kotlinx.coroutines.launch
 
@@ -33,8 +34,9 @@ fun TeacherMaterialsScreen(
     var searchQuery by remember { mutableStateOf("") }
     var materials by remember { mutableStateOf<List<MaterialItemDto>>(emptyList()) }
     var toastMessage by remember { mutableStateOf<String?>(null) }
+    var refreshKey by remember { mutableStateOf(0) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(refreshKey) {
         coroutineScope.launch {
             isLoading = true
             try {
@@ -70,6 +72,7 @@ fun TeacherMaterialsScreen(
             .fillMaxSize()
             .background(DarkCanvas)
     ) {
+        PullToRefreshWrapper(isRefreshing = isLoading, onRefresh = { refreshKey++ }) {
         Column(modifier = Modifier.fillMaxSize()) {
             Row(
                 modifier = Modifier
@@ -141,6 +144,7 @@ fun TeacherMaterialsScreen(
                     }
                 }
             }
+        }
         }
     }
 }

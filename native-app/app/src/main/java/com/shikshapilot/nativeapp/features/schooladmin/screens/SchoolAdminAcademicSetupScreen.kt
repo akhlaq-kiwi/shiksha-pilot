@@ -56,6 +56,7 @@ import com.shikshapilot.nativeapp.data.remote.HolidayRequestDto
 import com.shikshapilot.nativeapp.data.remote.RetrofitClient
 import com.shikshapilot.nativeapp.data.remote.SubjectItemDto
 import com.shikshapilot.nativeapp.data.remote.SubjectRequestDto
+import com.shikshapilot.nativeapp.ui.components.PullToRefreshWrapper
 import com.shikshapilot.nativeapp.ui.components.StickyTopBar
 import com.shikshapilot.nativeapp.ui.components.ThreeDotsLoader
 import com.shikshapilot.nativeapp.ui.theme.CardBorder
@@ -146,6 +147,7 @@ fun SchoolAdminAcademicSetupScreen(
                 .padding(paddingValues)
                 .background(DarkCanvas)
         ) {
+            PullToRefreshWrapper(isRefreshing = isLoading, onRefresh = { reloadKey++ }) {
             Column(modifier = Modifier.fillMaxSize()) {
                 StickyTopBar(schoolName = schoolName, unreadNotificationCount = 2, onNotificationClick = {}, onAvatarClick = {})
 
@@ -280,6 +282,7 @@ fun SchoolAdminAcademicSetupScreen(
                         }
                     }
                 }
+            }
             }
         }
     }

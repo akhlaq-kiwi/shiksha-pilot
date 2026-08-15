@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.shikshapilot.nativeapp.data.remote.RetrofitClient
 import com.shikshapilot.nativeapp.data.remote.StudentFeeReceiptDto
+import com.shikshapilot.nativeapp.ui.components.PullToRefreshWrapper
 import com.shikshapilot.nativeapp.ui.components.StickyTopBar
 import com.shikshapilot.nativeapp.ui.components.ThreeDotsLoader
 import com.shikshapilot.nativeapp.ui.theme.CardBorder
@@ -69,6 +70,7 @@ fun StudentFeesScreen(
     var pendingAmount by remember { mutableStateOf(29333.0) }
     var receiptsList by remember { mutableStateOf<List<StudentFeeReceiptDto>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var refreshKey by remember { mutableStateOf(0) }
 
     val currencyFormatter = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
 
@@ -79,7 +81,7 @@ fun StudentFeesScreen(
         )
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(refreshKey) {
         isLoading = true
         try {
             val response = RetrofitClient.apiService.getStudentFees()
@@ -108,6 +110,7 @@ fun StudentFeesScreen(
                 .padding(paddingValues)
                 .background(DarkCanvas)
         ) {
+            PullToRefreshWrapper(isRefreshing = isLoading, onRefresh = { refreshKey++ }) {
             Column(modifier = Modifier.fillMaxSize()) {
                 StickyTopBar(
                     schoolName = schoolName,
@@ -288,6 +291,7 @@ fun StudentFeesScreen(
                         }
                     }
                 }
+            }
             }
         }
     }

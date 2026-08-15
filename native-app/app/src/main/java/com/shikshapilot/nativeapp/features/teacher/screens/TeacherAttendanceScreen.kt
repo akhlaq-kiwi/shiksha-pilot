@@ -48,6 +48,7 @@ import com.shikshapilot.nativeapp.data.remote.MarkAttendanceRequestDto
 import com.shikshapilot.nativeapp.data.remote.MarkAttendanceStudentDto
 import com.shikshapilot.nativeapp.data.remote.RetrofitClient
 import com.shikshapilot.nativeapp.data.remote.StudentItemDto
+import com.shikshapilot.nativeapp.ui.components.PullToRefreshWrapper
 import com.shikshapilot.nativeapp.ui.components.StickyTopBar
 import com.shikshapilot.nativeapp.ui.components.ThreeDotsLoader
 import com.shikshapilot.nativeapp.ui.theme.CardBorder
@@ -75,6 +76,7 @@ fun TeacherAttendanceScreen(
     var studentsList by remember { mutableStateOf<List<StudentItemDto>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var isSubmitting by remember { mutableStateOf(false) }
+    var refreshKey by remember { mutableStateOf(0) }
 
     val attendanceMap = remember { mutableStateMapOf<Int, String>() }
 
@@ -86,7 +88,7 @@ fun TeacherAttendanceScreen(
         )
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(Unit, refreshKey) {
         isLoading = true
         try {
             val response = RetrofitClient.apiService.getStudents()
@@ -116,6 +118,7 @@ fun TeacherAttendanceScreen(
                 .padding(paddingValues)
                 .background(DarkCanvas)
         ) {
+            PullToRefreshWrapper(isRefreshing = isLoading, onRefresh = { refreshKey++ }) {
             Column(modifier = Modifier.fillMaxSize()) {
                 StickyTopBar(
                     schoolName = schoolName,
@@ -314,6 +317,7 @@ fun TeacherAttendanceScreen(
                         }
                     }
                 }
+            }
             }
         }
     }

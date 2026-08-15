@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.shikshapilot.nativeapp.data.remote.RetrofitClient
 import com.shikshapilot.nativeapp.data.remote.SchoolStatsDataDto
+import com.shikshapilot.nativeapp.ui.components.PullToRefreshWrapper
 import com.shikshapilot.nativeapp.ui.components.StickyTopBar
 import com.shikshapilot.nativeapp.ui.theme.CardBorder
 import com.shikshapilot.nativeapp.ui.theme.DarkCanvas
@@ -88,9 +89,12 @@ fun SchoolAdminFinanceScreen(
     onAvatarClick: () -> Unit = {}
 ) {
     var statsDto by remember { mutableStateOf<SchoolStatsDataDto?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+    var refreshKey by remember { mutableStateOf(0) }
     val currencyFormatter = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(refreshKey) {
+        isLoading = true
         try {
             val statsRes = RetrofitClient.apiService.getSchoolStats()
             if (statsRes.isSuccessful && statsRes.body()?.data != null) {
@@ -98,6 +102,8 @@ fun SchoolAdminFinanceScreen(
             }
         } catch (_: Exception) {
             // Non-fatal: hub tiles work without stats.
+        } finally {
+            isLoading = false
         }
     }
 
@@ -111,6 +117,7 @@ fun SchoolAdminFinanceScreen(
                 .padding(paddingValues)
                 .background(DarkCanvas)
         ) {
+            PullToRefreshWrapper(isRefreshing = isLoading, onRefresh = { refreshKey++ }) {
             Column(modifier = Modifier.fillMaxSize()) {
                 StickyTopBar(
                     schoolName = schoolName,
@@ -261,6 +268,7 @@ fun SchoolAdminFinanceScreen(
                         }
                     }
                 }
+            }
             }
         }
     }

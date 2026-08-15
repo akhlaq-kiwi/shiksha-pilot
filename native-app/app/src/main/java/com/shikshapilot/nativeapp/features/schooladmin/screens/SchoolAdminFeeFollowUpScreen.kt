@@ -48,6 +48,7 @@ import com.shikshapilot.nativeapp.data.remote.FeeFollowUpItemDto
 import com.shikshapilot.nativeapp.data.remote.MarkFollowUpContactedRequestDto
 import com.shikshapilot.nativeapp.data.remote.RetrofitClient
 import com.shikshapilot.nativeapp.data.remote.UpdateFollowUpStatusRequestDto
+import com.shikshapilot.nativeapp.ui.components.PullToRefreshWrapper
 import com.shikshapilot.nativeapp.ui.components.StickyTopBar
 import com.shikshapilot.nativeapp.ui.components.ThreeDotsLoader
 import com.shikshapilot.nativeapp.ui.theme.CardBorder
@@ -175,6 +176,7 @@ fun SchoolAdminFeeFollowUpScreen(
                 .padding(paddingValues)
                 .background(DarkCanvas)
         ) {
+            PullToRefreshWrapper(isRefreshing = isLoading, onRefresh = { reloadKey++ }) {
             Column(modifier = Modifier.fillMaxSize()) {
                 StickyTopBar(
                     schoolName = schoolName,
@@ -351,6 +353,7 @@ fun SchoolAdminFeeFollowUpScreen(
                         }
                     }
                 }
+            }
             }
         }
     }

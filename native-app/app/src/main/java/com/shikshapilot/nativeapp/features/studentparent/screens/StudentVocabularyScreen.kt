@@ -25,6 +25,7 @@ import com.shikshapilot.nativeapp.data.remote.RetrofitClient
 import com.shikshapilot.nativeapp.data.remote.VocabChallengeDto
 import com.shikshapilot.nativeapp.data.remote.VocabLeaderboardDataDto
 import com.shikshapilot.nativeapp.data.remote.VocabularyWordDto
+import com.shikshapilot.nativeapp.ui.components.PullToRefreshWrapper
 import com.shikshapilot.nativeapp.ui.components.StickyTopBar
 import com.shikshapilot.nativeapp.ui.components.ThreeDotsLoader
 import com.shikshapilot.nativeapp.ui.theme.*
@@ -165,6 +166,7 @@ private fun ChallengeTab(kind: String) {
         }
     }
 
+    PullToRefreshWrapper(isRefreshing = isLoading, onRefresh = { load() }) {
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text(
             text = "QA Server: ${if (kind == "daily") "GET/POST /api/student/vocabulary/challenge/daily" else "GET/POST /api/student/vocabulary/challenge/weekly"}",
@@ -244,6 +246,7 @@ private fun ChallengeTab(kind: String) {
             }
         }
     }
+    }
 }
 
 @Composable
@@ -286,8 +289,9 @@ private fun LeaderboardTab() {
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var selectedScope by remember { mutableStateOf(0) } // 0 = school, 1 = class, 2 = section
+    var refreshKey by remember { mutableStateOf(0) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(refreshKey) {
         scope.launch {
             isLoading = true
             errorMessage = null
@@ -306,6 +310,7 @@ private fun LeaderboardTab() {
         }
     }
 
+    PullToRefreshWrapper(isRefreshing = isLoading, onRefresh = { refreshKey++ }) {
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text(text = "QA Server: GET /api/student/vocabulary/leaderboard", fontSize = 10.5.sp, color = SunsetOrange)
         Spacer(modifier = Modifier.height(10.dp))
@@ -372,5 +377,6 @@ private fun LeaderboardTab() {
                 }
             }
         }
+    }
     }
 }

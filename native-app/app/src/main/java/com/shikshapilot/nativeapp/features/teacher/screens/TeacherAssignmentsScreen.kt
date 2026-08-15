@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.shikshapilot.nativeapp.data.remote.AssignmentItemDto
 import com.shikshapilot.nativeapp.data.remote.RetrofitClient
+import com.shikshapilot.nativeapp.ui.components.PullToRefreshWrapper
 import com.shikshapilot.nativeapp.ui.theme.*
 import kotlinx.coroutines.launch
 
@@ -34,6 +35,7 @@ fun TeacherAssignmentsScreen(
     var showCreateModal by remember { mutableStateOf(false) }
     var assignments by remember { mutableStateOf<List<AssignmentItemDto>>(emptyList()) }
     var toastMessage by remember { mutableStateOf<String?>(null) }
+    var refreshKey by remember { mutableStateOf(0) }
 
     // Form fields
     var newTitle by remember { mutableStateOf("") }
@@ -69,7 +71,7 @@ fun TeacherAssignmentsScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(Unit, refreshKey) {
         fetchAssignments()
     }
 
@@ -83,6 +85,7 @@ fun TeacherAssignmentsScreen(
             .fillMaxSize()
             .background(DarkCanvas)
     ) {
+        PullToRefreshWrapper(isRefreshing = isLoading, onRefresh = { refreshKey++ }) {
         Column(modifier = Modifier.fillMaxSize()) {
             // Top Bar
             Row(
@@ -166,6 +169,7 @@ fun TeacherAssignmentsScreen(
                     }
                 }
             }
+        }
         }
 
         // Toast Message
