@@ -40,8 +40,15 @@ Each item: implement -> build verify -> commit -> push -> next.
       card view per student (no PDF export/print, view-only). Wired via Classes screen menu.
 
 ## Medium-large
-- [ ] **Question Paper Designer** — `school-admin/pages/QuestionPaperDesignerPage.jsx`. Needs exact route
-      confirmation in `ExamsController`/question-bank endpoints.
+- [ ] **Question Paper Designer — investigated, deferred (2026-08-16).**
+      `school-admin/pages/QuestionPaperDesignerPage.jsx` is 3,837 lines and persists entirely to
+      browser `localStorage` (`qpd_current_draft`, `qpd_saved_papers`, revision history) — there is
+      **no backend route** for question papers at all (`grep -i "question\|paper" backend/src/Routes/api.php`
+      returns nothing); it only calls existing `getClasses`/`getExaminations`/`getSubjects` for
+      context. True parity means building a full rich document editor (sections, question types,
+      marks allocation, revision history, print/export) with local-only persistence — a large,
+      standalone effort on its own, not a quick module. Deferred; revisit as its own scoped task if
+      wanted.
 - [x] **Seating Plan Generator** — done (commit dacd921): `SchoolAdminSeatingPlanScreen`. Wired into
       the Education hub.
 
