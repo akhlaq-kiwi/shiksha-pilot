@@ -94,6 +94,17 @@ Found while doing the native-app parity inventory (see `native-app/PARITY_GAPS.m
   backend follow-up: either accept and validate submitted answers, or accept this as an intentionally
   low-stakes gamification reward (not a security-sensitive resource) — flagging so it's a conscious
   decision rather than an oversight.
+- **New finding — audit log descriptions for Class/Staff create/update/delete are always blank
+  (production observation, 2026-08-16):** `GET /api/school/security/audit-logs` on production
+  (school_id 31) shows entries like `Class Created` / `Class ""  created.` and `Teacher Created` /
+  `Teacher ""  added to the staff list.` — the description template's name placeholder is empty for
+  every one of these events, so the audit trail can't tell you which specific class/teacher record
+  was affected. This made it impossible to confirm exactly which classes were removed during an
+  accidental native-app testing mishap on production (classes were later found to be fully intact —
+  all 17 standard predefined classes present — so no data was actually lost, but the blank audit
+  descriptions meant this had to be confirmed by comparing the live class list against the expected
+  set rather than by reading the log). Worth a backend fix: whatever builds these log descriptions
+  isn't receiving/interpolating the entity name at class/staff creation and deletion time.
 - **New finding — `GET /api/student/vocabulary/achievements` returns a bare JSON array under `data`,
   inconsistent with every other endpoint's object-shaped `data` (native-app research, 2026-08-15):**
   `VocabularyService::getAchievements` returns a plain list of 8 fixed badge definitions
