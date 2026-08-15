@@ -34,8 +34,8 @@ Each item: implement -> build verify -> commit -> push -> next.
       'school' vs 'classes' with per-student amount overrides
       (`backend/.../SchoolAdminService.php::createAdditionalFeeType`, ~line 10604). A school-wide-only
       MVP (skip the class-targeted mode) would be a reasonable scope.
-- [ ] **Student Transfer Between Sections** — `ClassesPage.jsx` transfer dialog.
-      API: `POST /api/school/classes/transfer-students`.
+- [x] **Student Transfer Between Sections** — done (commit 0ef114b): multi-select + Transfer action
+      in `SchoolAdminStudentsScreen` when viewing a class-filtered roster.
 
 ## Medium
 - [ ] **Class Identity Cards generation/print** — `ClassesPage.jsx` (`view === 'identity-cards'`) +
