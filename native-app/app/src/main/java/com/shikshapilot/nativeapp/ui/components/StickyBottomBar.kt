@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Settings
@@ -38,7 +39,7 @@ import com.shikshapilot.nativeapp.ui.theme.TextSecondary
 
 @Composable
 fun StickyBottomBar(
-    activeTab: String = "home", // "home", "education", "finance", "settings"
+    activeTab: String = "home", // "home", "education", "exams", "finance", "settings"
     onTabSelected: (String) -> Unit
 ) {
     Column(
@@ -75,7 +76,16 @@ fun StickyBottomBar(
                 onClick = { onTabSelected("education") }
             )
 
-            // 3. FINANCE TAB
+            // 3. EXAMS TAB
+            BottomNavItem(
+                icon = Icons.Default.Assignment,
+                label = "Exams",
+                isSelected = activeTab == "exams",
+                badgeCount = 0,
+                onClick = { onTabSelected("exams") }
+            )
+
+            // 4. FINANCE TAB
             BottomNavItem(
                 icon = Icons.Default.AccountBalanceWallet,
                 label = "Finance",
@@ -84,7 +94,7 @@ fun StickyBottomBar(
                 onClick = { onTabSelected("finance") }
             )
 
-            // 4. SETTINGS TAB
+            // 5. SETTINGS TAB
             BottomNavItem(
                 icon = Icons.Default.Settings,
                 label = "Settings",

@@ -56,8 +56,6 @@ import android.content.Context
 import com.shikshapilot.nativeapp.data.remote.ClassDto
 import com.shikshapilot.nativeapp.data.repository.SchoolAdminRepository
 import com.shikshapilot.nativeapp.data.repository.UserRepository
-import com.shikshapilot.nativeapp.features.schooladmin.components.SchoolAdminMenuDrawer
-import com.shikshapilot.nativeapp.ui.components.CategorizedActionSheet
 import com.shikshapilot.nativeapp.ui.components.ChartPointData
 import com.shikshapilot.nativeapp.ui.components.MonthlyLineChartCard
 import com.shikshapilot.nativeapp.ui.components.NotificationsSheet
@@ -182,10 +180,17 @@ fun DashboardScreen(
         containerColor = DarkCanvas,
         bottomBar = {
             StickyBottomBar(
-                activeTab = if (activeSheet == "education") "education" else "home",
+                activeTab = "home",
                 onTabSelected = { tab ->
                     when (tab) {
-                        "education" -> activeSheet = "education"
+                        "education" -> {
+                            activeSheet = null
+                            onModuleClick("education")
+                        }
+                        "exams" -> {
+                            activeSheet = null
+                            onModuleClick("exams")
+                        }
                         "finance" -> {
                             activeSheet = null
                             onModuleClick("finance")
@@ -568,31 +573,6 @@ fun DashboardScreen(
                 NotificationsSheet(
                     onDismiss = { activeSheet = null }
                 )
-            }
-
-            // Education Hub: Classes, Timetable, Exams, Attendance, Academic Setup
-            if (activeSheet == "education") {
-                if (activeRole.uppercase() == "SCHOOL_ADMIN") {
-                    SchoolAdminMenuDrawer(
-                        activeScreenId = "dashboard",
-                        schoolName = activeSchool,
-                        adminName = activeName,
-                        onDismiss = { activeSheet = null },
-                        onNavigate = { targetScreenId ->
-                            activeSheet = null
-                            onModuleClick(targetScreenId)
-                        }
-                    )
-                } else {
-                    CategorizedActionSheet(
-                        roleName = activeRole,
-                        onDismiss = { activeSheet = null },
-                        onActionClick = { actionId ->
-                            activeSheet = null
-                            onModuleClick(actionId)
-                        }
-                    )
-                }
             }
 
             // Profile Options Bottom Sheet Modal

@@ -23,6 +23,7 @@ import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminAcadem
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminAnnouncementsScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminAttendanceScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminClassesScreen
+import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminEducationScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminCredentialsScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminExamsScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminFeeCollectionScreen
@@ -414,6 +415,13 @@ class MainActivity : ComponentActivity() {
                                     SchoolAdminAttendanceScreen(
                                         schoolName = schoolName,
                                         onBack = { goBack() }
+                                    )
+                                }
+                                "education" -> {
+                                    SchoolAdminEducationScreen(
+                                        schoolName = schoolName,
+                                        onBack = { goBack() },
+                                        onNavigate = navigateTo
                                     )
                                 }
                                 "classes", "sections" -> {
