@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Class
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.EventSeat
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.Icon
@@ -95,6 +96,13 @@ fun SchoolAdminEducationScreen(
             title = "Seating Plan",
             subtitle = "Configure rooms & generate exam seating",
             icon = Icons.Default.EventSeat,
+            iconColor = InfoBlue
+        ),
+        EducationModule(
+            id = "report_cards",
+            title = "Report Cards",
+            subtitle = "View student report cards by exam & class",
+            icon = Icons.Default.Description,
             iconColor = InfoBlue
         ),
         EducationModule(

@@ -37,6 +37,7 @@ import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminFinanc
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminLatePaymentPenaltyScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminLeaveRequestsScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminProfileScreen
+import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminReportCardsScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminSalaryDisbursementScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminSeatingPlanScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminSecurityScreen
@@ -518,6 +519,12 @@ class MainActivity : ComponentActivity() {
                                 }
                                 "seating_plan" -> {
                                     SchoolAdminSeatingPlanScreen(
+                                        schoolName = schoolName,
+                                        onBack = { goBack() }
+                                    )
+                                }
+                                "report_cards" -> {
+                                    SchoolAdminReportCardsScreen(
                                         schoolName = schoolName,
                                         onBack = { goBack() }
                                     )

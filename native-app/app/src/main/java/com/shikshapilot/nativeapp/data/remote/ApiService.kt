@@ -2286,6 +2286,15 @@ interface ApiService {
         @Header("Authorization") authHeader: String? = null
     ): Response<StudentReportCardsResponseDto>
 
+    // School-admin bulk report cards for one class within an exam (SchoolAdminController::
+    // getReportCards -> reuses the same ReportCardDto shape as the student-side endpoint).
+    @GET("api/school/exams-new/{id}/report-cards")
+    suspend fun getSchoolReportCards(
+        @Path("id") examId: Int,
+        @Query("class_id") classId: Int,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<StudentReportCardsResponseDto>
+
     // -------------------------------------------------------------------------------------
     // School Admin — Finance breakdown
     // -------------------------------------------------------------------------------------

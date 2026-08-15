@@ -544,7 +544,7 @@ private fun StudentReportCardsScreen(onBack: () -> Unit) {
 }
 
 @Composable
-private fun ReportCardDetailScreen(card: ReportCardDto, onBack: () -> Unit) {
+fun ReportCardDetailScreen(card: ReportCardDto, onBack: () -> Unit) {
     Box(modifier = Modifier.fillMaxSize().background(DarkCanvas)) {
         Column(modifier = Modifier.fillMaxSize()) {
             Row(
