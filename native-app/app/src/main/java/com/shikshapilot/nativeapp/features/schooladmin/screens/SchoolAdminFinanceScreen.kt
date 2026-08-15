@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.MoneyOff
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.PriceChange
 import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -75,7 +76,8 @@ private val financeModules = listOf(
     FinanceModuleItem("financial_reports", "Financial Reports", "Generate & review profit/loss reports", Icons.Default.Assessment),
     FinanceModuleItem("transport_fees", "Transport Fees", "Assign & manage student transport charges", Icons.Default.DirectionsBus),
     FinanceModuleItem("school_expenses", "School Expenses", "Record & track school expenditures", Icons.Default.MoneyOff),
-    FinanceModuleItem("late_payment_penalty", "Late-Payment Penalty", "Configure penalty percentage on overdue fees", Icons.Default.PriceChange)
+    FinanceModuleItem("late_payment_penalty", "Late-Payment Penalty", "Configure penalty percentage on overdue fees", Icons.Default.PriceChange),
+    FinanceModuleItem("additional_fees", "Additional Fees", "Apply one-off fees to all active students", Icons.Default.ReceiptLong)
 )
 
 /**

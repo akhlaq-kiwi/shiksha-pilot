@@ -213,6 +213,39 @@ data class TransferStudentsRequestDto(
     val student_ids: List<Int>
 )
 
+// Additional Fee Types — GET/POST/DELETE api/school/additional-fees/types{,/{id}}
+// (SchoolAdminController::getAdditionalFeeTypes/createAdditionalFeeType/deleteAdditionalFeeType).
+// Native only supports apply_type='school' (entire active-student body at one flat amount) —
+// the web's 'classes' apply_type (per-class custom amounts via `class_amounts`) is not implemented.
+data class AdditionalFeeTypeItemDto(
+    val id: Int,
+    val name: String,
+    val amount: Double,
+    val due_date: String? = null,
+    val academic_year_id: Int = 0,
+    val category: String? = null,
+    val total_students: Int = 0,
+    val collected_students: Int = 0,
+    val pending_students: Int = 0,
+    val collected_amount: Double = 0.0,
+    val pending_amount: Double = 0.0,
+    val total_amount: Double = 0.0,
+    val assigned_to: String? = null
+)
+
+data class AdditionalFeeTypesResponseDto(
+    val status: String? = "success",
+    val message: String? = null,
+    val data: List<AdditionalFeeTypeItemDto> = emptyList()
+)
+
+data class CreateAdditionalFeeTypeRequestDto(
+    val name: String,
+    val amount: Double,
+    val due_date: String,
+    val apply_type: String = "school"
+)
+
 data class ClassDto(
     val id: Int,
     val name: String,
@@ -2636,6 +2669,24 @@ interface ApiService {
     @POST("api/school/classes/transfer-students")
     suspend fun transferStudents(
         @Body request: TransferStudentsRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
+    // --- Additional Fee Types ---
+    @GET("api/school/additional-fees/types")
+    suspend fun getAdditionalFeeTypes(
+        @Header("Authorization") authHeader: String? = null
+    ): Response<AdditionalFeeTypesResponseDto>
+
+    @POST("api/school/additional-fees/types")
+    suspend fun createAdditionalFeeType(
+        @Body request: CreateAdditionalFeeTypeRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
+    @DELETE("api/school/additional-fees/types/{id}")
+    suspend fun deleteAdditionalFeeType(
+        @Path("id") id: Int,
         @Header("Authorization") authHeader: String? = null
     ): Response<JsonElement>
 }

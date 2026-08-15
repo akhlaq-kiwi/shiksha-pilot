@@ -20,6 +20,7 @@ import androidx.compose.runtime.setValue
 import com.shikshapilot.nativeapp.data.remote.RetrofitClient
 import com.shikshapilot.nativeapp.data.repository.UserRepository
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminAcademicSetupScreen
+import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminAdditionalFeesScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminAnnouncementsScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminAttendanceScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminClassesScreen
@@ -463,6 +464,12 @@ class MainActivity : ComponentActivity() {
                                 }
                                 "late_payment_penalty" -> {
                                     SchoolAdminLatePaymentPenaltyScreen(
+                                        schoolName = schoolName,
+                                        onBack = { goBack() }
+                                    )
+                                }
+                                "additional_fees" -> {
+                                    SchoolAdminAdditionalFeesScreen(
                                         schoolName = schoolName,
                                         onBack = { goBack() }
                                     )
