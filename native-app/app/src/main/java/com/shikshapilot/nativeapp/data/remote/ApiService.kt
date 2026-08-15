@@ -159,6 +159,50 @@ data class UpdateSchoolExpenseRequestDto(
     val reference_number: String? = null
 )
 
+// Late-Payment Penalty — GET api/school/late-payment-penalty/{stats,config}, POST/DELETE
+// .../config (SchoolAdminController::getLatePaymentPenaltyStats/getLatePaymentPenaltyConfig/
+// saveLatePaymentPenaltyConfig/deleteLatePaymentPenaltyConfig -> late_payment_penalty_configs,
+// scoped to the school's active academic year).
+data class LatePaymentPenaltyStatsDto(
+    val current_academic_session: String? = null,
+    val total_students: Int = 0,
+    val students_having_due: Int = 0,
+    val total_outstanding_due: Double = 0.0,
+    val last_applied_date: String? = null,
+    val last_applied_by: String? = null,
+    val active_processing_id: Int? = null
+)
+
+data class LatePaymentPenaltyStatsResponseDto(
+    val status: String? = "success",
+    val message: String? = null,
+    val data: LatePaymentPenaltyStatsDto? = null
+)
+
+// NOTE: `percentage` is a float when a config row exists but an empty string "" when it doesn't
+// (SchoolAdminService::getLatePaymentPenaltyConfig) — modeled as JsonElement so Gson doesn't crash
+// on the string case; callers must use percentageOrNull().
+data class LatePaymentPenaltyConfigDto(
+    val percentage: JsonElement? = null,
+    val description: String? = null,
+    val status: String? = "Inactive"
+) {
+    fun percentageOrNull(): Double? =
+        percentage?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isNumber }?.asDouble
+}
+
+data class LatePaymentPenaltyConfigResponseDto(
+    val status: String? = "success",
+    val message: String? = null,
+    val data: LatePaymentPenaltyConfigDto? = null
+)
+
+data class SaveLatePaymentPenaltyConfigRequestDto(
+    val percentage: Double,
+    val description: String? = null,
+    val status: String = "Active"
+)
+
 data class ClassDto(
     val id: Int,
     val name: String,
@@ -2554,6 +2598,28 @@ interface ApiService {
     @DELETE("api/school/expenses/{id}")
     suspend fun deleteSchoolExpense(
         @Path("id") id: Int,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
+    // --- Late-Payment Penalty ---
+    @GET("api/school/late-payment-penalty/stats")
+    suspend fun getLatePaymentPenaltyStats(
+        @Header("Authorization") authHeader: String? = null
+    ): Response<LatePaymentPenaltyStatsResponseDto>
+
+    @GET("api/school/late-payment-penalty/config")
+    suspend fun getLatePaymentPenaltyConfig(
+        @Header("Authorization") authHeader: String? = null
+    ): Response<LatePaymentPenaltyConfigResponseDto>
+
+    @POST("api/school/late-payment-penalty/config")
+    suspend fun saveLatePaymentPenaltyConfig(
+        @Body request: SaveLatePaymentPenaltyConfigRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
+    @DELETE("api/school/late-payment-penalty/config")
+    suspend fun deleteLatePaymentPenaltyConfig(
         @Header("Authorization") authHeader: String? = null
     ): Response<JsonElement>
 }

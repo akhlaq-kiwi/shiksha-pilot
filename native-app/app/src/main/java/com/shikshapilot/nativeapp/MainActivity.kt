@@ -32,6 +32,7 @@ import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminFeeFol
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminFeeStructureScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminFinanceScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminFinancialReportsScreen
+import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminLatePaymentPenaltyScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminLeaveRequestsScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminProfileScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminSalaryDisbursementScreen
@@ -456,6 +457,12 @@ class MainActivity : ComponentActivity() {
                                 }
                                 "school_expenses" -> {
                                     SchoolAdminExpensesScreen(
+                                        schoolName = schoolName,
+                                        onBack = { goBack() }
+                                    )
+                                }
+                                "late_payment_penalty" -> {
+                                    SchoolAdminLatePaymentPenaltyScreen(
                                         schoolName = schoolName,
                                         onBack = { goBack() }
                                     )
