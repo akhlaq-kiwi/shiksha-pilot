@@ -325,19 +325,10 @@ class TeacherService extends BaseService
                 $this->validateClassTeacherAssignment($pdo, $user, $classId);
             }
 
-            // Boundary date validation
-            $requestYearId = $_SERVER['HTTP_X_ACADEMIC_YEAR_ID'] ?? $_SERVER['X_ACADEMIC_YEAR_ID'] ?? null;
-            $workingYear = null;
-            if ($requestYearId !== null && is_numeric($requestYearId)) {
-                $stmt = $pdo->prepare("SELECT * FROM academic_years WHERE id = :id AND school_id = :sid LIMIT 1");
-                $stmt->execute([':id' => (int)$requestYearId, ':sid' => $schoolId]);
-                $workingYear = $stmt->fetch(PDO::FETCH_ASSOC);
-            }
-            if (!$workingYear) {
-                $stmt = $pdo->prepare("SELECT * FROM academic_years WHERE school_id = :sid AND (status = 'ACTIVE' OR is_current = 1) LIMIT 1");
-                $stmt->execute([':sid' => $schoolId]);
-                $workingYear = $stmt->fetch(PDO::FETCH_ASSOC);
-            }
+            // Boundary date validation (Strictly enforce active Academic Year)
+            $stmt = $pdo->prepare("SELECT * FROM academic_years WHERE school_id = :sid AND (status = 'ACTIVE' OR is_current = 1) ORDER BY is_current DESC, id DESC LIMIT 1");
+            $stmt->execute([':sid' => $schoolId]);
+            $workingYear = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if ($workingYear) {
                 $startDate = $workingYear['start_date'];
@@ -403,18 +394,9 @@ class TeacherService extends BaseService
             $this->validateClassTeacherAssignment($pdo, $user, $classId);
         }
         
-        $requestYearId = $_SERVER['HTTP_X_ACADEMIC_YEAR_ID'] ?? $_SERVER['X_ACADEMIC_YEAR_ID'] ?? null;
-        $workingYear = null;
-        if ($requestYearId !== null && is_numeric($requestYearId)) {
-            $stmt = $pdo->prepare("SELECT * FROM academic_years WHERE id = :id AND school_id = :sid LIMIT 1");
-            $stmt->execute([':id' => (int)$requestYearId, ':sid' => $schoolId]);
-            $workingYear = $stmt->fetch(PDO::FETCH_ASSOC);
-        }
-        if (!$workingYear) {
-            $stmt = $pdo->prepare("SELECT * FROM academic_years WHERE school_id = :sid AND (status = 'ACTIVE' OR is_current = 1) LIMIT 1");
-            $stmt->execute([':sid' => $schoolId]);
-            $workingYear = $stmt->fetch(PDO::FETCH_ASSOC);
-        }
+        $stmt = $pdo->prepare("SELECT * FROM academic_years WHERE school_id = :sid AND (status = 'ACTIVE' OR is_current = 1) ORDER BY is_current DESC, id DESC LIMIT 1");
+        $stmt->execute([':sid' => $schoolId]);
+        $workingYear = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($workingYear) {
             $startDate = $workingYear['start_date'];

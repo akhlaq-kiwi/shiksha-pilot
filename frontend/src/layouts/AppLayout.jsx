@@ -38,9 +38,8 @@ const AppLayout = ({ children }) => {
 
   const user = authService.getCurrentUser();
   const role = authService.getUserRole();
-  const isSchoolAdmin = role === 'SCHOOL_ADMIN' || role === 'TEACHER';
-
-  const { academicYears, currentYear, selectYear } = isSchoolAdmin
+  const isSchoolAdmin = role === 'SCHOOL_ADMIN';
+  const { academicYears, currentYear, selectYear } = (role && role !== 'SUPER_ADMIN')
     ? useAcademicYear()
     : { academicYears: [], currentYear: null, selectYear: () => {} };
 
@@ -192,38 +191,45 @@ const AppLayout = ({ children }) => {
                       {schoolProfile.name}
                     </span>
                     
-                    {isSchoolAdmin && currentYear && (
+                    {currentYear && (
                       <>
                         <div className="h-4 w-px bg-border flex-shrink-0" aria-hidden="true"></div>
-                        <div className="flex items-center gap-2 rounded-lg border border-border-strong bg-surface-sunken px-2 py-1 flex-shrink-0">
-                          <select
-                            id="academic-year-switcher"
-                            value={currentYear.id}
-                            onChange={async (e) => {
-                              const nextId = e.target.value;
-                              const next = academicYears.find((y) => String(y.id) === String(nextId));
-                              const leavingActive = currentYear.status === 'ACTIVE' && next?.status !== 'ACTIVE';
-                              if (leavingActive) {
-                                const ok = await confirm({
-                                  title: `Switch from active year to ${next?.name}?`,
-                                  message: `All dashboards, fees, attendance and exam figures will show ${next?.name} data until you switch back.`,
-                                  confirmLabel: 'Switch Year',
-                                  danger: false,
-                                });
-                                if (!ok) return;
-                              }
-                              selectYear(nextId);
-                              navigate('/school-admin');
-                            }}
-                            className="h-7 cursor-pointer rounded-md border-0 bg-transparent pr-6 text-body-sm font-semibold text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-                          >
-                            {academicYears.map(y => (
-                              <option key={y.id} value={y.id}>
-                                {y.name} {y.status === 'ACTIVE' ? '(Active)' : y.status === 'Archived' ? '(Archived)' : `(${y.status})`}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
+                        {isSchoolAdmin ? (
+                          <div className="flex items-center gap-2 rounded-lg border border-border-strong bg-surface-sunken px-2 py-1 flex-shrink-0">
+                            <select
+                              id="academic-year-switcher"
+                              value={currentYear.id}
+                              onChange={async (e) => {
+                                const nextId = e.target.value;
+                                const next = academicYears.find((y) => String(y.id) === String(nextId));
+                                const leavingActive = currentYear.status === 'ACTIVE' && next?.status !== 'ACTIVE';
+                                if (leavingActive) {
+                                  const ok = await confirm({
+                                    title: `Switch from active year to ${next?.name}?`,
+                                    message: `All dashboards, fees, attendance and exam figures will show ${next?.name} data until you switch back.`,
+                                    confirmLabel: 'Switch Year',
+                                    danger: false,
+                                  });
+                                  if (!ok) return;
+                                }
+                                selectYear(nextId);
+                                navigate('/school-admin');
+                              }}
+                              className="h-7 cursor-pointer rounded-md border-0 bg-transparent pr-6 text-body-sm font-semibold text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                            >
+                              {academicYears.map(y => (
+                                <option key={y.id} value={y.id}>
+                                  {y.name} {y.status === 'ACTIVE' ? '(Active)' : y.status === 'Archived' ? '(Archived)' : `(${y.status})`}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 rounded-lg border border-border bg-surface-sunken px-2.5 py-1 flex-shrink-0">
+                            <span className="text-body-xs font-medium text-text-muted">Academic Year:</span>
+                            <span className="text-body-xs font-bold text-text-primary">{currentYear.name}</span>
+                          </div>
+                        )}
                       </>
                     )}
                   </div>

@@ -22,7 +22,9 @@ export const AcademicYearProvider = ({ children }) => {
       
       setAcademicYears(sorted);
 
-      const savedId = forceSetId || localStorage.getItem('shiksha_pilot_academic_year_id');
+      const role = localStorage.getItem('shiksha_pilot_role');
+      const isAdmin = role === 'SCHOOL_ADMIN' || role === 'SUPER_ADMIN';
+      const savedId = isAdmin ? (forceSetId || localStorage.getItem('shiksha_pilot_academic_year_id')) : null;
       let target = null;
       
       if (savedId) {
@@ -39,7 +41,11 @@ export const AcademicYearProvider = ({ children }) => {
 
       if (target) {
         setCurrentYear(target);
-        localStorage.setItem('shiksha_pilot_academic_year_id', String(target.id));
+        if (isAdmin) {
+          localStorage.setItem('shiksha_pilot_academic_year_id', String(target.id));
+        } else {
+          localStorage.removeItem('shiksha_pilot_academic_year_id');
+        }
       } else {
         setCurrentYear(null);
         localStorage.removeItem('shiksha_pilot_academic_year_id');
@@ -55,7 +61,7 @@ export const AcademicYearProvider = ({ children }) => {
     const handleAuthChange = () => {
       const token = localStorage.getItem('shiksha_pilot_token');
       const role = localStorage.getItem('shiksha_pilot_role');
-      if (token && (role === 'SCHOOL_ADMIN' || role === 'TEACHER')) {
+      if (token && role && role !== 'SUPER_ADMIN') {
         setLoading(true);
         loadYears();
       } else {
@@ -74,6 +80,8 @@ export const AcademicYearProvider = ({ children }) => {
   }, []);
 
   const selectYear = (yearId) => {
+    const role = localStorage.getItem('shiksha_pilot_role');
+    if (role !== 'SCHOOL_ADMIN' && role !== 'SUPER_ADMIN') return;
     const target = academicYears.find(y => String(y.id) === String(yearId));
     if (target) {
       setCurrentYear(target);
