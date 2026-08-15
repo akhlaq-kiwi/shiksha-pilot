@@ -248,6 +248,24 @@ fun SchoolAdminMenuDrawer(
             icon = Icons.Default.Shield,
             iconColor = OnlineGreen,
             isSelected = activeScreenId == "security"
+        ),
+        SchoolAdminMenuItem(
+            id = "school_profile",
+            title = "School Profile",
+            subtitle = "School details, logo & signature",
+            category = "Reports & System Security",
+            icon = Icons.Default.School,
+            iconColor = InfoBlue,
+            isSelected = activeScreenId == "school_profile"
+        ),
+        SchoolAdminMenuItem(
+            id = "credentials",
+            title = "Credentials",
+            subtitle = "Generate student & staff login credentials",
+            category = "Reports & System Security",
+            icon = Icons.Default.PersonAdd,
+            iconColor = OnlineGreen,
+            isSelected = activeScreenId == "credentials"
         )
     )
 
