@@ -1,5 +1,6 @@
 package com.shikshapilot.nativeapp.features.schooladmin.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,27 +19,48 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBackIos
 import androidx.compose.material.icons.filled.Class
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.shikshapilot.nativeapp.data.remote.ClassDto
+import com.shikshapilot.nativeapp.data.remote.CreateClassRequestDto
+import com.shikshapilot.nativeapp.data.remote.DeleteClassRequestDto
 import com.shikshapilot.nativeapp.data.remote.RetrofitClient
+import com.shikshapilot.nativeapp.data.remote.UpdateClassRequestDto
 import com.shikshapilot.nativeapp.ui.components.StickyTopBar
 import com.shikshapilot.nativeapp.ui.components.ThreeDotsLoader
 import com.shikshapilot.nativeapp.ui.theme.CardBorder
@@ -48,25 +70,47 @@ import com.shikshapilot.nativeapp.ui.theme.InfoBlue
 import com.shikshapilot.nativeapp.ui.theme.SunsetOrange
 import com.shikshapilot.nativeapp.ui.theme.TextPrimary
 import com.shikshapilot.nativeapp.ui.theme.TextSecondary
+import kotlinx.coroutines.launch
+
+private val ALPHABET_SECTIONS = listOf("A", "B", "C", "D")
+private val COLOR_SECTIONS = listOf("Red", "Blue", "Green", "Yellow")
+private const val SECTION_TYPE_NONE = "No Sections"
+private const val SECTION_TYPE_ALPHABET = "Alphabet Sections"
+private const val SECTION_TYPE_COLOR = "Color Sections"
 
 /**
- * Backend: GET /api/school/classes (SchoolAdminController::getClasses ->
- * SchoolAdminService::getClasses -> ClassRepository::findBySchool). Each row is one
- * class+section combination (`classes` table has no per-class student-count or class-teacher
- * columns), so this list groups rows by class `name` and shows the sections found under it.
- * Create/update/delete are exposed via POST/PUT/DELETE api/school/classes but require a
- * name+sections "master catalog" resolution flow (see SchoolAdminService::createClass /
- * updateClass) that is out of scope for this read-focused screen; only a view is built here.
+ * Backend: GET/POST/PUT/DELETE api/school/classes (SchoolAdminController::getClasses/createClass/
+ * updateClass/deleteClass). Each row is one class+section combination (`classes` table has no
+ * per-class student-count or class-teacher columns), so this list groups rows by class `name` and
+ * shows the sections found under it. Create/update/delete match SchoolAdminService's name+sections
+ * "master catalog" contract used by the web ClassesPage.
  */
 @Composable
 fun SchoolAdminClassesScreen(
     schoolName: String = "Jamiya Kids Planet Academy",
     onBack: () -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
     var classes by remember { mutableStateOf<List<ClassDto>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var reloadKey by remember { mutableStateOf(0) }
+
+    var showFormDialog by remember { mutableStateOf(false) }
+    var isEditing by remember { mutableStateOf(false) }
+    var editOldClassName by remember { mutableStateOf("") }
+    var classNameInput by remember { mutableStateOf("") }
+    var sectionTypeInput by remember { mutableStateOf(SECTION_TYPE_NONE) }
+    var selectedSections by remember { mutableStateOf<List<String>>(emptyList()) }
+    var formError by remember { mutableStateOf<String?>(null) }
+    var isSaving by remember { mutableStateOf(false) }
+
+    var menuForClass by remember { mutableStateOf<String?>(null) }
+    var deleteTarget by remember { mutableStateOf<String?>(null) }
+    var isDeleting by remember { mutableStateOf(false) }
+    var deleteError by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(reloadKey) {
         isLoading = true
@@ -89,7 +133,106 @@ fun SchoolAdminClassesScreen(
         classes.groupBy { it.name }.toSortedMap()
     }
 
-    Scaffold(containerColor = DarkCanvas) { paddingValues ->
+    fun resetForm() {
+        showFormDialog = false
+        isEditing = false
+        editOldClassName = ""
+        classNameInput = ""
+        sectionTypeInput = SECTION_TYPE_NONE
+        selectedSections = emptyList()
+        formError = null
+    }
+
+    fun openAddDialog() {
+        resetForm()
+        showFormDialog = true
+    }
+
+    fun openEditDialog(className: String, sections: List<String>) {
+        isEditing = true
+        editOldClassName = className
+        classNameInput = className
+        sectionTypeInput = when {
+            sections.isEmpty() -> SECTION_TYPE_NONE
+            sections.all { it in ALPHABET_SECTIONS } -> SECTION_TYPE_ALPHABET
+            sections.all { it in COLOR_SECTIONS } -> SECTION_TYPE_COLOR
+            else -> SECTION_TYPE_ALPHABET
+        }
+        selectedSections = sections
+        formError = null
+        showFormDialog = true
+    }
+
+    fun saveClass() {
+        val name = classNameInput.trim()
+        if (name.isEmpty()) {
+            formError = "Class name is required."
+            return
+        }
+        if (selectedSections.size > 4) {
+            formError = "Maximum 4 sections allowed."
+            return
+        }
+        isSaving = true
+        formError = null
+        scope.launch {
+            try {
+                val response = if (isEditing) {
+                    RetrofitClient.apiService.updateClass(
+                        UpdateClassRequestDto(oldName = editOldClassName, name = name, sections = selectedSections)
+                    )
+                } else {
+                    RetrofitClient.apiService.createClass(
+                        CreateClassRequestDto(name = name, sections = selectedSections)
+                    )
+                }
+                if (response.isSuccessful) {
+                    Toast.makeText(context, if (isEditing) "Class updated" else "Class created", Toast.LENGTH_SHORT).show()
+                    resetForm()
+                    reloadKey++
+                } else {
+                    formError = "Failed to save class (code ${response.code()})"
+                }
+            } catch (e: Exception) {
+                formError = e.message ?: "Network error while saving class"
+            } finally {
+                isSaving = false
+            }
+        }
+    }
+
+    fun confirmDelete(className: String) {
+        isDeleting = true
+        deleteError = null
+        scope.launch {
+            try {
+                val response = RetrofitClient.apiService.deleteClass(DeleteClassRequestDto(name = className))
+                if (response.isSuccessful) {
+                    Toast.makeText(context, "Class deleted", Toast.LENGTH_SHORT).show()
+                    deleteTarget = null
+                    reloadKey++
+                } else {
+                    deleteError = "This class may still have students enrolled. Transfer or remove them before deleting."
+                }
+            } catch (e: Exception) {
+                deleteError = e.message ?: "Network error while deleting class"
+            } finally {
+                isDeleting = false
+            }
+        }
+    }
+
+    Scaffold(
+        containerColor = DarkCanvas,
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { openAddDialog() },
+                containerColor = SunsetOrange
+            ) {
+                Text(text = "+", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = androidx.compose.ui.graphics.Color.White)
+            }
+        }
+    ) { paddingValues ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -140,7 +283,7 @@ fun SchoolAdminClassesScreen(
                                 color = TextPrimary
                             )
                             Text(
-                                text = "${grouped.size} Classes • ${classes.size} Sections (QA Live API)",
+                                text = "${grouped.size} Classes • ${classes.size} Sections",
                                 fontSize = 11.5.sp,
                                 color = SunsetOrange
                             )
@@ -179,7 +322,7 @@ fun SchoolAdminClassesScreen(
                         }
                         grouped.isEmpty() -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = "No classes have been set up yet.", color = TextSecondary, fontSize = 13.sp)
+                                Text(text = "No classes registered. Tap + to add one.", color = TextSecondary, fontSize = 13.sp)
                             }
                         }
                         else -> {
@@ -243,18 +386,43 @@ fun SchoolAdminClassesScreen(
                                                 }
                                             }
 
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(8.dp))
-                                                    .background(SunsetOrange.copy(alpha = 0.18f))
-                                                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                                            ) {
-                                                Text(
-                                                    text = "${sections.size.coerceAtLeast(1)} Sec",
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = SunsetOrange
-                                                )
+                                            Box {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(32.dp)
+                                                        .clip(CircleShape)
+                                                        .clickable { menuForClass = className },
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.MoreVert,
+                                                        contentDescription = "More options",
+                                                        tint = TextSecondary,
+                                                        modifier = Modifier.size(20.dp)
+                                                    )
+                                                }
+                                                DropdownMenu(
+                                                    expanded = menuForClass == className,
+                                                    onDismissRequest = { menuForClass = null }
+                                                ) {
+                                                    DropdownMenuItem(
+                                                        text = { Text("Manage Sections") },
+                                                        leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                                                        onClick = {
+                                                            menuForClass = null
+                                                            openEditDialog(className, sections)
+                                                        }
+                                                    )
+                                                    DropdownMenuItem(
+                                                        text = { Text("Delete Class") },
+                                                        leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
+                                                        onClick = {
+                                                            menuForClass = null
+                                                            deleteError = null
+                                                            deleteTarget = className
+                                                        }
+                                                    )
+                                                }
                                             }
                                         }
                                     }
@@ -265,5 +433,203 @@ fun SchoolAdminClassesScreen(
                 }
             }
         }
+    }
+
+    if (showFormDialog) {
+        Dialog(onDismissRequest = { resetForm() }) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(DarkCanvas)
+                    .border(width = 1.dp, color = CardBorder, shape = RoundedCornerShape(20.dp))
+                    .padding(20.dp)
+            ) {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (isEditing) "Manage Class Sections" else "Add Class",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = TextSecondary,
+                            modifier = Modifier.clickable { resetForm() }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(text = "Class Name", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = classNameInput,
+                        onValueChange = { if (!isEditing) classNameInput = it },
+                        enabled = !isEditing,
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("e.g. Class 5") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = FrostedCard,
+                            unfocusedContainerColor = FrostedCard,
+                            disabledContainerColor = FrostedCard,
+                            focusedBorderColor = SunsetOrange,
+                            unfocusedBorderColor = CardBorder,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
+                            disabledTextColor = TextPrimary
+                        )
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(text = "Section Type (Optional)", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    var sectionTypeExpanded by remember { mutableStateOf(false) }
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(FrostedCard)
+                                .border(width = 1.dp, color = CardBorder, shape = RoundedCornerShape(14.dp))
+                                .clickable { sectionTypeExpanded = true }
+                                .padding(horizontal = 14.dp, vertical = 14.dp)
+                        ) {
+                            Text(text = sectionTypeInput, fontSize = 14.sp, color = TextPrimary)
+                        }
+                        DropdownMenu(
+                            expanded = sectionTypeExpanded,
+                            onDismissRequest = { sectionTypeExpanded = false }
+                        ) {
+                            listOf(SECTION_TYPE_NONE, SECTION_TYPE_ALPHABET, SECTION_TYPE_COLOR).forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option) },
+                                    onClick = {
+                                        if (option != sectionTypeInput) {
+                                            sectionTypeInput = option
+                                            selectedSections = emptyList()
+                                        }
+                                        sectionTypeExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    if (sectionTypeInput != SECTION_TYPE_NONE) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(text = "Select Sections (Max 4)", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        val options = if (sectionTypeInput == SECTION_TYPE_ALPHABET) ALPHABET_SECTIONS else COLOR_SECTIONS
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            options.chunked(2).forEach { rowItems ->
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    rowItems.forEach { sec ->
+                                        val isChecked = selectedSections.contains(sec)
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(if (isChecked) SunsetOrange.copy(alpha = 0.18f) else FrostedCard)
+                                                .border(
+                                                    width = 1.dp,
+                                                    color = if (isChecked) SunsetOrange else CardBorder,
+                                                    shape = RoundedCornerShape(12.dp)
+                                                )
+                                                .clickable {
+                                                    selectedSections = if (isChecked) {
+                                                        selectedSections - sec
+                                                    } else if (selectedSections.size < 4) {
+                                                        selectedSections + sec
+                                                    } else {
+                                                        selectedSections
+                                                    }
+                                                }
+                                                .padding(horizontal = 10.dp, vertical = 10.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = sec,
+                                                fontSize = 12.5.sp,
+                                                fontWeight = if (isChecked) FontWeight.Bold else FontWeight.Medium,
+                                                color = if (isChecked) SunsetOrange else TextPrimary
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (formError != null) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(text = formError ?: "", fontSize = 11.5.sp, color = androidx.compose.ui.graphics.Color(0xFFEF4444))
+                    }
+
+                    Spacer(modifier = Modifier.height(18.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = { resetForm() }) {
+                            Text("Cancel", color = TextSecondary)
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = { saveClass() },
+                            enabled = !isSaving,
+                            colors = ButtonDefaults.buttonColors(containerColor = SunsetOrange)
+                        ) {
+                            if (isSaving) {
+                                ThreeDotsLoader(dotSize = 6.dp, dotColor = androidx.compose.ui.graphics.Color.White, spaceBetween = 4.dp, travelDistance = 4.dp)
+                            } else {
+                                Text("Save", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (deleteTarget != null) {
+        AlertDialog(
+            onDismissRequest = { if (!isDeleting) deleteTarget = null },
+            title = { Text("Delete Class ${deleteTarget}?") },
+            text = {
+                Column {
+                    Text("This will permanently remove the class and its sections. Classes with enrolled students cannot be deleted.")
+                    if (deleteError != null) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(text = deleteError ?: "", color = androidx.compose.ui.graphics.Color(0xFFEF4444), fontSize = 12.sp)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { deleteTarget?.let { confirmDelete(it) } },
+                    enabled = !isDeleting
+                ) {
+                    Text(if (isDeleting) "Deleting..." else "Delete", color = androidx.compose.ui.graphics.Color(0xFFEF4444))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteTarget = null }, enabled = !isDeleting) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }

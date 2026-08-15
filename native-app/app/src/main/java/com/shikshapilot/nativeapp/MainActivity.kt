@@ -107,7 +107,15 @@ class MainActivity : ComponentActivity() {
                 }
 
                 if (isLoggedIn) {
-                    BackHandler(enabled = backStack.size > 1) { goBack() }
+                    // Single back on the dashboard root minimizes the app instead of killing the
+                    // activity (default Android behavior for a root screen with no back-stack).
+                    BackHandler(enabled = true) {
+                        if (backStack.size > 1) {
+                            goBack()
+                        } else {
+                            moveTaskToBack(true)
+                        }
+                    }
                 }
 
                 val performLogout: () -> Unit = {
