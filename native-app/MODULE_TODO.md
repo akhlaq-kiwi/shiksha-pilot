@@ -53,10 +53,12 @@ Each item: implement -> build verify -> commit -> push -> next.
       the Education hub.
 
 ## Large
-- [ ] **Report Card Generation/Download (admin bulk + PDF)** — `report-card-templates/*` (4 templates) +
-      admin trigger via `ExamsPage.jsx`. API: `GET /api/school/exams-new/{id}/report-cards`,
-      `GET /api/school/achievements/{id}/report-card`. Native `StudentResultsScreen.kt` only has
-      read-only student-side viewing, no PDF/download/bulk-generate flow.
+- [x] **Report Card Generation/Download — partially done (2026-08-16, commit 1349168).**
+      `SchoolAdminReportCardsScreen`: admin picks exam + class, views every student's report card
+      in that class (bulk view), reusing the existing `ReportCardDetailScreen`. PDF export /
+      bulk-print / download and the 4 report-card-template rendering styles are NOT implemented —
+      viewing only, single hardcoded layout (matches the student-side view's layout, not the
+      web's template system).
 
 ## Confirmed out of scope / not gaps
 - Super Admin back-office (explicit user decision, web-only).
