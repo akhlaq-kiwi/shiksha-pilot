@@ -13,6 +13,7 @@ import com.shikshapilot.nativeapp.data.repository.UserRepository
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminAnnouncementsScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminAttendanceScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminClassesScreen
+import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminExamsScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminFinanceScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminLeaveRequestsScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminStaffScreen
@@ -24,11 +25,13 @@ import com.shikshapilot.nativeapp.features.studentparent.screens.StudentAttendan
 import com.shikshapilot.nativeapp.features.studentparent.screens.StudentDashboardScreen
 import com.shikshapilot.nativeapp.features.studentparent.screens.StudentFeesScreen
 import com.shikshapilot.nativeapp.features.studentparent.screens.StudentMaterialsScreen
+import com.shikshapilot.nativeapp.features.studentparent.screens.StudentResultsScreen
 import com.shikshapilot.nativeapp.features.studentparent.screens.StudentTimetableScreen
 import com.shikshapilot.nativeapp.features.teacher.screens.TeacherAssignmentsScreen
 import com.shikshapilot.nativeapp.features.teacher.screens.TeacherAttendanceScreen
 import com.shikshapilot.nativeapp.features.teacher.screens.TeacherClassesScreen
 import com.shikshapilot.nativeapp.features.teacher.screens.TeacherDashboardScreen
+import com.shikshapilot.nativeapp.features.teacher.screens.TeacherExamsScreen
 import com.shikshapilot.nativeapp.features.teacher.screens.TeacherLeaveScreen
 import com.shikshapilot.nativeapp.features.teacher.screens.TeacherMaterialsScreen
 import com.shikshapilot.nativeapp.features.teacher.screens.TeacherNotificationsScreen
@@ -136,6 +139,12 @@ class MainActivity : ComponentActivity() {
                                         onBack = { currentScreenId = "dashboard" }
                                     )
                                 }
+                                "teacher_exams" -> {
+                                    TeacherExamsScreen(
+                                        schoolName = schoolName,
+                                        onBack = { currentScreenId = "dashboard" }
+                                    )
+                                }
                                 "announcements" -> {
                                     SchoolAdminAnnouncementsScreen(
                                         schoolName = schoolName,
@@ -187,6 +196,12 @@ class MainActivity : ComponentActivity() {
                                 }
                                 "student_timetable" -> {
                                     StudentTimetableScreen(
+                                        schoolName = schoolName,
+                                        onBack = { currentScreenId = "dashboard" }
+                                    )
+                                }
+                                "student_results" -> {
+                                    StudentResultsScreen(
                                         schoolName = schoolName,
                                         onBack = { currentScreenId = "dashboard" }
                                     )
@@ -261,6 +276,12 @@ class MainActivity : ComponentActivity() {
                                 }
                                 "timetable" -> {
                                     SchoolAdminTimetableScreen(
+                                        schoolName = schoolName,
+                                        onBack = { currentScreenId = "dashboard" }
+                                    )
+                                }
+                                "exams" -> {
+                                    SchoolAdminExamsScreen(
                                         schoolName = schoolName,
                                         onBack = { currentScreenId = "dashboard" }
                                     )

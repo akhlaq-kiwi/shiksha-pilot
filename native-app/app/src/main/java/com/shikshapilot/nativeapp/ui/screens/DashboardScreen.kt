@@ -20,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Class
@@ -342,6 +343,20 @@ fun DashboardScreen(
                                 icon = Icons.Default.CalendarMonth,
                                 color = SunsetOrange,
                                 onClick = { onModuleClick("timetable") }
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            WebStatCard(
+                                modifier = Modifier.weight(1f),
+                                label = "Examinations",
+                                value = "Manage & Publish",
+                                icon = Icons.Default.Assignment,
+                                color = InfoBlue,
+                                onClick = { onModuleClick("exams") }
                             )
                         }
                     }

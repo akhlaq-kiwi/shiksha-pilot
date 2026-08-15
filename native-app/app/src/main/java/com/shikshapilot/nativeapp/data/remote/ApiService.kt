@@ -496,6 +496,297 @@ data class TeacherSalariesResponseDto(
     val data: TeacherSalariesDataDto? = null
 )
 
+// --- EXAMS (SCHOOL ADMIN) ---
+
+// Raw `examinations` table row (SchoolAdminService::getExaminations/createExamination/getExaminationDetails).
+data class ExamItemDto(
+    val id: Int,
+    val school_id: Int? = null,
+    val academic_year_id: Int? = null,
+    val name: String,
+    val start_date: String? = null,
+    val end_date: String? = null,
+    val publish_date: String? = null,
+    val description: String? = null,
+    val status: String? = "Draft",
+    val papers_count: Int? = null
+)
+
+data class ExamsListResponseDto(
+    val status: String? = "success",
+    val data: List<ExamItemDto> = emptyList()
+)
+
+data class ExamResponseDto(
+    val status: String? = "success",
+    val message: String? = null,
+    val data: ExamItemDto? = null
+)
+
+data class CreateExamRequestDto(
+    val name: String,
+    val start_date: String,
+    val end_date: String,
+    val publish_date: String,
+    val description: String? = null
+)
+
+data class ExamClassStatusItemDto(
+    val id: Int,
+    val name: String,
+    val section: String? = null,
+    val status: String? = "Draft",
+    val publish_date: String? = null,
+    val scheme_published: Int? = 0,
+    val admit_card_published: Int? = 0
+)
+
+data class ExamClassStatusResponseDto(
+    val status: String? = "success",
+    val data: List<ExamClassStatusItemDto> = emptyList()
+)
+
+data class PublishExamRequestDto(
+    val class_id: Int,
+    val status: String = "Published"
+)
+
+// --- EXAMS (TEACHER) ---
+
+data class TeacherExamListItemDto(
+    val id: Int,
+    val name: String,
+    val start_date: String? = null,
+    val end_date: String? = null,
+    val scheme_published: Int? = 0,
+    val result_status: String? = "Draft",
+    val result_published: Int? = 0,
+    val status: String? = null
+)
+
+data class TeacherExamsListResponseDto(
+    val status: String? = "success",
+    val data: List<TeacherExamListItemDto> = emptyList()
+)
+
+data class TeacherExamPaperDto(
+    val id: Int? = null,
+    val subject_id: Int? = null,
+    val exam_date: String? = null,
+    val start_time: String? = null,
+    val end_time: String? = null,
+    val max_marks: Double? = 0.0,
+    val passing_marks: Double? = 0.0,
+    val room: String? = null,
+    val evaluation_type: String? = "marks",
+    val subject_name: String? = null
+)
+
+data class TeacherExamResultPaperDto(
+    val subject_name: String? = null,
+    val marks_obtained: Double? = null,
+    val is_absent: Int? = 0,
+    val max_marks: Double? = 0.0,
+    val passing_marks: Double? = 0.0
+)
+
+data class TeacherExamResultStudentDto(
+    val student_id: Int,
+    val roll_number: String? = null,
+    val student_name: String? = null,
+    val papers: List<TeacherExamResultPaperDto> = emptyList(),
+    val total_max_marks: Double? = 0.0,
+    val total_marks_obtained: Double? = 0.0,
+    val status: String? = null
+)
+
+data class TeacherExamDetailsDto(
+    val exam_name: String? = null,
+    val start_date: String? = null,
+    val end_date: String? = null,
+    val scheme_published: Int? = 0,
+    val result_published: Int? = 0,
+    val scheme: List<TeacherExamPaperDto> = emptyList(),
+    val has_papers: Int? = 0,
+    val result: List<TeacherExamResultStudentDto>? = null
+)
+
+data class TeacherExamDetailsResponseDto(
+    val status: String? = "success",
+    val data: TeacherExamDetailsDto? = null
+)
+
+// `marks_obtained` is numeric for "marks" papers and a letter grade string for "grade" papers
+// (see TeacherService::getMarksSheet) — Gson maps either JSON shape into `Any?` (Double/String).
+data class TeacherMarksSheetStudentDto(
+    val student_id: Int,
+    val student_name: String? = null,
+    val roll_no: String? = null,
+    val marks_obtained: Any? = null,
+    val is_absent: Int? = 0,
+    val remarks: String? = null
+)
+
+data class TeacherMarksSheetDto(
+    val exam_name: String? = null,
+    val class_name: String? = null,
+    val subject_name: String? = null,
+    val evaluation_type: String? = "marks",
+    val max_marks: Double? = 0.0,
+    val passing_marks: Double? = 0.0,
+    val available_grades: List<String> = emptyList(),
+    val is_result_published: Boolean? = false,
+    val students: List<TeacherMarksSheetStudentDto> = emptyList()
+)
+
+data class TeacherMarksSheetResponseDto(
+    val status: String? = "success",
+    val data: TeacherMarksSheetDto? = null
+)
+
+data class SaveMarkItemDto(
+    val student_id: Int,
+    val marks_obtained: String? = null,
+    val is_absent: Int = 0,
+    val remarks: String? = null
+)
+
+data class SaveMarksSheetRequestDto(
+    val subject_id: Int,
+    val marks: List<SaveMarkItemDto>
+)
+
+// --- EXAMS (STUDENT) ---
+
+data class StudentExamListItemDto(
+    val id: Int,
+    val name: String,
+    val start_date: String? = null,
+    val end_date: String? = null,
+    val scheme_published: Int? = 0,
+    val admit_card_published: Int? = 0,
+    val result_status: String? = "Draft",
+    val result_published: Int? = 0,
+    val status: String? = null
+)
+
+data class StudentExamsListResponseDto(
+    val status: String? = "success",
+    val data: List<StudentExamListItemDto> = emptyList()
+)
+
+data class StudentExamSchemeItemDto(
+    val id: Int? = null,
+    val exam_date: String? = null,
+    val start_time: String? = null,
+    val end_time: String? = null,
+    val max_marks: Double? = 0.0,
+    val passing_marks: Double? = 0.0,
+    val room: String? = null,
+    val subject_name: String? = null
+)
+
+data class StudentAdmitCardDto(
+    val school_name: String? = null,
+    val academic_year: String? = null,
+    val student_name: String? = null,
+    val class_name: String? = null,
+    val roll_no: String? = null,
+    val room_name: String? = null,
+    val bench_number: String? = null,
+    val seat_position: String? = null,
+    val seat_number: String? = null
+)
+
+data class StudentResultPaperDto(
+    val subject_name: String? = null,
+    val marks_obtained: Double? = null,
+    val is_absent: Int? = 0,
+    val remarks: String? = null,
+    val max_marks: Double? = 0.0,
+    val passing_marks: Double? = 0.0
+)
+
+data class StudentResultDto(
+    val papers: List<StudentResultPaperDto> = emptyList(),
+    val total_max_marks: Double? = 0.0,
+    val total_marks_obtained: Double? = 0.0,
+    val status: String? = null
+)
+
+// Shared report-card shape (SchoolAdminService::getReportCards / StudentService::getPublishedReportCards
+// both build this exact structure). `max_marks`/`passing_marks`/`marks_obtained` are `Any?` because the
+// backend emits either a number or the literal string "—"/"ABSENT" for grade-only or missing papers.
+data class ReportCardSubjectDto(
+    val subject_name: String? = null,
+    val max_marks: Any? = null,
+    val passing_marks: Any? = null,
+    val marks_obtained: Any? = null,
+    val grade: String? = null,
+    val remarks: String? = null,
+    val result: String? = null
+)
+
+data class ReportCardAttendanceDto(
+    val working_days: Int? = 0,
+    val present_days: Int? = 0,
+    val attendance_rate: Double? = 0.0
+)
+
+data class ReportCardDto(
+    val exam_id: Int? = null,
+    val student_id: Int? = null,
+    val student_name: String? = null,
+    val roll_no: String? = null,
+    val admission_no: String? = null,
+    val father_name: String? = null,
+    val mother_name: String? = null,
+    val dob: String? = null,
+    val class_name: String? = null,
+    val class_section: String? = null,
+    val exam_name: String? = null,
+    val academic_year_name: String? = null,
+    val school_name: String? = null,
+    val school_logo: String? = null,
+    val report_card_remark: String? = null,
+    val subjects: List<ReportCardSubjectDto> = emptyList(),
+    val total_max: Double? = 0.0,
+    val total_obtained: Double? = 0.0,
+    val percentage: Double? = 0.0,
+    val grade: String? = null,
+    val result: String? = null,
+    val class_rank: String? = null,
+    val section_rank: String? = null,
+    val attendance: ReportCardAttendanceDto? = null,
+    val status: String? = null
+)
+
+data class StudentExamDetailsDto(
+    val exam_name: String? = null,
+    val start_date: String? = null,
+    val end_date: String? = null,
+    val scheme_published: Int? = 0,
+    val admit_card_published: Int? = 0,
+    val result_published: Int? = 0,
+    val scheme: List<StudentExamSchemeItemDto>? = null,
+    val admit_card: StudentAdmitCardDto? = null,
+    val result: StudentResultDto? = null,
+    val report_card: ReportCardDto? = null,
+    val is_restricted: Boolean? = false,
+    val admit_card_restricted: Boolean? = false,
+    val result_restricted: Boolean? = false
+)
+
+data class StudentExamDetailsResponseDto(
+    val status: String? = "success",
+    val data: StudentExamDetailsDto? = null
+)
+
+data class StudentReportCardsResponseDto(
+    val status: String? = "success",
+    val data: List<ReportCardDto> = emptyList()
+)
+
 interface ApiService {
 
     // Auth
@@ -622,6 +913,36 @@ interface ApiService {
         @Header("Authorization") authHeader: String? = null
     ): Response<JsonElement>
 
+    @GET("api/school/exams-new")
+    suspend fun getSchoolExams(
+        @Header("Authorization") authHeader: String? = null
+    ): Response<ExamsListResponseDto>
+
+    @POST("api/school/exams-new")
+    suspend fun createSchoolExam(
+        @Body request: CreateExamRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<ExamResponseDto>
+
+    @GET("api/school/exams-new/{id}")
+    suspend fun getSchoolExamDetails(
+        @Path("id") id: Int,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<ExamResponseDto>
+
+    @GET("api/school/exams-new/{id}/class-status")
+    suspend fun getSchoolExamClassStatus(
+        @Path("id") id: Int,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<ExamClassStatusResponseDto>
+
+    @POST("api/school/exams-new/{id}/publish")
+    suspend fun publishSchoolExam(
+        @Path("id") id: Int,
+        @Body request: PublishExamRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
     // Teacher Endpoints
     @GET("api/teacher/dashboard")
     suspend fun getTeacherDashboard(
@@ -713,6 +1034,31 @@ interface ApiService {
         @Header("Authorization") authHeader: String? = null
     ): Response<ResponseBody>
 
+    @GET("api/teacher/exams-new")
+    suspend fun getTeacherExams(
+        @Header("Authorization") authHeader: String? = null
+    ): Response<TeacherExamsListResponseDto>
+
+    @GET("api/teacher/exams-new/{id}/details")
+    suspend fun getTeacherExamDetails(
+        @Path("id") id: Int,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<TeacherExamDetailsResponseDto>
+
+    @GET("api/teacher/exams-new/{id}/marks-sheet")
+    suspend fun getTeacherMarksSheet(
+        @Path("id") id: Int,
+        @Query("subject_id") subjectId: Int,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<TeacherMarksSheetResponseDto>
+
+    @POST("api/teacher/exams-new/{id}/marks-sheet")
+    suspend fun saveTeacherMarksSheet(
+        @Path("id") id: Int,
+        @Body request: SaveMarksSheetRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
     // Student & Parent Endpoints
     @GET("api/student/dashboard")
     suspend fun getStudentDashboard(
@@ -748,4 +1094,20 @@ interface ApiService {
     suspend fun getStudentAnnouncements(
         @Header("Authorization") authHeader: String? = null
     ): Response<StudentAnnouncementsResponseDto>
+
+    @GET("api/student/exams-new")
+    suspend fun getStudentExams(
+        @Header("Authorization") authHeader: String? = null
+    ): Response<StudentExamsListResponseDto>
+
+    @GET("api/student/exams-new/{id}/details")
+    suspend fun getStudentExamDetails(
+        @Path("id") id: Int,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<StudentExamDetailsResponseDto>
+
+    @GET("api/student/exams-new/report-cards")
+    suspend fun getStudentReportCards(
+        @Header("Authorization") authHeader: String? = null
+    ): Response<StudentReportCardsResponseDto>
 }

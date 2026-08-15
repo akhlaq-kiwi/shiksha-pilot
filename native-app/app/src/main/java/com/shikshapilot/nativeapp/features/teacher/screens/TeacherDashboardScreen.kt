@@ -309,6 +309,19 @@ fun TeacherDashboardScreen(
                         ) {
                             Text(text = "Salary", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                         }
+
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(FrostedCard)
+                                .border(width = 1.dp, color = CardBorder, shape = RoundedCornerShape(12.dp))
+                                .clickable { onNavigate("teacher_exams") }
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(text = "Exams", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))

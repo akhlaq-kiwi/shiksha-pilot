@@ -15,7 +15,7 @@ this file only tracks what native-app still needs to build.
 | School Admin Staff | ✅ | n/a | ✅ (list only) | partial |
 | School Admin Classes/Sections | ✅ | n/a | ❌ | missing |
 | School Admin Timetable (+publish/backup/paste/replace) | ✅ | n/a | ❌ | missing |
-| School Admin Exams (exams-new: instructions, marks, seating plan, report cards, question paper designer) | ✅ extensive | n/a | ❌ | missing |
+| School Admin Exams (exams-new: instructions, marks, seating plan, report cards, question paper designer) | ✅ extensive | n/a | ✅ (list/create/publish + class-status; instructions/seating plan/admit-card toggle/report cards/question paper designer deferred) | partial |
 | School Admin Finance (fee structures, additional fees, transport fees, late-penalty, expenses, collection history, fee follow-up, financial reports, salary disbursement) | ✅ many pages | n/a | ✅ single `SchoolAdminFinanceScreen` stub | mostly missing |
 | School Admin Leave Requests | ✅ | n/a | ✅ | present |
 | School Admin Announcements | ✅ | n/a | ✅ | present |
@@ -29,13 +29,13 @@ this file only tracks what native-app still needs to build.
 | Teacher Assignments/Homework | ✅ | ✅ (homework_list_screen) | ✅ (assignments only, no "homework" API used) | partial |
 | Teacher Materials | ✅ | n/a | ✅ | present |
 | Teacher Classes list | ✅ | n/a | ❌ (endpoint not called) | missing |
-| Teacher Exams/Marks entry | ✅ (exams-new, marks-sheet) | n/a | ❌ | missing |
+| Teacher Exams/Marks entry | ✅ (exams-new, marks-sheet) | n/a | ✅ (list/details/marks entry) | present |
 | Teacher Salaries/receipts | ✅ | ✅ (salary_card_screen) | ❌ | missing |
 | Teacher Leave (apply) | ✅ TeacherLeavePage | ✅ apply_leave_screen | ❌ | missing |
 | Teacher Notifications | ✅ | ✅ notification_center_screen | ❌ | missing |
 | Teacher Vocabulary report | ✅ | n/a | ❌ | missing |
 | Student/Parent Dashboard | ✅ | ✅ home_screen | ✅ | present |
-| Student/Parent Academics/Results | ✅ AcademicsPage | ✅ exam_list/exam_detail | ❌ | missing |
+| Student/Parent Academics/Results | ✅ AcademicsPage | ✅ exam_list/exam_detail | ✅ StudentResultsScreen (list/details/report card) | present |
 | Student/Parent Attendance | ✅ | ✅ attendance_screen | ❌ (endpoint not consumed) | missing |
 | Student/Parent Assignments/Homework | ✅ | ✅ homework_list_screen | ❌ (endpoint not consumed) | missing |
 | Student/Parent Fees | ✅ FeesPage | ✅ fees_card_screen | ✅ StudentFeesScreen | present |
@@ -53,7 +53,7 @@ this file only tracks what native-app still needs to build.
 ### schooladmin/ (native-app)
 - Classes & Sections management
 - Timetable (view/edit/publish/backup)
-- Exams (exams-new suite: create, instructions, marks entry, seating plan, report cards, admit cards, question paper designer)
+- Exams: `SchoolAdminExamsScreen` covers list/create/publish + class-status. Deferred (skip, not attempted): instructions editor, seating plan (generate/preview), admit-card publish/unpublish toggle in admin UI, admin report cards view, question paper designer (genuinely complex web-only tooling).
 - Finance breakdown: fee structures, additional fees, transport fees, late-payment penalty, expenses, collection history, fee follow-ups, financial reports, salary disbursement (currently one generic `SchoolAdminFinanceScreen`)
 - Security: audit logs, login history
 - Profile: school profile, logo/signature upload
@@ -64,14 +64,14 @@ this file only tracks what native-app still needs to build.
 
 ### teacher/ (native-app)
 - Classes list screen (endpoint exists unused)
-- Exams / marks entry (exams-new, marks-sheet)
+- ~~Exams / marks entry (exams-new, marks-sheet)~~ — done: `TeacherExamsScreen` + `TeacherMarksEntryScreen`.
 - Salaries & salary receipts
 - Leave application (apply/view own leave)
 - Notifications center
 - Vocabulary report
 
 ### studentparent/ (native-app)
-- Academics/Results screen
+- ~~Academics/Results screen~~ — done: `StudentResultsScreen` (exam list, details with scheme/admit-card/result, native report card view).
 - Attendance screen (endpoint exists, unused)
 - Assignments/Homework screen (endpoint exists, unused)
 - Materials/Resources screen (endpoint exists, unused)
@@ -88,14 +88,14 @@ this file only tracks what native-app still needs to build.
 ## Backend API Endpoints Not Yet Consumed by Native App
 
 native-app's `ApiService.kt` currently defines ~30 endpoints. Backend exposes ~195. Notably unconsumed:
-- All `/api/school/exams-new/*`, `/api/school/exams`, `/api/school/exam-marks`
+- `/api/school/exams-new` (list/create/get/publish/class-status) now consumed by `SchoolAdminExamsScreen`. Still unconsumed: `/api/school/exams-new/{id}/instructions`, `/seating-plan(+/preview)`, `/publish-scheme`, `/unpublish-scheme`, `/publish-admit-card`, `/unpublish-admit-card`, `/report-cards`, `/timetable`, `/marks` (legacy per-mark endpoint — teacher marks entry uses `/marks-sheet` instead), and legacy `/api/school/exams`, `/api/school/exam-marks`, `/api/school/grade-configurations`
 - All `/api/school/*fee*`, `/api/school/expenses`, `/api/school/financial-reports`, `/api/school/collection-history`, `/api/school/staff-payments`, `/api/school/late-payment-penalty/*`
 - `/api/school/timetable/{publish,backup,paste,replace}` (only bare GET timetable is used, and with a different query pattern than backend expects — verify `class_id`/`date` params match backend controller)
 - `/api/school/classes/sections`, `/api/school/classes/transfer-students`, `/api/school/classes/{id}/next-roll-no`
 - `/api/school/security/*`, `/api/school/profile*`, `/api/school/academic-years/*`, `/api/school/holidays/*`, `/api/school/subjects/*`, `/api/school/grade-configurations`, `/api/school/credentials/*`, `/api/school/attendance/leaderboard`
-- `/api/teacher/exams-new/*`, `/api/teacher/exams`, `/api/teacher/marks`, `/api/teacher/homework`, `/api/teacher/homework/{id}`, `/api/teacher/salaries*`, `/api/teacher/notifications*`, `/api/teacher/schedule/today`, `/api/teacher/vocabulary/report`
+- `/api/teacher/exams-new/*` and `/api/teacher/exams-new/{id}/marks-sheet` now consumed by `TeacherExamsScreen`/`TeacherMarksEntryScreen`. Still unconsumed: legacy `/api/teacher/exams`, `/api/teacher/marks`, `/api/teacher/homework`, `/api/teacher/homework/{id}`, `/api/teacher/salaries*`, `/api/teacher/notifications*`, `/api/teacher/schedule/today`, `/api/teacher/vocabulary/report`
 - `/api/student/attendance`, `/api/student/assignments`, `/api/student/materials`, `/api/student/timetable` (all defined in native ApiService but no screen calls them)
-- `/api/student/exams-new/*`, `/api/student/results`, `/api/student/homework`, `/api/student/fee-payments`, `/api/student/fees/card`, `/api/student/fees/receipt`
+- `/api/student/exams-new` (list/details) and `/api/student/exams-new/report-cards` now consumed by `StudentResultsScreen`. Still unconsumed: `/api/student/results`, `/api/student/homework`, `/api/student/fee-payments`, `/api/student/fees/card`, `/api/student/fees/receipt`
 - `/api/student/notifications*`, `/api/student/announcements/{id}/read`
 - `/api/student/game/word-builder/*`, `/api/student/vocabulary/*`
 - `/api/parent/children`, `/api/parent/vocabulary/report`
@@ -118,7 +118,7 @@ Note: native-app also calls some endpoints (e.g. `api/school/leave-requests`, `a
 2. **Student/Parent core screens using already-defined-but-unused endpoints**: Attendance, Assignments, Materials, Timetable — fastest wins since DTOs/API calls already exist in `ApiService.kt`.
 3. **Teacher gaps using existing endpoints**: Classes list, then new: Leave application, Notifications, Salaries.
 4. **School Admin Classes & Sections, Timetable** (view + publish) — needed by both admin and consumed by teacher/student timetable screens for consistency.
-5. **Exams suite** (school admin + teacher + student) — largest single feature area (`exams-new/*`), do after core CRUD screens are stable.
+5. ~~**Exams suite** (school admin + teacher + student)~~ — done: core flow (admin list/create/publish/class-status, teacher list/details/marks entry, student list/details/report card) implemented in `SchoolAdminExamsScreen`, `TeacherExamsScreen`/`TeacherMarksEntryScreen`, `StudentResultsScreen`. Deferred as web-only/lower-priority: exam instructions editor, seating plan generation, admit-card publish/unpublish toggle in admin UI, admin-side report card viewer, and the question paper designer (explicitly out of scope — complex web-only tooling).
 6. **Finance breakdown** (fee structures, additional/transport fees, late-penalty, expenses, collection history, follow-ups, financial reports, salary disbursement) — second-largest area, split into incremental screens matching web pages one-for-one.
 7. **Security/Profile/Academic setup** (audit logs, login history, school profile, academic years, holidays, subjects, grade config, credentials generation) — lower daily-use priority, admin setup/back-office features.
 8. **Achievements + Vocabulary/games + push notifications** — student engagement layer, do last unless product explicitly prioritizes it.
