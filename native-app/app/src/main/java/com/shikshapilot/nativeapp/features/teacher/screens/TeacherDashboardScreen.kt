@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.sp
 import com.shikshapilot.nativeapp.data.remote.ClassDto
 import com.shikshapilot.nativeapp.data.remote.RetrofitClient
 import com.shikshapilot.nativeapp.data.remote.TimetableItemDto
+import com.shikshapilot.nativeapp.ui.components.PullToRefreshWrapper
 import com.shikshapilot.nativeapp.ui.components.StickyTopBar
 import com.shikshapilot.nativeapp.ui.components.ThreeDotsLoader
 import com.shikshapilot.nativeapp.ui.theme.CardBorder
@@ -70,6 +71,7 @@ fun TeacherDashboardScreen(
     var scheduleList by remember { mutableStateOf<List<TimetableItemDto>>(emptyList()) }
     var classesList by remember { mutableStateOf<List<ClassDto>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var refreshKey by remember { mutableStateOf(0) }
 
     val defaultSchedule = remember {
         listOf(
@@ -81,7 +83,7 @@ fun TeacherDashboardScreen(
         )
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(Unit, refreshKey) {
         isLoading = true
         try {
             val response = RetrofitClient.apiService.getTeacherDashboard()
@@ -112,6 +114,7 @@ fun TeacherDashboardScreen(
                 .padding(paddingValues)
                 .background(DarkCanvas)
         ) {
+            PullToRefreshWrapper(isRefreshing = isLoading, onRefresh = { refreshKey++ }) {
             Column(modifier = Modifier.fillMaxSize()) {
                 StickyTopBar(
                     schoolName = schoolName,
@@ -355,6 +358,19 @@ fun TeacherDashboardScreen(
                         ) {
                             Text(text = "Notification Prefs", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                         }
+
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(FrostedCard)
+                                .border(width = 1.dp, color = CardBorder, shape = RoundedCornerShape(12.dp))
+                                .clickable { onNavigate("achievements") }
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(text = "Achievements", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -466,6 +482,7 @@ fun TeacherDashboardScreen(
                         }
                     }
                 }
+            }
             }
         }
     }
