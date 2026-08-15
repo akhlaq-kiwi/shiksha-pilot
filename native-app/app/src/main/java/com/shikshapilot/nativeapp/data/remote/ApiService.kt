@@ -787,6 +787,312 @@ data class StudentReportCardsResponseDto(
     val data: List<ReportCardDto> = emptyList()
 )
 
+// -----------------------------------------------------------------------------------------
+// Finance breakdown DTOs (school-admin) — verified against
+// backend/src/Domain/SchoolAdmin/{Controllers,Services}/SchoolAdminController.php /
+// SchoolAdminService.php and backend/src/Database/Migrations/001_baseline_schema.sql
+// (`fee_structures`, `fee_payments`, `class_fee_configurations`, `fee_follow_ups`,
+// `fee_follow_up_notes`, `staff_payments`, `financial_reports` tables).
+// -----------------------------------------------------------------------------------------
+
+// GET/POST api/school/fee-structures (SchoolAdminService::getFeeStructures/createFeeStructure)
+data class FeeStructureDto(
+    val id: Int,
+    val school_id: Int? = null,
+    val name: String,
+    val amount: Double = 0.0,
+    val frequency: String? = null,
+    val class_id: Int? = null,
+    val class_name: String? = null,
+    val created_at: String? = null,
+    val updated_at: String? = null
+)
+
+data class FeeStructuresResponseDto(
+    val status: String? = "success",
+    val data: List<FeeStructureDto> = emptyList()
+)
+
+data class CreateFeeStructureRequestDto(
+    val name: String,
+    val amount: Double,
+    val frequency: String? = "Monthly",
+    val class_id: Int? = null
+)
+
+data class FeeStructureResponseDto(
+    val status: String? = "success",
+    val message: String? = null,
+    val data: FeeStructureDto? = null
+)
+
+// GET api/school/class-fee-configurations (SchoolAdminService::getClassFeeConfigurations);
+// `monthly_fees` is stored as JSON text server-side but decoded to a map before returning.
+data class ClassFeeConfigurationDto(
+    val id: Int,
+    val school_id: Int? = null,
+    val academic_year_id: Int,
+    val class_id: Int,
+    val mode: String? = "SAME",
+    val monthly_fees: Map<String, Double>? = null,
+    val amount: Double? = null,
+    val is_locked: Int = 0,
+    val created_at: String? = null,
+    val updated_at: String? = null
+)
+
+data class ClassFeeConfigurationsResponseDto(
+    val status: String? = "success",
+    val data: List<ClassFeeConfigurationDto> = emptyList()
+)
+
+// POST api/school/class-fee-configurations (SchoolAdminService::saveClassFeeConfiguration) —
+// `class_id` accepts either a school class_id or a master-catalog id/name; `monthly_fees` is a
+// map of academic month name -> amount (April..March).
+data class SaveClassFeeConfigurationRequestDto(
+    val class_id: String,
+    val academic_year_id: Int? = null,
+    val monthly_fees: Map<String, Double>
+)
+
+// POST api/school/fee-payments (SchoolAdminService::createFeePayment)
+data class CreateFeePaymentRequestDto(
+    val student_id: Int,
+    val months: List<String>? = null,
+    val fee_month: String? = null,
+    val amount_paid: Double? = null,
+    val payment_method: String? = "Cash"
+)
+
+data class FeePaymentDto(
+    val id: Int,
+    val school_id: Int? = null,
+    val student_id: Int? = null,
+    val fee_structure_id: Int? = null,
+    val amount_paid: Double = 0.0,
+    val payment_date: String? = null,
+    val receipt_no: String? = null,
+    val status: String? = null,
+    val fee_month: String? = null,
+    val academic_year_id: Int? = null,
+    val payment_method: String? = null,
+    val collected_by: String? = null
+)
+
+data class FeePaymentResponseDto(
+    val status: String? = "success",
+    val message: String? = null,
+    val data: FeePaymentDto? = null
+)
+
+// GET api/school/collection-history (SchoolAdminService::getCollectionHistory) — transactions
+// are grouped monthly-fee payments merged with additional-fee payments by receipt_no.
+data class CollectionHistoryItemDto(
+    val id: Int,
+    val type: String? = null,
+    val receipt_no: String? = null,
+    val student_name: String? = null,
+    val student_roll_no: String? = null,
+    val class_name: String? = null,
+    val fee_name: String? = null,
+    val collected_by: String? = null,
+    val payment_method: String? = null,
+    val amount: Double = 0.0,
+    val amount_paid: Double = 0.0,
+    val fee_month: String? = null,
+    val payment_date: String? = null,
+    val created_at: String? = null,
+    val status: String? = null,
+    val previous_total: Double? = null,
+    val updated_total: Double? = null
+)
+
+data class CollectionHistoryStatsDto(
+    val total_collected: Double = 0.0,
+    val today_collection: Double = 0.0,
+    val this_month_collection: Double = 0.0,
+    val total_transactions: Int = 0
+)
+
+data class CollectionHistoryDataDto(
+    val transactions: List<CollectionHistoryItemDto> = emptyList(),
+    val stats: CollectionHistoryStatsDto? = null,
+    val available_months: List<String> = emptyList(),
+    val selected_month: String? = null
+)
+
+data class CollectionHistoryResponseDto(
+    val status: String? = "success",
+    val data: CollectionHistoryDataDto? = null
+)
+
+// GET api/school/fee-follow-ups (SchoolAdminService::getFeeFollowUps)
+data class FeeFollowUpItemDto(
+    val id: Int,
+    val school_id: Int? = null,
+    val student_id: Int,
+    val academic_year_id: Int? = null,
+    val pending_amount: Double = 0.0,
+    val promised_date: String? = null,
+    val reason: String? = null,
+    val reminder_notes: String? = null,
+    val status: String? = null,
+    val created_by: Int? = null,
+    val completed_at: String? = null,
+    val extended_count: Int = 0,
+    val student_name: String? = null,
+    val roll_no: String? = null,
+    val class_name: String? = null,
+    val mobile_number: String? = null
+)
+
+data class FeeFollowUpStatsDto(
+    val pending: Int = 0,
+    val due_today: Int = 0,
+    val upcoming: Int = 0,
+    val overdue: Int = 0,
+    val completed: Int = 0
+)
+
+data class FeeFollowUpsDataDto(
+    val stats: FeeFollowUpStatsDto? = null,
+    val items: List<FeeFollowUpItemDto> = emptyList()
+)
+
+data class FeeFollowUpsResponseDto(
+    val status: String? = "success",
+    val data: FeeFollowUpsDataDto? = null
+)
+
+data class FeeFollowUpNoteDto(
+    val id: Int,
+    val follow_up_id: Int? = null,
+    val comment: String,
+    val created_by: Int? = null,
+    val user_name: String? = null,
+    val created_at: String? = null
+)
+
+// GET api/school/fee-follow-ups/{id} (SchoolAdminService::getFeeFollowUpDetails)
+data class FeeFollowUpDetailsDto(
+    val id: Int,
+    val student_id: Int? = null,
+    val student_name: String? = null,
+    val admission_no: String? = null,
+    val class_name: String? = null,
+    val parent_name: String? = null,
+    val mobile_number: String? = null,
+    val creator_name: String? = null,
+    val pending_amount: Double = 0.0,
+    val promised_date: String? = null,
+    val reason: String? = null,
+    val status: String? = null,
+    val extended_count: Int = 0,
+    val notes: List<FeeFollowUpNoteDto> = emptyList()
+)
+
+data class FeeFollowUpDetailsResponseDto(
+    val status: String? = "success",
+    val data: FeeFollowUpDetailsDto? = null
+)
+
+// PUT api/school/fee-follow-ups/{id}/extend
+data class ExtendFollowUpRequestDto(
+    val promised_date: String,
+    val reason: String? = null
+)
+
+// PUT api/school/fee-follow-ups/{id}/status
+data class UpdateFollowUpStatusRequestDto(
+    val status: String
+)
+
+// POST api/school/fee-follow-ups/{id}/notes
+data class AddFollowUpNoteRequestDto(
+    val comment: String
+)
+
+// POST api/school/fee-follow-ups/{id}/contacted
+data class MarkFollowUpContactedRequestDto(
+    val comment: String? = null
+)
+
+// GET api/school/staff-payments?month=... (SchoolAdminService::getStaffPayments)
+data class StaffPaymentItemDto(
+    val id: Int,
+    val name: String? = null,
+    val designation: String? = null,
+    val salary: Double = 0.0,
+    val payable_salary: Double = 0.0,
+    val status: String? = null,
+    val date: String? = null,
+    val payment_id: Int? = null,
+    val photo_path: String? = null
+)
+
+data class StaffPaymentsResponseDto(
+    val status: String? = "success",
+    val data: List<StaffPaymentItemDto> = emptyList()
+)
+
+// POST api/school/staff-payments (SchoolAdminService::payStaffSalary)
+data class PayStaffSalaryRequestDto(
+    val staff_id: Int,
+    val month: String
+)
+
+data class PayStaffSalaryResultDto(
+    val success: Boolean = false,
+    val id: Int? = null
+)
+
+data class PayStaffSalaryResponseDto(
+    val status: String? = "success",
+    val message: String? = null,
+    val data: PayStaffSalaryResultDto? = null
+)
+
+// GET/POST api/school/financial-reports (SchoolAdminService::getFinancialReports/createFinancialReport)
+data class FinancialReportItemDto(
+    val id: Int,
+    val school_id: Int? = null,
+    val report_id: String? = null,
+    val from_date: String? = null,
+    val to_date: String? = null,
+    val fees_collected: Double = 0.0,
+    val salary_paid: Double = 0.0,
+    val profit_loss: Double = 0.0,
+    val status: String? = null,
+    val created_at: String? = null,
+    val updated_at: String? = null
+)
+
+data class FinancialReportsDataDto(
+    val reports: List<FinancialReportItemDto> = emptyList(),
+    val next_suggested_start_date: String? = null,
+    val has_previous_report: Boolean = false
+)
+
+data class FinancialReportsResponseDto(
+    val status: String? = "success",
+    val data: FinancialReportsDataDto? = null
+)
+
+data class CreateFinancialReportRequestDto(
+    val from_date: String,
+    val to_date: String
+)
+
+data class FinancialReportResponseDto(
+    val status: String? = "success",
+    val message: String? = null,
+    val data: FinancialReportItemDto? = null
+)
+
+data class UpdateFinancialReportStatusRequestDto(
+    val status: String
+)
+
 interface ApiService {
 
     // Auth
@@ -1110,4 +1416,117 @@ interface ApiService {
     suspend fun getStudentReportCards(
         @Header("Authorization") authHeader: String? = null
     ): Response<StudentReportCardsResponseDto>
+
+    // -------------------------------------------------------------------------------------
+    // School Admin — Finance breakdown
+    // -------------------------------------------------------------------------------------
+
+    @GET("api/school/fee-structures")
+    suspend fun getFeeStructures(
+        @Header("Authorization") authHeader: String? = null
+    ): Response<FeeStructuresResponseDto>
+
+    @POST("api/school/fee-structures")
+    suspend fun createFeeStructure(
+        @Body request: CreateFeeStructureRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<FeeStructureResponseDto>
+
+    @GET("api/school/class-fee-configurations")
+    suspend fun getClassFeeConfigurations(
+        @Query("class_id") classId: Int? = null,
+        @Query("academic_year_id") academicYearId: Int? = null,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<ClassFeeConfigurationsResponseDto>
+
+    @POST("api/school/class-fee-configurations")
+    suspend fun saveClassFeeConfiguration(
+        @Body request: SaveClassFeeConfigurationRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
+    @POST("api/school/fee-payments")
+    suspend fun createFeePayment(
+        @Body request: CreateFeePaymentRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<FeePaymentResponseDto>
+
+    @GET("api/school/collection-history")
+    suspend fun getCollectionHistory(
+        @Query("month") month: String? = null,
+        @Query("search") search: String? = null,
+        @Query("page") page: Int? = null,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<CollectionHistoryResponseDto>
+
+    @GET("api/school/fee-follow-ups")
+    suspend fun getFeeFollowUps(
+        @Query("status") status: String? = null,
+        @Query("page") page: Int? = null,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<FeeFollowUpsResponseDto>
+
+    @GET("api/school/fee-follow-ups/{id}")
+    suspend fun getFeeFollowUpDetails(
+        @Path("id") id: Int,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<FeeFollowUpDetailsResponseDto>
+
+    @PUT("api/school/fee-follow-ups/{id}/extend")
+    suspend fun extendFeeFollowUp(
+        @Path("id") id: Int,
+        @Body request: ExtendFollowUpRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
+    @PUT("api/school/fee-follow-ups/{id}/status")
+    suspend fun updateFeeFollowUpStatus(
+        @Path("id") id: Int,
+        @Body request: UpdateFollowUpStatusRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
+    @POST("api/school/fee-follow-ups/{id}/notes")
+    suspend fun addFollowUpNote(
+        @Path("id") id: Int,
+        @Body request: AddFollowUpNoteRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
+    @POST("api/school/fee-follow-ups/{id}/contacted")
+    suspend fun markFollowUpContacted(
+        @Path("id") id: Int,
+        @Body request: MarkFollowUpContactedRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
+    @GET("api/school/staff-payments")
+    suspend fun getStaffPayments(
+        @Query("month") month: String,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<StaffPaymentsResponseDto>
+
+    @POST("api/school/staff-payments")
+    suspend fun payStaffSalary(
+        @Body request: PayStaffSalaryRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<PayStaffSalaryResponseDto>
+
+    @GET("api/school/financial-reports")
+    suspend fun getFinancialReports(
+        @Header("Authorization") authHeader: String? = null
+    ): Response<FinancialReportsResponseDto>
+
+    @POST("api/school/financial-reports")
+    suspend fun createFinancialReport(
+        @Body request: CreateFinancialReportRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<FinancialReportResponseDto>
+
+    @PUT("api/school/financial-reports/{id}/settle")
+    suspend fun updateFinancialReportStatus(
+        @Path("id") id: Int,
+        @Body request: UpdateFinancialReportStatusRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
 }

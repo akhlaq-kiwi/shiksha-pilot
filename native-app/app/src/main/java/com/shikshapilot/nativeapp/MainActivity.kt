@@ -14,8 +14,13 @@ import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminAnnoun
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminAttendanceScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminClassesScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminExamsScreen
+import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminFeeCollectionScreen
+import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminFeeFollowUpScreen
+import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminFeeStructureScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminFinanceScreen
+import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminFinancialReportsScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminLeaveRequestsScreen
+import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminSalaryDisbursementScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminStaffScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminStudentsScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminTimetableScreen
@@ -253,7 +258,38 @@ class MainActivity : ComponentActivity() {
                                 "finance", "expenses", "fee_defaulters" -> {
                                     SchoolAdminFinanceScreen(
                                         schoolName = schoolName,
-                                        onBack = { currentScreenId = "dashboard" }
+                                        onBack = { currentScreenId = "dashboard" },
+                                        onNavigate = { targetId -> currentScreenId = targetId }
+                                    )
+                                }
+                                "fee_structure" -> {
+                                    SchoolAdminFeeStructureScreen(
+                                        schoolName = schoolName,
+                                        onBack = { currentScreenId = "finance" }
+                                    )
+                                }
+                                "fee_collection" -> {
+                                    SchoolAdminFeeCollectionScreen(
+                                        schoolName = schoolName,
+                                        onBack = { currentScreenId = "finance" }
+                                    )
+                                }
+                                "fee_follow_up" -> {
+                                    SchoolAdminFeeFollowUpScreen(
+                                        schoolName = schoolName,
+                                        onBack = { currentScreenId = "finance" }
+                                    )
+                                }
+                                "salary_disbursement" -> {
+                                    SchoolAdminSalaryDisbursementScreen(
+                                        schoolName = schoolName,
+                                        onBack = { currentScreenId = "finance" }
+                                    )
+                                }
+                                "financial_reports" -> {
+                                    SchoolAdminFinancialReportsScreen(
+                                        schoolName = schoolName,
+                                        onBack = { currentScreenId = "finance" }
                                     )
                                 }
                                 "announcements", "broadcast_emergency" -> {

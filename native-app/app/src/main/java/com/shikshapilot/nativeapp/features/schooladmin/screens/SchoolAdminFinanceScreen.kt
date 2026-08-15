@@ -1,6 +1,5 @@
 package com.shikshapilot.nativeapp.features.schooladmin.screens
 
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,9 +19,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.ArrowBackIos
-import androidx.compose.material.icons.filled.Campaign
+import androidx.compose.material.icons.filled.EventBusy
+import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -36,15 +39,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.shikshapilot.nativeapp.data.remote.RetrofitClient
 import com.shikshapilot.nativeapp.data.remote.SchoolStatsDataDto
-import com.shikshapilot.nativeapp.data.remote.StudentItemDto
 import com.shikshapilot.nativeapp.ui.components.StickyTopBar
-import com.shikshapilot.nativeapp.ui.components.ThreeDotsLoader
 import com.shikshapilot.nativeapp.ui.theme.CardBorder
 import com.shikshapilot.nativeapp.ui.theme.DarkCanvas
 import com.shikshapilot.nativeapp.ui.theme.FrostedCard
@@ -55,55 +56,55 @@ import com.shikshapilot.nativeapp.ui.theme.TextSecondary
 import java.text.NumberFormat
 import java.util.Locale
 
+private data class FinanceModuleItem(
+    val screenId: String,
+    val title: String,
+    val subtitle: String,
+    val icon: ImageVector
+)
+
+private val financeModules = listOf(
+    FinanceModuleItem("fee_structure", "Fee Structures", "Configure per-class fee amounts", Icons.Default.Receipt),
+    FinanceModuleItem("fee_collection", "Fee Collection", "Record payments & collection history", Icons.Default.Payments),
+    FinanceModuleItem("fee_follow_up", "Fee Follow-Ups", "Track defaulters & payment commitments", Icons.Default.EventBusy),
+    FinanceModuleItem("salary_disbursement", "Salary Disbursement", "Pay monthly staff salaries", Icons.Default.AccountBalanceWallet),
+    FinanceModuleItem("financial_reports", "Financial Reports", "Generate & review profit/loss reports", Icons.Default.Assessment)
+)
+
+/**
+ * Finance module hub — repurposed from the old single generic finance stub into a menu that
+ * links out to the dedicated finance screens (fee structures, fee collection, follow-ups,
+ * salary disbursement, financial reports), matching how the web splits finance into ~8 pages
+ * (frontend/src/features/school-admin/pages/Finance*.jsx). See native-app/PARITY_GAPS.md for
+ * what's still deferred (additional/transport fees, late-payment penalty, expenses, finance
+ * settings).
+ */
 @Composable
 fun SchoolAdminFinanceScreen(
     schoolName: String = "Jamiya Kids Planet Academy",
     onBack: () -> Unit = {},
+    onNavigate: (String) -> Unit = {},
     onNotificationClick: () -> Unit = {},
     onAvatarClick: () -> Unit = {}
 ) {
-    val context = LocalContext.current
     var statsDto by remember { mutableStateOf<SchoolStatsDataDto?>(null) }
-    var defaultersList by remember { mutableStateOf<List<StudentItemDto>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
-
     val currencyFormatter = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
 
-    val defaultDefaulters = remember {
-        listOf(
-            StudentItemDto(id = 1, name = "Amir KIhan", sr_no = "SR-51", class_name = "Class 1-B", father_name = "Afzal Ahmed"),
-            StudentItemDto(id = 2, name = "Amir KIhan", sr_no = "SR-15", class_name = "Class 1-C", father_name = "Afzal Ahmed"),
-            StudentItemDto(id = 3, name = "Shahid hussain", sr_no = "SR-1", class_name = "Class 1-A", father_name = "Sabir Hussain")
-        )
-    }
-
     LaunchedEffect(Unit) {
-        isLoading = true
         try {
             val statsRes = RetrofitClient.apiService.getSchoolStats()
             if (statsRes.isSuccessful && statsRes.body()?.data != null) {
                 statsDto = statsRes.body()!!.data
             }
-
-            val studentsRes = RetrofitClient.apiService.getStudents()
-            if (studentsRes.isSuccessful && studentsRes.body()?.data != null && studentsRes.body()!!.data.isNotEmpty()) {
-                defaultersList = studentsRes.body()!!.data
-            } else {
-                defaultersList = defaultDefaulters
-            }
-        } catch (e: Exception) {
-            defaultersList = defaultDefaulters
-        } finally {
-            isLoading = false
+        } catch (_: Exception) {
+            // Non-fatal: hub tiles work without stats.
         }
     }
 
-    val totalCollectedStr = statsDto?.let { currencyFormatter.format(it.total_collected) } ?: "₹ 2,000"
-    val pendingDuesStr = statsDto?.let { currencyFormatter.format(it.pending_fees) } ?: "₹ 29,333"
+    val totalCollectedStr = statsDto?.let { currencyFormatter.format(it.total_collected) } ?: "₹ 0"
+    val pendingDuesStr = statsDto?.let { currencyFormatter.format(it.pending_fees) } ?: "₹ 0"
 
-    Scaffold(
-        containerColor = DarkCanvas
-    ) { paddingValues ->
+    Scaffold(containerColor = DarkCanvas) { paddingValues ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -123,7 +124,6 @@ fun SchoolAdminFinanceScreen(
                         .fillMaxSize()
                         .padding(horizontal = 16.dp, vertical = 12.dp)
                 ) {
-                    // Back Header Row
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
@@ -149,14 +149,14 @@ fun SchoolAdminFinanceScreen(
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Fee Management & Defaulters",
+                                text = "Finance",
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = TextPrimary
                             )
                             Text(
-                                text = "QA Server: GET /api/school/stats",
-                                fontSize = 11.5.sp,
+                                text = "Fee structures, collection, follow-ups, salaries, reports",
+                                fontSize = 11.sp,
                                 color = SunsetOrange
                             )
                         }
@@ -164,7 +164,6 @@ fun SchoolAdminFinanceScreen(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Summary KPI Cards Row
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -192,7 +191,7 @@ fun SchoolAdminFinanceScreen(
                                 .padding(12.dp)
                         ) {
                             Column {
-                                Text(text = "Overdue Balances", fontSize = 11.sp, color = TextSecondary)
+                                Text(text = "Pending Dues", fontSize = 11.sp, color = TextSecondary)
                                 Text(text = pendingDuesStr, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFFEF4444))
                             }
                         }
@@ -201,7 +200,7 @@ fun SchoolAdminFinanceScreen(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Text(
-                        text = "FEE DEFAULTERS QUEUE (QA LIVE API)",
+                        text = "FINANCE MODULES",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = TextSecondary,
@@ -210,96 +209,53 @@ fun SchoolAdminFinanceScreen(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    if (isLoading) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            ThreeDotsLoader(
-                                dotSize = 10.dp,
-                                dotColor = SunsetOrange,
-                                spaceBetween = 8.dp,
-                                travelDistance = 8.dp
-                            )
-                        }
-                    } else {
-                        // Defaulters List
-                        LazyColumn(
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            items(defaultersList) { item ->
-                                val studentClass = item.class_name ?: "Class 1-A"
-                                val fatherName = item.father_name ?: "Parent"
-                                val srNo = item.sr_no ?: "SR-${item.id}"
-
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(18.dp))
-                                        .background(FrostedCard)
-                                        .border(width = 1.dp, color = CardBorder, shape = RoundedCornerShape(18.dp))
-                                        .padding(14.dp)
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(financeModules) { module ->
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(18.dp))
+                                    .background(FrostedCard)
+                                    .border(width = 1.dp, color = CardBorder, shape = RoundedCornerShape(18.dp))
+                                    .clickable { onNavigate(module.screenId) }
+                                    .padding(14.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        verticalAlignment = Alignment.CenterVertically
+                                    Box(
+                                        modifier = Modifier
+                                            .size(42.dp)
+                                            .clip(CircleShape)
+                                            .background(SunsetOrange.copy(alpha = 0.18f))
+                                            .border(width = 1.dp, color = SunsetOrange.copy(alpha = 0.4f), shape = CircleShape),
+                                        contentAlignment = Alignment.Center
                                     ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(42.dp)
-                                                .clip(CircleShape)
-                                                .background(SunsetOrange.copy(alpha = 0.18f))
-                                                .border(width = 1.dp, color = SunsetOrange.copy(alpha = 0.4f), shape = CircleShape),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.AccountBalanceWallet,
-                                                contentDescription = "Fee",
-                                                tint = SunsetOrange,
-                                                modifier = Modifier.size(20.dp)
-                                            )
-                                        }
-
-                                        Spacer(modifier = Modifier.width(12.dp))
-
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = "${item.name} ($srNo)",
-                                                fontSize = 15.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = TextPrimary
-                                            )
-                                            Text(
-                                                text = "$studentClass • Father: $fatherName",
-                                                fontSize = 12.sp,
-                                                color = TextSecondary
-                                            )
-                                            Text(
-                                                text = "Pending Dues: ₹ 9,777",
-                                                fontSize = 12.5.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color(0xFFEF4444)
-                                            )
-                                        }
-
-                                        // Send WhatsApp / SMS Reminder
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(10.dp))
-                                                .background(SunsetOrange)
-                                                .clickable {
-                                                    Toast.makeText(context, "Payment reminder sent to $fatherName (${item.name})", Toast.LENGTH_SHORT).show()
-                                                }
-                                                .padding(horizontal = 10.dp, vertical = 6.dp)
-                                        ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(imageVector = Icons.Default.Campaign, contentDescription = "Reminder", tint = Color.White, modifier = Modifier.size(14.dp))
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                Text(text = "Remind", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                                            }
-                                        }
+                                        Icon(
+                                            imageVector = module.icon,
+                                            contentDescription = module.title,
+                                            tint = SunsetOrange,
+                                            modifier = Modifier.size(20.dp)
+                                        )
                                     }
+
+                                    Spacer(modifier = Modifier.width(12.dp))
+
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(text = module.title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                        Text(text = module.subtitle, fontSize = 12.sp, color = TextSecondary)
+                                    }
+
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                                        contentDescription = "Open",
+                                        tint = TextSecondary,
+                                        modifier = Modifier.size(14.dp)
+                                    )
                                 }
                             }
                         }
