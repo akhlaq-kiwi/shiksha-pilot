@@ -472,85 +472,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: Colors.indigo.shade200, width: 1),
                 ),
-                child: PopupMenuButton<int>(
-                  tooltip: 'Switch Academic Year',
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  offset: const Offset(0, 42),
-                  elevation: 4,
-                  onSelected: (int selectedId) {
-                    final yr = _academicYears.firstWhere(
-                      (y) => (y['id'] is int ? y['id'] : int.tryParse(y['id'].toString())) == selectedId,
-                      orElse: () => null,
-                    );
-                    if (yr != null) {
-                      _handleSwitchAcademicYear(selectedId, yr['name']?.toString() ?? '');
-                    }
-                  },
-                  itemBuilder: (BuildContext context) {
-                    if (_academicYears.isEmpty) {
-                      return [
-                        PopupMenuItem<int>(
-                          value: _selectedAcademicYearId ?? 0,
-                          child: Row(
-                            children: [
-                              Icon(Icons.check_circle_rounded, size: 16, color: Colors.indigo.shade700),
-                              const SizedBox(width: 8),
-                              Text(
-                                _selectedAcademicYearName.isNotEmpty ? _selectedAcademicYearName : '2026-2027 (Active)',
-                                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.indigo.shade900, fontSize: 13),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ];
-                    }
-                    return _academicYears.map((yr) {
-                      final yrId = (yr['id'] is int) ? yr['id'] as int : int.tryParse(yr['id'].toString()) ?? 0;
-                      final isSelected = yrId == _selectedAcademicYearId;
-                      final isCurrent = yr['is_current'] == 1 || yr['is_current'] == true || yr['status'] == 'ACTIVE';
-
-                      return PopupMenuItem<int>(
-                        value: yrId,
-                        child: Row(
-                          children: [
-                            Icon(
-                              isSelected ? Icons.check_circle_rounded : Icons.calendar_today_rounded,
-                              size: 16,
-                              color: isSelected ? Colors.indigo.shade700 : Colors.grey.shade600,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '${yr['name']}${isCurrent ? ' (Current)' : ''}',
-                              style: TextStyle(
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                color: isSelected ? Colors.indigo.shade900 : Colors.black87,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList();
-                  },
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.calendar_month_rounded, size: 16, color: Colors.indigo.shade700),
-                      const SizedBox(width: 6),
-                      Text(
-                        _selectedAcademicYearName.isNotEmpty
-                            ? _selectedAcademicYearName
-                            : '2026-2027',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.indigo.shade900,
-                        ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.calendar_month_rounded, size: 16, color: Colors.indigo.shade700),
+                    const SizedBox(width: 6),
+                    Text(
+                      _selectedAcademicYearName.isNotEmpty
+                          ? _selectedAcademicYearName
+                          : 'Active Session',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.indigo.shade900,
                       ),
-                      const SizedBox(width: 4),
-                      Icon(Icons.arrow_drop_down_rounded, size: 18, color: Colors.indigo.shade700),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
