@@ -233,9 +233,17 @@ class StudentDataRepository extends BaseRepository
             WHERE t.class_id  = :class_id
               AND t.school_id = :school_id
               AND t.day_of_week = :day
-              AND t.is_published = 1
-              AND t.start_date <= :target_date
+              AND (t.start_date IS NULL OR t.start_date <= :target_date)
               AND (t.end_date IS NULL OR t.end_date >= :target_date2)
+              AND (
+                t.is_published = 1 OR 
+                EXISTS (
+                    SELECT 1 FROM timetable t2 
+                    WHERE t2.class_id = t.class_id 
+                      AND t2.day_of_week = t.day_of_week 
+                      AND t2.is_published = 1
+                )
+              )
             ORDER BY t.period_number
         ";
 
