@@ -266,15 +266,15 @@ class StudentDataRepository extends BaseRepository
             WHERE b.timetable_id = :tid AND b.date = :date
         ");
 
-        foreach ($periods as &$p) {
+        foreach ($periods as $idx => $p) {
             $stmtBackup->execute([':tid' => $p['id'], ':date' => $targetDate]);
             $backup = $stmtBackup->fetch(PDO::FETCH_ASSOC);
             if ($backup) {
-                $p['backup_teacher_id'] = (int)$backup['backup_teacher_id'];
-                $p['teacher_name'] = $backup['backup_teacher_name'];
-                $p['is_backup'] = true;
+                $periods[$idx]['backup_teacher_id'] = (int)$backup['backup_teacher_id'];
+                $periods[$idx]['teacher_name'] = $backup['backup_teacher_name'];
+                $periods[$idx]['is_backup'] = true;
             } else {
-                $p['is_backup'] = false;
+                $periods[$idx]['is_backup'] = false;
             }
         }
 
