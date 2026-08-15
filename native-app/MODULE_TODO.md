@@ -29,11 +29,9 @@ Each item: implement -> build verify -> commit -> push -> next.
 - [x] **Late-Payment Penalty config** — done (commit 08a51ba): `SchoolAdminLatePaymentPenaltyScreen`
       (stats + percentage/description/active config). Bulk "apply penalty now" run/history
       (`late_payment_penalty_applications`) not implemented — config-only.
-- [ ] **Additional Fee Types** — `FinanceManagementPage.jsx` tab `additional-fee`. More complex than
-      originally estimated: `createAdditionalFeeType`/`updateAdditionalFeeType` support `apply_type`
-      'school' vs 'classes' with per-student amount overrides
-      (`backend/.../SchoolAdminService.php::createAdditionalFeeType`, ~line 10604). A school-wide-only
-      MVP (skip the class-targeted mode) would be a reasonable scope.
+- [x] **Additional Fee Types** — done (commit f5e551d): `SchoolAdminAdditionalFeesScreen`, school-wide
+      apply_type only (flat amount to all active students). Per-class custom-amount mode not
+      implemented.
 - [x] **Student Transfer Between Sections** — done (commit 0ef114b): multi-select + Transfer action
       in `SchoolAdminStudentsScreen` when viewing a class-filtered roster.
 
