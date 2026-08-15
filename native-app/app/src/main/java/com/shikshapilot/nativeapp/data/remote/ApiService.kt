@@ -428,6 +428,28 @@ data class PublishTimetableRequestDto(
     val day_of_week: String? = null
 )
 
+// New student enrollment — POST api/school/students (SchoolAdminService::createStudent).
+// class_id must be a `classes` table row id (each row is one class+section combination) —
+// see native-app's ClassDto. Only first_name/last_name/gender/dob/class_id are required
+// server-side; everything else is optional.
+data class CreateStudentRequestDto(
+    val first_name: String,
+    val last_name: String,
+    val gender: String,
+    val dob: String,
+    val class_id: Int,
+    // Required only for a school's first academic year (SchoolAdminService::createStudent,
+    // ~line 1259 "SR number logic") — auto-generated for later years, but the native app can't
+    // know which case applies without an extra round-trip, so it's always collected here and
+    // the backend's own validation error surfaces if omitted when required.
+    val sr_no: String? = null,
+    // Required; backend accepts "Existing Student" or "New Admission".
+    val student_category: String,
+    val roll_no: String? = null,
+    val father_name: String? = null,
+    val student_mobile: String? = null
+)
+
 data class StudentItemDto(
     val id: Int,
     val name: String,
@@ -2795,6 +2817,12 @@ interface ApiService {
     @DELETE("api/school/exams-new/{id}/seating-plan")
     suspend fun deleteSeatingPlanForExam(
         @Path("id") examId: Int,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
+    @POST("api/school/students")
+    suspend fun createStudent(
+        @Body request: CreateStudentRequestDto,
         @Header("Authorization") authHeader: String? = null
     ): Response<JsonElement>
 }

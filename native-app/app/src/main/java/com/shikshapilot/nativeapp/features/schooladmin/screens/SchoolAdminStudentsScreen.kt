@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -28,6 +29,8 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -50,6 +53,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.shikshapilot.nativeapp.data.remote.ClassDto
+import com.shikshapilot.nativeapp.data.remote.CreateStudentRequestDto
 import com.shikshapilot.nativeapp.data.remote.RetrofitClient
 import com.shikshapilot.nativeapp.data.remote.StudentItemDto
 import com.shikshapilot.nativeapp.data.remote.TransferStudentsRequestDto
@@ -87,6 +92,102 @@ fun SchoolAdminStudentsScreen(
     var destSectionInput by remember { mutableStateOf("") }
     var transferError by remember { mutableStateOf<String?>(null) }
     var isTransferring by remember { mutableStateOf(false) }
+
+    var allClasses by remember { mutableStateOf<List<ClassDto>>(emptyList()) }
+    var showEnrollDialog by remember { mutableStateOf(false) }
+    var selectedEnrollClass by remember { mutableStateOf<ClassDto?>(null) }
+    var enrollFirstName by remember { mutableStateOf("") }
+    var enrollLastName by remember { mutableStateOf("") }
+    var enrollGender by remember { mutableStateOf("Male") }
+    var enrollDob by remember { mutableStateOf("") }
+    var enrollSrNo by remember { mutableStateOf("") }
+    var enrollCategory by remember { mutableStateOf("New Admission") }
+    var enrollRollNo by remember { mutableStateOf("") }
+    var enrollFatherName by remember { mutableStateOf("") }
+    var enrollMobile by remember { mutableStateOf("") }
+    var enrollError by remember { mutableStateOf<String?>(null) }
+    var isEnrolling by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        try {
+            val response = RetrofitClient.apiService.getClasses()
+            if (response.isSuccessful && response.body()?.data != null) {
+                allClasses = response.body()!!.data
+            }
+        } catch (_: Exception) {
+        }
+    }
+
+    fun resetEnrollForm() {
+        showEnrollDialog = false
+        selectedEnrollClass = allClasses.firstOrNull { it.name.trim().equals(classNameFilter?.trim(), ignoreCase = true) }
+        enrollFirstName = ""
+        enrollLastName = ""
+        enrollGender = "Male"
+        enrollDob = ""
+        enrollSrNo = ""
+        enrollCategory = "New Admission"
+        enrollRollNo = ""
+        enrollFatherName = ""
+        enrollMobile = ""
+        enrollError = null
+    }
+
+    fun submitEnroll() {
+        val cls = selectedEnrollClass
+        if (cls == null) {
+            enrollError = "Select a class."
+            return
+        }
+        if (enrollFirstName.isBlank() || enrollLastName.isBlank()) {
+            enrollError = "First and last name are required."
+            return
+        }
+        if (enrollDob.isBlank()) {
+            enrollError = "Date of birth is required."
+            return
+        }
+        isEnrolling = true
+        enrollError = null
+        scope.launch {
+            try {
+                val response = RetrofitClient.apiService.createStudent(
+                    CreateStudentRequestDto(
+                        first_name = enrollFirstName.trim(),
+                        last_name = enrollLastName.trim(),
+                        gender = enrollGender,
+                        dob = enrollDob.trim(),
+                        class_id = cls.id,
+                        sr_no = enrollSrNo.ifBlank { null },
+                        student_category = enrollCategory,
+                        roll_no = enrollRollNo.ifBlank { null },
+                        father_name = enrollFatherName.ifBlank { null },
+                        student_mobile = enrollMobile.ifBlank { null }
+                    )
+                )
+                if (response.isSuccessful) {
+                    Toast.makeText(context, "Student enrolled", Toast.LENGTH_SHORT).show()
+                    showEnrollDialog = false
+                    refreshKey++
+                } else {
+                    val bodyStr = response.errorBody()?.string()
+                    val parsed = try {
+                        bodyStr?.let {
+                            val obj = com.google.gson.JsonParser().parse(it).asJsonObject
+                            val errorsObj = obj.getAsJsonObject("data")?.getAsJsonObject("errors")
+                            errorsObj?.entrySet()?.firstOrNull()?.value?.asString
+                                ?: obj.get("message")?.asString
+                        }
+                    } catch (_: Exception) { null }
+                    enrollError = parsed ?: "Failed to enroll (code ${response.code()})"
+                }
+            } catch (e: Exception) {
+                enrollError = e.message ?: "Network error while enrolling"
+            } finally {
+                isEnrolling = false
+            }
+        }
+    }
 
     fun submitTransfer() {
         if (classNameFilter.isNullOrBlank()) return
@@ -246,7 +347,7 @@ fun SchoolAdminStudentsScreen(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(SunsetOrange)
-                                .clickable { /* Open Enrollment Form */ }
+                                .clickable { resetEnrollForm(); showEnrollDialog = true }
                                 .padding(horizontal = 10.dp, vertical = 6.dp)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -516,6 +617,218 @@ fun SchoolAdminStudentsScreen(
                                 ThreeDotsLoader(dotSize = 6.dp, dotColor = Color.White, spaceBetween = 4.dp, travelDistance = 4.dp)
                             } else {
                                 Text("Transfer", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showEnrollDialog) {
+        Dialog(onDismissRequest = { if (!isEnrolling) showEnrollDialog = false }) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(DarkCanvas)
+                    .border(width = 1.dp, color = CardBorder, shape = RoundedCornerShape(20.dp))
+                    .padding(20.dp)
+            ) {
+                Column {
+                    Text(text = "Enroll New Student", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(text = "Class", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    var classExpanded by remember { mutableStateOf(false) }
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(FrostedCard)
+                                .border(width = 1.dp, color = CardBorder, shape = RoundedCornerShape(14.dp))
+                                .clickable { classExpanded = true }
+                                .padding(horizontal = 14.dp, vertical = 14.dp)
+                        ) {
+                            Text(
+                                text = selectedEnrollClass?.let { "${it.name}${it.section?.let { s -> " - $s" } ?: ""}" } ?: "Select a class",
+                                fontSize = 14.sp,
+                                color = if (selectedEnrollClass != null) TextPrimary else TextSecondary
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = classExpanded,
+                            onDismissRequest = { classExpanded = false },
+                            modifier = Modifier.heightIn(max = 300.dp)
+                        ) {
+                            allClasses.distinctBy { it.id }.forEach { cls ->
+                                DropdownMenuItem(
+                                    text = { Text("${cls.name}${cls.section?.let { s -> " - $s" } ?: ""}") },
+                                    onClick = { selectedEnrollClass = cls; classExpanded = false }
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = enrollFirstName,
+                            onValueChange = { enrollFirstName = it },
+                            modifier = Modifier.weight(1f),
+                            placeholder = { Text("First Name") },
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = FrostedCard, unfocusedContainerColor = FrostedCard,
+                                focusedBorderColor = SunsetOrange, unfocusedBorderColor = CardBorder,
+                                focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary
+                            )
+                        )
+                        OutlinedTextField(
+                            value = enrollLastName,
+                            onValueChange = { enrollLastName = it },
+                            modifier = Modifier.weight(1f),
+                            placeholder = { Text("Last Name") },
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = FrostedCard, unfocusedContainerColor = FrostedCard,
+                                focusedBorderColor = SunsetOrange, unfocusedBorderColor = CardBorder,
+                                focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary
+                            )
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(text = "Gender", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("Male", "Female", "Other").forEach { g ->
+                            val isSelected = enrollGender == g
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (isSelected) SunsetOrange.copy(alpha = 0.18f) else FrostedCard)
+                                    .border(width = 1.dp, color = if (isSelected) SunsetOrange else CardBorder, shape = RoundedCornerShape(10.dp))
+                                    .clickable { enrollGender = g }
+                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                Text(text = g, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = if (isSelected) SunsetOrange else TextPrimary)
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(text = "Category", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("New Admission", "Existing Student").forEach { c ->
+                            val isSelected = enrollCategory == c
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (isSelected) SunsetOrange.copy(alpha = 0.18f) else FrostedCard)
+                                    .border(width = 1.dp, color = if (isSelected) SunsetOrange else CardBorder, shape = RoundedCornerShape(10.dp))
+                                    .clickable { enrollCategory = c }
+                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                Text(text = c, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = if (isSelected) SunsetOrange else TextPrimary)
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = enrollDob,
+                        onValueChange = { enrollDob = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Date of Birth (YYYY-MM-DD)") },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = FrostedCard, unfocusedContainerColor = FrostedCard,
+                            focusedBorderColor = SunsetOrange, unfocusedBorderColor = CardBorder,
+                            focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary
+                        )
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = enrollSrNo,
+                        onValueChange = { enrollSrNo = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("SR No. (required for a school's first academic year)") },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = FrostedCard, unfocusedContainerColor = FrostedCard,
+                            focusedBorderColor = SunsetOrange, unfocusedBorderColor = CardBorder,
+                            focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary
+                        )
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = enrollRollNo,
+                        onValueChange = { enrollRollNo = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Roll No. (optional)") },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = FrostedCard, unfocusedContainerColor = FrostedCard,
+                            focusedBorderColor = SunsetOrange, unfocusedBorderColor = CardBorder,
+                            focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary
+                        )
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = enrollFatherName,
+                        onValueChange = { enrollFatherName = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Father Name (optional)") },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = FrostedCard, unfocusedContainerColor = FrostedCard,
+                            focusedBorderColor = SunsetOrange, unfocusedBorderColor = CardBorder,
+                            focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary
+                        )
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = enrollMobile,
+                        onValueChange = { enrollMobile = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Student Mobile (optional)") },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = FrostedCard, unfocusedContainerColor = FrostedCard,
+                            focusedBorderColor = SunsetOrange, unfocusedBorderColor = CardBorder,
+                            focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary
+                        )
+                    )
+
+                    if (enrollError != null) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(text = enrollError ?: "", fontSize = 11.5.sp, color = Color(0xFFEF4444))
+                    }
+
+                    Spacer(modifier = Modifier.height(18.dp))
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = { if (!isEnrolling) showEnrollDialog = false }) {
+                            Text("Cancel", color = TextSecondary)
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = { submitEnroll() },
+                            enabled = !isEnrolling,
+                            colors = ButtonDefaults.buttonColors(containerColor = SunsetOrange)
+                        ) {
+                            if (isEnrolling) {
+                                ThreeDotsLoader(dotSize = 6.dp, dotColor = Color.White, spaceBetween = 4.dp, travelDistance = 4.dp)
+                            } else {
+                                Text("Enroll", fontWeight = FontWeight.Bold)
                             }
                         }
                     }
