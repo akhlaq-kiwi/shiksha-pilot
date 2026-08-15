@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.EventNote
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Notifications
@@ -50,6 +51,7 @@ import androidx.compose.ui.unit.sp
 import com.shikshapilot.nativeapp.data.remote.RetrofitClient
 import com.shikshapilot.nativeapp.data.remote.StudentDashboardDataDto
 import com.shikshapilot.nativeapp.data.remote.TimetableItemDto
+import com.shikshapilot.nativeapp.ui.components.PullToRefreshWrapper
 import com.shikshapilot.nativeapp.ui.components.StickyTopBar
 import com.shikshapilot.nativeapp.ui.components.ThreeDotsLoader
 import com.shikshapilot.nativeapp.ui.theme.CardBorder
@@ -74,6 +76,7 @@ fun StudentDashboardScreen(
     var dashboardDto by remember { mutableStateOf<StudentDashboardDataDto?>(null) }
     var timetableList by remember { mutableStateOf<List<TimetableItemDto>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var refreshKey by remember { mutableStateOf(0) }
 
     val defaultTimetable = remember {
         listOf(
@@ -84,7 +87,7 @@ fun StudentDashboardScreen(
         )
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(refreshKey) {
         isLoading = true
         try {
             val response = RetrofitClient.apiService.getStudentDashboard()
@@ -114,6 +117,7 @@ fun StudentDashboardScreen(
                 .padding(paddingValues)
                 .background(DarkCanvas)
         ) {
+            PullToRefreshWrapper(isRefreshing = isLoading, onRefresh = { refreshKey++ }) {
             Column(modifier = Modifier.fillMaxSize()) {
                 StickyTopBar(
                     schoolName = schoolName,
@@ -395,6 +399,30 @@ fun StudentDashboardScreen(
                         }
                     }
 
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(FrostedCard)
+                                .border(width = 1.dp, color = CardBorder, shape = RoundedCornerShape(12.dp))
+                                .clickable { onNavigate("student_leave") }
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(imageVector = Icons.Default.EventNote, contentDescription = "Leave", tint = TextPrimary, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(text = "Leave", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                            }
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Row(
@@ -479,6 +507,7 @@ fun StudentDashboardScreen(
                         }
                     }
                 }
+            }
             }
         }
     }

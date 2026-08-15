@@ -46,6 +46,7 @@ import com.shikshapilot.nativeapp.features.studentparent.screens.StudentAssignme
 import com.shikshapilot.nativeapp.features.studentparent.screens.StudentAttendanceScreen
 import com.shikshapilot.nativeapp.features.studentparent.screens.StudentDashboardScreen
 import com.shikshapilot.nativeapp.features.studentparent.screens.StudentFeesScreen
+import com.shikshapilot.nativeapp.features.studentparent.screens.StudentLeaveScreen
 import com.shikshapilot.nativeapp.features.studentparent.screens.StudentMaterialsScreen
 import com.shikshapilot.nativeapp.features.studentparent.screens.StudentResultsScreen
 import com.shikshapilot.nativeapp.features.studentparent.screens.StudentTimetableScreen
@@ -350,6 +351,12 @@ class MainActivity : ComponentActivity() {
                                 }
                                 "announcements" -> {
                                     StudentAnnouncementsScreen(
+                                        schoolName = schoolName,
+                                        onBack = { goBack() }
+                                    )
+                                }
+                                "student_leave" -> {
+                                    StudentLeaveScreen(
                                         schoolName = schoolName,
                                         onBack = { goBack() }
                                     )
