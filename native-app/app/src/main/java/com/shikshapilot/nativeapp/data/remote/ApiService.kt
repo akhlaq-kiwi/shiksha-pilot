@@ -117,6 +117,48 @@ data class ToggleTransportFeeStatusRequestDto(
     val status: String
 )
 
+// School Expenses — GET/POST/PUT/DELETE api/school/expenses{,/{id}}
+// (SchoolAdminController::getSchoolExpenses/createSchoolExpense/updateSchoolExpense/
+// deleteSchoolExpense -> school_expenses table). Edits/deletes are blocked server-side once an
+// expense's date falls inside an already-generated financial report (`is_locked`) or a historical
+// academic year.
+data class SchoolExpenseItemDto(
+    val id: Int,
+    val description: String,
+    val amount: Double,
+    val expense_date: String,
+    val category: String? = "Other",
+    val payment_method: String? = "Cash",
+    val reference_number: String? = null,
+    val bill_attachment_path: String? = null,
+    val creator_name: String? = null,
+    val is_locked: Boolean = false
+)
+
+data class SchoolExpensesResponseDto(
+    val status: String? = "success",
+    val message: String? = null,
+    val data: List<SchoolExpenseItemDto> = emptyList()
+)
+
+data class CreateSchoolExpenseRequestDto(
+    val description: String,
+    val amount: Double,
+    val expense_date: String,
+    val category: String? = null,
+    val payment_method: String? = null,
+    val reference_number: String? = null
+)
+
+data class UpdateSchoolExpenseRequestDto(
+    val description: String? = null,
+    val amount: Double? = null,
+    val expense_date: String? = null,
+    val category: String? = null,
+    val payment_method: String? = null,
+    val reference_number: String? = null
+)
+
 data class ClassDto(
     val id: Int,
     val name: String,
@@ -2485,6 +2527,33 @@ interface ApiService {
     suspend fun toggleTransportFeeStatus(
         @Path("id") id: Int,
         @Body request: ToggleTransportFeeStatusRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
+    // --- School Expenses ---
+    @GET("api/school/expenses")
+    suspend fun getSchoolExpenses(
+        @Query("month") month: String? = null,
+        @Query("search") search: String? = null,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<SchoolExpensesResponseDto>
+
+    @POST("api/school/expenses")
+    suspend fun createSchoolExpense(
+        @Body request: CreateSchoolExpenseRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
+    @PUT("api/school/expenses/{id}")
+    suspend fun updateSchoolExpense(
+        @Path("id") id: Int,
+        @Body request: UpdateSchoolExpenseRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
+    @DELETE("api/school/expenses/{id}")
+    suspend fun deleteSchoolExpense(
+        @Path("id") id: Int,
         @Header("Authorization") authHeader: String? = null
     ): Response<JsonElement>
 }

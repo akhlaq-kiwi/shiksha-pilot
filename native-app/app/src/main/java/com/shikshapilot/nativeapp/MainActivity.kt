@@ -26,6 +26,7 @@ import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminClasse
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminEducationScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminCredentialsScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminExamsScreen
+import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminExpensesScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminFeeCollectionScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminFeeFollowUpScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminFeeStructureScreen
@@ -449,6 +450,12 @@ class MainActivity : ComponentActivity() {
                                 }
                                 "transport_fees" -> {
                                     SchoolAdminTransportFeesScreen(
+                                        schoolName = schoolName,
+                                        onBack = { goBack() }
+                                    )
+                                }
+                                "school_expenses" -> {
+                                    SchoolAdminExpensesScreen(
                                         schoolName = schoolName,
                                         onBack = { goBack() }
                                     )
