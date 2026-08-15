@@ -5,17 +5,17 @@ cross-checked against `native-app/.../MainActivity.kt` routing and screens. Orde
 Each item: implement -> build verify -> commit -> push -> next.
 
 ## Bugs (misrouted / unreachable, fix first)
-- [ ] **Student/Parent "Leave" opens the wrong screen.** `MainActivity.kt`'s `"leaves"` case always renders
-      `SchoolAdminLeaveRequestsScreen` regardless of role. Student/Parent needs their own apply/view-leave
-      screen (backend already supports this via the same `/api/school/leave-requests` endpoints, scoped
-      server-side by role — no new backend work needed).
-- [ ] **Teacher "Achievements" has no entry point.** `StudentAchievementsScreen` + `"achievements"` route
-      already work for any role (hits shared `/api/school/achievements`), but nothing in the Teacher UI
-      navigates to it. Just needs a menu/dashboard tile wired in.
+- [x] **Student/Parent had no Leave screen at all.** (Corrected: not actually misrouted — the admin
+      `"leaves"` case only ever existed in the SCHOOL_ADMIN branch; Student/Parent simply had no entry
+      point.) Fixed: new `StudentLeaveScreen` reusing the same shared `/api/school/leave-requests`
+      endpoint/DTOs as `TeacherLeaveScreen`, wired `"student_leave"` route + dashboard tile
+      (commit 20981f7).
+- [x] **Teacher "Achievements" has no entry point.** Fixed: added a dashboard tile wired to the existing
+      `"achievements"` route (commit 1d556ee).
 
 ## Small
-- [ ] **Transport Fee Management** — `FinanceManagementPage.jsx` tab `transport-fee`.
-      API: `GET/POST/PUT/DELETE /api/school/transport-fees{,/{id}}`, `PUT .../{id}/status`.
+- [x] **Transport Fee Management** — done (commit d089cfb): `SchoolAdminTransportFeesScreen`, wired
+      into the Finance hub.
 - [ ] **School Expenses Tracking** — `FinanceManagementPage.jsx` tab `expenses` (incl. bill upload).
       API: `GET/POST/PUT/DELETE /api/school/expenses{,/{id}}`.
 - [ ] **Parent "My Children" switcher** — student-parent sidebar `id: 'parent'`, parent-only. Multi-child
