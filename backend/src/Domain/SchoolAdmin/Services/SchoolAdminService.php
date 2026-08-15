@@ -15641,7 +15641,7 @@ Only approve the settlement after reviewing all financial records.
         $stmtStudents = $pdo->prepare("
             SELECT s.email, s.parent_phone, s.father_phone, s.guardian_phone, s.student_mobile 
             FROM students s 
-            WHERE s.school_id = :sid AND s.class_id = :cid AND (s.status = 'ACTIVE' OR s.status = 'Active')
+            WHERE s.school_id = :sid AND s.class_id = :cid AND (s.status IS NULL OR UPPER(s.status) = 'ACTIVE') AND s.exit_date IS NULL
         ");
         $stmtStudents->execute([':sid' => $schoolId, ':cid' => $classId]);
         $rows = $stmtStudents->fetchAll(PDO::FETCH_ASSOC);
@@ -15650,25 +15650,44 @@ Only approve the settlement after reviewing all financial records.
             return;
         }
 
-        $emails = array_filter(array_column($rows, 'email'));
+        $emails = array_unique(array_filter(array_column($rows, 'email')));
         $phones = [];
         foreach ($rows as $r) {
-            if (!empty($r['parent_phone'])) $phones[] = $r['parent_phone'];
-            if (!empty($r['father_phone'])) $phones[] = $r['father_phone'];
-            if (!empty($r['guardian_phone'])) $phones[] = $r['guardian_phone'];
-            if (!empty($r['student_mobile'])) $phones[] = $r['student_mobile'];
+            if (!empty($r['parent_phone'])) $phones[] = trim((string)$r['parent_phone']);
+            if (!empty($r['father_phone'])) $phones[] = trim((string)$r['father_phone']);
+            if (!empty($r['guardian_phone'])) $phones[] = trim((string)$r['guardian_phone']);
+            if (!empty($r['student_mobile'])) $phones[] = trim((string)$r['student_mobile']);
         }
         $phones = array_unique(array_filter($phones));
 
-        // Insert notifications for Student users
-        if (!empty($emails)) {
-            $placeholders = implode(',', array_fill(0, count($emails), '?'));
-            $stmtStudentUsers = $pdo->prepare("
-                SELECT id FROM users 
-                WHERE school_id = ? AND role = 'STUDENT' AND email IN ($placeholders)
-            ");
-            $stmtStudentUsers->execute(array_merge([$schoolId], array_values($emails)));
-            $studentUserIds = $stmtStudentUsers->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        // Find Student users by email or phone
+        $studentUserIds = [];
+        if (!empty($emails) || !empty($phones)) {
+            $conditions = [];
+            $params = [':sid' => $schoolId];
+            if (!empty($emails)) {
+                $placeholders = [];
+                foreach (array_values($emails) as $idx => $e) {
+                    $k = ":e_" . $idx;
+                    $placeholders[] = $k;
+                    $params[$k] = $e;
+                }
+                $conditions[] = "email IN (" . implode(',', $placeholders) . ")";
+            }
+            if (!empty($phones)) {
+                $placeholders = [];
+                foreach (array_values($phones) as $idx => $p) {
+                    $k = ":p_" . $idx;
+                    $placeholders[] = $k;
+                    $params[$k] = $p;
+                }
+                $conditions[] = "phone IN (" . implode(',', $placeholders) . ")";
+            }
+
+            $sql = "SELECT DISTINCT id FROM users WHERE school_id = :sid AND role = 'STUDENT' AND (" . implode(' OR ', $conditions) . ")";
+            $stmtStudentUsers = $pdo->prepare($sql);
+            $stmtStudentUsers->execute($params);
+            $studentUserIds = array_map('intval', $stmtStudentUsers->fetchAll(PDO::FETCH_COLUMN) ?: []);
 
             if (!empty($studentUserIds)) {
                 $stmtIns = $pdo->prepare("
@@ -15677,19 +15696,26 @@ Only approve the settlement after reviewing all financial records.
                 ");
                 foreach ($studentUserIds as $uid) {
                     $stmtIns->execute([$schoolId, $uid, $title, $message]);
+                    \App\Shared\Notifications\PushDispatcher::pushOnly(
+                        $pdo, $schoolId, 'STUDENT', (int)$uid, 'TIMETABLE_UPDATED', $title, $message, '/timetable'
+                    );
                 }
             }
         }
 
-        // Insert notifications for Parent users
+        // Find Parent users by phone
         if (!empty($phones)) {
-            $placeholders = implode(',', array_fill(0, count($phones), '?'));
-            $stmtParentUsers = $pdo->prepare("
-                SELECT id FROM users 
-                WHERE school_id = ? AND role = 'PARENT' AND phone IN ($placeholders)
-            ");
-            $stmtParentUsers->execute(array_merge([$schoolId], array_values($phones)));
-            $parentUserIds = $stmtParentUsers->fetchAll(PDO::FETCH_COLUMN) ?: [];
+            $placeholders = [];
+            $params = [':sid' => $schoolId];
+            foreach (array_values($phones) as $idx => $p) {
+                $k = ":par_p_" . $idx;
+                $placeholders[] = $k;
+                $params[$k] = $p;
+            }
+            $sqlParent = "SELECT DISTINCT id FROM users WHERE school_id = :sid AND role = 'PARENT' AND phone IN (" . implode(',', $placeholders) . ")";
+            $stmtParentUsers = $pdo->prepare($sqlParent);
+            $stmtParentUsers->execute($params);
+            $parentUserIds = array_map('intval', $stmtParentUsers->fetchAll(PDO::FETCH_COLUMN) ?: []);
 
             if (!empty($parentUserIds)) {
                 $stmtIns = $pdo->prepare("
@@ -15698,6 +15724,9 @@ Only approve the settlement after reviewing all financial records.
                 ");
                 foreach ($parentUserIds as $uid) {
                     $stmtIns->execute([$schoolId, $uid, $title, $message]);
+                    \App\Shared\Notifications\PushDispatcher::pushOnly(
+                        $pdo, $schoolId, 'PARENT', (int)$uid, 'TIMETABLE_UPDATED', $title, $message, '/timetable'
+                    );
                 }
             }
         }
@@ -15714,25 +15743,31 @@ Only approve the settlement after reviewing all financial records.
         $email = $staff['email'] ?? null;
 
         $stmtUser = $pdo->prepare("
-            SELECT id FROM users 
+            SELECT DISTINCT id FROM users 
             WHERE school_id = :sid AND role = 'TEACHER' AND (
-                (phone IS NOT NULL AND phone = :phone) OR (email IS NOT NULL AND email = :email)
-            ) LIMIT 1
+                (phone IS NOT NULL AND phone != '' AND phone = :phone) OR 
+                (email IS NOT NULL AND email != '' AND email = :email)
+            )
         ");
         $stmtUser->execute([':sid' => $schoolId, ':phone' => $phone, ':email' => $email]);
-        $userId = $stmtUser->fetchColumn();
+        $userIds = array_map('intval', $stmtUser->fetchAll(PDO::FETCH_COLUMN) ?: []);
 
-        if ($userId) {
+        if (!empty($userIds)) {
             $stmtIns = $pdo->prepare("
                 INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, category, event_key, is_read)
                 VALUES (:sid, 'TEACHER', :uid, :title, :msg, '/timetable', 'TIMETABLE', 'TIMETABLE_UPDATED', 0)
             ");
-            $stmtIns->execute([
-                ':sid' => $schoolId,
-                ':uid' => $userId,
-                ':title' => $title,
-                ':msg' => $message
-            ]);
+            foreach ($userIds as $userId) {
+                $stmtIns->execute([
+                    ':sid' => $schoolId,
+                    ':uid' => $userId,
+                    ':title' => $title,
+                    ':msg' => $message
+                ]);
+                \App\Shared\Notifications\PushDispatcher::pushOnly(
+                    $pdo, $schoolId, 'TEACHER', (int)$userId, 'TIMETABLE_UPDATED', $title, $message, '/timetable'
+                );
+            }
         }
     }
 
