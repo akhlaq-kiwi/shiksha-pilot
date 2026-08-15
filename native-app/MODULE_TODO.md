@@ -36,9 +36,8 @@ Each item: implement -> build verify -> commit -> push -> next.
       in `SchoolAdminStudentsScreen` when viewing a class-filtered roster.
 
 ## Medium
-- [ ] **Class Identity Cards generation/print** — `ClassesPage.jsx` (`view === 'identity-cards'`) +
-      `components/ClassIdentityCardPreview.jsx`. Client-rendered from student/class data, no dedicated
-      backend route found. Mobile equivalent likely a styled card view + share/print rather than PDF.
+- [x] **Class Identity Cards** — done (commit c412601): `SchoolAdminIdentityCardsScreen`, styled
+      card view per student (no PDF export/print, view-only). Wired via Classes screen menu.
 
 ## Medium-large
 - [ ] **Question Paper Designer** — `school-admin/pages/QuestionPaperDesignerPage.jsx`. Needs exact route
