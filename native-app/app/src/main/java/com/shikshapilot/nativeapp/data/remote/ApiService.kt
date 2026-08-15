@@ -203,6 +203,78 @@ data class SaveLatePaymentPenaltyConfigRequestDto(
     val status: String = "Active"
 )
 
+// Seating Plan — GET api/school/exams-new/{id}/seating-plan, POST .../preview, POST/DELETE
+// .../seating-plan (SchoolAdminController::getSeatingPlan/previewSeatingPlan/generateSeatingPlan/
+// deleteSeatingPlan). room_details in the preview/generate response is a PHP associative array
+// keyed by room name (non-sequential string keys), which serializes to a JSON *object* not an
+// array — modeled as Map<String, ...> to match, not List<...>.
+data class RoomConfigDto(
+    val room_name: String,
+    val bench_count: Int
+)
+
+data class SeatingPlanRequestDto(
+    val classes: List<Int>,
+    val students_per_bench: Int,
+    val room_configs: List<RoomConfigDto>
+)
+
+data class RoomDetailItemDto(
+    val room_name: String? = null,
+    val bench_count: Int = 0,
+    val capacity: Int = 0,
+    val allocated: Int = 0,
+    val remaining: Int = 0
+)
+
+data class SeatingPlanPreviewDataDto(
+    val total_students: Int = 0,
+    val students_per_bench: Int = 2,
+    val required_benches: Int = 0,
+    val available_benches: Int = 0,
+    val remaining: Int = 0,
+    val enough_benches: Boolean = false,
+    val room_details: Map<String, RoomDetailItemDto> = emptyMap()
+)
+
+data class SeatingPlanPreviewResponseDto(
+    val status: String? = "success",
+    val message: String? = null,
+    val data: SeatingPlanPreviewDataDto? = null
+)
+
+data class SeatingAllocationItemDto(
+    val id: Int? = null,
+    val student_id: Int? = null,
+    val room_name: String? = null,
+    val bench_number: Int? = null,
+    val seat_position: String? = null,
+    val seat_number: String? = null,
+    val student_name: String? = null,
+    val roll_no: String? = null,
+    val class_name: String? = null
+)
+
+data class SeatingPlanRowDto(
+    val id: Int = 0,
+    val students_per_bench: Int = 2,
+    val room_configs: List<RoomConfigDto> = emptyList()
+)
+
+data class SeatingPlanDataDto(
+    val plan: SeatingPlanRowDto? = null,
+    val allocations: List<SeatingAllocationItemDto> = emptyList(),
+    val school_name: String? = null,
+    val school_logo: String? = null,
+    val exam_name: String? = null
+)
+
+data class SeatingPlanResponseDto(
+    val status: String? = "success",
+    val message: String? = null,
+    val data: SeatingPlanDataDto? = null
+)
+
 // Student transfer between sections — POST api/school/classes/transfer-students
 // (SchoolAdminController::transferStudents -> SchoolAdminService::transferStudents). Moves the
 // given students from their current class/section to `destination_section` within the same
@@ -2687,6 +2759,33 @@ interface ApiService {
     @DELETE("api/school/additional-fees/types/{id}")
     suspend fun deleteAdditionalFeeType(
         @Path("id") id: Int,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
+    // --- Seating Plan ---
+    @GET("api/school/exams-new/{id}/seating-plan")
+    suspend fun getSeatingPlan(
+        @Path("id") examId: Int,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<SeatingPlanResponseDto>
+
+    @POST("api/school/exams-new/{id}/seating-plan/preview")
+    suspend fun previewSeatingPlan(
+        @Path("id") examId: Int,
+        @Body request: SeatingPlanRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<SeatingPlanPreviewResponseDto>
+
+    @POST("api/school/exams-new/{id}/seating-plan")
+    suspend fun generateSeatingPlan(
+        @Path("id") examId: Int,
+        @Body request: SeatingPlanRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
+    @DELETE("api/school/exams-new/{id}/seating-plan")
+    suspend fun deleteSeatingPlanForExam(
+        @Path("id") examId: Int,
         @Header("Authorization") authHeader: String? = null
     ): Response<JsonElement>
 }
