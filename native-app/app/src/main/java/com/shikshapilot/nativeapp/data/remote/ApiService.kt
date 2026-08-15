@@ -1,6 +1,7 @@
 package com.shikshapilot.nativeapp.data.remote
 
 import com.google.gson.JsonElement
+import okhttp3.MultipartBody
 import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
@@ -8,8 +9,10 @@ import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.HTTP
 import retrofit2.http.Header
+import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.PUT
+import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
 import retrofit2.http.Streaming
@@ -1093,6 +1096,248 @@ data class UpdateFinancialReportStatusRequestDto(
     val status: String
 )
 
+// ---------------------------------------------------------------------------
+// Security: GET api/school/security/audit-logs, GET api/school/security/login-history
+// (SchoolAdminService::getSchoolAuditLogs / getSchoolLoginHistory — both query `audit_logs` table)
+// ---------------------------------------------------------------------------
+data class AuditLogItemDto(
+    val id: Int,
+    val module: String? = null,
+    val action: String? = null,
+    val description: String? = null,
+    val user: String? = null,
+    val performed_by: String? = null,
+    val created_at: String? = null,
+    val formatted_date: String? = null
+)
+
+data class AuditLogUserDto(
+    val user: String? = null,
+    val performed_by: String? = null
+)
+
+data class AuditLogsDataDto(
+    val logs: List<AuditLogItemDto> = emptyList(),
+    val total: Int = 0,
+    val page: Int = 1,
+    val limit: Int = 25,
+    val modules: List<String> = emptyList(),
+    val users: List<AuditLogUserDto> = emptyList()
+)
+
+data class AuditLogsResponseDto(
+    val status: String? = "success",
+    val data: AuditLogsDataDto? = null
+)
+
+data class LoginHistoryItemDto(
+    val id: Int,
+    val action: String? = null,
+    val status: String? = null,
+    val user: String? = null,
+    val performed_by: String? = null,
+    val created_at: String? = null,
+    val formatted_date: String? = null
+)
+
+data class LoginHistoryDataDto(
+    val history: List<LoginHistoryItemDto> = emptyList(),
+    val total: Int = 0,
+    val page: Int = 1,
+    val limit: Int = 25
+)
+
+data class LoginHistoryResponseDto(
+    val status: String? = "success",
+    val data: LoginHistoryDataDto? = null
+)
+
+// ---------------------------------------------------------------------------
+// School Profile: GET/POST api/school/profile, POST/DELETE .../logo, .../signature
+// (SchoolAdminService::getSchoolProfile / updateSchoolProfile — `schools` table row)
+// ---------------------------------------------------------------------------
+data class SchoolProfileDto(
+    val id: Int,
+    val name: String? = null,
+    val contact_phone: String? = null,
+    val contact_email: String? = null,
+    val registration_no: String? = null,
+    val affiliation_board: String? = null,
+    val school_type: String? = null,
+    val founded_year: String? = null,
+    val medium_of_instruction: String? = null,
+    val street_address: String? = null,
+    val city: String? = null,
+    val state: String? = null,
+    val pin_code: String? = null,
+    val current_term: String? = null,
+    val term_start: String? = null,
+    val term_end: String? = null,
+    val classes_offered: String? = null,
+    val report_card_remark: String? = null,
+    val logo_path: String? = null,
+    val principal_signature_path: String? = null,
+    val active_plan: String? = null,
+    val subscription_expiry: String? = null,
+    val subscription_start: String? = null
+)
+
+data class SchoolProfileResponseDto(
+    val status: String? = "success",
+    val message: String? = null,
+    val data: SchoolProfileDto? = null
+)
+
+// Only the editable fields from SchoolAdminService::updateSchoolProfile's UPDATE statement.
+data class UpdateSchoolProfileRequestDto(
+    val name: String? = null,
+    val contact_phone: String? = null,
+    val contact_email: String? = null,
+    val registration_no: String? = null,
+    val affiliation_board: String? = null,
+    val school_type: String? = null,
+    val founded_year: String? = null,
+    val medium_of_instruction: String? = null,
+    val street_address: String? = null,
+    val city: String? = null,
+    val state: String? = null,
+    val pin_code: String? = null,
+    val current_term: String? = null,
+    val term_start: String? = null,
+    val term_end: String? = null,
+    val classes_offered: String? = null,
+    val report_card_remark: String? = null
+)
+
+// ---------------------------------------------------------------------------
+// Academic Setup: academic-years, holidays, subjects, grade-configurations
+// ---------------------------------------------------------------------------
+data class AcademicYearItemDto(
+    val id: Int,
+    val school_id: Int? = null,
+    val name: String? = null,
+    val start_date: String? = null,
+    val end_date: String? = null,
+    val is_current: Int? = 0,
+    val status: String? = null,
+    val migration_status: String? = null
+)
+
+data class AcademicYearsResponseDto(
+    val status: String? = "success",
+    val data: List<AcademicYearItemDto> = emptyList()
+)
+
+// POST api/school/academic-years (SchoolAdminService::createAcademicYear) — name must be "YYYY-YYYY".
+data class CreateAcademicYearRequestDto(
+    val name: String,
+    val start_date: String? = null,
+    val end_date: String? = null
+)
+
+data class CreateAcademicYearResultDto(
+    val id: Int? = null,
+    val name: String? = null,
+    val status: String? = null
+)
+
+data class CreateAcademicYearResponseDto(
+    val status: String? = "success",
+    val message: String? = null,
+    val data: CreateAcademicYearResultDto? = null
+)
+
+data class HolidayItemDto(
+    val id: Int,
+    val school_id: Int? = null,
+    val academic_year_id: Int? = null,
+    val name: String? = null,
+    val date: String? = null
+)
+
+data class HolidaysResponseDto(
+    val status: String? = "success",
+    val data: List<HolidayItemDto> = emptyList()
+)
+
+// POST/PUT api/school/holidays(/{id}) (SchoolAdminService::createHoliday/updateHoliday) — `name` + `date` (YYYY-MM-DD).
+data class HolidayRequestDto(
+    val name: String,
+    val date: String
+)
+
+data class HolidayResultDto(
+    val id: Int? = null,
+    val name: String? = null,
+    val date: String? = null
+)
+
+data class HolidayResponseDto(
+    val status: String? = "success",
+    val message: String? = null,
+    val data: HolidayResultDto? = null
+)
+
+data class SubjectItemDto(
+    val id: Int,
+    val school_id: Int? = null,
+    val name: String? = null,
+    val class_id: Int? = null,
+    val teacher_id: Int? = null,
+    val teacher_name: String? = null
+)
+
+data class SubjectsResponseDto(
+    val status: String? = "success",
+    val data: List<SubjectItemDto> = emptyList()
+)
+
+// POST/PUT api/school/subjects(/{id}) (SchoolAdminService::createSubject/updateSubject) — only `name`.
+data class SubjectRequestDto(
+    val name: String
+)
+
+data class GradeConfigItemDto(
+    val id: Int,
+    val school_id: Int? = null,
+    val min_percentage: Double = 0.0,
+    val max_percentage: Double = 0.0,
+    val grade: String? = null,
+    val grade_point: Double? = null,
+    val remark: String? = null
+)
+
+data class GradeConfigsResponseDto(
+    val status: String? = "success",
+    val data: List<GradeConfigItemDto> = emptyList()
+)
+
+// ---------------------------------------------------------------------------
+// Credentials: GET api/school/credentials/{role}/{id}, POST api/school/credentials/generate
+// (SchoolAdminService::getCredentials / generateCredentials)
+// ---------------------------------------------------------------------------
+data class CredentialsDto(
+    val phone: String? = null,
+    val plain_password: String? = null
+)
+
+data class CredentialsResponseDto(
+    val status: String? = "success",
+    val data: CredentialsDto? = null
+)
+
+data class GenerateCredentialsRequestDto(
+    val role: String,
+    val id: Int,
+    val password: String? = null
+)
+
+data class GenerateCredentialsResponseDto(
+    val status: String? = "success",
+    val message: String? = null,
+    val data: CredentialsDto? = null
+)
+
 interface ApiService {
 
     // Auth
@@ -1529,4 +1774,156 @@ interface ApiService {
         @Body request: UpdateFinancialReportStatusRequestDto,
         @Header("Authorization") authHeader: String? = null
     ): Response<JsonElement>
+
+    // --- Security ---
+    @GET("api/school/security/audit-logs")
+    suspend fun getSchoolAuditLogs(
+        @Query("page") page: Int? = null,
+        @Query("limit") limit: Int? = null,
+        @Query("date_filter") dateFilter: String? = null,
+        @Query("from_date") fromDate: String? = null,
+        @Query("to_date") toDate: String? = null,
+        @Query("module") module: String? = null,
+        @Query("search") search: String? = null,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<AuditLogsResponseDto>
+
+    @GET("api/school/security/login-history")
+    suspend fun getSchoolLoginHistory(
+        @Query("page") page: Int? = null,
+        @Query("limit") limit: Int? = null,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<LoginHistoryResponseDto>
+
+    // --- School Profile ---
+    @GET("api/school/profile")
+    suspend fun getSchoolProfile(
+        @Header("Authorization") authHeader: String? = null
+    ): Response<SchoolProfileResponseDto>
+
+    @POST("api/school/profile")
+    suspend fun updateSchoolProfile(
+        @Body request: UpdateSchoolProfileRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<SchoolProfileResponseDto>
+
+    @Multipart
+    @POST("api/school/profile/logo")
+    suspend fun uploadSchoolLogo(
+        @Part file: MultipartBody.Part,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<SchoolProfileResponseDto>
+
+    @DELETE("api/school/profile/logo")
+    suspend fun removeSchoolLogo(
+        @Header("Authorization") authHeader: String? = null
+    ): Response<SchoolProfileResponseDto>
+
+    @Multipart
+    @POST("api/school/profile/signature")
+    suspend fun uploadPrincipalSignature(
+        @Part file: MultipartBody.Part,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<SchoolProfileResponseDto>
+
+    @DELETE("api/school/profile/signature")
+    suspend fun removePrincipalSignature(
+        @Header("Authorization") authHeader: String? = null
+    ): Response<SchoolProfileResponseDto>
+
+    // --- Academic Setup: Academic Years ---
+    @GET("api/school/academic-years")
+    suspend fun getAcademicYears(
+        @Header("Authorization") authHeader: String? = null
+    ): Response<AcademicYearsResponseDto>
+
+    @POST("api/school/academic-years")
+    suspend fun createAcademicYear(
+        @Body request: CreateAcademicYearRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<CreateAcademicYearResponseDto>
+
+    @POST("api/school/academic-years/{id}/activate")
+    suspend fun activateAcademicYear(
+        @Path("id") id: Int,
+        @Body request: Map<String, String> = emptyMap(),
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
+    @POST("api/school/academic-years/{id}/migrate")
+    suspend fun migrateAcademicYear(
+        @Path("id") id: Int,
+        @Body request: Map<String, String> = emptyMap(),
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
+    // --- Academic Setup: Holidays ---
+    @GET("api/school/holidays")
+    suspend fun getHolidays(
+        @Header("Authorization") authHeader: String? = null
+    ): Response<HolidaysResponseDto>
+
+    @POST("api/school/holidays")
+    suspend fun createHoliday(
+        @Body request: HolidayRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<HolidayResponseDto>
+
+    @PUT("api/school/holidays/{id}")
+    suspend fun updateHoliday(
+        @Path("id") id: Int,
+        @Body request: HolidayRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<HolidayResponseDto>
+
+    @DELETE("api/school/holidays/{id}")
+    suspend fun deleteHoliday(
+        @Path("id") id: Int,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
+    // --- Academic Setup: Subjects ---
+    @GET("api/school/subjects")
+    suspend fun getSubjects(
+        @Header("Authorization") authHeader: String? = null
+    ): Response<SubjectsResponseDto>
+
+    @POST("api/school/subjects")
+    suspend fun createSubject(
+        @Body request: SubjectRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
+    @PUT("api/school/subjects/{id}")
+    suspend fun updateSubject(
+        @Path("id") id: Int,
+        @Body request: SubjectRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
+    @DELETE("api/school/subjects/{id}")
+    suspend fun deleteSubject(
+        @Path("id") id: Int,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
+    // --- Academic Setup: Grade Configurations (view-only in native for now) ---
+    @GET("api/school/grade-configurations")
+    suspend fun getGradeConfigurations(
+        @Header("Authorization") authHeader: String? = null
+    ): Response<GradeConfigsResponseDto>
+
+    // --- Credentials ---
+    @GET("api/school/credentials/{role}/{id}")
+    suspend fun getCredentials(
+        @Path("role") role: String,
+        @Path("id") id: Int,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<CredentialsResponseDto>
+
+    @POST("api/school/credentials/generate")
+    suspend fun generateCredentials(
+        @Body request: GenerateCredentialsRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<GenerateCredentialsResponseDto>
 }

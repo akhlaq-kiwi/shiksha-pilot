@@ -10,9 +10,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.shikshapilot.nativeapp.data.remote.RetrofitClient
 import com.shikshapilot.nativeapp.data.repository.UserRepository
+import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminAcademicSetupScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminAnnouncementsScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminAttendanceScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminClassesScreen
+import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminCredentialsScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminExamsScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminFeeCollectionScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminFeeFollowUpScreen
@@ -20,7 +22,9 @@ import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminFeeStr
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminFinanceScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminFinancialReportsScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminLeaveRequestsScreen
+import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminProfileScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminSalaryDisbursementScreen
+import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminSecurityScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminStaffScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminStudentsScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminTimetableScreen
@@ -318,6 +322,30 @@ class MainActivity : ComponentActivity() {
                                 }
                                 "exams" -> {
                                     SchoolAdminExamsScreen(
+                                        schoolName = schoolName,
+                                        onBack = { currentScreenId = "dashboard" }
+                                    )
+                                }
+                                "security" -> {
+                                    SchoolAdminSecurityScreen(
+                                        schoolName = schoolName,
+                                        onBack = { currentScreenId = "dashboard" }
+                                    )
+                                }
+                                "school_profile" -> {
+                                    SchoolAdminProfileScreen(
+                                        schoolName = schoolName,
+                                        onBack = { currentScreenId = "dashboard" }
+                                    )
+                                }
+                                "academic_setup" -> {
+                                    SchoolAdminAcademicSetupScreen(
+                                        schoolName = schoolName,
+                                        onBack = { currentScreenId = "dashboard" }
+                                    )
+                                }
+                                "credentials" -> {
+                                    SchoolAdminCredentialsScreen(
                                         schoolName = schoolName,
                                         onBack = { currentScreenId = "dashboard" }
                                     )

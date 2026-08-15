@@ -20,10 +20,10 @@ this file only tracks what native-app still needs to build.
 | School Admin Leave Requests | ✅ | n/a | ✅ | present |
 | School Admin Announcements | ✅ | n/a | ✅ | present |
 | School Admin Reports | ✅ | n/a | ✅ (stub, 196 lines) | partial |
-| School Admin Security/Audit logs, login history | ✅ | n/a | ❌ | missing |
-| School Admin Profile (logo/signature) | ✅ | n/a | ❌ | missing |
-| School Admin Academic years, holidays, subjects, grade config | ✅ | n/a | ❌ | missing |
-| School Admin Credentials generation | ✅ | n/a | ❌ | missing |
+| School Admin Security/Audit logs, login history | ✅ | n/a | ✅ | present |
+| School Admin Profile (logo/signature) | ✅ | n/a | ✅ | present |
+| School Admin Academic years, holidays, subjects, grade config | ✅ | n/a | ✅ (grade config view-only; migration deferred) | partial |
+| School Admin Credentials generation | ✅ | n/a | ✅ | present |
 | Teacher Dashboard | ✅ | n/a | ✅ | present |
 | Teacher Attendance | ✅ | n/a | ✅ | present |
 | Teacher Assignments/Homework | ✅ | ✅ (homework_list_screen) | ✅ (assignments only, no "homework" API used) | partial |
@@ -55,10 +55,10 @@ this file only tracks what native-app still needs to build.
 - Timetable (view/edit/publish/backup)
 - Exams: `SchoolAdminExamsScreen` covers list/create/publish + class-status. Deferred (skip, not attempted): instructions editor, seating plan (generate/preview), admit-card publish/unpublish toggle in admin UI, admin report cards view, question paper designer (genuinely complex web-only tooling).
 - Finance breakdown — done: `SchoolAdminFeeStructureScreen` (view/create fee structures), `SchoolAdminFeeCollectionScreen` (record fee payment + collection history), `SchoolAdminFeeFollowUpScreen` (list/contacted/extend/status), `SchoolAdminSalaryDisbursementScreen` (staff-payments list + disburse), `SchoolAdminFinancialReportsScreen` (list + generate). `SchoolAdminFinanceScreen` repurposed into a hub linking to these. Deferred (not attempted, still missing): additional fee types/payments, transport fees, late-payment-penalty config/history/stats, expenses, finance-settings, class-fee-configurations editor (monthly per-class amounts), financial report export (binary XLSX)/settle/settlement-request workflow, staff-payments disburse-previous-year bulk catch-up, class-course-fee-configurations.
-- Security: audit logs, login history
-- Profile: school profile, logo/signature upload
-- Academic years, holidays, subjects, grade configurations
-- Credentials generation (student/staff login credential issuance)
+- ~~Security: audit logs, login history~~ — done: `SchoolAdminSecurityScreen` (tabbed audit-logs + login-history, read-only, first 50 rows).
+- ~~Profile: school profile, logo/signature upload~~ — done: `SchoolAdminProfileScreen` (view/edit school details + multipart logo/signature upload/remove). Distinct from `SettingsScreen.kt` (own-password change).
+- ~~Academic years, holidays, subjects, grade configurations~~ — done: `SchoolAdminAcademicSetupScreen` (tabbed: academic years list+create+activate, holidays list+add+delete, subjects list+add+delete, grade configurations view-only). Deferred: academic year migration flow (`/{id}/migrate` — complex staff/student promotion, not called from native), grade-configuration edit/save (`POST grade-configurations` replaces the whole scale list; view-only here).
+- ~~Credentials generation (student/staff login credential issuance)~~ — done: `SchoolAdminCredentialsScreen` (tabbed student/staff picker, per-row dialog to view existing or generate new credentials via `GET/POST api/school/credentials/*`).
 - Attendance leaderboard
 - Full student enrollment form (currently list/view only)
 
@@ -92,7 +92,7 @@ native-app's `ApiService.kt` currently defines ~30 endpoints. Backend exposes ~1
 - Now consumed by the new finance screens: `/api/school/fee-structures`, `/api/school/class-fee-configurations` (GET only), `/api/school/fee-payments` (POST), `/api/school/collection-history`, `/api/school/fee-follow-ups` (+`/{id}/extend`,`/{id}/status`,`/{id}/contacted`), `/api/school/staff-payments` (GET+POST), `/api/school/financial-reports` (GET+POST). Still unconsumed: `/api/school/class-fee-configurations` POST/lock, `/api/school/class-course-fee-configurations`, `/api/school/annual-fees`, `/api/school/additional-fees/*`, `/api/school/transport-fees`, `/api/school/expenses`, `/api/school/late-payment-penalty/*`, `/api/school/finance-settings`, `/api/school/fee-follow-ups/{id}` GET details + `/notes`, `/api/school/financial-reports/{id}/export`, `/settle`, `/settlement-request`, `/preview`, `/api/school/staff-payments/disburse-previous-year`, `/api/school/fee-payments/{id}` DELETE.
 - `/api/school/timetable/{publish,backup,paste,replace}` (only bare GET timetable is used, and with a different query pattern than backend expects — verify `class_id`/`date` params match backend controller)
 - `/api/school/classes/sections`, `/api/school/classes/transfer-students`, `/api/school/classes/{id}/next-roll-no`
-- `/api/school/security/*`, `/api/school/profile*`, `/api/school/academic-years/*`, `/api/school/holidays/*`, `/api/school/subjects/*`, `/api/school/grade-configurations`, `/api/school/credentials/*`, `/api/school/attendance/leaderboard`
+- Now consumed by the new back-office screens: `/api/school/security/audit-logs`, `/api/school/security/login-history`, `/api/school/profile` (GET/POST), `/api/school/profile/logo`(+DELETE), `/api/school/profile/signature`(+DELETE), `/api/school/academic-years` (GET/POST/activate), `/api/school/holidays` (GET/POST/DELETE), `/api/school/subjects` (GET/POST/DELETE), `/api/school/grade-configurations` (GET only), `/api/school/credentials/{role}/{id}` (GET), `/api/school/credentials/generate` (POST). Still unconsumed: `/api/school/security/audit-logs/log` (client-side action logging, write-only, not needed for a read-only viewer), `/api/school/academic-years/{id}/migrate`, `/api/school/holidays/{id}` PUT (edit, only add/delete built), `/api/school/subjects/{id}` PUT (edit, only add/delete built), `POST /api/school/grade-configurations` (save/replace scale list), `/api/school/attendance/leaderboard`
 - `/api/teacher/exams-new/*` and `/api/teacher/exams-new/{id}/marks-sheet` now consumed by `TeacherExamsScreen`/`TeacherMarksEntryScreen`. Still unconsumed: legacy `/api/teacher/exams`, `/api/teacher/marks`, `/api/teacher/homework`, `/api/teacher/homework/{id}`, `/api/teacher/salaries*`, `/api/teacher/notifications*`, `/api/teacher/schedule/today`, `/api/teacher/vocabulary/report`
 - `/api/student/attendance`, `/api/student/assignments`, `/api/student/materials`, `/api/student/timetable` (all defined in native ApiService but no screen calls them)
 - `/api/student/exams-new` (list/details) and `/api/student/exams-new/report-cards` now consumed by `StudentResultsScreen`. Still unconsumed: `/api/student/results`, `/api/student/homework`, `/api/student/fee-payments`, `/api/student/fees/card`, `/api/student/fees/receipt`
@@ -120,6 +120,6 @@ Note: native-app also calls some endpoints (e.g. `api/school/leave-requests`, `a
 4. **School Admin Classes & Sections, Timetable** (view + publish) — needed by both admin and consumed by teacher/student timetable screens for consistency.
 5. ~~**Exams suite** (school admin + teacher + student)~~ — done: core flow (admin list/create/publish/class-status, teacher list/details/marks entry, student list/details/report card) implemented in `SchoolAdminExamsScreen`, `TeacherExamsScreen`/`TeacherMarksEntryScreen`, `StudentResultsScreen`. Deferred as web-only/lower-priority: exam instructions editor, seating plan generation, admit-card publish/unpublish toggle in admin UI, admin-side report card viewer, and the question paper designer (explicitly out of scope — complex web-only tooling).
 6. ~~**Finance breakdown**~~ — done: `SchoolAdminFeeStructureScreen`, `SchoolAdminFeeCollectionScreen` (record payment + collection history), `SchoolAdminFeeFollowUpScreen` (contacted/extend/status), `SchoolAdminSalaryDisbursementScreen`, `SchoolAdminFinancialReportsScreen` (list + generate), with `SchoolAdminFinanceScreen` repurposed into a hub. Deferred as nice-to-have (out of time budget, not attempted): additional fee types/payments, transport fees, late-payment-penalty config/history/stats, expenses, finance-settings, class-fee-configurations editor, financial report export/settle/settlement-request, staff-payments disburse-previous-year bulk catch-up.
-7. **Security/Profile/Academic setup** (audit logs, login history, school profile, academic years, holidays, subjects, grade config, credentials generation) — lower daily-use priority, admin setup/back-office features.
+7. ~~**Security/Profile/Academic setup**~~ — done: `SchoolAdminSecurityScreen`, `SchoolAdminProfileScreen`, `SchoolAdminAcademicSetupScreen`, `SchoolAdminCredentialsScreen`.
 8. **Achievements + Vocabulary/games + push notifications** — student engagement layer, do last unless product explicitly prioritizes it.
 9. **Super Admin section** — confirm with product/user whether this belongs in the native mobile app at all (web-only back-office pattern in most school-management products); do not build until confirmed in scope.

@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -357,6 +358,50 @@ fun DashboardScreen(
                                 icon = Icons.Default.Assignment,
                                 color = InfoBlue,
                                 onClick = { onModuleClick("exams") }
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            WebStatCard(
+                                modifier = Modifier.weight(1f),
+                                label = "Security",
+                                value = "Audit & Logins",
+                                icon = Icons.Default.Security,
+                                color = SunsetOrange,
+                                onClick = { onModuleClick("security") }
+                            )
+                            WebStatCard(
+                                modifier = Modifier.weight(1f),
+                                label = "School Profile",
+                                value = "Logo & Details",
+                                icon = Icons.Default.School,
+                                color = InfoBlue,
+                                onClick = { onModuleClick("school_profile") }
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            WebStatCard(
+                                modifier = Modifier.weight(1f),
+                                label = "Academic Setup",
+                                value = "Years & Subjects",
+                                icon = Icons.Default.CalendarMonth,
+                                color = WarningYellow,
+                                onClick = { onModuleClick("academic_setup") }
+                            )
+                            WebStatCard(
+                                modifier = Modifier.weight(1f),
+                                label = "Credentials",
+                                value = "Generate Login",
+                                icon = Icons.Default.Person,
+                                color = OnlineGreen,
+                                onClick = { onModuleClick("credentials") }
                             )
                         }
                     }
