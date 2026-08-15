@@ -47,9 +47,20 @@ object UserRepository {
 
     suspend fun refreshProfileFromApi() {
         try {
-            // Background sync attempt with API endpoint
-            val current = _currentUser.value
-            _currentUser.value = current.copy(status = "Synced Live")
+            val response = RetrofitClient.apiService.getProfile()
+            val profile = response.body()?.data
+            if (response.isSuccessful && profile != null) {
+                val current = _currentUser.value
+                _currentUser.value = current.copy(
+                    name = profile.name ?: current.name,
+                    phone = profile.phone ?: current.phone,
+                    role = profile.role ?: current.role,
+                    schoolName = profile.school_name ?: current.schoolName,
+                    email = profile.email ?: current.email,
+                    avatarUrl = profile.photo_path ?: current.avatarUrl,
+                    status = profile.status ?: current.status
+                )
+            }
         } catch (e: Exception) {
             // Keep local cached profile state intact on failure (Local-First Offline Fallback)
         }

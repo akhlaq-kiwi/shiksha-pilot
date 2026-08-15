@@ -74,8 +74,8 @@ import kotlinx.coroutines.launch
 fun LoginScreen(
     onLoginSuccess: (phone: String, roleName: String, schoolName: String) -> Unit
 ) {
-    var phone by remember { mutableStateOf("9319398941") }
-    var password by remember { mutableStateOf("Test@123") }
+    var phone by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
     var isPasswordVisible by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
     var flashMessage by remember { mutableStateOf<FlashMessage?>(null) }
@@ -118,27 +118,19 @@ fun LoginScreen(
                             u.role,
                             u.school_name ?: "Jamiya Kids Planet Academy"
                         )
-                    } else if (cleanPhone == "8650302490") {
-                        RetrofitClient.authToken = "eyJpZCI6MjYsInJvbGUiOiJURUFDSEVSIiwicGhvbmUiOiI4NjUwMzAyNDkwIiwiZW1haWwiOm51bGwsInNjaG9vbF9pZCI6MTcsInB3ZCI6IiQyeSQxMCR5UmMiLCJleHAiOjE3ODg5ODg4NzV9"
-                        onLoginSuccess(cleanPhone, "TEACHER", "Jamiya Kids Planet Academy")
-                    } else if (cleanPhone == "9319398941") {
-                        RetrofitClient.authToken = "eyJpZCI6MjMsInJvbGUiOiJTVFVERU5UIiwicGhvbmUiOiI5MzE5Mzk4OTQxIiwiZW1haWwiOm51bGwsInNjaG9vbF9pZCI6MTcsInB3ZCI6IiQyeSQxMCR5UmMiLCJleHAiOjE3ODg5ODg4NzV9"
-                        onLoginSuccess(cleanPhone, "STUDENT", "Jamiya Kids Planet Academy")
                     } else {
                         flashMessage = FlashMessage(
-                            message = "Invalid mobile number or password credentials",
+                            message = response.body()?.message
+                                ?: "Invalid mobile number or password credentials",
                             type = FlashMessageType.ERROR
                         )
                     }
                 } catch (e: Exception) {
                     isLoading = false
-                    if (cleanPhone == "8650302490") {
-                        RetrofitClient.authToken = "eyJpZCI6MjYsInJvbGUiOiJURUFDSEVSIiwicGhvbmUiOiI4NjUwMzAyNDkwIiwiZW1haWwiOm51bGwsInNjaG9vbF9pZCI6MTcsInB3ZCI6IiQyeSQxMCR5UmMiLCJleHAiOjE3ODg5ODg4NzV9"
-                        onLoginSuccess(cleanPhone, "TEACHER", "Jamiya Kids Planet Academy")
-                    } else {
-                        RetrofitClient.authToken = "eyJpZCI6MjMsInJvbGUiOiJTVFVERU5UIiwicGhvbmUiOiI5MzE5Mzk4OTQxIiwiZW1haWwiOiJuYWRlZW1AeW9wbWFpbC5jb20iLCJzY2hvb2xfaWQiOjE3LCJwd2QiOiIkMnkkMTAkcEFFIiwiZXhwIjoxNzg4OTg0NTI0fQ"
-                        onLoginSuccess(cleanPhone, "STUDENT", "Jamiya Kids Planet Academy")
-                    }
+                    flashMessage = FlashMessage(
+                        message = "Unable to sign in. Please check your connection and try again.",
+                        type = FlashMessageType.ERROR
+                    )
                 }
             }
         }

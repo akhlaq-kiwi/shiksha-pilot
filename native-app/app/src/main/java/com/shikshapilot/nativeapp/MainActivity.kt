@@ -24,6 +24,7 @@ import com.shikshapilot.nativeapp.features.teacher.screens.TeacherDashboardScree
 import com.shikshapilot.nativeapp.features.teacher.screens.TeacherMaterialsScreen
 import com.shikshapilot.nativeapp.ui.screens.DashboardScreen
 import com.shikshapilot.nativeapp.ui.screens.LoginScreen
+import com.shikshapilot.nativeapp.ui.screens.SettingsScreen
 import com.shikshapilot.nativeapp.ui.theme.ShikshaPilotTheme
 
 class MainActivity : ComponentActivity() {
@@ -60,9 +61,8 @@ class MainActivity : ComponentActivity() {
                 if (!isLoggedIn) {
                     LoginScreen(
                         onLoginSuccess = { phone, role, school ->
-                            val token = RetrofitClient.authToken ?: "eyJpZCI6MjMsInJvbGUiOiJTQ0hPT0xfQURNSU4iLCJwaG9uZSI6IjkzMTkzOTg5NDEiLCJlbWFpbCI6Im5hZGVlbUB5b3BtYWlsLmNvbSIsInNjaG9vbF9pZCI6MTcsInB3ZCI6IiQyeSQxMCRwYUUiLCJleHAiOjE3ODg5ODQ1MjR9"
-                            RetrofitClient.authToken = token
-                            
+                            val token = RetrofitClient.authToken
+
                             // Save session persistently
                             prefs.edit().apply {
                                 putBoolean("is_logged_in", true)
@@ -107,6 +107,13 @@ class MainActivity : ComponentActivity() {
                                         onBack = { currentScreenId = "dashboard" }
                                     )
                                 }
+                                "settings" -> {
+                                    SettingsScreen(
+                                        schoolName = schoolName,
+                                        onBack = { currentScreenId = "dashboard" },
+                                        onLogoutClick = performLogout
+                                    )
+                                }
                                 else -> {
                                     TeacherDashboardScreen(
                                         schoolName = schoolName,
@@ -129,6 +136,13 @@ class MainActivity : ComponentActivity() {
                                     SchoolAdminAnnouncementsScreen(
                                         schoolName = schoolName,
                                         onBack = { currentScreenId = "dashboard" }
+                                    )
+                                }
+                                "settings" -> {
+                                    SettingsScreen(
+                                        schoolName = schoolName,
+                                        onBack = { currentScreenId = "dashboard" },
+                                        onLogoutClick = performLogout
                                     )
                                 }
                                 else -> {
@@ -178,6 +192,13 @@ class MainActivity : ComponentActivity() {
                                     SchoolAdminAttendanceScreen(
                                         schoolName = schoolName,
                                         onBack = { currentScreenId = "dashboard" }
+                                    )
+                                }
+                                "settings" -> {
+                                    SettingsScreen(
+                                        schoolName = schoolName,
+                                        onBack = { currentScreenId = "dashboard" },
+                                        onLogoutClick = performLogout
                                     )
                                 }
                                 else -> {

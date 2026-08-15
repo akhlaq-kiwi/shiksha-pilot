@@ -272,6 +272,47 @@ data class StudentFeesResponseDto(
     val receipts: List<StudentFeeReceiptDto> = emptyList()
 )
 
+data class IdentifyRequestDto(
+    val phone: String
+)
+
+data class IdentifyResponseDto(
+    val status: String? = "success",
+    val message: String? = null,
+    val data: JsonElement? = null
+)
+
+data class ChangePasswordRequestDto(
+    val current_password: String? = null,
+    val new_password: String
+)
+
+data class ChangePasswordResponseDto(
+    val status: String? = "success",
+    val message: String? = null,
+    val data: JsonElement? = null
+)
+
+data class ProfileDataDto(
+    val id: Any? = null,
+    val name: String? = null,
+    val phone: String? = null,
+    val email: String? = null,
+    val role: String? = null,
+    val school_id: Any? = null,
+    val school_name: String? = null,
+    val status: String? = null,
+    val photo_path: String? = null,
+    val department: String? = null,
+    val employee_id: String? = null
+)
+
+data class ProfileResponseDto(
+    val status: String? = "success",
+    val message: String? = null,
+    val data: ProfileDataDto? = null
+)
+
 interface ApiService {
 
     // Auth
@@ -279,6 +320,22 @@ interface ApiService {
     suspend fun login(
         @Body request: LoginRequestDto
     ): Response<LoginResponseDto>
+
+    @POST("api/auth/identify")
+    suspend fun identify(
+        @Body request: IdentifyRequestDto
+    ): Response<IdentifyResponseDto>
+
+    @POST("api/auth/change-password")
+    suspend fun changePassword(
+        @Body request: ChangePasswordRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<ChangePasswordResponseDto>
+
+    @GET("api/auth/profile")
+    suspend fun getProfile(
+        @Header("Authorization") authHeader: String? = null
+    ): Response<ProfileResponseDto>
 
     // School Admin Endpoints
     @GET("api/leaves")
