@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import com.shikshapilot.nativeapp.data.remote.RetrofitClient
 import com.shikshapilot.nativeapp.data.remote.StudentItemDto
 import com.shikshapilot.nativeapp.ui.components.ThreeDotsLoader
+import com.shikshapilot.nativeapp.ui.components.PullToRefreshWrapper
 import com.shikshapilot.nativeapp.ui.components.StickyTopBar
 import com.shikshapilot.nativeapp.ui.theme.CardBorder
 import com.shikshapilot.nativeapp.ui.theme.DarkCanvas
@@ -63,9 +64,10 @@ fun SchoolAdminStudentsScreen(
     var searchQuery by remember { mutableStateOf("") }
     var allStudents by remember { mutableStateOf<List<StudentItemDto>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var refreshKey by remember { mutableStateOf(0) }
 
     // Live QA Server API Students Request
-    LaunchedEffect(searchQuery) {
+    LaunchedEffect(searchQuery, refreshKey) {
         isLoading = true
         try {
             val response = RetrofitClient.apiService.getStudents(
@@ -98,6 +100,7 @@ fun SchoolAdminStudentsScreen(
                 .padding(paddingValues)
                 .background(DarkCanvas)
         ) {
+            PullToRefreshWrapper(isRefreshing = isLoading, onRefresh = { refreshKey++ }) {
             Column(modifier = Modifier.fillMaxSize()) {
                 // Header Top Bar
                 StickyTopBar(
@@ -312,6 +315,7 @@ fun SchoolAdminStudentsScreen(
                         }
                     }
                 }
+            }
             }
         }
     }
