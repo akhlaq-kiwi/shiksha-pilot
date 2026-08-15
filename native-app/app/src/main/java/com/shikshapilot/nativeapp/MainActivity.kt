@@ -25,8 +25,12 @@ import com.shikshapilot.nativeapp.features.studentparent.screens.StudentMaterial
 import com.shikshapilot.nativeapp.features.studentparent.screens.StudentTimetableScreen
 import com.shikshapilot.nativeapp.features.teacher.screens.TeacherAssignmentsScreen
 import com.shikshapilot.nativeapp.features.teacher.screens.TeacherAttendanceScreen
+import com.shikshapilot.nativeapp.features.teacher.screens.TeacherClassesScreen
 import com.shikshapilot.nativeapp.features.teacher.screens.TeacherDashboardScreen
+import com.shikshapilot.nativeapp.features.teacher.screens.TeacherLeaveScreen
 import com.shikshapilot.nativeapp.features.teacher.screens.TeacherMaterialsScreen
+import com.shikshapilot.nativeapp.features.teacher.screens.TeacherNotificationsScreen
+import com.shikshapilot.nativeapp.features.teacher.screens.TeacherSalariesScreen
 import com.shikshapilot.nativeapp.ui.screens.DashboardScreen
 import com.shikshapilot.nativeapp.ui.screens.LoginScreen
 import com.shikshapilot.nativeapp.ui.screens.SettingsScreen
@@ -102,6 +106,30 @@ class MainActivity : ComponentActivity() {
                                 }
                                 "teacher_materials" -> {
                                     TeacherMaterialsScreen(
+                                        schoolName = schoolName,
+                                        onBack = { currentScreenId = "dashboard" }
+                                    )
+                                }
+                                "teacher_classes" -> {
+                                    TeacherClassesScreen(
+                                        schoolName = schoolName,
+                                        onBack = { currentScreenId = "dashboard" }
+                                    )
+                                }
+                                "teacher_leave" -> {
+                                    TeacherLeaveScreen(
+                                        schoolName = schoolName,
+                                        onBack = { currentScreenId = "dashboard" }
+                                    )
+                                }
+                                "teacher_notifications" -> {
+                                    TeacherNotificationsScreen(
+                                        schoolName = schoolName,
+                                        onBack = { currentScreenId = "dashboard" }
+                                    )
+                                }
+                                "teacher_salaries" -> {
+                                    TeacherSalariesScreen(
                                         schoolName = schoolName,
                                         onBack = { currentScreenId = "dashboard" }
                                     )

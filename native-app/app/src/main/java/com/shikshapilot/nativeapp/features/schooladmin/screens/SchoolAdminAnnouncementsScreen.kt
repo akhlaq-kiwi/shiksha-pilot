@@ -78,26 +78,26 @@ fun SchoolAdminAnnouncementsScreen(
         listOf(
             AnnouncementItemDto(
                 id = 1,
-                title = "Independence Day Celebration Notice",
-                content = "All students & staff members must assemble by 8:00 AM on August 15 in full school uniform.",
-                target_audience = "ALL",
-                is_urgent = 0,
+                subject = "Independence Day Celebration Notice",
+                description = "All students & staff members must assemble by 8:00 AM on August 15 in full school uniform.",
+                audience = "Both",
+                status = "Published",
                 created_at = "10 Aug 2026"
             ),
             AnnouncementItemDto(
                 id = 2,
-                title = "URGENT: Bus Route 4 Delay Notice",
-                content = "Route 4 bus delayed by 20 mins due to rain traffic on MG Road. Parents please note.",
-                target_audience = "PARENTS",
-                is_urgent = 1,
+                subject = "URGENT: Bus Route 4 Delay Notice",
+                description = "Route 4 bus delayed by 20 mins due to rain traffic on MG Road. Parents please note.",
+                audience = "Students",
+                status = "Published",
                 created_at = "09 Aug 2026"
             ),
             AnnouncementItemDto(
                 id = 3,
-                title = "Staff Monthly Meeting",
-                content = "All faculty members are requested to attend the monthly academic review at 3:30 PM in Conference Room B.",
-                target_audience = "TEACHERS",
-                is_urgent = 0,
+                subject = "Staff Monthly Meeting",
+                description = "All faculty members are requested to attend the monthly academic review at 3:30 PM in Conference Room B.",
+                audience = "Teachers",
+                status = "Published",
                 created_at = "08 Aug 2026"
             )
         )
@@ -216,9 +216,9 @@ fun SchoolAdminAnnouncementsScreen(
                             modifier = Modifier.fillMaxSize()
                         ) {
                             items(announcementsList) { item ->
-                                val isEmergency = (item.is_urgent ?: 0) == 1
-                                val audienceStr = item.target_audience ?: "ALL"
-                                val dateStr = item.created_at ?: "Today"
+                                val isEmergency = item.subject.contains("URGENT", ignoreCase = true)
+                                val audienceStr = item.audience ?: "Both"
+                                val dateStr = item.published_at ?: item.created_at ?: "Today"
 
                                 Box(
                                     modifier = Modifier
@@ -239,7 +239,7 @@ fun SchoolAdminAnnouncementsScreen(
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Text(
-                                                text = item.title,
+                                                text = item.subject,
                                                 fontSize = 15.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = TextPrimary,
@@ -263,7 +263,7 @@ fun SchoolAdminAnnouncementsScreen(
                                         Spacer(modifier = Modifier.height(4.dp))
 
                                         Text(
-                                            text = item.content,
+                                            text = item.description,
                                             fontSize = 12.5.sp,
                                             color = TextSecondary
                                         )
@@ -338,10 +338,10 @@ fun SchoolAdminAnnouncementsScreen(
                             onClick = {
                                 if (broadcastTitle.isNotBlank()) {
                                     val newDto = AnnouncementItemDto(
-                                        title = broadcastTitle,
-                                        content = broadcastMsg,
-                                        target_audience = "ALL",
-                                        is_urgent = 1,
+                                        subject = broadcastTitle,
+                                        description = broadcastMsg,
+                                        audience = "Both",
+                                        status = "Published",
                                         created_at = "Just Now"
                                     )
                                     announcementsList = listOf(newDto) + announcementsList

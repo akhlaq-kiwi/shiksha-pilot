@@ -1,14 +1,17 @@
 package com.shikshapilot.nativeapp.data.remote
 
 import com.google.gson.JsonElement
+import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
+import retrofit2.http.Streaming
 
 data class LoginRequestDto(
     val phone: String,
@@ -163,10 +166,11 @@ data class UpdateLeaveStatusRequestDto(
 
 data class AnnouncementItemDto(
     val id: Int? = null,
-    val title: String,
-    val content: String,
-    val target_audience: String? = "ALL",
-    val is_urgent: Int? = 0,
+    val subject: String,
+    val description: String,
+    val audience: String? = "Both",
+    val status: String? = "Draft",
+    val published_at: String? = null,
     val created_at: String? = null
 )
 
@@ -256,11 +260,8 @@ data class StudentAttendanceResponseDto(
     val data: List<StudentAttendanceRecordDto> = emptyList()
 )
 
-// Note: the `announcements` table's real columns are subject/description/audience/status/
-// published_at (see backend/src/Domain/SchoolAdmin/Services/SchoolAdminService.php
-// getAnnouncements()/createAnnouncement()), NOT title/content/target_audience/is_urgent as
-// AnnouncementItemDto above assumes. StudentAnnouncementItemDto below uses the real field
-// names for the read-only student/parent notices endpoint.
+// StudentAnnouncementItemDto uses the same real field names (subject/description/audience/
+// status/published_at) as AnnouncementItemDto above, for the read-only student/parent notices endpoint.
 data class StudentAnnouncementItemDto(
     val id: Int? = null,
     val subject: String? = null,
@@ -332,6 +333,84 @@ data class ProfileResponseDto(
     val status: String? = "success",
     val message: String? = null,
     val data: ProfileDataDto? = null
+)
+
+// --- TEACHER LEAVE DTOS ---
+// Real `leave_requests` table columns are from_date/to_date (NOT start_date/end_date as the
+// pre-existing LeaveRequestItemDto above assumes for the school-admin leave screen). This DTO
+// uses the correct column names so the new teacher leave screen renders/submits real data.
+data class TeacherLeaveItemDto(
+    val id: Int? = null,
+    val applicant_role: String? = null,
+    val leave_type: String,
+    val from_date: String,
+    val to_date: String,
+    val reason: String,
+    val status: String? = "PENDING",
+    val reject_reason: String? = null,
+    val created_at: String? = null
+)
+
+data class TeacherLeaveListResponseDto(
+    val status: String? = "success",
+    val data: List<TeacherLeaveItemDto> = emptyList()
+)
+
+data class ApplyLeaveRequestDto(
+    val leave_type: String,
+    val from_date: String,
+    val to_date: String,
+    val reason: String
+)
+
+// --- TEACHER NOTIFICATIONS DTOS ---
+
+data class TeacherNotificationItemDto(
+    val id: Int? = null,
+    val title: String? = null,
+    val message: String? = null,
+    val link: String? = null,
+    val path: String? = null,
+    val is_read: Int? = 0,
+    val created_at: String? = null
+)
+
+data class TeacherNotificationsResponseDto(
+    val status: String? = "success",
+    val data: List<TeacherNotificationItemDto> = emptyList()
+)
+
+data class MarkNotificationReadRequestDto(
+    val event_key: String? = null,
+    val link: String? = null,
+    val title: String? = null
+)
+
+// --- TEACHER SALARIES DTOS ---
+
+data class TeacherSalaryPaymentDto(
+    val id: Int? = 0,
+    val month: String? = null,
+    val salary: Double? = 0.0,
+    val disbursed_date: String? = null,
+    val status: String? = "Pending"
+)
+
+data class TeacherSalaryYearDto(
+    val academic_year_name: String? = null,
+    val salary: Double? = 0.0,
+    val has_unpaid: Boolean? = null,
+    val payments: List<TeacherSalaryPaymentDto> = emptyList()
+)
+
+data class TeacherSalariesDataDto(
+    val current_year: TeacherSalaryYearDto? = null,
+    val previous_year: TeacherSalaryYearDto? = null
+)
+
+data class TeacherSalariesResponseDto(
+    val status: String? = "success",
+    val data: TeacherSalariesDataDto? = null
 )
 
 interface ApiService {
@@ -461,6 +540,52 @@ interface ApiService {
         @Body material: MaterialItemDto,
         @Header("Authorization") authHeader: String? = null
     ): Response<JsonElement>
+
+    // Teacher own leave requests (reuses api/school/leave-requests; for TEACHER-role callers the
+    // backend defaults view_type to OWN and applicant_role to TEACHER server-side).
+    @GET("api/school/leave-requests")
+    suspend fun getTeacherLeaveRequests(
+        @Header("Authorization") authHeader: String? = null,
+        @Query("status") status: String? = null
+    ): Response<TeacherLeaveListResponseDto>
+
+    @POST("api/school/leave-requests")
+    suspend fun applyTeacherLeaveRequest(
+        @Body request: ApplyLeaveRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
+    @GET("api/teacher/notifications")
+    suspend fun getTeacherNotifications(
+        @Header("Authorization") authHeader: String? = null,
+        @Query("limit") limit: Int? = null,
+        @Query("offset") offset: Int? = null
+    ): Response<TeacherNotificationsResponseDto>
+
+    @POST("api/teacher/notifications/{id}/read")
+    suspend fun markTeacherNotificationRead(
+        @Path("id") id: Int,
+        @Body body: MarkNotificationReadRequestDto = MarkNotificationReadRequestDto(),
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
+    @DELETE("api/teacher/notifications/{id}")
+    suspend fun deleteTeacherNotification(
+        @Path("id") id: Int,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
+    @GET("api/teacher/salaries")
+    suspend fun getTeacherSalaries(
+        @Header("Authorization") authHeader: String? = null
+    ): Response<TeacherSalariesResponseDto>
+
+    @Streaming
+    @GET("api/teacher/salaries/receipt")
+    suspend fun getTeacherSalaryReceipt(
+        @Query("id") id: Int,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<ResponseBody>
 
     // Student & Parent Endpoints
     @GET("api/student/dashboard")
