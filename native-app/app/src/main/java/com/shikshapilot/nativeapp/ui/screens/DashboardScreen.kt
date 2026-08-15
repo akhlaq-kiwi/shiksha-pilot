@@ -183,33 +183,7 @@ fun DashboardScreen(
     }
 
     Scaffold(
-        containerColor = DarkCanvas,
-        bottomBar = {
-            StickyBottomBar(
-                activeTab = "home",
-                onTabSelected = { tab ->
-                    when (tab) {
-                        "education" -> {
-                            activeSheet = null
-                            onModuleClick("education")
-                        }
-                        "exams" -> {
-                            activeSheet = null
-                            onModuleClick("exams")
-                        }
-                        "finance" -> {
-                            activeSheet = null
-                            onModuleClick("finance")
-                        }
-                        "settings" -> {
-                            activeSheet = null
-                            onModuleClick("settings")
-                        }
-                        else -> activeSheet = null
-                    }
-                }
-            )
-        }
+        containerColor = DarkCanvas
     ) { paddingValues ->
         Box(
             modifier = Modifier

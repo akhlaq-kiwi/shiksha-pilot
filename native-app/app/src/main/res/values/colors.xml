@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="dark_canvas">#0F1526</color>
-    <color name="frosted_card">#161C2E</color>
-    <color name="sunset_orange">#F97316</color>
+    <!-- Matches frontend/src/index.css's light Scholar palette (surface-canvas,
+         surface-raised, color-primary/brand-600). Names kept for compatibility even
+         though the theme is now light, not dark. -->
+    <color name="dark_canvas">#FAF9F6</color>
+    <color name="frosted_card">#FFFFFF</color>
+    <color name="sunset_orange">#059669</color>
 </resources>

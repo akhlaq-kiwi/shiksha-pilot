@@ -12,11 +12,15 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import com.shikshapilot.nativeapp.data.remote.RetrofitClient
 import com.shikshapilot.nativeapp.data.repository.UserRepository
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminAcademicSetupScreen
@@ -70,6 +74,7 @@ import com.shikshapilot.nativeapp.features.teacher.screens.TeacherMaterialsScree
 import com.shikshapilot.nativeapp.features.teacher.screens.TeacherNotificationsScreen
 import com.shikshapilot.nativeapp.features.teacher.screens.TeacherSalariesScreen
 import com.shikshapilot.nativeapp.features.teacher.screens.TeacherVocabularyReportScreen
+import com.shikshapilot.nativeapp.ui.components.StickyBottomBar
 import com.shikshapilot.nativeapp.ui.screens.DashboardScreen
 import com.shikshapilot.nativeapp.ui.screens.LoginScreen
 import com.shikshapilot.nativeapp.ui.screens.SettingsScreen
@@ -195,6 +200,55 @@ class MainActivity : ComponentActivity() {
                         }
                     )
                 } else {
+                    val roleUpper = userRole.uppercase()
+                    val bottomBarActiveTab = when {
+                        currentScreenId == "dashboard" -> "home"
+                        currentScreenId == "settings" -> "settings"
+                        roleUpper == "TEACHER" && currentScreenId in setOf("teacher_classes", "teacher_attendance") -> "education"
+                        roleUpper == "TEACHER" && currentScreenId in setOf("teacher_exams", "teacher_marks_entry") -> "exams"
+                        roleUpper == "TEACHER" && currentScreenId == "teacher_salaries" -> "finance"
+                        (roleUpper == "STUDENT" || roleUpper == "PARENT") && currentScreenId in setOf("student_timetable", "student_materials") -> "education"
+                        (roleUpper == "STUDENT" || roleUpper == "PARENT") && currentScreenId == "student_results" -> "exams"
+                        (roleUpper == "STUDENT" || roleUpper == "PARENT") && currentScreenId == "student_fees" -> "finance"
+                        currentScreenId in setOf("education", "classes", "sections", "timetable", "identity_cards", "academic_setup", "attendance") -> "education"
+                        currentScreenId in setOf("exams", "seating_plan", "report_cards") -> "exams"
+                        currentScreenId in setOf("finance", "fee_structure", "fee_collection", "fee_follow_up", "salary_disbursement", "financial_reports", "transport_fees", "school_expenses", "late_payment_penalty", "additional_fees") -> "finance"
+                        else -> ""
+                    }
+                    val onBottomTabSelected: (String) -> Unit = { tab ->
+                        when (tab) {
+                            "home" -> {
+                                isForwardNavigation = false
+                                backStack.clear()
+                                backStack.add("dashboard")
+                            }
+                            "education" -> navigateTo(
+                                when (roleUpper) {
+                                    "TEACHER" -> "teacher_classes"
+                                    "STUDENT", "PARENT" -> "student_timetable"
+                                    else -> "education"
+                                }
+                            )
+                            "exams" -> navigateTo(
+                                when (roleUpper) {
+                                    "TEACHER" -> "teacher_exams"
+                                    "STUDENT", "PARENT" -> "student_results"
+                                    else -> "exams"
+                                }
+                            )
+                            "finance" -> navigateTo(
+                                when (roleUpper) {
+                                    "TEACHER" -> "teacher_salaries"
+                                    "STUDENT", "PARENT" -> "student_fees"
+                                    else -> "finance"
+                                }
+                            )
+                            "settings" -> navigateTo("settings")
+                        }
+                    }
+
+                    Column(modifier = Modifier.fillMaxSize()) {
+                    Box(modifier = Modifier.weight(1f)) {
                     AnimatedContent(
                         targetState = currentScreenId,
                         transitionSpec = {
@@ -592,6 +646,12 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
+                    }
+                    }
+                    StickyBottomBar(
+                        activeTab = bottomBarActiveTab,
+                        onTabSelected = onBottomTabSelected
+                    )
                     }
                 }
             }

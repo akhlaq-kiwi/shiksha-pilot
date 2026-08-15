@@ -54,12 +54,17 @@ import com.shikshapilot.nativeapp.data.remote.RetrofitClient
 import com.shikshapilot.nativeapp.ui.components.StickyTopBar
 import com.shikshapilot.nativeapp.ui.components.ThreeDotsLoader
 import com.shikshapilot.nativeapp.ui.theme.CardBorder
+import com.shikshapilot.nativeapp.ui.theme.DangerRed
 import com.shikshapilot.nativeapp.ui.theme.DarkCanvas
 import com.shikshapilot.nativeapp.ui.theme.FrostedCard
 import com.shikshapilot.nativeapp.ui.theme.SunsetOrange
 import com.shikshapilot.nativeapp.ui.theme.TextPrimary
 import com.shikshapilot.nativeapp.ui.theme.TextSecondary
 import kotlinx.coroutines.launch
+
+// Matches the <select> options in web's StudentEnrollmentForm.jsx exactly.
+private val BLOOD_GROUPS = listOf("A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-")
+private val STUDENT_CATEGORIES = listOf("General", "OBC", "SC", "ST")
 
 /**
  * Full-screen student enrollment form matching web's StudentEnrollmentForm.jsx sections
@@ -122,6 +127,7 @@ fun SchoolAdminEnrollStudentScreen(
 
     var formError by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
+    var invalidFields by remember { mutableStateOf<Set<String>>(emptySet()) }
 
     LaunchedEffect(Unit) {
         try {
@@ -136,24 +142,48 @@ fun SchoolAdminEnrollStudentScreen(
         }
     }
 
+    // Mirrors SchoolAdminService::createStudent's server-side validation
+    // (backend/src/Domain/SchoolAdmin/Services/SchoolAdminService.php, ~line 1134) so invalid
+    // input is caught client-side before hitting the network, with the same rules:
+    // required first/last name+gender+dob+class, digits-only mobile/roll/sr numbers, 12-digit
+    // aadhaar, valid email format, and a 50-char cap on address lines.
+    fun validate(): Set<String> {
+        val invalid = mutableSetOf<String>()
+        if (selectedClass == null) invalid += "class"
+        if (firstName.isBlank()) invalid += "first_name"
+        if (lastName.isBlank()) invalid += "last_name"
+        if (gender.isBlank()) invalid += "gender"
+        if (dob.isBlank()) invalid += "dob"
+        if (studentEmail.isNotBlank() && !android.util.Patterns.EMAIL_ADDRESS.matcher(studentEmail).matches()) invalid += "student_email"
+        if (studentMobile.isNotBlank() && !studentMobile.all { it.isDigit() }) invalid += "student_mobile"
+        if (fatherPhone.isNotBlank() && !fatherPhone.all { it.isDigit() }) invalid += "father_phone"
+        if (rollNo.isNotBlank() && !rollNo.all { it.isDigit() }) invalid += "roll_no"
+        if (srNo.isNotBlank() && !srNo.all { it.isDigit() }) invalid += "sr_no"
+        if (aadhaarNo.isNotBlank() && !Regex("^\\d{12}$").matches(aadhaarNo)) invalid += "aadhaar_no"
+        if (currentAddressLine.trim().length > 50) invalid += "current_address_line"
+        if (!sameAsCurrent && permanentAddressLine.trim().length > 50) invalid += "permanent_address_line"
+        return invalid
+    }
+
     fun submit() {
-        val cls = selectedClass
-        if (cls == null) {
-            formError = "Select a class."
+        val invalid = validate()
+        invalidFields = invalid
+        if (invalid.isNotEmpty()) {
+            formError = when {
+                invalid.any { it in setOf("class", "first_name", "last_name", "gender", "dob") } ->
+                    "Please fill in all required fields (marked in red)."
+                "student_email" in invalid -> "Enter a valid email address."
+                "student_mobile" in invalid -> "Student mobile must contain only digits."
+                "father_phone" in invalid -> "Father phone must contain only digits."
+                "roll_no" in invalid -> "Roll no. must contain only digits."
+                "sr_no" in invalid -> "SR no. must contain only digits."
+                "aadhaar_no" in invalid -> "Aadhaar no. must be exactly 12 digits."
+                "current_address_line" in invalid || "permanent_address_line" in invalid -> "Address line cannot exceed 50 characters."
+                else -> "Please fix the highlighted fields."
+            }
             return
         }
-        if (firstName.isBlank() || lastName.isBlank()) {
-            formError = "First and last name are required."
-            return
-        }
-        if (gender.isBlank()) {
-            formError = "Gender is required."
-            return
-        }
-        if (dob.isBlank()) {
-            formError = "Date of birth is required."
-            return
-        }
+        val cls = selectedClass!!
         isSaving = true
         formError = null
         scope.launch {
@@ -258,7 +288,7 @@ fun SchoolAdminEnrollStudentScreen(
                     SectionHeader("Academic Info")
 
                     FieldLabel("Class *")
-                    ClassPicker(allClasses, selectedClass) { selectedClass = it }
+                    ClassPicker(allClasses, selectedClass, isError = invalidFields.contains("class")) { selectedClass = it }
                     Spacer(modifier = Modifier.height(8.dp))
 
                     FieldLabel("Category *")
@@ -267,7 +297,9 @@ fun SchoolAdminEnrollStudentScreen(
 
                     TwoFieldRow(
                         "SR No.", srNo, { srNo = it },
-                        "Roll No.", rollNo, { rollNo = it }
+                        "Roll No.", rollNo, { rollNo = it },
+                        isError1 = invalidFields.contains("sr_no"),
+                        isError2 = invalidFields.contains("roll_no")
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     TwoFieldRow(
@@ -280,31 +312,37 @@ fun SchoolAdminEnrollStudentScreen(
 
                     TwoFieldRow(
                         "First Name *", firstName, { firstName = it },
-                        "Middle Name", middleName, { middleName = it }
+                        "Middle Name", middleName, { middleName = it },
+                        isError1 = invalidFields.contains("first_name")
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    SingleField("Last Name *", lastName) { lastName = it }
+                    SingleField("Last Name *", lastName, isError = invalidFields.contains("last_name")) { lastName = it }
                     Spacer(modifier = Modifier.height(8.dp))
 
                     FieldLabel("Gender *")
-                    ChoiceRow(listOf("Male", "Female", "Other"), gender) { gender = it }
+                    ChoiceRow(listOf("Male", "Female", "Other"), gender, isError = invalidFields.contains("gender")) { gender = it }
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    TwoFieldRow(
-                        "Date of Birth (YYYY-MM-DD) *", dob, { dob = it },
-                        "Blood Group", bloodGroup, { bloodGroup = it }
-                    )
+                    SingleField("Date of Birth (YYYY-MM-DD) *", dob, isError = invalidFields.contains("dob")) { dob = it }
                     Spacer(modifier = Modifier.height(8.dp))
-                    TwoFieldRow(
-                        "Category (e.g. General/OBC/SC/ST)", category, { category = it },
-                        "Religion", religion, { religion = it }
-                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            DropdownField("Blood Group", BLOOD_GROUPS, bloodGroup) { bloodGroup = it }
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            DropdownField("Category", STUDENT_CATEGORIES, category) { category = it }
+                        }
+                    }
                     Spacer(modifier = Modifier.height(8.dp))
-                    SingleField("Aadhaar No. (12 digits)", aadhaarNo) { aadhaarNo = it }
+                    SingleField("Religion", religion) { religion = it }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    SingleField("Aadhaar No. (12 digits)", aadhaarNo, isError = invalidFields.contains("aadhaar_no")) { aadhaarNo = it }
                     Spacer(modifier = Modifier.height(8.dp))
                     TwoFieldRow(
                         "Student Mobile", studentMobile, { studentMobile = it },
-                        "Student Email", studentEmail, { studentEmail = it }
+                        "Student Email", studentEmail, { studentEmail = it },
+                        isError1 = invalidFields.contains("student_mobile"),
+                        isError2 = invalidFields.contains("student_email")
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -312,7 +350,8 @@ fun SchoolAdminEnrollStudentScreen(
 
                     TwoFieldRow(
                         "Father Name", fatherName, { fatherName = it },
-                        "Father Phone", fatherPhone, { fatherPhone = it }
+                        "Father Phone", fatherPhone, { fatherPhone = it },
+                        isError2 = invalidFields.contains("father_phone")
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     TwoFieldRow(
@@ -323,7 +362,7 @@ fun SchoolAdminEnrollStudentScreen(
                     Spacer(modifier = Modifier.height(16.dp))
                     SectionHeader("Current Address")
 
-                    SingleField("Address Line", currentAddressLine) { currentAddressLine = it }
+                    SingleField("Address Line", currentAddressLine, isError = invalidFields.contains("current_address_line")) { currentAddressLine = it }
                     Spacer(modifier = Modifier.height(8.dp))
                     TwoFieldRow(
                         "City", currentCity, { currentCity = it },
@@ -352,7 +391,7 @@ fun SchoolAdminEnrollStudentScreen(
                     if (!sameAsCurrent) {
                         Spacer(modifier = Modifier.height(11.dp))
                         SectionHeader("Permanent Address")
-                        SingleField("Address Line", permanentAddressLine) { permanentAddressLine = it }
+                        SingleField("Address Line", permanentAddressLine, isError = invalidFields.contains("permanent_address_line")) { permanentAddressLine = it }
                         Spacer(modifier = Modifier.height(8.dp))
                         TwoFieldRow(
                             "City", permanentCity, { permanentCity = it },
@@ -409,16 +448,18 @@ private fun FieldLabel(text: String) {
 }
 
 @Composable
-private fun SingleField(label: String, value: String, onValueChange: (String) -> Unit) {
+private fun SingleField(label: String, value: String, isError: Boolean = false, onValueChange: (String) -> Unit) {
     FieldLabel(label)
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
         modifier = Modifier.fillMaxWidth().height(48.dp),
         singleLine = true,
+        isError = isError,
         colors = OutlinedTextFieldDefaults.colors(
             focusedContainerColor = FrostedCard, unfocusedContainerColor = FrostedCard,
-            focusedBorderColor = SunsetOrange, unfocusedBorderColor = CardBorder,
+            focusedBorderColor = SunsetOrange, unfocusedBorderColor = if (isError) DangerRed else CardBorder,
+            errorBorderColor = DangerRed,
             focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary
         )
     )
@@ -427,7 +468,8 @@ private fun SingleField(label: String, value: String, onValueChange: (String) ->
 @Composable
 private fun TwoFieldRow(
     label1: String, value1: String, onChange1: (String) -> Unit,
-    label2: String, value2: String, onChange2: (String) -> Unit
+    label2: String, value2: String, onChange2: (String) -> Unit,
+    isError1: Boolean = false, isError2: Boolean = false
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Column(modifier = Modifier.weight(1f)) {
@@ -437,9 +479,11 @@ private fun TwoFieldRow(
                 onValueChange = onChange1,
                 modifier = Modifier.fillMaxWidth().height(48.dp),
                 singleLine = true,
+                isError = isError1,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = FrostedCard, unfocusedContainerColor = FrostedCard,
-                    focusedBorderColor = SunsetOrange, unfocusedBorderColor = CardBorder,
+                    focusedBorderColor = SunsetOrange, unfocusedBorderColor = if (isError1) DangerRed else CardBorder,
+                    errorBorderColor = DangerRed,
                     focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary
                 )
             )
@@ -451,9 +495,11 @@ private fun TwoFieldRow(
                 onValueChange = onChange2,
                 modifier = Modifier.fillMaxWidth().height(48.dp),
                 singleLine = true,
+                isError = isError2,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = FrostedCard, unfocusedContainerColor = FrostedCard,
-                    focusedBorderColor = SunsetOrange, unfocusedBorderColor = CardBorder,
+                    focusedBorderColor = SunsetOrange, unfocusedBorderColor = if (isError2) DangerRed else CardBorder,
+                    errorBorderColor = DangerRed,
                     focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary
                 )
             )
@@ -462,7 +508,7 @@ private fun TwoFieldRow(
 }
 
 @Composable
-private fun ChoiceRow(options: List<String>, selected: String, onSelect: (String) -> Unit) {
+private fun ChoiceRow(options: List<String>, selected: String, isError: Boolean = false, onSelect: (String) -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEach { option ->
             val isSelected = selected == option
@@ -470,7 +516,7 @@ private fun ChoiceRow(options: List<String>, selected: String, onSelect: (String
                 modifier = Modifier
                     .clip(RoundedCornerShape(10.dp))
                     .background(if (isSelected) SunsetOrange.copy(alpha = 0.18f) else FrostedCard)
-                    .border(width = 1.dp, color = if (isSelected) SunsetOrange else CardBorder, shape = RoundedCornerShape(10.dp))
+                    .border(width = 1.dp, color = if (isSelected) SunsetOrange else if (isError) DangerRed else CardBorder, shape = RoundedCornerShape(10.dp))
                     .clickable { onSelect(option) }
                     .padding(horizontal = 10.dp, vertical = 6.dp)
             ) {
@@ -481,7 +527,7 @@ private fun ChoiceRow(options: List<String>, selected: String, onSelect: (String
 }
 
 @Composable
-private fun ClassPicker(classes: List<ClassDto>, selected: ClassDto?, onSelect: (ClassDto) -> Unit) {
+private fun ClassPicker(classes: List<ClassDto>, selected: ClassDto?, isError: Boolean = false, onSelect: (ClassDto) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Box(modifier = Modifier.fillMaxWidth()) {
         Box(
@@ -489,7 +535,7 @@ private fun ClassPicker(classes: List<ClassDto>, selected: ClassDto?, onSelect: 
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(14.dp))
                 .background(FrostedCard)
-                .border(width = 1.dp, color = CardBorder, shape = RoundedCornerShape(14.dp))
+                .border(width = 1.dp, color = if (isError) DangerRed else CardBorder, shape = RoundedCornerShape(14.dp))
                 .clickable { expanded = true }
                 .padding(horizontal = 11.dp, vertical = 11.dp)
         ) {
@@ -505,6 +551,38 @@ private fun ClassPicker(classes: List<ClassDto>, selected: ClassDto?, onSelect: 
                     text = { Text("${cls.name}${cls.section?.let { s -> " - $s" } ?: ""}") },
                     onClick = { onSelect(cls); expanded = false }
                 )
+            }
+        }
+    }
+}
+
+/** Fixed-option picker matching a web `<select>` field (e.g. Blood Group, Category). */
+@Composable
+private fun DropdownField(label: String, options: List<String>, selected: String, onSelect: (String) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    FieldLabel(label)
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(FrostedCard)
+                .border(width = 1.dp, color = CardBorder, shape = RoundedCornerShape(14.dp))
+                .clickable { expanded = true }
+                .padding(horizontal = 11.dp),
+            contentAlignment = Alignment.CenterStart
+        ) {
+            Text(
+                text = selected.ifBlank { "Select..." },
+                fontSize = 12.sp,
+                color = if (selected.isNotBlank()) TextPrimary else TextSecondary
+            )
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, modifier = Modifier.heightIn(max = 300.dp)) {
+            DropdownMenuItem(text = { Text("Select...") }, onClick = { onSelect(""); expanded = false })
+            options.forEach { option ->
+                DropdownMenuItem(text = { Text(option) }, onClick = { onSelect(option); expanded = false })
             }
         }
     }
