@@ -303,22 +303,38 @@ class LeaveRequestService extends BaseService
 
             $this->repo->update($id, $updateData);
 
-            // Notify applicant
-            $applicantUserRole = $leave['applicant_role'] === 'TEACHER' ? 'TEACHER' : 'PARENT';
-            $title = $newStatus === 'APPROVED' ? "🎉 Leave Application Approved" : "⚠️ Leave Application Rejected";
-            $message = $newStatus === 'APPROVED' 
-                ? "Your leave request has been APPROVED by the School Admin."
-                : "Your leave request has been REJECTED. Reason: $rejectReason";
+            // Notify applicant (In-App & Push Notification to Teacher/Student/Parent)
+            $dateRange = $this->formatLeaveDateRange($leave['from_date'], $leave['to_date']);
 
-            $this->createNotification(
-                $pdo,
-                $schoolId,
-                $applicantUserRole,
-                $title,
-                $message,
-                $leave['applicant_role'] === 'TEACHER' ? '/teacher/leaves' : '/parent/leaves',
-                $newStatus === 'APPROVED' ? 'LEAVE_APPROVED' : 'LEAVE_REJECTED'
-            );
+            if ($newStatus === 'APPROVED') {
+                $title = 'Leave Request Approved';
+                $message = "Your leave request for $dateRange has been approved.";
+                $eventKey = 'LEAVE_APPROVED';
+            } else {
+                $title = 'Leave Request Rejected';
+                $message = !empty($rejectReason)
+                    ? "Your leave request for $dateRange has been rejected. Reason: $rejectReason"
+                    : "Your leave request for $dateRange has been rejected.";
+                $eventKey = 'LEAVE_REJECTED';
+            }
+
+            $recipients = $this->resolveRecipientsForLeaveRequest($pdo, $leave);
+            if (!empty($recipients)) {
+                $dispatcher = new PushDispatcher($pdo, new \App\Shared\Notifications\FcmClient($pdo));
+                foreach ($recipients as $rec) {
+                    $recRole = $rec['role'];
+                    $recUserId = (int)$rec['user_id'];
+                    $link = ($recRole === 'TEACHER') 
+                        ? '/teacher/leaves' 
+                        : (($recRole === 'STUDENT') ? '/student/leaves' : '/parent/leaves');
+
+                    $dispatcher->toUser($schoolId, $recUserId, $recRole, $eventKey, $title, $message, $link);
+                }
+            } else {
+                $applicantUserRole = $leave['applicant_role'] === 'TEACHER' ? 'TEACHER' : 'PARENT';
+                $link = $leave['applicant_role'] === 'TEACHER' ? '/teacher/leaves' : '/parent/leaves';
+                $this->createNotification($pdo, $schoolId, $applicantUserRole, $title, $message, $link, $eventKey);
+            }
 
             $this->commit($pdo);
         } catch (\Exception $e) {
@@ -486,25 +502,45 @@ class LeaveRequestService extends BaseService
         if (empty($phone) || strlen($phone) < 10) {
             if (!empty($email)) {
                 $stmt = $pdo->prepare("
-                    SELECT s.*, c.name as class_name, c.section as section_name 
+                    SELECT s.*, 
+                           c.name AS class_name, 
+                           c.section AS section_name,
+                           ay.name AS academic_year_name,
+                           ay.is_current AS is_current_academic_year
                     FROM students s
                     LEFT JOIN classes c ON s.class_id = c.id
+                    LEFT JOIN academic_years ay ON s.academic_year_id = ay.id
                     WHERE s.school_id = :sid
                       AND (s.status IS NULL OR UPPER(s.status) = 'ACTIVE')
                       AND s.exit_date IS NULL
                       AND LOWER(s.email) = LOWER(:email)
-                    ORDER BY s.id ASC
+                    ORDER BY COALESCE(ay.is_current, 0) DESC, s.id DESC
                 ");
                 $stmt->execute([':sid' => $schoolId, ':email' => $email]);
-                return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+                $raw = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+                $filtered = [];
+                $seen = [];
+                foreach ($raw as $st) {
+                    $identity = !empty($st['admission_no']) ? 'ADM_' . $st['admission_no'] : 'NAME_' . mb_strtolower(trim($st['name'] ?? ''));
+                    if (!isset($seen[$identity])) {
+                        $seen[$identity] = true;
+                        $filtered[] = $st;
+                    }
+                }
+                return $filtered;
             }
             return [];
         }
 
         $stmt = $pdo->prepare("
-            SELECT s.*, c.name as class_name, c.section as section_name 
+            SELECT s.*, 
+                   c.name AS class_name, 
+                   c.section AS section_name,
+                   ay.name AS academic_year_name,
+                   ay.is_current AS is_current_academic_year
             FROM students s
             LEFT JOIN classes c ON s.class_id = c.id
+            LEFT JOIN academic_years ay ON s.academic_year_id = ay.id
             WHERE s.school_id = :sid
               AND (s.status IS NULL OR UPPER(s.status) = 'ACTIVE')
               AND s.exit_date IS NULL
@@ -514,7 +550,7 @@ class LeaveRequestService extends BaseService
                 (s.guardian_phone = :p3 AND s.guardian_phone IS NOT NULL AND s.guardian_phone != '') OR
                 (s.student_mobile = :p4 AND s.student_mobile IS NOT NULL AND s.student_mobile != '')
               )
-            ORDER BY s.id ASC
+            ORDER BY COALESCE(ay.is_current, 0) DESC, s.id DESC
         ");
 
         $stmt->execute([
@@ -525,7 +561,19 @@ class LeaveRequestService extends BaseService
             ':p4'  => $phone
         ]);
 
-        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $rawStudents = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        $filtered = [];
+        $seenIdentityMap = [];
+        foreach ($rawStudents as $st) {
+            $identity = !empty($st['admission_no']) ? 'ADM_' . $st['admission_no'] : 'NAME_' . mb_strtolower(trim($st['name'] ?? ''));
+            if (!isset($seenIdentityMap[$identity])) {
+                $seenIdentityMap[$identity] = true;
+                $filtered[] = $st;
+            }
+        }
+
+        return $filtered;
     }
 
     private function getAssignedClassIds(int $teacherId, int $schoolId): array
@@ -560,6 +608,144 @@ class LeaveRequestService extends BaseService
         $stmt = $pdo->prepare("SELECT date FROM holidays WHERE school_id = :sid");
         $stmt->execute([':sid' => $schoolId]);
         return $stmt->fetchAll(PDO::FETCH_COLUMN);
+    }
+
+    private function formatLeaveDateRange(string $fromDate, string $toDate): string
+    {
+        $fromTs = strtotime($fromDate);
+        $toTs = strtotime($toDate);
+
+        if ($fromTs === $toTs) {
+            return date('j M Y', $fromTs);
+        }
+
+        return date('j M Y', $fromTs) . ' - ' . date('j M Y', $toTs);
+    }
+
+    private function resolveRecipientsForLeaveRequest(PDO $pdo, array $leave): array
+    {
+        $recipients = [];
+        $addedUserIds = [];
+
+        $schoolId = (int)($leave['school_id'] ?? 0);
+        $createdBy = (int)($leave['created_by'] ?? 0);
+
+        // 1. Creator user
+        if ($createdBy > 0) {
+            $stmt = $pdo->prepare("SELECT id, role FROM users WHERE id = :id LIMIT 1");
+            $stmt->execute([':id' => $createdBy]);
+            $creator = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($creator) {
+                $recipients[] = [
+                    'user_id' => (int)$creator['id'],
+                    'role' => $creator['role']
+                ];
+                $addedUserIds[(int)$creator['id']] = true;
+            }
+        }
+
+        // 2. If TEACHER leave request, also match staff details to user
+        if (($leave['applicant_role'] ?? '') === 'TEACHER' && !empty($leave['teacher_id'])) {
+            $stmtStaff = $pdo->prepare("SELECT phone, email FROM staff WHERE id = :id LIMIT 1");
+            $stmtStaff->execute([':id' => (int)$leave['teacher_id']]);
+            $staff = $stmtStaff->fetch(PDO::FETCH_ASSOC);
+            if ($staff) {
+                $phone = trim($staff['phone'] ?? '');
+                $email = trim($staff['email'] ?? '');
+                if ($phone !== '' || $email !== '') {
+                    $conds = [];
+                    $params = [':sid' => $schoolId];
+                    if ($phone !== '') {
+                        $conds[] = "phone = :phone";
+                        $params[':phone'] = $phone;
+                    }
+                    if ($email !== '') {
+                        $conds[] = "email = :email";
+                        $params[':email'] = $email;
+                    }
+                    $sql = "SELECT id, role FROM users WHERE school_id = :sid AND (UPPER(role) = 'TEACHER') AND (" . implode(' OR ', $conds) . ")";
+                    $stmtUser = $pdo->prepare($sql);
+                    $stmtUser->execute($params);
+                    $teachers = $stmtUser->fetchAll(PDO::FETCH_ASSOC);
+                    foreach ($teachers as $t) {
+                        $tId = (int)$t['id'];
+                        if (!isset($addedUserIds[$tId])) {
+                            $recipients[] = [
+                                'user_id' => $tId,
+                                'role' => $t['role']
+                            ];
+                            $addedUserIds[$tId] = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. If STUDENT leave request, resolve student & parent user accounts
+        if (($leave['applicant_role'] ?? '') === 'STUDENT' && !empty($leave['student_id'])) {
+            $studentId = (int)$leave['student_id'];
+            $stmtSt = $pdo->prepare("
+                SELECT id, student_mobile, parent_phone, father_phone, guardian_phone, email, student_email 
+                FROM students 
+                WHERE id = :id LIMIT 1
+            ");
+            $stmtSt->execute([':id' => $studentId]);
+            $st = $stmtSt->fetch(PDO::FETCH_ASSOC);
+            if ($st) {
+                $phones = array_values(array_filter(array_map('trim', [
+                    $st['student_mobile'] ?? '',
+                    $st['parent_phone'] ?? '',
+                    $st['father_phone'] ?? '',
+                    $st['guardian_phone'] ?? ''
+                ])));
+                $emails = array_values(array_filter(array_map('trim', [
+                    $st['email'] ?? '',
+                    $st['student_email'] ?? ''
+                ])));
+
+                if (!empty($phones) || !empty($emails)) {
+                    $conditions = [];
+                    $params = [':sid' => $schoolId];
+
+                    if (!empty($phones)) {
+                        $phonePlaceholders = [];
+                        foreach ($phones as $idx => $ph) {
+                            $key = ":ph_$idx";
+                            $phonePlaceholders[] = "phone = $key";
+                            $params[$key] = $ph;
+                        }
+                        $conditions[] = "(" . implode(' OR ', $phonePlaceholders) . ")";
+                    }
+
+                    if (!empty($emails)) {
+                        $emailPlaceholders = [];
+                        foreach ($emails as $idx => $em) {
+                            $key = ":em_$idx";
+                            $emailPlaceholders[] = "email = $key";
+                            $params[$key] = $em;
+                        }
+                        $conditions[] = "(" . implode(' OR ', $emailPlaceholders) . ")";
+                    }
+
+                    $sql = "SELECT id, role FROM users WHERE school_id = :sid AND (UPPER(role) IN ('STUDENT','PARENT')) AND (" . implode(' OR ', $conditions) . ")";
+                    $stmtUsers = $pdo->prepare($sql);
+                    $stmtUsers->execute($params);
+                    $users = $stmtUsers->fetchAll(PDO::FETCH_ASSOC);
+                    foreach ($users as $u) {
+                        $uId = (int)$u['id'];
+                        if (!isset($addedUserIds[$uId])) {
+                            $recipients[] = [
+                                'user_id' => $uId,
+                                'role' => $u['role']
+                            ];
+                            $addedUserIds[$uId] = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        return $recipients;
     }
 
     private function createNotification(PDO $pdo, int $schoolId, string $role, string $title, string $message, ?string $link = null, ?string $eventKey = null): void

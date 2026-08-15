@@ -196,8 +196,43 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       final roleUpper = role.toUpperCase();
       if (roleUpper == 'PARENT' || roleUpper == 'STUDENT') {
         final savedStudentId = prefs.getInt('selected_student_id');
-        if (savedStudentId != null) {
-          if (mounted) {
+        try {
+          final children = await leaveService.getChildren();
+          if (children.isNotEmpty) {
+            int activeStudentId = children[0]['id'] is int 
+                ? children[0]['id'] 
+                : int.parse(children[0]['id'].toString());
+
+            if (savedStudentId != null) {
+              for (final child in children) {
+                final cId = child['id'] is int 
+                    ? child['id'] 
+                    : int.parse(child['id'].toString());
+                if (cId == savedStudentId) {
+                  activeStudentId = cId;
+                  break;
+                }
+              }
+            }
+
+            await prefs.setInt('selected_student_id', activeStudentId);
+
+            if (mounted) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => HomeScreen(
+                    leaveService: leaveService,
+                    userRole: role,
+                    selectedStudentId: activeStudentId,
+                  ),
+                ),
+              );
+              return;
+            }
+          }
+        } catch (e) {
+          if (savedStudentId != null && mounted) {
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
@@ -209,30 +244,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               ),
             );
             return;
-          }
-        } else {
-          // Fallback to query children if not saved
-          try {
-            final children = await leaveService.getChildren();
-            if (children.isNotEmpty) {
-              final defaultStudentId = children[0]['id'] as int;
-              await prefs.setInt('selected_student_id', defaultStudentId);
-              if (mounted) {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => HomeScreen(
-                      leaveService: leaveService,
-                      userRole: role,
-                      selectedStudentId: defaultStudentId,
-                    ),
-                  ),
-                );
-                return;
-              }
-            }
-          } catch (e) {
-            // Ignore offline fallback failures, let it fall through to login
           }
         }
       } else {

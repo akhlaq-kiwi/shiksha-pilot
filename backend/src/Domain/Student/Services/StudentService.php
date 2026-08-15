@@ -69,25 +69,83 @@ class StudentService extends BaseService
                 $matchesEmail = !empty($userEmail) && strcasecmp((string)$candidate['email'], $userEmail) === 0;
 
                 if ($matchesPhone || $matchesEmail) {
-                    $student = $candidate;
+                    // Check if candidate belongs to active current Academic Year (ay.is_current = 1)
+                    $stmtAy = $pdo->prepare("
+                        SELECT is_current FROM academic_years 
+                        WHERE id = :ayid AND school_id = :sid 
+                        LIMIT 1
+                    ");
+                    $stmtAy->execute([':ayid' => (int)($candidate['academic_year_id'] ?? 0), ':sid' => $schoolId]);
+                    $isCurrent = (int)($stmtAy->fetchColumn() ?: 0);
+
+                    if ($isCurrent === 1) {
+                        $student = $candidate;
+                    } else {
+                        // Candidate is from an old/archived Academic Year (e.g. stale cached mobile ID).
+                        // Check if a new active student record exists for this same student in current active Academic Year.
+                        $adm = trim((string)($candidate['admission_no'] ?? ''));
+                        $cName = trim((string)($candidate['name'] ?? ''));
+                        
+                        $matchConds = [];
+                        $paramsNewer = [':sid' => $schoolId];
+                        
+                        if ($adm !== '') {
+                            $matchConds[] = "s.admission_no = :adm";
+                            $paramsNewer[':adm'] = $adm;
+                        }
+                        if ($cName !== '' && $userPhone !== '') {
+                            $matchConds[] = "(s.name = :cname AND (s.student_mobile = :p1 OR s.parent_phone = :p2 OR s.father_phone = :p3))";
+                            $paramsNewer[':cname'] = $cName;
+                            $paramsNewer[':p1'] = $userPhone;
+                            $paramsNewer[':p2'] = $userPhone;
+                            $paramsNewer[':p3'] = $userPhone;
+                        }
+                        
+                        if (!empty($matchConds)) {
+                            $sqlNewer = "
+                                SELECT s.* 
+                                FROM students s
+                                JOIN academic_years ay ON s.academic_year_id = ay.id
+                                WHERE s.school_id = :sid
+                                  AND ay.is_current = 1
+                                  AND (s.status IS NULL OR UPPER(s.status) = 'ACTIVE')
+                                  AND s.exit_date IS NULL
+                                  AND (" . implode(' OR ', $matchConds) . ")
+                                ORDER BY s.id DESC
+                                LIMIT 1
+                            ";
+                            $stmtNewer = $pdo->prepare($sqlNewer);
+                            $stmtNewer->execute($paramsNewer);
+                            $newerStudent = $stmtNewer->fetch(PDO::FETCH_ASSOC);
+                            if ($newerStudent) {
+                                $student = $newerStudent;
+                            } else {
+                                $student = $candidate;
+                            }
+                        } else {
+                            $student = $candidate;
+                        }
+                    }
                 }
             }
         }
 
-        // 2. Default resolution by phone number
+        // 2. Default resolution by phone number (Prioritize current active Academic Year)
         if ($student === null && !empty($userPhone) && strlen($userPhone) >= 10) {
             $stmt = $pdo->prepare("
-                SELECT * FROM students 
-                WHERE school_id = :school_id
+                SELECT s.* 
+                FROM students s
+                LEFT JOIN academic_years ay ON s.academic_year_id = ay.id
+                WHERE s.school_id = :school_id
                   AND (
-                    (student_mobile = :p1 AND student_mobile IS NOT NULL AND student_mobile != '') OR 
-                    (parent_phone = :p2 AND parent_phone IS NOT NULL AND parent_phone != '') OR 
-                    (father_phone = :p3 AND father_phone IS NOT NULL AND father_phone != '') OR 
-                    (guardian_phone = :p4 AND guardian_phone IS NOT NULL AND guardian_phone != '')
+                    (s.student_mobile = :p1 AND s.student_mobile IS NOT NULL AND s.student_mobile != '') OR 
+                    (s.parent_phone = :p2 AND s.parent_phone IS NOT NULL AND s.parent_phone != '') OR 
+                    (s.father_phone = :p3 AND s.father_phone IS NOT NULL AND s.father_phone != '') OR 
+                    (s.guardian_phone = :p4 AND s.guardian_phone IS NOT NULL AND s.guardian_phone != '')
                   )
-                  AND (status IS NULL OR UPPER(status) = 'ACTIVE')
-                  AND exit_date IS NULL
-                ORDER BY id ASC
+                  AND (s.status IS NULL OR UPPER(s.status) = 'ACTIVE')
+                  AND s.exit_date IS NULL
+                ORDER BY COALESCE(ay.is_current, 0) DESC, s.id DESC
                 LIMIT 1
             ");
             $stmt->execute([
@@ -102,7 +160,22 @@ class StudentService extends BaseService
 
         // 3. Resolution by user email (if phone didn't match)
         if ($student === null && !empty($userEmail)) {
-            $student = $this->repo->findByUserEmail($userEmail, $schoolId);
+            $stmt = $pdo->prepare("
+                SELECT s.* 
+                FROM students s
+                LEFT JOIN academic_years ay ON s.academic_year_id = ay.id
+                WHERE s.school_id = :school_id
+                  AND LOWER(s.email) = LOWER(:email)
+                  AND (s.status IS NULL OR UPPER(s.status) = 'ACTIVE')
+                  AND s.exit_date IS NULL
+                ORDER BY COALESCE(ay.is_current, 0) DESC, s.id DESC
+                LIMIT 1
+            ");
+            $stmt->execute([
+                ':school_id' => $schoolId,
+                ':email' => $userEmail
+            ]);
+            $student = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
         }
 
         if ($student === null) {
