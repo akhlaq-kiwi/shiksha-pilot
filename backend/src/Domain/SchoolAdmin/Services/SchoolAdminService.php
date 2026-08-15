@@ -15441,14 +15441,14 @@ Only approve the settlement after reviewing all financial records.
             }
             $phone = $staff['phone'] ?? '';
             $userRole = 'TEACHER';
-        } else if ($role === 'PARENT') {
-            $stmt = $pdo->prepare("SELECT student_mobile, name FROM students WHERE id = :id AND school_id = :sid LIMIT 1");
+        } else if ($role === 'PARENT' || $role === 'STUDENT') {
+            $stmt = $pdo->prepare("SELECT student_mobile, parent_phone, father_phone, guardian_phone, name FROM students WHERE id = :id AND school_id = :sid LIMIT 1");
             $stmt->execute(['id' => $id, 'sid' => $schoolId]);
             $student = $stmt->fetch(\PDO::FETCH_ASSOC);
             if (!$student) {
                 throw new NotFoundException('Student not found in this school.');
             }
-            $phone = $student['student_mobile'] ?? '';
+            $phone = trim((string)($student['parent_phone'] ?: ($student['father_phone'] ?: ($student['guardian_phone'] ?: ($student['student_mobile'] ?: '')))));
             $userRole = 'PARENT';
         } else {
             throw new ValidationException(['role' => 'Invalid role specified.']);
@@ -15458,8 +15458,8 @@ Only approve the settlement after reviewing all financial records.
             return null;
         }
 
-        $stmtUser = $pdo->prepare("SELECT phone, plain_password FROM users WHERE phone = :phone AND role = :role LIMIT 1");
-        $stmtUser->execute(['phone' => $phone, 'role' => $userRole]);
+        $stmtUser = $pdo->prepare("SELECT phone, plain_password FROM users WHERE phone = :phone LIMIT 1");
+        $stmtUser->execute(['phone' => $phone]);
         $row = $stmtUser->fetch(\PDO::FETCH_ASSOC);
 
         return $row !== false ? $row : null;
@@ -15484,18 +15484,18 @@ Only approve the settlement after reviewing all financial records.
             if (!$staff) {
                 throw new NotFoundException('Teacher not found in this school.');
             }
-            $phone = $staff['phone'] ?? '';
+            $phone = trim((string)($staff['phone'] ?? ''));
             $name = $staff['name'] ?? '';
             $userRole = 'TEACHER';
-        } else if ($role === 'PARENT') {
-            $stmt = $pdo->prepare("SELECT student_mobile, name FROM students WHERE id = :id AND school_id = :sid LIMIT 1");
+        } else if ($role === 'PARENT' || $role === 'STUDENT') {
+            $stmt = $pdo->prepare("SELECT student_mobile, parent_phone, father_phone, guardian_phone, first_name, last_name, name FROM students WHERE id = :id AND school_id = :sid LIMIT 1");
             $stmt->execute(['id' => $id, 'sid' => $schoolId]);
             $student = $stmt->fetch(\PDO::FETCH_ASSOC);
             if (!$student) {
                 throw new NotFoundException('Student not found in this school.');
             }
-            $phone = $student['student_mobile'] ?? '';
-            $name = $student['name'] ?? '';
+            $phone = trim((string)($student['parent_phone'] ?: ($student['father_phone'] ?: ($student['guardian_phone'] ?: ($student['student_mobile'] ?: '')))));
+            $name = $student['name'] ?? trim(($student['first_name'] ?? '') . ' ' . ($student['last_name'] ?? ''));
             $userRole = 'PARENT';
         } else {
             throw new ValidationException(['role' => 'Invalid role specified.']);
@@ -15520,26 +15520,21 @@ Only approve the settlement after reviewing all financial records.
         }
         $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
 
-        // Check if user already exists
-        $stmtCheck = $pdo->prepare("SELECT id FROM users WHERE phone = :phone LIMIT 1");
-        $stmtCheck->execute(['phone' => $phone]);
-        $existingUser = $stmtCheck->fetch(\PDO::FETCH_ASSOC);
+        // Update all user accounts associated with this phone number
+        $stmtUpdate = $pdo->prepare("
+            UPDATE users 
+            SET password = :password, plain_password = :plain, role = :role, school_id = COALESCE(school_id, :sid), status = 'ACTIVE'
+            WHERE phone = :phone
+        ");
+        $stmtUpdate->execute([
+            ':password' => $hashedPassword,
+            ':plain' => $password,
+            ':role' => $userRole,
+            ':sid' => $schoolId,
+            ':phone' => $phone
+        ]);
 
-        if ($existingUser) {
-            $stmtUpdate = $pdo->prepare("
-                UPDATE users 
-                SET password = :password, plain_password = :plain, role = :role, name = :name, school_id = :sid, status = 'ACTIVE'
-                WHERE id = :id
-            ");
-            $stmtUpdate->execute([
-                ':password' => $hashedPassword,
-                ':plain' => $password,
-                ':role' => $userRole,
-                ':name' => $name,
-                ':sid' => $schoolId,
-                ':id' => $existingUser['id']
-            ]);
-        } else {
+        if ($stmtUpdate->rowCount() === 0) {
             $stmtInsert = $pdo->prepare("
                 INSERT INTO users (phone, password, plain_password, role, name, school_id, status)
                 VALUES (:phone, :password, :plain, :role, :name, :sid, 'ACTIVE')
