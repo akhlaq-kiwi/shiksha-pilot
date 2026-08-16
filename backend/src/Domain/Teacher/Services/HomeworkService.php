@@ -9,75 +9,20 @@ use App\Shared\Exceptions\ValidationException;
 use App\Shared\Exceptions\NotFoundException;
 use App\Shared\Notifications\NotificationCatalog;
 use App\Shared\Notifications\PushDispatcher;
+use App\Shared\Storage\StorageService;
 use Psr\Log\LoggerInterface;
 use PDO;
 
 class HomeworkService extends BaseService
 {
     private PDO $pdo;
+    private StorageService $storage;
 
-    public function __construct(PDO $pdo, ?LoggerInterface $logger = null)
+    public function __construct(PDO $pdo, ?StorageService $storage = null, ?LoggerInterface $logger = null)
     {
         parent::__construct($logger);
         $this->pdo = $pdo;
-    }
-
-    private function syncExistingUploadsToWebRoot(string $targetWebDir): void
-    {
-        $candidateDirs = [
-            dirname(__DIR__, 4) . '/public/uploads',
-            dirname(__DIR__, 5) . '/backend/public/uploads',
-            dirname(__DIR__, 4) . '/public/uploads/homework',
-            dirname(__DIR__, 5) . '/backend/public/uploads/homework',
-            dirname(__DIR__, 5) . '/public/uploads',
-        ];
-
-        foreach ($candidateDirs as $srcDir) {
-            if ($srcDir === $targetWebDir || !is_dir($srcDir)) {
-                continue;
-            }
-            $files = @glob($srcDir . '/*');
-            if (is_array($files)) {
-                foreach ($files as $file) {
-                    if (is_file($file)) {
-                        $dest = $targetWebDir . '/' . basename($file);
-                        if (!file_exists($dest)) {
-                            @copy($file, $dest);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private function getUploadsDirectory(): string
-    {
-        $docRoot = $_SERVER['DOCUMENT_ROOT'] ?? '';
-        if (!empty($docRoot) && is_dir($docRoot)) {
-            $targetDir = rtrim($docRoot, '/\\') . '/uploads';
-            if (!is_dir($targetDir)) {
-                @mkdir($targetDir, 0777, true);
-            }
-            if (is_dir($targetDir) && is_writable($targetDir)) {
-                $this->syncExistingUploadsToWebRoot($targetDir);
-                return $targetDir;
-            }
-        }
-
-        $baseDir = dirname(__DIR__, 4);
-        $altPublic = dirname(__DIR__, 5) . '/public/uploads';
-        if (is_dir($altPublic) && is_writable($altPublic)) {
-            $this->syncExistingUploadsToWebRoot($altPublic);
-            return $altPublic;
-        }
-
-        $targetDir = $baseDir . '/public/uploads';
-        if (!is_dir($targetDir)) {
-            @mkdir($targetDir, 0777, true);
-        }
-
-        $this->syncExistingUploadsToWebRoot($targetDir);
-        return $targetDir;
+        $this->storage = $storage ?? new StorageService();
     }
 
     public function uploadAttachment($uploadedFile): array
@@ -99,15 +44,13 @@ class HomeworkService extends BaseService
             throw new ValidationException(['file' => 'File size exceeds the allowed limit.'], 'File size exceeds the allowed limit.');
         }
 
-        $directory = $this->getUploadsDirectory();
-        $uniqueName = sprintf('hw_%s_%s.%s', bin2hex(random_bytes(8)), time(), $extension);
-        $uploadedFile->moveTo($directory . DIRECTORY_SEPARATOR . $uniqueName);
+        $stored = $this->storage->storeUploadedFile($uploadedFile, StorageService::CATEGORY_HOMEWORK, 'hw');
 
         $fileType = ($extension === 'pdf') ? 'pdf' : 'image';
 
         return [
             'file_name' => $originalFilename,
-            'file_path' => '/uploads/' . $uniqueName,
+            'file_path' => $stored['url'],
             'file_type' => $fileType,
             'file_size' => $size,
         ];
@@ -277,16 +220,11 @@ class HomeworkService extends BaseService
             throw new NotFoundException('Homework not found');
         }
 
-        // Delete physical attachment files from disk
+        // Remove the stored attachments (S3 objects or local files).
         if (!empty($existing['attachments'])) {
-            $uploadsDir = $this->getUploadsDirectory();
             foreach ($existing['attachments'] as $att) {
                 if (!empty($att['file_path'])) {
-                    $filename = basename($att['file_path']);
-                    $fullPath = $uploadsDir . DIRECTORY_SEPARATOR . $filename;
-                    if (file_exists($fullPath)) {
-                        @unlink($fullPath);
-                    }
+                    $this->storage->delete((string)$att['file_path']);
                 }
             }
         }

@@ -700,7 +700,8 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
       const uploadData = new FormData();
       uploadData.append('file', file);
       
-      const res = await schoolService.uploadDocument(uploadData);
+      const category = fieldName === 'photo_path' ? 'student-photos' : 'student-documents';
+      const res = await schoolService.uploadDocument(uploadData, category);
       setFormData(prev => ({ ...prev, [fieldName]: res.url }));
       setUploadStates(prev => ({ ...prev, [fieldName]: 'done' }));
     } catch (err) {
