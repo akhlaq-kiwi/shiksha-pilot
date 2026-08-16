@@ -80,6 +80,24 @@ jobs:
           cp backend/composer.json "$TEMP_DIR/api/"
           cp backend/composer.lock "$TEMP_DIR/api/"
 
+          # File storage. Defaults to s3 so a missing secret cannot silently
+          # send production uploads to the web server's local disk.
+          STORAGE_DRIVER="${{ secrets.PROD_STORAGE_DRIVER }}"
+          if [ -z "$STORAGE_DRIVER" ]; then
+            STORAGE_DRIVER="s3"
+          fi
+          if [ "$STORAGE_DRIVER" = "s3" ] && [ -z "${{ secrets.PROD_AWS_ACCESS_KEY_ID }}" ]; then
+            echo "::error::STORAGE_DRIVER is s3 but PROD_AWS_ACCESS_KEY_ID is not set. Uploads would fall back to local disk."
+            exit 1
+          fi
+
+          # The bucket is shared across projects and environments, so every
+          # object must sit under a namespace. Never leave this blank.
+          AWS_ROOT_FOLDER="${{ secrets.PROD_AWS_ROOT_FOLDER }}"
+          if [ -z "$AWS_ROOT_FOLDER" ]; then
+            AWS_ROOT_FOLDER="sp"
+          fi
+
           # Backend .env assembled entirely from secrets
           cat > "$TEMP_DIR/api/.env" <<EOF
           APP_ENV=production
@@ -98,6 +116,14 @@ jobs:
           SMTP_USER=${{ secrets.PROD_SMTP_USER }}
           SMTP_PASS=${{ secrets.PROD_SMTP_PASS }}
           SMTP_FROM_NAME=${{ secrets.PROD_SMTP_FROM_NAME }}
+
+          STORAGE_DRIVER=$STORAGE_DRIVER
+          AWS_ACCESS_KEY_ID=${{ secrets.PROD_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY=${{ secrets.PROD_AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION=${{ secrets.PROD_AWS_DEFAULT_REGION }}
+          AWS_BUCKET=${{ secrets.PROD_AWS_BUCKET }}
+          AWS_ROOT_FOLDER=$AWS_ROOT_FOLDER
+          AWS_URL=${{ secrets.PROD_AWS_URL }}
           EOF
 
           # Create config directory if not present
