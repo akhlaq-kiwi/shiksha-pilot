@@ -200,6 +200,9 @@ export default function AchievementsPage() {
       if (selectedCategory === 'attendance_champions' && item.feature_type !== 'attendance_leaderboard') return false;
       if (selectedCategory === 'academic_excellence' && item.feature_type !== 'academic_excellence') return false;
     }
+    if (selectedClassId && selectedClassId !== 'ALL' && selectedClassId !== 'all') {
+      if (String(item.class_id) !== String(selectedClassId)) return false;
+    }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const nameMatch = (item.student_name || '').toLowerCase().includes(q);
@@ -222,7 +225,11 @@ export default function AchievementsPage() {
     return acc;
   }, {});
 
-  const currentYearObj = (data.academic_years || []).find(y => String(y.id) === String(selectedYearId)) || currentYear;
+  // Academic Year Card selection state
+  const [selectedYearCardId, setSelectedYearCardId] = useState(null);
+
+  const availableYears = data.available_achievement_years || [];
+  const currentYearObj = availableYears.find(y => String(y.id) === String(selectedYearCardId));
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300 pb-12">
@@ -230,11 +237,17 @@ export default function AchievementsPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/80 pb-6">
         <div>
           <div className="flex items-center gap-3">
-            {selectedCategory && (
+            {(selectedCategory || selectedYearCardId) && (
               <Button
                 variant="outline"
                 size="icon"
-                onClick={() => setSelectedCategory(null)}
+                onClick={() => {
+                  if (selectedCategory) {
+                    setSelectedCategory(null);
+                  } else {
+                    setSelectedYearCardId(null);
+                  }
+                }}
                 className="h-9 w-9 rounded-xl border border-border hover:bg-secondary/80"
               >
                 <ArrowLeft className="h-4 w-4" />
@@ -247,6 +260,8 @@ export default function AchievementsPage() {
                   ? 'Attendance Champions'
                   : selectedCategory === 'academic_excellence'
                   ? 'Academic Excellence'
+                  : selectedYearCardId && currentYearObj
+                  ? `Achievements for ${currentYearObj.name}`
                   : 'Hall of Fame & Achievements'}
               </h2>
               <p className="text-text-secondary text-sm mt-1">
@@ -254,12 +269,13 @@ export default function AchievementsPage() {
                   ? 'Recognizing students with outstanding school attendance and commitment.'
                   : selectedCategory === 'academic_excellence'
                   ? 'Honoring top academic performers in examination results.'
-                  : 'Celebrating excellence in attendance and academic performance.'}
+                  : selectedYearCardId && currentYearObj
+                  ? `Celebrating excellence in attendance and academic performance for ${currentYearObj.name}.`
+                  : 'Celebrating excellence in attendance and academic performance across academic sessions.'}
               </p>
             </div>
           </div>
         </div>
-
       </div>
 
       {/* Error State */}
@@ -271,11 +287,80 @@ export default function AchievementsPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* 1. LANDING PAGE VIEW (When no specific category selected)                 */}
+      {/* 1. NO MIGRATIONS / NEW SCHOOL EMPTY STATE                                 */}
       {/* ========================================================================= */}
-      {!selectedCategory && (
+      {availableYears.length === 0 && !loading && (
+        <div className="flex flex-col items-center justify-center p-14 text-center bg-surface rounded-3xl border border-border/80 space-y-4 shadow-sm">
+          <div className="w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center border border-amber-500/20">
+            <Trophy className="h-8 w-8" />
+          </div>
+          <h3 className="text-xl font-bold text-text-primary font-display">No Achievement History Available Yet</h3>
+          <p className="text-text-secondary text-sm max-w-md leading-relaxed">
+            Academic Year achievement cards will automatically appear here once your school completes its first Academic Year Migration.
+          </p>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 2. ACADEMIC YEAR CARDS LISTING (When no specific year card opened)        */}
+      {/* ========================================================================= */}
+      {availableYears.length > 0 && !selectedYearCardId && !selectedCategory && (
+        <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-bold text-text-primary font-display flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-amber-500" />
+              Academic Year Achievement History
+            </h3>
+            <span className="text-xs text-text-secondary font-medium">
+              Select an Academic Year to view achievements
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {availableYears.map((year) => (
+              <Card
+                key={year.id}
+                onClick={() => {
+                  setSelectedYearCardId(year.id);
+                  setSelectedYearId(String(year.id));
+                }}
+                className="group relative overflow-hidden border-2 border-border hover:border-amber-400/80 rounded-3xl p-6 transition-all duration-300 hover:shadow-xl cursor-pointer bg-gradient-to-br from-surface via-surface to-amber-500/5"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center border border-amber-500/20 group-hover:scale-105 transition-transform">
+                    <Trophy className="h-6 w-6" />
+                  </div>
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                    {year.status === 'Archived' ? 'Completed Session' : (year.migration_status === 'Completed' ? 'Migrated Session' : 'Active Session')}
+                  </span>
+                </div>
+
+                <div className="mt-5 space-y-1">
+                  <h4 className="text-xl font-bold text-text-primary font-display group-hover:text-amber-600 transition-colors">
+                    Achievements for {year.name}
+                  </h4>
+                  <p className="text-xs text-text-secondary leading-relaxed">
+                    View top attendance achievers & academic toppers for session {year.name}.
+                  </p>
+                </div>
+
+                <div className="mt-6 pt-4 border-t border-border/60 flex items-center justify-between text-xs font-bold text-amber-600 dark:text-amber-400">
+                  <span>View Achievements</span>
+                  <span className="flex items-center gap-1 font-bold">
+                    Explore <ChevronRight className="h-4 w-4 transform group-hover:translate-x-1 transition-transform" />
+                  </span>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 3. LANDING CATEGORIES VIEW (When an Academic Year card is opened)          */}
+      {/* ========================================================================= */}
+      {availableYears.length > 0 && selectedYearCardId && !selectedCategory && (
         <div className="space-y-10 animate-in fade-in duration-300">
-          
           {/* Category Cards Section */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             
@@ -304,7 +389,7 @@ export default function AchievementsPage() {
                     <ChevronRight className="h-5 w-5 opacity-0 group-hover:opacity-100 transform -translate-x-2 group-hover:translate-x-0 transition-all text-amber-500" />
                   </h3>
                   <p className="text-xs text-text-secondary mt-2 leading-relaxed font-medium">
-                    Students with outstanding school attendance, discipline, and daily commitment to learning throughout the academic session.
+                    Students with outstanding school attendance, discipline, and daily commitment to learning throughout session {currentYearObj?.name}.
                   </p>
                 </div>
 
@@ -342,7 +427,7 @@ export default function AchievementsPage() {
                     <ChevronRight className="h-5 w-5 opacity-0 group-hover:opacity-100 transform -translate-x-2 group-hover:translate-x-0 transition-all text-emerald-500" />
                   </h3>
                   <p className="text-xs text-text-secondary mt-2 leading-relaxed font-medium">
-                    Top academic performers in final examination results. Celebrates scholars with highest percentages and subject mastery.
+                    Top academic performers in examination results for session {currentYearObj?.name}. Celebrates scholars with highest percentages and subject mastery.
                   </p>
                 </div>
 
@@ -356,7 +441,6 @@ export default function AchievementsPage() {
             </Card>
 
           </div>
-
         </div>
       )}
 
@@ -430,27 +514,30 @@ export default function AchievementsPage() {
               {/* SECTION B: CLASS WISE CHAMPIONS */}
               {Object.keys(classGroups).length > 0 && (selectedLevel === 'all' || selectedLevel === 'class') && (
                 <div className="space-y-8">
-                  {Object.entries(classGroups).map(([className, items]) => (
-                    <div key={className} className="space-y-4">
-                      <div className="flex items-center gap-2 pb-2 border-b border-border">
-                        <span className="px-3 py-1 rounded-xl text-xs font-bold bg-primary/10 text-primary uppercase tracking-wider">
-                          {className}
-                        </span>
-                        <span className="text-xs text-text-muted font-bold">Top Achievers</span>
-                      </div>
+                  {Object.entries(classGroups).map(([className, items]) => {
+                    const sortedItems = [...items].sort((a, b) => parseInt(a.rank || 0) - parseInt(b.rank || 0));
+                    return (
+                      <div key={className} className="space-y-4">
+                        <div className="flex items-center gap-2 pb-2 border-b border-border">
+                          <span className="px-3 py-1 rounded-xl text-xs font-bold bg-primary/10 text-primary uppercase tracking-wider">
+                            {className}
+                          </span>
+                          <span className="text-xs text-text-muted font-bold">Top Achievers</span>
+                        </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {items.map(item => (
-                          <AchievementCard
-                            key={item.id}
-                            item={item}
-                            onOpenCert={handleOpenCertificate}
-                            onOpenReport={handleOpenReportCard}
-                          />
-                        ))}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                          {sortedItems.map(item => (
+                            <AchievementCard
+                              key={item.id}
+                              item={item}
+                              onOpenCert={handleOpenCertificate}
+                              onOpenReport={handleOpenReportCard}
+                            />
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
@@ -481,9 +568,6 @@ export default function AchievementsPage() {
                 <Button variant="outline" size="sm" onClick={handleDownloadCertPDF} className="font-bold flex items-center gap-1.5 text-xs">
                   <Download className="h-3.5 w-3.5" /> Download PDF
                 </Button>
-                <Button variant="outline" size="sm" onClick={handlePrintCert} className="font-bold flex items-center gap-1.5 text-xs">
-                  <Printer className="h-3.5 w-3.5" /> Print
-                </Button>
               </div>
             </div>
 
@@ -506,7 +590,7 @@ export default function AchievementsPage() {
                         : 'CERTIFICATE OF ATTENDANCE ACHIEVEMENT'}
                     </h1>
                     <p className="text-[11px] sm:text-xs text-zinc-500 font-bold">
-                      Academic Session: {currentYearObj?.name || '2026–2027'}
+                      Academic Session: {(currentYearObj?.name || data.academic_year_name || '2026-2027').replace(/[\u2010-\u2015\u2212–—]/g, '-')}
                     </p>
                     <div className="border-b border-zinc-200 w-full pt-2"></div>
                   </div>
@@ -583,13 +667,11 @@ export default function AchievementsPage() {
                   </div>
 
                   {/* Bottom Signature Section */}
-                  <div className="flex justify-between items-end pt-6 border-t border-zinc-200 text-[11px] sm:text-xs font-bold text-zinc-700">
-                    <div className="text-left space-y-1">
-                      <div className="w-24 sm:w-36 border-b border-zinc-400"></div>
+                  <div className="flex justify-between items-end pt-6 text-[11px] sm:text-xs font-bold text-zinc-700">
+                    <div className="text-left">
                       <span>Teacher Sign</span>
                     </div>
-                    <div className="text-right space-y-1">
-                      <div className="w-24 sm:w-36 border-b border-zinc-400 ml-auto"></div>
+                    <div className="text-right">
                       <span>Principal Sign</span>
                     </div>
                   </div>
@@ -798,22 +880,10 @@ function AchievementCard({ item, onOpenCert, onOpenReport }) {
           onClick={() => onOpenCert(item)}
           variant="outline"
           size="sm"
-          className="flex-1 font-bold text-xs shadow-2xs border-border hover:bg-secondary/60"
+          className="w-full font-bold text-xs shadow-2xs border-border hover:bg-secondary/60"
         >
           View Certificate
         </Button>
-
-        {/* Show View Report Card ONLY for Academic Excellence */}
-        {isAcademic && (
-          <Button
-            onClick={() => onOpenReport(item)}
-            variant="primary"
-            size="sm"
-            className="flex-1 font-bold text-xs shadow-2xs"
-          >
-            View Report Card
-          </Button>
-        )}
       </div>
 
     </Card>

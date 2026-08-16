@@ -12,6 +12,7 @@ use App\Domain\SchoolAdmin\Repositories\FinancialReportRepository;
 use App\Domain\SchoolAdmin\Repositories\StaffRepository;
 use App\Domain\SchoolAdmin\Repositories\StudentRepository;
 use App\Shared\BaseService;
+use App\Shared\Exceptions\ForbiddenException;
 use App\Shared\Exceptions\NotFoundException;
 use App\Shared\Exceptions\ValidationException;
 use App\Shared\Notifications\PushDispatcher;
@@ -4692,20 +4693,20 @@ class SchoolAdminService extends BaseService
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->attendanceRepo->getPdo();
 
-        // 1. Resolve Academic Year
-        $academicYearId = !empty($params['academic_year_id']) ? (int)$params['academic_year_id'] : null;
-        if (!$academicYearId) {
-            $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
-            $academicYearId = $workingYear ? (int)$workingYear['id'] : null;
-        }
-        if (!$academicYearId) {
-            $stmtLatestAY = $pdo->prepare("SELECT id FROM academic_years WHERE school_id = :sid ORDER BY id DESC LIMIT 1");
-            $stmtLatestAY->execute([':sid' => $schoolId]);
-            $academicYearId = (int)$stmtLatestAY->fetchColumn();
-        }
+        // 1. Resolve Available Achievement Academic Years (ONLY years with completed migration or archived status)
+        $stmtAvailAYs = $pdo->prepare("
+            SELECT id, name, status, migration_status, is_current 
+            FROM academic_years 
+            WHERE school_id = :sid 
+              AND (migration_status = 'Completed' OR status = 'Archived')
+            ORDER BY id DESC
+        ");
+        $stmtAvailAYs->execute([':sid' => $schoolId]);
+        $availableYears = $stmtAvailAYs->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-        if (!$academicYearId) {
+        if (empty($availableYears)) {
             return [
+                'available_achievement_years' => [],
                 'academic_year_id' => null,
                 'categories_summary' => [
                     'attendance_champions' => ['count' => 0, 'label' => 'Attendance Champions', 'description' => 'Students with outstanding school attendance.'],
@@ -4717,23 +4718,18 @@ class SchoolAdminService extends BaseService
             ];
         }
 
-        // 2. Check if Academic Year Migration is Completed
-        $stmtAYCheck = $pdo->prepare("SELECT migration_status, status FROM academic_years WHERE id = :ayid AND school_id = :sid");
-        $stmtAYCheck->execute([':ayid' => $academicYearId, ':sid' => $schoolId]);
-        $ayData = $stmtAYCheck->fetch(PDO::FETCH_ASSOC);
+        // 2. Resolve Selected Academic Year (MUST be one of the available completed/archived achievement years)
+        $academicYearId = !empty($params['academic_year_id']) ? (int)$params['academic_year_id'] : null;
+        $availAyIds = array_map('intval', array_column($availableYears, 'id'));
 
-        $isMigrated = $ayData && ($ayData['migration_status'] === 'Completed' || $ayData['status'] === 'Archived');
-
-        if (!$isMigrated) {
-            // Clean up any premature snapshots created for active/ongoing academic year
-            $stmtCleanActive = $pdo->prepare("DELETE FROM academic_achievement_snapshots WHERE school_id = :sid AND academic_year_id = :ayid");
-            $stmtCleanActive->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
-        } else {
-            // Auto-generate snapshots if not present for this completed/migrated academic year
-            $this->autoGenerateAchievementsSnapshots($pdo, $schoolId, $academicYearId);
+        if (!$academicYearId || !in_array($academicYearId, $availAyIds, true)) {
+            $academicYearId = (int)$availableYears[0]['id'];
         }
 
-        // 3. Build Filters
+        // Auto-generate snapshots if not present for this completed/migrated academic year
+        $this->autoGenerateAchievementsSnapshots($pdo, $schoolId, $academicYearId);
+
+        // 4. Build Filters
         $category = !empty($params['category']) ? trim($params['category']) : null;
         $classId = isset($params['class_id']) && $params['class_id'] !== '' && $params['class_id'] !== 'ALL' ? (int)$params['class_id'] : null;
         $level = !empty($params['level']) ? trim($params['level']) : null; // 'school', 'class', 'all'
@@ -4742,6 +4738,62 @@ class SchoolAdminService extends BaseService
 
         $whereClause = " WHERE a.school_id = :sid AND a.academic_year_id = :ayid ";
         $queryParams = [':sid' => $schoolId, ':ayid' => $academicYearId];
+
+        // 5. Enforce Student Visibility Rule (STUDENT / PARENT role only sees their own class)
+        $role = strtoupper($user['role'] ?? '');
+        if ($role === 'STUDENT' || $role === 'PARENT') {
+            $userPhone = (string)($user['phone'] ?? '');
+            $userEmail = (string)($user['email'] ?? '');
+            if (empty($userPhone) && isset($user['id'])) {
+                $stmtU = $pdo->prepare("SELECT phone, email FROM users WHERE id = :id LIMIT 1");
+                $stmtU->execute([':id' => $user['id']]);
+                $uRow = $stmtU->fetch(PDO::FETCH_ASSOC);
+                if ($uRow) {
+                    $userPhone = $uRow['phone'] ?? '';
+                    $userEmail = $uRow['email'] ?? '';
+                }
+            }
+
+            $studentClassId = null;
+            if ($role === 'STUDENT') {
+                $stmtSt = $pdo->prepare("
+                    SELECT class_id FROM students 
+                    WHERE school_id = :sid 
+                      AND academic_year_id = :ayid
+                      AND (LOWER(email) = LOWER(:em1) OR LOWER(student_email) = LOWER(:em2) OR student_mobile = :ph1 OR parent_phone = :ph2)
+                    ORDER BY (
+                        SELECT COUNT(*) 
+                        FROM academic_achievement_snapshots 
+                        WHERE school_id = :sub_sid 
+                          AND academic_year_id = :sub_ayid 
+                          AND class_id = students.class_id
+                    ) DESC, id DESC LIMIT 1
+                ");
+                $stmtSt->execute([':sid' => $schoolId, ':ayid' => $academicYearId, ':em1' => $userEmail, ':em2' => $userEmail, ':ph1' => $userPhone, ':ph2' => $userPhone, ':sub_sid' => $schoolId, ':sub_ayid' => $academicYearId]);
+                $studentClassId = $stmtSt->fetchColumn();
+            } else if ($role === 'PARENT') {
+                $stmtSt = $pdo->prepare("
+                    SELECT class_id FROM students 
+                    WHERE school_id = :sid 
+                      AND academic_year_id = :ayid
+                      AND (parent_phone = :ph1 OR father_phone = :ph2 OR guardian_phone = :ph3)
+                    ORDER BY (
+                        SELECT COUNT(*) 
+                        FROM academic_achievement_snapshots 
+                        WHERE school_id = :sub_sid 
+                          AND academic_year_id = :sub_ayid 
+                          AND class_id = students.class_id
+                    ) DESC, id DESC LIMIT 1
+                ");
+                $stmtSt->execute([':sid' => $schoolId, ':ayid' => $academicYearId, ':ph1' => $userPhone, ':ph2' => $userPhone, ':ph3' => $userPhone, ':sub_sid' => $schoolId, ':sub_ayid' => $academicYearId]);
+                $studentClassId = $stmtSt->fetchColumn();
+            }
+
+            if ($studentClassId) {
+                $whereClause .= " AND a.class_id = :stu_class_id ";
+                $queryParams[':stu_class_id'] = (int)$studentClassId;
+            }
+        }
 
         if ($category) {
             if ($category === 'attendance_champions') {
@@ -4833,8 +4885,15 @@ class SchoolAdminService extends BaseService
         $stmtAYs->execute([':sid' => $schoolId]);
         $ayList = $stmtAYs->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
+        // Fetch selected academic year name
+        $stmtSelAYName = $pdo->prepare("SELECT name FROM academic_years WHERE id = :ayid AND school_id = :sid LIMIT 1");
+        $stmtSelAYName->execute([':ayid' => $academicYearId, ':sid' => $schoolId]);
+        $selAYName = $stmtSelAYName->fetchColumn() ?: '';
+
         return [
+            'available_achievement_years' => $availableYears,
             'academic_year_id' => $academicYearId,
+            'academic_year_name' => $selAYName,
             'categories_summary' => [
                 'attendance_champions' => [
                     'count' => $attCount,
@@ -4864,6 +4923,10 @@ class SchoolAdminService extends BaseService
         if (!$ayData || ($ayData['migration_status'] !== 'Completed' && $ayData['status'] !== 'Archived')) {
             return;
         }
+
+        // Purge old achievement snapshots from prior academic years so only the latest migrated session's achievements are retained
+        $stmtPurgeOld = $pdo->prepare("DELETE FROM academic_achievement_snapshots WHERE school_id = :sid AND academic_year_id != :ayid");
+        $stmtPurgeOld->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
 
         // Pre-calculate Final Exam Marks Percentage for all students in this Academic Year (used as Tie-Breaker)
         $stmtExamMarks = $pdo->prepare("
@@ -5017,69 +5080,72 @@ class SchoolAdminService extends BaseService
                 $classId = (int)$cls['id'];
                 $className = $cls['name'];
 
-                // Find latest exam for this class
-                $stmtExam = $pdo->prepare("
-                    SELECT e.id, e.name 
-                    FROM examinations e 
-                    JOIN examination_papers ep ON ep.exam_id = e.id 
-                    WHERE ep.class_id = :cid AND e.school_id = :sid 
-                    ORDER BY e.id DESC 
-                    LIMIT 1
+                // Calculate cumulative grand total marks obtained and max marks across ALL examinations in this Academic Year
+                $stmtCumCalc = $pdo->prepare("
+                    SELECT 
+                        s.id AS student_id,
+                        s.name AS student_name,
+                        s.photo_path AS student_photo,
+                        s.roll_no AS roll_number,
+                        SUM(CASE WHEN em.is_absent = 0 AND em.marks_obtained IS NOT NULL THEN em.marks_obtained ELSE 0 END) AS cumulative_obtained,
+                        SUM(CASE WHEN em.marks_obtained IS NOT NULL OR em.is_absent = 1 THEN ep.max_marks ELSE 0 END) AS cumulative_max
+                    FROM students s
+                    INNER JOIN examination_marks em ON s.id = em.student_id
+                    INNER JOIN examination_papers ep ON em.paper_id = ep.id
+                    INNER JOIN examinations e ON em.exam_id = e.id
+                    WHERE e.school_id = :sid 
+                      AND e.academic_year_id = :ayid 
+                      AND s.class_id = :cid
+                    GROUP BY s.id
+                    HAVING cumulative_max > 0
                 ");
-                $stmtExam->execute([':cid' => $classId, ':sid' => $schoolId]);
-                $exam = $stmtExam->fetch(PDO::FETCH_ASSOC);
+                $stmtCumCalc->execute([':sid' => $schoolId, ':ayid' => $academicYearId, ':cid' => $classId]);
+                $cumRows = $stmtCumCalc->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-                if ($exam) {
-                    $examId = (int)$exam['id'];
-                    $examName = $exam['name'];
+                if (!empty($cumRows)) {
+                    $roster = [];
+                    foreach ($cumRows as $r) {
+                        $totMax = (float)$r['cumulative_max'];
+                        $totObt = (float)$r['cumulative_obtained'];
+                        $pct = $totMax > 0 ? round(($totObt / $totMax) * 100, 2) : 0.00;
+                        $roster[] = array_merge($r, [
+                            'percentage' => $pct,
+                            'total_obtained' => $totObt,
+                            'total_max' => $totMax
+                        ]);
+                    }
 
-                    try {
-                        $dummyUser = ['id' => 1, 'role' => 'SCHOOL_ADMIN', 'school_id' => $schoolId];
-                        $reportCards = $this->getReportCards($dummyUser, $examId, $classId);
+                    usort($roster, function($a, $b) {
+                        return (float)($b['percentage'] ?? 0) <=> (float)($a['percentage'] ?? 0);
+                    });
 
-                        if (!empty($reportCards) && is_array($reportCards)) {
-                            // Filter valid report cards and sort by percentage DESC
-                            usort($reportCards, function($a, $b) {
-                                return (float)($b['percentage'] ?? 0) <=> (float)($a['percentage'] ?? 0);
-                            });
+                    $top3 = array_slice($roster, 0, 3);
+                    foreach ($top3 as $idx => $rc) {
+                        $rank = $idx + 1;
+                        $stuId = (int)$rc['student_id'];
+                        $pct = (float)$rc['percentage'];
 
-                            $top3 = array_slice($reportCards, 0, 3);
-                            foreach ($top3 as $idx => $rc) {
-                                $rank = $idx + 1;
-                                $stuId = (int)$rc['student_id'];
-                                $pct = (float)($rc['percentage'] ?? 0.0);
+                        $stmtInsAcad->execute([
+                            ':sid' => $schoolId,
+                            ':ay_id' => $academicYearId,
+                            ':class_id' => $classId,
+                            ':stu_id' => $stuId,
+                            ':stu_name' => $rc['student_name'],
+                            ':stu_photo' => $rc['student_photo'] ?: null,
+                            ':cls_name' => $className,
+                            ':roll' => $rc['roll_number'] ?? '',
+                            ':score' => $pct,
+                            ':rank' => $rank,
+                            ':meta' => json_encode([
+                                'exam_name' => 'Overall Academic Performance',
+                                'total_obtained' => $rc['total_obtained'],
+                                'total_max' => $rc['total_max'],
+                                'percentage' => $pct,
+                                'result' => 'PASS'
+                            ])
+                        ]);
 
-                                // Fetch photo
-                                $stmtSt = $pdo->prepare("SELECT photo_path FROM students WHERE id = :sid LIMIT 1");
-                                $stmtSt->execute([':sid' => $stuId]);
-                                $photoPath = $stmtSt->fetchColumn() ?: null;
-
-                                $stmtInsAcad->execute([
-                                    ':sid' => $schoolId,
-                                    ':ay_id' => $academicYearId,
-                                    ':class_id' => $classId,
-                                    ':stu_id' => $stuId,
-                                    ':stu_name' => $rc['student_name'],
-                                    ':stu_photo' => $photoPath,
-                                    ':cls_name' => $className,
-                                    ':roll' => $rc['roll_no'] ?? '',
-                                    ':score' => $pct,
-                                    ':rank' => $rank,
-                                    ':meta' => json_encode([
-                                        'exam_id' => $examId,
-                                        'exam_name' => $examName,
-                                        'total_obtained' => $rc['total_obtained'] ?? 0,
-                                        'total_max' => $rc['total_max'] ?? 0,
-                                        'percentage' => $pct,
-                                        'result' => $rc['result'] ?? 'PASS'
-                                    ])
-                                ]);
-
-                                $this->notifyAchievementGenerated($pdo, $schoolId, $stuId, $rc['student_name'], 'Academic Excellence Topper!', "Congratulations! You secured Rank #{$rank} in Class {$className} Final Examination. Your achievement certificate is now available.");
-                            }
-                        }
-                    } catch (\Exception $ex) {
-                        // Ignore individual class calculation failures
+                        $this->notifyAchievementGenerated($pdo, $schoolId, $stuId, $rc['student_name'], 'Academic Excellence Topper!', "Congratulations! You secured Rank #{$rank} in Class {$className} Academic Performance. Your achievement certificate is now available.");
                     }
                 }
             }
@@ -5139,23 +5205,42 @@ class SchoolAdminService extends BaseService
         // Security / Authorization check
         if (!in_array($role, ['SUPER_ADMIN', 'SUPERADMIN', 'SCHOOL_ADMIN', 'SCHOOLADMIN', 'TEACHER'])) {
             $isAuthorized = false;
+            $userPhone = (string)($user['phone'] ?? '');
+            $userEmail = (string)($user['email'] ?? '');
 
             // Fetch student info
-            $stmtStu = $pdo->prepare("SELECT id, student_mobile, parent_phone, phone FROM students WHERE id = :sid LIMIT 1");
+            $stmtStu = $pdo->prepare("SELECT id, student_mobile, parent_phone FROM students WHERE id = :sid LIMIT 1");
             $stmtStu->execute([':sid' => $targetStudentId]);
             $stu = $stmtStu->fetch(PDO::FETCH_ASSOC);
 
             if ($stu) {
-                $userPhone = (string)($user['phone'] ?? '');
+                if ($role === 'STUDENT' || $role === 'PARENT') {
+                    if ($userPhone !== '' && ($userPhone === (string)$stu['student_mobile'] || $userPhone === (string)$stu['parent_phone'])) {
+                        $isAuthorized = true;
+                    }
+                }
+            }
 
-                if ($role === 'STUDENT') {
-                    if ($userPhone !== '' && ($userPhone === (string)$stu['student_mobile'] || $userPhone === (string)$stu['phone'])) {
-                        $isAuthorized = true;
-                    }
-                } else if ($role === 'PARENT') {
-                    if ($userPhone !== '' && $userPhone === (string)$stu['parent_phone']) {
-                        $isAuthorized = true;
-                    }
+            if (!$isAuthorized && isset($achievement['class_id'])) {
+                // Check if user belongs to the same class as the achievement
+                $stmtClassCheck = $pdo->prepare("
+                    SELECT COUNT(*) FROM students 
+                    WHERE school_id = :sid 
+                      AND class_id = :cid 
+                      AND (LOWER(email) = LOWER(:em1) OR LOWER(student_email) = LOWER(:em2) OR student_mobile = :ph1 OR parent_phone = :ph2 OR father_phone = :ph3 OR guardian_phone = :ph4)
+                ");
+                $stmtClassCheck->execute([
+                    ':sid' => $schoolId,
+                    ':cid' => (int)$achievement['class_id'],
+                    ':em1' => $userEmail,
+                    ':em2' => $userEmail,
+                    ':ph1' => $userPhone,
+                    ':ph2' => $userPhone,
+                    ':ph3' => $userPhone,
+                    ':ph4' => $userPhone
+                ]);
+                if ((int)$stmtClassCheck->fetchColumn() > 0) {
+                    $isAuthorized = true;
                 }
             }
 
@@ -5167,6 +5252,17 @@ class SchoolAdminService extends BaseService
         $meta = !empty($achievement['metadata']) ? json_decode($achievement['metadata'], true) : [];
         $examId = isset($meta['exam_id']) ? (int)$meta['exam_id'] : null;
         $classId = (int)$achievement['class_id'];
+
+        if (!$examId) {
+            $stmtEx = $pdo->prepare("
+                SELECT e.id FROM examinations e 
+                JOIN examination_papers ep ON ep.exam_id = e.id 
+                WHERE ep.class_id = :cid AND e.school_id = :sid 
+                ORDER BY e.id DESC LIMIT 1
+            ");
+            $stmtEx->execute([':cid' => $classId, ':sid' => $schoolId]);
+            $examId = (int)$stmtEx->fetchColumn();
+        }
 
         if (!$examId || !$classId) {
             throw new ValidationException(['report_card' => 'Report card is not available for this achievement.']);

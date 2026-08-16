@@ -56,9 +56,9 @@ class NotificationHelper {
             // Handle file download notification click
             if (notif['type'] == 'download_complete') {
               if (_lastDownloadedBytes != null && _lastDownloadedFileName != null) {
-                await Printing.sharePdf(
-                  bytes: _lastDownloadedBytes!,
-                  filename: _lastDownloadedFileName!,
+                await Printing.layoutPdf(
+                  onLayout: (format) async => _lastDownloadedBytes!,
+                  name: _lastDownloadedFileName!,
                 );
               }
               return;
