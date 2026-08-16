@@ -25,6 +25,7 @@ import com.shikshapilot.nativeapp.data.remote.RetrofitClient
 import com.shikshapilot.nativeapp.data.repository.UserRepository
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminAcademicSetupScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminAdditionalFeesScreen
+import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminAchievementsScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminAnnouncementsScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminAttendanceScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminClassesScreen
@@ -563,6 +564,12 @@ class MainActivity : ComponentActivity() {
                                         schoolName = schoolName,
                                         onBack = { goBack() },
                                         onNavigate = navigateTo
+                                    )
+                                }
+                                "school_achievements" -> {
+                                    SchoolAdminAchievementsScreen(
+                                        schoolName = schoolName,
+                                        onBack = { goBack() }
                                     )
                                 }
                                 "classes", "sections" -> {

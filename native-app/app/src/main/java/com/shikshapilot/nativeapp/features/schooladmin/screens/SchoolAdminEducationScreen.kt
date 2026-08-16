@@ -26,7 +26,9 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Class
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.EventSeat
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
@@ -70,6 +72,13 @@ fun SchoolAdminEducationScreen(
     onNavigate: (String) -> Unit = {}
 ) {
     val modules = listOf(
+        EducationModule(
+            id = "staff",
+            title = "Teachers",
+            subtitle = "Manage teaching & non-teaching staff records",
+            icon = Icons.Default.Person,
+            iconColor = SunsetOrange
+        ),
         EducationModule(
             id = "classes",
             title = "Classes & Sections",
@@ -117,6 +126,13 @@ fun SchoolAdminEducationScreen(
             title = "Academic Setup",
             subtitle = "Academic years, subjects & grading configuration",
             icon = Icons.Default.School,
+            iconColor = WarningYellow
+        ),
+        EducationModule(
+            id = "school_achievements",
+            title = "Hall of Fame & Achievements",
+            subtitle = "Attendance Champions & Academic Excellence leaderboards",
+            icon = Icons.Default.EmojiEvents,
             iconColor = WarningYellow
         )
     )
