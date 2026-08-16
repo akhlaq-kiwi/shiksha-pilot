@@ -1720,6 +1720,43 @@ export default function ExamsPage() {
         compileFinalSessionReportCardData(cardsArray, weightagePolicy, schoolProfile, currentAcademicYear)
       ).filter(Boolean);
 
+      // Sort session cards by Percentage DESC (highest cumulative percentage first)
+      sessionCards.sort((a, b) => {
+        const pctA = parseFloat(a.summary?.percentage || 0);
+        const pctB = parseFloat(b.summary?.percentage || 0);
+        if (Math.abs(pctB - pctA) > 0.001) {
+          return pctB - pctA;
+        }
+        const attA = parseFloat(a.summary?.attendance?.attendance_rate || 0);
+        const attB = parseFloat(b.summary?.attendance?.attendance_rate || 0);
+        if (Math.abs(attB - attA) > 0.001) {
+          return attB - attA;
+        }
+        return (a.student?.name || '').localeCompare(b.student?.name || '');
+      });
+
+      // Reassign sequential ranks 1, 2, 3... matching cumulative performance
+      const totalClassStudents = sessionCards.length;
+      let currentRank = 1;
+      let prevPct = null;
+      let prevAtt = null;
+
+      sessionCards.forEach((card, idx) => {
+        const curPct = parseFloat(card.summary?.percentage || 0);
+        const curAtt = parseFloat(card.summary?.attendance?.attendance_rate || 0);
+
+        if (prevPct !== null) {
+          const isTie = Math.abs(curPct - prevPct) < 0.001 && Math.abs(curAtt - prevAtt) < 0.001;
+          if (!isTie) {
+            currentRank = idx + 1;
+          }
+        }
+        card.summary.class_rank = `${currentRank} of ${totalClassStudents}`;
+        card.summary.section_rank = `${currentRank} of ${totalClassStudents}`;
+        prevPct = curPct;
+        prevAtt = curAtt;
+      });
+
       setFinalSessionReportCards(sessionCards);
       setActiveView('final_reports');
     } catch (err) {

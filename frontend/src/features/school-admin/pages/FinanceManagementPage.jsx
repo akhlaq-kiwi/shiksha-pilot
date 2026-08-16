@@ -405,17 +405,16 @@ export default function FinanceManagementPage() {
   };
 
   const handleSaveAllFinanceConfig = async () => {
-    if (!lppPercentage) {
-      setError('Penalty percentage is required.');
-      return;
-    }
-    const pct = parseFloat(lppPercentage);
-    if (isNaN(pct) || pct <= 0 || pct > 100) {
-      setError('Penalty percentage must be between 0.01 and 100.');
-      return;
+    let pct = null;
+    if (lppPercentage && String(lppPercentage).trim() !== '') {
+      pct = parseFloat(lppPercentage);
+      if (isNaN(pct) || pct <= 0 || pct > 100) {
+        setError('Penalty percentage must be between 0.01 and 100.');
+        return;
+      }
     }
     const limit = parseFloat(maxAllowedDue);
-    if (isNaN(limit) || limit < 0) {
+    if (enableDueRestriction && (isNaN(limit) || limit < 0)) {
       setError('Maximum allowed due amount must be a positive number.');
       return;
     }
@@ -423,22 +422,29 @@ export default function FinanceManagementPage() {
     setSuccess('');
     setLppApplying(true);
     try {
-      await Promise.all([
-        schoolService.saveLatePaymentPenaltyConfig({
-          percentage: pct,
-          description: lppDescription,
-          status: lppStatus
-        }),
+      const promises = [
         schoolService.saveFinanceSettings({
           enable_due_restriction: enableDueRestriction ? 1 : 0,
-          max_allowed_due: limit,
+          max_allowed_due: isNaN(limit) ? 0 : limit,
           restrict_admit_card: restrictAdmitCard ? 1 : 0,
           restrict_exam_result: restrictExamResult ? 1 : 0
         })
-      ]);
+      ];
+      if (pct !== null) {
+        promises.push(
+          schoolService.saveLatePaymentPenaltyConfig({
+            percentage: pct,
+            description: lppDescription,
+            status: lppStatus
+          })
+        );
+      }
+      await Promise.all(promises);
       setSuccess('Configurations saved successfully.');
-      setIsLppConfigSaved(true);
-      loadLppConfig();
+      if (pct !== null) {
+        setIsLppConfigSaved(true);
+        loadLppConfig();
+      }
       loadFinanceSettings();
     } catch (err) {
       console.error(err);
@@ -466,6 +472,10 @@ export default function FinanceManagementPage() {
     const currentSess = lppStats.current_academic_session || currentYear?.name || '';
     setLppDescription(currentSess ? `Late Payment Penalty ${currentSess}` : 'Late Payment Penalty');
     setLppStatus('Active');
+    setEnableDueRestriction(false);
+    setMaxAllowedDue('0');
+    setRestrictAdmitCard(true);
+    setRestrictExamResult(true);
     setError('');
     setSuccess('');
   };
@@ -1902,7 +1912,7 @@ export default function FinanceManagementPage() {
                 {!isLppConfigSaved ? (
                   <Button 
                     onClick={handleSaveAllFinanceConfig} 
-                    disabled={isReadOnly || lppApplying || !lppPercentage}
+                    disabled={isReadOnly || lppApplying}
                     className="font-bold uppercase tracking-wider text-xs px-6 py-2.5 bg-primary hover:bg-primary/95 text-white shadow-2xs"
                   >
                     {lppApplying ? 'Saving...' : 'Save Configuration'}

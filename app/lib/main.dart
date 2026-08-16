@@ -22,7 +22,7 @@ void callbackDispatcher() {
           final prefs = await SharedPreferences.getInstance();
           final token = prefs.getString('auth_token') ?? '';
           final userRole = prefs.getString('user_role') ?? '';
-          final baseUrl = prefs.getString('base_url') ?? 'https://app.shikshapilot.com';
+          final baseUrl = prefs.getString('base_url') ?? 'http://10.174.49.71:8000';
           if (token.isEmpty || userRole.isEmpty) return true;
 
           final roleUpper = userRole.toUpperCase();
@@ -154,7 +154,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
 
-  final String _baseUrl = 'http://10.55.253.71:8000';
+  final String _baseUrl = 'http://10.174.49.71:8000';
 
   @override
   void initState() {
@@ -187,7 +187,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
     final role = prefs.getString('user_role');
-    final baseUrl = prefs.getString('base_url') ?? 'https://app.shikshapilot.com';
+    final baseUrl = prefs.getString('base_url') ?? 'http://10.174.49.71:8000';
     await prefs.setString('base_url', baseUrl);
 
     if (token != null && role != null) {
@@ -199,16 +199,18 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         try {
           final children = await leaveService.getChildren();
           if (children.isNotEmpty) {
+            // children[0] is guaranteed to be the active academic year student record by server ordering
             int activeStudentId = children[0]['id'] is int 
                 ? children[0]['id'] 
                 : int.parse(children[0]['id'].toString());
 
-            if (savedStudentId != null) {
+            if (roleUpper == 'PARENT' && savedStudentId != null) {
               for (final child in children) {
                 final cId = child['id'] is int 
                     ? child['id'] 
                     : int.parse(child['id'].toString());
-                if (cId == savedStudentId) {
+                final isCurrent = child['is_current_academic_year'] == 1 || child['is_current_academic_year'] == true || child['is_current_academic_year'] == '1';
+                if (cId == savedStudentId && isCurrent) {
                   activeStudentId = cId;
                   break;
                 }
@@ -334,7 +336,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _serverUrlController = TextEditingController(text: 'https://app.shikshapilot.com');
+  final _serverUrlController = TextEditingController(text: 'http://10.174.49.71:8000');
   
   bool _obscurePassword = true;
   bool _isLoading = false;
@@ -356,17 +358,17 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _loadServerUrl() async {
     final prefs = await SharedPreferences.getInstance();
     final savedUrl = prefs.getString('base_url');
-    if (savedUrl != null && savedUrl.isNotEmpty && savedUrl != 'https://qa.shikshapilot.com') {
+    if (savedUrl != null && savedUrl.isNotEmpty && savedUrl != 'https://qa.shikshapilot.com' && savedUrl != 'https://app.shikshapilot.com') {
       if (mounted) {
         setState(() {
           _serverUrlController.text = savedUrl;
         });
       }
     } else {
-      await prefs.setString('base_url', 'https://app.shikshapilot.com');
+      await prefs.setString('base_url', 'http://10.174.49.71:8000');
       if (mounted) {
         setState(() {
-          _serverUrlController.text = 'https://app.shikshapilot.com';
+          _serverUrlController.text = 'http://10.174.49.71:8000';
         });
       }
     }

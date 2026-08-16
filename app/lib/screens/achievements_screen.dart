@@ -45,20 +45,22 @@ class _AchievementsScreenState extends State<AchievementsScreen> with SingleTick
   String? _expandedClassKey;
 
   String get _selectedYearName {
-    if (_selectedYearId != null) {
+    String val = '2026-2027';
+    if (_data['academic_year_name'] != null && _data['academic_year_name'].toString().isNotEmpty) {
+      val = _data['academic_year_name'].toString();
+    } else if (_selectedYearId != null) {
       final found = _academicYears.firstWhere(
         (y) => y['id'].toString() == _selectedYearId,
         orElse: () => null,
       );
       if (found != null) {
-        return (found['name'] ?? found['academic_year_name'] ?? _selectedYearId).toString();
+        val = (found['name'] ?? found['academic_year_name'] ?? _selectedYearId).toString();
       }
-    }
-    if (_academicYears.isNotEmpty) {
+    } else if (_academicYears.isNotEmpty) {
       final first = _academicYears.first;
-      return (first['name'] ?? first['academic_year_name'] ?? '').toString();
+      val = (first['name'] ?? first['academic_year_name'] ?? '').toString();
     }
-    return '2026–2027';
+    return val.replaceAll(RegExp(r'[\u2010-\u2015\u2212–—]'), '-');
   }
 
   String _formatClassName(dynamic raw) {
@@ -178,7 +180,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> with SingleTick
   }
 
   List<dynamic> _filterCategory(String category) {
-    return _achievements.filter((item) {
+    return _achievements.where((item) {
       final cat = item['category'] ?? item['feature_type'];
       if (category == 'attendance' && cat != 'attendance_champions' && cat != 'attendance_leaderboard') {
         return false;
@@ -246,7 +248,8 @@ class _AchievementsScreenState extends State<AchievementsScreen> with SingleTick
     final rollNumber = item['roll_number']?.toString();
     final score = (item['achievement_score'] ?? '').toString();
     final schoolName = (_data['school_name'] ?? 'Jamiya Sams Academy').toString();
-    final sessionName = (_data['academic_year_name'] ?? '2026–2027').toString();
+    final rawSession = (_data['academic_year_name'] ?? _selectedYearName ?? '2026-2027').toString();
+    final sessionName = rawSession.replaceAll(RegExp(r'[\u2010-\u2015\u2212–—]'), '-');
 
     final initials = studentName.isNotEmpty
         ? studentName.trim().split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join('').toUpperCase()
@@ -527,7 +530,10 @@ class _AchievementsScreenState extends State<AchievementsScreen> with SingleTick
               label: 'OPEN',
               textColor: Colors.amber.shade300,
               onPressed: () async {
-                await Printing.sharePdf(bytes: pdfBytes, filename: filename);
+                await Printing.layoutPdf(
+                  onLayout: (format) async => pdfBytes,
+                  name: filename,
+                );
               },
             ),
             backgroundColor: const Color(0xFF059669),
@@ -642,7 +648,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> with SingleTick
 
                     // Session
                     Text(
-                      'Academic Session: ${_data['academic_year_name'] ?? '2026–2027'}',
+                      'Academic Session: $_selectedYearName',
                       style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey.shade500),
                     ),
                     const SizedBox(height: 8),
@@ -770,23 +776,9 @@ class _AchievementsScreenState extends State<AchievementsScreen> with SingleTick
                     // Signatures
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(width: 80, height: 1, color: Colors.grey.shade400),
-                            const SizedBox(height: 4),
-                            const Text('Teacher Sign', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87)),
-                          ],
-                        ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Container(width: 80, height: 1, color: Colors.grey.shade400),
-                            const SizedBox(height: 4),
-                            const Text('Principal Sign', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87)),
-                          ],
-                        ),
+                      children: const [
+                        Text('Teacher Sign', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87)),
+                        Text('Principal Sign', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87)),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -1016,48 +1008,45 @@ class _AchievementsScreenState extends State<AchievementsScreen> with SingleTick
       ),
       body: Column(
         children: [
-          // Filter Bar
+          // Academic Year Session Banner (Center Aligned & Dynamic)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            color: Colors.amber.shade50,
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            color: const Color(0xFFFFF8E1),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: 'Search by student name or class...',
-                      hintStyle: const TextStyle(fontSize: 12),
-                      prefixIcon: const Icon(Icons.search, size: 18),
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                      fillColor: Colors.white,
-                      filled: true,
-                    ),
-                  ),
-                ),
+                const Icon(Icons.emoji_events_outlined, size: 20, color: Color(0xFFFF8F00)),
                 const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.refresh, color: Colors.amber),
-                  onPressed: _fetchAchievements,
+                Text(
+                  'Achievements for AY $_selectedYearName',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 14,
+                    color: Color(0xFFE65100),
+                  ),
                 ),
               ],
             ),
           ),
 
-          // Content Tabs
+          // Content Tabs with Pull-to-Refresh
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _errorText.isNotEmpty
                     ? Center(child: Text(_errorText, style: const TextStyle(color: Colors.red)))
-                    : TabBarView(
-                        controller: _tabController,
-                        children: [
-                          _buildGrid(attItems, false),
-                          _buildGrid(acadItems, true),
-                        ],
+                    : RefreshIndicator(
+                        onRefresh: _fetchAchievements,
+                        color: Colors.amber.shade800,
+                        child: TabBarView(
+                          controller: _tabController,
+                          children: [
+                            _buildGrid(attItems, false),
+                            _buildGrid(acadItems, true),
+                          ],
+                        ),
                       ),
           ),
         ],
@@ -1070,84 +1059,72 @@ class _AchievementsScreenState extends State<AchievementsScreen> with SingleTick
     final schoolOverallList = _getSchoolOverallAchievements(items);
 
     if (groupedClasses.isEmpty && schoolOverallList.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
-            Icon(Icons.emoji_events_outlined, size: 48, color: Colors.grey),
-            SizedBox(height: 8),
-            Text('No achievements found', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
-          ],
-        ),
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: const [
+          SizedBox(height: 120),
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.emoji_events_outlined, size: 48, color: Colors.grey),
+                SizedBox(height: 8),
+                Text('No achievements found', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+        ],
       );
     }
 
     final classNames = groupedClasses.keys.toList()..sort();
 
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(12),
       children: [
-        // Class Listing Cards
+        // Direct Achievement Certificate Cards per Class (No dropdown / expandable card)
         ...classNames.map((cName) {
-          final toppers = groupedClasses[cName]!;
-          final isExpanded = _searchQuery.isNotEmpty || (_expandedClassKey == cName);
+          final toppers = List<Map<String, dynamic>>.from(groupedClasses[cName]!)
+            ..sort((a, b) => (int.tryParse(a['rank']?.toString() ?? '0') ?? 0)
+                .compareTo(int.tryParse(b['rank']?.toString() ?? '0') ?? 0));
 
-          return Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: Colors.amber.shade400, width: 1.5),
-            ),
-            elevation: 2,
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              children: [
-                // Class Card Header
-                ListTile(
-                  tileColor: Colors.amber.shade50.withOpacity(0.7),
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.amber.shade100,
-                      shape: BoxShape.circle,
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Class Section Label
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        cName.toUpperCase(),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                          color: Colors.amber.shade900,
+                        ),
+                      ),
                     ),
-                    child: Icon(Icons.school_rounded, color: Colors.amber.shade900, size: 20),
-                  ),
-                  title: Text(
-                    cName,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87),
-                  ),
-                  subtitle: Text(
-                    '${toppers.length} Top Achievers (Rank 1 - Rank ${toppers.length})',
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade700, fontWeight: FontWeight.w600),
-                  ),
-                  trailing: Icon(
-                    isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                    color: Colors.amber.shade900,
-                  ),
-                  onTap: () {
-                    setState(() {
-                      if (_expandedClassKey == cName) {
-                        _expandedClassKey = null;
-                      } else {
-                        _expandedClassKey = cName;
-                      }
-                    });
-                  },
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Top Achievers',
+                      style: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold),
+                    ),
+                  ],
                 ),
+              ),
 
-                // Expanded Toppers List (Rank 1 at top -> Rank 2 in middle -> Rank 3 at bottom)
-                if (isExpanded) ...[
-                  const Divider(height: 1),
-                  Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: Column(
-                      children: toppers.map((topper) => _buildTopperItemCard(topper, isAcademic)).toList(),
-                    ),
-                  ),
-                ],
-              ],
-            ),
+              // Direct Achievement Cards
+              ...toppers.map((topper) => _buildTopperItemCard(topper, isAcademic)),
+              const SizedBox(height: 12),
+            ],
           );
         }),
       ],
@@ -1219,21 +1196,6 @@ class _AchievementsScreenState extends State<AchievementsScreen> with SingleTick
                     ),
                   ),
                 ),
-                if (isAcademic) ...[
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () => _fetchAndShowReportCard(item),
-                      icon: const Icon(Icons.assessment_rounded, size: 16),
-                      label: const Text('Report Card', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.amber.shade800,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                    ),
-                  ),
-                ],
               ],
             ),
           ],

@@ -62,7 +62,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (role == 'PARENT' || role == 'STUDENT') {
       await _fetchChildrenList();
     }
-    await _fetchAcademicYears();
+    if (role == 'SCHOOL_ADMIN' || role == 'SUPER_ADMIN' || role == 'PRINCIPAL') {
+      await _fetchAcademicYears();
+    }
   }
 
   Future<void> _fetchAcademicYears() async {
@@ -460,39 +462,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         scrolledUnderElevation: 0,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: Center(
-              child: Container(
-                height: 34,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                decoration: BoxDecoration(
-                  color: Colors.indigo.shade50,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.indigo.shade200, width: 1),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.calendar_month_rounded, size: 16, color: Colors.indigo.shade700),
-                    const SizedBox(width: 6),
-                    Text(
-                      _selectedAcademicYearName.isNotEmpty
-                          ? _selectedAcademicYearName
-                          : 'Active Session',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.indigo.shade900,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
