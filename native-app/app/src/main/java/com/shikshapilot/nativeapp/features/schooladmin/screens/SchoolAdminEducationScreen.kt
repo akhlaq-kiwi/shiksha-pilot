@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.ArrowBackIos
+import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Class
@@ -134,6 +135,13 @@ fun SchoolAdminEducationScreen(
             subtitle = "Attendance Champions & Academic Excellence leaderboards",
             icon = Icons.Default.EmojiEvents,
             iconColor = WarningYellow
+        ),
+        EducationModule(
+            id = "assign_user_role",
+            title = "Assign User Role",
+            subtitle = "Teacher menu permissions & class teacher assignment",
+            icon = Icons.Default.Badge,
+            iconColor = InfoBlue
         )
     )
 

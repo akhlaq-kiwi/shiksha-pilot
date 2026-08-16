@@ -27,6 +27,7 @@ import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminAcadem
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminAdditionalFeesScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminAchievementsScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminAnnouncementsScreen
+import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminUserRoleScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminAttendanceScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminClassesScreen
 import com.shikshapilot.nativeapp.features.schooladmin.screens.SchoolAdminEducationScreen
@@ -568,6 +569,12 @@ class MainActivity : ComponentActivity() {
                                 }
                                 "school_achievements" -> {
                                     SchoolAdminAchievementsScreen(
+                                        schoolName = schoolName,
+                                        onBack = { goBack() }
+                                    )
+                                }
+                                "assign_user_role" -> {
+                                    SchoolAdminUserRoleScreen(
                                         schoolName = schoolName,
                                         onBack = { goBack() }
                                     )

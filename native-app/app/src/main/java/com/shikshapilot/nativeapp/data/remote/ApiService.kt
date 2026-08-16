@@ -2853,4 +2853,96 @@ interface ApiService {
         @Body request: CreateStudentRequestDto,
         @Header("Authorization") authHeader: String? = null
     ): Response<JsonElement>
+
+    // --- Assign User Role (SchoolAdminService::getMenuPermissions/saveMenuPermissions,
+    // getClassTeacherAssignments/saveClassTeacherAssignments) ---
+    @GET("api/school/menu-permissions")
+    suspend fun getMenuPermissions(
+        @Header("Authorization") authHeader: String? = null
+    ): Response<MenuPermissionsResponseDto>
+
+    @POST("api/school/menu-permissions")
+    suspend fun saveMenuPermissions(
+        @Body request: SaveMenuPermissionsRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
+
+    @GET("api/school/class-teacher-assignments")
+    suspend fun getClassTeacherAssignments(
+        @Header("Authorization") authHeader: String? = null
+    ): Response<ClassTeacherAssignmentsResponseDto>
+
+    @POST("api/school/class-teacher-assignments")
+    suspend fun saveClassTeacherAssignments(
+        @Body request: SaveClassTeacherAssignmentsRequestDto,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<JsonElement>
 }
+
+// GET/POST api/school/menu-permissions — the fixed set of togglable menu labels matches the
+// web's "Menus Access" grid exactly (verified live against the running web app).
+val TEACHER_MENU_OPTIONS = listOf(
+    "Dashboard", "Classes", "Teachers", "Attendance", "Leave Requests", "Examinations",
+    "Fees Portal", "Financial Reports", "Finance Management", "Fee Follow-up", "Timetable", "Audits & Settings"
+)
+
+data class TeacherPermissionItemDto(
+    val id: Int,
+    val name: String,
+    val employee_id: String? = null,
+    val phone: String? = null,
+    val role: String? = null,
+    val department: String? = null,
+    val status: String? = null,
+    val menus: List<String> = emptyList()
+)
+
+data class MenuPermissionsResponseDto(
+    val status: String? = "success",
+    val data: MenuPermissionsDataDto = MenuPermissionsDataDto()
+)
+
+data class MenuPermissionsDataDto(
+    val teachers: List<TeacherPermissionItemDto> = emptyList()
+)
+
+data class SaveMenuPermissionsRequestDto(
+    val teacher_id: Int,
+    val menus: List<String>
+)
+
+data class ClassTeacherAssignmentItemDto(
+    val id: Int,
+    val name: String,
+    val section: String? = null,
+    val stream: String? = null,
+    val assigned_teacher_id: Int? = null,
+    val assigned_teacher_name: String? = null
+)
+
+data class AssignableTeacherDto(
+    val id: Int,
+    val name: String,
+    val phone: String? = null,
+    val employee_id: String? = null,
+    val department: String? = null
+)
+
+data class ClassTeacherAssignmentsResponseDto(
+    val status: String? = "success",
+    val data: ClassTeacherAssignmentsDataDto = ClassTeacherAssignmentsDataDto()
+)
+
+data class ClassTeacherAssignmentsDataDto(
+    val classes: List<ClassTeacherAssignmentItemDto> = emptyList(),
+    val teachers: List<AssignableTeacherDto> = emptyList()
+)
+
+data class ClassTeacherAssignmentPairDto(
+    val class_id: Int,
+    val teacher_id: Int
+)
+
+data class SaveClassTeacherAssignmentsRequestDto(
+    val assignments: List<ClassTeacherAssignmentPairDto>
+)
