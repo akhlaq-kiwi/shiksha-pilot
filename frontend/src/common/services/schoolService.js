@@ -33,7 +33,13 @@ export const schoolService = {
     return apiClient.post(`/api/school/students/${id}/advance`, { class_id: classId });
   },
 
-  uploadDocument(formData) {
+  // `category` decides which folder the file lands in on the storage backend
+  // (student-photos, staff-photos, student-documents, staff-documents,
+  // finance). Omit it and the file goes to the generic documents folder.
+  uploadDocument(formData, category = '') {
+    if (category && !formData.has('category')) {
+      formData.append('category', category);
+    }
     return apiClient.post('/api/school/upload', formData);
   },
 

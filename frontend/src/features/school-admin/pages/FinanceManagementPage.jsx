@@ -902,7 +902,7 @@ export default function FinanceManagementPage() {
     try {
       const formData = new FormData();
       formData.append('document', file);
-      const res = await schoolService.uploadDocument(formData);
+      const res = await schoolService.uploadDocument(formData, 'finance');
       if (res && res.data && res.data.url) {
         setExpenseBillPath(res.data.url);
       } else if (res && res.url) {

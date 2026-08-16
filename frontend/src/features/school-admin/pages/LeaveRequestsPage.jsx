@@ -13,6 +13,7 @@ import { DropdownMenu, DropdownItem } from '../../../common/ui/DropdownMenu';
 import { useToast } from '../../../common/components/Toast';
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 import PageTitle from '../../../common/components/PageTitle';
+import { resolveFileUrl } from '../../../common/utils/fileUrl';
 
 export default function LeaveRequestsPage() {
   const toast = useToast();
@@ -970,7 +971,7 @@ export default function LeaveRequestsPage() {
               <div>
                 <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider block mb-1">Attachment</span>
                 <a 
-                  href={`http://localhost:8000${selectedLeave.attachment_path}`} 
+                  href={resolveFileUrl(selectedLeave.attachment_path)} 
                   target="_blank" 
                   rel="noreferrer"
                   className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-xs font-bold text-text-primary border border-border"

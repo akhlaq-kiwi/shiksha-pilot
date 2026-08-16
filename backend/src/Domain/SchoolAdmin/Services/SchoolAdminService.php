@@ -15,6 +15,7 @@ use App\Shared\BaseService;
 use App\Shared\Exceptions\NotFoundException;
 use App\Shared\Exceptions\ValidationException;
 use App\Shared\Notifications\PushDispatcher;
+use App\Shared\Storage\StorageService;
 use PDO;
 use Psr\Log\LoggerInterface;
 
@@ -28,10 +29,14 @@ class SchoolAdminService extends BaseService
         private readonly ExamRepository       $examRepo,
         private readonly FeeRepository        $feeRepo,
         private readonly FinancialReportRepository $financialReportRepo,
+        ?StorageService $storage = null,
         ?LoggerInterface $logger = null,
     ) {
         parent::__construct($logger);
+        $this->storage = $storage ?? new StorageService();
     }
+
+    private readonly StorageService $storage;
 
     private function isDateHoliday(int $schoolId, string $date): bool
     {
@@ -2012,37 +2017,12 @@ class SchoolAdminService extends BaseService
     }
 
 
-    private function getUploadsDirectory(): string
+    /**
+     * Store an uploaded file and return its URL (absolute when the S3 driver is
+     * active, "/uploads/<category>/<file>" when running on local disk).
+     */
+    public function handleFileUpload($uploadedFile, string $category = StorageService::CATEGORY_DOCUMENTS): string
     {
-        $docRoot = $_SERVER['DOCUMENT_ROOT'] ?? '';
-        if (!empty($docRoot) && is_dir($docRoot)) {
-            $targetDir = rtrim($docRoot, '/\\') . '/uploads';
-            if (!is_dir($targetDir)) {
-                @mkdir($targetDir, 0777, true);
-            }
-            if (is_dir($targetDir) && is_writable($targetDir)) {
-                return $targetDir;
-            }
-        }
-
-        $baseDir = dirname(__DIR__, 4);
-        $altPublic = dirname(__DIR__, 5) . '/public/uploads';
-        if (is_dir($altPublic) && is_writable($altPublic)) {
-            return $altPublic;
-        }
-
-        $targetDir = $baseDir . '/public/uploads';
-        if (!is_dir($targetDir)) {
-            @mkdir($targetDir, 0777, true);
-        }
-
-        return $targetDir;
-    }
-
-    public function handleFileUpload($uploadedFile): string
-    {
-        $directory = $this->getUploadsDirectory();
-
         $extension = strtolower(pathinfo($uploadedFile->getClientFilename(), PATHINFO_EXTENSION));
         $videoExts = ['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv', 'wmv', '3gp', 'm4v', 'ts', 'ogv'];
         if (in_array($extension, $videoExts, true)) {
@@ -2053,10 +2033,7 @@ class SchoolAdminService extends BaseService
             throw new ValidationException(['file' => 'Video files are not allowed. Please upload an image or document file.']);
         }
 
-        $filename = sprintf('%s.%0.8s', bin2hex(random_bytes(8)), $extension);
-        $uploadedFile->moveTo($directory . DIRECTORY_SEPARATOR . $filename);
-        
-        return '/uploads/' . $filename;
+        return $this->storage->storeUploadedFile($uploadedFile, $category)['url'];
     }
 
     // -------------------------------------------------------------------------
@@ -7301,7 +7278,7 @@ class SchoolAdminService extends BaseService
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->classRepo->getPdo();
 
-        $logoPath = $this->handleFileUpload($uploadedFile);
+        $logoPath = $this->handleFileUpload($uploadedFile, StorageService::CATEGORY_LOGOS);
 
         $stmt = $pdo->prepare("UPDATE schools SET logo_path = :logo_path WHERE id = :id");
         $stmt->execute([
@@ -7330,7 +7307,7 @@ class SchoolAdminService extends BaseService
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->classRepo->getPdo();
 
-        $sigPath = $this->handleFileUpload($uploadedFile);
+        $sigPath = $this->handleFileUpload($uploadedFile, StorageService::CATEGORY_SIGNATURES);
         $this->processTransparentSignature($sigPath);
 
         $stmt = $pdo->prepare("UPDATE schools SET principal_signature_path = :path WHERE id = :id");
@@ -7355,22 +7332,14 @@ class SchoolAdminService extends BaseService
         return $this->getSchoolProfile($user);
     }
 
-    private function processTransparentSignature(string $relativeUploadPath): void
+    private function processTransparentSignature(string $storedPath): void
     {
         if (!function_exists('imagecreatefromstring')) {
             return;
         }
 
-        $directory = $this->getUploadsDirectory();
-
-        $filename = ltrim(str_replace('/uploads/', '', $relativeUploadPath), '/\\');
-        $filePath = $directory . DIRECTORY_SEPARATOR . $filename;
-
-        if (!file_exists($filePath)) {
-            return;
-        }
-
-        $content = @file_get_contents($filePath);
+        // Works for both drivers: reads back from S3 or from local disk.
+        $content = $this->storage->readContents($storedPath);
         if (!$content) return;
 
         $img = @imagecreatefromstring($content);
@@ -7436,14 +7405,27 @@ class SchoolAdminService extends BaseService
             imagesavealpha($cropped, true);
 
             imagecopyresampled($cropped, $transparent, 0, 0, $minX, $minY, $cropW, $cropH, $cropW, $cropH);
-            imagepng($cropped, $filePath);
+            $png = $this->capturePng($cropped);
             imagedestroy($cropped);
         } else {
-            imagepng($transparent, $filePath);
+            $png = $this->capturePng($transparent);
         }
 
         imagedestroy($img);
         imagedestroy($transparent);
+
+        if ($png !== '') {
+            $this->storage->replaceContents($storedPath, $png, 'image/png');
+        }
+    }
+
+    /** Render a GD image to PNG bytes without touching the filesystem. */
+    private function capturePng($image): string
+    {
+        ob_start();
+        imagepng($image);
+
+        return (string)ob_get_clean();
     }
 
     public function updateClass(array $user, array $data): array

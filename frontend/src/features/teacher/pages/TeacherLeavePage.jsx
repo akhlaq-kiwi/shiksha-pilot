@@ -10,6 +10,7 @@ import { Input } from '../../../common/ui/input';
 import { Select } from '../../../common/ui/select';
 import { Dialog } from '../../../common/ui/dialog';
 import { useToast } from '../../../common/components/Toast';
+import { resolveFileUrl } from '../../../common/utils/fileUrl';
 
 const LEAVE_TYPES = [
   'Sick Leave',
@@ -421,7 +422,7 @@ export default function TeacherLeavePage() {
                           <div className="flex items-center gap-1.5">
                             {lr.attachment_path && (
                               <a
-                                href={`http://localhost:8000${lr.attachment_path}`}
+                                href={resolveFileUrl(lr.attachment_path)}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="p-1.5 rounded-lg border border-border bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-text-secondary shrink-0 transition-colors flex items-center justify-center"

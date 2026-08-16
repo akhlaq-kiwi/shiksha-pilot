@@ -11,6 +11,7 @@ import { authService } from '../../../common/services/authService';
 import { schoolService } from '../../../common/services/schoolService';
 import { useToast } from '../../../common/components/Toast';
 import { apiClient } from '../../../common/services/apiClient';
+import { resolveFileUrl } from '../../../common/utils/fileUrl';
 
 export default function SettingsPage() {
   const toast = useToast();
@@ -66,7 +67,7 @@ export default function SettingsPage() {
             <div className="h-20 w-20 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-2xl border-2 border-primary/20 shadow-inner">
               {profileData?.photo_path ? (
                 <img 
-                  src={`http://localhost:8000${profileData.photo_path}`} 
+                  src={resolveFileUrl(profileData.photo_path)} 
                   alt={user?.name} 
                   className="w-full h-full object-cover rounded-full"
                   onError={(e) => { e.target.src = ''; e.target.style.display = 'none'; }}

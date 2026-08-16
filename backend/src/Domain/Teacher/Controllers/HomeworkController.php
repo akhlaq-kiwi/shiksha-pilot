@@ -100,15 +100,28 @@ class HomeworkController extends BaseController
             return $response->withStatus(400);
         }
 
+        // Reject traversal before touching the filesystem.
+        if (str_contains($filename, '..')) {
+            $response->getBody()->write('Invalid path');
+            return $response->withStatus(400);
+        }
+
         $baseNameOnly = basename($filename);
-        $dirs = [
+        $roots = [
             dirname(__DIR__, 4) . '/public/uploads',
             dirname(__DIR__, 5) . '/backend/public/uploads',
             dirname(__DIR__, 5) . '/public/uploads',
-            dirname(__DIR__, 4) . '/public/uploads/homework',
-            dirname(__DIR__, 5) . '/backend/public/uploads/homework',
-            dirname(__DIR__, 5) . '/public/uploads/homework',
         ];
+
+        // Legacy uploads sat flat in these roots; new local uploads live in a
+        // per-category subfolder. Check both.
+        $dirs = [];
+        foreach ($roots as $root) {
+            $dirs[] = $root;
+            foreach (['homework', 'documents', 'leave-attachments', 'school-logos', 'signatures'] as $category) {
+                $dirs[] = $root . '/' . $category;
+            }
+        }
 
         $filePath = null;
         foreach ($dirs as $dir) {

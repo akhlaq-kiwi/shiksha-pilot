@@ -56,6 +56,7 @@ use App\Domain\Student\Services\VocabularyService;
 use App\Domain\Student\Controllers\VocabularyController;
 
 // ── Shared: Push notifications ────────────────────────────────────────────────
+use App\Shared\Storage\StorageService;
 use App\Shared\Notifications\FcmClient;
 use App\Shared\Notifications\PushDispatcher;
 use App\Shared\Notifications\DeviceTokenService;
@@ -144,6 +145,9 @@ class App
             },
 
             // ── Shared ────────────────────────────────────────────────────────
+            // File storage (S3 or local disk, per STORAGE_DRIVER).
+            StorageService::class => fn($c) => new StorageService(),
+
             TokenService::class => fn($c) => new TokenService($c->get(Connection::class)),
             \App\Shared\Http\AuditLoggingMiddleware::class => function ($c) {
                 return new \App\Shared\Http\AuditLoggingMiddleware(
@@ -251,6 +255,7 @@ class App
                     $c->get(ExamRepository::class),
                     $c->get(FeeRepository::class),
                     $c->get(FinancialReportRepository::class),
+                    $c->get(StorageService::class),
                 );
             },
 
@@ -341,7 +346,10 @@ class App
             },
 
             HomeworkService::class => function ($c) {
-                return new HomeworkService($c->get(Connection::class)->getPdo());
+                return new HomeworkService(
+                    $c->get(Connection::class)->getPdo(),
+                    $c->get(StorageService::class),
+                );
             },
 
             HomeworkController::class => function ($c) {

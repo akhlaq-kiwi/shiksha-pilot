@@ -9,6 +9,7 @@ use App\Domain\SchoolAdmin\Services\SchoolAdminService;
 use App\Shared\Auth\TokenService;
 use App\Shared\BaseController;
 use App\Shared\Http\RequestParser;
+use App\Shared\Storage\StorageService;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 
@@ -82,7 +83,7 @@ class LeaveRequestController extends BaseController
             return $this->error($response, 'Failed to upload file', 400);
         }
 
-        $url = $this->schoolAdminService->handleFileUpload($uploadedFile);
+        $url = $this->schoolAdminService->handleFileUpload($uploadedFile, StorageService::CATEGORY_LEAVE);
 
         return $this->success($response, ['url' => $url], 'Attachment uploaded successfully');
     }

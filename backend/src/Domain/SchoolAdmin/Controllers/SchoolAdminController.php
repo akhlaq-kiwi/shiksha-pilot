@@ -163,8 +163,13 @@ class SchoolAdminController extends BaseController
             return $this->error($response, 'File size exceeds 20MB maximum allowed limit.', 400);
         }
 
+        // Clients may declare what the file is, so it lands in the right
+        // bucket folder. Unknown values fall back to "documents".
+        $body     = (array)$request->getParsedBody();
+        $category = (string)($body['category'] ?? $request->getQueryParams()['category'] ?? '');
+
         try {
-            $url = $this->service->handleFileUpload($uploadedFile);
+            $url = $this->service->handleFileUpload($uploadedFile, $category);
             return $this->success($response, ['url' => $url], 'File uploaded successfully');
         } catch (\Throwable $e) {
             return $this->error($response, 'File save error: ' . $e->getMessage(), 500);

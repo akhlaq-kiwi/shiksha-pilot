@@ -14,6 +14,7 @@ import html2pdf from 'html2pdf.js';
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 import { DropdownMenu, DropdownItem } from '../../../common/ui/DropdownMenu';
 import CredentialsDialog from '../../../common/components/CredentialsDialog';
+import { resolveFileUrl } from '../../../common/utils/fileUrl';
 
 // Self-healing avatar image component to handle loading errors gracefully
 const TeacherAvatar = ({ src, name, updatedAt }) => {
@@ -417,7 +418,7 @@ export default function StaffPage() {
     formData.append('file', file);
     
     try {
-      const res = await schoolService.uploadDocument(formData);
+      const res = await schoolService.uploadDocument(formData, 'staff-photos');
       if (res && res.url) {
         setNewStaff(prev => ({ ...prev, photo_path: res.url }));
         setFormErrors(prev => {
@@ -459,7 +460,7 @@ export default function StaffPage() {
     formData.append('file', file);
     
     try {
-      const res = await schoolService.uploadDocument(formData);
+      const res = await schoolService.uploadDocument(formData, 'staff-documents');
       if (res && res.url) {
         setNewStaff(prev => ({
           ...prev,
@@ -1132,7 +1133,7 @@ export default function StaffPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                           {t.documents.map((doc, idx) => {
                             const rawPath = doc.file_path || doc.path || '';
-                            const fileUrl = rawPath ? (rawPath.startsWith('http') ? rawPath : `${window.location.origin.includes('localhost') ? 'http://localhost:8000' : ''}${rawPath.startsWith('/') ? '' : '/'}${rawPath}`) : '#';
+                            const fileUrl = resolveFileUrl(rawPath) || '#';
 
                             return (
                               <div key={doc.id || idx} className="flex items-center justify-between p-3 border border-border rounded-xl bg-zinc-50/50 dark:bg-zinc-900/10">

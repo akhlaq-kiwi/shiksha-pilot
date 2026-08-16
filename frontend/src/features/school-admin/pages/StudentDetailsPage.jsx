@@ -10,9 +10,10 @@ import html2pdf from 'html2pdf.js';
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 import { FeeReceiptModal } from '../components/FeeReceiptModal';
 import { formatCurrency } from '../../../common/utils/format';
-import { 
-  User, BookOpen, Users, Home, Calendar, FileText, 
-  Download, Printer, AlertCircle, Eye, ChevronDown, ChevronUp, X, ShieldAlert, Phone 
+import { resolveFileUrl } from '../../../common/utils/fileUrl';
+import {
+  User, BookOpen, Users, Home, Calendar, FileText,
+  Download, Printer, AlertCircle, Eye, ChevronDown, ChevronUp, X, ShieldAlert, Phone
 } from 'lucide-react';
 
 // Self-healing avatar image component to handle loading errors gracefully
@@ -534,7 +535,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const res = await schoolService.uploadDocument(formData);
+      const res = await schoolService.uploadDocument(formData, 'student-photos');
       
       if (res && res.url) {
         const updatePayload = {
@@ -960,7 +961,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                         {/* 1. Array-based uploaded documents (student.documents) */}
                         {Array.isArray(student.documents) && student.documents.map((doc, idx) => {
                           const rawPath = doc.file_path || doc.path || '';
-                          const fileUrl = rawPath ? (rawPath.startsWith('http') ? rawPath : `${window.location.origin.includes('localhost') ? 'http://localhost:8000' : ''}${rawPath.startsWith('/') ? '' : '/'}${rawPath}`) : '#';
+                          const fileUrl = resolveFileUrl(rawPath) || '#';
 
                           return (
                             <div key={doc.id || idx} className="flex items-center justify-between p-3 border border-border rounded-xl bg-zinc-50/50 dark:bg-zinc-900/10">
@@ -1004,7 +1005,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                           { key: 'additional_docs_path', label: 'Additional Documents' }
                         ].filter(doc => !!student[doc.key]).map(doc => {
                           const rawPath = student[doc.key];
-                          const fileUrl = rawPath ? (rawPath.startsWith('http') ? rawPath : `${window.location.origin.includes('localhost') ? 'http://localhost:8000' : ''}${rawPath.startsWith('/') ? '' : '/'}${rawPath}`) : '#';
+                          const fileUrl = resolveFileUrl(rawPath) || '#';
 
                           return (
                             <div key={doc.key} className="flex items-center justify-between p-3 border border-border rounded-xl bg-zinc-50/50 dark:bg-zinc-900/10">
