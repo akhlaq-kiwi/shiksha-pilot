@@ -35,4 +35,4 @@ export const STAMP_SPACE = '19mm';
  * short card fills the page without tripping the auto-scaler; a long subject
  * list still overflows it and scales down exactly as before.
  */
-export const PAGE_CONTENT_MIN_HEIGHT = '270mm';
+export const PAGE_CONTENT_MIN_HEIGHT = '278mm';
