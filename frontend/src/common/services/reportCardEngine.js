@@ -28,44 +28,59 @@ export function formatDateOfBirth(dobStr) {
 }
 
 export function compileReportCardData(card = {}, schoolProfile = {}, currentYear = {}, exam = {}) {
-  // If card is already marked as final session report
-  if (card.is_final_session_report) {
-    return card;
-  }
-
   const student = {
-    id: card.student_id || card.id || null,
-    name: card.student_name || card.name || 'Student Name',
-    roll_no: card.roll_no || card.roll || '—',
-    admission_no: card.admission_no || card.sr_no || '—',
-    class_name: card.class_name || '—',
-    section: card.class_section || card.section || '',
-    father_name: card.father_name || '—',
-    mother_name: card.mother_name || '—',
-    dob: formatDateOfBirth(card.date_of_birth || card.dob),
-    photo_path: card.photo_path || card.avatar_url || null
+    id: card.student?.id || card.student_id || card.id || null,
+    name: card.student?.name || card.student_name || card.name || 'Student Name',
+    roll_no: card.student?.roll_no || card.roll_no || card.roll || '—',
+    admission_no: card.student?.admission_no || card.admission_no || card.sr_no || '—',
+    class_name: card.student?.class_name || card.class_name || '—',
+    section: card.student?.section || card.class_section || card.section || '',
+    father_name: card.student?.father_name || card.father_name || card.father_name_text || card.father || card.guardian_name || '—',
+    mother_name: card.student?.mother_name || card.mother_name || card.mother_name_text || card.mother || '—',
+    dob: formatDateOfBirth(card.student?.dob || card.date_of_birth || card.dob),
+    photo_path: card.student?.photo_path || card.photo_path || card.avatar_url || null
   };
 
   const school = {
-    id: schoolProfile?.id || null,
-    name: (schoolProfile?.name || 'SHIKSHA PILOT SCHOOL').toUpperCase(),
-    logo_path: schoolProfile?.logo_path || null,
-    address: formatSchoolAddress(schoolProfile),
-    phone: schoolProfile?.phone || schoolProfile?.contact_no || '',
-    email: schoolProfile?.email || '',
-    website: schoolProfile?.website || '',
-    principal_signature_path: schoolProfile?.principal_signature_path || null
+    id: schoolProfile?.id || card.school?.id || null,
+    name: (schoolProfile?.name || card.school?.name || card.school_name || 'SHIKSHA PILOT SCHOOL').toUpperCase(),
+    logo_path: schoolProfile?.logo_path || card.school?.logo_path || card.school_logo || null,
+    address: formatSchoolAddress(schoolProfile?.name ? schoolProfile : (card.school || { address: card.school_address })),
+    phone: schoolProfile?.phone || card.school?.phone || '',
+    email: schoolProfile?.email || card.school?.email || '',
+    website: schoolProfile?.website || card.school?.website || '',
+    principal_signature_path: schoolProfile?.principal_signature_path || card.school?.principal_signature_path || null
   };
 
   const academic_year = {
-    name: currentYear?.name || card.academic_year_name || '2026–2027'
+    name: currentYear?.name || card.academic_year?.name || card.academic_year_name || '2026–2027'
   };
 
   const exam_info = {
-    name: exam?.name || card.exam_name || 'Annual Examination',
+    name: exam?.name || card.exam?.name || card.exam_name || 'Annual Examination',
     type: exam?.type || 'Summative Assessment',
     is_final_session_report: Boolean(exam?.is_final_session_report || card.is_final_session_report)
   };
+
+  // If card is already marked as final session report
+  if (card.is_final_session_report) {
+    return {
+      ...card,
+      student,
+      school,
+      academic_year,
+      exam: exam_info,
+      summary: card.summary || {
+        total_max: card.total_max ?? 0,
+        total_obtained: card.total_obtained ?? 0,
+        percentage: card.percentage ?? 0,
+        grade: card.grade ?? 'A',
+        result: card.result ?? 'PASS',
+        class_rank: card.class_rank ?? '1 of 1',
+        attendance: card.attendance ?? { attendance_rate: 100 }
+      }
+    };
+  }
 
   const rawSubjects = Array.isArray(card.subjects) ? card.subjects : [];
   const subjects = rawSubjects.map((s) => {

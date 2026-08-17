@@ -127,11 +127,17 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
             <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold bg-zinc-100">Class & Sec</td>
             <td style={{ padding: metaPadding }} className="font-bold">{student.class_name} {student.section ? `(${student.section})` : ''}</td>
           </tr>
-          <tr>
+          <tr className="border-b border-zinc-300">
             <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold bg-zinc-100">Father's Name</td>
-            <td style={{ padding: metaPadding }} className="border-r border-zinc-300">{student.father_name}</td>
+            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold text-zinc-900">{student.father_name || '—'}</td>
+            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold bg-zinc-100">Mother's Name</td>
+            <td style={{ padding: metaPadding }} className="font-bold text-zinc-900">{student.mother_name || '—'}</td>
+          </tr>
+          <tr>
             <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold bg-zinc-100">Date of Birth</td>
-            <td style={{ padding: metaPadding }} className="font-mono">{student.dob}</td>
+            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-mono">{student.dob}</td>
+            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold bg-zinc-100">Roll / SR No</td>
+            <td style={{ padding: metaPadding }} className="font-mono font-bold">{student.roll_no} | {student.admission_no}</td>
           </tr>
         </tbody>
       </table>

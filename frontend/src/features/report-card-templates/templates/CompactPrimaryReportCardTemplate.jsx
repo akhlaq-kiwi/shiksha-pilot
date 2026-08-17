@@ -118,10 +118,18 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
       </div>
 
       {/* Student Details Card */}
-      <div className="bg-amber-50/50 border border-amber-200 rounded-xl p-3 text-xs grid grid-cols-4 gap-3">
+      <div className="bg-amber-50/50 border border-amber-200 rounded-xl p-3 text-xs grid grid-cols-3 gap-3">
         <div>
           <span className="text-[10px] text-amber-800 uppercase font-bold block">Student Name</span>
           <strong className="text-zinc-900 text-xs uppercase">{student.name}</strong>
+        </div>
+        <div>
+          <span className="text-[10px] text-amber-800 uppercase font-bold block">Father Name</span>
+          <strong className="text-zinc-900 text-xs uppercase">{student.father_name || '—'}</strong>
+        </div>
+        <div>
+          <span className="text-[10px] text-amber-800 uppercase font-bold block">Mother Name</span>
+          <strong className="text-zinc-900 text-xs uppercase">{student.mother_name || '—'}</strong>
         </div>
         <div>
           <span className="text-[10px] text-amber-800 uppercase font-bold block">Class & Sec</span>
