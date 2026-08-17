@@ -2120,33 +2120,89 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
         } catch (_) {}
       }
 
+      final int subCount = subjects.length;
+
+      // Dynamic layout density scaling matching Web Report Card
+      double cellPaddingV = 4.0;
+      double headerPaddingV = 6.0;
+      double tableFontSize = 8.5;
+      double headerFontSize = 8.5;
+      double sectionGap = 12.0;
+      double infoPaddingV = 10.0;
+      double summaryLabelSize = 7.0;
+      double summaryValueSize = 11.0;
+      double summaryPaddingV = 6.0;
+
+      if (subCount <= 4) {
+        // 4 or fewer subjects: Expanded rows & font sizes to fill A4 page naturally
+        cellPaddingV = 22.0;
+        headerPaddingV = 14.0;
+        tableFontSize = 11.5;
+        headerFontSize = 11.0;
+        sectionGap = 24.0;
+        infoPaddingV = 14.0;
+        summaryLabelSize = 8.5;
+        summaryValueSize = 14.0;
+        summaryPaddingV = 10.0;
+      } else if (subCount == 5) {
+        cellPaddingV = 18.0;
+        headerPaddingV = 12.0;
+        tableFontSize = 11.0;
+        headerFontSize = 10.5;
+        sectionGap = 20.0;
+        infoPaddingV = 13.0;
+        summaryLabelSize = 8.0;
+        summaryValueSize = 13.5;
+        summaryPaddingV = 9.0;
+      } else if (subCount == 6) {
+        cellPaddingV = 14.0;
+        headerPaddingV = 10.0;
+        tableFontSize = 10.5;
+        headerFontSize = 10.0;
+        sectionGap = 18.0;
+        infoPaddingV = 12.0;
+        summaryLabelSize = 7.8;
+        summaryValueSize = 13.0;
+        summaryPaddingV = 8.0;
+      } else if (subCount <= 8) {
+        cellPaddingV = 10.0;
+        headerPaddingV = 8.0;
+        tableFontSize = 9.5;
+        headerFontSize = 9.0;
+        sectionGap = 15.0;
+        infoPaddingV = 11.0;
+        summaryLabelSize = 7.5;
+        summaryValueSize = 12.0;
+        summaryPaddingV = 7.0;
+      }
+
       pdf.addPage(
         pw.Page(
           pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.all(24),
+          margin: const pw.EdgeInsets.all(20),
           build: (pw.Context context) {
             return pw.Container(
               decoration: pw.BoxDecoration(
-                border: pw.Border.all(color: PdfColors.teal900, width: 2),
-                borderRadius: pw.BorderRadius.circular(8),
+                border: pw.Border.all(color: PdfColor.fromHex('#042F2E'), width: 2),
+                borderRadius: pw.BorderRadius.circular(10),
               ),
               padding: const pw.EdgeInsets.all(16),
               child: pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
-                  // School Banner Header (Matching Modern Template Admin Banner)
+                  // School Banner Header
                   pw.Container(
                     padding: const pw.EdgeInsets.all(12),
                     decoration: pw.BoxDecoration(
-                      color: PdfColors.teal900,
-                      borderRadius: pw.BorderRadius.circular(6),
+                      color: PdfColor.fromHex('#042F2E'),
+                      borderRadius: pw.BorderRadius.circular(8),
                     ),
                     child: pw.Row(
                       children: [
                         if (logoImage != null) ...[
                           pw.Container(
-                            width: 50,
-                            height: 50,
+                            width: 52,
+                            height: 52,
                             decoration: pw.BoxDecoration(
                               borderRadius: pw.BorderRadius.circular(6),
                               color: PdfColors.white,
@@ -2163,7 +2219,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                               pw.Text(
                                 schoolName,
                                 style: pw.TextStyle(
-                                  fontSize: 16,
+                                  fontSize: 17,
                                   fontWeight: pw.FontWeight.bold,
                                   color: PdfColors.amber300,
                                 ),
@@ -2172,24 +2228,27 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                 pw.SizedBox(height: 2),
                                 pw.Text(
                                   schoolAddress,
-                                  style: const pw.TextStyle(fontSize: 9, color: PdfColors.teal100),
+                                  style: const pw.TextStyle(fontSize: 9.5, color: PdfColors.teal100),
                                 ),
                               ],
-                              pw.SizedBox(height: 4),
+                              pw.SizedBox(height: 5),
                               pw.Row(
                                 children: [
                                   pw.Container(
-                                    padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: const pw.BoxDecoration(color: PdfColors.amber400),
+                                    padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: pw.BoxDecoration(
+                                      color: PdfColors.amber400,
+                                      borderRadius: pw.BorderRadius.circular(4),
+                                    ),
                                     child: pw.Text(
                                       examName.toUpperCase(),
-                                      style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#042F2E')),
+                                      style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#042F2E')),
                                     ),
                                   ),
-                                  pw.SizedBox(width: 8),
+                                  pw.SizedBox(width: 10),
                                   pw.Text(
                                     'Session: $academicYear',
-                                    style: const pw.TextStyle(fontSize: 9, color: PdfColors.white),
+                                    style: pw.TextStyle(fontSize: 9.5, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
                                   ),
                                 ],
                               ),
@@ -2199,14 +2258,14 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                       ],
                     ),
                   ),
-                  pw.SizedBox(height: 10),
+                  pw.SizedBox(height: sectionGap),
 
                   // Student Details Grid
                   pw.Container(
-                    padding: const pw.EdgeInsets.all(10),
+                    padding: pw.EdgeInsets.symmetric(horizontal: 12, vertical: infoPaddingV),
                     decoration: pw.BoxDecoration(
                       color: PdfColors.grey100,
-                      borderRadius: pw.BorderRadius.circular(6),
+                      borderRadius: pw.BorderRadius.circular(8),
                       border: pw.Border.all(color: PdfColors.grey300),
                     ),
                     child: pw.Column(
@@ -2218,7 +2277,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                             pw.Expanded(child: _pdfInfoCell("MOTHER'S NAME", motherName, isBold: true)),
                           ],
                         ),
-                        pw.SizedBox(height: 6),
+                        pw.SizedBox(height: 8),
                         pw.Row(
                           children: [
                             pw.Expanded(child: _pdfInfoCell('CLASS & SECTION', fullClass, isBold: true)),
@@ -2229,22 +2288,22 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                       ],
                     ),
                   ),
-                  pw.SizedBox(height: 12),
+                  pw.SizedBox(height: sectionGap),
 
-                  // Marks Table (Matching Admin Portal Column Headers: SUBJECT, OBTAINED, MAX, PASS, GRADE, VERDICT)
+                  // Marks Table
                   pw.Table(
                     border: pw.TableBorder.all(color: PdfColors.grey400),
                     children: [
                       // Header Row
                       pw.TableRow(
-                        decoration: const pw.BoxDecoration(color: PdfColors.teal900),
+                        decoration: pw.BoxDecoration(color: PdfColor.fromHex('#042F2E')),
                         children: [
-                          _pdfTableHeaderCell('SUBJECT'),
-                          _pdfTableHeaderCell('OBTAINED'),
-                          _pdfTableHeaderCell('MAX'),
-                          _pdfTableHeaderCell('PASS'),
-                          _pdfTableHeaderCell('GRADE'),
-                          _pdfTableHeaderCell('VERDICT'),
+                          _pdfTableHeaderCell('SUBJECT', verticalPadding: headerPaddingV, fontSize: headerFontSize),
+                          _pdfTableHeaderCell('OBTAINED', verticalPadding: headerPaddingV, fontSize: headerFontSize),
+                          _pdfTableHeaderCell('MAX', verticalPadding: headerPaddingV, fontSize: headerFontSize),
+                          _pdfTableHeaderCell('PASS', verticalPadding: headerPaddingV, fontSize: headerFontSize),
+                          _pdfTableHeaderCell('GRADE', verticalPadding: headerPaddingV, fontSize: headerFontSize),
+                          _pdfTableHeaderCell('VERDICT', verticalPadding: headerPaddingV, fontSize: headerFontSize),
                         ],
                       ),
                       // Data Rows
@@ -2259,31 +2318,31 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
 
                         return pw.TableRow(
                           children: [
-                            _pdfTableCell(sName, alignLeft: true),
-                            _pdfTableCell(obt, isBold: true, color: isFail ? PdfColors.red700 : PdfColors.teal900),
-                            _pdfTableCell(maxM),
-                            _pdfTableCell(passM),
-                            _pdfTableCell(sGrade),
-                            _pdfTableCell(sRes, color: isFail ? PdfColors.red700 : PdfColors.teal900, isBold: true),
+                            _pdfTableCell(sName, alignLeft: true, verticalPadding: cellPaddingV, fontSize: tableFontSize),
+                            _pdfTableCell(obt, isBold: true, color: isFail ? PdfColors.red700 : PdfColor.fromHex('#042F2E'), verticalPadding: cellPaddingV, fontSize: tableFontSize),
+                            _pdfTableCell(maxM, verticalPadding: cellPaddingV, fontSize: tableFontSize),
+                            _pdfTableCell(passM, verticalPadding: cellPaddingV, fontSize: tableFontSize),
+                            _pdfTableCell(sGrade, verticalPadding: cellPaddingV, fontSize: tableFontSize),
+                            _pdfTableCell(sRes, color: isFail ? PdfColors.red700 : PdfColor.fromHex('#042F2E'), isBold: true, verticalPadding: cellPaddingV, fontSize: tableFontSize),
                           ],
                         );
                       }).toList(),
                     ],
                   ),
-                  pw.SizedBox(height: 12),
+                  pw.SizedBox(height: sectionGap),
 
-                  // Summary Cards Row (5 columns matching Admin Portal)
+                  // Summary Cards Row
                   pw.Row(
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
-                      _pdfSummaryBox('TOTAL MARKS', '${totalObtained.toStringAsFixed(0)} / ${totalMax.toStringAsFixed(0)}', PdfColors.teal50, PdfColors.teal900),
-                      _pdfSummaryBox('PERCENTAGE', '${percentage.toStringAsFixed(1)}%', PdfColors.amber50, PdfColors.amber900),
-                      _pdfSummaryBox('OVERALL GRADE', 'Grade $grade', PdfColors.teal50, PdfColors.teal900),
-                      _pdfSummaryBox('ATTENDANCE', attRate, PdfColors.amber50, PdfColors.amber900),
-                      _pdfSummaryBox('CLASS RANK', classRank.split(' ')[0], PdfColors.teal50, PdfColors.teal900),
+                      _pdfSummaryBox('TOTAL MARKS', '${totalObtained.toStringAsFixed(0)} / ${totalMax.toStringAsFixed(0)}', PdfColors.teal50, PdfColor.fromHex('#042F2E'), labelFontSize: summaryLabelSize, valueFontSize: summaryValueSize, verticalPadding: summaryPaddingV),
+                      _pdfSummaryBox('PERCENTAGE', '${percentage.toStringAsFixed(1)}%', PdfColors.amber50, PdfColors.amber900, labelFontSize: summaryLabelSize, valueFontSize: summaryValueSize, verticalPadding: summaryPaddingV),
+                      _pdfSummaryBox('OVERALL GRADE', 'Grade $grade', PdfColors.teal50, PdfColor.fromHex('#042F2E'), labelFontSize: summaryLabelSize, valueFontSize: summaryValueSize, verticalPadding: summaryPaddingV),
+                      _pdfSummaryBox('ATTENDANCE', attRate, PdfColors.amber50, PdfColors.amber900, labelFontSize: summaryLabelSize, valueFontSize: summaryValueSize, verticalPadding: summaryPaddingV),
+                      _pdfSummaryBox('CLASS RANK', classRank.split(' ')[0], PdfColors.teal50, PdfColor.fromHex('#042F2E'), labelFontSize: summaryLabelSize, valueFontSize: summaryValueSize, verticalPadding: summaryPaddingV),
                     ],
                   ),
-                  pw.SizedBox(height: 10),
+                  pw.SizedBox(height: 12),
 
                   if (remark.isNotEmpty) ...[
                     pw.Container(
@@ -2294,9 +2353,9 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                         border: pw.Border.all(color: PdfColors.grey300),
                         borderRadius: pw.BorderRadius.circular(4),
                       ),
-                      child: pw.Text('Remarks: $remark', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey800)),
+                      child: pw.Text('Remarks: $remark', style: const pw.TextStyle(fontSize: 8.5, color: PdfColors.grey800)),
                     ),
-                    pw.SizedBox(height: 10),
+                    pw.SizedBox(height: 12),
                   ],
 
                   pw.Spacer(),
@@ -2307,16 +2366,16 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                     children: [
                       pw.Column(
                         children: [
-                          pw.Container(width: 120, height: 1, color: PdfColors.black),
+                          pw.Container(width: 140, height: 1, color: PdfColors.black),
                           pw.SizedBox(height: 4),
-                          pw.Text('CLASS TEACHER SIGNATURE', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+                          pw.Text('CLASS TEACHER SIGNATURE', style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, color: PdfColors.grey700)),
                         ],
                       ),
                       pw.Column(
                         children: [
-                          pw.Container(width: 120, height: 1, color: PdfColors.black),
+                          pw.Container(width: 140, height: 1, color: PdfColors.black),
                           pw.SizedBox(height: 4),
-                          pw.Text('PRINCIPAL SIGNATURE & STAMP', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+                          pw.Text('PRINCIPAL SIGNATURE & STAMP', style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, color: PdfColors.grey700)),
                         ],
                       ),
                     ],
@@ -2386,12 +2445,12 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        pw.Text(label, style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey600)),
+        pw.Text(label, style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey600)),
         pw.SizedBox(height: 2),
         pw.Text(
           value,
           style: pw.TextStyle(
-            fontSize: isBold ? 10 : 9,
+            fontSize: isBold ? 10.5 : 9.5,
             fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
             color: PdfColors.black,
           ),
@@ -2400,24 +2459,24 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
     );
   }
 
-  pw.Widget _pdfTableHeaderCell(String text) {
+  pw.Widget _pdfTableHeaderCell(String text, {double verticalPadding = 4, double fontSize = 8}) {
     return pw.Padding(
-      padding: const pw.EdgeInsets.all(4),
+      padding: pw.EdgeInsets.symmetric(horizontal: 4, vertical: verticalPadding),
       child: pw.Text(
         text,
-        style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+        style: pw.TextStyle(fontSize: fontSize, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
         textAlign: pw.TextAlign.center,
       ),
     );
   }
 
-  pw.Widget _pdfTableCell(String text, {bool alignLeft = false, bool isBold = false, PdfColor? color}) {
+  pw.Widget _pdfTableCell(String text, {bool alignLeft = false, bool isBold = false, PdfColor? color, double verticalPadding = 3, double fontSize = 8}) {
     return pw.Padding(
-      padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+      padding: pw.EdgeInsets.symmetric(horizontal: 6, vertical: verticalPadding),
       child: pw.Text(
         text,
         style: pw.TextStyle(
-          fontSize: 8,
+          fontSize: fontSize,
           fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
           color: color ?? PdfColors.black,
         ),
@@ -2426,20 +2485,21 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
     );
   }
 
-  pw.Widget _pdfSummaryBox(String label, String value, PdfColor bg, PdfColor textCol) {
+  pw.Widget _pdfSummaryBox(String label, String value, PdfColor bg, PdfColor textCol, {double labelFontSize = 7, double valueFontSize = 11, double verticalPadding = 6}) {
     return pw.Container(
-      width: 90,
-      padding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 6),
+      width: 92,
+      padding: pw.EdgeInsets.symmetric(vertical: verticalPadding, horizontal: 4),
       decoration: pw.BoxDecoration(
         color: bg,
         borderRadius: pw.BorderRadius.circular(6),
         border: pw.Border.all(color: textCol, width: 0.5),
       ),
       child: pw.Column(
+        mainAxisAlignment: pw.MainAxisAlignment.center,
         children: [
-          pw.Text(label, style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold, color: textCol)),
-          pw.SizedBox(height: 2),
-          pw.Text(value, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: textCol)),
+          pw.Text(label, style: pw.TextStyle(fontSize: labelFontSize, fontWeight: pw.FontWeight.bold, color: textCol)),
+          pw.SizedBox(height: 3),
+          pw.Text(value, style: pw.TextStyle(fontSize: valueFontSize, fontWeight: pw.FontWeight.bold, color: textCol)),
         ],
       ),
     );
