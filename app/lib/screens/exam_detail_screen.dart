@@ -2544,7 +2544,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
       pdf.addPage(
         pw.Page(
           pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.all(20),
+          margin: const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           build: (pw.Context context) {
             return pw.Container(
               decoration: pw.BoxDecoration(
@@ -2844,6 +2844,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                     children: [
                       pw.Column(
                         children: [
+                          pw.SizedBox(height: 38), // Increased blank space by 35% for physical stamp & signature
                           pw.Container(width: 140, height: 1, color: PdfColors.black),
                           pw.SizedBox(height: 4),
                           pw.Text('CLASS TEACHER SIGNATURE', style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, color: PdfColors.grey700)),
@@ -2851,6 +2852,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                       ),
                       pw.Column(
                         children: [
+                          pw.SizedBox(height: 38), // Increased blank space by 35% for physical stamp & signature
                           pw.Container(width: 140, height: 1, color: PdfColors.black),
                           pw.SizedBox(height: 4),
                           pw.Text('PRINCIPAL SIGNATURE & STAMP', style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, color: PdfColors.grey700)),

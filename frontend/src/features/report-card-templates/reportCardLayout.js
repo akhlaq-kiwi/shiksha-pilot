@@ -19,7 +19,7 @@
  * proportionally along with everything else.
  */
 export const SIGNATURE_GAP = '10mm';
-export const STAMP_SPACE = '14mm';
+export const STAMP_SPACE = '19mm';
 
 /**
  * Minimum height of the card body, so the footer can be pinned to the bottom of
@@ -31,8 +31,8 @@ export const STAMP_SPACE = '14mm';
  * against an auto-height parent resolves to zero, which left `mt-auto` with no
  * free space and made the footer ride up directly under the table.
  *
- * 265mm sits just under the wrapper's 270mm (1020px) single-page budget, so a
+ * 270mm sits just under the wrapper's 272mm single-page budget, so a
  * short card fills the page without tripping the auto-scaler; a long subject
  * list still overflows it and scales down exactly as before.
  */
-export const PAGE_CONTENT_MIN_HEIGHT = '265mm';
+export const PAGE_CONTENT_MIN_HEIGHT = '270mm';
