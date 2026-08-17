@@ -1,5 +1,5 @@
 import React from 'react';
-import { SIGNATURE_GAP, STAMP_SPACE } from '../reportCardLayout';
+import { SIGNATURE_GAP, STAMP_SPACE, PAGE_CONTENT_MIN_HEIGHT } from '../reportCardLayout';
 
 /**
  * Template 3: Traditional School Format Report Card
@@ -87,17 +87,18 @@ export default function TraditionalReportCardTemplate({ data, config = {} }) {
 
   return (
     <div
-      className="w-full bg-amber-50/20 text-zinc-900 font-serif relative h-full flex flex-col"
+      className="w-full bg-amber-50/20 text-zinc-900 font-serif relative h-full flex flex-col justify-between"
       style={{
         padding: containerPadding,
         boxSizing: 'border-box',
         border: '8px double #1e3a8a',
         borderRadius: '2px',
-        minHeight: '100%'
+        minHeight: PAGE_CONTENT_MIN_HEIGHT,
+        height: '100%'
       }}
     >
       {/* Decorative Outer Border */}
-      <div className="border border-zinc-900 flex-1 flex flex-col" style={{ padding: innerPaddingPx, gap: sectionGapPx, boxSizing: 'border-box' }}>
+      <div className="border border-zinc-900 flex-1 flex flex-col justify-between h-full" style={{ padding: innerPaddingPx, gap: sectionGapPx, boxSizing: 'border-box' }}>
         <div>
           {/* Header */}
           <div className="text-center border-b-2 border-zinc-900 pb-4 mb-4">

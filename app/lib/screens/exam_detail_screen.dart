@@ -2547,6 +2547,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
           margin: const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           build: (pw.Context context) {
             return pw.Container(
+              height: double.infinity,
               decoration: pw.BoxDecoration(
                 border: pw.Border.all(color: PdfColor.fromHex('#042F2E'), width: 2),
                 borderRadius: pw.BorderRadius.circular(10),

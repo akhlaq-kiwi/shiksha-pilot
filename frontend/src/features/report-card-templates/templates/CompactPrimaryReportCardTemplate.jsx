@@ -1,5 +1,5 @@
 import React from 'react';
-import { SIGNATURE_GAP, STAMP_SPACE } from '../reportCardLayout';
+import { SIGNATURE_GAP, STAMP_SPACE, PAGE_CONTENT_MIN_HEIGHT } from '../reportCardLayout';
 
 /**
  * Template 4: Compact Primary School Format Report Card
@@ -80,14 +80,15 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
 
   return (
     <div
-      className="w-full bg-white text-zinc-900 font-sans relative flex flex-col"
+      className="w-full bg-white text-zinc-900 font-sans relative flex flex-col justify-between h-full"
       style={{
         padding: containerPadding,
         gap: sectionGapPx,
         boxSizing: 'border-box',
         border: '2px solid #f59e0b',
         borderRadius: '12px',
-        minHeight: '100%'
+        minHeight: PAGE_CONTENT_MIN_HEIGHT,
+        height: '100%'
       }}
     >
       {/* Header */}

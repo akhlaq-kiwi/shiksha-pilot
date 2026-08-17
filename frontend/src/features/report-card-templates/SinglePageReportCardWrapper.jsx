@@ -102,7 +102,7 @@ export default function SinglePageReportCardWrapper({ children, subjectsCount = 
           signal the scaler needs. */}
       <div
         ref={contentRef}
-        className="single-page-report-content w-full"
+        className="single-page-report-content w-full h-full flex flex-col"
         style={{
           // Both dimensions are divided by the scale so that, once the transform
           // is applied, the template still covers the full printable page.

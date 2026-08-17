@@ -1,5 +1,5 @@
 import React from 'react';
-import { SIGNATURE_GAP, STAMP_SPACE } from '../reportCardLayout';
+import { SIGNATURE_GAP, STAMP_SPACE, PAGE_CONTENT_MIN_HEIGHT } from '../reportCardLayout';
 
 /**
  * Template 1: Modern School Report
@@ -82,8 +82,8 @@ export default function ModernReportCardTemplate({ data, config = {} }) {
 
   return (
     <div
-      className="w-full bg-white text-zinc-900 font-sans relative flex flex-col"
-      style={{ padding: containerPadding, gap: sectionGapPx, boxSizing: 'border-box', minHeight: '100%' }}
+      className="w-full bg-white text-zinc-900 font-sans relative flex flex-col justify-between h-full border border-zinc-300 rounded-xl"
+      style={{ padding: containerPadding, gap: sectionGapPx, boxSizing: 'border-box', minHeight: PAGE_CONTENT_MIN_HEIGHT, height: '100%' }}
     >
       {/* Header Banner */}
       <div className="bg-gradient-to-r from-emerald-800 via-teal-800 to-emerald-900 text-white p-6 rounded-xl relative overflow-hidden flex items-center justify-between border border-emerald-700/30">
