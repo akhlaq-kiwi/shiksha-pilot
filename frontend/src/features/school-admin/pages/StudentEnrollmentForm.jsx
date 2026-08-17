@@ -761,8 +761,8 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
 
       if (!formData.student_mobile) {
         errs.student_mobile = 'Contact Number is required.';
-      } else if (!/^\d+$/.test(formData.student_mobile)) {
-        errs.student_mobile = 'Only numeric digits are allowed.';
+      } else if (!/^\d{10}$/.test(formData.student_mobile.trim())) {
+        errs.student_mobile = 'Mobile No should be exactly 10 digits';
       }
 
       if (formData.aadhaar_no && (!/^\d+$/.test(formData.aadhaar_no) || formData.aadhaar_no.length !== 12)) {

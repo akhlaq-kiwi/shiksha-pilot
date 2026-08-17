@@ -602,56 +602,58 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                   ),
                   const Divider(height: 1),
 
-                  // Subjects Bar
-                  Container(
-                    height: 50,
-                    color: Colors.grey.shade50,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      itemCount: scheme.length,
-                      itemBuilder: (context, idx) {
-                        final item = scheme[idx];
-                        final subId = (item['subject_id'] is int)
-                            ? item['subject_id'] as int
-                            : int.tryParse(item['subject_id'].toString()) ?? 0;
-                        final subName = item['subject_name'] ?? 'Subject';
-                        final isSelected = subId == selectedSubjectId;
+                  // Subjects Bar (Only if no error)
+                  if (sheetError == null) ...[
+                    Container(
+                      height: 50,
+                      color: Colors.grey.shade50,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        itemCount: scheme.length,
+                        itemBuilder: (context, idx) {
+                          final item = scheme[idx];
+                          final subId = (item['subject_id'] is int)
+                              ? item['subject_id'] as int
+                              : int.tryParse(item['subject_id'].toString()) ?? 0;
+                          final subName = item['subject_name'] ?? 'Subject';
+                          final isSelected = subId == selectedSubjectId;
 
-                        return GestureDetector(
-                          onTap: () {
-                            if (subId != selectedSubjectId) {
-                              setModalState(() {
-                                selectedSubjectId = subId;
-                                marksSheetData = null;
-                              });
-                              loadMarksForSubject(subId);
-                            }
-                          },
-                          child: Container(
-                            margin: const EdgeInsets.only(right: 10),
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: isSelected ? Colors.indigo.shade700 : Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: isSelected ? Colors.indigo.shade700 : Colors.grey.shade300,
+                          return GestureDetector(
+                            onTap: () {
+                              if (subId != selectedSubjectId) {
+                                setModalState(() {
+                                  selectedSubjectId = subId;
+                                  marksSheetData = null;
+                                });
+                                loadMarksForSubject(subId);
+                              }
+                            },
+                            child: Container(
+                              margin: const EdgeInsets.only(right: 10),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: isSelected ? Colors.indigo.shade700 : Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: isSelected ? Colors.indigo.shade700 : Colors.grey.shade300,
+                                ),
+                              ),
+                              child: Text(
+                                subName,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: isSelected ? Colors.white : Colors.indigo.shade900,
+                                ),
                               ),
                             ),
-                            child: Text(
-                              subName,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: isSelected ? Colors.white : Colors.indigo.shade900,
-                              ),
-                            ),
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
                     ),
-                  ),
-                  const Divider(height: 1),
+                    const Divider(height: 1),
+                  ],
 
                   Expanded(
                     child: isLoadingSheet
@@ -659,16 +661,42 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                         : sheetError != null
                             ? Center(
                                 child: Padding(
-                                  padding: const EdgeInsets.all(20),
+                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Text(sheetError!, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-                                      const SizedBox(height: 12),
-                                      ElevatedButton(
-                                        onPressed: () => loadMarksForSubject(selectedSubjectId),
-                                        child: const Text('Retry'),
-                                      )
+                                      Container(
+                                        padding: const EdgeInsets.all(20),
+                                        decoration: BoxDecoration(
+                                          color: Colors.amber.shade50,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(
+                                          Icons.assignment_ind_outlined,
+                                          size: 48,
+                                          color: Colors.amber.shade800,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 20),
+                                      const Text(
+                                        'No class Assigned to you yet',
+                                        style: TextStyle(
+                                          fontSize: 17,
+                                          fontWeight: FontWeight.w900,
+                                          color: Colors.black87,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Please contact school administrator to assign a class to your teacher profile.',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500,
+                                          color: Colors.grey.shade600,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -858,8 +886,8 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                               ),
                   ),
 
-                  // Action Button (Hidden if Result Published)
-                  if (!isResultPublished)
+                  // Action Button (Hidden if Result Published or if error state)
+                  if (!isResultPublished && sheetError == null)
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -2683,32 +2711,56 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.error_outline_rounded, size: 64, color: Colors.red.shade400),
-                        const SizedBox(height: 16),
-                        Text(
-                          _errorMessage!,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 16, color: Colors.grey.shade700, fontWeight: FontWeight.w500),
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: _loadDetails,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.indigo.shade700,
-                            foregroundColor: Colors.white,
+              ? (() {
+                  final isNoClass = _errorMessage!.contains('No class') || _errorMessage!.contains('Class Teacher') || _errorMessage!.contains('assigned');
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.shade50,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              isNoClass ? Icons.assignment_ind_outlined : Icons.error_outline_rounded,
+                              size: 48,
+                              color: isNoClass ? Colors.amber.shade800 : Colors.red.shade400,
+                            ),
                           ),
-                          child: const Text('Try Again'),
-                        ),
-                      ],
+                          const SizedBox(height: 20),
+                          Text(
+                            isNoClass ? 'No class Assigned to you yet' : _errorMessage!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 17, color: Colors.black87, fontWeight: FontWeight.w900),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            isNoClass
+                                ? 'Please contact school administrator to assign a class to your teacher profile.'
+                                : 'An error occurred while loading examination details.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 13, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
+                          ),
+                          if (!isNoClass) ...[
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: _loadDetails,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.indigo.shade700,
+                                foregroundColor: Colors.white,
+                              ),
+                              child: const Text('Try Again'),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
-                  ),
-                )
+                  );
+                })()
               : ListView(
                   padding: const EdgeInsets.all(20),
                   children: [

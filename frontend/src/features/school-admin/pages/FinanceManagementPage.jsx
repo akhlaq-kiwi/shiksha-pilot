@@ -248,15 +248,25 @@ export default function FinanceManagementPage() {
         errors.amount = 'Annual Fee amount exceeds system maximum.';
       }
     } else {
-      const enteredAmounts = Object.values(annualFeeClassAmountsMap).filter(v => v !== '' && parseFloat(v) > 0);
-      if (enteredAmounts.length === 0) {
-        errors.classes = 'At least one class fee amount must be entered.';
-      }
-      Object.entries(annualFeeClassAmountsMap).forEach(([cname, val]) => {
-        if (val !== '' && parseFloat(val) < 0) {
-          errors[`class_${cname}`] = 'Amount cannot be negative.';
+      const missingClasses = [];
+      const invalidClasses = [];
+      uniqueClasses.forEach(uc => {
+        const val = annualFeeClassAmountsMap[uc.name];
+        if (val === undefined || val === null || val.trim() === '') {
+          missingClasses.push(uc.name);
+        } else {
+          const amt = parseFloat(val);
+          if (isNaN(amt) || amt <= 0) {
+            invalidClasses.push(uc.name);
+          }
         }
       });
+
+      if (missingClasses.length > 0) {
+        errors.classes = `Fee amount for all classes is mandatory. Missing for: ${missingClasses.join(', ')}`;
+      } else if (invalidClasses.length > 0) {
+        errors.classes = `Fee amount must be greater than zero for all classes. Invalid for: ${invalidClasses.join(', ')}`;
+      }
     }
 
     if (Object.keys(errors).length > 0) {
@@ -1095,27 +1105,29 @@ export default function FinanceManagementPage() {
         }
       } else {
         const activeClassAmounts = {};
-        let hasPositive = false;
-        let hasInvalid = false;
+        const missingClasses = [];
+        const invalidClasses = [];
+
         uniqueClasses.forEach(uc => {
           const val = classAmountsMap[uc.name];
-          if (val && val.trim() !== '') {
+          if (val === undefined || val === null || val.trim() === '') {
+            missingClasses.push(uc.name);
+          } else {
             const amt = parseFloat(val);
-            if (amt > 0) {
+            if (isNaN(amt) || amt <= 0) {
+              invalidClasses.push(uc.name);
+            } else {
               uc.ids.forEach(cid => {
                 activeClassAmounts[cid] = amt;
               });
-              hasPositive = true;
-            } else {
-              hasInvalid = true;
             }
           }
         });
 
-        if (hasInvalid) {
-          errors.classAmounts = 'Class fee amounts must be greater than zero.';
-        } else if (!hasPositive) {
-          errors.classAmounts = 'At least one class amount is required.';
+        if (missingClasses.length > 0) {
+          errors.classAmounts = `Fee amount for all classes is mandatory. Missing for: ${missingClasses.join(', ')}`;
+        } else if (invalidClasses.length > 0) {
+          errors.classAmounts = `Fee amount must be greater than zero for all classes. Invalid for: ${invalidClasses.join(', ')}`;
         } else {
           payload.class_amounts = activeClassAmounts;
         }
@@ -2254,7 +2266,7 @@ export default function FinanceManagementPage() {
                         <TableCell className="py-1">
                           <Input id={`class-dues-${uc.name}`} 
                             type="number" 
-                            placeholder="Blank if none" 
+                            placeholder="Enter Amount (₹)" 
                             value={classAmountsMap[uc.name] || ''} 
                             onChange={e => setClassAmountsMap(prev => ({ ...prev, [uc.name]: e.target.value }))}
                             className="h-7 text-xs w-full"
@@ -2833,7 +2845,7 @@ export default function FinanceManagementPage() {
                         <TableCell className="text-right">
                           <Input id={`annual-fee-class-${uc.name}`}
                             type="number"
-                            placeholder="0"
+                            placeholder="Enter Amount (₹)"
                             value={annualFeeClassAmountsMap[uc.name] || ''}
                             onChange={e => setAnnualFeeClassAmountsMap({
                               ...annualFeeClassAmountsMap,
