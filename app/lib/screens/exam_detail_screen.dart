@@ -1763,31 +1763,6 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                           padding: const EdgeInsets.all(20),
                           child: Column(
                             children: [
-                              // Download Action Button
-                              ElevatedButton.icon(
-                                onPressed: _isDownloading ? null : () => _downloadReportCardPDF(rcData, setModalState),
-                                icon: _isDownloading
-                                    ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          color: Colors.white,
-                                          strokeWidth: 2,
-                                        ),
-                                      )
-                                    : const Icon(Icons.download_rounded),
-                                label: Text(_isDownloading ? 'Downloading...' : 'Download Report Card (PDF)'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.indigo.shade900,
-                                  foregroundColor: Colors.white,
-                                  minimumSize: const Size.fromHeight(50),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 20),
-
                               // Formatted Report Card Container (Dynamic Active Template Match)
                               Builder(
                                 builder: (context) {
@@ -2569,7 +2544,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
       pdf.addPage(
         pw.Page(
           pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.all(20),
+          margin: const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           build: (pw.Context context) {
             return pw.Container(
               decoration: pw.BoxDecoration(
@@ -2869,6 +2844,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                     children: [
                       pw.Column(
                         children: [
+                          pw.SizedBox(height: 38), // Increased blank space by 35% for physical stamp & signature
                           pw.Container(width: 140, height: 1, color: PdfColors.black),
                           pw.SizedBox(height: 4),
                           pw.Text('CLASS TEACHER SIGNATURE', style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, color: PdfColors.grey700)),
@@ -2876,6 +2852,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                       ),
                       pw.Column(
                         children: [
+                          pw.SizedBox(height: 38), // Increased blank space by 35% for physical stamp & signature
                           pw.Container(width: 140, height: 1, color: PdfColors.black),
                           pw.SizedBox(height: 4),
                           pw.Text('PRINCIPAL SIGNATURE & STAMP', style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, color: PdfColors.grey700)),
