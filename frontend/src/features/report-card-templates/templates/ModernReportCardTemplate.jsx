@@ -21,44 +21,44 @@ export default function ModernReportCardTemplate({ data, config = {} }) {
 
   if (subCount <= 4) {
     // 4 or fewer subjects: Dynamically expanded table rows
-    cellPadding = '22px 16px';
-    headerPadding = '16px 16px';
-    fontSizePx = '13.5px';
+    cellPadding = '14px 16px';
+    headerPadding = '12px 16px';
+    fontSizePx = '13px';
     containerPadding = '8.5mm';
     sectionGapPx = '14px';
     metaPadding = '14px 16px';
   } else if (subCount <= 6) {
-    // 5–6 subjects: Dynamically padded table rows
-    cellPadding = '18px 16px';
-    headerPadding = '14px 16px';
-    fontSizePx = '13px';
-    containerPadding = '8mm';
-    sectionGapPx = '14px';
-    metaPadding = '13px 14px';
-  } else if (subCount <= 9) {
-    // 7–9 subjects: Standard table padding
-    cellPadding = '10px 14px';
+    // 5–6 subjects: Balanced table padding
+    cellPadding = '9px 14px';
     headerPadding = '10px 14px';
     fontSizePx = '12px';
-    containerPadding = '7.5mm';
+    containerPadding = '8mm';
     sectionGapPx = '12px';
-    metaPadding = '11px 14px';
-  } else if (subCount <= 11) {
-    // 10–11 subjects: Compact table padding
-    cellPadding = '6px 12px';
-    headerPadding = '6px 12px';
-    fontSizePx = '11.5px';
-    containerPadding = '6mm';
+    metaPadding = '12px 14px';
+  } else if (subCount <= 9) {
+    // 7–9 subjects: Compact table padding to ensure all 9 subjects fit cleanly with 150px signature gap
+    cellPadding = '5px 10px';
+    headerPadding = '6px 10px';
+    fontSizePx = '11px';
+    containerPadding = '7.5mm';
     sectionGapPx = '10px';
-    metaPadding = '8px 12px';
+    metaPadding = '8px 10px';
+  } else if (subCount <= 11) {
+    // 10–11 subjects: Ultra compact table padding
+    cellPadding = '3px 8px';
+    headerPadding = '4px 8px';
+    fontSizePx = '10.5px';
+    containerPadding = '6mm';
+    sectionGapPx = '8px';
+    metaPadding = '6px 8px';
   } else {
     // 12+ subjects: Extra compact table padding
-    cellPadding = '4px 10px';
-    headerPadding = '4px 10px';
-    fontSizePx = '11px';
+    cellPadding = '2px 6px';
+    headerPadding = '3px 6px';
+    fontSizePx = '10px';
     containerPadding = '4.5mm';
-    sectionGapPx = '8px';
-    metaPadding = '8px 10px';
+    sectionGapPx = '6px';
+    metaPadding = '5px 6px';
   }
 
   // Clean rank display (e.g. "13" instead of "13 of 34")
@@ -82,6 +82,7 @@ export default function ModernReportCardTemplate({ data, config = {} }) {
               {school.name ? school.name.charAt(0) : 'S'}
             </div>
           )}
+
           <div className="min-w-0">
             <h1 className="text-xl sm:text-2xl font-black uppercase tracking-tight leading-none text-white drop-shadow-xs font-display">
               {school.name}
@@ -136,8 +137,8 @@ export default function ModernReportCardTemplate({ data, config = {} }) {
         </div>
       </div>
 
-      {/* Scholastic Achievements Table Container (Dynamically fills upper area) */}
-      <div className="w-full flex-1 flex flex-col justify-between overflow-hidden border border-zinc-200 rounded-xl shadow-2xs">
+      {/* Scholastic Achievements Table Container (Dynamically fills upper area without row clipping) */}
+      <div className="w-full flex-1 flex flex-col justify-between border border-zinc-200 rounded-xl shadow-2xs">
         {isFinalReport ? (
           <table className="w-full text-left border-collapse" style={{ fontSize: fontSizePx }}>
             <thead>
