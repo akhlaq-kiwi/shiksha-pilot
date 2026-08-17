@@ -1100,24 +1100,37 @@ class StudentService extends BaseService
         $classId = (int)$student['class_id'];
         $pdo = $this->repo->getPdo();
 
-        // 1. Fetch class base monthly fee configurations
-        $stmtBase = $pdo->prepare("SELECT amount FROM class_fee_configurations WHERE class_id = :class_id AND school_id = :school_id LIMIT 1");
+        // 1. Fetch class base monthly fee configurations (monthly_fees JSON column)
+        $stmtBase = $pdo->prepare("
+            SELECT monthly_fees FROM class_fee_configurations 
+            WHERE class_id = :class_id AND school_id = :school_id 
+            ORDER BY id DESC LIMIT 1
+        ");
         $stmtBase->execute([':class_id' => $classId, ':school_id' => $schoolId]);
-        $fallbackAmount = (float)$stmtBase->fetchColumn();
+        $rawMonthlyFees = $stmtBase->fetchColumn();
+        $classMonthlyFees = [];
+        if ($rawMonthlyFees) {
+            $classMonthlyFees = json_decode((string)$rawMonthlyFees, true) ?: [];
+        }
 
         // 2. Fetch specific student monthly fee configurations
-        $stmtMonths = $pdo->prepare("SELECT fee_month, amount FROM student_monthly_fee_configurations WHERE student_id = :student_id AND school_id = :school_id");
+        $stmtMonths = $pdo->prepare("
+            SELECT fee_month, amount 
+            FROM student_monthly_fee_configurations 
+            WHERE student_id = :student_id AND school_id = :school_id
+        ");
         $stmtMonths->execute([':student_id' => $studentId, ':school_id' => $schoolId]);
-        $monthlyFeesAmountMap = $stmtMonths->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
+        $studentMonthlyFees = $stmtMonths->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
 
-        // 3. Fetch paid records from fee_payments
-        $stmtPay = $pdo->prepare("SELECT * FROM fee_payments WHERE school_id = :sid AND student_id = :stid");
+        // 3. Fetch paid records from fee_payments (only count status = PAID / SUCCESS)
+        $stmtPay = $pdo->prepare("
+            SELECT fee_month, SUM(COALESCE(amount_paid, 0)) AS total_paid
+            FROM fee_payments
+            WHERE school_id = :sid AND student_id = :stid AND (LOWER(status) = 'paid' OR LOWER(status) = 'success')
+            GROUP BY fee_month
+        ");
         $stmtPay->execute([':sid' => $schoolId, ':stid' => $studentId]);
-        $payments = $stmtPay->fetchAll();
-        $paymentsMap = [];
-        foreach ($payments as $p) {
-            $paymentsMap[$p['fee_month']] = $p;
-        }
+        $paidMap = $stmtPay->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
 
         // Generate months structure
         $allAcademicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
@@ -1129,35 +1142,34 @@ class StudentService extends BaseService
 
         $monthlyDue = 0.0;
         foreach ($allAcademicMonths as $month) {
-            $monthAmount = isset($monthlyFeesAmountMap[$month]) ? (float)$monthlyFeesAmountMap[$month] : $fallbackAmount;
+            if (isset($studentMonthlyFees[$month])) {
+                $monthAmount = (float)$studentMonthlyFees[$month];
+            } else if (isset($classMonthlyFees[$month])) {
+                $monthAmount = (float)$classMonthlyFees[$month];
+            } else {
+                $monthAmount = 0.0;
+            }
+
             $monthIdx = array_search($month, $allAcademicMonths, true);
             $isFuture = $monthIdx > $currentMonthIdx;
 
-            if (!isset($paymentsMap[$month])) {
-                if (!$isFuture) {
-                    $monthlyDue += $monthAmount;
-                }
+            if (!$isFuture && $monthAmount > 0) {
+                $paidForMonth = isset($paidMap[$month]) ? (float)$paidMap[$month] : 0.0;
+                $dueForMonth = max(0.0, $monthAmount - $paidForMonth);
+                $monthlyDue += $dueForMonth;
             }
         }
 
-        // 4. Fetch additional fee payments
+        // 4. Fetch additional fee payments (where status is NOT Paid)
         $stmtAdd = $pdo->prepare("
-            SELECT afp.amount, afp.status
+            SELECT COALESCE(SUM(afp.amount), 0)
             FROM additional_fee_payments afp
-            WHERE afp.school_id = :sid AND afp.student_id = :stid
+            WHERE afp.school_id = :sid AND afp.student_id = :stid AND LOWER(afp.status) != 'paid'
         ");
         $stmtAdd->execute([':sid' => $schoolId, ':stid' => $studentId]);
-        $additionalPayments = $stmtAdd->fetchAll(PDO::FETCH_ASSOC);
+        $additionalDue = (float)$stmtAdd->fetchColumn();
 
-        $additionalDue = 0.0;
-        foreach ($additionalPayments as $row) {
-            $isPaid = strtolower($row['status']) === 'paid';
-            if (!$isPaid) {
-                $additionalDue += (float)$row['amount'];
-            }
-        }
-
-        return $monthlyDue + $additionalDue;
+        return round($monthlyDue + $additionalDue, 2);
     }
 
     public function getExamDetails(array $user, int $examId): array
@@ -1198,13 +1210,25 @@ class StudentService extends BaseService
         }
 
         // Check if there is an active finance setting for due restriction
-        $academicYearId = (int)$student['academic_year_id'];
+        $academicYearId = (int)($student['academic_year_id'] ?? 0);
         $stmtSetting = $pdo->prepare("
             SELECT enable_due_restriction, max_allowed_due, restrict_admit_card, restrict_exam_result FROM school_finance_settings 
-            WHERE school_id = :sid AND academic_year_id = :ayid LIMIT 1
+            WHERE school_id = :sid AND (academic_year_id = :ayid OR academic_year_id IS NULL OR academic_year_id = 0)
+            ORDER BY id DESC LIMIT 1
         ");
         $stmtSetting->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
         $settings = $stmtSetting->fetch(PDO::FETCH_ASSOC);
+
+        if (!$settings) {
+            $stmtSettingFallback = $pdo->prepare("
+                SELECT enable_due_restriction, max_allowed_due, restrict_admit_card, restrict_exam_result 
+                FROM school_finance_settings 
+                WHERE school_id = :sid 
+                ORDER BY id DESC LIMIT 1
+            ");
+            $stmtSettingFallback->execute([':sid' => $schoolId]);
+            $settings = $stmtSettingFallback->fetch(PDO::FETCH_ASSOC);
+        }
 
         $admitCardRestricted = false;
         $resultRestricted = false;
