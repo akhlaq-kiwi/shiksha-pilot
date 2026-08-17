@@ -284,10 +284,10 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
         </div>
       </div>
 
-      {/* Dual Signatures locked at EXACT 160px gap below 5 summary boxes */}
+      {/* Dual Signatures locked at EXACT 96px gap below 5 summary boxes (reduced by 40%) */}
       <div
         className="pb-1 font-sans flex justify-between items-end text-xs font-bold text-zinc-700 px-6"
-        style={{ marginTop: '160px' }}
+        style={{ marginTop: '96px' }}
       >
         <div className="inline-flex flex-col items-center">
           <div style={{ height: STAMP_SPACE }} aria-hidden="true" />
