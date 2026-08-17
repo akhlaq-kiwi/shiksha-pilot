@@ -282,10 +282,10 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
         </div>
       </div>
 
-      {/* Signatures locked at EXACT 160px gap below 5 summary boxes */}
+      {/* Signatures locked at EXACT 96px gap below 5 summary boxes (reduced by 40%) */}
       <div
         className="pb-1 font-sans flex justify-between items-end text-xs font-bold text-zinc-800 px-6"
-        style={{ marginTop: '160px' }}
+        style={{ marginTop: '96px' }}
       >
         <div className="inline-flex flex-col items-center">
           <div style={{ height: STAMP_SPACE }} aria-hidden="true" />
