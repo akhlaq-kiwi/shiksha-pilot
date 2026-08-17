@@ -258,8 +258,8 @@ export default function TraditionalReportCardTemplate({ data, config = {} }) {
           </div>
         </div>
 
-        {/* Performance Summary Cards (5 columns) - Locked at a CONSTANT 10px gap below table */}
-        <div className="grid grid-cols-5 gap-2 font-sans" style={{ marginTop: '10px' }}>
+        {/* Performance Summary Cards (5 columns) */}
+        <div className="grid grid-cols-5 gap-2 font-sans" style={{ marginTop: 'auto' }}>
           <div className="bg-emerald-50 border border-emerald-200 p-2 rounded text-center flex flex-col justify-center">
             <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 block">Total Marks</span>
             <span className="text-xs font-bold font-mono text-emerald-950 mt-0.5">{summary.total_obtained} / {summary.total_max}</span>
@@ -286,10 +286,10 @@ export default function TraditionalReportCardTemplate({ data, config = {} }) {
           </div>
         </div>
 
-        {/* Dual Signatures pinned to the bottom of the page */}
+        {/* Dual Signatures locked at EXACT 160px gap below 5 summary boxes */}
         <div
           className="pb-1 font-sans flex justify-between items-end text-xs font-bold text-zinc-900 px-6"
-          style={{ marginTop: 'auto' }}
+          style={{ marginTop: '160px' }}
         >
           <div className="inline-flex flex-col items-center">
             <div style={{ height: STAMP_SPACE }} aria-hidden="true" />
