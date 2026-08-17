@@ -114,163 +114,271 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
 
   void _showSchemeModal() {
     final List<dynamic> scheme = _details['scheme'] ?? [];
+    final List<dynamic> publishedClassSchemes = (_details['published_class_schemes'] as List<dynamic>?) ?? [];
+    final bool isTeacher = (widget.userRole == 'TEACHER');
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.8,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(24),
-            topRight: Radius.circular(24),
-          ),
-        ),
-        child: Column(
-          children: [
-            const SizedBox(height: 12),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Examination Timetable Scheme',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.black87),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              widget.examName,
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
-            ),
-            const Divider(height: 24),
-            Expanded(
-              child: scheme.isEmpty
-                  ? const Center(child: Text('No timetable entries found.'))
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: scheme.length,
-                      itemBuilder: (context, index) {
-                        final paper = scheme[index];
-                        final sub = paper['subject_name'] ?? 'Subject';
-                        final date = paper['exam_date'] ?? '';
-                        final start = paper['start_time'] ?? '';
-                        final end = paper['end_time'] ?? '';
-                        final maxM = paper['max_marks']?.toString() ?? '100';
-                        final passM = paper['passing_marks']?.toString() ?? '33';
-                        final room = paper['room'] ?? 'As scheduled';
+      builder: (context) {
+        int? expandedClassIndex;
 
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade50,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.grey.shade200),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                sub,
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.black87),
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Text(
-                                              'Date: ',
-                                              style: TextStyle(fontSize: 13, color: Colors.indigo.shade800, fontWeight: FontWeight.bold),
-                                            ),
-                                            Expanded(
-                                              child: Text(
-                                                _formatDate(date),
-                                                style: TextStyle(fontSize: 13, color: Colors.grey.shade700, fontWeight: FontWeight.bold),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 12),
-                                        Row(
-                                          children: [
-                                            Text(
-                                              'Max: ',
-                                              style: TextStyle(fontSize: 12, color: Colors.indigo.shade800, fontWeight: FontWeight.bold),
-                                            ),
-                                            Expanded(
-                                              child: Text(
-                                                '${_formatMarks(maxM)} Marks',
-                                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Text(
-                                              'Time: ',
-                                              style: TextStyle(fontSize: 13, color: Colors.indigo.shade800, fontWeight: FontWeight.bold),
-                                            ),
-                                            Expanded(
-                                              child: Text(
-                                                '${_formatTime(start)} - ${_formatTime(end)}',
-                                                style: TextStyle(fontSize: 13, color: Colors.grey.shade700, fontWeight: FontWeight.bold),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 12),
-                                        Row(
-                                          children: [
-                                            Text(
-                                              'Pass: ',
-                                              style: TextStyle(fontSize: 12, color: Colors.indigo.shade800, fontWeight: FontWeight.bold),
-                                            ),
-                                            Expanded(
-                                              child: Text(
-                                                '${_formatMarks(passM)} Marks',
-                                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        );
-                      },
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.8,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(24),
+                  topRight: Radius.circular(24),
+                ),
+              ),
+              child: Column(
+                children: [
+                  const SizedBox(height: 12),
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
                     ),
-            ),
-          ],
-        ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Examination Timetable Scheme',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.black87),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.examName,
+                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
+                  ),
+                  const Divider(height: 24),
+                  Expanded(
+                    child: isTeacher
+                        ? (publishedClassSchemes.isEmpty
+                            ? const Center(child: Text('No published examination schemes found.'))
+                            : ListView.builder(
+                                padding: const EdgeInsets.all(16),
+                                itemCount: publishedClassSchemes.length,
+                                itemBuilder: (context, index) {
+                                  final item = publishedClassSchemes[index];
+                                  final className = item['class_name'] ?? 'Class';
+                                  final List<dynamic> papers = (item['scheme'] as List<dynamic>?) ?? [];
+                                  final isExpanded = (expandedClassIndex == index);
+
+                                  return Container(
+                                    margin: const EdgeInsets.only(bottom: 12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                        color: isExpanded ? Colors.indigo.shade300 : Colors.grey.shade200,
+                                        width: isExpanded ? 1.5 : 1,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.03),
+                                          blurRadius: 6,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        InkWell(
+                                          borderRadius: BorderRadius.circular(16),
+                                          onTap: () {
+                                            setModalState(() {
+                                              expandedClassIndex = isExpanded ? null : index;
+                                            });
+                                          },
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                            child: Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    Container(
+                                                      padding: const EdgeInsets.all(8),
+                                                      decoration: BoxDecoration(
+                                                        color: isExpanded ? Colors.indigo.shade50 : Colors.grey.shade100,
+                                                        borderRadius: BorderRadius.circular(10),
+                                                      ),
+                                                      child: Icon(
+                                                        Icons.class_rounded,
+                                                        color: isExpanded ? Colors.indigo.shade800 : Colors.grey.shade600,
+                                                        size: 20,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 12),
+                                                    Text(
+                                                      className,
+                                                      style: TextStyle(
+                                                        fontSize: 15,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: isExpanded ? Colors.indigo.shade900 : Colors.black87,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                Icon(
+                                                  isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                                                  color: isExpanded ? Colors.indigo.shade800 : Colors.grey.shade500,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                        if (isExpanded) ...[
+                                          const Divider(height: 1),
+                                          Padding(
+                                            padding: const EdgeInsets.all(12),
+                                            child: papers.isEmpty
+                                                ? const Padding(
+                                                    padding: EdgeInsets.all(16),
+                                                    child: Text('No scheduled papers for this class.', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                                                  )
+                                                : Column(
+                                                    children: papers.map((paper) => _buildPaperItemCard(paper)).toList(),
+                                                  ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ))
+                        : (scheme.isEmpty
+                            ? const Center(child: Text('No timetable entries found.'))
+                            : ListView.builder(
+                                padding: const EdgeInsets.all(16),
+                                itemCount: scheme.length,
+                                itemBuilder: (context, index) {
+                                  return _buildPaperItemCard(scheme[index]);
+                                },
+                              )),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildPaperItemCard(dynamic paper) {
+    final sub = paper['subject_name'] ?? 'Subject';
+    final date = paper['exam_date'] ?? '';
+    final start = paper['start_time'] ?? '';
+    final end = paper['end_time'] ?? '';
+    final maxM = paper['max_marks']?.toString() ?? '100';
+    final passM = paper['passing_marks']?.toString() ?? '33';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            sub,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.black87),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'Date: ',
+                          style: TextStyle(fontSize: 13, color: Colors.indigo.shade800, fontWeight: FontWeight.bold),
+                        ),
+                        Expanded(
+                          child: Text(
+                            _formatDate(date),
+                            style: TextStyle(fontSize: 13, color: Colors.grey.shade700, fontWeight: FontWeight.bold),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Text(
+                          'Max: ',
+                          style: TextStyle(fontSize: 12, color: Colors.indigo.shade800, fontWeight: FontWeight.bold),
+                        ),
+                        Expanded(
+                          child: Text(
+                            '${_formatMarks(maxM)} Marks',
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'Time: ',
+                          style: TextStyle(fontSize: 13, color: Colors.indigo.shade800, fontWeight: FontWeight.bold),
+                        ),
+                        Expanded(
+                          child: Text(
+                            '${_formatTime(start)} - ${_formatTime(end)}',
+                            style: TextStyle(fontSize: 13, color: Colors.grey.shade700, fontWeight: FontWeight.bold),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Text(
+                          'Pass: ',
+                          style: TextStyle(fontSize: 12, color: Colors.indigo.shade800, fontWeight: FontWeight.bold),
+                        ),
+                        Expanded(
+                          child: Text(
+                            '${_formatMarks(passM)} Marks',
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

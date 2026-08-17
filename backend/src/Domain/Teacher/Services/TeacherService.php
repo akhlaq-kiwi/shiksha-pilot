@@ -1038,7 +1038,7 @@ class TeacherService extends BaseService
             'result' => null
         ];
 
-        // 2. Fetch current live scheme papers for teacher class
+        // Fetch current live scheme papers for teacher class
         $stmtScheme = $pdo->prepare("
             SELECT ep.id, ep.subject_id, ep.exam_date, ep.start_time, ep.end_time, ep.max_marks, ep.passing_marks, ep.room,
                    CASE WHEN ep.max_marks = 0 THEN 'grade' ELSE 'marks' END AS evaluation_type,
@@ -1052,6 +1052,37 @@ class TeacherService extends BaseService
         $schemePapers = $stmtScheme->fetchAll(PDO::FETCH_ASSOC) ?: [];
         $response['scheme'] = $schemePapers;
         $response['has_papers'] = !empty($schemePapers) ? 1 : 0;
+
+        // Fetch all published class examination schemes for the school (sorted in logical class order)
+        $stmtClasses = $pdo->prepare("
+            SELECT DISTINCT c.id AS class_id, c.name, c.section, COALESCE(ecs.scheme_published, 0) AS scheme_published
+            FROM examination_class_status ecs
+            JOIN classes c ON ecs.class_id = c.id
+            WHERE ecs.exam_id = :exam_id AND ecs.scheme_published = 1 AND c.school_id = :sid
+        ");
+        $stmtClasses->execute([':exam_id' => $examId, ':sid' => $schoolId]);
+        $publishedClasses = $stmtClasses->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        usort($publishedClasses, function ($a, $b) {
+            $nameA = trim(($a['name'] ?? '') . ' ' . ($a['section'] ?? ''));
+            $nameB = trim(($b['name'] ?? '') . ' ' . ($b['section'] ?? ''));
+            return strnatcasecmp($nameA, $nameB);
+        });
+
+        $publishedClassSchemes = [];
+        foreach ($publishedClasses as $c) {
+            $cid = (int)$c['class_id'];
+            $cName = trim(($c['name'] ?? '') . ' ' . ($c['section'] ?? ''));
+            $stmtScheme->execute([':exam_id' => $examId, ':class_id' => $cid]);
+            $papers = $stmtScheme->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            
+            $publishedClassSchemes[] = [
+                'class_id' => $cid,
+                'class_name' => $cName,
+                'scheme' => $papers
+            ];
+        }
+        $response['published_class_schemes'] = $publishedClassSchemes;
 
         // 3. Fetch result if published
         if ($resultPublished) {
