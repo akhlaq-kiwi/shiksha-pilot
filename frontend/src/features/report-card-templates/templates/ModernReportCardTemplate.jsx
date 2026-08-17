@@ -29,24 +29,24 @@ export default function ModernReportCardTemplate({ data, config = {} }) {
     metaPadding = '14px 16px';
   } else if (subCount <= 6) {
     // 5–6 subjects: Balanced padding to fit 280mm budget at 1.0 scale
-    cellPadding = '12px 16px';
-    headerPadding = '12px 16px';
+    cellPadding = '14px 16px';
+    headerPadding = '13px 16px';
     fontSizePx = '13px';
     containerPadding = '8mm';
-    sectionGapPx = '14px';
-    metaPadding = '12px 14px';
-  } else if (subCount <= 8) {
-    // 7–8 subjects: Standard table padding
-    cellPadding = '9px 14px';
-    headerPadding = '10px 14px';
+    sectionGapPx = '16px';
+    metaPadding = '13px 14px';
+  } else if (subCount <= 9) {
+    // 7–9 subjects: Calibrated padding to ensure exact 160px signature gap
+    cellPadding = '11px 14px';
+    headerPadding = '11px 14px';
     fontSizePx = '12px';
     containerPadding = '7.5mm';
-    sectionGapPx = '12px';
-    metaPadding = '10px 14px';
+    sectionGapPx = '14px';
+    metaPadding = '11px 14px';
   } else if (subCount <= 11) {
-    // 9–11 subjects: Compact table padding
-    cellPadding = '6px 12px';
-    headerPadding = '6px 12px';
+    // 10–11 subjects: Compact table padding
+    cellPadding = '7px 12px';
+    headerPadding = '7px 12px';
     fontSizePx = '11.5px';
     containerPadding = '6mm';
     sectionGapPx = '10px';
