@@ -2479,10 +2479,10 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
       final String className = (reportCard['class_name'] ?? '').toString();
       final String classSection = (reportCard['class_section'] ?? '').toString();
       final String fullClass = classSection.isNotEmpty ? '$className ($classSection)' : className;
-      final String rollNo = (reportCard['roll_no'] ?? '—').toString();
-      final String fatherName = (reportCard['father_name'] ?? '—').toString();
-      final String motherName = (reportCard['mother_name'] ?? '—').toString();
-      final String admissionNo = (reportCard['admission_no'] ?? '—').toString();
+      final String rollNo = (reportCard['roll_no'] ?? '-').toString();
+      final String fatherName = (reportCard['father_name'] ?? '-').toString();
+      final String motherName = (reportCard['mother_name'] ?? '-').toString();
+      final String admissionNo = (reportCard['admission_no'] ?? '-').toString();
       final List<dynamic> subjects = reportCard['subjects'] as List? ?? [];
       final bool isPdfFinalReport = reportCard['is_final_report'] == true || (reportCard['session_exams'] as List?) != null;
 
@@ -2498,7 +2498,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
 
       final String schoolAddress = (reportCard['school_address'] ?? '').toString();
       final String schoolLogo = (reportCard['school_logo'] ?? '').toString();
-      final String dob = (reportCard['dob'] ?? '—').toString();
+      final String dob = (reportCard['dob'] ?? '-').toString();
 
       pw.MemoryImage? logoImage;
       if (schoolLogo.isNotEmpty) {
@@ -2711,12 +2711,12 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                           decoration: pw.BoxDecoration(color: PdfColor.fromHex('#042F2E')),
                           children: [
                             _pdfTableHeaderCell('SUBJECT', verticalPadding: headerPaddingV, fontSize: headerFontSize),
-                            ...((reportCard['session_exams'] as List? ?? ['Quarterly Examination', 'Half Yearly Examination', 'Annual Examination']).map((ex) {
+                            ...((reportCard['session_exams'] as List? ?? ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam']).map((ex) {
                               return pw.Container(
                                 padding: pw.EdgeInsets.symmetric(vertical: headerPaddingV, horizontal: 2),
                                 alignment: pw.Alignment.center,
                                 child: pw.Text(
-                                  ex.toString().toUpperCase(),
+                                  ex.toString().toUpperCase().replaceAll('EXAMINATION', 'EXAM'),
                                   textAlign: pw.TextAlign.center,
                                   style: pw.TextStyle(color: PdfColors.white, fontSize: headerFontSize - 1.5, fontWeight: pw.FontWeight.bold),
                                 ),
@@ -2735,7 +2735,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                           decoration: pw.BoxDecoration(color: PdfColor.fromHex('#033E3B')),
                           children: [
                             _pdfTableHeaderCell('', verticalPadding: 3, fontSize: 7),
-                            ...((reportCard['session_exams'] as List? ?? ['Quarterly Examination', 'Half Yearly Examination', 'Annual Examination']).expand((_) => [
+                            ...((reportCard['session_exams'] as List? ?? ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam']).expand((_) => [
                               _pdfTableHeaderCell('M.M.', verticalPadding: 3, fontSize: 7.5, color: PdfColors.amber300),
                               _pdfTableHeaderCell('OBT.', verticalPadding: 3, fontSize: 7.5, color: PdfColors.amber300),
                             ])),
@@ -2751,7 +2751,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                           final String grandMax = (sub['grand_total_max'] ?? sub['max_marks'] ?? '-').toString();
                           final String grandObt = (sub['grand_total_obtained'] ?? sub['marks_obtained'] ?? '-').toString();
                           final String sGrade = (sub['grade'] ?? '-').toString();
-                          final List<dynamic> sessionExams = (reportCard['session_exams'] as List?) ?? ['Quarterly Examination', 'Half Yearly Examination', 'Annual Examination'];
+                          final List<dynamic> sessionExams = (reportCard['session_exams'] as List?) ?? ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam'];
 
                           return pw.TableRow(
                             children: [
@@ -2759,7 +2759,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                               ...sessionExams.expand((exName) {
                                 final sc = examScores[exName] ?? examScores[exName.toString()];
                                 final String mm = sc != null ? (sc['max_marks'] ?? '-').toString() : '100';
-                                final String obt = sc != null ? (sc['marks_obtained'] ?? '-').toString() : '—';
+                                final String obt = sc != null ? (sc['marks_obtained'] ?? '-').toString() : '-';
                                 return [
                                   _pdfTableCell(mm, isBold: false, color: PdfColors.grey700, verticalPadding: cellPaddingV, fontSize: tableFontSize - 0.5),
                                   _pdfTableCell(obt, isBold: true, color: PdfColor.fromHex('#042F2E'), verticalPadding: cellPaddingV, fontSize: tableFontSize - 0.5),
