@@ -1884,7 +1884,7 @@ export default function ExamsPage() {
               break-inside: avoid !important;
               page-break-after: always !important;
               break-after: page !important;
-              max-height: 275mm !important;
+              max-height: 280mm !important;
               overflow: hidden !important;
               margin: 0 auto !important;
             }
@@ -1893,7 +1893,7 @@ export default function ExamsPage() {
               break-after: page !important;
               page-break-inside: avoid !important;
               break-inside: avoid !important;
-              max-height: 275mm !important;
+              max-height: 280mm !important;
               overflow: hidden !important;
               margin: 0 auto !important;
             }
@@ -2239,7 +2239,7 @@ export default function ExamsPage() {
               break-inside: avoid !important;
               page-break-after: always !important;
               break-after: page !important;
-              max-height: 275mm !important;
+              max-height: 280mm !important;
               overflow: hidden !important;
               margin: 0 auto !important;
             }
@@ -2327,7 +2327,7 @@ export default function ExamsPage() {
                   breakAfter: 'page',
                   pageBreakInside: 'avoid',
                   breakInside: 'avoid',
-                  maxHeight: '275mm',
+                  maxHeight: '280mm',
                   overflow: 'hidden'
                 }}
               >
@@ -3640,7 +3640,7 @@ export default function ExamsPage() {
                 break-inside: avoid !important;
                 page-break-after: always !important;
                 break-after: page !important;
-                max-height: 275mm !important;
+                max-height: 280mm !important;
                 overflow: hidden !important;
                 margin: 0 auto !important;
               }
@@ -3668,7 +3668,7 @@ export default function ExamsPage() {
                     breakAfter: 'page',
                     pageBreakInside: 'avoid',
                     breakInside: 'avoid',
-                    maxHeight: '275mm',
+                    maxHeight: '280mm',
                     overflow: 'hidden'
                   }}
                 >
