@@ -2484,6 +2484,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
       final String motherName = (reportCard['mother_name'] ?? '—').toString();
       final String admissionNo = (reportCard['admission_no'] ?? '—').toString();
       final List<dynamic> subjects = reportCard['subjects'] as List? ?? [];
+      final bool isPdfFinalReport = reportCard['is_final_report'] == true || (reportCard['session_exams'] as List?) != null;
 
       final double totalMax = double.tryParse((reportCard['total_max'] ?? reportCard['total_max_marks'] ?? 0.0).toString()) ?? 0.0;
       final double totalObtained = double.tryParse((reportCard['total_obtained'] ?? reportCard['total_marks_obtained'] ?? 0.0).toString()) ?? 0.0;
@@ -2588,19 +2589,28 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                     ),
                     child: pw.Row(
                       children: [
-                        if (logoImage != null) ...[
-                          pw.Container(
-                            width: 52,
-                            height: 52,
-                            decoration: pw.BoxDecoration(
-                              borderRadius: pw.BorderRadius.circular(6),
-                              color: PdfColors.white,
-                            ),
-                            padding: const pw.EdgeInsets.all(4),
-                            child: pw.Image(logoImage, fit: pw.BoxFit.contain),
+                        pw.Container(
+                          width: 52,
+                          height: 52,
+                          decoration: pw.BoxDecoration(
+                            borderRadius: pw.BorderRadius.circular(8),
+                            color: PdfColors.amber400,
                           ),
-                          pw.SizedBox(width: 12),
-                        ],
+                          padding: const pw.EdgeInsets.all(4),
+                          child: logoImage != null
+                              ? pw.Image(logoImage, fit: pw.BoxFit.contain)
+                              : pw.Center(
+                                  child: pw.Text(
+                                    schoolName.isNotEmpty ? schoolName[0] : 'S',
+                                    style: pw.TextStyle(
+                                      fontSize: 26,
+                                      fontWeight: pw.FontWeight.bold,
+                                      color: PdfColor.fromHex('#042F2E'),
+                                    ),
+                                  ),
+                                ),
+                        ),
+                        pw.SizedBox(width: 12),
                         pw.Expanded(
                           child: pw.Column(
                             crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -2630,7 +2640,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                       borderRadius: pw.BorderRadius.circular(4),
                                     ),
                                     child: pw.Text(
-                                      examName.toUpperCase(),
+                                      (isPdfFinalReport ? 'FINAL ACADEMIC REPORT CARD' : examName).toUpperCase(),
                                       style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#042F2E')),
                                     ),
                                   ),
@@ -2679,23 +2689,59 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                   ),
                   pw.SizedBox(height: sectionGap),
 
-                  // Marks Table
-                  if ((reportCard['is_final_session_report'] == true) || 
-                      (reportCard['badge_title']?.toString().toUpperCase() == 'FINAL ACADEMIC REPORT CARD') ||
-                      ((reportCard['exam_name'] ?? widget.examName).toString().toLowerCase().contains('annual')))
+                  // Marks Table (Exact Matching Image 2 Web PDF layout)
+                  if (isPdfFinalReport)
                     pw.Table(
-                      border: pw.TableBorder.all(color: PdfColors.grey400),
+                      border: pw.TableBorder.all(color: PdfColor.fromHex('#042F2E')),
+                      columnWidths: {
+                        0: const pw.FlexColumnWidth(3.2), // SUBJECT
+                        1: const pw.FlexColumnWidth(1.4), // Q1 MM
+                        2: const pw.FlexColumnWidth(1.4), // Q1 OBT
+                        3: const pw.FlexColumnWidth(1.4), // HY MM
+                        4: const pw.FlexColumnWidth(1.4), // HY OBT
+                        5: const pw.FlexColumnWidth(1.4), // AN MM
+                        6: const pw.FlexColumnWidth(1.4), // AN OBT
+                        7: const pw.FlexColumnWidth(1.6), // GRAND MAX
+                        8: const pw.FlexColumnWidth(1.6), // GRAND OBT
+                        9: const pw.FlexColumnWidth(1.4), // GRADE
+                      },
                       children: [
-                        // Header Row
+                        // Header Row 1
                         pw.TableRow(
                           decoration: pw.BoxDecoration(color: PdfColor.fromHex('#042F2E')),
                           children: [
                             _pdfTableHeaderCell('SUBJECT', verticalPadding: headerPaddingV, fontSize: headerFontSize),
                             ...((reportCard['session_exams'] as List? ?? ['Quarterly Examination', 'Half Yearly Examination', 'Annual Examination']).map((ex) {
-                              return _pdfTableHeaderCell(ex.toString().toUpperCase(), verticalPadding: headerPaddingV, fontSize: headerFontSize - 1);
+                              return pw.Container(
+                                padding: pw.EdgeInsets.symmetric(vertical: headerPaddingV, horizontal: 2),
+                                alignment: pw.Alignment.center,
+                                child: pw.Text(
+                                  ex.toString().toUpperCase(),
+                                  textAlign: pw.TextAlign.center,
+                                  style: pw.TextStyle(color: PdfColors.white, fontSize: headerFontSize - 1.5, fontWeight: pw.FontWeight.bold),
+                                ),
+                              );
                             })),
-                            _pdfTableHeaderCell('GRAND TOTAL', verticalPadding: headerPaddingV, fontSize: headerFontSize - 1),
+                            pw.Container(
+                              padding: pw.EdgeInsets.symmetric(vertical: headerPaddingV, horizontal: 2),
+                              alignment: pw.Alignment.center,
+                              child: pw.Text('GRAND TOTAL', textAlign: pw.TextAlign.center, style: pw.TextStyle(color: PdfColors.white, fontSize: headerFontSize - 1.5, fontWeight: pw.FontWeight.bold)),
+                            ),
                             _pdfTableHeaderCell('GRADE', verticalPadding: headerPaddingV, fontSize: headerFontSize),
+                          ],
+                        ),
+                        // Header Row 2 (M.M. and OBT.)
+                        pw.TableRow(
+                          decoration: pw.BoxDecoration(color: PdfColor.fromHex('#033E3B')),
+                          children: [
+                            _pdfTableHeaderCell('', verticalPadding: 3, fontSize: 7),
+                            ...((reportCard['session_exams'] as List? ?? ['Quarterly Examination', 'Half Yearly Examination', 'Annual Examination']).expand((_) => [
+                              _pdfTableHeaderCell('M.M.', verticalPadding: 3, fontSize: 7.5, color: PdfColors.amber300),
+                              _pdfTableHeaderCell('OBT.', verticalPadding: 3, fontSize: 7.5, color: PdfColors.amber300),
+                            ])),
+                            _pdfTableHeaderCell('MAX', verticalPadding: 3, fontSize: 7.5, color: PdfColors.amber300),
+                            _pdfTableHeaderCell('OBT.', verticalPadding: 3, fontSize: 7.5, color: PdfColors.amber300),
+                            _pdfTableHeaderCell('', verticalPadding: 3, fontSize: 7),
                           ],
                         ),
                         // Data Rows
@@ -2710,13 +2756,17 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                           return pw.TableRow(
                             children: [
                               _pdfTableCell(sName, alignLeft: true, verticalPadding: cellPaddingV, fontSize: tableFontSize),
-                              ...sessionExams.map((exName) {
+                              ...sessionExams.expand((exName) {
                                 final sc = examScores[exName] ?? examScores[exName.toString()];
                                 final String mm = sc != null ? (sc['max_marks'] ?? '-').toString() : '100';
                                 final String obt = sc != null ? (sc['marks_obtained'] ?? '-').toString() : '—';
-                                return _pdfTableCell('$obt / $mm', isBold: true, color: PdfColor.fromHex('#042F2E'), verticalPadding: cellPaddingV, fontSize: tableFontSize - 1);
+                                return [
+                                  _pdfTableCell(mm, isBold: false, color: PdfColors.grey700, verticalPadding: cellPaddingV, fontSize: tableFontSize - 0.5),
+                                  _pdfTableCell(obt, isBold: true, color: PdfColor.fromHex('#042F2E'), verticalPadding: cellPaddingV, fontSize: tableFontSize - 0.5),
+                                ];
                               }),
-                              _pdfTableCell('$grandObt / $grandMax', isBold: true, color: PdfColor.fromHex('#042F2E'), verticalPadding: cellPaddingV, fontSize: tableFontSize - 1),
+                              _pdfTableCell(grandMax, isBold: true, color: PdfColors.grey900, verticalPadding: cellPaddingV, fontSize: tableFontSize - 0.5),
+                              _pdfTableCell(grandObt, isBold: true, color: PdfColor.fromHex('#042F2E'), verticalPadding: cellPaddingV, fontSize: tableFontSize - 0.5),
                               _pdfTableCell(sGrade, isBold: true, color: PdfColor.fromHex('#042F2E'), verticalPadding: cellPaddingV, fontSize: tableFontSize),
                             ],
                           );
@@ -2726,14 +2776,18 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                           decoration: const pw.BoxDecoration(color: PdfColors.teal50),
                           children: [
                             _pdfTableCell('Total Marks', alignLeft: true, isBold: true, color: PdfColor.fromHex('#042F2E'), verticalPadding: cellPaddingV, fontSize: tableFontSize),
-                            ...((reportCard['session_exams'] as List? ?? ['Quarterly Examination', 'Half Yearly Examination', 'Annual Examination']).map((exName) {
+                            ...((reportCard['session_exams'] as List? ?? ['Quarterly Examination', 'Half Yearly Examination', 'Annual Examination']).expand((exName) {
                               final Map<String, dynamic> examTotalsMap = Map<String, dynamic>.from(reportCard['exam_totals'] ?? {});
                               final exTot = Map<String, dynamic>.from(examTotalsMap[exName] ?? examTotalsMap[exName.toString()] ?? {});
                               final String exMax = (exTot['max_marks'] ?? 0).toString();
                               final String exObt = (exTot['marks_obtained'] ?? 0).toString();
-                              return _pdfTableCell('$exObt / $exMax', isBold: true, color: PdfColor.fromHex('#042F2E'), verticalPadding: cellPaddingV, fontSize: tableFontSize - 1);
+                              return [
+                                _pdfTableCell(exMax, isBold: true, color: PdfColors.grey900, verticalPadding: cellPaddingV, fontSize: tableFontSize - 0.5),
+                                _pdfTableCell(exObt, isBold: true, color: PdfColor.fromHex('#042F2E'), verticalPadding: cellPaddingV, fontSize: tableFontSize - 0.5),
+                              ];
                             })),
-                            _pdfTableCell('${reportCard['total_obtained'] ?? 0} / ${reportCard['total_max'] ?? 0}', isBold: true, color: PdfColor.fromHex('#042F2E'), verticalPadding: cellPaddingV, fontSize: tableFontSize - 1),
+                            _pdfTableCell('${reportCard['total_max'] ?? 0}', isBold: true, color: PdfColors.grey900, verticalPadding: cellPaddingV, fontSize: tableFontSize - 0.5),
+                            _pdfTableCell('${reportCard['total_obtained'] ?? 0}', isBold: true, color: PdfColor.fromHex('#042F2E'), verticalPadding: cellPaddingV, fontSize: tableFontSize - 0.5),
                             _pdfTableCell('${reportCard['grade'] ?? '—'}', isBold: true, color: PdfColor.fromHex('#042F2E'), verticalPadding: cellPaddingV, fontSize: tableFontSize),
                           ],
                         ),
@@ -2908,12 +2962,12 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
     );
   }
 
-  pw.Widget _pdfTableHeaderCell(String text, {double verticalPadding = 4, double fontSize = 8}) {
+  pw.Widget _pdfTableHeaderCell(String text, {double verticalPadding = 4, double fontSize = 8, PdfColor? color}) {
     return pw.Padding(
       padding: pw.EdgeInsets.symmetric(horizontal: 4, vertical: verticalPadding),
       child: pw.Text(
         text,
-        style: pw.TextStyle(fontSize: fontSize, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+        style: pw.TextStyle(fontSize: fontSize, fontWeight: pw.FontWeight.bold, color: color ?? PdfColors.white),
         textAlign: pw.TextAlign.center,
       ),
     );
