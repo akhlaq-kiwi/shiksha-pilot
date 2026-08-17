@@ -2484,6 +2484,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
       final String motherName = (reportCard['mother_name'] ?? '—').toString();
       final String admissionNo = (reportCard['admission_no'] ?? '—').toString();
       final List<dynamic> subjects = reportCard['subjects'] as List? ?? [];
+      final bool isPdfFinalReport = reportCard['is_final_report'] == true || (reportCard['session_exams'] as List?) != null;
 
       final double totalMax = double.tryParse((reportCard['total_max'] ?? reportCard['total_max_marks'] ?? 0.0).toString()) ?? 0.0;
       final double totalObtained = double.tryParse((reportCard['total_obtained'] ?? reportCard['total_marks_obtained'] ?? 0.0).toString()) ?? 0.0;
@@ -2961,12 +2962,12 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
     );
   }
 
-  pw.Widget _pdfTableHeaderCell(String text, {double verticalPadding = 4, double fontSize = 8}) {
+  pw.Widget _pdfTableHeaderCell(String text, {double verticalPadding = 4, double fontSize = 8, PdfColor? color}) {
     return pw.Padding(
       padding: pw.EdgeInsets.symmetric(horizontal: 4, vertical: verticalPadding),
       child: pw.Text(
         text,
-        style: pw.TextStyle(fontSize: fontSize, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+        style: pw.TextStyle(fontSize: fontSize, fontWeight: pw.FontWeight.bold, color: color ?? PdfColors.white),
         textAlign: pw.TextAlign.center,
       ),
     );

@@ -153,7 +153,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
-
   final String _baseUrl = 'https://app.shikshapilot.com';
 
   @override
@@ -163,14 +162,13 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       vsync: this,
       duration: const Duration(milliseconds: 2000),
     );
-    _fadeAnimation = CurvedAnimation(
-      parent: _animationController,
-      curve: const Interval(0.0, 0.7, curve: Curves.easeIn),
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
     );
-    _scaleAnimation = CurvedAnimation(
-      parent: _animationController,
-      curve: const Interval(0.1, 0.9, curve: Curves.easeOutBack),
+    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOutBack),
     );
+
     _animationController.forward();
     _checkAuthSession();
   }
@@ -357,10 +355,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _loadServerUrl() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('base_url', 'https://app.shikshapilot.com');
+    final savedUrl = prefs.getString('base_url') ?? 'https://app.shikshapilot.com';
     if (mounted) {
       setState(() {
-        _serverUrlController.text = 'https://app.shikshapilot.com';
+        _serverUrlController.text = savedUrl;
       });
     }
   }
@@ -790,6 +788,71 @@ class _LoginScreenState extends State<LoginScreen> {
                                     letterSpacing: 1,
                                   ),
                                 ),
+                        ),
+                        const SizedBox(height: 16),
+                        const Divider(height: 1),
+                        const SizedBox(height: 12),
+
+                        // Environment Switcher Buttons
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Server:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
+                            InkWell(
+                              onTap: () async {
+                                final prefs = await SharedPreferences.getInstance();
+                                await prefs.setString('base_url', 'http://10.174.49.71:8000');
+                                setState(() {
+                                  _serverUrlController.text = 'http://10.174.49.71:8000';
+                                });
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: _serverUrlController.text.contains('10.174.49.71') ? Colors.indigo.shade100 : Colors.grey.shade100,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: _serverUrlController.text.contains('10.174.49.71') ? Colors.indigo.shade800 : Colors.grey.shade300),
+                                ),
+                                child: Text('LOCAL', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: _serverUrlController.text.contains('10.174.49.71') ? Colors.indigo.shade900 : Colors.black87)),
+                              ),
+                            ),
+                            InkWell(
+                              onTap: () async {
+                                final prefs = await SharedPreferences.getInstance();
+                                await prefs.setString('base_url', 'https://qa.shikshapilot.com');
+                                setState(() {
+                                  _serverUrlController.text = 'https://qa.shikshapilot.com';
+                                });
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: _serverUrlController.text.contains('qa.shikshapilot') ? Colors.amber.shade100 : Colors.grey.shade100,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: _serverUrlController.text.contains('qa.shikshapilot') ? Colors.amber.shade800 : Colors.grey.shade300),
+                                ),
+                                child: Text('QA', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: _serverUrlController.text.contains('qa.shikshapilot') ? Colors.amber.shade900 : Colors.black87)),
+                              ),
+                            ),
+                            InkWell(
+                              onTap: () async {
+                                final prefs = await SharedPreferences.getInstance();
+                                await prefs.setString('base_url', 'https://app.shikshapilot.com');
+                                setState(() {
+                                  _serverUrlController.text = 'https://app.shikshapilot.com';
+                                });
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: _serverUrlController.text.contains('app.shikshapilot') ? Colors.green.shade100 : Colors.grey.shade100,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: _serverUrlController.text.contains('app.shikshapilot') ? Colors.green.shade800 : Colors.grey.shade300),
+                                ),
+                                child: Text('PROD', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: _serverUrlController.text.contains('app.shikshapilot') ? Colors.green.shade900 : Colors.black87)),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
