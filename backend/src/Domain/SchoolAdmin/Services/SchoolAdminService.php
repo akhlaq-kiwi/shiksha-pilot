@@ -12506,7 +12506,10 @@ Only approve the settlement after reviewing all financial records.
             $stmtClassReset->execute([':exam_id' => $id]);
         }
 
-        if ($status === 'Published' && !empty($startDate) && !empty($endDate)) {
+        $wasPublished = (strcasecmp((string)$exam['status'], 'Published') === 0);
+        $isNowPublished = (strcasecmp((string)$status, 'Published') === 0);
+
+        if (!$wasPublished && $isNowPublished && !empty($startDate) && !empty($endDate)) {
             $this->notifyExamScheduled($pdo, $schoolId, $name, $startDate, $endDate);
         }
     }
@@ -12538,6 +12541,7 @@ Only approve the settlement after reviewing all financial records.
             $stmtCheck = $pdo->prepare("
                 SELECT COUNT(*) FROM dashboard_notifications
                 WHERE school_id = :sid AND user_role = :role AND title = :title AND message = :msg
+                  AND created_at >= NOW() - INTERVAL 10 SECOND
             ");
             $stmtCheck->execute([
                 ':sid' => $schoolId,
@@ -13341,11 +13345,9 @@ Only approve the settlement after reviewing all financial records.
             PushDispatcher::pushOnly($pdo, $schoolId, $userRole, $userId, $eventKey, $title, $message, $link);
         }
 
-        // Also insert role-wide broadcast notifications & FCM topic push if classId is 0 (all classes)
-        if ($classId <= 0) {
-            foreach (['STUDENT', 'TEACHER', 'PARENT'] as $bRole) {
-                PushDispatcher::pushOnly($pdo, $schoolId, $bRole, null, $eventKey, $title, $message, $link);
-            }
+        // Also insert role-wide broadcast notifications & FCM topic push if classId is 0 (all classes) or for scheme publication to teachers
+        if ($classId <= 0 || $type === 'SCHEME' || $type === 'UNPUBLISH_SCHEME') {
+            PushDispatcher::pushOnly($pdo, $schoolId, 'TEACHER', null, $eventKey, $title, $message, $link);
         }
     }
 
