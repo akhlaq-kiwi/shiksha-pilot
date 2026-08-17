@@ -2305,6 +2305,85 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
               ),
             );
           }).toList(),
+
+          // Total Marks Footer Row (matching Admin Portal report card)
+          Builder(
+            builder: (context) {
+              final Map<String, dynamic> examTotalsMap = Map<String, dynamic>.from(rcData['exam_totals'] ?? {});
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.teal.shade50,
+                  borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(6), bottomRight: Radius.circular(6)),
+                  border: Border(top: BorderSide(color: Colors.teal.shade900, width: 1.5)),
+                ),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      flex: 3,
+                      child: Text(
+                        'Total Marks',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF042F2E)),
+                      ),
+                    ),
+                    ...sessionExams.map((exName) {
+                      final exTot = Map<String, dynamic>.from(examTotalsMap[exName] ?? examTotalsMap[exName.toString()] ?? {});
+                      return Expanded(
+                        flex: 4,
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '${exTot['max_marks'] ?? 0}',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87),
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                '${exTot['marks_obtained'] ?? 0}',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF042F2E)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    Expanded(
+                      flex: 4,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '${rcData['total_max'] ?? 0}',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.black87),
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              '${rcData['total_obtained'] ?? 0}',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF042F2E)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        '${rcData['grade'] ?? '—'}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Color(0xFF042F2E)),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         ],
       ),
     );
@@ -2642,6 +2721,22 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                             ],
                           );
                         }).toList(),
+                        // Total Marks Footer Row
+                        pw.TableRow(
+                          decoration: const pw.BoxDecoration(color: PdfColors.teal50),
+                          children: [
+                            _pdfTableCell('Total Marks', alignLeft: true, isBold: true, color: PdfColor.fromHex('#042F2E'), verticalPadding: cellPaddingV, fontSize: tableFontSize),
+                            ...((reportCard['session_exams'] as List? ?? ['Quarterly Examination', 'Half Yearly Examination', 'Annual Examination']).map((exName) {
+                              final Map<String, dynamic> examTotalsMap = Map<String, dynamic>.from(reportCard['exam_totals'] ?? {});
+                              final exTot = Map<String, dynamic>.from(examTotalsMap[exName] ?? examTotalsMap[exName.toString()] ?? {});
+                              final String exMax = (exTot['max_marks'] ?? 0).toString();
+                              final String exObt = (exTot['marks_obtained'] ?? 0).toString();
+                              return _pdfTableCell('$exObt / $exMax', isBold: true, color: PdfColor.fromHex('#042F2E'), verticalPadding: cellPaddingV, fontSize: tableFontSize - 1);
+                            })),
+                            _pdfTableCell('${reportCard['total_obtained'] ?? 0} / ${reportCard['total_max'] ?? 0}', isBold: true, color: PdfColor.fromHex('#042F2E'), verticalPadding: cellPaddingV, fontSize: tableFontSize - 1),
+                            _pdfTableCell('${reportCard['grade'] ?? '—'}', isBold: true, color: PdfColor.fromHex('#042F2E'), verticalPadding: cellPaddingV, fontSize: tableFontSize),
+                          ],
+                        ),
                       ],
                     )
                   else

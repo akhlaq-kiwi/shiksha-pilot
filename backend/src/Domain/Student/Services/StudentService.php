@@ -760,6 +760,25 @@ class StudentService extends BaseService
         $overallPct = $grandSessionMax > 0 ? round(($grandSessionObtained / $grandSessionMax) * 100, 2) : 0.0;
         $overallGrade = $resolveGrade($overallPct);
 
+        $examTotalsMap = [];
+        foreach ($sessionExams as $exName) {
+            $exMax = 0.0;
+            $exObt = 0.0;
+            foreach ($subjectScoresMap as $subjScores) {
+                $sc = $subjScores[$exName] ?? null;
+                if ($sc) {
+                    $exMax += (float)$sc['max_marks'];
+                    if ($sc['has_score']) {
+                        $exObt += (float)$sc['raw_obtained'];
+                    }
+                }
+            }
+            $examTotalsMap[$exName] = [
+                'max_marks' => $exMax,
+                'marks_obtained' => $exObt
+            ];
+        }
+
         // Fetch Attendance
         $stmtAY = $pdo->prepare("SELECT * FROM academic_years WHERE id = :id LIMIT 1");
         $stmtAY->execute([':id' => $annualExam['academic_year_id']]);
@@ -807,6 +826,7 @@ class StudentService extends BaseService
             'template_code' => $tplCode,
             'session_exams' => $sessionExams,
             'subjects' => $finalSubjects,
+            'exam_totals' => $examTotalsMap,
             'total_max' => $grandSessionMax,
             'total_obtained' => $grandSessionObtained,
             'percentage' => $overallPct,
