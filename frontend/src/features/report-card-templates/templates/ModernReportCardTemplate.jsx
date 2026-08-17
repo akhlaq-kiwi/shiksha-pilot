@@ -249,8 +249,8 @@ export default function ModernReportCardTemplate({ data, config = {} }) {
         </div>
       )}
 
-      {/* Performance Summary Cards (5 columns) - Locked at a CONSTANT 10px gap below table */}
-      <div className="grid grid-cols-5 gap-2 font-sans" style={{ marginTop: '10px' }}>
+      {/* Performance Summary Cards (5 columns) - Pushed to bottom area with auto margin */}
+      <div className="grid grid-cols-5 gap-2 font-sans" style={{ marginTop: 'auto' }}>
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 text-center flex flex-col justify-center">
           <span className="text-[9.5px] font-bold uppercase tracking-wider text-emerald-800 block">Total Marks</span>
           <span className="text-sm font-bold text-emerald-950 font-mono mt-0.5">{summary.total_obtained} / {summary.total_max}</span>
@@ -277,10 +277,10 @@ export default function ModernReportCardTemplate({ data, config = {} }) {
         </div>
       </div>
 
-      {/* Signatures pinned to the bottom of the page */}
+      {/* Signatures locked at EXACT 160px gap below 5 summary boxes */}
       <div
         className="pb-1 flex justify-between items-end text-xs font-bold text-zinc-700 px-6 font-sans"
-        style={{ marginTop: 'auto' }}
+        style={{ marginTop: '160px' }}
       >
         <div className="inline-flex flex-col items-center">
           <div style={{ height: STAMP_SPACE }} aria-hidden="true" />
