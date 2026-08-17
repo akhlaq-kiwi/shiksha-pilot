@@ -20,33 +20,33 @@ export default function ModernReportCardTemplate({ data, config = {} }) {
   let metaPadding = '12px 14px';
 
   if (subCount <= 4) {
-    // 4 or fewer subjects: Comfortably spaced rows
-    cellPadding = '16px 16px';
-    headerPadding = '14px 16px';
+    // 4 or fewer subjects: Dynamically expanded table rows
+    cellPadding = '22px 16px';
+    headerPadding = '16px 16px';
     fontSizePx = '13.5px';
     containerPadding = '8.5mm';
-    sectionGapPx = '18px';
+    sectionGapPx = '14px';
     metaPadding = '14px 16px';
   } else if (subCount <= 6) {
-    // 5–6 subjects: Balanced padding to fit 280mm budget at 1.0 scale
-    cellPadding = '14px 16px';
-    headerPadding = '13px 16px';
+    // 5–6 subjects: Dynamically padded table rows
+    cellPadding = '18px 16px';
+    headerPadding = '14px 16px';
     fontSizePx = '13px';
     containerPadding = '8mm';
-    sectionGapPx = '16px';
+    sectionGapPx = '14px';
     metaPadding = '13px 14px';
   } else if (subCount <= 9) {
-    // 7–9 subjects: Calibrated padding to ensure exact 160px signature gap
-    cellPadding = '11px 14px';
-    headerPadding = '11px 14px';
+    // 7–9 subjects: Standard table padding
+    cellPadding = '10px 14px';
+    headerPadding = '10px 14px';
     fontSizePx = '12px';
     containerPadding = '7.5mm';
-    sectionGapPx = '14px';
+    sectionGapPx = '12px';
     metaPadding = '11px 14px';
   } else if (subCount <= 11) {
     // 10–11 subjects: Compact table padding
-    cellPadding = '7px 12px';
-    headerPadding = '7px 12px';
+    cellPadding = '6px 12px';
+    headerPadding = '6px 12px';
     fontSizePx = '11.5px';
     containerPadding = '6mm';
     sectionGapPx = '10px';
@@ -83,17 +83,18 @@ export default function ModernReportCardTemplate({ data, config = {} }) {
             </div>
           )}
           <div className="min-w-0">
-            <h1 className="text-xl font-bold uppercase tracking-tight font-display text-amber-300 leading-normal block">
+            <h1 className="text-xl sm:text-2xl font-black uppercase tracking-tight leading-none text-white drop-shadow-xs font-display">
               {school.name}
             </h1>
-            <p className="text-xs font-medium text-emerald-100 opacity-90 leading-normal mt-0.5 block">
-              {school.address || 'Civil Lines, Central Education Hub'} {school.phone ? `| Tel: ${school.phone}` : ''}
+            <p className="text-xs font-medium text-emerald-100 mt-1 truncate tracking-wide">
+              {school.address} {school.phone ? `• Ph: ${school.phone}` : ''}
             </p>
-            <div className="flex items-center gap-2 mt-2">
-              <span className="px-2.5 py-0.5 bg-amber-400 text-emerald-950 text-[11px] font-bold rounded-md uppercase tracking-wider">
-                {isFinalReport ? 'FINAL ACADEMIC REPORT CARD' : exam.name}
+            <div className="inline-flex items-center gap-2 mt-2 bg-emerald-950/60 backdrop-blur-xs px-3 py-1 rounded-lg border border-emerald-600/40">
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-300">
+                {exam.name}
               </span>
-              <span className="text-xs font-mono font-bold text-emerald-200">
+              <span className="text-[10px] text-emerald-300 font-semibold">•</span>
+              <span className="text-[11px] font-semibold text-emerald-200">
                 Session: {academic_year.name}
               </span>
             </div>
@@ -123,20 +124,20 @@ export default function ModernReportCardTemplate({ data, config = {} }) {
         {/* Row 2 */}
         <div className="flex flex-col items-center">
           <span className="text-[11px] font-bold text-zinc-400 uppercase block">Class & Section</span>
-          <strong className="text-zinc-900 text-sm font-mono font-bold tracking-tight">{student.class_name} {student.section ? `(${student.section})` : ''}</strong>
+          <strong className="text-zinc-900 text-sm font-bold">{student.class_name} {student.section ? `(${student.section})` : ''}</strong>
         </div>
         <div className="flex flex-col items-center">
           <span className="text-[11px] font-bold text-zinc-400 uppercase block">Roll / SR. No</span>
-          <strong className="text-zinc-900 text-sm font-mono font-bold tracking-tight">{student.roll_no || '—'} | {student.admission_no || '—'}</strong>
+          <strong className="text-zinc-900 text-sm font-mono font-bold">{student.roll_no} | {student.admission_no}</strong>
         </div>
         <div className="flex flex-col items-center">
           <span className="text-[11px] font-bold text-zinc-400 uppercase block">Date of Birth</span>
-          <strong className="text-zinc-900 text-sm font-mono font-bold tracking-tight">{student.dob || '—'}</strong>
+          <strong className="text-zinc-900 text-sm font-mono font-bold">{student.dob}</strong>
         </div>
       </div>
 
-      {/* Subjects Marks Table */}
-      <div className="border border-zinc-200 rounded-xl overflow-hidden shadow-2xs">
+      {/* Scholastic Achievements Table Container (Dynamically fills upper area) */}
+      <div className="w-full flex-1 flex flex-col justify-between overflow-hidden border border-zinc-200 rounded-xl shadow-2xs">
         {isFinalReport ? (
           <table className="w-full text-left border-collapse" style={{ fontSize: fontSizePx }}>
             <thead>
@@ -249,8 +250,8 @@ export default function ModernReportCardTemplate({ data, config = {} }) {
         </div>
       )}
 
-      {/* Performance Summary Cards (5 columns) - Pushed to bottom area with auto margin */}
-      <div className="grid grid-cols-5 gap-2 font-sans" style={{ marginTop: 'auto' }}>
+      {/* Performance Summary Cards (5 columns) - Locked at EXACT 8px gap below Total Marks row */}
+      <div className="grid grid-cols-5 gap-2 font-sans" style={{ marginTop: '8px' }}>
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 text-center flex flex-col justify-center">
           <span className="text-[9.5px] font-bold uppercase tracking-wider text-emerald-800 block">Total Marks</span>
           <span className="text-sm font-bold text-emerald-950 font-mono mt-0.5">{summary.total_obtained} / {summary.total_max}</span>
@@ -277,10 +278,10 @@ export default function ModernReportCardTemplate({ data, config = {} }) {
         </div>
       </div>
 
-      {/* Signatures locked at EXACT 96px gap below 5 summary boxes (reduced by 40%) */}
+      {/* Signatures locked at EXACT 150px gap below 5 summary boxes */}
       <div
         className="pb-1 flex justify-between items-end text-xs font-bold text-zinc-700 px-6 font-sans"
-        style={{ marginTop: '96px' }}
+        style={{ marginTop: '150px' }}
       >
         <div className="inline-flex flex-col items-center">
           <div style={{ height: STAMP_SPACE }} aria-hidden="true" />
