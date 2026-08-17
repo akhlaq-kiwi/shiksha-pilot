@@ -1049,7 +1049,7 @@ class StudentService extends BaseService
         $academicYearId = (int) ($student['academic_year_id'] ?? 0);
         $pdo = $this->repo->getPdo();
 
-        $stmt = $pdo->prepare("
+        $sql = "
             SELECT DISTINCT e.id, e.name, e.start_date, e.end_date,
                    COALESCE(ecs.scheme_published, 0) AS scheme_published,
                    COALESCE(ecs.admit_card_published, 0) AS admit_card_published,
@@ -1058,21 +1058,27 @@ class StudentService extends BaseService
             LEFT JOIN examination_class_status ecs ON e.id = ecs.exam_id AND ecs.class_id = :class_id
             WHERE e.school_id = :school_id 
               AND e.status = 'Published'
-              AND (e.academic_year_id = :ayid OR :ayid_check = 0 OR e.academic_year_id IS NULL)
-            ORDER BY 
-              CASE 
-                WHEN LOWER(e.name) LIKE '%quarterly%' THEN 1 
-                WHEN LOWER(e.name) LIKE '%half%' THEN 2 
-                WHEN LOWER(e.name) LIKE '%annual%' THEN 3 
-                ELSE 4 
-              END ASC, e.start_date ASC, e.id ASC
-        ");
-        $stmt->execute([
+        ";
+        $params = [
             ':class_id' => $classId,
-            ':school_id' => $schoolId,
-            ':ayid' => $academicYearId,
-            ':ayid_check' => $academicYearId
-        ]);
+            ':school_id' => $schoolId
+        ];
+
+        if ($academicYearId > 0) {
+            $sql .= " AND (e.academic_year_id = :ayid OR e.academic_year_id IS NULL)";
+            $params[':ayid'] = $academicYearId;
+        }
+
+        $sql .= " ORDER BY 
+            CASE 
+              WHEN LOWER(e.name) LIKE '%quarterly%' THEN 1 
+              WHEN LOWER(e.name) LIKE '%half%' THEN 2 
+              WHEN LOWER(e.name) LIKE '%annual%' THEN 3 
+              ELSE 4 
+            END ASC, e.start_date ASC, e.id ASC";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
         $exams = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
         $today = date('Y-m-d');

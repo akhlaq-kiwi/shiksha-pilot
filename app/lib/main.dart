@@ -357,20 +357,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _loadServerUrl() async {
     final prefs = await SharedPreferences.getInstance();
-    final savedUrl = prefs.getString('base_url');
-    if (savedUrl != null && savedUrl.isNotEmpty && !savedUrl.contains('10.174.49.71') && !savedUrl.contains('localhost') && savedUrl != 'https://app.shikshapilot.com') {
-      if (mounted) {
-        setState(() {
-          _serverUrlController.text = savedUrl;
-        });
-      }
-    } else {
-      await prefs.setString('base_url', 'https://qa.shikshapilot.com');
-      if (mounted) {
-        setState(() {
-          _serverUrlController.text = 'https://qa.shikshapilot.com';
-        });
-      }
+    await prefs.setString('base_url', 'http://10.174.49.71:8000');
+    if (mounted) {
+      setState(() {
+        _serverUrlController.text = 'http://10.174.49.71:8000';
+      });
     }
   }
 

@@ -1163,8 +1163,8 @@ class SchoolAdminService extends BaseService
         if (!empty($data['student_email']) && !filter_var($data['student_email'], FILTER_VALIDATE_EMAIL)) {
             $errors['student_email'] = 'Invalid student email format';
         }
-        if (!empty($data['student_mobile']) && !preg_match('/^[0-9]+$/', $data['student_mobile'])) {
-            $errors['student_mobile'] = 'Only numeric digits are allowed.';
+        if (!empty($data['student_mobile']) && !preg_match('/^[0-9]{10}$/', trim($data['student_mobile']))) {
+            $errors['student_mobile'] = 'Mobile No should be exactly 10 digits';
         }
         if (!empty($data['roll_no']) && !preg_match('/^[0-9]+$/', $data['roll_no'])) {
             $errors['roll_no'] = 'Only numeric digits are allowed.';
@@ -1507,8 +1507,8 @@ class SchoolAdminService extends BaseService
         if (!empty($data['student_email']) && !filter_var($data['student_email'], FILTER_VALIDATE_EMAIL)) {
             $errors['student_email'] = 'Invalid student email format';
         }
-        if (!empty($data['student_mobile']) && !preg_match('/^[0-9]+$/', $data['student_mobile'])) {
-            $errors['student_mobile'] = 'Only numeric digits are allowed.';
+        if (!empty($data['student_mobile']) && !preg_match('/^[0-9]{10}$/', trim($data['student_mobile']))) {
+            $errors['student_mobile'] = 'Mobile No should be exactly 10 digits';
         }
         if (!empty($data['roll_no']) && !preg_match('/^[0-9]+$/', $data['roll_no'])) {
             $errors['roll_no'] = 'Only numeric digits are allowed.';
@@ -15653,62 +15653,96 @@ Only approve the settlement after reviewing all financial records.
             return;
         }
 
-        $studentEmail = $studentInfo['email'];
-        $phones = array_filter([
+        $studentEmail = !empty($studentInfo['email']) ? trim((string)$studentInfo['email']) : null;
+        $rawPhones = [
             $studentInfo['parent_phone'] ?? null,
             $studentInfo['father_phone'] ?? null,
             $studentInfo['guardian_phone'] ?? null,
             $studentInfo['student_mobile'] ?? null
-        ]);
+        ];
+        $phones = [];
+        foreach ($rawPhones as $p) {
+            if ($p !== null && trim((string)$p) !== '') {
+                $cleaned = trim((string)$p);
+                $phones[] = $cleaned;
+            }
+        }
+        $phones = array_unique(array_filter($phones));
 
-        // 2. Notify Student User account
-        if (!empty($studentEmail)) {
-            $stmtStudentUser = $pdo->prepare("
-                SELECT id FROM users 
-                WHERE school_id = :sid AND role = 'STUDENT' AND email = :email LIMIT 1
-            ");
-            $stmtStudentUser->execute([':sid' => $schoolId, ':email' => $studentEmail]);
-            $studentUserId = $stmtStudentUser->fetchColumn();
+        // 2. Notify Student User accounts (match by email or mobile phone)
+        $studentUserIds = [];
+        if ($studentEmail !== null || !empty($phones)) {
+            $conditions = [];
+            $params = [':sid' => $schoolId];
+            if ($studentEmail !== null) {
+                $conditions[] = "email = :semail";
+                $params[':semail'] = $studentEmail;
+            }
+            if (!empty($phones)) {
+                $placeholders = [];
+                foreach (array_values($phones) as $idx => $ph) {
+                    $k = ":sph_" . $idx;
+                    $placeholders[] = $k;
+                    $params[$k] = $ph;
+                }
+                $conditions[] = "phone IN (" . implode(',', $placeholders) . ")";
+            }
 
-            if ($studentUserId) {
+            $sqlStudent = "SELECT DISTINCT id FROM users WHERE school_id = :sid AND role = 'STUDENT' AND (" . implode(' OR ', $conditions) . ")";
+            $stmtStudentUsers = $pdo->prepare($sqlStudent);
+            $stmtStudentUsers->execute($params);
+            $studentUserIds = array_map('intval', $stmtStudentUsers->fetchAll(PDO::FETCH_COLUMN) ?: []);
+
+            if (!empty($studentUserIds)) {
                 $stmtInsert = $pdo->prepare("
-                    INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, is_read)
-                    VALUES (:school_id, 'STUDENT', :user_id, :title, :message, :link, 0)
+                    INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, category, event_key, is_read)
+                    VALUES (:school_id, 'STUDENT', :user_id, :title, :message, :link, 'FEES', 'FEE_PAYMENT_RECORDED', 0)
                 ");
-                $stmtInsert->execute([
-                    ':school_id' => $schoolId,
-                    ':user_id' => $studentUserId,
-                    ':title' => $title,
-                    ':message' => $message,
-                    ':link' => "/student/fees?student_id=" . $studentId
-                ]);
+                foreach ($studentUserIds as $suId) {
+                    $stmtInsert->execute([
+                        ':school_id' => $schoolId,
+                        ':user_id' => $suId,
+                        ':title' => $title,
+                        ':message' => $message,
+                        ':link' => "/student/fees"
+                    ]);
+                    \App\Shared\Notifications\PushDispatcher::pushOnly(
+                        $pdo, $schoolId, 'STUDENT', (int)$suId, 'FEE_PAYMENT_RECORDED', $title, $message, '/student/fees'
+                    );
+                }
             }
         }
 
-        // 3. Notify Parent User account
+        // 3. Notify Parent User accounts (match by phone)
         if (!empty($phones)) {
-            $placeholders = implode(',', array_fill(0, count($phones), '?'));
-            $stmtParentUser = $pdo->prepare("
-                SELECT id FROM users 
-                WHERE school_id = ? AND role = 'PARENT' AND phone IN ($placeholders)
-            ");
-            $params = array_merge([$schoolId], array_values($phones));
-            $stmtParentUser->execute($params);
-            $parentUserIds = $stmtParentUser->fetchAll(PDO::FETCH_COLUMN) ?: [];
+            $placeholders = [];
+            $params = [':sid' => $schoolId];
+            foreach (array_values($phones) as $idx => $ph) {
+                $k = ":pph_" . $idx;
+                $placeholders[] = $k;
+                $params[$k] = $ph;
+            }
+            $sqlParent = "SELECT DISTINCT id FROM users WHERE school_id = :sid AND role = 'PARENT' AND phone IN (" . implode(',', $placeholders) . ")";
+            $stmtParentUsers = $pdo->prepare($sqlParent);
+            $stmtParentUsers->execute($params);
+            $parentUserIds = array_map('intval', $stmtParentUsers->fetchAll(PDO::FETCH_COLUMN) ?: []);
 
             if (!empty($parentUserIds)) {
                 $stmtInsert = $pdo->prepare("
-                    INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, is_read)
-                    VALUES (:school_id, 'PARENT', :user_id, :title, :message, :link, 0)
+                    INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, category, event_key, is_read)
+                    VALUES (:school_id, 'PARENT', :user_id, :title, :message, :link, 'FEES', 'FEE_PAYMENT_RECORDED', 0)
                 ");
-                foreach ($parentUserIds as $parentUserId) {
+                foreach ($parentUserIds as $puId) {
                     $stmtInsert->execute([
                         ':school_id' => $schoolId,
-                        ':user_id' => $parentUserId,
+                        ':user_id' => $puId,
                         ':title' => $title,
                         ':message' => $message,
-                        ':link' => "/parent/fees?student_id=" . $studentId
+                        ':link' => "/student/fees"
                     ]);
+                    \App\Shared\Notifications\PushDispatcher::pushOnly(
+                        $pdo, $schoolId, 'PARENT', (int)$puId, 'FEE_PAYMENT_RECORDED', $title, $message, '/student/fees'
+                    );
                 }
             }
         }
