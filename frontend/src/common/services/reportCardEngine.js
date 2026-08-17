@@ -185,13 +185,15 @@ export function compileFinalSessionReportCardData(examCards = [], weightagePolic
 
   const baseCard = examCards[0] || {};
   const student = {
-    id: baseCard.student_id || baseCard.id || null,
-    name: baseCard.student_name || baseCard.name || 'Student Name',
-    roll_no: baseCard.roll_no || baseCard.roll || '—',
-    admission_no: baseCard.admission_no || baseCard.sr_no || '—',
-    class_name: baseCard.class_name || baseCard.class || 'Class 1',
-    section: baseCard.class_section || baseCard.section || '',
-    dob: formatDateOfBirth(baseCard.dob)
+    id: baseCard.student?.id || baseCard.student_id || baseCard.id || null,
+    name: baseCard.student?.name || baseCard.student_name || baseCard.name || 'Student Name',
+    roll_no: baseCard.student?.roll_no || baseCard.roll_no || baseCard.roll || '—',
+    admission_no: baseCard.student?.admission_no || baseCard.admission_no || baseCard.sr_no || '—',
+    class_name: baseCard.student?.class_name || baseCard.class_name || baseCard.class || 'Class 1',
+    section: baseCard.student?.section || baseCard.class_section || baseCard.section || '',
+    father_name: baseCard.student?.father_name || baseCard.father_name || baseCard.father_name_text || baseCard.father || baseCard.guardian_name || '—',
+    mother_name: baseCard.student?.mother_name || baseCard.mother_name || baseCard.mother_name_text || baseCard.mother || '—',
+    dob: formatDateOfBirth(baseCard.student?.dob || baseCard.date_of_birth || baseCard.dob)
   };
 
   const school = {
