@@ -256,8 +256,8 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
         </div>
       )}
 
-      {/* Performance Summary Cards (5 columns) */}
-      <div className="grid grid-cols-5 gap-2 font-sans" style={{ marginTop: 'auto' }}>
+      {/* Performance Summary Cards (5 columns) - Locked at EXACT 8px gap below Total Marks row */}
+      <div className="grid grid-cols-5 gap-2 font-sans" style={{ marginTop: '8px' }}>
         <div className="bg-emerald-50 border border-emerald-200 p-2.5 rounded-lg text-center flex flex-col justify-center">
           <span className="text-[11px] font-bold text-emerald-800 uppercase block">Total Marks</span>
           <span className="text-xs font-bold font-mono text-emerald-950 mt-0.5">{summary.total_obtained} / {summary.total_max}</span>
@@ -284,10 +284,10 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
         </div>
       </div>
 
-      {/* Dual Signatures locked at EXACT 96px gap below 5 summary boxes (reduced by 40%) */}
+      {/* Dual Signatures locked at EXACT 150px gap below 5 summary boxes */}
       <div
         className="pb-1 font-sans flex justify-between items-end text-xs font-bold text-zinc-700 px-6"
-        style={{ marginTop: '96px' }}
+        style={{ marginTop: '150px' }}
       >
         <div className="inline-flex flex-col items-center">
           <div style={{ height: STAMP_SPACE }} aria-hidden="true" />
