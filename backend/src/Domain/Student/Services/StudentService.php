@@ -405,6 +405,12 @@ class StudentService extends BaseService
 
         foreach ($publishedExams as $ex) {
             $examId = (int)$ex['id'];
+            $isAnnual = str_contains(strtolower($ex['exam_name'] ?? ''), 'annual');
+
+            if ($isAnnual) {
+                $reportCards[] = $this->compileFinalAcademicReportCard($user, $student, $school, $schoolAddress, $schoolLogoUrl, $tplCode, $publishedExams, $gradeScales, $resolveGrade, $ex);
+                continue;
+            }
 
             // Fetch Exam Details for dates
             $stmtExDetails = $pdo->prepare("SELECT * FROM examinations WHERE id = :id LIMIT 1");
@@ -616,6 +622,225 @@ class StudentService extends BaseService
         }
 
         return $reportCards;
+    }
+
+    private function compileFinalAcademicReportCard(
+        array $user,
+        array $student,
+        array $school,
+        string $schoolAddress,
+        ?string $schoolLogoUrl,
+        string $tplCode,
+        array $publishedExams,
+        array $gradeScales,
+        callable $resolveGrade,
+        array $annualExam
+    ): array {
+        $studentId = (int)$student['id'];
+        $classId = (int)$student['class_id'];
+        $schoolId = (int)($user['school_id'] ?? 0);
+        $pdo = $this->repo->getPdo();
+
+        // 1. Collect published exam names & IDs for this academic year
+        $sessionExams = [];
+        $publishedExamIds = [];
+        foreach ($publishedExams as $pe) {
+            $eName = $pe['exam_name'];
+            if (!in_array($eName, $sessionExams)) {
+                $sessionExams[] = $eName;
+            }
+            $publishedExamIds[] = (int)$pe['id'];
+        }
+
+        if (empty($publishedExamIds)) {
+            $publishedExamIds[] = (int)$annualExam['id'];
+        }
+        $inExamIds = implode(',', $publishedExamIds);
+
+        // Fetch papers for these exams in student's class
+        $stmtPapers = $pdo->prepare("
+            SELECT ep.*, s.name AS subject_name, e.name AS exam_name
+            FROM examination_papers ep
+            JOIN subjects s ON ep.subject_id = s.id
+            JOIN examinations e ON ep.exam_id = e.id
+            WHERE ep.exam_id IN ({$inExamIds}) AND ep.class_id = :cid
+            ORDER BY ep.exam_date ASC, s.id ASC
+        ");
+        $stmtPapers->execute([':cid' => $classId]);
+        $allPapers = $stmtPapers->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        // Fetch marks for this student across these exams
+        $stmtMarks = $pdo->prepare("
+            SELECT * FROM examination_marks 
+            WHERE exam_id IN ({$inExamIds}) AND student_id = :sid
+        ");
+        $stmtMarks->execute([':sid' => $studentId]);
+        $allMarks = $stmtMarks->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        $marksByPaperId = [];
+        foreach ($allMarks as $m) {
+            $marksByPaperId[(int)$m['paper_id']] = $m;
+        }
+
+        // Group scores by subject_name -> exam_name
+        $subjectScoresMap = [];
+        foreach ($allPapers as $p) {
+            $subjName = $p['subject_name'];
+            $exName = $p['exam_name'];
+            $pid = (int)$p['id'];
+            $m = $marksByPaperId[$pid] ?? null;
+
+            $maxM = (float)$p['max_marks'];
+            $passM = (float)$p['passing_marks'];
+            $obt = null;
+            $isAbsent = false;
+
+            if ($m) {
+                $isAbsent = ((int)$m['is_absent'] === 1);
+                if (!$isAbsent && $m['marks_obtained'] !== null) {
+                    $obt = (float)$m['marks_obtained'];
+                }
+            }
+
+            if (!isset($subjectScoresMap[$subjName])) {
+                $subjectScoresMap[$subjName] = [];
+            }
+            $subjectScoresMap[$subjName][$exName] = [
+                'max_marks' => $maxM,
+                'passing_marks' => $passM,
+                'marks_obtained' => $isAbsent ? 'ABSENT' : ($obt !== null ? $obt : '—'),
+                'raw_obtained' => $isAbsent ? 0.0 : ($obt !== null ? $obt : 0.0),
+                'is_absent' => $isAbsent,
+                'has_score' => ($obt !== null && !$isAbsent)
+            ];
+        }
+
+        $finalSubjects = [];
+        $grandSessionMax = 0.0;
+        $grandSessionObtained = 0.0;
+        $allPassed = true;
+
+        foreach ($subjectScoresMap as $subjName => $examScores) {
+            $subGrandMax = 0.0;
+            $subGrandObt = 0.0;
+
+            foreach ($sessionExams as $exName) {
+                $sc = $examScores[$exName] ?? null;
+                if ($sc) {
+                    $subGrandMax += (float)$sc['max_marks'];
+                    if ($sc['has_score']) {
+                        $subGrandObt += (float)$sc['raw_obtained'];
+                    }
+                }
+            }
+
+            $subPct = $subGrandMax > 0 ? ($subGrandObt / $subGrandMax) * 100 : 0.0;
+            $subGrade = $resolveGrade($subPct);
+            $subPassed = $subGrandMax > 0 ? ($subGrandObt >= ($subGrandMax * 0.33)) : true;
+            if (!$subPassed) {
+                $allPassed = false;
+            }
+
+            $grandSessionMax += $subGrandMax;
+            $grandSessionObtained += $subGrandObt;
+
+            $finalSubjects[] = [
+                'subject_name' => $subjName,
+                'exam_scores' => $examScores,
+                'grand_total_max' => $subGrandMax,
+                'grand_total_obtained' => $subGrandObt,
+                'max_marks' => $subGrandMax,
+                'marks_obtained' => $subGrandObt,
+                'passing_marks' => round($subGrandMax * 0.33, 2),
+                'grade' => $subGrade,
+                'result' => $subPassed ? 'PASS' : 'FAIL'
+            ];
+        }
+
+        $overallPct = $grandSessionMax > 0 ? round(($grandSessionObtained / $grandSessionMax) * 100, 2) : 0.0;
+        $overallGrade = $resolveGrade($overallPct);
+
+        $examTotalsMap = [];
+        foreach ($sessionExams as $exName) {
+            $exMax = 0.0;
+            $exObt = 0.0;
+            foreach ($subjectScoresMap as $subjScores) {
+                $sc = $subjScores[$exName] ?? null;
+                if ($sc) {
+                    $exMax += (float)$sc['max_marks'];
+                    if ($sc['has_score']) {
+                        $exObt += (float)$sc['raw_obtained'];
+                    }
+                }
+            }
+            $examTotalsMap[$exName] = [
+                'max_marks' => $exMax,
+                'marks_obtained' => $exObt
+            ];
+        }
+
+        // Fetch Attendance
+        $stmtAY = $pdo->prepare("SELECT * FROM academic_years WHERE id = :id LIMIT 1");
+        $stmtAY->execute([':id' => $annualExam['academic_year_id']]);
+        $ayDetail = $stmtAY->fetch(\PDO::FETCH_ASSOC);
+        $startD = $ayDetail ? $ayDetail['start_date'] : '2020-01-01';
+        $endD = $ayDetail ? $ayDetail['end_date'] : '2030-12-31';
+
+        $stmtAtt = $pdo->prepare("
+            SELECT 
+                COUNT(*) AS total,
+                SUM(CASE WHEN status IN ('PRESENT', 'LATE') THEN 1 ELSE 0 END) AS present
+            FROM attendance
+            WHERE student_id = :sid AND date BETWEEN :start_d AND :end_d
+        ");
+        $stmtAtt->execute([
+            ':sid' => $studentId,
+            ':start_d' => $startD,
+            ':end_d' => $endD
+        ]);
+        $att = $stmtAtt->fetch(\PDO::FETCH_ASSOC);
+        $attTotal = (int)($att['total'] ?? 0);
+        $attPresent = (int)($att['present'] ?? 0);
+        $attRate = $attTotal > 0 ? round(($attPresent / $attTotal) * 100, 2) : 100.00;
+
+        return [
+            'is_final_session_report' => true,
+            'badge_title' => 'FINAL ACADEMIC REPORT CARD',
+            'exam_id' => (int)$annualExam['id'],
+            'exam_name' => 'FINAL ACADEMIC REPORT CARD',
+            'original_exam_name' => $annualExam['exam_name'],
+            'student_id' => $studentId,
+            'student_name' => $student['name'],
+            'roll_no' => $student['roll_no'],
+            'admission_no' => $student['sr_no'] ?? $student['admission_no'] ?? '',
+            'father_name' => $student['father_name'] ?? '',
+            'mother_name' => $student['mother_name'] ?? '',
+            'dob' => $student['dob'] ?? '',
+            'class_name' => $annualExam['class_name'],
+            'class_section' => $annualExam['class_section'],
+            'academic_year_name' => $annualExam['academic_year_name'],
+            'school_name' => $school['name'] ?? 'Academic Portal',
+            'school_address' => $schoolAddress,
+            'school_logo' => $schoolLogoUrl,
+            'report_card_remark' => $school['report_card_remark'] ?? null,
+            'template_code' => $tplCode,
+            'session_exams' => $sessionExams,
+            'subjects' => $finalSubjects,
+            'exam_totals' => $examTotalsMap,
+            'total_max' => $grandSessionMax,
+            'total_obtained' => $grandSessionObtained,
+            'percentage' => $overallPct,
+            'grade' => $overallGrade,
+            'result' => $allPassed ? 'PASS' : 'FAIL',
+            'class_rank' => "1 of 1",
+            'section_rank' => "1 of 1",
+            'attendance' => [
+                'working_days' => $attTotal,
+                'present_days' => $attPresent,
+                'attendance_rate' => $attRate
+            ],
+            'status' => 'Published'
+        ];
     }
 
     public function getFeesCard(array $user): array
