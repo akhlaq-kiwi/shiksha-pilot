@@ -246,19 +246,16 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       final history = await widget.attendanceService.getTeacherAttendanceHistory(_selectedClassId!, dateStr);
       setState(() {
         _markedHistory = history;
-        _isSubmittedForSelectedDate = history.isNotEmpty;
+        final totalStudentsCount = _students.length;
+        final markedCount = history.length;
+        _isSubmittedForSelectedDate = totalStudentsCount > 0 && markedCount >= totalStudentsCount;
         _isOffline = false;
 
-        // If already submitted, map status
-        if (_isSubmittedForSelectedDate) {
-          for (var record in history) {
-            final sId = record['student_id'] as int;
-            final status = record['status'] as String;
-            _tempAttendance[sId] = status;
-          }
-        } else {
-          // If not submitted, clear temp marking
-          _tempAttendance.clear();
+        // Map existing attendance records into temp state
+        for (var record in history) {
+          final sId = record['student_id'] as int;
+          final status = record['status'] as String;
+          _tempAttendance[sId] = status;
         }
       });
     } catch (e) {
