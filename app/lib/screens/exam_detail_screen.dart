@@ -1763,31 +1763,6 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                           padding: const EdgeInsets.all(20),
                           child: Column(
                             children: [
-                              // Download Action Button
-                              ElevatedButton.icon(
-                                onPressed: _isDownloading ? null : () => _downloadReportCardPDF(rcData, setModalState),
-                                icon: _isDownloading
-                                    ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          color: Colors.white,
-                                          strokeWidth: 2,
-                                        ),
-                                      )
-                                    : const Icon(Icons.download_rounded),
-                                label: Text(_isDownloading ? 'Downloading...' : 'Download Report Card (PDF)'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.indigo.shade900,
-                                  foregroundColor: Colors.white,
-                                  minimumSize: const Size.fromHeight(50),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 20),
-
                               // Formatted Report Card Container (Dynamic Active Template Match)
                               Builder(
                                 builder: (context) {
