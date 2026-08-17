@@ -21,61 +21,53 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
   let metaPadding = '8px 12px';
 
   if (subCount <= 4) {
-    // 4 or fewer subjects: Generously expanded rows, text & vertical spacing
-    cellPadding = '26px 14px';
-    headerPadding = '18px 14px';
-    fontSizePx = '14px';
-    containerPadding = '9.5mm';
-    sectionGapPx = '28px';
-    metaPadding = '14px 14px';
-  } else if (subCount === 5) {
-    // 5 subjects: Expanded rows & padding to fill vertical space
-    cellPadding = '22px 14px';
-    headerPadding = '16px 14px';
-    fontSizePx = '13.5px';
-    containerPadding = '9mm';
-    sectionGapPx = '24px';
-    metaPadding = '12px 14px';
-  } else if (subCount === 6) {
-    // 6 subjects: Taller rows & padding to eliminate large white space gap
-    cellPadding = '18px 14px';
-    headerPadding = '14px 14px';
+    // 1–4 subjects
+    cellPadding = '12px 14px';
+    headerPadding = '10px 12px';
     fontSizePx = '13px';
-    containerPadding = '8.5mm';
-    sectionGapPx = '22px';
-    metaPadding = '10px 12px';
-  } else if (subCount === 7) {
-    // 7 subjects: Comfortably padded rows
-    cellPadding = '14px 14px';
-    headerPadding = '12px 14px';
-    fontSizePx = '12.5px';
     containerPadding = '8mm';
-    sectionGapPx = '18px';
-    metaPadding = '10px 12px';
-  } else if (subCount <= 9) {
-    // 8–9 subjects (Default 8): Standard table padding
-    cellPadding = '10px 14px';
-    headerPadding = '10px 14px';
+    sectionGapPx = '12px';
+    metaPadding = '12px 14px';
+  } else if (subCount <= 6) {
+    // 5–6 subjects
+    cellPadding = '8px 12px';
+    headerPadding = '8px 12px';
     fontSizePx = '12px';
     containerPadding = '7.5mm';
-    sectionGapPx = '16px';
-    metaPadding = '8px 12px';
-  } else if (subCount <= 11) {
-    // 10–11 subjects: Compact table padding
+    sectionGapPx = '10px';
+    metaPadding = '10px 12px';
+  } else if (subCount <= 8) {
+    // 7–8 subjects
     cellPadding = '6px 10px';
     headerPadding = '6px 10px';
     fontSizePx = '11.5px';
-    containerPadding = '6mm';
-    sectionGapPx = '12px';
-    metaPadding = '6px 10px';
-  } else {
-    // 12+ subjects: Extra compact table padding
-    cellPadding = '4px 8px';
-    headerPadding = '4px 8px';
-    fontSizePx = '11px';
-    containerPadding = '4.5mm';
+    containerPadding = '7mm';
     sectionGapPx = '8px';
-    metaPadding = '5px 8px';
+    metaPadding = '8px 10px';
+  } else if (subCount <= 10) {
+    // 9–10 subjects
+    cellPadding = '4px 8px';
+    headerPadding = '5px 8px';
+    fontSizePx = '11px';
+    containerPadding = '6mm';
+    sectionGapPx = '8px';
+    metaPadding = '7px 8px';
+  } else if (subCount <= 12) {
+    // 11–12 subjects
+    cellPadding = '3px 6px';
+    headerPadding = '4px 6px';
+    fontSizePx = '10.5px';
+    containerPadding = '5mm';
+    sectionGapPx = '6px';
+    metaPadding = '6px 6px';
+  } else {
+    // 13+ subjects
+    cellPadding = '2px 5px';
+    headerPadding = '3px 5px';
+    fontSizePx = '10px';
+    containerPadding = '4mm';
+    sectionGapPx = '5px';
+    metaPadding = '4px 5px';
   }
 
   return (
