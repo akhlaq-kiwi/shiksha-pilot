@@ -20,53 +20,37 @@ export default function ModernReportCardTemplate({ data, config = {} }) {
   let metaPadding = '12px 14px';
 
   if (subCount <= 4) {
-    // 4 or fewer subjects: Generously expanded rows, text & vertical spacing
-    cellPadding = '28px 16px';
-    headerPadding = '18px 16px';
-    fontSizePx = '14px';
-    containerPadding = '9.5mm';
-    sectionGapPx = '28px';
-    metaPadding = '20px 18px';
-  } else if (subCount === 5) {
-    // 5 subjects: Expanded rows & padding to fill vertical space
-    cellPadding = '24px 16px';
-    headerPadding = '16px 16px';
-    fontSizePx = '13.5px';
-    containerPadding = '9mm';
-    sectionGapPx = '24px';
-    metaPadding = '18px 16px';
-  } else if (subCount === 6) {
-    // 6 subjects: Taller rows & padding to eliminate large white space gap
-    cellPadding = '20px 16px';
+    // 4 or fewer subjects: Comfortably spaced rows
+    cellPadding = '16px 16px';
     headerPadding = '14px 16px';
-    fontSizePx = '13px';
+    fontSizePx = '13.5px';
     containerPadding = '8.5mm';
-    sectionGapPx = '22px';
-    metaPadding = '16px 16px';
-  } else if (subCount === 7) {
-    // 7 subjects: Comfortably padded rows
-    cellPadding = '15px 16px';
-    headerPadding = '12px 16px';
-    fontSizePx = '12.5px';
-    containerPadding = '8mm';
     sectionGapPx = '18px';
     metaPadding = '14px 16px';
-  } else if (subCount <= 9) {
-    // 8–9 subjects (Default 8): Standard table padding
-    cellPadding = '10px 14px';
+  } else if (subCount <= 6) {
+    // 5–6 subjects: Balanced padding to fit 280mm budget at 1.0 scale
+    cellPadding = '12px 16px';
+    headerPadding = '12px 16px';
+    fontSizePx = '13px';
+    containerPadding = '8mm';
+    sectionGapPx = '14px';
+    metaPadding = '12px 14px';
+  } else if (subCount <= 8) {
+    // 7–8 subjects: Standard table padding
+    cellPadding = '9px 14px';
     headerPadding = '10px 14px';
     fontSizePx = '12px';
     containerPadding = '7.5mm';
-    sectionGapPx = '16px';
-    metaPadding = '12px 14px';
+    sectionGapPx = '12px';
+    metaPadding = '10px 14px';
   } else if (subCount <= 11) {
-    // 10–11 subjects: Compact table padding
+    // 9–11 subjects: Compact table padding
     cellPadding = '6px 12px';
     headerPadding = '6px 12px';
     fontSizePx = '11.5px';
     containerPadding = '6mm';
-    sectionGapPx = '12px';
-    metaPadding = '10px 12px';
+    sectionGapPx = '10px';
+    metaPadding = '8px 12px';
   } else {
     // 12+ subjects: Extra compact table padding
     cellPadding = '4px 10px';
