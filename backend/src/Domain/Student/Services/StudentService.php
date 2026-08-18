@@ -526,7 +526,7 @@ class StudentService extends BaseService
                     $absent = (int)$m['is_absent'] === 1;
                     if (!$absent) {
                         $rawObtained = $m['marks_obtained'];
-                        $isGradePaper = ((float)$p['max_marks'] === 0.0) || (!is_null($rawObtained) && !is_numeric($rawObtained));
+                        $isGradePaper = ((float)$p['max_marks'] === 0.0) || (!is_null($rawObtained) && $rawObtained !== '' && !is_numeric($rawObtained) && strtoupper(trim((string)$rawObtained)) !== 'ABSENT');
                         if ($isGradePaper) {
                             $obtained = (!is_null($rawObtained) && $rawObtained !== '') ? (string)$rawObtained : '—';
                             $subjectGrade = $obtained !== '—' ? $obtained : 'A';
@@ -552,10 +552,12 @@ class StudentService extends BaseService
                     $totalMax += $maxM;
                 }
 
+                $isGradeSubject = ((float)$p['max_marks'] === 0.0) || ($m && !is_null($m['marks_obtained']) && $m['marks_obtained'] !== '' && !is_numeric($m['marks_obtained']) && strtoupper(trim((string)$m['marks_obtained'])) !== 'ABSENT');
+
                 $subjectMarks[] = [
                     'subject_name' => $p['subject_name'],
-                    'max_marks' => (float)$p['max_marks'] === 0.0 ? 'GRADE' : $maxM,
-                    'passing_marks' => (float)$p['max_marks'] === 0.0 ? 'C' : $passM,
+                    'max_marks' => $isGradeSubject ? 'GRADE' : $maxM,
+                    'passing_marks' => $isGradeSubject ? 'C' : $passM,
                     'marks_obtained' => $absent ? 'ABSENT' : ($obtained !== null ? $obtained : '-'),
                     'grade' => $absent ? 'F' : ($obtained !== null ? $subjectGrade : '-'),
                     'remarks' => $remarks,

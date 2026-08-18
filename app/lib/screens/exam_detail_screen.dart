@@ -2013,8 +2013,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                                    final bool isGradeOnly = sub['is_grade_only'] == true || 
                                                        sub['evaluation_type'] == 'grade' || 
                                                        rawMax == '0' || rawMax == '0.0' || rawMax == 'GRADE' ||
-                                                       ['A+', 'A', 'B', 'C', 'D', 'E', 'F'].contains(rawObt) ||
-                                                       ['A+', 'A', 'B', 'C', 'D', 'E', 'F'].contains(rawGrade);
+                                                       (['A+', 'A', 'B', 'C', 'D', 'E', 'F'].contains(rawObt) && rawObt != 'ABSENT');
 
                                                    final String assignedGrade = (isGradeOnly && ['A+', 'A', 'B', 'C', 'D', 'E', 'F'].contains(rawObt)) 
                                                        ? rawObt 
