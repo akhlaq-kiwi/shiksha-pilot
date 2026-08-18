@@ -15,6 +15,7 @@ import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 import { DropdownMenu, DropdownItem } from '../../../common/ui/DropdownMenu';
 import CredentialsDialog from '../../../common/components/CredentialsDialog';
 import { resolveFileUrl } from '../../../common/utils/fileUrl';
+import TeacherIdentityCardPreview from '../components/TeacherIdentityCardPreview';
 
 // Self-healing avatar image component to handle loading errors gracefully
 const TeacherAvatar = ({ src, name, updatedAt }) => {
@@ -193,8 +194,9 @@ const getVisibleMonths = (joiningDateStr, workingYearStartStr) => {
 
 export default function StaffPage() {
   const [searchParams] = useSearchParams();
-  const [view, setView] = useState('list'); // 'list', 'details'
+  const [view, setView] = useState('list'); // 'list', 'details', 'identity-cards'
   const [selectedTeacherId, setSelectedTeacherId] = useState(null);
+  const [selectedTeacherForIdCard, setSelectedTeacherForIdCard] = useState(null);
   const [totalPeriodsLimit, setTotalPeriodsLimit] = useState(8);
 
   useEffect(() => {
@@ -321,7 +323,7 @@ export default function StaffPage() {
     }
   };
 
-  const { isReadOnly } = useAcademicYear();
+  const { currentYear, isReadOnly } = useAcademicYear();
 
   useEffect(() => {
     loadStaff(true);
@@ -389,6 +391,21 @@ export default function StaffPage() {
   const teachers = staff.filter(s => s.role === 'TEACHER' || s.role === 'Teacher');
   const totalTeachers = teachers.length;
   const activeTeachersCount = teachers.filter(s => s.status === 'ACTIVE').length;
+
+  if (view === 'identity-cards') {
+    return (
+      <TeacherIdentityCardPreview
+        teachers={teachers}
+        schoolProfile={schoolProfile}
+        currentYear={currentYear}
+        selectedTeacherId={selectedTeacherForIdCard}
+        onBack={() => {
+          setView('list');
+          setSelectedTeacherForIdCard(null);
+        }}
+      />
+    );
+  }
 
   const filteredStaff = teachers.filter(s => {
     const matchesSearch = s.name.toLowerCase().includes(staffSearch.toLowerCase()) ||
@@ -996,6 +1013,16 @@ export default function StaffPage() {
                 <h2 className="text-2xl font-bold text-text-primary tracking-tight font-display">Teacher Profile</h2>
               </div>
               <div className="flex items-center gap-3">
+                <Button 
+                  variant="outline" 
+                  className="flex items-center gap-2 font-bold border-border"
+                  onClick={() => {
+                    setSelectedTeacherForIdCard(t.id);
+                    setView('identity-cards');
+                  }}
+                >
+                  <CreditCard className="h-4 w-4 text-emerald-600" /> Identity Card
+                </Button>
                 {isInactiveTeacher && (
                   <Button 
                     onClick={() => {
@@ -1411,42 +1438,54 @@ export default function StaffPage() {
               <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Teachers</h2>
               <p className="text-text-secondary text-sm mt-1">{totalTeachers} teachers · {activeTeachersCount} active</p>
             </div>
-            {!isReadOnly && (
-            <Button className="flex items-center gap-2 font-bold shadow-xs hover:shadow-md transition-all duration-200" onClick={() => {
-              setNewStaff({
-                id: null,
-                name: '',
-                role: 'Teacher',
-                department: '',
-                email: '',
-                phone: '',
-                emergency_phone: '',
-                photo_path: '',
-                father_name: '',
-                mother_name: '',
-                joining_date: '',
-                exit_date: '',
-                salary: '',
-                current_address_line: '',
-                current_city: '',
-                current_state: '',
-                current_country: 'India',
-                current_pin_code: '',
-                permanent_address_line: '',
-                permanent_city: '',
-                permanent_state: '',
-                permanent_country: 'India',
-                permanent_pin_code: '',
-                same_as_current: 0,
-                documents: []
-              });
-              setFormErrors({});
-              setUploadError('');
-              setIsAddStaffOpen(true);
-            }}>
-              <Plus className="h-4 w-4" /> Add Teacher
-            </Button>
-          )}
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSelectedTeacherForIdCard(null);
+                  setView('identity-cards');
+                }}
+                className="flex items-center gap-2 font-bold shadow-xs hover:shadow-md transition-all duration-200 border-border"
+              >
+                <CreditCard className="h-4 w-4 text-emerald-600" /> Identity Cards
+              </Button>
+              {!isReadOnly && (
+                <Button className="flex items-center gap-2 font-bold shadow-xs hover:shadow-md transition-all duration-200" onClick={() => {
+                  setNewStaff({
+                    id: null,
+                    name: '',
+                    role: 'Teacher',
+                    department: '',
+                    email: '',
+                    phone: '',
+                    emergency_phone: '',
+                    photo_path: '',
+                    father_name: '',
+                    mother_name: '',
+                    joining_date: '',
+                    exit_date: '',
+                    salary: '',
+                    current_address_line: '',
+                    current_city: '',
+                    current_state: '',
+                    current_country: 'India',
+                    current_pin_code: '',
+                    permanent_address_line: '',
+                    permanent_city: '',
+                    permanent_state: '',
+                    permanent_country: 'India',
+                    permanent_pin_code: '',
+                    same_as_current: 0,
+                    documents: []
+                  });
+                  setFormErrors({});
+                  setUploadError('');
+                  setIsAddStaffOpen(true);
+                }}>
+                  <Plus className="h-4 w-4" /> Add Teacher
+                </Button>
+              )}
+            </div>
           </div>
 
           {error && (
@@ -1494,6 +1533,12 @@ export default function StaffPage() {
                         <DropdownMenu>
                           <DropdownItem onClick={() => { setSelectedTeacherId(t.id); setView('details'); }}>
                             View Details
+                          </DropdownItem>
+                          <DropdownItem onClick={() => {
+                            setSelectedTeacherForIdCard(t.id);
+                            setView('identity-cards');
+                          }}>
+                            Identity Card
                           </DropdownItem>
                           <DropdownItem onClick={() => {
                             setCredentialsTarget(t);
