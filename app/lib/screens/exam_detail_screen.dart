@@ -1774,8 +1774,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                   final String badgeTitle = theme['badgeTitle'] as String;
 
                                   final bool isFinalReport = (rcData['is_final_session_report'] == true) || 
-                                      (rcData['badge_title']?.toString().toUpperCase() == 'FINAL ACADEMIC REPORT CARD') ||
-                                      ((rcData['exam_name'] ?? widget.examName).toString().toLowerCase().contains('annual'));
+                                      (rcData['badge_title']?.toString().toUpperCase() == 'FINAL ACADEMIC REPORT CARD');
 
                                   return Container(
                                     padding: const EdgeInsets.all(16),
