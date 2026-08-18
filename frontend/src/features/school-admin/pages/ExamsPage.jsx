@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Plus, ArrowLeft, Calendar, Clock, BookOpen, UserCheck, 
@@ -534,6 +534,8 @@ export default function ExamsPage() {
   // Local Marks Spreadsheet State
   const [marksSheet, setMarksSheet] = useState(null);
   const [savingMarkStudentId, setSavingMarkStudentId] = useState(null);
+  const markInputRefs = useRef({});
+  const autoAdvanceTimerRef = useRef(null);
 
   // Local Report Cards State
   const [reportCards, setReportCards] = useState([]);
@@ -3311,7 +3313,7 @@ export default function ExamsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {marksSheet.students.map(s => {
+                  {marksSheet.students.map((s, idx) => {
                     const isReadOnlyField = false;
                     const currentPaper = timetablePapers.find(p => p.subject_id.toString() === selectedSubjectId);
                     const isGradeSheet = marksSheet.evaluation_type === 'grade' || parseFloat(marksSheet.max_marks) === 0 || currentPaper?.evaluation_type === 'grade';
@@ -3352,6 +3354,7 @@ export default function ExamsPage() {
                             })()
                           ) : (
                             <Input 
+                              ref={el => { markInputRefs.current[s.student_id] = el; }}
                               type="text"
                               inputMode="numeric"
                               pattern="[0-9]*"
@@ -3359,7 +3362,62 @@ export default function ExamsPage() {
                               className="h-8 text-xs font-mono w-full"
                               disabled={s.is_absent === 1 || isReadOnlyField}
                               value={s.is_absent === 1 ? '' : (s.marks_obtained !== null && s.marks_obtained !== undefined ? s.marks_obtained : '')}
-                              onChange={e => handleMarkCellChange(s.student_id, 'marks_obtained', e.target.value)}
+                              onChange={e => {
+                                const val = e.target.value;
+                                handleMarkCellChange(s.student_id, 'marks_obtained', val);
+
+                                const cleanVal = val.replace(/\D/g, '');
+                                const maxM = parseFloat(marksSheet?.max_marks || 100);
+                                const nextStudent = marksSheet?.students?.[idx + 1];
+
+                                if (nextStudent) {
+                                  const focusNext = () => {
+                                    const nextEl = markInputRefs.current[nextStudent.student_id];
+                                    if (nextEl) {
+                                      nextEl.focus();
+                                      if (nextEl.select) nextEl.select();
+                                    }
+                                  };
+
+                                  if (cleanVal.length >= 3) {
+                                    if (autoAdvanceTimerRef.current) clearTimeout(autoAdvanceTimerRef.current);
+                                    focusNext();
+                                  } else if (cleanVal.length === 2) {
+                                    if (cleanVal === '10' && maxM >= 100) {
+                                      if (autoAdvanceTimerRef.current) clearTimeout(autoAdvanceTimerRef.current);
+                                      autoAdvanceTimerRef.current = setTimeout(() => {
+                                        focusNext();
+                                      }, 300);
+                                    } else {
+                                      if (autoAdvanceTimerRef.current) clearTimeout(autoAdvanceTimerRef.current);
+                                      focusNext();
+                                    }
+                                  }
+                                }
+                              }}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter' || e.key === 'ArrowDown') {
+                                  e.preventDefault();
+                                  const nextStudent = marksSheet?.students?.[idx + 1];
+                                  if (nextStudent) {
+                                    const nextEl = markInputRefs.current[nextStudent.student_id];
+                                    if (nextEl) {
+                                      nextEl.focus();
+                                      if (nextEl.select) nextEl.select();
+                                    }
+                                  }
+                                } else if (e.key === 'ArrowUp') {
+                                  e.preventDefault();
+                                  const prevStudent = marksSheet?.students?.[idx - 1];
+                                  if (prevStudent) {
+                                    const prevEl = markInputRefs.current[prevStudent.student_id];
+                                    if (prevEl) {
+                                      prevEl.focus();
+                                      if (prevEl.select) prevEl.select();
+                                    }
+                                  }
+                                }
+                              }}
                             />
                           )}
                         </TableCell>
