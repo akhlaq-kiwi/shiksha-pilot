@@ -2006,10 +2006,24 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                                  // Table Rows
                                                  ...((rcData['subjects'] as List? ?? []).map((sub) {
                                                    final String sName = (sub['subject_name'] ?? '').toString();
-                                                   final String maxM = (sub['max_marks'] ?? '-').toString();
-                                                   final String passM = (sub['passing_marks'] ?? '-').toString();
-                                                   final String obt = (sub['marks_obtained'] ?? '-').toString();
-                                                   final String grade = (sub['grade'] ?? '-').toString();
+                                                   final String rawObt = (sub['marks_obtained'] ?? '').toString().toUpperCase().trim();
+                                                   final String rawMax = (sub['max_marks'] ?? '').toString().toUpperCase().trim();
+                                                   final String rawGrade = (sub['grade'] ?? '').toString().toUpperCase().trim();
+
+                                                   final bool isGradeOnly = sub['is_grade_only'] == true || 
+                                                       sub['evaluation_type'] == 'grade' || 
+                                                       rawMax == '0' || rawMax == '0.0' || rawMax == 'GRADE' ||
+                                                       ['A+', 'A', 'B', 'C', 'D', 'E', 'F'].contains(rawObt) ||
+                                                       ['A+', 'A', 'B', 'C', 'D', 'E', 'F'].contains(rawGrade);
+
+                                                   final String assignedGrade = (isGradeOnly && ['A+', 'A', 'B', 'C', 'D', 'E', 'F'].contains(rawObt)) 
+                                                       ? rawObt 
+                                                       : (rawGrade.isNotEmpty && rawGrade != '—' && rawGrade != '-' ? rawGrade : (rawObt.isNotEmpty && rawObt != '—' && rawObt != '-' ? rawObt : 'A'));
+
+                                                   final String obt = isGradeOnly ? assignedGrade : (sub['marks_obtained'] ?? '—').toString();
+                                                   final String maxM = isGradeOnly ? 'GRADE' : (sub['max_marks'] ?? '—').toString();
+                                                   final String passM = isGradeOnly ? 'C' : (sub['passing_marks'] ?? '—').toString();
+                                                   final String grade = isGradeOnly ? assignedGrade : (sub['grade'] ?? '—').toString();
                                                    final String res = (sub['result'] ?? 'PASS').toString().toUpperCase();
                                                    final bool isFail = res == 'FAIL';
 
@@ -2251,8 +2265,11 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                   ),
                   ...sessionExams.map((exName) {
                     final sc = examScores[exName] ?? examScores[exName.toString()];
-                    final String mm = sc != null ? (sc['max_marks'] ?? '-').toString() : '100';
-                    final String obt = sc != null ? (sc['marks_obtained'] ?? '-').toString() : '—';
+                    final String rawMM = sc != null ? (sc['max_marks'] ?? '-').toString().toUpperCase().trim() : '100';
+                    final String rawObt = sc != null ? (sc['marks_obtained'] ?? '-').toString().toUpperCase().trim();
+                    final bool isGradeSub = rawMM == '0' || rawMM == '0.0' || rawMM == 'GRADE' || ['A+', 'A', 'B', 'C', 'D', 'E', 'F'].contains(rawObt);
+                    final String mm = isGradeSub ? 'GRADE' : rawMM;
+                    final String obt = isGradeSub ? (rawObt.isNotEmpty && rawObt != '—' ? rawObt : 'A') : (sc != null ? (sc['marks_obtained'] ?? '-').toString() : '—');
                     final bool isAbs = sc != null && (sc['is_absent'] == true || obt == 'ABSENT');
 
                     return Expanded(
