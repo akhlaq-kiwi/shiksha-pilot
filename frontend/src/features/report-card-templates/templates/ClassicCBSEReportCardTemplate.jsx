@@ -96,7 +96,7 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
         <h1 className="text-2xl font-bold uppercase tracking-tight font-display text-zinc-900 leading-tight">
           {school.name}
         </h1>
-        <p className="text-xs font-sans text-zinc-600 mt-0.5">
+        <p className="text-xs font-sans text-zinc-600 font-semibold mt-0.5 uppercase tracking-wide">
           {school.address}
         </p>
         <div className="inline-block border-y border-zinc-800 py-1 px-4 mt-2 font-sans font-bold text-xs uppercase tracking-widest text-zinc-900">
@@ -134,14 +134,14 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
         </tbody>
       </table>
 
-      {/* Scholastic Achievements Table */}
-      <div className="font-sans">
+      {/* Scholastic Achievements Table Container - Expands dynamically for small subject counts */}
+      <div className="font-sans flex-1 flex flex-col justify-between">
         <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-900 border-b border-zinc-400 pb-1 mb-2">
           Part 1: Scholastic Performance ({exam.name})
         </h3>
         
         {exam.is_final_session_report ? (
-          <table className="w-full border border-zinc-800 border-collapse" style={{ fontSize: fontSizePx }}>
+          <table className="w-full h-full border border-zinc-800 border-collapse" style={{ fontSize: fontSizePx }}>
             <thead>
               <tr className="bg-zinc-800 text-white font-bold uppercase text-[11px]">
                 <th rowSpan={2} style={{ padding: headerPadding }} className="text-left border-r border-zinc-700">Subject</th>
@@ -184,8 +184,7 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
                   <td style={{ padding: cellPadding }} className="text-center font-bold text-xs">{s.grade || '—'}</td>
                 </tr>
               ))}
-            </tbody>
-            <tfoot>
+              {/* Total Marks Row (Inside tbody so height expands equally with subject rows) */}
               <tr className="bg-zinc-100 font-bold border-t-2 border-zinc-800">
                 <td style={{ padding: cellPadding }} className="border-r border-zinc-300">Grand Total</td>
                 {(data.session_exams || ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam']).map(exName => (
@@ -198,10 +197,10 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
                 <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono font-bold text-sm">{summary.total_obtained ?? '—'}</td>
                 <td style={{ padding: cellPadding }} className="text-center font-bold text-sm">{summary.grade || '—'}</td>
               </tr>
-            </tfoot>
+            </tbody>
           </table>
         ) : (
-          <table className="w-full border border-zinc-800 border-collapse" style={{ fontSize: fontSizePx }}>
+          <table className="w-full h-full border border-zinc-800 border-collapse" style={{ fontSize: fontSizePx }}>
             <thead>
               <tr className="bg-zinc-800 text-white font-bold uppercase text-[11px]">
                 <th style={{ padding: headerPadding }} className="text-left border-r border-zinc-700">Subject</th>
@@ -223,8 +222,7 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
                   <td style={{ padding: cellPadding }} className="text-center font-bold text-[11px] uppercase">{s.result}</td>
                 </tr>
               ))}
-            </tbody>
-            <tfoot>
+              {/* Total Marks Row (Inside tbody so height expands equally with subject rows) */}
               <tr className="bg-zinc-100 font-bold border-t-2 border-zinc-800">
                 <td style={{ padding: cellPadding }} className="border-r border-zinc-300">Grand Total</td>
                 <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono">{summary.total_max}</td>
@@ -233,21 +231,13 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
                 <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-bold text-sm">{summary.grade}</td>
                 <td style={{ padding: cellPadding }} className="text-center font-bold text-xs">{summary.result}</td>
               </tr>
-            </tfoot>
+            </tbody>
           </table>
         )}
       </div>
 
-      {/* Teacher Remarks (Rendered ONLY if non-empty remark exists) */}
-      {Boolean(summary.teacher_remark && summary.teacher_remark.toString().trim() !== '') && (
-        <div className="px-1 font-sans text-xs text-zinc-800 leading-normal">
-          <strong className="font-bold text-zinc-900">Teacher Remarks:</strong>{' '}
-          <span className="font-normal text-zinc-800">{summary.teacher_remark}</span>
-        </div>
-      )}
-
-      {/* Performance Summary Cards (5 columns) - Locked at EXACT 8px gap below Total Marks row */}
-      <div className="grid grid-cols-5 gap-2 font-sans" style={{ marginTop: '8px' }}>
+      {/* Performance Summary Cards (5 columns) - Locked at EXACT constant 5px gap below Total Marks row */}
+      <div className="grid grid-cols-5 gap-2 font-sans" style={{ marginTop: '5px' }}>
         <div className="bg-emerald-50 border border-emerald-200 p-2 rounded text-center flex flex-col justify-center">
           <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 block">Total Marks</span>
           <span className="text-xs font-bold text-emerald-950 font-mono mt-0.5">{summary.total_obtained} / {summary.total_max}</span>
@@ -274,11 +264,20 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
         </div>
       </div>
 
-      {/* Signatures locked at EXACT 150px gap below 5 summary boxes */}
-      <div
-        className="pb-1 font-sans flex justify-between items-end text-xs font-bold text-zinc-800 px-6"
-        style={{ marginTop: '150px' }}
-      >
+      {/* Teacher Remarks (Rendered ONLY if non-empty remark exists, placed JUST BELOW 5 Summary Cards) */}
+      {(() => {
+        const remarkText = summary?.teacher_remark || data?.teacher_remark || data?.report_card_remark || school?.report_card_remark;
+        if (!remarkText || remarkText.toString().trim() === '') return null;
+        return (
+          <div className="mt-2.5 px-1 font-sans text-xs leading-normal">
+            <strong className="font-bold text-zinc-900">Teacher Remarks:</strong>{' '}
+            <span className="font-bold italic text-emerald-700">"{remarkText}"</span>
+          </div>
+        );
+      })()}
+
+      {/* Dual Signatures locked below 5 summary boxes & remarks */}
+      <div className="pb-1 font-sans flex justify-between items-end text-xs font-bold text-zinc-800 px-6" style={{ marginTop: '75px' }}>
         <div className="inline-flex flex-col items-center">
           <div style={{ height: STAMP_SPACE }} aria-hidden="true" />
           <div className="w-full border-b border-zinc-800 mb-1.5" />

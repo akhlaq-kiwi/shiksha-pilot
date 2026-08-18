@@ -105,7 +105,7 @@ export default function TraditionalReportCardTemplate({ data, config = {} }) {
             <h1 className="text-2xl font-bold uppercase tracking-tight text-zinc-950 font-display">
               {school.name}
             </h1>
-            <p className="text-xs text-zinc-700 italic mt-0.5">
+            <p className="text-xs text-zinc-700 font-semibold mt-0.5 uppercase tracking-wide">
               {school.address}
             </p>
             <div className="mt-2 text-sm font-bold uppercase tracking-widest text-zinc-900 border-t border-b border-zinc-900 inline-block px-6 py-1">
@@ -144,10 +144,10 @@ export default function TraditionalReportCardTemplate({ data, config = {} }) {
             </div>
           </div>
 
-          {/* Traditional Marks Table */}
-          <div className="font-sans">
+          {/* Traditional Marks Table Container - Expands dynamically for small subject counts */}
+          <div className="font-sans flex-1 flex flex-col justify-between">
             {exam.is_final_session_report ? (
-              <table className="w-full border border-zinc-900 border-collapse text-zinc-900" style={{ fontSize: fontSizePx }}>
+              <table className="w-full h-full border border-zinc-900 border-collapse text-zinc-900" style={{ fontSize: fontSizePx }}>
                 <thead>
                   <tr className="bg-zinc-950 text-white font-bold uppercase text-[9.5px] tracking-wide">
                     <th rowSpan={2} style={{ padding: headerPadding }} className="text-left border-r border-zinc-800">Subject</th>
@@ -190,8 +190,7 @@ export default function TraditionalReportCardTemplate({ data, config = {} }) {
                       <td style={{ padding: cellPadding }} className="text-center font-bold text-xs">{sub.grade || '—'}</td>
                     </tr>
                   ))}
-                </tbody>
-                <tfoot>
+                  {/* Total Marks Row (Inside tbody so height expands equally with subject rows) */}
                   <tr className="bg-zinc-100 font-bold border-t-2 border-zinc-900">
                     <td style={{ padding: cellPadding }} className="border-r border-zinc-900">Grand Total</td>
                     {(data.session_exams || ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam']).map(exName => (
@@ -204,10 +203,10 @@ export default function TraditionalReportCardTemplate({ data, config = {} }) {
                     <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-900 font-mono font-bold text-sm text-zinc-950">{summary.total_obtained ?? '—'}</td>
                     <td style={{ padding: cellPadding }} className="text-center font-bold text-sm">{summary.grade || '—'}</td>
                   </tr>
-                </tfoot>
+                </tbody>
               </table>
             ) : (
-              <table className="w-full border border-zinc-900 border-collapse text-zinc-900" style={{ fontSize: fontSizePx }}>
+              <table className="w-full h-full border border-zinc-900 border-collapse text-zinc-900" style={{ fontSize: fontSizePx }}>
                 <thead>
                   <tr className="bg-zinc-950 text-white font-bold uppercase text-[11px] tracking-wide">
                     <th style={{ padding: headerPadding }} className="text-left border-r border-zinc-800">Subject</th>
@@ -233,8 +232,7 @@ export default function TraditionalReportCardTemplate({ data, config = {} }) {
                       </td>
                     </tr>
                   ))}
-                </tbody>
-                <tfoot>
+                  {/* Total Marks Row (Inside tbody so height expands equally with subject rows) */}
                   <tr className="bg-zinc-100 font-bold border-t-2 border-zinc-900">
                     <td style={{ padding: cellPadding }} className="border-r border-zinc-900">Grand Total</td>
                     <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-900 font-mono">{summary.total_max}</td>
@@ -243,56 +241,65 @@ export default function TraditionalReportCardTemplate({ data, config = {} }) {
                     <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-900 font-bold text-sm">{summary.grade}</td>
                     <td style={{ padding: cellPadding }} className="text-center font-bold text-xs">{summary.result}</td>
                   </tr>
-                </tfoot>
+                </tbody>
               </table>
             )}
           </div>
         </div>
 
-        {/* Performance Summary Cards (5 columns) - Locked at EXACT 8px gap below Total Marks row */}
-        <div className="grid grid-cols-5 gap-2 font-sans" style={{ marginTop: '8px' }}>
-          <div className="bg-emerald-50 border border-emerald-200 p-2 rounded text-center flex flex-col justify-center">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 block">Total Marks</span>
-            <span className="text-xs font-bold font-mono text-emerald-950 mt-0.5">{summary.total_obtained} / {summary.total_max}</span>
+          {/* Performance Summary Cards (5 columns) - Locked at EXACT constant 5px gap below Total Marks row */}
+          <div className="grid grid-cols-5 gap-2 font-sans" style={{ marginTop: '5px' }}>
+            <div className="bg-emerald-50 border border-emerald-200 p-2 rounded text-center flex flex-col justify-center">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 block">Total Marks</span>
+              <span className="text-xs font-bold font-mono text-emerald-950 mt-0.5">{summary.total_obtained} / {summary.total_max}</span>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 p-2 rounded text-center flex flex-col justify-center">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 block">Percentage</span>
+              <span className="text-xs font-bold font-mono text-amber-950 mt-0.5">{summary.percentage}%</span>
+            </div>
+
+            <div className="bg-emerald-50 border border-emerald-200 p-2 rounded text-center flex flex-col justify-center">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 block">Overall Grade</span>
+              <span className="text-xs font-bold text-emerald-950 mt-0.5">Grade {summary.grade}</span>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 p-2 rounded text-center flex flex-col justify-center">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 block">Attendance</span>
+              <span className="text-xs font-bold font-mono text-amber-950 mt-0.5">{summary.attendance?.attendance_rate ?? 90.3}%</span>
+            </div>
+
+            <div className="bg-emerald-50 border border-emerald-200 p-2 rounded text-center flex flex-col justify-center">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 block">Class Rank</span>
+              <span className="text-xs font-bold font-mono text-emerald-950 mt-0.5">{summary.class_rank || '1st'}</span>
+            </div>
           </div>
 
-          <div className="bg-amber-50 border border-amber-200 p-2 rounded text-center flex flex-col justify-center">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 block">Percentage</span>
-            <span className="text-xs font-bold font-mono text-amber-950 mt-0.5">{summary.percentage}%</span>
-          </div>
+          {/* Teacher Remarks (Rendered ONLY if non-empty remark exists, placed JUST BELOW 5 Summary Cards) */}
+          {(() => {
+            const remarkText = summary?.teacher_remark || data?.teacher_remark || data?.report_card_remark || school?.report_card_remark;
+            if (!remarkText || remarkText.toString().trim() === '') return null;
+            return (
+              <div className="mt-2.5 px-1 font-sans text-xs leading-normal">
+                <strong className="font-bold text-zinc-900">Teacher Remarks:</strong>{' '}
+                <span className="font-bold italic text-emerald-700">"{remarkText}"</span>
+              </div>
+            );
+          })()}
 
-          <div className="bg-emerald-50 border border-emerald-200 p-2 rounded text-center flex flex-col justify-center">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 block">Overall Grade</span>
-            <span className="text-xs font-bold text-emerald-950 mt-0.5">Grade {summary.grade}</span>
+          {/* Dual Signatures locked below 5 summary boxes & remarks */}
+          <div className="pb-1 font-sans flex justify-between items-end text-xs font-bold text-zinc-900 px-6" style={{ marginTop: '75px' }}>
+            <div className="inline-flex flex-col items-center">
+              <div style={{ height: STAMP_SPACE }} aria-hidden="true" />
+              <div className="w-full border-b border-zinc-900 mb-1.5" />
+              <span className="uppercase text-[11px] font-bold tracking-wider text-zinc-950 whitespace-nowrap">Class Teacher Signature</span>
+            </div>
+            <div className="inline-flex flex-col items-center">
+              <div style={{ height: STAMP_SPACE }} aria-hidden="true" />
+              <div className="w-full border-b border-zinc-900 mb-1.5" />
+              <span className="uppercase text-[11px] font-bold tracking-wider text-zinc-950 whitespace-nowrap">Principal Signature & Stamp</span>
+            </div>
           </div>
-
-          <div className="bg-amber-50 border border-amber-200 p-2 rounded text-center flex flex-col justify-center">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 block">Attendance</span>
-            <span className="text-xs font-bold font-mono text-amber-950 mt-0.5">{summary.attendance?.attendance_rate ?? 90.3}%</span>
-          </div>
-
-          <div className="bg-emerald-50 border border-emerald-200 p-2 rounded text-center flex flex-col justify-center">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 block">Class Rank</span>
-            <span className="text-xs font-bold font-mono text-emerald-950 mt-0.5">{summary.class_rank || '1st'}</span>
-          </div>
-        </div>
-
-        {/* Dual Signatures locked at EXACT 150px gap below 5 summary boxes */}
-        <div
-          className="pb-1 font-sans flex justify-between items-end text-xs font-bold text-zinc-900 px-6"
-          style={{ marginTop: '150px' }}
-        >
-          <div className="inline-flex flex-col items-center">
-            <div style={{ height: STAMP_SPACE }} aria-hidden="true" />
-            <div className="w-full border-b border-zinc-900 mb-1.5" />
-            <span className="uppercase text-[11px] font-bold tracking-wider text-zinc-950 whitespace-nowrap">Class Teacher Signature</span>
-          </div>
-          <div className="inline-flex flex-col items-center">
-            <div style={{ height: STAMP_SPACE }} aria-hidden="true" />
-            <div className="w-full border-b border-zinc-900 mb-1.5" />
-            <span className="uppercase text-[11px] font-bold tracking-wider text-zinc-950 whitespace-nowrap">Principal Signature & Stamp</span>
-          </div>
-        </div>
       </div>
     </div>
   );
