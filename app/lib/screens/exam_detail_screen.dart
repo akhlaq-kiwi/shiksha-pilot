@@ -2266,7 +2266,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                   ...sessionExams.map((exName) {
                     final sc = examScores[exName] ?? examScores[exName.toString()];
                     final String rawMM = sc != null ? (sc['max_marks'] ?? '-').toString().toUpperCase().trim() : '100';
-                    final String rawObt = sc != null ? (sc['marks_obtained'] ?? '-').toString().toUpperCase().trim();
+                    final String rawObt = sc != null ? (sc['marks_obtained'] ?? '-').toString().toUpperCase().trim() : '';
                     final bool isGradeSub = rawMM == '0' || rawMM == '0.0' || rawMM == 'GRADE' || ['A+', 'A', 'B', 'C', 'D', 'E', 'F'].contains(rawObt);
                     final String mm = isGradeSub ? 'GRADE' : rawMM;
                     final String obt = isGradeSub ? (rawObt.isNotEmpty && rawObt != '—' ? rawObt : 'A') : (sc != null ? (sc['marks_obtained'] ?? '-').toString() : '—');
