@@ -525,11 +525,19 @@ class StudentService extends BaseService
                     $anyData = true;
                     $absent = (int)$m['is_absent'] === 1;
                     if (!$absent) {
-                        $obtained = (float)$m['marks_obtained'];
-                        $totalObtained += $obtained;
-                        $passed = $obtained >= $passM;
-                        $subjectPct = ($maxM > 0) ? ($obtained / $maxM) * 100 : 0.0;
-                        $subjectGrade = $resolveGrade($subjectPct);
+                        $rawObtained = $m['marks_obtained'];
+                        $isGradePaper = ((float)$p['max_marks'] === 0.0) || (!is_null($rawObtained) && $rawObtained !== '' && !is_numeric($rawObtained) && strtoupper(trim((string)$rawObtained)) !== 'ABSENT');
+                        if ($isGradePaper) {
+                            $obtained = (!is_null($rawObtained) && $rawObtained !== '') ? (string)$rawObtained : '—';
+                            $subjectGrade = $obtained !== '—' ? $obtained : 'A';
+                            $passed = true;
+                        } else {
+                            $obtained = (float)$rawObtained;
+                            $totalObtained += $obtained;
+                            $passed = $obtained >= $passM;
+                            $subjectPct = ($maxM > 0) ? ($obtained / $maxM) * 100 : 0.0;
+                            $subjectGrade = $resolveGrade($subjectPct);
+                        }
                     } else {
                         $subjectGrade = 'F';
                         $passed = false;
@@ -540,12 +548,16 @@ class StudentService extends BaseService
                 if (!$passed) {
                     $allPassed = false;
                 }
-                $totalMax += $maxM;
+                if ((float)$p['max_marks'] > 0) {
+                    $totalMax += $maxM;
+                }
+
+                $isGradeSubject = ((float)$p['max_marks'] === 0.0) || ($m && !is_null($m['marks_obtained']) && $m['marks_obtained'] !== '' && !is_numeric($m['marks_obtained']) && strtoupper(trim((string)$m['marks_obtained'])) !== 'ABSENT');
 
                 $subjectMarks[] = [
                     'subject_name' => $p['subject_name'],
-                    'max_marks' => $maxM,
-                    'passing_marks' => $passM,
+                    'max_marks' => $isGradeSubject ? 'GRADE' : $maxM,
+                    'passing_marks' => $isGradeSubject ? 'C' : $passM,
                     'marks_obtained' => $absent ? 'ABSENT' : ($obtained !== null ? $obtained : '-'),
                     'grade' => $absent ? 'F' : ($obtained !== null ? $subjectGrade : '-'),
                     'remarks' => $remarks,
