@@ -405,12 +405,6 @@ class StudentService extends BaseService
 
         foreach ($publishedExams as $ex) {
             $examId = (int)$ex['id'];
-            $isAnnual = str_contains(strtolower($ex['exam_name'] ?? ''), 'annual');
-
-            if ($isAnnual) {
-                $reportCards[] = $this->compileFinalAcademicReportCard($user, $student, $school, $schoolAddress, $schoolLogoUrl, $tplCode, $publishedExams, $gradeScales, $resolveGrade, $ex);
-                continue;
-            }
 
             // Fetch Exam Details for dates
             $stmtExDetails = $pdo->prepare("SELECT * FROM examinations WHERE id = :id LIMIT 1");

@@ -2459,7 +2459,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
       final String motherName = (reportCard['mother_name'] ?? '-').toString();
       final String admissionNo = (reportCard['admission_no'] ?? '-').toString();
       final List<dynamic> subjects = reportCard['subjects'] as List? ?? [];
-      final bool isPdfFinalReport = reportCard['is_final_report'] == true || (reportCard['session_exams'] as List?) != null;
+      final bool isPdfFinalReport = false;
 
       final double totalMax = double.tryParse((reportCard['total_max'] ?? reportCard['total_max_marks'] ?? 0.0).toString()) ?? 0.0;
       final double totalObtained = double.tryParse((reportCard['total_obtained'] ?? reportCard['total_marks_obtained'] ?? 0.0).toString()) ?? 0.0;
