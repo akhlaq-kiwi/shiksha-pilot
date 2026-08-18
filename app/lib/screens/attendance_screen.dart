@@ -251,7 +251,16 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         _isSubmittedForSelectedDate = totalStudentsCount > 0 && markedCount >= totalStudentsCount;
         _isOffline = false;
 
-        // Map existing attendance records into temp state
+        // Clear temp state so previous date statuses never leak across dates
+        _tempAttendance.clear();
+
+        // Default all active students to 'Present' for fresh/pending attendance dates
+        for (var student in _students) {
+          final sId = student['id'] as int;
+          _tempAttendance[sId] = 'Present';
+        }
+
+        // Map actual saved attendance records from DB for the selected date (if any exist)
         for (var record in history) {
           final sId = record['student_id'] as int;
           final status = record['status'] as String;
