@@ -4928,6 +4928,8 @@ class SchoolAdminService extends BaseService
         $stmtPurgeOld = $pdo->prepare("DELETE FROM academic_achievement_snapshots WHERE school_id = :sid AND academic_year_id != :ayid");
         $stmtPurgeOld->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
 
+        $anyGenerated = false;
+
         // Pre-calculate Final Exam Marks Percentage for all students in this Academic Year (used as Tie-Breaker)
         $stmtExamMarks = $pdo->prepare("
             SELECT 
@@ -5049,7 +5051,7 @@ class SchoolAdminService extends BaseService
                             ':rank' => $rank,
                             ':meta' => json_encode(['present_days' => $row['present_days'], 'total_working_days' => $row['total_working_days'], 'exam_percentage' => $row['exam_percentage']])
                         ]);
-                        $this->notifyAchievementGenerated($pdo, $schoolId, (int)$row['student_id'], $row['student_name'], 'Attendance Champion Award!', "Congratulations! You secured Rank #{$rank} in Class {$row['class_name']} Attendance. View your certificate from the Achievements section.");
+                        $anyGenerated = true;
                     }
                 }
             }
@@ -5144,11 +5146,45 @@ class SchoolAdminService extends BaseService
                                 'result' => 'PASS'
                             ])
                         ]);
-
-                        $this->notifyAchievementGenerated($pdo, $schoolId, $stuId, $rc['student_name'], 'Academic Excellence Topper!', "Congratulations! You secured Rank #{$rank} in Class {$className} Academic Performance. Your achievement certificate is now available.");
+                        $anyGenerated = true;
                     }
                 }
             }
+        }
+
+        if ($anyGenerated) {
+            $this->notifySingleAchievementsUnlocked($pdo, $schoolId);
+        }
+    }
+
+    private function notifySingleAchievementsUnlocked(PDO $pdo, int $schoolId): void
+    {
+        try {
+            $title = "Achievements Unlocked";
+            $message = "The achievement leaderboard is now available. See the top performers in attendance and academics.";
+
+            $stmtInsNotif = $pdo->prepare("
+                INSERT INTO dashboard_notifications (school_id, user_role, title, message, link, is_read)
+                VALUES (:sid, :role, :title, :msg, '/achievements', 0)
+            ");
+
+            // Notify STUDENT role
+            $stmtInsNotif->execute([
+                ':sid' => $schoolId,
+                ':role' => 'STUDENT',
+                ':title' => $title,
+                ':msg' => $message
+            ]);
+
+            // Notify TEACHER role
+            $stmtInsNotif->execute([
+                ':sid' => $schoolId,
+                ':role' => 'TEACHER',
+                ':title' => $title,
+                ':msg' => $message
+            ]);
+        } catch (\Throwable $e) {
+            error_log("Failed to send single achievement notification: " . $e->getMessage());
         }
     }
 

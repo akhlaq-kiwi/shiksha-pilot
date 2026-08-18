@@ -526,6 +526,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
     String? sheetError;
 
     final Map<int, TextEditingController> marksControllers = {};
+    final Map<int, FocusNode> marksFocusNodes = {};
     final Map<int, bool> absentMap = {};
 
     showModalBottomSheet(
@@ -547,6 +548,8 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                 final data = await widget.examService.getMarksSheet(widget.examId, subId);
                 marksControllers.forEach((_, c) => c.dispose());
                 marksControllers.clear();
+                marksFocusNodes.forEach((_, f) => f.dispose());
+                marksFocusNodes.clear();
                 absentMap.clear();
 
                 bool anyExistingMarks = false;
@@ -563,6 +566,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                   marksControllers[sId] = TextEditingController(
                     text: (marksObtained != null && !isAbsent) ? marksObtained.toString() : '',
                   );
+                  marksFocusNodes[sId] = FocusNode();
                   absentMap[sId] = isAbsent;
                 }
 
@@ -956,34 +960,65 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                                         ),
                                                       );
                                                     } else {
-                                                      return SizedBox(
-                                                        width: 75,
-                                                        height: 42,
-                                                        child: TextField(
-                                                          controller: marksControllers[sId],
-                                                          enabled: isEditingMode && !isAb && !isResultPublished,
-                                                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                                          inputFormatters: [
-                                                            FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                                                            MaxValueTextInputFormatter(maxM),
-                                                          ],
-                                                          textAlign: TextAlign.center,
-                                                          style: TextStyle(
-                                                            fontWeight: FontWeight.bold,
-                                                            fontSize: 14,
-                                                            color: (isEditingMode && !isResultPublished) ? Colors.black87 : Colors.indigo.shade900,
-                                                          ),
-                                                          decoration: InputDecoration(
-                                                            hintText: isAb ? 'ABS' : '0.0',
-                                                            hintStyle: TextStyle(fontSize: 12, color: isAb ? Colors.red : Colors.grey),
-                                                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                                            filled: true,
-                                                            fillColor: isAb ? Colors.red.shade50 : ((isEditingMode && !isResultPublished) ? Colors.white : Colors.grey.shade100),
-                                                          ),
-                                                        ),
-                                                      );
-                                                    }
+                                                       return SizedBox(
+                                                         width: 75,
+                                                         height: 42,
+                                                         child: TextField(
+                                                           controller: marksControllers[sId],
+                                                           focusNode: marksFocusNodes[sId],
+                                                           enabled: isEditingMode && !isAb && !isResultPublished,
+                                                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                                           textInputAction: (index < studentsList.length - 1) ? TextInputAction.next : TextInputAction.done,
+                                                           inputFormatters: [
+                                                             FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                                                             MaxValueTextInputFormatter(maxM),
+                                                           ],
+                                                           textAlign: TextAlign.center,
+                                                           style: TextStyle(
+                                                             fontWeight: FontWeight.bold,
+                                                             fontSize: 14,
+                                                             color: (isEditingMode && !isResultPublished) ? Colors.black87 : Colors.indigo.shade900,
+                                                           ),
+                                                           onChanged: (val) {
+                                                             final cleanVal = val.replaceAll(RegExp(r'\D'), '');
+                                                             if (index < studentsList.length - 1) {
+                                                               final nextSt = studentsList[index + 1];
+                                                               final nextId = nextSt['student_id'] as int;
+                                                               final nextFocus = marksFocusNodes[nextId];
+
+                                                               if (cleanVal.length >= 3) {
+                                                                 nextFocus?.requestFocus();
+                                                               } else if (cleanVal.length == 2) {
+                                                                 if (cleanVal == '10' && maxM >= 100) {
+                                                                   Future.delayed(const Duration(milliseconds: 300), () {
+                                                                     if (marksControllers[sId]?.text == '10') {
+                                                                       nextFocus?.requestFocus();
+                                                                     }
+                                                                   });
+                                                                 } else {
+                                                                   nextFocus?.requestFocus();
+                                                                 }
+                                                               }
+                                                             }
+                                                           },
+                                                           onSubmitted: (_) {
+                                                             if (index < studentsList.length - 1) {
+                                                               final nextSt = studentsList[index + 1];
+                                                               final nextId = nextSt['student_id'] as int;
+                                                               marksFocusNodes[nextId]?.requestFocus();
+                                                             }
+                                                           },
+                                                           decoration: InputDecoration(
+                                                             hintText: isAb ? 'ABS' : '0.0',
+                                                             hintStyle: TextStyle(fontSize: 12, color: isAb ? Colors.red : Colors.grey),
+                                                             contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                                             filled: true,
+                                                             fillColor: isAb ? Colors.red.shade50 : ((isEditingMode && !isResultPublished) ? Colors.white : Colors.grey.shade100),
+                                                           ),
+                                                         ),
+                                                       );
+                                                     }
                                                   })(),
                                                 ],
                                               );
@@ -1774,8 +1809,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                   final String badgeTitle = theme['badgeTitle'] as String;
 
                                   final bool isFinalReport = (rcData['is_final_session_report'] == true) || 
-                                      (rcData['badge_title']?.toString().toUpperCase() == 'FINAL ACADEMIC REPORT CARD') ||
-                                      ((rcData['exam_name'] ?? widget.examName).toString().toLowerCase().contains('annual'));
+                                      (rcData['badge_title']?.toString().toUpperCase() == 'FINAL ACADEMIC REPORT CARD');
 
                                   return Container(
                                     padding: const EdgeInsets.all(16),
