@@ -690,13 +690,25 @@ export default function ExamsPage() {
     setGradeScales(updated);
   };
 
-  const handleResetGradesDefault = () => {
+  const DEFAULT_REPORT_CARD_REMARK = "It was excellent performance by you really appreciable work you have done";
+
+  const handleResetGradesDefault = async () => {
     setGradeScales([
       { min_percentage: 75, max_percentage: 100, grade: 'A', grade_point: 10, remark: 'Excellent' },
       { min_percentage: 60, max_percentage: 74.99, grade: 'B', grade_point: 8, remark: 'Good' },
       { min_percentage: 40, max_percentage: 59.99, grade: 'C', grade_point: 6, remark: 'Average' },
       { min_percentage: 0, max_percentage: 39.99, grade: 'D', grade_point: 0, remark: 'Fail' }
     ]);
+    try {
+      await schoolService.updateSchoolProfile({
+        report_card_remark: DEFAULT_REPORT_CARD_REMARK
+      });
+      setReportCardRemark(DEFAULT_REPORT_CARD_REMARK);
+      setSchoolProfile(prev => ({ ...(prev || {}), report_card_remark: DEFAULT_REPORT_CARD_REMARK }));
+      setGradeSuccess('Reset to default grading scales and report card remark successfully.');
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   // Load Initial Dashboard Data
@@ -719,7 +731,7 @@ export default function ExamsPage() {
       setGradeScales(gradesList || []);
       if (profile) {
         setSchoolProfile(profile);
-        setReportCardRemark(profile.report_card_remark || '');
+        setReportCardRemark(profile.report_card_remark ?? '');
       }
     } catch (err) {
       console.error(err);

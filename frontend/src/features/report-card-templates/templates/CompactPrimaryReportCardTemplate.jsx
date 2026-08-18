@@ -97,6 +97,11 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
             <h1 className="text-lg font-bold uppercase text-amber-600 tracking-tight font-display">
               {school.name}
             </h1>
+            {school.address && (
+              <p className="text-[10.5px] font-semibold text-amber-800 uppercase tracking-wide">
+                {school.address}
+              </p>
+            )}
             <p className="text-[11px] font-bold text-zinc-500 uppercase">
               {exam.is_final_session_report ? 'Final Academic Session Report' : `Primary Progress Card — ${exam.name}`}
             </p>
@@ -137,10 +142,10 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
         </div>
       </div>
 
-      {/* Marks Table */}
-      <div className="border border-amber-200 rounded-xl overflow-hidden shadow-2xs">
+      {/* Marks Table Container - Expands dynamically for small subject counts */}
+      <div className="border border-amber-200 rounded-xl overflow-hidden shadow-2xs flex-1 flex flex-col justify-between">
         {isFinalReport ? (
-          <table className="w-full text-left border-collapse" style={{ fontSize: fontSizePx }}>
+          <table className="w-full h-full text-left border-collapse" style={{ fontSize: fontSizePx }}>
             <thead>
               <tr className="bg-amber-500 text-white font-bold uppercase text-[9.5px]">
                 <th rowSpan={2} style={{ padding: headerPadding }} className="text-left font-bold border-r border-amber-400 whitespace-nowrap min-w-[140px]">Subject</th>
@@ -183,8 +188,7 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
                   <td style={{ padding: cellPadding }} className="text-center font-bold text-amber-900">{sub.grade || '—'}</td>
                 </tr>
               ))}
-            </tbody>
-            <tfoot>
+              {/* Total Marks Row (Inside tbody so height expands equally with subject rows) */}
               <tr className="bg-amber-100 border-t-2 border-amber-500 font-bold text-amber-950">
                 <td style={{ padding: cellPadding }} className="text-left border-r border-amber-200 whitespace-nowrap font-bold">Total Marks</td>
                 {(data.session_exams || ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam']).map(exName => (
@@ -197,10 +201,10 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
                 <td style={{ padding: cellPadding }} className="text-center border-r border-amber-200 font-mono font-bold text-amber-950">{summary.total_obtained ?? '—'}</td>
                 <td style={{ padding: cellPadding }} className="text-center font-bold">{summary.grade || '—'}</td>
               </tr>
-            </tfoot>
+            </tbody>
           </table>
         ) : (
-          <table className="w-full text-left border-collapse" style={{ fontSize: fontSizePx }}>
+          <table className="w-full h-full text-left border-collapse" style={{ fontSize: fontSizePx }}>
             <thead>
               <tr className="bg-amber-500 text-white font-bold uppercase text-[11px]">
                 <th style={{ padding: headerPadding }} className="border-r border-amber-400">Subject</th>
@@ -226,8 +230,6 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
                   </td>
                 </tr>
               ))}
-            </tbody>
-            <tfoot>
               <tr className="bg-amber-100 border-t-2 border-amber-500 font-bold text-amber-950">
                 <td style={{ padding: cellPadding }} className="font-bold border-r border-amber-200">Total Marks</td>
                 <td style={{ padding: cellPadding }} className="text-center border-r border-amber-200 font-mono font-bold text-amber-900">{summary.total_obtained}</td>
@@ -235,21 +237,13 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
                 <td style={{ padding: cellPadding }} className="text-center border-r border-amber-200 font-bold text-amber-900">{summary.grade}</td>
                 <td style={{ padding: cellPadding }} className="text-center font-bold uppercase">{summary.result}</td>
               </tr>
-            </tfoot>
+            </tbody>
           </table>
         )}
       </div>
 
-      {/* Teacher Remarks */}
-      {Boolean(summary.teacher_remark && summary.teacher_remark.toString().trim() !== '') && (
-        <div className="font-sans text-xs text-zinc-800 leading-normal border border-amber-100 rounded-lg p-3 bg-amber-50/30">
-          <strong className="font-bold text-amber-900">Teacher Remarks:</strong>{' '}
-          <span className="font-normal text-zinc-800">{summary.teacher_remark}</span>
-        </div>
-      )}
-
-      {/* Performance Summary Cards (5 columns) - Locked at EXACT 8px gap below Total Marks row */}
-      <div className="grid grid-cols-5 gap-2 font-sans" style={{ marginTop: '8px' }}>
+      {/* Performance Summary Cards (5 columns) - Locked at EXACT constant 5px gap below Total Marks row */}
+      <div className="grid grid-cols-5 gap-2 font-sans" style={{ marginTop: '5px' }}>
         <div className="bg-emerald-50 border border-emerald-200 p-2.5 rounded-lg text-center flex flex-col justify-center">
           <span className="text-[11px] font-bold text-emerald-800 uppercase block">Total Marks</span>
           <span className="text-xs font-bold font-mono text-emerald-950 mt-0.5">{summary.total_obtained} / {summary.total_max}</span>
@@ -276,11 +270,20 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
         </div>
       </div>
 
-      {/* Dual Signatures locked at EXACT 150px gap below 5 summary boxes */}
-      <div
-        className="pb-1 font-sans flex justify-between items-end text-xs font-bold text-zinc-700 px-6"
-        style={{ marginTop: '150px' }}
-      >
+      {/* Teacher Remarks (Rendered ONLY if non-empty remark exists, placed JUST BELOW 5 Summary Cards) */}
+      {(() => {
+        const remarkText = summary?.teacher_remark || data?.teacher_remark || data?.report_card_remark || school?.report_card_remark;
+        if (!remarkText || remarkText.toString().trim() === '') return null;
+        return (
+          <div className="mt-2.5 font-sans text-xs leading-normal border border-amber-100 rounded-lg p-3 bg-amber-50/30">
+            <strong className="font-bold text-amber-900">Teacher Remarks:</strong>{' '}
+            <span className="font-bold italic text-emerald-700">"{remarkText}"</span>
+          </div>
+        );
+      })()}
+
+      {/* Dual Signatures locked below 5 summary boxes & remarks */}
+      <div className="pb-1 font-sans flex justify-between items-end text-xs font-bold text-zinc-700 px-6" style={{ marginTop: '75px' }}>
         <div className="inline-flex flex-col items-center">
           <div style={{ height: STAMP_SPACE }} aria-hidden="true" />
           <div className="w-full border-b border-zinc-800 mb-1.5" />

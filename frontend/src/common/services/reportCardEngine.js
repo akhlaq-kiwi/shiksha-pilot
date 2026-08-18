@@ -27,7 +27,11 @@ export function formatDateOfBirth(dobStr) {
   return str;
 }
 
-export function compileReportCardData(card = {}, schoolProfile = {}, currentYear = {}, exam = {}) {
+export function compileReportCardData(card = {}, schoolProfile = {}, currentYear = {}, exam = {}, gradeScales = []) {
+  const gradeScalesList = Array.isArray(gradeScales) && gradeScales.length > 0
+    ? gradeScales
+    : (schoolProfile?.grade_scales || card.grade_scales || []);
+
   const student = {
     id: card.student?.id || card.student_id || card.id || null,
     name: card.student?.name || card.student_name || card.name || 'Student Name',
@@ -45,7 +49,7 @@ export function compileReportCardData(card = {}, schoolProfile = {}, currentYear
     id: schoolProfile?.id || card.school?.id || null,
     name: (schoolProfile?.name || card.school?.name || card.school_name || 'SHIKSHA PILOT SCHOOL').toUpperCase(),
     logo_path: schoolProfile?.logo_path || card.school?.logo_path || card.school_logo || null,
-    address: formatSchoolAddress(schoolProfile?.name ? schoolProfile : (card.school || { address: card.school_address })),
+    address: formatSchoolAddress(schoolProfile?.name ? schoolProfile : (card.school || { address: card.school_address })).toUpperCase(),
     phone: schoolProfile?.phone || card.school?.phone || '',
     email: schoolProfile?.email || card.school?.email || '',
     website: schoolProfile?.website || card.school?.website || '',
@@ -114,7 +118,7 @@ export function compileReportCardData(card = {}, schoolProfile = {}, currentYear
       marks_obtained: obtained,
       max_marks: max,
       passing_marks: pass,
-      grade: calculateDefaultGrade(obtained, max),
+      grade: calculateGradeFromScales(max > 0 ? (obtained / max) * 100 : 0, gradeScalesList),
       result: s.result || result,
       is_grade_only: false
     };
@@ -136,7 +140,7 @@ export function compileReportCardData(card = {}, schoolProfile = {}, currentYear
   const totalObtained = numericSubjects.reduce((sum, s) => sum + (parseFloat(s.marks_obtained) || 0), 0);
   const totalMax = numericSubjects.reduce((sum, s) => sum + (parseFloat(s.max_marks) || 0), 0);
   const percentage = card.percentage ? parseFloat(card.percentage) : (totalMax > 0 ? parseFloat(((totalObtained / totalMax) * 100).toFixed(2)) : 0);
-  const overallGrade = card.grade || calculateDefaultGrade(totalObtained, totalMax);
+  const overallGrade = calculateGradeFromScales(percentage, gradeScalesList);
   const gpa = (percentage / 10).toFixed(1);
 
   const resultStatus = card.result || (percentage >= 33 ? 'PASS' : 'FAIL');
@@ -144,7 +148,7 @@ export function compileReportCardData(card = {}, schoolProfile = {}, currentYear
     ? `Promoted to ${getNextClassName(student.class_name)}`
     : `Retained in ${student.class_name}`;
 
-  const teacherRemark = card.report_card_remark || schoolProfile?.report_card_remark || '';
+  const teacherRemark = card.report_card_remark ?? schoolProfile?.report_card_remark ?? card.teacher_remark ?? '';
 
   const attendance = {
     total_days: card.attendance_total || card.total_days || 220,
@@ -165,7 +169,8 @@ export function compileReportCardData(card = {}, schoolProfile = {}, currentYear
       grade: overallGrade,
       gpa,
       result: resultStatus,
-      promotion_status: promotionStatus
+      promotion_status: promotionStatus,
+      teacher_remark: teacherRemark
     },
     attendance,
     teacher_remark: teacherRemark,
@@ -178,12 +183,15 @@ export function compileReportCardData(card = {}, schoolProfile = {}, currentYear
  * Combines multiple examination result cards for a student across an entire academic year
  * into a multi-exam breakdown table matching paper report card standards (Screenshot 2).
  */
-export function compileFinalSessionReportCardData(examCards = [], weightagePolicy = {}, schoolProfile = {}, currentYear = {}) {
+export function compileFinalSessionReportCardData(examCards = [], weightagePolicy = {}, schoolProfile = {}, currentYear = {}, gradeScales = []) {
   if (!Array.isArray(examCards) || examCards.length === 0) {
     return null;
   }
 
   const baseCard = examCards[0] || {};
+  const gradeScalesList = Array.isArray(gradeScales) && gradeScales.length > 0
+    ? gradeScales
+    : (schoolProfile?.grade_scales || baseCard.grade_scales || []);
   const student = {
     id: baseCard.student?.id || baseCard.student_id || baseCard.id || null,
     name: baseCard.student?.name || baseCard.student_name || baseCard.name || 'Student Name',
@@ -284,7 +292,7 @@ export function compileFinalSessionReportCardData(examCards = [], weightagePolic
     const isSubjectGradeOnly = Object.values(examScoresMap).some(s => s && s.is_grade_only) || !hasNumericScore;
 
     const grade = !isSubjectGradeOnly 
-      ? calculateDefaultGrade(grandTotalObtained, grandTotalMax)
+      ? calculateGradeFromScales(grandTotalMax > 0 ? (grandTotalObtained / grandTotalMax) * 100 : 0, gradeScalesList)
       : lastAssignedGrade;
 
     return {
@@ -319,7 +327,7 @@ export function compileFinalSessionReportCardData(examCards = [], weightagePolic
   const grandTotalObtained = numericSubjects.reduce((sum, s) => sum + s.grand_total_obtained, 0);
   const grandTotalMax = numericSubjects.reduce((sum, s) => sum + s.grand_total_max, 0);
   const percentage = grandTotalMax > 0 ? parseFloat(((grandTotalObtained / grandTotalMax) * 100).toFixed(2)) : 0;
-  const overallGrade = calculateDefaultGrade(grandTotalObtained, grandTotalMax);
+  const overallGrade = calculateGradeFromScales(percentage, gradeScalesList);
   const gpa = (percentage / 10).toFixed(1);
 
   const allPassed = finalSubjects.every(s => s.result === 'PASS');
@@ -342,7 +350,7 @@ export function compileFinalSessionReportCardData(examCards = [], weightagePolic
     ? parseFloat(((totalPresentDays / totalWorkingDays) * 100).toFixed(1))
     : (baseCard.attendance?.attendance_rate || 94.55);
 
-  const teacherRemark = schoolProfile?.report_card_remark || '';
+  const teacherRemark = schoolProfile?.report_card_remark ?? baseCard.report_card_remark ?? '';
 
   return {
     is_final_session_report: true,
@@ -377,16 +385,24 @@ export function compileFinalSessionReportCardData(examCards = [], weightagePolic
   };
 }
 
-function calculateDefaultGrade(obtained, max) {
-  if (!max || max <= 0) return 'D';
-  const pct = (obtained / max) * 100;
-  if (pct >= 90) return 'A+';
-  if (pct >= 80) return 'A';
-  if (pct >= 70) return 'B+';
-  if (pct >= 60) return 'B';
-  if (pct >= 50) return 'C';
-  if (pct >= 40) return 'D';
-  return 'E';
+export function calculateGradeFromScales(pct, gradeScales = []) {
+  const numericPct = parseFloat(pct) || 0;
+
+  if (Array.isArray(gradeScales) && gradeScales.length > 0) {
+    for (const s of gradeScales) {
+      const min = parseFloat(s.min_percentage ?? s.min_percent ?? 0);
+      const max = parseFloat(s.max_percentage ?? s.max_percent ?? 100);
+      if (numericPct >= min && numericPct <= max) {
+        return s.grade || s.grade_code || 'B';
+      }
+    }
+  }
+
+  // Fallback matching default Grade Configuration Scale: A (75-100), B (60-74.99), C (40-59.99), D (0-39.99)
+  if (numericPct >= 75) return 'A';
+  if (numericPct >= 60) return 'B';
+  if (numericPct >= 40) return 'C';
+  return 'D';
 }
 
 function getNextClassName(currentClass) {

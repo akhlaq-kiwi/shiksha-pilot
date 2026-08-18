@@ -95,7 +95,7 @@ export default function ModernReportCardTemplate({ data, config = {} }) {
             <h1 className="text-xl sm:text-2xl font-black uppercase tracking-tight leading-none text-white drop-shadow-xs font-display">
               {school.name}
             </h1>
-            <p className="text-xs font-medium text-emerald-100 mt-1 truncate tracking-wide">
+            <p className="text-xs font-medium text-emerald-100 mt-1 truncate tracking-wide uppercase">
               {school.address} {school.phone ? `• Ph: ${school.phone}` : ''}
             </p>
             <div className="inline-flex items-center gap-2 mt-2 bg-emerald-950/60 backdrop-blur-xs px-3 py-1 rounded-lg border border-emerald-600/40">
@@ -145,10 +145,10 @@ export default function ModernReportCardTemplate({ data, config = {} }) {
         </div>
       </div>
 
-      {/* Scholastic Achievements Table Container (Dynamically fills upper area without row clipping) */}
-      <div className="w-full flex-1 flex flex-col justify-between border border-zinc-200 rounded-xl shadow-2xs">
+      {/* Scholastic Achievements Table Container - Expands dynamically for small subject counts */}
+      <div className="w-full border border-zinc-200 rounded-xl shadow-2xs overflow-hidden flex-1 flex flex-col justify-between">
         {isFinalReport ? (
-          <table className="w-full text-left border-collapse" style={{ fontSize: fontSizePx }}>
+          <table className="w-full h-full text-left border-collapse" style={{ fontSize: fontSizePx }}>
             <thead>
               <tr className="bg-emerald-950 text-white font-bold uppercase text-[9.5px] tracking-wider">
                 <th rowSpan={2} style={{ padding: headerPadding }} className="text-left font-bold border-r border-emerald-800 whitespace-nowrap min-w-[140px]">Subject</th>
@@ -191,8 +191,7 @@ export default function ModernReportCardTemplate({ data, config = {} }) {
                   <td style={{ padding: cellPadding }} className="text-center font-bold text-emerald-800">{sub.grade || '—'}</td>
                 </tr>
               ))}
-            </tbody>
-            <tfoot>
+              {/* Total Marks Row (Inside tbody so height expands equally with subject rows) */}
               <tr className="bg-emerald-50 border-t-2 border-emerald-950 font-bold text-emerald-950">
                 <td style={{ padding: cellPadding }} className="text-left border-r border-emerald-200 whitespace-nowrap font-bold">Total Marks</td>
                 {(data.session_exams || ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam']).map(exName => (
@@ -205,10 +204,10 @@ export default function ModernReportCardTemplate({ data, config = {} }) {
                 <td style={{ padding: cellPadding }} className="text-center border-r border-emerald-200 font-mono font-bold text-emerald-900">{summary.total_obtained ?? '—'}</td>
                 <td style={{ padding: cellPadding }} className="text-center font-bold">{summary.grade || '—'}</td>
               </tr>
-            </tfoot>
+            </tbody>
           </table>
         ) : (
-          <table className="w-full text-left border-collapse" style={{ fontSize: fontSizePx }}>
+          <table className="w-full h-full text-left border-collapse" style={{ fontSize: fontSizePx }}>
             <thead>
               <tr className="bg-emerald-950 text-white font-bold uppercase text-[10.5px] tracking-wider">
                 <th style={{ padding: headerPadding }} className="text-left font-bold border-r border-emerald-800 whitespace-nowrap min-w-[140px]">Subject</th>
@@ -236,8 +235,7 @@ export default function ModernReportCardTemplate({ data, config = {} }) {
                   </td>
                 </tr>
               ))}
-            </tbody>
-            <tfoot>
+              {/* Total Marks Row (Inside tbody so height expands equally with subject rows) */}
               <tr className="bg-emerald-50 border-t-2 border-emerald-950 font-bold text-emerald-950">
                 <td style={{ padding: cellPadding }} className="text-left font-bold border-r border-emerald-200 whitespace-nowrap">Total Marks</td>
                 <td style={{ padding: cellPadding }} className="text-center border-r border-emerald-200 font-mono font-bold text-emerald-900">{summary.total_obtained}</td>
@@ -246,21 +244,13 @@ export default function ModernReportCardTemplate({ data, config = {} }) {
                 <td style={{ padding: cellPadding }} className="text-center border-r border-emerald-200 font-bold text-emerald-900">{summary.grade}</td>
                 <td style={{ padding: cellPadding }} className="text-center font-bold uppercase">{summary.result}</td>
               </tr>
-            </tfoot>
+            </tbody>
           </table>
         )}
       </div>
 
-      {/* Teacher Remarks (Rendered ONLY if non-empty remark exists) */}
-      {Boolean(summary.teacher_remark && summary.teacher_remark.toString().trim() !== '') && (
-        <div className="px-1 font-sans text-xs text-zinc-700 leading-normal">
-          <strong className="font-bold text-zinc-900">Teacher Remarks:</strong>{' '}
-          <span className="font-normal text-zinc-700">{summary.teacher_remark}</span>
-        </div>
-      )}
-
-      {/* Performance Summary Cards (5 columns) - Locked at EXACT 8px gap below Total Marks row */}
-      <div className="grid grid-cols-5 gap-2 font-sans" style={{ marginTop: '8px' }}>
+      {/* Performance Summary Cards (5 columns) - Locked at EXACT constant 5px gap below Total Marks row */}
+      <div className="grid grid-cols-5 gap-2 font-sans" style={{ marginTop: '5px' }}>
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 text-center flex flex-col justify-center">
           <span className="text-[9.5px] font-bold uppercase tracking-wider text-emerald-800 block">Total Marks</span>
           <span className="text-sm font-bold text-emerald-950 font-mono mt-0.5">{summary.total_obtained} / {summary.total_max}</span>
@@ -287,11 +277,20 @@ export default function ModernReportCardTemplate({ data, config = {} }) {
         </div>
       </div>
 
-      {/* Signatures locked at EXACT 150px gap below 5 summary boxes */}
-      <div
-        className="pb-1 flex justify-between items-end text-xs font-bold text-zinc-700 px-6 font-sans"
-        style={{ marginTop: '150px' }}
-      >
+      {/* Teacher Remarks (Rendered ONLY if non-empty remark exists, placed JUST BELOW 5 Summary Cards) */}
+      {(() => {
+        const remarkText = summary?.teacher_remark || data?.teacher_remark || data?.report_card_remark || school?.report_card_remark;
+        if (!remarkText || remarkText.toString().trim() === '') return null;
+        return (
+          <div className="mt-2.5 px-1 font-sans text-xs leading-normal">
+            <strong className="font-bold text-zinc-900">Teacher Remarks:</strong>{' '}
+            <span className="font-bold italic text-emerald-700">"{remarkText}"</span>
+          </div>
+        );
+      })()}
+
+      {/* Dual Signatures locked below 5 summary boxes & remarks */}
+      <div className="pb-1 flex justify-between items-end text-xs font-bold text-zinc-700 px-6 font-sans" style={{ marginTop: '75px' }}>
         <div className="inline-flex flex-col items-center">
           <div style={{ height: STAMP_SPACE }} aria-hidden="true" />
           <div className="w-full border-b border-zinc-800 mb-1.5" />

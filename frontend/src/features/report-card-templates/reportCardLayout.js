@@ -18,8 +18,8 @@
  * overflows one A4 page, so on a very long subject list these gaps shrink
  * proportionally along with everything else.
  */
-export const SIGNATURE_GAP = '10mm';
-export const STAMP_SPACE = '19mm';
+export const SIGNATURE_GAP = '5mm';
+export const STAMP_SPACE = '12mm';
 
 /**
  * Minimum height of the card body, so the footer can be pinned to the bottom of

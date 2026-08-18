@@ -16,10 +16,15 @@ export default function ReportCardRenderer({
   currentYear = {},
   exam = {},
   forcedTemplateCode = null,
-  customConfig = null
+  customConfig = null,
+  gradeScales = []
 }) {
+  const activeScales = Array.isArray(gradeScales) && gradeScales.length > 0
+    ? gradeScales
+    : (schoolProfile?.grade_scales || card?.grade_scales || []);
+
   // Step 1: Layer 1 calculation & data standardization
-  const reportData = compileReportCardData(card, schoolProfile, currentYear, exam);
+  const reportData = compileReportCardData(card, schoolProfile, currentYear, exam, activeScales);
 
   // Step 2: Determine active template code
   const activeTemplateCode = forcedTemplateCode || schoolProfile?.report_card_template?.code || card?.school?.report_card_template?.code || 'modern';
