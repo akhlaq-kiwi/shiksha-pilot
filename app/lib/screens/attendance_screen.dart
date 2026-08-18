@@ -213,6 +213,21 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     }
   }
 
+  String _formatYmd(DateTime d) {
+    return '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  }
+
+  bool _isHolidayDate(DateTime d) {
+    final targetStr = _formatYmd(d);
+    return _holidays.any((h) {
+      if (h == null) return false;
+      final raw = (h['date'] ?? '').toString().trim();
+      if (raw.isEmpty) return false;
+      final clean = raw.split(' ')[0].split('T')[0];
+      return clean == targetStr;
+    });
+  }
+
   Future<void> _fetchTeacherStudentsAndHistory() async {
     if (_selectedClassId == null) return;
     setState(() {
@@ -240,7 +255,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   Future<void> _fetchTeacherAttendanceForDate() async {
     if (_selectedClassId == null || _teacherSelectedDate == null) return;
-    final dateStr = _teacherSelectedDate!.toIso8601String().split('T')[0];
+    final dateStr = _formatYmd(_teacherSelectedDate!);
 
     try {
       final history = await widget.attendanceService.getTeacherAttendanceHistory(_selectedClassId!, dateStr);
@@ -251,7 +266,16 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         _isSubmittedForSelectedDate = totalStudentsCount > 0 && markedCount >= totalStudentsCount;
         _isOffline = false;
 
-        // Map existing attendance records into temp state
+        // Clear temp state so previous date statuses never leak across dates
+        _tempAttendance.clear();
+
+        // Default all active students to 'Present' for fresh/pending attendance dates
+        for (var student in _students) {
+          final sId = student['id'] as int;
+          _tempAttendance[sId] = 'Present';
+        }
+
+        // Map actual saved attendance records from DB for the selected date (if any exist)
         for (var record in history) {
           final sId = record['student_id'] as int;
           final status = record['status'] as String;
@@ -325,7 +349,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       _isTeacherSubmitting = true;
     });
 
-    final dateStr = _teacherSelectedDate!.toIso8601String().split('T')[0];
+    final dateStr = _formatYmd(_teacherSelectedDate!);
 
     try {
       // Mark attendance sequentially / concurrently for all students in sheet
@@ -1108,8 +1132,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               final date = _teacherAcademicYearStart.add(Duration(days: index));
               final isSelectedDateToday = date.day == _teacherToday.day && date.month == _teacherToday.month && date.year == _teacherToday.year;
               final isSunday = date.weekday == DateTime.sunday;
-              final dateStr = date.toIso8601String().split('T')[0];
-              final isHoliday = _holidays.any((h) => h['date'] == dateStr);
+              final dateStr = _formatYmd(date);
+              final isHoliday = _isHolidayDate(date);
 
               if (_isLoadingTeacherData) {
                 return const Center(child: CircularProgressIndicator());
@@ -1277,7 +1301,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             !_isSubmittedForSelectedDate && 
             _students.isNotEmpty &&
             _teacherSelectedDate!.weekday != DateTime.sunday &&
-            !_holidays.any((h) => h['date'] == _teacherSelectedDate!.toIso8601String().split('T')[0]))
+            !_isHolidayDate(_teacherSelectedDate!))
           Padding(
             padding: const EdgeInsets.all(16),
             child: SizedBox(
