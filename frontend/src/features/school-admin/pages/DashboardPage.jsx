@@ -325,7 +325,7 @@ export default function DashboardPage({ onNavigate }) {
           value={formatCurrency(totalFeeCollected)}
           icon={Banknote}
           color="bg-chart-2/10 text-chart-2"
-          onClick={currentYear?.status === 'ACTIVE' && onNavigate ? () => onNavigate('collection-history') : undefined}
+          onClick={onNavigate ? () => onNavigate('collection-history') : undefined}
         />
         <StatCard
           label="Dues pending"

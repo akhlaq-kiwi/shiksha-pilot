@@ -450,7 +450,7 @@ class LeaveRequestService extends BaseService
                       AND (s.status IS NULL OR UPPER(s.status) = 'ACTIVE')
                       AND s.exit_date IS NULL
                       AND LOWER(s.email) = LOWER(:email)
-                    ORDER BY COALESCE(ay.is_current, 0) DESC, s.id DESC
+                    ORDER BY (CASE WHEN ay.status = 'ACTIVE' THEN 2 WHEN ay.is_current = 1 THEN 1 ELSE 0 END) DESC, s.id DESC
                 ");
                 $stmt->execute([':sid' => $schoolId, ':email' => $email]);
                 $raw = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -486,7 +486,7 @@ class LeaveRequestService extends BaseService
                 (s.guardian_phone = :p3 AND s.guardian_phone IS NOT NULL AND s.guardian_phone != '') OR
                 (s.student_mobile = :p4 AND s.student_mobile IS NOT NULL AND s.student_mobile != '')
               )
-            ORDER BY COALESCE(ay.is_current, 0) DESC, s.id DESC
+            ORDER BY (CASE WHEN ay.status = 'ACTIVE' THEN 2 WHEN ay.is_current = 1 THEN 1 ELSE 0 END) DESC, s.id DESC
         ");
 
         $stmt->execute([
