@@ -153,7 +153,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
-  final String _baseUrl = 'https://app.shikshapilot.com';
+  final String _baseUrl = 'http://10.174.49.71:8000';
 
   @override
   void initState() {
@@ -185,7 +185,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
     final role = prefs.getString('user_role');
-    final baseUrl = prefs.getString('base_url') ?? 'https://app.shikshapilot.com';
+    final baseUrl = 'http://10.174.49.71:8000';
     await prefs.setString('base_url', baseUrl);
 
     if (token != null && role != null) {
@@ -334,7 +334,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _serverUrlController = TextEditingController(text: 'https://app.shikshapilot.com');
+  final _serverUrlController = TextEditingController(text: 'http://10.174.49.71:8000');
   
   bool _obscurePassword = true;
   bool _isLoading = false;
@@ -355,11 +355,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _loadServerUrl() async {
     final prefs = await SharedPreferences.getInstance();
-    const prodUrl = 'https://app.shikshapilot.com';
-    await prefs.setString('base_url', prodUrl);
+    const localUrl = 'http://10.174.49.71:8000';
+    await prefs.setString('base_url', localUrl);
     if (mounted) {
       setState(() {
-        _serverUrlController.text = prodUrl;
+        _serverUrlController.text = localUrl;
       });
     }
   }

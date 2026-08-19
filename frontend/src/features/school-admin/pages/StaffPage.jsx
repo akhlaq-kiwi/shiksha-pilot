@@ -193,6 +193,7 @@ const getVisibleMonths = (joiningDateStr, workingYearStartStr) => {
 };
 
 export default function StaffPage() {
+  const { currentYear, isReadOnly } = useAcademicYear();
   const [searchParams] = useSearchParams();
   const [view, setView] = useState('list'); // 'list', 'details', 'identity-cards'
   const [selectedTeacherId, setSelectedTeacherId] = useState(null);
@@ -322,8 +323,6 @@ export default function StaffPage() {
       setLoadingDetails(false);
     }
   };
-
-  const { currentYear, isReadOnly } = useAcademicYear();
 
   useEffect(() => {
     loadStaff(true);
@@ -1195,13 +1194,17 @@ export default function StaffPage() {
                   <div className="flex items-center justify-between border-b border-border pb-4 mb-4">
                     <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider">Salary Card</h3>
                     <span className="text-xs text-text-secondary font-bold">
-                      Academic Year: {academicYears.find(y => y.is_current)?.name || academicYears.find(y => y.status === 'Draft')?.name || '—'}
+                      Academic Year: {currentYear?.name || academicYears.find(y => y.is_current)?.name || academicYears.find(y => y.status === 'Draft')?.name || '—'}
                     </span>
                   </div>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                    {getVisibleMonths(t.joining_date, (academicYears.find(y => y.is_current) || academicYears.find(y => y.status === 'Draft'))?.start_date).map(month => {
-                      const payment = (t.salary_payments || []).find(p => p.payment_month === month);
+                    {getVisibleMonths(t.joining_date, currentYear?.start_date || (academicYears.find(y => y.is_current) || academicYears.find(y => y.status === 'Draft'))?.start_date).map(month => {
+                      const payment = (t.salary_payments || []).find(p => 
+                        p.payment_month === month && 
+                        (!t.previous_year_pending || parseInt(p.academic_year_id, 10) !== parseInt(t.previous_year_pending.academic_year_id, 10)) &&
+                        !String(p.payment_month).startsWith('Previous Year - ')
+                      );
                       const isPaid = !!payment;
                       const isLocked = payment ? !!payment.is_locked : false;
                       
@@ -1320,10 +1323,10 @@ export default function StaffPage() {
                       {['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'].map(month => {
                         const isPending = t.previous_year_pending.pending_months.includes(month);
                         const payment = (t.salary_payments || []).find(p => 
-                          p.payment_month === month || 
+                          (parseInt(p.academic_year_id, 10) === parseInt(t.previous_year_pending.academic_year_id, 10) && (p.payment_month === month || p.payment_month === `Previous Year - ${month}`)) || 
                           p.payment_month === `Previous Year - ${month}`
                         );
-                        const isPaid = !isPending || !!payment;
+                        const isPaid = payment ? true : (!isPending ? true : false);
                         const isLocked = payment ? !!payment.is_locked : false;
                         const salaryAmount = t.previous_year_pending.salary || 0.0;
 

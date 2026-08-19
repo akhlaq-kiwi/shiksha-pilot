@@ -444,9 +444,9 @@ class SchoolAdminService extends BaseService
                     $stmtPayments = $pdo->prepare("
                         SELECT student_id, fee_month 
                         FROM fee_payments 
-                        WHERE school_id = :sid AND status = 'PAID' AND academic_year_id = :ayid AND student_id IN ($studentIdsStr)
+                        WHERE school_id = :sid AND status = 'PAID' AND student_id IN ($studentIdsStr)
                     ");
-                    $stmtPayments->execute([':sid' => $schoolId, ':ayid' => $activeYear['id']]);
+                    $stmtPayments->execute([':sid' => $schoolId]);
                     $payments = $stmtPayments->fetchAll(\PDO::FETCH_ASSOC);
 
                     $studentPaidMonths = [];
@@ -678,9 +678,11 @@ class SchoolAdminService extends BaseService
             $stmtAutoReassign->execute([':sid' => $schoolId]);
         } catch (\Throwable $e) {}
 
-        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
-        if ($workingYear) {
-            $filters['academic_year_id'] = (int)$workingYear['id'];
+        if (empty($filters['academic_year_id'])) {
+            $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+            if ($workingYear) {
+                $filters['academic_year_id'] = (int)$workingYear['id'];
+            }
         }
         $students = $this->studentRepo->findBySchool($schoolId, $filters);
         return $students;
@@ -729,17 +731,17 @@ class SchoolAdminService extends BaseService
         $feeStmt = $pdo->prepare("
             SELECT COALESCE(SUM(amount_paid), 0) AS total_paid, COUNT(*) AS payment_count
             FROM fee_payments
-            WHERE student_id = :student_id AND status = 'PAID' AND academic_year_id = :academic_year_id
+            WHERE student_id = :student_id AND status = 'PAID'
         ");
-        $feeStmt->execute([':student_id' => $id, ':academic_year_id' => $workingYearId]);
+        $feeStmt->execute([':student_id' => $id]);
         $feeSummary = $feeStmt->fetch(PDO::FETCH_ASSOC);
 
         $paymentsStmt = $pdo->prepare("
             SELECT * FROM fee_payments
-            WHERE student_id = :student_id AND status = 'PAID' AND academic_year_id = :academic_year_id
+            WHERE student_id = :student_id AND status = 'PAID'
             ORDER BY id ASC
         ");
-        $paymentsStmt->execute([':student_id' => $id, ':academic_year_id' => $workingYearId]);
+        $paymentsStmt->execute([':student_id' => $id]);
         $payments = $paymentsStmt->fetchAll(PDO::FETCH_ASSOC);
         $feeSummary['payments'] = $payments;
 
@@ -2000,6 +2002,13 @@ class SchoolAdminService extends BaseService
         $this->studentRepo->update($id, [
             'class_id' => $targetClassId,
             'roll_no' => $rollNo
+        ]);
+
+        // Clear previous class monthly tuition fee payments so new class fee card is 100% fresh
+        $stmtDelMonthly = $pdo->prepare("DELETE FROM fee_payments WHERE student_id = :student_id AND school_id = :school_id");
+        $stmtDelMonthly->execute([
+            ':student_id' => $id,
+            ':school_id' => $schoolId
         ]);
 
         // 7. Write Audit Log
@@ -4382,7 +4391,7 @@ class SchoolAdminService extends BaseService
 
         $stmtCfg = $pdo->prepare("
             SELECT monthly_fees FROM class_fee_configurations 
-            WHERE school_id = :school_id AND class_id = :class_id AND academic_year_id = :academic_year_id
+            WHERE school_id = :school_id AND class_id = :class_id AND (academic_year_id = :academic_year_id OR academic_year_id IS NULL)
             LIMIT 1
         ");
         $stmtCfg->execute([
@@ -4392,13 +4401,30 @@ class SchoolAdminService extends BaseService
         ]);
         $cfgRow = $stmtCfg->fetch(PDO::FETCH_ASSOC);
         if (!$cfgRow) {
-            return 0.0;
+            $stmtFallback = $pdo->prepare("
+                SELECT cfg.monthly_fees 
+                FROM class_fee_configurations cfg
+                JOIN classes c1 ON cfg.class_id = c1.id
+                JOIN classes c2 ON c1.name COLLATE utf8mb4_unicode_ci = c2.name COLLATE utf8mb4_unicode_ci AND c1.school_id = c2.school_id
+                WHERE cfg.school_id = :school_id AND c2.id = :class_id AND (cfg.academic_year_id = :academic_year_id OR cfg.academic_year_id IS NULL)
+                LIMIT 1
+            ");
+            $stmtFallback->execute([
+                ':school_id' => $schoolId,
+                ':class_id' => $classId,
+                ':academic_year_id' => $academicYearId
+            ]);
+            $cfgRow = $stmtFallback->fetch(PDO::FETCH_ASSOC);
         }
-        $monthlyFees = json_decode($cfgRow['monthly_fees'], true);
+
+        $monthlyFees = [];
+        if ($cfgRow && !empty($cfgRow['monthly_fees'])) {
+            $monthlyFees = is_string($cfgRow['monthly_fees']) ? json_decode($cfgRow['monthly_fees'], true) : $cfgRow['monthly_fees'];
+        }
 
         $stmtPaid = $pdo->prepare("
             SELECT fee_month FROM fee_payments 
-            WHERE student_id = :student_id AND school_id = :school_id AND status = 'PAID' AND academic_year_id = :academic_year_id
+            WHERE student_id = :student_id AND school_id = :school_id AND status = 'PAID' AND (academic_year_id = :academic_year_id OR academic_year_id IS NULL)
         ");
         $stmtPaid->execute([
             ':student_id' => $studentId,
@@ -4421,8 +4447,8 @@ class SchoolAdminService extends BaseService
             JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
             WHERE afp.student_id = :student_id
               AND afp.school_id = :school_id
-              AND afp.status = 'Pending'
-              AND aft.academic_year_id = :academic_year_id
+              AND LOWER(afp.status) = 'pending'
+              AND (aft.academic_year_id = :academic_year_id OR aft.academic_year_id IS NULL OR aft.name = 'Previous Year Dues')
         ");
         $stmtAddPending->execute([
             ':student_id' => $studentId,
@@ -6773,6 +6799,12 @@ class SchoolAdminService extends BaseService
             throw new ValidationException(['fields' => "This student's outstanding balance has already been migrated to the current Academic Year as 'Previous Year Dues'. Payment can only be collected from the current Academic Year."]);
         }
 
+        $stmtActiveAy = $pdo->prepare("SELECT id FROM academic_years WHERE school_id = :sid AND (is_current = 1 OR UPPER(status) = 'ACTIVE') ORDER BY is_current DESC, id DESC LIMIT 1");
+        $stmtActiveAy->execute([':sid' => $schoolId]);
+        $activeAyId = (int)($stmtActiveAy->fetchColumn() ?: 0);
+
+        $paymentAcademicYearId = $activeAyId > 0 ? $activeAyId : (int)$academicYearId;
+
         // 2. Fetch fee structure for this class (or fallback)
         $feeStructureId = null;
         $amountPaid = 0.0; // Default fallback
@@ -6840,8 +6872,8 @@ class SchoolAdminService extends BaseService
         });
 
         // 4. Fetch already paid months
-        $stmtPaid = $pdo->prepare("SELECT fee_month FROM fee_payments WHERE student_id = :student_id AND status = 'PAID' AND academic_year_id = :academic_year_id");
-        $stmtPaid->execute([':student_id' => $studentId, ':academic_year_id' => $academicYearId]);
+        $stmtPaid = $pdo->prepare("SELECT fee_month FROM fee_payments WHERE student_id = :student_id AND status = 'PAID'");
+        $stmtPaid->execute([':student_id' => $studentId]);
         $alreadyPaid = $stmtPaid->fetchAll(PDO::FETCH_COLUMN);
 
         $tempPaid = $alreadyPaid;
@@ -6899,7 +6931,7 @@ class SchoolAdminService extends BaseService
                 'receipt_no'       => $receiptNo,
                 'status'           => 'PAID',
                 'fee_month'        => $m,
-                'academic_year_id' => $academicYearId,
+                'academic_year_id' => $paymentAcademicYearId,
                 'payment_method'   => $paymentMethod,
                 'collected_by'     => $collectedBy
             ]);
@@ -6924,10 +6956,14 @@ class SchoolAdminService extends BaseService
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->feeRepo->getPdo();
 
+        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+        $workingYearId = $workingYear ? (int)$workingYear['id'] : 0;
+
         // 1. Fetch current academic year dates
-        $stmtYear = $pdo->prepare("SELECT start_date, end_date FROM academic_years WHERE school_id = :school_id AND is_current = 1 LIMIT 1");
-        $stmtYear->execute([':school_id' => $schoolId]);
-        $ay = $stmtYear->fetch(PDO::FETCH_ASSOC);
+        $ay = $workingYear;
+
+        $isCurrentAy = !empty($workingYear['is_current']) || (isset($workingYear['status']) && strtoupper($workingYear['status']) === 'ACTIVE');
+        $startDate = $workingYear['start_date'] ?? '1970-01-01';
 
         // 2. Fetch monthly fee payments
         $stmtMonthly = $pdo->prepare("
@@ -6942,7 +6978,9 @@ class SchoolAdminService extends BaseService
                     TRIM(CONCAT(s.first_name, ' ', COALESCE(s.middle_name, ''), ' ', s.last_name))
                 END AS student_name,
                 s.roll_no AS student_roll_no,
-                c.name AS class_name,
+                s.academic_year_id AS student_ay_id,
+                say.name AS student_ay_name,
+                COALESCE(c.name, 'N/A') AS class_name,
                 CONCAT('Monthly Fee (', fp.fee_month, ')') AS fee_name,
                 fp.collected_by,
                 fp.payment_method,
@@ -6952,15 +6990,29 @@ class SchoolAdminService extends BaseService
                 fp.payment_date,
                 fp.created_at,
                 'Completed' AS status,
-                ay.name AS academic_year_name,
-                ay.status AS academic_year_status
+                pay_ay.name AS academic_year_name,
+                pay_ay.status AS academic_year_status
             FROM fee_payments fp
             JOIN students s ON fp.student_id = s.id
-            JOIN classes c ON s.class_id = c.id
-            JOIN academic_years ay ON fp.academic_year_id = ay.id
-            WHERE fp.school_id = :school_id AND fp.status = 'PAID' AND ay.status IN ('ACTIVE', 'Draft')
+            LEFT JOIN classes c ON s.class_id = c.id
+            LEFT JOIN academic_years say ON s.academic_year_id = say.id
+            LEFT JOIN academic_years pay_ay ON fp.academic_year_id = pay_ay.id
+            WHERE fp.school_id = :school_id AND fp.status = 'PAID'
+              AND (
+                s.academic_year_id = :ayid 
+                OR (
+                  :is_curr1 = 1 
+                  AND (s.status = 'Inactive' OR s.status = 'Alumni' OR s.status = 'Archived')
+                  AND fp.created_at >= (SELECT created_at FROM academic_years WHERE school_id = :sid_sub AND (is_current = 1 OR UPPER(status) = 'ACTIVE') LIMIT 1)
+                )
+              )
         ");
-        $stmtMonthly->execute([':school_id' => $schoolId]);
+        $stmtMonthly->execute([
+            ':school_id' => $schoolId,
+            ':ayid' => $workingYearId,
+            ':is_curr1' => $isCurrentAy ? 1 : 0,
+            ':sid_sub' => $schoolId
+        ]);
         $monthly = $stmtMonthly->fetchAll(PDO::FETCH_ASSOC);
 
         // 3. Fetch additional fee payments
@@ -6976,7 +7028,9 @@ class SchoolAdminService extends BaseService
                     TRIM(CONCAT(s.first_name, ' ', COALESCE(s.middle_name, ''), ' ', s.last_name))
                 END AS student_name,
                 s.roll_no AS student_roll_no,
-                c.name AS class_name,
+                s.academic_year_id AS student_ay_id,
+                say.name AS student_ay_name,
+                COALESCE(c.name, 'N/A') AS class_name,
                 aft.name AS fee_name,
                 afp.collected_by,
                 afp.payment_method,
@@ -6986,29 +7040,51 @@ class SchoolAdminService extends BaseService
                 afp.payment_date,
                 afp.created_at,
                 'Completed' AS status,
-                ay.name AS academic_year_name,
-                ay.status AS academic_year_status
+                pay_ay.name AS academic_year_name,
+                pay_ay.status AS academic_year_status
             FROM additional_fee_payments afp
             JOIN students s ON afp.student_id = s.id
-            JOIN classes c ON c.id = s.class_id
+            LEFT JOIN classes c ON c.id = s.class_id
             JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
-            JOIN academic_years ay ON aft.academic_year_id = ay.id
-            WHERE afp.school_id = :school_id AND afp.status = 'Paid' AND ay.status IN ('ACTIVE', 'Draft')
+            LEFT JOIN academic_years say ON s.academic_year_id = say.id
+            LEFT JOIN academic_years pay_ay ON aft.academic_year_id = pay_ay.id
+            WHERE afp.school_id = :school_id AND LOWER(afp.status) = 'paid'
+              AND (
+                aft.academic_year_id = :ayid 
+                OR (
+                  :is_curr1 = 1 
+                  AND (s.status = 'Inactive' OR s.status = 'Alumni' OR s.status = 'Archived')
+                  AND afp.updated_at >= (SELECT created_at FROM academic_years WHERE school_id = :sid_sub AND (is_current = 1 OR UPPER(status) = 'ACTIVE') LIMIT 1)
+                )
+              )
         ");
-        $stmtAdditional->execute([':school_id' => $schoolId]);
+        $stmtAdditional->execute([
+            ':school_id' => $schoolId,
+            ':ayid' => $workingYearId,
+            ':is_curr1' => $isCurrentAy ? 1 : 0,
+            ':sid_sub' => $schoolId
+        ]);
         $additional = $stmtAdditional->fetchAll(PDO::FETCH_ASSOC);
 
         // Merge
         $merged = array_merge($monthly, $additional);
 
         // Standardize types and fallback fields
-        $merged = array_map(function($t) {
+        $merged = array_map(function($t) use ($workingYearId) {
             $t['amount'] = (float)$t['amount'];
             if (empty($t['payment_method'])) {
                 $t['payment_method'] = 'Cash';
             }
             if (empty($t['collected_by'])) {
                 $t['collected_by'] = 'School Admin';
+            }
+
+            if (!empty($t['student_ay_id']) && (int)$t['student_ay_id'] !== $workingYearId && !empty($t['student_ay_name'])) {
+                if ($t['type'] === 'additional') {
+                    $t['fee_name'] = $t['fee_name'] . " (Dues for " . $t['student_ay_name'] . ")";
+                } else {
+                    $t['fee_name'] = $t['fee_name'] . " [Dues for " . $t['student_ay_name'] . "]";
+                }
             }
             if (empty($t['receipt_no'])) {
                 if ($t['type'] === 'additional') {
@@ -7092,6 +7168,15 @@ class SchoolAdminService extends BaseService
                 } else {
                     $t['fee_name'] = "Monthly Fee (" . $t['months_list'][0] . ")";
                     $t['fee_month'] = $t['months_list'][0];
+                }
+            }
+
+            // Append Dues for Academic Year name if student enrolled year differs from working year
+            if (!empty($t['student_ay_id']) && (int)$t['student_ay_id'] !== $workingYearId && !empty($t['student_ay_name'])) {
+                if ($t['type'] === 'additional') {
+                    $t['fee_name'] = $t['fee_name'] . " (Dues for " . $t['student_ay_name'] . ")";
+                } else {
+                    $t['fee_name'] = $t['fee_name'] . " [Dues for " . $t['student_ay_name'] . "]";
                 }
             }
             // Re-apply the Draft suffix if applicable
@@ -8746,15 +8831,7 @@ class SchoolAdminService extends BaseService
             if ($this->isStaffMigrated($pdo, $staffId, $schoolId)) {
                 throw new ValidationException(['month' => 'This teacher has been migrated/copied to the next academic year. Salary cannot be disbursed from the archived academic year.']);
             }
-
-            // Non-migrated teacher: record in current active year
-            $stmtCurr = $pdo->prepare("SELECT * FROM academic_years WHERE school_id = :sid AND is_current = 1 LIMIT 1");
-            $stmtCurr->execute([':sid' => $schoolId]);
-            $currYear = $stmtCurr->fetch(PDO::FETCH_ASSOC);
-            if (!$currYear) {
-                throw new ValidationException(['month' => 'No current active academic year found for recording this previous year salary expense.']);
-            }
-            $payYearId = (int)$currYear['id'];
+            $payYearId = $academicYearId;
         } else {
             $this->requireWritableAcademicYear($pdo, $schoolId);
         }
@@ -9129,13 +9206,12 @@ class SchoolAdminService extends BaseService
             $stmtFees = $pdo->prepare("
                 SELECT COALESCE(SUM(fp.amount_paid), 0) 
                 FROM fee_payments fp
-                LEFT JOIN students s ON fp.student_id = s.id
+                JOIN students s ON fp.student_id = s.id
                 WHERE fp.school_id = :sid AND fp.status = 'PAID'
                   AND (
-                    fp.academic_year_id = :ayid
+                    s.academic_year_id = :ayid
                     OR (
                       fp.created_at >= (SELECT created_at FROM academic_years WHERE id = :ayid_2 LIMIT 1)
-                      AND fp.academic_year_id != :ayid_3
                       AND (s.status = 'Inactive' OR s.status = 'Alumni' OR s.status = 'Archived')
                     )
                   )
@@ -9145,20 +9221,18 @@ class SchoolAdminService extends BaseService
                 ':sid' => $schoolId,
                 ':ayid' => $workingYear['id'],
                 ':ayid_2' => $workingYear['id'],
-                ':ayid_3' => $workingYear['id'],
                 ':latest_rep_ts' => $latestReportCreatedAt
             ]);
         } else {
             $stmtFees = $pdo->prepare("
                 SELECT COALESCE(SUM(fp.amount_paid), 0) 
                 FROM fee_payments fp
-                LEFT JOIN students s ON fp.student_id = s.id
+                JOIN students s ON fp.student_id = s.id
                 WHERE fp.school_id = :sid AND fp.status = 'PAID'
                   AND (
-                    fp.academic_year_id = :ayid
+                    s.academic_year_id = :ayid
                     OR (
                       fp.created_at >= (SELECT created_at FROM academic_years WHERE id = :ayid_2 LIMIT 1)
-                      AND fp.academic_year_id != :ayid_3
                       AND (s.status = 'Inactive' OR s.status = 'Alumni' OR s.status = 'Archived')
                     )
                   )
@@ -9166,8 +9240,7 @@ class SchoolAdminService extends BaseService
             $stmtFees->execute([
                 ':sid' => $schoolId,
                 ':ayid' => $workingYear['id'],
-                ':ayid_2' => $workingYear['id'],
-                ':ayid_3' => $workingYear['id']
+                ':ayid_2' => $workingYear['id']
             ]);
         }
         $tuitionCollected = (float)$stmtFees->fetchColumn();
@@ -9178,14 +9251,13 @@ class SchoolAdminService extends BaseService
                 SELECT COALESCE(SUM(afp.amount), 0) 
                 FROM additional_fee_payments afp
                 JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
-                LEFT JOIN students s ON afp.student_id = s.id
+                JOIN students s ON afp.student_id = s.id
                 WHERE afp.school_id = :sid 
-                  AND afp.status = 'Paid' 
+                  AND LOWER(afp.status) = 'paid' 
                   AND (
                     aft.academic_year_id = :ayid
                     OR (
                       afp.updated_at >= (SELECT created_at FROM academic_years WHERE id = :ayid_2 LIMIT 1)
-                      AND aft.academic_year_id != :ayid_3
                       AND (s.status = 'Inactive' OR s.status = 'Alumni' OR s.status = 'Archived')
                     )
                   )
@@ -9195,7 +9267,6 @@ class SchoolAdminService extends BaseService
                 ':sid' => $schoolId,
                 ':ayid' => $workingYear['id'],
                 ':ayid_2' => $workingYear['id'],
-                ':ayid_3' => $workingYear['id'],
                 ':latest_rep_ts' => $latestReportCreatedAt
             ]);
         } else {
@@ -9203,14 +9274,13 @@ class SchoolAdminService extends BaseService
                 SELECT COALESCE(SUM(afp.amount), 0) 
                 FROM additional_fee_payments afp
                 JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
-                LEFT JOIN students s ON afp.student_id = s.id
+                JOIN students s ON afp.student_id = s.id
                 WHERE afp.school_id = :sid 
-                  AND afp.status = 'Paid' 
+                  AND LOWER(afp.status) = 'paid' 
                   AND (
                     aft.academic_year_id = :ayid
                     OR (
                       afp.updated_at >= (SELECT created_at FROM academic_years WHERE id = :ayid_2 LIMIT 1)
-                      AND aft.academic_year_id != :ayid_3
                       AND (s.status = 'Inactive' OR s.status = 'Alumni' OR s.status = 'Archived')
                     )
                   )
@@ -9218,8 +9288,7 @@ class SchoolAdminService extends BaseService
             $stmtAddFees->execute([
                 ':sid' => $schoolId,
                 ':ayid' => $workingYear['id'],
-                ':ayid_2' => $workingYear['id'],
-                ':ayid_3' => $workingYear['id']
+                ':ayid_2' => $workingYear['id']
             ]);
         }
         $addFeesCollected = (float)$stmtAddFees->fetchColumn();
@@ -9232,12 +9301,17 @@ class SchoolAdminService extends BaseService
                 SELECT COALESCE(SUM(amount_paid), 0) 
                 FROM staff_payments 
                 WHERE school_id = :sid 
-                  AND academic_year_id = :ayid 
+                  AND (
+                    academic_year_id = :ayid
+                    OR created_at >= (SELECT created_at FROM academic_years WHERE id = :ayid_2 LIMIT 1)
+                    OR DATE(created_at) = CURRENT_DATE()
+                  )
                   AND created_at > :latest_rep_ts
             ");
             $stmtSalaries->execute([
                 ':sid' => $schoolId,
                 ':ayid' => $workingYear['id'],
+                ':ayid_2' => $workingYear['id'],
                 ':latest_rep_ts' => $latestReportCreatedAt
             ]);
         } else {
@@ -9245,11 +9319,16 @@ class SchoolAdminService extends BaseService
                 SELECT COALESCE(SUM(amount_paid), 0) 
                 FROM staff_payments 
                 WHERE school_id = :sid 
-                  AND academic_year_id = :ayid
+                  AND (
+                    academic_year_id = :ayid
+                    OR created_at >= (SELECT created_at FROM academic_years WHERE id = :ayid_2 LIMIT 1)
+                    OR DATE(created_at) = CURRENT_DATE()
+                  )
             ");
             $stmtSalaries->execute([
                 ':sid' => $schoolId,
-                ':ayid' => $workingYear['id']
+                ':ayid' => $workingYear['id'],
+                ':ayid_2' => $workingYear['id']
             ]);
         }
         $salariesPaid = (float)$stmtSalaries->fetchColumn();
@@ -9603,7 +9682,8 @@ class SchoolAdminService extends BaseService
                 'Tuition Fee' AS fee_type, 
                 fp.fee_month AS months_covered, 
                 fp.amount_paid AS amount,
-                fp.academic_year_id
+                fp.academic_year_id,
+                s.academic_year_id AS student_academic_year_id
             FROM fee_payments fp
             JOIN students s ON fp.student_id = s.id
             LEFT JOIN classes c ON s.class_id = c.id
@@ -9626,7 +9706,8 @@ class SchoolAdminService extends BaseService
                 aft.name AS fee_type, 
                 'N/A' AS months_covered, 
                 afp.amount,
-                aft.academic_year_id
+                aft.academic_year_id,
+                s.academic_year_id AS student_academic_year_id
             FROM additional_fee_payments afp
             JOIN students s ON afp.student_id = s.id
             LEFT JOIN classes c ON s.class_id = c.id
@@ -9646,22 +9727,22 @@ class SchoolAdminService extends BaseService
         $ayNames = $stmtAYNames->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
 
         foreach ($feePayments as &$fp) {
-            $payAYId = isset($fp['academic_year_id']) ? (int)$fp['academic_year_id'] : 0;
-            if ($workingYearId && $payAYId && $payAYId !== $workingYearId) {
-                $ayName = $ayNames[$payAYId] ?? '';
-                $fp['fee_type'] = "Previous Year Dues – " . $fp['student_name'] . " – AY " . $ayName;
+            $stuAYId = (int)($fp['student_academic_year_id'] ?? 0);
+            if ($workingYearId && $stuAYId && $stuAYId !== $workingYearId) {
+                $ayName = $ayNames[$stuAYId] ?? '';
+                $fp['fee_type'] = "Dues for " . $ayName;
             }
-            unset($fp['academic_year_id']);
+            unset($fp['academic_year_id'], $fp['student_academic_year_id']);
         }
         unset($fp);
 
         foreach ($addPayments as &$ap) {
-            $payAYId = isset($ap['academic_year_id']) ? (int)$ap['academic_year_id'] : 0;
-            if ($workingYearId && $payAYId && $payAYId !== $workingYearId) {
-                $ayName = $ayNames[$payAYId] ?? '';
-                $ap['fee_type'] = "Previous Year Dues – " . $ap['student_name'] . " – AY " . $ayName;
+            $stuAYId = (int)($ap['student_academic_year_id'] ?? 0);
+            if ($workingYearId && $stuAYId && $stuAYId !== $workingYearId) {
+                $ayName = $ayNames[$stuAYId] ?? '';
+                $ap['fee_type'] = "Dues for " . $ayName;
             }
-            unset($ap['academic_year_id']);
+            unset($ap['academic_year_id'], $ap['student_academic_year_id']);
         }
         unset($ap);
 
@@ -9683,9 +9764,10 @@ class SchoolAdminService extends BaseService
         });
 
         $stmtSalaryList = $pdo->prepare("
-            SELECT sp.payment_month, sp.academic_year_id, st.name AS staff_name, sp.payment_date AS expense_date, sp.amount_paid AS amount, 'Salary Payment' AS category
+            SELECT sp.payment_month, sp.academic_year_id, st.name AS staff_name, sp.payment_date AS expense_date, sp.amount_paid AS amount, ay.name AS ay_name
             FROM staff_payments sp
             JOIN staff st ON sp.staff_id = st.id
+            LEFT JOIN academic_years ay ON sp.academic_year_id = ay.id
             WHERE sp.school_id = :sid 
               AND sp.created_at {$operator} :from_ts 
               AND sp.created_at <= :to_ts
@@ -9695,9 +9777,11 @@ class SchoolAdminService extends BaseService
 
         $salaryPayments = [];
         foreach ($salaryPaymentsRaw as $spr) {
+            $ayName = $spr['ay_name'] ?? ($ayNames[$spr['academic_year_id']] ?? '');
+            $categoryStr = !empty($ayName) ? "Salary Payment [{$ayName}]" : "Salary Payment";
             $salaryPayments[] = [
-                'description' => $this->getSalaryPaymentDescription($pdo, $schoolId, $spr, $spr['staff_name']),
-                'category' => $spr['category'],
+                'description' => $spr['staff_name'],
+                'category' => $categoryStr,
                 'expense_date' => $spr['expense_date'],
                 'amount' => $spr['amount']
             ];
@@ -9963,7 +10047,8 @@ Only approve the settlement after reviewing all financial records.
                 'Tuition Fee' AS fee_type, 
                 fp.fee_month AS months_covered, 
                 fp.amount_paid AS amount,
-                fp.academic_year_id
+                fp.academic_year_id,
+                s.academic_year_id AS student_academic_year_id
             FROM fee_payments fp
             JOIN students s ON fp.student_id = s.id
             LEFT JOIN classes c ON s.class_id = c.id
@@ -9986,7 +10071,8 @@ Only approve the settlement after reviewing all financial records.
                 aft.name AS fee_type, 
                 'N/A' AS months_covered, 
                 afp.amount,
-                aft.academic_year_id
+                aft.academic_year_id,
+                s.academic_year_id AS student_academic_year_id
             FROM additional_fee_payments afp
             JOIN students s ON afp.student_id = s.id
             LEFT JOIN classes c ON s.class_id = c.id
@@ -10009,22 +10095,22 @@ Only approve the settlement after reviewing all financial records.
         $ayNames = $stmtAYNames->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
 
         foreach ($feePayments as &$fp) {
-            $payAYId = isset($fp['academic_year_id']) ? (int)$fp['academic_year_id'] : 0;
-            if ($workingYearId && $payAYId && $payAYId !== $workingYearId) {
-                $ayName = $ayNames[$payAYId] ?? '';
-                $fp['fee_type'] = "Previous Year Dues – " . $fp['student_name'] . " – AY " . $ayName;
+            $stuAYId = (int)($fp['student_academic_year_id'] ?? 0);
+            if ($workingYearId && $stuAYId && $stuAYId !== $workingYearId) {
+                $ayName = $ayNames[$stuAYId] ?? '';
+                $fp['fee_type'] = "Dues for " . $ayName;
             }
-            unset($fp['academic_year_id']);
+            unset($fp['academic_year_id'], $fp['student_academic_year_id']);
         }
         unset($fp);
 
         foreach ($addPayments as &$ap) {
-            $payAYId = isset($ap['academic_year_id']) ? (int)$ap['academic_year_id'] : 0;
-            if ($workingYearId && $payAYId && $payAYId !== $workingYearId) {
-                $ayName = $ayNames[$payAYId] ?? '';
-                $ap['fee_type'] = "Previous Year Dues – " . $ap['student_name'] . " – AY " . $ayName;
+            $stuAYId = (int)($ap['student_academic_year_id'] ?? 0);
+            if ($workingYearId && $stuAYId && $stuAYId !== $workingYearId) {
+                $ayName = $ayNames[$stuAYId] ?? '';
+                $ap['fee_type'] = "Dues for " . $ayName;
             }
-            unset($ap['academic_year_id']);
+            unset($ap['academic_year_id'], $ap['student_academic_year_id']);
         }
         unset($ap);
 
@@ -10046,9 +10132,10 @@ Only approve the settlement after reviewing all financial records.
         });
 
         $stmtSalaryList = $pdo->prepare("
-            SELECT sp.payment_month, sp.academic_year_id, st.name AS staff_name, sp.payment_date AS expense_date, sp.amount_paid AS amount, 'Salary Payment' AS category
+            SELECT sp.payment_month, sp.academic_year_id, st.name AS staff_name, sp.payment_date AS expense_date, sp.amount_paid AS amount, ay.name AS ay_name
             FROM staff_payments sp
             JOIN staff st ON sp.staff_id = st.id
+            LEFT JOIN academic_years ay ON sp.academic_year_id = ay.id
             WHERE sp.school_id = :sid 
               AND sp.created_at {$operator} :from_ts 
               AND sp.created_at <= :to_ts
@@ -10058,9 +10145,11 @@ Only approve the settlement after reviewing all financial records.
 
         $salaryPayments = [];
         foreach ($salaryPaymentsRaw as $spr) {
+            $ayName = $spr['ay_name'] ?? ($ayNames[$spr['academic_year_id']] ?? '');
+            $categoryStr = !empty($ayName) ? "Salary Payment [{$ayName}]" : "Salary Payment";
             $salaryPayments[] = [
-                'description' => $this->getSalaryPaymentDescription($pdo, $schoolId, $spr, $spr['staff_name']),
-                'category' => $spr['category'],
+                'description' => $spr['staff_name'],
+                'category' => $categoryStr,
                 'expense_date' => $spr['expense_date'],
                 'amount' => $spr['amount']
             ];
@@ -10099,7 +10188,7 @@ Only approve the settlement after reviewing all financial records.
     {
         // 1. Get the academic year of the student
         $stmtStu = $pdo->prepare("
-            SELECT s.admission_no, s.name, s.father_name, s.academic_year_id, ay.start_date
+            SELECT s.admission_no, s.name, s.father_name, s.parent_phone, s.father_phone, s.student_mobile, s.academic_year_id, ay.start_date
             FROM students s
             JOIN academic_years ay ON s.academic_year_id = ay.id
             WHERE s.id = :id AND s.school_id = :sid
@@ -10111,50 +10200,67 @@ Only approve the settlement after reviewing all financial records.
             return false;
         }
 
-        $admissionNo = $stu['admission_no'];
-        $name = $stu['name'];
-        $fatherName = $stu['father_name'] ?? '';
+        $admissionNo = trim((string)($stu['admission_no'] ?? ''));
+        $name = trim((string)($stu['name'] ?? ''));
+        $fatherName = trim((string)($stu['father_name'] ?? ''));
+        $phone = !empty($stu['parent_phone']) ? trim((string)$stu['parent_phone']) : (!empty($stu['father_phone']) ? trim((string)$stu['father_phone']) : (!empty($stu['student_mobile']) ? trim((string)$stu['student_mobile']) : ''));
         $startDate = $stu['start_date'];
+        $currentAyId = (int)$stu['academic_year_id'];
 
-        // If the student belongs to the current active/working academic year, they are NOT a promoted past record
-        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
-        if ($workingYear && (int)$stu['academic_year_id'] === (int)$workingYear['id']) {
+        // Get the system active academic year (is_current = 1 or status = 'ACTIVE')
+        $stmtActive = $pdo->prepare("SELECT id FROM academic_years WHERE school_id = :sid AND (is_current = 1 OR UPPER(status) = 'ACTIVE') ORDER BY is_current DESC, id DESC LIMIT 1");
+        $stmtActive->execute([':sid' => $schoolId]);
+        $activeAyId = (int)($stmtActive->fetchColumn() ?: 0);
+
+        // If the student record belongs to the current active academic year, they are NOT a promoted past record
+        if ($activeAyId > 0 && $currentAyId === $activeAyId) {
             return false;
         }
 
-        // 2. Check if there is a student in a newer academic year matching this student
-        if (!empty($admissionNo)) {
-            $stmtCheck = $pdo->prepare("
-                SELECT COUNT(*)
-                FROM students s
-                JOIN academic_years ay ON s.academic_year_id = ay.id
-                WHERE s.school_id = :sid
-                  AND ay.start_date > :start_date
-                  AND s.admission_no = :admission_no
-            ");
-            $stmtCheck->execute([
-                ':sid' => $schoolId,
-                ':start_date' => $startDate,
-                ':admission_no' => $admissionNo
-            ]);
-        } else {
-            $stmtCheck = $pdo->prepare("
-                SELECT COUNT(*)
-                FROM students s
-                JOIN academic_years ay ON s.academic_year_id = ay.id
-                WHERE s.school_id = :sid
-                  AND ay.start_date > :start_date
-                  AND s.name = :name
-                  AND COALESCE(s.father_name, '') = :father_name
-            ");
-            $stmtCheck->execute([
-                ':sid' => $schoolId,
-                ':start_date' => $startDate,
-                ':name' => $name,
-                ':father_name' => $fatherName
-            ]);
+        // 2. Check if there is a matching student record in a newer or current active academic year
+        $conds = [];
+        $params = [
+            ':sid' => $schoolId,
+            ':curr_ay' => $currentAyId,
+            ':start_date' => $startDate
+        ];
+
+        if ($admissionNo !== '') {
+            $conds[] = "s.admission_no = :adm";
+            $params[':adm'] = $admissionNo;
         }
 
+        if ($name !== '') {
+            $nameCond = "LOWER(TRIM(s.name)) = LOWER(:cname)";
+            $params[':cname'] = $name;
+
+            if ($phone !== '') {
+                $conds[] = "({$nameCond} AND (s.parent_phone = :p1 OR s.father_phone = :p2 OR s.student_mobile = :p3))";
+                $params[':p1'] = $phone;
+                $params[':p2'] = $phone;
+                $params[':p3'] = $phone;
+            } else {
+                $conds[] = "({$nameCond} AND COALESCE(TRIM(s.father_name), '') = :fname)";
+                $params[':fname'] = $fatherName;
+            }
+        }
+
+        if (empty($conds)) {
+            return false;
+        }
+
+        $sqlCheck = "
+            SELECT COUNT(*)
+            FROM students s
+            JOIN academic_years ay ON s.academic_year_id = ay.id
+            WHERE s.school_id = :sid
+              AND s.academic_year_id != :curr_ay
+              AND (ay.is_current = 1 OR UPPER(ay.status) = 'ACTIVE' OR ay.start_date > :start_date)
+              AND (" . implode(' OR ', $conds) . ")
+        ";
+
+        $stmtCheck = $pdo->prepare($sqlCheck);
+        $stmtCheck->execute($params);
         return ((int)$stmtCheck->fetchColumn()) > 0;
     }
 

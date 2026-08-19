@@ -215,7 +215,7 @@ const AppLayout = ({ children }) => {
                                 selectYear(nextId);
                                 navigate('/school-admin');
                               }}
-                              className="h-7 cursor-pointer rounded-md border-0 bg-transparent pr-6 text-body-sm font-semibold text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                              className="h-7 cursor-pointer rounded-md border-0 bg-transparent pr-6 text-body-sm font-semibold text-text-primary outline-none focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 shadow-none"
                             >
                               {academicYears.map(y => (
                                 <option key={y.id} value={y.id}>

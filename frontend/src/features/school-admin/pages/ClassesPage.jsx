@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
-import { Plus, Search, Users, User, X, MoreVertical, Check } from 'lucide-react';
+import { Plus, Search, Users, User, X, MoreVertical, Check, AlertTriangle } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardContent } from '../../../common/ui/card';
 import { Input } from '../../../common/ui/input';
@@ -148,6 +148,8 @@ export default function ClassesPage() {
   const [selectedAdvanceClassId, setSelectedAdvanceClassId] = useState('');
   const [advancing, setAdvancing] = useState(false);
   const [advanceError, setAdvanceError] = useState('');
+  const [advanceStudentFeeInfo, setAdvanceStudentFeeInfo] = useState(null);
+  const [loadingAdvanceFee, setLoadingAdvanceFee] = useState(false);
 
   // Class Section Enhancement States
   const [originalSections, setOriginalSections] = useState([]);
@@ -731,11 +733,28 @@ export default function ClassesPage() {
                             <span className="block text-[8px] text-red-500 font-bold whitespace-normal text-left">Only active students can be advanced.</span>
                           </DropdownItem>
                         ) : (
-                          <DropdownItem onClick={() => {
+                          <DropdownItem onClick={async () => {
                             setAdvanceTargetStudent(s);
                             setSelectedAdvanceClassId('');
                             setAdvanceError('');
+                            setAdvanceStudentFeeInfo(null);
                             setIsAdvanceDialogOpen(true);
+                            setLoadingAdvanceFee(true);
+                            try {
+                              const detail = await schoolService.getStudentById(s.id);
+                              const payments = detail?.fee_summary?.payments || [];
+                              const totalPaid = payments.reduce((sum, p) => sum + parseFloat(p.amount_paid || 0), 0);
+                              const monthsList = payments.map(p => p.fee_month);
+                              setAdvanceStudentFeeInfo({
+                                totalPaid,
+                                monthsList,
+                                count: payments.length
+                              });
+                            } catch (e) {
+                              console.error(e);
+                            } finally {
+                              setLoadingAdvanceFee(false);
+                            }
                           }}>
                             Advance Student
                           </DropdownItem>
@@ -842,12 +861,38 @@ export default function ClassesPage() {
                   </select>
                 </div>
 
+                {/* Deposited Fee Warning Notice */}
+                {loadingAdvanceFee ? (
+                  <div className="p-3 bg-zinc-100 dark:bg-zinc-800/60 border border-border rounded-xl text-xs text-text-muted font-semibold flex items-center gap-2 animate-pulse">
+                    <div className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                    Checking student fee records...
+                  </div>
+                ) : advanceStudentFeeInfo && advanceStudentFeeInfo.totalPaid > 0 ? (
+                  <div className="p-4 bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 rounded-xl space-y-2.5 text-xs animate-in fade-in duration-200">
+                    <div className="flex items-center gap-2 font-bold text-amber-700 dark:text-amber-400 text-xs">
+                      <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+                      <span>Monthly Fee Deposit Alert</span>
+                    </div>
+                    <p className="leading-relaxed">
+                      This student has deposited <strong className="text-amber-950 dark:text-amber-100 font-extrabold">₹{advanceStudentFeeInfo.totalPaid.toLocaleString('en-IN')}</strong> monthly tuition fees ({advanceStudentFeeInfo.monthsList.join(', ')}) in {advanceTargetStudent.class_name}.
+                    </p>
+                    <div className="p-3 bg-amber-500/15 border border-amber-500/25 rounded-lg text-amber-950 dark:text-amber-100 leading-relaxed font-medium space-y-1">
+                      <p className="text-[11.5px] font-bold text-amber-800 dark:text-amber-300">
+                        ⚠️ Advancing this student will clear the current class monthly fee deposit of ₹{advanceStudentFeeInfo.totalPaid.toLocaleString('en-IN')} ({advanceStudentFeeInfo.monthsList.join(', ')}).
+                      </p>
+                      <p className="text-[11px] text-amber-700 dark:text-amber-400 font-semibold">
+                        👉 Please note down this amount! After advancing to the new class, please re-deposit ₹{advanceStudentFeeInfo.totalPaid.toLocaleString('en-IN')} ({advanceStudentFeeInfo.monthsList.join(', ')}) in the new class fee structure.
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
+
                 {/* Warning box */}
-                <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 text-amber-600 rounded-xl text-xs leading-relaxed space-y-1.5">
-                  <p className="font-bold">Important Notice:</p>
-                  <ul className="list-disc pl-4 space-y-1">
+                <div className="p-3.5 bg-zinc-50 dark:bg-zinc-900/50 border border-border text-text-secondary rounded-xl text-xs leading-relaxed space-y-1.5">
+                  <p className="font-bold text-text-primary">Important Notice:</p>
+                  <ul className="list-disc pl-4 space-y-1 text-text-muted font-medium">
                     <li>This action will move the student to the selected class immediately.</li>
-                    <li>All academic records and history will be preserved.</li>
+                    <li>Academic history and additional fee records will be preserved.</li>
                     <li>Please verify carefully before continuing.</li>
                   </ul>
                 </div>

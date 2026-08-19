@@ -145,7 +145,7 @@ class StudentService extends BaseService
                   )
                   AND (s.status IS NULL OR UPPER(s.status) = 'ACTIVE')
                   AND s.exit_date IS NULL
-                ORDER BY COALESCE(ay.is_current, 0) DESC, s.id DESC
+                ORDER BY (CASE WHEN ay.status = 'ACTIVE' THEN 2 WHEN ay.is_current = 1 THEN 1 ELSE 0 END) DESC, s.id DESC
                 LIMIT 1
             ");
             $stmt->execute([
@@ -168,7 +168,7 @@ class StudentService extends BaseService
                   AND LOWER(s.email) = LOWER(:email)
                   AND (s.status IS NULL OR UPPER(s.status) = 'ACTIVE')
                   AND s.exit_date IS NULL
-                ORDER BY COALESCE(ay.is_current, 0) DESC, s.id DESC
+                ORDER BY (CASE WHEN ay.status = 'ACTIVE' THEN 2 WHEN ay.is_current = 1 THEN 1 ELSE 0 END) DESC, s.id DESC
                 LIMIT 1
             ");
             $stmt->execute([
@@ -864,19 +864,36 @@ class StudentService extends BaseService
         }
 
         // 1. Fetch class fee config
-        $stmtCfg = $pdo->prepare("SELECT * FROM class_fee_configurations WHERE school_id = :sid AND class_id = :cid LIMIT 1");
-        $stmtCfg->execute([':sid' => $schoolId, ':cid' => $classId]);
+        if ($academicYearId > 0) {
+            $stmtCfg = $pdo->prepare("SELECT * FROM class_fee_configurations WHERE school_id = :sid AND class_id = :cid AND (academic_year_id = :ayid OR academic_year_id IS NULL) LIMIT 1");
+            $stmtCfg->execute([':sid' => $schoolId, ':cid' => $classId, ':ayid' => $academicYearId]);
+        } else {
+            $stmtCfg = $pdo->prepare("SELECT * FROM class_fee_configurations WHERE school_id = :sid AND class_id = :cid LIMIT 1");
+            $stmtCfg->execute([':sid' => $schoolId, ':cid' => $classId]);
+        }
         $config = $stmtCfg->fetch();
         if (!$config && $classId) {
-            $stmtFallback = $pdo->prepare("
-                SELECT cfg.* 
-                FROM class_fee_configurations cfg
-                JOIN classes c1 ON cfg.class_id = c1.id
-                JOIN classes c2 ON c1.name COLLATE utf8mb4_unicode_ci = c2.name COLLATE utf8mb4_unicode_ci AND c1.school_id = c2.school_id
-                WHERE cfg.school_id = :sid AND c2.id = :cid
-                LIMIT 1
-            ");
-            $stmtFallback->execute([':sid' => $schoolId, ':cid' => $classId]);
+            if ($academicYearId > 0) {
+                $stmtFallback = $pdo->prepare("
+                    SELECT cfg.* 
+                    FROM class_fee_configurations cfg
+                    JOIN classes c1 ON cfg.class_id = c1.id
+                    JOIN classes c2 ON c1.name COLLATE utf8mb4_unicode_ci = c2.name COLLATE utf8mb4_unicode_ci AND c1.school_id = c2.school_id
+                    WHERE cfg.school_id = :sid AND c2.id = :cid AND (cfg.academic_year_id = :ayid OR cfg.academic_year_id IS NULL)
+                    LIMIT 1
+                ");
+                $stmtFallback->execute([':sid' => $schoolId, ':cid' => $classId, ':ayid' => $academicYearId]);
+            } else {
+                $stmtFallback = $pdo->prepare("
+                    SELECT cfg.* 
+                    FROM class_fee_configurations cfg
+                    JOIN classes c1 ON cfg.class_id = c1.id
+                    JOIN classes c2 ON c1.name COLLATE utf8mb4_unicode_ci = c2.name COLLATE utf8mb4_unicode_ci AND c1.school_id = c2.school_id
+                    WHERE cfg.school_id = :sid AND c2.id = :cid
+                    LIMIT 1
+                ");
+                $stmtFallback->execute([':sid' => $schoolId, ':cid' => $classId]);
+            }
             $config = $stmtFallback->fetch();
         }
         $monthlyFeesAmountMap = [];
@@ -890,9 +907,14 @@ class StudentService extends BaseService
         $stmtFeeStruct->execute([':sid' => $schoolId, ':cid' => $classId]);
         $fallbackAmount = (float)($stmtFeeStruct->fetchColumn() ?: 0.0);
 
-        // 3. Fetch paid records from fee_payments
-        $stmtPay = $pdo->prepare("SELECT * FROM fee_payments WHERE school_id = :sid AND student_id = :stid");
-        $stmtPay->execute([':sid' => $schoolId, ':stid' => $studentId]);
+        // 3. Fetch paid records from fee_payments for current academic year
+        if ($academicYearId > 0) {
+            $stmtPay = $pdo->prepare("SELECT * FROM fee_payments WHERE school_id = :sid AND student_id = :stid AND (academic_year_id = :ayid OR academic_year_id IS NULL)");
+            $stmtPay->execute([':sid' => $schoolId, ':stid' => $studentId, ':ayid' => $academicYearId]);
+        } else {
+            $stmtPay = $pdo->prepare("SELECT * FROM fee_payments WHERE school_id = :sid AND student_id = :stid");
+            $stmtPay->execute([':sid' => $schoolId, ':stid' => $studentId]);
+        }
         $payments = $stmtPay->fetchAll();
         $paymentsMap = [];
         foreach ($payments as $p) {
@@ -938,14 +960,24 @@ class StudentService extends BaseService
             }
         }
 
-        // 4. Fetch additional fee payments
-        $stmtAdd = $pdo->prepare("
-            SELECT afp.*, aft.name AS fee_name, aft.due_date AS type_due_date
-            FROM additional_fee_payments afp
-            JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
-            WHERE afp.school_id = :sid AND afp.student_id = :stid
-        ");
-        $stmtAdd->execute([':sid' => $schoolId, ':stid' => $studentId]);
+        // 4. Fetch additional fee payments for current academic year (or Previous Year Dues)
+        if ($academicYearId > 0) {
+            $stmtAdd = $pdo->prepare("
+                SELECT afp.*, aft.name AS fee_name, aft.due_date AS type_due_date
+                FROM additional_fee_payments afp
+                JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+                WHERE afp.school_id = :sid AND afp.student_id = :stid AND (aft.academic_year_id = :ayid OR aft.academic_year_id IS NULL OR aft.name = 'Previous Year Dues')
+            ");
+            $stmtAdd->execute([':sid' => $schoolId, ':stid' => $studentId, ':ayid' => $academicYearId]);
+        } else {
+            $stmtAdd = $pdo->prepare("
+                SELECT afp.*, aft.name AS fee_name, aft.due_date AS type_due_date
+                FROM additional_fee_payments afp
+                JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+                WHERE afp.school_id = :sid AND afp.student_id = :stid
+            ");
+            $stmtAdd->execute([':sid' => $schoolId, ':stid' => $studentId]);
+        }
         $additionalPayments = $stmtAdd->fetchAll();
 
         $additionalFees = [];
