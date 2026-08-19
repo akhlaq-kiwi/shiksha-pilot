@@ -221,7 +221,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     final targetStr = _formatYmd(d);
     return _holidays.any((h) {
       if (h == null) return false;
-      final raw = (h['date'] ?? '').toString().trim();
+      final raw = (h['date'] ?? h['holiday_date'] ?? h['start_date'] ?? h['date_from'] ?? '').toString().trim();
       if (raw.isEmpty) return false;
       final clean = raw.split(' ')[0].split('T')[0];
       return clean == targetStr;
@@ -378,12 +378,30 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       // Refresh data
       await _fetchTeacherAttendanceForDate();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString().replaceAll('Exception:', '').trim()),
-          backgroundColor: Colors.red,
-        ),
-      );
+      final errStr = e.toString().replaceAll('Exception:', '').trim();
+      final errLower = errStr.toLowerCase();
+      if (errLower.contains('holiday') || errLower.contains('sunday') || errLower.contains('leave')) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('No Attendance Required', style: TextStyle(fontWeight: FontWeight.bold)),
+            content: Text('Attendance is not required for the selected date because it is a scheduled holiday or weekend.\n\n($errStr)'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errStr),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } finally {
       setState(() {
         _isTeacherSubmitting = false;
@@ -1251,7 +1269,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                             children: [
                               // Roll & Name block
                               Expanded(
-                                flex: 2,
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
@@ -1267,20 +1284,37 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                                   ],
                                 ),
                               ),
-                              
-                              // Segmented Controls (Radio buttons design chip style)
-                              Expanded(
-                                flex: 3,
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.end,
-                                  children: [
-                                    _buildStatusChip('Present', 'Present', sId, isEditable),
-                                    const SizedBox(width: 4),
-                                    _buildStatusChip('Absent', 'Absent', sId, isEditable),
-                                    const SizedBox(width: 4),
-                                    _buildStatusChip('Leave', 'Leave', sId, isEditable),
-                                  ],
+
+                              // Middle Green Check Indicator (Instantly shown when P, A, or L is selected!)
+                              if (currentMark != null && currentMark.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(2),
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFFE8F5E9),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.check_circle_rounded,
+                                      color: Color(0xFF2E7D32),
+                                      size: 22,
+                                    ),
+                                  ),
                                 ),
+
+                              const SizedBox(width: 4),
+                              
+                              // Segmented Controls (50% larger PAL Boxes!)
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _buildStatusChip('Present', 'Present', sId, isEditable),
+                                  const SizedBox(width: 6),
+                                  _buildStatusChip('Absent', 'Absent', sId, isEditable),
+                                  const SizedBox(width: 6),
+                                  _buildStatusChip('Leave', 'Leave', sId, isEditable),
+                                ],
                               ),
                             ],
                           ),
@@ -1340,23 +1374,32 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               });
             }
           : null,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(10),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        width: 42,
+        height: 42,
+        alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.12) : Colors.grey.shade50,
-          borderRadius: BorderRadius.circular(8),
+          color: isSelected ? color.withOpacity(0.18) : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: isSelected ? color : Colors.grey.shade300,
-            width: isSelected ? 1.5 : 1.0,
+            width: isSelected ? 2.0 : 1.0,
           ),
+          boxShadow: isSelected ? [
+            BoxShadow(
+              color: color.withOpacity(0.18),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            )
+          ] : [],
         ),
         child: Text(
           label[0], // P / A / L
           style: TextStyle(
             fontWeight: FontWeight.w900,
-            fontSize: 12,
-            color: isSelected ? color : Colors.grey.shade600,
+            fontSize: 16,
+            color: isSelected ? color : Colors.grey.shade700,
           ),
         ),
       ),
