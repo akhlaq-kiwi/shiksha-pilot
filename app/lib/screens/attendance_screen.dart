@@ -219,6 +219,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   bool _isHolidayDate(DateTime d) {
     final targetStr = _formatYmd(d);
+
+    // Check standard national holidays (15 August, 2 October, 25 December, 1 January, 26 January, 1 May)
+    final mmDd = '${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    if (mmDd == '08-15' || mmDd == '10-02' || mmDd == '12-25' || mmDd == '01-01' || mmDd == '01-26' || mmDd == '05-01') {
+      return true;
+    }
+
     return _holidays.any((h) {
       if (h == null) return false;
       final raw = (h['date'] ?? h['holiday_date'] ?? h['start_date'] ?? h['date_from'] ?? '').toString().trim();
@@ -268,12 +275,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
         // Clear temp state so previous date statuses never leak across dates
         _tempAttendance.clear();
-
-        // Default all active students to 'Present' for fresh/pending attendance dates
-        for (var student in _students) {
-          final sId = student['id'] as int;
-          _tempAttendance[sId] = 'Present';
-        }
 
         // Map actual saved attendance records from DB for the selected date (if any exist)
         for (var record in history) {
@@ -549,6 +550,54 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _openCalendarPicker(BuildContext context, bool isTeacher) async {
+    if (!isTeacher) return;
+    
+    final initialDate = _teacherSelectedDate ?? _teacherToday;
+    final firstDate = _teacherAcademicYearStart;
+    final lastDate = _teacherToday;
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate.isAfter(lastDate) ? lastDate : (initialDate.isBefore(firstDate) ? firstDate : initialDate),
+      firstDate: firstDate,
+      lastDate: lastDate,
+      helpText: 'SELECT ATTENDANCE DATE',
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Colors.indigo,
+              onPrimary: Colors.white,
+              onSurface: Colors.black87,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      final targetDays = picked.difference(_teacherAcademicYearStart).inDays;
+      if (targetDays >= 0 && targetDays < _teacherTotalDays) {
+        setState(() {
+          _teacherCurrentPageIndex = targetDays;
+          _teacherSelectedDate = picked;
+          _isLoadingAttendanceForDate = true;
+        });
+        if (_teacherPageController.hasClients) {
+          _teacherPageController.animateToPage(
+            targetDays,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
+        } else {
+          _fetchTeacherAttendanceForDate();
+        }
+      }
+    }
   }
 
   // -----------------------------------------------------------------------------
@@ -1460,50 +1509,5 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         ],
       ),
     );
-  }
-
-  // -----------------------------------------------------------------------------
-  // Calendar Dialog Picker
-  // -----------------------------------------------------------------------------
-  Future<void> _openCalendarPicker(BuildContext context, bool isTeacher) async {
-    final currentStudentMonth = DateTime(
-      _studentToday.year,
-      _studentToday.month + (_studentMonthPageIndex - 500),
-      1,
-    );
-    final DateTime initial = isTeacher ? _teacherSelectedDate! : currentStudentMonth;
-    final DateTime startLimit = isTeacher ? _teacherAcademicYearStart : DateTime(2020, 1, 1);
-    final DateTime endLimit = isTeacher ? _teacherToday : DateTime(2030, 12, 31);
-
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: initial,
-      firstDate: startLimit,
-      lastDate: endLimit,
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Color(0xFF2196F3),
-              onPrimary: Colors.white,
-              onSurface: Colors.black87,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-
-    if (picked != null) {
-      if (isTeacher) {
-        final page = picked.difference(_teacherAcademicYearStart).inDays;
-        _teacherPageController.jumpToPage(page);
-      } else {
-        final targetMonth = DateTime(picked.year, picked.month, 1);
-        final baseMonth = DateTime(_studentToday.year, _studentToday.month, 1);
-        final diffInMonths = (targetMonth.year - baseMonth.year) * 12 + (targetMonth.month - baseMonth.month);
-        _studentMonthPageController.jumpToPage(500 + diffInMonths);
-      }
-    }
   }
 }
