@@ -596,12 +596,41 @@ class TeacherService extends BaseService
         $currStaffId = (int)$currStaff['id'];
         $currSalary = (float)($currStaff['salary'] ?? 0.0);
 
-        // 4. Fetch paid months for current year
-        $stmtPayments = $pdo->prepare("
-            SELECT * FROM staff_payments 
-            WHERE school_id = :sid AND staff_id = :staff_id AND academic_year_id = :ayid
+        // Find previous academic year & previous staff record
+        $stmtPrevYear = $pdo->prepare("
+            SELECT * FROM academic_years 
+            WHERE school_id = :sid AND id < :ayid 
+            ORDER BY id DESC LIMIT 1
         ");
-        $stmtPayments->execute([':sid' => $schoolId, ':staff_id' => $currStaffId, ':ayid' => $currYearId]);
+        $stmtPrevYear->execute([':sid' => $schoolId, ':ayid' => $currYearId]);
+        $prevYear = $stmtPrevYear->fetch();
+        $prevStaff = null;
+        if ($prevYear) {
+            $stmtPrevStaff = $pdo->prepare("SELECT * FROM staff WHERE school_id = :sid AND academic_year_id = :ayid AND phone = :phone LIMIT 1");
+            $stmtPrevStaff->execute([':sid' => $schoolId, ':ayid' => (int)$prevYear['id'], ':phone' => $phone]);
+            $prevStaff = $stmtPrevStaff->fetch();
+        }
+        $prevStaffId = $prevStaff ? (int)$prevStaff['id'] : $currStaffId;
+        $staffIds = array_filter(array_unique([$currStaffId, $prevStaffId]));
+        if (!empty($currStaff['employee_id'])) {
+            $stmtAllStaff = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND employee_id = :emp_id");
+            $stmtAllStaff->execute([':sid' => $schoolId, ':emp_id' => $currStaff['employee_id']]);
+            $staffIds = array_filter(array_unique(array_merge($staffIds, $stmtAllStaff->fetchAll(PDO::FETCH_COLUMN))));
+        } else if (!empty($currStaff['name'])) {
+            $stmtAllStaff = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND name = :name");
+            $stmtAllStaff->execute([':sid' => $schoolId, ':name' => $currStaff['name']]);
+            $staffIds = array_filter(array_unique(array_merge($staffIds, $stmtAllStaff->fetchAll(PDO::FETCH_COLUMN))));
+        }
+        $inStaffIds = implode(',', array_map('intval', $staffIds));
+
+        // 4. Fetch paid months for current year
+        $stmtPayments = $pdo->query("
+            SELECT * FROM staff_payments 
+            WHERE school_id = {$schoolId} 
+              AND staff_id IN ({$inStaffIds}) 
+              AND academic_year_id = {$currYearId}
+              AND payment_month NOT LIKE 'Previous Year - %'
+        ");
         $payments = $stmtPayments->fetchAll();
         $paymentsMap = [];
         foreach ($payments as $p) {
@@ -637,10 +666,10 @@ class TeacherService extends BaseService
                 $startMonthIndex = 0;
             }
         }
-        $allAcademicMonths = array_slice($allAcademicMonths, $startMonthIndex);
+        $currAcademicMonths = array_slice($allAcademicMonths, $startMonthIndex);
 
         $currentPayments = [];
-        foreach ($allAcademicMonths as $month) {
+        foreach ($currAcademicMonths as $month) {
             if (isset($paymentsMap[$month])) {
                 $currentPayments[] = [
                     'id' => (int)$paymentsMap[$month]['id'],
@@ -650,10 +679,26 @@ class TeacherService extends BaseService
                     'status' => 'Paid'
                 ];
             } else {
+                $monthSalary = $currSalary;
+                if (!empty($currStaff['joining_date'])) {
+                    try {
+                        $joiningMonthName = date('F', strtotime($currStaff['joining_date']));
+                        if ($month === $joiningMonthName) {
+                            $joiningDateObj = new \DateTime($currStaff['joining_date']);
+                            $daysInMonth = (int)$joiningDateObj->format('t');
+                            $dayNum = (int)$joiningDateObj->format('d');
+                            $workedDays = ($daysInMonth - $dayNum) + 1;
+                            if ($workedDays < $daysInMonth && $workedDays > 0) {
+                                $monthSalary = round(($workedDays / $daysInMonth) * $currSalary);
+                            }
+                        }
+                    } catch (\Exception $e) {}
+                }
+
                 $currentPayments[] = [
                     'id' => 0,
                     'month' => $month,
-                    'salary' => $currSalary,
+                    'salary' => $monthSalary,
                     'disbursed_date' => null,
                     'status' => 'Pending'
                 ];
@@ -665,112 +710,108 @@ class TeacherService extends BaseService
         $hasUnpaidPrev = false;
         $prevYearName = '';
 
-        // Find previous academic year
-        $stmtPrevYear = $pdo->prepare("
-            SELECT * FROM academic_years 
-            WHERE school_id = :sid AND id < :ayid 
-            ORDER BY id DESC LIMIT 1
-        ");
-        $stmtPrevYear->execute([':sid' => $schoolId, ':ayid' => $currYearId]);
-        $prevYear = $stmtPrevYear->fetch();
         if ($prevYear) {
             $prevYearId = (int)$prevYear['id'];
             $prevYearName = $prevYear['name'];
+            $prevSalary = (float)($prevStaff['salary'] ?? $currSalary);
 
-            // Find staff record in previous year
-            $stmtPrevStaff = $pdo->prepare("SELECT * FROM staff WHERE school_id = :sid AND academic_year_id = :ayid AND phone = :phone LIMIT 1");
-            $stmtPrevStaff->execute([':sid' => $schoolId, ':ayid' => $prevYearId, ':phone' => $phone]);
-            $prevStaff = $stmtPrevStaff->fetch();
-            if ($prevStaff) {
-                $prevStaffId = (int)$prevStaff['id'];
-                $prevSalary = (float)($prevStaff['salary'] ?? 0.0);
+            // Fetch all staff_payments matching previous year
+            $stmtOldPaid = $pdo->query("
+                SELECT * FROM staff_payments 
+                WHERE school_id = {$schoolId} 
+                  AND staff_id IN ({$inStaffIds}) 
+                  AND (academic_year_id = {$prevYearId} OR payment_month LIKE 'Previous Year - %')
+            ");
+            $oldPaidRecords = $stmtOldPaid->fetchAll() ?: [];
 
-                // Fetch paid previous-year months paid in previous year
-                $stmtOldPaid = $pdo->prepare("
-                    SELECT * FROM staff_payments 
-                    WHERE staff_id = :sid AND academic_year_id = :ayid
-                ");
-                $stmtOldPaid->execute([':sid' => $prevStaffId, ':ayid' => $prevYearId]);
-                $oldPaidMonthsRecords = $stmtOldPaid->fetchAll() ?: [];
-                $oldPaidMonthsMap = [];
-                foreach ($oldPaidMonthsRecords as $opmr) {
-                    $oldPaidMonthsMap[$opmr['payment_month']] = $opmr;
-                }
-
-                // Fetch paid previous-year months paid in current year
-                $stmtCurrOldPaid = $pdo->prepare("
-                    SELECT * FROM staff_payments 
-                    WHERE staff_id = :sid AND academic_year_id = :ayid AND payment_month LIKE 'Previous Year - %'
-                ");
-                $stmtCurrOldPaid->execute([':sid' => $currStaffId, ':ayid' => $currYearId]);
-                $currOldPaidRecords = $stmtCurrOldPaid->fetchAll() ?: [];
-
-                $resolvedCurrOldPaid = [];
-                $resolvedCurrOldPaidIds = [];
-                foreach ($currOldPaidRecords as $copr) {
-                    $cop = $copr['payment_month'];
-                    $parts = explode('Previous Year - ', $cop);
-                    if (count($parts) > 1) {
-                        $monthsStr = trim($parts[1]);
-                        $subMonths = array_map('trim', explode(',', $monthsStr));
-                        foreach ($subMonths as $sm) {
-                            $rangeParts = preg_split('/[-–]/', $sm);
-                            if (count($rangeParts) > 1) {
-                                $allMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
-                                $startIdx = array_search(trim($rangeParts[0]), $allMonths);
-                                $endIdx = array_search(trim($rangeParts[1]), $allMonths);
-                                if ($startIdx !== false && $endIdx !== false) {
-                                    for ($i = $startIdx; $i <= $endIdx; $i++) {
-                                        $resolvedCurrOldPaid[] = $allMonths[$i];
-                                        $resolvedCurrOldPaidIds[$allMonths[$i]] = (int)$copr['id'];
-                                    }
-                                }
-                            } else {
-                                $resolvedCurrOldPaid[] = $sm;
-                                $resolvedCurrOldPaidIds[$sm] = (int)$copr['id'];
+            $oldPaidMonthsMap = [];
+            foreach ($oldPaidRecords as $opr) {
+                $mStr = trim(str_replace('Previous Year - ', '', $opr['payment_month']));
+                $subMs = array_map('trim', explode(',', $mStr));
+                foreach ($subMs as $sm) {
+                    $rangeParts = preg_split('/[-–]/', $sm);
+                    if (count($rangeParts) > 1) {
+                        $allM = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+                        $sIdx = array_search(trim($rangeParts[0]), $allM);
+                        $eIdx = array_search(trim($rangeParts[1]), $allM);
+                        if ($sIdx !== false && $eIdx !== false) {
+                            for ($i = $sIdx; $i <= $eIdx; $i++) {
+                                $oldPaidMonthsMap[$allM[$i]] = $opr;
                             }
                         }
-                    }
-                }
-
-                // Generate previous year months structure
-                foreach ($allAcademicMonths as $month) {
-                    $isPaidInPrev = isset($oldPaidMonthsMap[$month]);
-                    $isPaidInCurr = in_array($month, $resolvedCurrOldPaid, true);
-
-                    if ($isPaidInPrev || $isPaidInCurr) {
-                        $payDate = null;
-                        $payId = 0;
-                        if ($isPaidInPrev) {
-                            $payDate = $oldPaidMonthsMap[$month]['payment_date'];
-                            $payId = (int)$oldPaidMonthsMap[$month]['id'];
-                        } else {
-                            // Find matching current year previous payment date
-                            $payId = $resolvedCurrOldPaidIds[$month] ?? 0;
-                            if ($payId > 0) {
-                                $stmtDate = $pdo->prepare("SELECT payment_date FROM staff_payments WHERE id = :id LIMIT 1");
-                                $stmtDate->execute([':id' => $payId]);
-                                $payDate = $stmtDate->fetchColumn();
-                            }
-                        }
-
-                        $prevPayments[] = [
-                            'id' => $payId,
-                            'month' => $month,
-                            'salary' => $prevSalary,
-                            'disbursed_date' => $payDate ?: null,
-                            'status' => 'Paid'
-                        ];
                     } else {
-                        $prevPayments[] = [
-                            'id' => 0,
-                            'month' => $month,
-                            'salary' => $prevSalary,
-                            'disbursed_date' => null,
-                            'status' => 'Pending'
-                        ];
-                        $hasUnpaidPrev = true;
+                        $oldPaidMonthsMap[$sm] = $opr;
                     }
+                }
+            }
+
+            // Generate previous year months structure starting from joining month
+            $prevAcademicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+            $prevStartMonthIndex = 0;
+            $prevJoiningDateStr = !empty($prevStaff['joining_date']) ? $prevStaff['joining_date'] : (!empty($currStaff['joining_date']) ? $currStaff['joining_date'] : null);
+            if (!empty($prevJoiningDateStr)) {
+                try {
+                    $joiningDate = new \DateTime($prevJoiningDateStr);
+                    $joiningYM = $joiningDate->format('Y-m');
+                    $ayStartYear = (int)date('Y', strtotime($prevYear['start_date'] ?? date('Y-04-01')));
+
+                    $monthMap = [
+                        'January' => '01', 'February' => '02', 'March' => '03',
+                        'April' => '04', 'May' => '05', 'June' => '06',
+                        'July' => '07', 'August' => '08', 'September' => '09',
+                        'October' => '10', 'November' => '11', 'December' => '12'
+                    ];
+
+                    foreach ($prevAcademicMonths as $idx => $mName) {
+                        $mNum = $monthMap[$mName] ?? '01';
+                        $mYear = ($idx >= 9) ? ($ayStartYear + 1) : $ayStartYear;
+                        $targetYM = "{$mYear}-{$mNum}";
+                        if ($targetYM >= $joiningYM) {
+                            $prevStartMonthIndex = $idx;
+                            break;
+                        }
+                    }
+                } catch (\Exception $e) {
+                    $prevStartMonthIndex = 0;
+                }
+            }
+            $prevAcademicMonths = array_slice($prevAcademicMonths, $prevStartMonthIndex);
+
+            foreach ($prevAcademicMonths as $month) {
+                if (isset($oldPaidMonthsMap[$month])) {
+                    $rec = $oldPaidMonthsMap[$month];
+                    $prevPayments[] = [
+                        'id' => (int)$rec['id'],
+                        'month' => $month,
+                        'salary' => (float)$rec['amount_paid'],
+                        'disbursed_date' => $rec['payment_date'],
+                        'status' => 'Paid'
+                    ];
+                } else {
+                    $monthSalary = $prevSalary;
+                    if (!empty($prevJoiningDateStr)) {
+                        try {
+                            $joiningMonthName = date('F', strtotime($prevJoiningDateStr));
+                            if ($month === $joiningMonthName) {
+                                $joiningDateObj = new \DateTime($prevJoiningDateStr);
+                                $daysInMonth = (int)$joiningDateObj->format('t');
+                                $dayNum = (int)$joiningDateObj->format('d');
+                                $workedDays = ($daysInMonth - $dayNum) + 1;
+                                if ($workedDays < $daysInMonth && $workedDays > 0) {
+                                    $monthSalary = round(($workedDays / $daysInMonth) * $prevSalary);
+                                }
+                            }
+                        } catch (\Exception $e) {}
+                    }
+
+                    $prevPayments[] = [
+                        'id' => 0,
+                        'month' => $month,
+                        'salary' => $monthSalary,
+                        'disbursed_date' => null,
+                        'status' => 'Pending'
+                    ];
+                    $hasUnpaidPrev = true;
                 }
             }
         }
