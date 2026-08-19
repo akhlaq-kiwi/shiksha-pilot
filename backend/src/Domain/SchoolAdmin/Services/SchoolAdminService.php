@@ -2280,60 +2280,104 @@ class SchoolAdminService extends BaseService
                 }
                 
                 if ($oldStaff) {
-                    // Fetch paid months in previous year
+                    // Fetch paid months for this teacher in previous academic year (check both old staff_id and current staff_id)
                     $stmtOldPaid = $pdo->prepare("
                         SELECT payment_month FROM staff_payments 
-                        WHERE staff_id = :sid AND academic_year_id = :ayid
+                        WHERE school_id = :sid 
+                          AND (staff_id = :old_sid OR staff_id = :curr_sid)
+                          AND (academic_year_id = :ayid OR payment_month LIKE 'Previous Year - %')
                     ");
-                    $stmtOldPaid->execute([':sid' => $oldStaff['id'], ':ayid' => $prevYear['id']]);
-                    $oldPaidMonths = $stmtOldPaid->fetchAll(PDO::FETCH_COLUMN) ?: [];
-                    
-                    // Fetch paid previous-year months in current year
-                    $stmtCurrOldPaid = $pdo->prepare("
-                        SELECT payment_month FROM staff_payments 
-                        WHERE staff_id = :sid AND academic_year_id = :ayid AND payment_month LIKE 'Previous Year - %'
-                    ");
-                    $stmtCurrOldPaid->execute([':sid' => $id, ':ayid' => $workingYear['id']]);
-                    $currOldPaid = $stmtCurrOldPaid->fetchAll(PDO::FETCH_COLUMN) ?: [];
-                    
-                    // Extract month names from "Previous Year - <Month>"
-                    $resolvedCurrOldPaid = [];
-                    foreach ($currOldPaid as $cop) {
-                        $parts = explode('Previous Year - ', $cop);
-                        if (count($parts) > 1) {
-                            $monthsStr = trim($parts[1]);
-                            $subMonths = array_map('trim', explode(',', $monthsStr));
-                            foreach ($subMonths as $sm) {
-                                $rangeParts = preg_split('/[-–]/', $sm);
-                                if (count($rangeParts) > 1) {
-                                    $allMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
-                                    $startIdx = array_search(trim($rangeParts[0]), $allMonths);
-                                    $endIdx = array_search(trim($rangeParts[1]), $allMonths);
-                                    if ($startIdx !== false && $endIdx !== false) {
-                                        for ($i = $startIdx; $i <= $endIdx; $i++) {
-                                            $resolvedCurrOldPaid[] = $allMonths[$i];
-                                        }
+                    $stmtOldPaid->execute([
+                        ':sid' => $schoolId,
+                        ':old_sid' => $oldStaff['id'],
+                        ':curr_sid' => $id,
+                        ':ayid' => $prevYear['id']
+                    ]);
+                    $oldPaidRaw = $stmtOldPaid->fetchAll(PDO::FETCH_COLUMN) ?: [];
+                    $oldPaidMonths = [];
+                    foreach ($oldPaidRaw as $op) {
+                        $cleanP = trim(str_replace('Previous Year - ', '', $op));
+                        $subMs = array_map('trim', explode(',', $cleanP));
+                        foreach ($subMs as $sm) {
+                            $rangeParts = preg_split('/[-–]/', $sm);
+                            if (count($rangeParts) > 1) {
+                                $allMonthsTemp = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+                                $startIdx = array_search(trim($rangeParts[0]), $allMonthsTemp);
+                                $endIdx = array_search(trim($rangeParts[1]), $allMonthsTemp);
+                                if ($startIdx !== false && $endIdx !== false) {
+                                    for ($i = $startIdx; $i <= $endIdx; $i++) {
+                                        $oldPaidMonths[] = $allMonthsTemp[$i];
                                     }
-                                } else {
-                                    $resolvedCurrOldPaid[] = $sm;
                                 }
+                            } else {
+                                $oldPaidMonths[] = $sm;
                             }
                         }
                     }
                     
                     $allAcademicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+                    $startMonthIndex = 0;
+                    $joiningDateStr = !empty($oldStaff['joining_date']) ? $oldStaff['joining_date'] : (!empty($member['joining_date']) ? $member['joining_date'] : null);
+                    
+                    if (!empty($joiningDateStr)) {
+                        try {
+                            $joiningDate = new \DateTime($joiningDateStr);
+                            $joiningYM = $joiningDate->format('Y-m');
+                            $ayStartYear = (int)date('Y', strtotime($prevYear['start_date'] ?? date('Y-04-01')));
+
+                            $monthMap = [
+                                'January' => '01', 'February' => '02', 'March' => '03',
+                                'April' => '04', 'May' => '05', 'June' => '06',
+                                'July' => '07', 'August' => '08', 'September' => '09',
+                                'October' => '10', 'November' => '11', 'December' => '12'
+                            ];
+
+                            foreach ($allAcademicMonths as $idx => $mName) {
+                                $mNum = $monthMap[$mName] ?? '01';
+                                $mYear = ($idx >= 9) ? ($ayStartYear + 1) : $ayStartYear;
+                                $targetYM = "{$mYear}-{$mNum}";
+                                if ($targetYM >= $joiningYM) {
+                                    $startMonthIndex = $idx;
+                                    break;
+                                }
+                            }
+                        } catch (\Exception $e) {
+                            $startMonthIndex = 0;
+                        }
+                    }
+                    $validPrevMonths = array_slice($allAcademicMonths, $startMonthIndex);
+
                     $pendingMonths = [];
-                    foreach ($allAcademicMonths as $m) {
-                        if (!in_array($m, $oldPaidMonths, true) && !in_array($m, $resolvedCurrOldPaid, true)) {
+                    foreach ($validPrevMonths as $m) {
+                        if (!in_array($m, $oldPaidMonths, true)) {
                             $pendingMonths[] = $m;
                         }
                     }
                     
-                    if (!empty($pendingMonths)) {
+                    $prevJoiningProration = null;
+                    if (!empty($joiningDateStr)) {
+                        try {
+                            $joiningMonthName = date('F', strtotime($joiningDateStr));
+                            $pror = $this->getSalaryProrationDetails((float)$oldStaff['salary'], $joiningDateStr, $joiningMonthName, $prevYear);
+                            if ($pror['is_prorated']) {
+                                $prevJoiningProration = [
+                                    'month' => $joiningMonthName,
+                                    'prorated_days' => $pror['prorated_days'],
+                                    'total_days' => $pror['total_days'],
+                                    'payable_salary' => $pror['payable_salary'],
+                                    'monthly_salary' => (float)$oldStaff['salary']
+                                ];
+                            }
+                        } catch (\Exception $e) {}
+                    }
+
+                    if (!empty($validPrevMonths)) {
                         $member['previous_year_pending'] = [
                             'academic_year_id' => $prevYear['id'],
                             'academic_year_name' => $prevYear['name'],
+                            'valid_months' => $validPrevMonths,
                             'pending_months' => $pendingMonths,
+                            'joining_month_proration' => $prevJoiningProration,
                             'salary' => (float)$oldStaff['salary'],
                             'total_pending' => count($pendingMonths) * (float)$oldStaff['salary']
                         ];
@@ -9105,7 +9149,12 @@ class SchoolAdminService extends BaseService
         $monthsString = implode(', ', $resultParts);
 
         $salary = (float)($oldStaff['salary'] ?? 0.0);
-        $totalPaid = $salary * count($months);
+        $joiningDateStr = !empty($oldStaff['joining_date']) ? $oldStaff['joining_date'] : (!empty($staff['joining_date']) ? $staff['joining_date'] : null);
+        $totalPaid = 0.0;
+        foreach ($months as $m) {
+            $pror = $this->getSalaryProrationDetails($salary, $joiningDateStr, $m, $prevYear);
+            $totalPaid += (float)$pror['payable_salary'];
+        }
         $paymentDate = date('Y-m-d');
 
         // Insert staff payment
@@ -9116,7 +9165,7 @@ class SchoolAdminService extends BaseService
         $stmt->execute([
             ':sid' => $schoolId,
             ':staff_id' => $staffId,
-            ':ayid' => $workingYear['id'],
+            ':ayid' => $prevYear['id'],
             ':amount_paid' => $totalPaid,
             ':month' => 'Previous Year - ' . $monthsString,
             ':payment_date' => $paymentDate
@@ -9777,8 +9826,12 @@ class SchoolAdminService extends BaseService
 
         $salaryPayments = [];
         foreach ($salaryPaymentsRaw as $spr) {
+            $rawMonth = $spr['payment_month'] ?? '';
+            $cleanMonth = trim(str_replace('Previous Year - ', '', $rawMonth));
+            $monthStr = !empty($cleanMonth) ? " ({$cleanMonth})" : "";
             $ayName = $spr['ay_name'] ?? ($ayNames[$spr['academic_year_id']] ?? '');
-            $categoryStr = !empty($ayName) ? "Salary Payment [{$ayName}]" : "Salary Payment";
+            $ayStr = !empty($ayName) ? " [{$ayName}]" : "";
+            $categoryStr = "Salary Payment{$monthStr}{$ayStr}";
             $salaryPayments[] = [
                 'description' => $spr['staff_name'],
                 'category' => $categoryStr,
@@ -10145,8 +10198,12 @@ Only approve the settlement after reviewing all financial records.
 
         $salaryPayments = [];
         foreach ($salaryPaymentsRaw as $spr) {
+            $rawMonth = $spr['payment_month'] ?? '';
+            $cleanMonth = trim(str_replace('Previous Year - ', '', $rawMonth));
+            $monthStr = !empty($cleanMonth) ? " ({$cleanMonth})" : "";
             $ayName = $spr['ay_name'] ?? ($ayNames[$spr['academic_year_id']] ?? '');
-            $categoryStr = !empty($ayName) ? "Salary Payment [{$ayName}]" : "Salary Payment";
+            $ayStr = !empty($ayName) ? " [{$ayName}]" : "";
+            $categoryStr = "Salary Payment{$monthStr}{$ayStr}";
             $salaryPayments[] = [
                 'description' => $spr['staff_name'],
                 'category' => $categoryStr,
@@ -10180,6 +10237,214 @@ Only approve the settlement after reviewing all financial records.
         $fromFormatted = date('j M Y', strtotime($report['from_date']));
         $toFormatted = date('j M Y', strtotime($report['to_date']));
         $filename = "Financial Report - {$fromFormatted} to {$toFormatted}.xlsx";
+
+        return ExcelGenerator::generate($feeCollections, $expenses, $summary);
+    }
+
+    public function exportFinancialPreviewReport(array $user, string $from = '', string $to = '', string &$filename = ''): string
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->financialReportRepo->getPdo();
+        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+
+        if (!$workingYear) {
+            throw new ValidationException(['message' => 'No working academic year found.']);
+        }
+
+        $stmtLatest = $pdo->prepare("
+            SELECT * FROM financial_reports 
+            WHERE school_id = :sid 
+              AND `from_date` >= :start_date 
+              AND `to_date` <= :end_date
+            ORDER BY id DESC LIMIT 1
+        ");
+        $stmtLatest->execute([
+            ':sid' => $schoolId,
+            ':start_date' => $workingYear['start_date'],
+            ':end_date' => $workingYear['end_date']
+        ]);
+        $latestReport = $stmtLatest->fetch(PDO::FETCH_ASSOC);
+        $latestReportCreatedAt = $latestReport ? $latestReport['created_at'] : null;
+
+        if (empty($from)) {
+            $from = $latestReport ? $latestReport['to_date'] : $workingYear['start_date'];
+        }
+        if (empty($to)) {
+            $to = date('Y-m-d');
+        }
+
+        $stmtFeeList = $pdo->prepare("
+            SELECT 
+                fp.created_at AS deposit_time, 
+                s.name AS student_name, 
+                c.name AS class_name, 
+                c.section AS class_section,
+                c.id AS class_id, 
+                s.roll_no, 
+                'Tuition Fee' AS fee_type, 
+                fp.fee_month AS months_covered, 
+                fp.amount_paid AS amount,
+                fp.academic_year_id,
+                s.academic_year_id AS student_academic_year_id
+            FROM fee_payments fp
+            JOIN students s ON fp.student_id = s.id
+            LEFT JOIN classes c ON s.class_id = c.id
+            WHERE fp.school_id = :sid 
+              AND fp.status = 'PAID'
+              AND (
+                s.academic_year_id = :ayid
+                OR (
+                  fp.created_at >= (SELECT created_at FROM academic_years WHERE id = :ayid_2 LIMIT 1)
+                  AND (s.status = 'Inactive' OR s.status = 'Alumni' OR s.status = 'Archived')
+                )
+              )
+              " . ($latestReportCreatedAt ? "AND fp.created_at > :latest_rep_ts" : "") . "
+        ");
+        $paramsFees = [
+            ':sid' => $schoolId,
+            ':ayid' => $workingYear['id'],
+            ':ayid_2' => $workingYear['id']
+        ];
+        if ($latestReportCreatedAt) {
+            $paramsFees[':latest_rep_ts'] = $latestReportCreatedAt;
+        }
+        $stmtFeeList->execute($paramsFees);
+        $feePayments = $stmtFeeList->fetchAll(PDO::FETCH_ASSOC);
+
+        $stmtAddFeeList = $pdo->prepare("
+            SELECT 
+                afp.updated_at AS deposit_time, 
+                s.name AS student_name, 
+                c.name AS class_name, 
+                c.section AS class_section,
+                c.id AS class_id, 
+                s.roll_no, 
+                aft.name AS fee_type, 
+                'N/A' AS months_covered, 
+                afp.amount,
+                aft.academic_year_id,
+                s.academic_year_id AS student_academic_year_id
+            FROM additional_fee_payments afp
+            JOIN students s ON afp.student_id = s.id
+            LEFT JOIN classes c ON s.class_id = c.id
+            JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+            WHERE afp.school_id = :sid 
+              AND LOWER(afp.status) = 'paid'
+              AND (
+                aft.academic_year_id = :ayid
+                OR (
+                  afp.updated_at >= (SELECT created_at FROM academic_years WHERE id = :ayid_2 LIMIT 1)
+                  AND (s.status = 'Inactive' OR s.status = 'Alumni' OR s.status = 'Archived')
+                )
+              )
+              " . ($latestReportCreatedAt ? "AND afp.updated_at > :latest_rep_ts" : "") . "
+        ");
+        $stmtAddFeeList->execute($paramsFees);
+        $addPayments = $stmtAddFeeList->fetchAll(PDO::FETCH_ASSOC);
+
+        $workingYearId = (int)$workingYear['id'];
+        $stmtAYNames = $pdo->prepare("SELECT id, name FROM academic_years WHERE school_id = :sid");
+        $stmtAYNames->execute([':sid' => $schoolId]);
+        $ayNames = $stmtAYNames->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
+
+        foreach ($feePayments as &$fp) {
+            $stuAYId = (int)($fp['student_academic_year_id'] ?? 0);
+            if ($workingYearId && $stuAYId && $stuAYId !== $workingYearId) {
+                $ayName = $ayNames[$stuAYId] ?? '';
+                $fp['fee_type'] = "Dues for " . $ayName;
+            }
+            unset($fp['academic_year_id'], $fp['student_academic_year_id']);
+        }
+        unset($fp);
+
+        foreach ($addPayments as &$ap) {
+            $stuAYId = (int)($ap['student_academic_year_id'] ?? 0);
+            if ($workingYearId && $stuAYId && $stuAYId !== $workingYearId) {
+                $ayName = $ayNames[$stuAYId] ?? '';
+                $ap['fee_type'] = "Dues for " . $ayName;
+            }
+            unset($ap['academic_year_id'], $ap['student_academic_year_id']);
+        }
+        unset($ap);
+
+        $feeCollections = array_merge($feePayments, $addPayments);
+
+        usort($feeCollections, function($a, $b) {
+            $classIdA = isset($a['class_id']) ? (int)$a['class_id'] : 999999;
+            $classIdB = isset($b['class_id']) ? (int)$b['class_id'] : 999999;
+            if ($classIdA !== $classIdB) {
+                return $classIdA <=> $classIdB;
+            }
+            $timeA = strtotime($a['deposit_time'] ?? '1970-01-01 00:00:00');
+            $timeB = strtotime($b['deposit_time'] ?? '1970-01-01 00:00:00');
+            if ($timeA !== $timeB) {
+                return $timeA <=> $timeB;
+            }
+            return strcmp($a['student_name'] ?? '', $b['student_name'] ?? '');
+        });
+
+        $stmtSalaryList = $pdo->prepare("
+            SELECT sp.payment_month, sp.academic_year_id, st.name AS staff_name, sp.payment_date AS expense_date, sp.amount_paid AS amount, ay.name AS ay_name
+            FROM staff_payments sp
+            JOIN staff st ON sp.staff_id = st.id
+            LEFT JOIN academic_years ay ON sp.academic_year_id = ay.id
+            WHERE sp.school_id = :sid 
+              AND (
+                sp.academic_year_id = :ayid
+                OR sp.created_at >= (SELECT created_at FROM academic_years WHERE id = :ayid_2 LIMIT 1)
+                OR DATE(sp.created_at) = CURRENT_DATE()
+              )
+              " . ($latestReportCreatedAt ? "AND sp.created_at > :latest_rep_ts" : "") . "
+        ");
+        $stmtSalaryList->execute($paramsFees);
+        $salaryPaymentsRaw = $stmtSalaryList->fetchAll(PDO::FETCH_ASSOC);
+
+        $salaryPayments = [];
+        foreach ($salaryPaymentsRaw as $spr) {
+            $rawMonth = $spr['payment_month'] ?? '';
+            $cleanMonth = trim(str_replace('Previous Year - ', '', $rawMonth));
+            $monthStr = !empty($cleanMonth) ? " ({$cleanMonth})" : "";
+            $ayName = $spr['ay_name'] ?? ($ayNames[$spr['academic_year_id']] ?? '');
+            $ayStr = !empty($ayName) ? " [{$ayName}]" : "";
+            $categoryStr = "Salary Payment{$monthStr}{$ayStr}";
+            $salaryPayments[] = [
+                'description' => $spr['staff_name'],
+                'category' => $categoryStr,
+                'expense_date' => $spr['expense_date'],
+                'amount' => $spr['amount']
+            ];
+        }
+
+        $stmtExpenseList = $pdo->prepare("
+            SELECT description, 'School Expense' AS category, expense_date, amount
+            FROM school_expenses
+            WHERE school_id = :sid 
+              AND academic_year_id = :ayid
+              " . ($latestReportCreatedAt ? "AND created_at > :latest_rep_ts" : "") . "
+        ");
+        $paramsExpenses = [':sid' => $schoolId, ':ayid' => $workingYear['id']];
+        if ($latestReportCreatedAt) {
+            $paramsExpenses[':latest_rep_ts'] = $latestReportCreatedAt;
+        }
+        $stmtExpenseList->execute($paramsExpenses);
+        $expensesItems = $stmtExpenseList->fetchAll(PDO::FETCH_ASSOC);
+
+        $expenses = array_merge($salaryPayments, $expensesItems);
+        usort($expenses, function($a, $b) {
+            return strcmp($a['expense_date'] ?? '', $b['expense_date'] ?? '');
+        });
+
+        $totalRev = array_reduce($feeCollections, fn($sum, $item) => $sum + (float)$item['amount'], 0.0);
+        $totalExp = array_reduce($expenses, fn($sum, $item) => $sum + (float)$item['amount'], 0.0);
+
+        $summary = [
+            'revenue' => $totalRev,
+            'expenses' => $totalExp,
+        ];
+
+        $fromFormatted = date('j M Y', strtotime($from));
+        $toFormatted = date('j M Y', strtotime($to));
+        $filename = "Financial Statement Preview - {$fromFormatted} to {$toFormatted}.xlsx";
 
         return ExcelGenerator::generate($feeCollections, $expenses, $summary);
     }

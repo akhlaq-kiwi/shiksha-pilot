@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Calendar, ArrowRight, AlertCircle, RefreshCw, BarChart2, Sparkles } from 'lucide-react';
+import { FileText, Calendar, ArrowRight, AlertCircle, RefreshCw, BarChart2, Sparkles, Download, MoreHorizontal } from 'lucide-react';
 import { Card, CardHeader, CardTitle } from '../../../common/ui/card';
 import { Button } from '../../../common/ui/button';
 import { Input } from '../../../common/ui/input';
@@ -7,6 +7,7 @@ import { schoolService } from '../../../common/services/schoolService';
 import { schoolAdminService } from '../../../common/services/schoolAdminService';
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 import { Dialog } from '../../../common/ui/dialog';
+import { DropdownMenu, DropdownItem } from '../../../common/ui/DropdownMenu';
 
 const formatCurrency = (val) => {
   return new Intl.NumberFormat('en-IN', {
@@ -239,6 +240,34 @@ export default function FinancialReportsPage() {
     }
   };
 
+  const handleExportPreviewReport = async () => {
+    if (!previewData) return;
+    try {
+      const blob = await schoolService.exportFinancialPreviewReport(previewData.from_date, previewData.to_date);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      const formatDateStr = (dateStr) => {
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const parts = dateStr.split('-');
+        if (parts.length === 3) {
+          return `${parseInt(parts[2], 10)} ${months[parseInt(parts[1], 10) - 1]} ${parts[0]}`;
+        }
+        return dateStr;
+      };
+      
+      const filename = `Financial Statement Preview - ${formatDateStr(previewData.from_date)} to ${formatDateStr(previewData.to_date)}.xlsx`;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to export preview report.');
+    }
+  };
+
   const handleConfirmSettlementRequest = async () => {
     if (!settlementTarget) return;
     setShowSettlementConfirm(false);
@@ -339,8 +368,21 @@ export default function FinancialReportsPage() {
 
           {/* Right Panel: Financial Statement Preview */}
           <Card className="bg-surface border border-border p-6 rounded-2xl shadow-2xs flex flex-col justify-between min-h-[300px]">
-            <CardHeader className="p-0 pb-2 border-b border-border">
+            <CardHeader className="p-0 pb-2 border-b border-border flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-bold text-text-primary uppercase tracking-wider">Financial Statement Preview</CardTitle>
+              {previewData && (
+                <DropdownMenu
+                  trigger={
+                    <button className="p-1 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-text-muted hover:text-text-primary transition-colors cursor-pointer">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </button>
+                  }
+                >
+                  <DropdownItem onClick={handleExportPreviewReport}>
+                    <Download className="h-3.5 w-3.5 mr-2 inline" /> Export Report
+                  </DropdownItem>
+                </DropdownMenu>
+              )}
             </CardHeader>
             
             <div className="flex-1 flex flex-col justify-center py-6">

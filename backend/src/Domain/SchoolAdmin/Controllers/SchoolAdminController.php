@@ -1459,6 +1459,26 @@ class SchoolAdminController extends BaseController
             ->withHeader('Expires', '0');
     }
 
+    public function exportFinancialPreviewReport(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $params = $request->getQueryParams();
+        $from = $params['from_date'] ?? '';
+        $to = $params['to_date'] ?? '';
+
+        $filename = "";
+        $excelData = $this->service->exportFinancialPreviewReport($user, $from, $to, $filename);
+
+        $response->getBody()->write($excelData);
+        return $response
+            ->withHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            ->withHeader('Content-Disposition', 'attachment; filename="' . $filename . '"')
+            ->withHeader('Pragma', 'no-cache')
+            ->withHeader('Expires', '0');
+    }
+
     public function ownerApproveSettlement(Request $request, Response $response, array $args): Response
     {
         $id = (int)$args['id'];

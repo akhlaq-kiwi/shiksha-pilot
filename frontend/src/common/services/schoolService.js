@@ -377,6 +377,10 @@ export const schoolService = {
     return apiClient.get(`/api/school/financial-reports/${id}/export`);
   },
 
+  exportFinancialPreviewReport(fromDate, toDate) {
+    return apiClient.get(buildUrl('/api/school/financial-reports/preview/export', { from_date: fromDate, to_date: toDate }));
+  },
+
   getSchoolExpenses(params = {}) {
     return apiClient.get(buildUrl('/api/school/expenses', params));
   },

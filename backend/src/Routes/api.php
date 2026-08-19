@@ -80,6 +80,7 @@ return function (App $app) {
     $app->post('/api/school/staff-payments/disburse-previous-year', [SchoolAdminController::class, 'disbursePreviousYearStaffSalary']);
     $app->delete('/api/school/staff-payments/{id}', [SchoolAdminController::class, 'revertStaffSalary']);
     $app->get('/api/school/financial-reports/preview', [SchoolAdminController::class, 'getFinancialPreview']);
+    $app->get('/api/school/financial-reports/preview/export', [SchoolAdminController::class, 'exportFinancialPreviewReport']);
     $app->get('/api/school/financial-reports', [SchoolAdminController::class, 'getFinancialReports']);
     $app->post('/api/school/financial-reports', [SchoolAdminController::class, 'createFinancialReport']);
     $app->put('/api/school/financial-reports/{id}/settle', [SchoolAdminController::class, 'updateFinancialReportStatus']);

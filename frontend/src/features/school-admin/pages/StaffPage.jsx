@@ -1320,7 +1320,7 @@ export default function StaffPage() {
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                      {['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'].map(month => {
+                      {(t.previous_year_pending.valid_months && t.previous_year_pending.valid_months.length > 0 ? t.previous_year_pending.valid_months : ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March']).map(month => {
                         const isPending = t.previous_year_pending.pending_months.includes(month);
                         const payment = (t.salary_payments || []).find(p => 
                           (parseInt(p.academic_year_id, 10) === parseInt(t.previous_year_pending.academic_year_id, 10) && (p.payment_month === month || p.payment_month === `Previous Year - ${month}`)) || 
@@ -1328,7 +1328,16 @@ export default function StaffPage() {
                         );
                         const isPaid = payment ? true : (!isPending ? true : false);
                         const isLocked = payment ? !!payment.is_locked : false;
-                        const salaryAmount = t.previous_year_pending.salary || 0.0;
+                        const isJoiningMonth = t.previous_year_pending?.joining_month_proration && t.previous_year_pending.joining_month_proration.month === month;
+                        let salaryAmount = t.previous_year_pending.salary || 0.0;
+                        let isProrated = false;
+                        if (isPaid && payment) {
+                          salaryAmount = payment.amount_paid;
+                          isProrated = !!payment.proration_details;
+                        } else if (isJoiningMonth) {
+                          salaryAmount = t.previous_year_pending.joining_month_proration.payable_salary;
+                          isProrated = true;
+                        }
 
                         return (
                           <div 
@@ -1346,10 +1355,10 @@ export default function StaffPage() {
                                 <p className="text-[11px] text-text-secondary font-bold uppercase mt-0.5">
                                   {isPaid ? (
                                     <span className="inline-flex items-center gap-1 text-green-600">
-                                      <CheckCircle className="h-3 w-3" /> Paid
+                                      <CheckCircle className="h-3 w-3" /> Paid {isProrated && '(Prorated)'}
                                     </span>
                                   ) : (
-                                    <span className="text-amber-500">Pending</span>
+                                    <span className="text-amber-500">Pending {isProrated && '(Prorated)'}</span>
                                   )}
                                 </p>
                               </div>

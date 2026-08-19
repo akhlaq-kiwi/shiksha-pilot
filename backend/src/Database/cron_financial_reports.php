@@ -288,10 +288,17 @@ try {
             $stmtSalaryList = $pdo->prepare("
                 SELECT 
                     st.name AS description, 
-                    CASE 
-                        WHEN ay.name IS NOT NULL AND ay.name != '' THEN CONCAT('Salary Payment [', ay.name, ']')
-                        ELSE 'Salary Payment'
-                    END AS category, 
+                    CONCAT(
+                        'Salary Payment',
+                        CASE 
+                            WHEN sp.payment_month IS NOT NULL AND sp.payment_month != '' THEN CONCAT(' (', REPLACE(sp.payment_month, 'Previous Year - ', ''), ')')
+                            ELSE ''
+                        END,
+                        CASE 
+                            WHEN ay.name IS NOT NULL AND ay.name != '' THEN CONCAT(' [', ay.name, ']')
+                            ELSE ''
+                        END
+                    ) AS category, 
                     sp.payment_date AS expense_date, 
                     sp.amount_paid AS amount
                 FROM staff_payments sp
