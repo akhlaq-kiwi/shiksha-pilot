@@ -26,6 +26,7 @@ import 'package:school_hub/screens/exam_list_screen.dart';
 import 'package:school_hub/screens/achievements_screen.dart';
 import 'package:school_hub/screens/homework_list_screen.dart';
 import 'package:school_hub/screens/achievements_screen.dart';
+import 'package:school_hub/screens/outstanding_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:school_hub/screens/user_profile_screen.dart';
 import 'package:school_hub/widgets/change_password_dialog.dart';
@@ -167,10 +168,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       allowedRoles: ['SCHOOL_ADMIN', 'PRINCIPAL'],
     ),
     LauncherFeature(
-      name: 'Students',
-      icon: Icons.school_rounded,
+      name: 'Outstanding',
+      icon: Icons.receipt_long_rounded,
       color: Colors.cyan,
-      allowedRoles: ['TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL'],
+      allowedRoles: ['TEACHER'],
+      isAvailable: true,
     ),
     LauncherFeature(
       name: 'Finance',
@@ -837,6 +839,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               token: token,
               userRole: widget.userRole,
               studentId: _activeStudentId,
+            ),
+          ),
+        );
+      } else if (feature.name == 'Outstanding') {
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('auth_token') ?? widget.leaveService.token;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => OutstandingScreen(
+              baseUrl: widget.leaveService.baseUrl,
+              token: token,
             ),
           ),
         );
