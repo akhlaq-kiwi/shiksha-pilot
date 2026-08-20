@@ -481,6 +481,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ),
                   ),
                 );
+              } else if (titleLower.contains('achievement') || msgLower.contains('achievement')) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => AchievementsScreen(
+                      baseUrl: widget.leaveService.baseUrl,
+                      token: widget.leaveService.token,
+                      userRole: widget.userRole,
+                      studentId: _activeStudentId,
+                    ),
+                  ),
+                );
               } else {
                 Navigator.push(
                   context,

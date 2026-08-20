@@ -428,11 +428,20 @@ class NotificationHelper {
           token: token,
         );
 
+      case NotificationEvent.achievementAttendanceAward:
+      case NotificationEvent.achievementAcademicTopper:
+      case 'ACHIEVEMENT_UNLOCKED':
+      case 'ACHIEVEMENT_GENERATED':
+        return AchievementsScreen(
+          baseUrl: baseUrl,
+          token: token,
+          userRole: userRole,
+          studentId: studentId,
+        );
+
       case NotificationEvent.announcementPublished:
       case NotificationEvent.attendanceMarkedAbsent:
       case NotificationEvent.attendanceNotMarkedReminder:
-      case NotificationEvent.achievementAttendanceAward:
-      case NotificationEvent.achievementAcademicTopper:
       case NotificationEvent.feeFollowupDueToday:
       case NotificationEvent.feeFollowupOverdue:
         // These have no dedicated mobile screen yet; the notification centre

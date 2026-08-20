@@ -439,6 +439,22 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                 return;
                               }
 
+                              final isAchievementNotif = linkStr.contains('achievement') || titleLower.contains('achievement') || msgLower.contains('achievement') || (notif['event_key'] ?? '').toString().contains('ACHIEVEMENT');
+                              if (isAchievementNotif) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => AchievementsScreen(
+                                      baseUrl: widget.baseUrl,
+                                      token: widget.token,
+                                      userRole: widget.studentId != null ? 'PARENT' : (widget.userRole ?? 'STUDENT'),
+                                      studentId: widget.studentId,
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+
                               final isNoticeNotif = linkStr.contains('notice') || linkStr.contains('announcement') || titleLower.contains('notice') || titleLower.contains('announcement');
                               if (isNoticeNotif) {
                                 showDialog(
