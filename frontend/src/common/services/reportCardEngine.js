@@ -150,10 +150,12 @@ export function compileReportCardData(card = {}, schoolProfile = {}, currentYear
 
   const teacherRemark = card.report_card_remark ?? schoolProfile?.report_card_remark ?? card.teacher_remark ?? '';
 
-  const attendance = {
-    total_days: card.attendance_total || card.total_days || 220,
-    present_days: card.attendance_present || card.present_days || 210,
-    percentage: card.attendance_pct || card.attendance_percentage || 95.45
+  const attData = (typeof card.attendance === 'object' && card.attendance !== null) ? card.attendance : {};
+  const attRateComputed = attData.attendance_rate ?? card.attendance_pct ?? card.attendance_percentage ?? (typeof card.attendance === 'number' ? card.attendance : null);
+  const attendanceObj = {
+    working_days: attData.working_days || card.attendance_total || card.total_days || 0,
+    present_days: attData.present_days || card.attendance_present || card.present_days || 0,
+    attendance_rate: attRateComputed
   };
 
   return {
@@ -170,9 +172,14 @@ export function compileReportCardData(card = {}, schoolProfile = {}, currentYear
       gpa,
       result: resultStatus,
       promotion_status: promotionStatus,
-      teacher_remark: teacherRemark
+      teacher_remark: teacherRemark,
+      class_rank: card.class_rank || '1st',
+      section_rank: card.section_rank || '1st',
+      attendance: attendanceObj
     },
-    attendance,
+    attendance: attendanceObj,
+    class_rank: card.class_rank || '1st',
+    section_rank: card.section_rank || '1st',
     teacher_remark: teacherRemark,
     is_final_session_report: false
   };

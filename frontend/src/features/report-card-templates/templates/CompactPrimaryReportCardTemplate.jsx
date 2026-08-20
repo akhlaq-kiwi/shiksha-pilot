@@ -263,9 +263,7 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
           <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 block">Attendance</span>
           <span className="text-xs font-bold text-amber-950 font-mono mt-0.5">
             {(() => {
-              const att = summary?.attendance;
-              let rate = typeof att === 'object' && att !== null ? (att.attendance_rate ?? att.attendance_pct ?? att.percentage) : att;
-              if (rate === null || rate === undefined) rate = summary?.attendance_rate ?? summary?.attendance_pct ?? summary?.attendance_percentage;
+              const rate = summary?.attendance?.attendance_rate ?? data?.attendance?.attendance_rate ?? summary?.attendance_rate ?? data?.attendance_rate;
               return (rate !== null && rate !== undefined && !isNaN(rate)) ? `${Math.round(rate)}%` : '—';
             })()}
           </span>
