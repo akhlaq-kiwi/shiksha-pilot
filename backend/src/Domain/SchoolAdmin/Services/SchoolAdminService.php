@@ -13070,7 +13070,7 @@ Only approve the settlement after reviewing all financial records.
             SELECT 
                 ep.*, 
                 s.name AS subject_name,
-                (SELECT COUNT(*) FROM students stud WHERE stud.class_id = ep.class_id AND stud.school_id = :sid_student AND stud.status = 'ACTIVE') AS total_students,
+                (SELECT COUNT(*) FROM students stud WHERE stud.class_id = ep.class_id AND stud.school_id = :sid_student) AS total_students,
                 (SELECT COUNT(*) FROM examination_marks em WHERE em.exam_id = ep.exam_id AND em.paper_id = ep.id AND (em.marks_obtained IS NOT NULL OR em.is_absent = 1)) AS entered_marks_count
             FROM examination_papers ep
             JOIN subjects s ON ep.subject_id = s.id
@@ -13214,7 +13214,7 @@ Only approve the settlement after reviewing all financial records.
         $stmtStudents = $pdo->prepare("
             SELECT id, roll_no, name 
             FROM students 
-            WHERE class_id = :cid AND school_id = :sid AND status = 'ACTIVE' 
+            WHERE class_id = :cid AND school_id = :sid 
             ORDER BY CAST(roll_no AS UNSIGNED) ASC, name ASC
         ");
         $stmtStudents->execute([':cid' => $classId, ':sid' => $schoolId]);

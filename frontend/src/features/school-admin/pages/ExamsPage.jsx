@@ -2548,24 +2548,24 @@ export default function ExamsPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div onClick={(evt) => evt.stopPropagation()}>
-                        {!isReadOnly && (
-                          <DropdownMenu>
+                        <DropdownMenu>
+                          {!isReadOnly && (
                             <DropdownItem onClick={() => handleEditExamClick(e)}>
                               Edit Examination
                             </DropdownItem>
-                            {e.status === 'Published' ? (
-                              <DropdownItem onClick={() => handlePublishMasterExam(e, 'Draft')} className="text-rose-600 font-semibold hover:bg-rose-50">
-                                Revert to Draft
+                          )}
+                          {e.status === 'Published' ? (
+                            <DropdownItem onClick={() => handlePublishMasterExam(e, 'Draft')} className="text-rose-600 font-semibold hover:bg-rose-50">
+                              Revert to Draft
+                            </DropdownItem>
+                          ) : (
+                            (e.start_date && e.end_date && String(e.start_date).trim() !== '' && String(e.start_date).trim() !== '-' && String(e.end_date).trim() !== '' && String(e.end_date).trim() !== '-') && (
+                              <DropdownItem onClick={() => handlePublishMasterExam(e, 'Published')} className="text-emerald-600 font-semibold hover:bg-emerald-50">
+                                Publish Examination
                               </DropdownItem>
-                            ) : (
-                              (e.start_date && e.end_date && String(e.start_date).trim() !== '' && String(e.start_date).trim() !== '-' && String(e.end_date).trim() !== '' && String(e.end_date).trim() !== '-') && (
-                                <DropdownItem onClick={() => handlePublishMasterExam(e, 'Published')} className="text-emerald-600 font-semibold hover:bg-emerald-50">
-                                  Publish Examination
-                                </DropdownItem>
-                              )
-                            )}
-                          </DropdownMenu>
-                        )}
+                            )
+                          )}
+                        </DropdownMenu>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -2920,7 +2920,7 @@ export default function ExamsPage() {
                                 : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800'
                             }`}
                             onClick={() => {
-                              if (currentClass.status === 'Published' && !isReadOnly) {
+                              if (currentClass.status === 'Published') {
                                 handleUnpublishClassResults(selectedExam, currentClass.id);
                               }
                             }}
@@ -2935,7 +2935,7 @@ export default function ExamsPage() {
                       </div>
                     </div>
                     <div className="pt-2">
-                      {currentClass.status === 'Draft' && !isReadOnly ? (
+                      {currentClass.status === 'Draft' ? (
                         <Button className="w-full flex items-center justify-center gap-2 text-xs font-bold bg-green-600 hover:bg-green-700 text-white" onClick={() => handlePublishClassResults(selectedExam, currentClass.id)}>
                           <CheckCircle className="h-4 w-4" /> Publish Result
                         </Button>
@@ -2943,8 +2943,7 @@ export default function ExamsPage() {
                         <Button 
                           type="button"
                           className="w-full text-xs font-bold bg-amber-600/10 hover:bg-amber-600/20 text-amber-600 border border-amber-600/20 cursor-pointer flex items-center justify-center gap-2" 
-                          onClick={() => { if (!isReadOnly) handleUnpublishClassResults(selectedExam, currentClass.id); }}
-                          disabled={isReadOnly}
+                          onClick={() => handleUnpublishClassResults(selectedExam, currentClass.id)}
                         >
                           <AlertCircle className="h-4 w-4" /> Move to Draft
                         </Button>
