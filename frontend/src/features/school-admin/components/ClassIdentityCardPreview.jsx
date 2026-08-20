@@ -18,8 +18,8 @@ const IdCardAvatar = ({ src, name, updatedAt }) => {
         src={cleanUrl}
         alt={name || 'Student'}
         onError={() => setError(true)}
-        className="w-full h-full object-cover rounded-xl"
-        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        className="w-full h-full object-cover block p-0 m-0 border-none"
+        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', padding: 0, margin: 0, border: 'none' }}
       />
     );
   }
@@ -44,24 +44,43 @@ const convertImagesToDataUrls = async (container) => {
     const currentSrc = img.src;
     if (!currentSrc || currentSrc.startsWith('data:')) return;
     try {
-      const imageObj = new Image();
-      await new Promise((resolve) => {
-        imageObj.onload = resolve;
-        imageObj.onerror = resolve;
-        imageObj.src = currentSrc;
-      });
+      let dataUrl = null;
+      try {
+        const response = await fetch(currentSrc, { mode: 'cors' }).catch(() => fetch(currentSrc));
+        if (response && response.ok) {
+          const blob = await response.blob();
+          dataUrl = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(blob);
+          });
+        }
+      } catch (_) {}
 
-      if (!imageObj.naturalWidth && !imageObj.width) return;
+      if (!dataUrl || !dataUrl.startsWith('data:')) {
+        const imageObj = new Image();
+        imageObj.crossOrigin = 'anonymous';
+        await new Promise((resolve) => {
+          imageObj.onload = resolve;
+          imageObj.onerror = resolve;
+          imageObj.src = currentSrc;
+        });
 
-      const canvas = document.createElement('canvas');
-      canvas.width = imageObj.naturalWidth || imageObj.width;
-      canvas.height = imageObj.naturalHeight || imageObj.height;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(imageObj, 0, 0);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.98);
+        if (imageObj.naturalWidth || imageObj.width) {
+          const canvas = document.createElement('canvas');
+          canvas.width = imageObj.naturalWidth || imageObj.width;
+          canvas.height = imageObj.naturalHeight || imageObj.height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(imageObj, 0, 0);
+          dataUrl = canvas.toDataURL('image/jpeg', 0.98);
+        }
+      }
 
-      restoredMap.set(img, currentSrc);
-      img.src = dataUrl;
+      if (dataUrl && dataUrl.startsWith('data:')) {
+        restoredMap.set(img, currentSrc);
+        img.src = dataUrl;
+      }
     } catch (e) {
       console.warn('Image dataUrl conversion skipped for:', currentSrc, e);
     }
