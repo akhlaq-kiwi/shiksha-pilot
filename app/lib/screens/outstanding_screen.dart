@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../services/http_service.dart' as http;
 
 class OutstandingScreen extends StatefulWidget {
@@ -110,6 +111,60 @@ class _OutstandingScreenState extends State<OutstandingScreen> {
     } catch (_) {
       return '₹$amount';
     }
+  }
+
+  Widget _buildStudentAvatar(String photoPath, String name, bool hasDues) {
+    final String initialText = name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : 'S';
+    final Color bgColor = hasDues ? Colors.amber.shade50 : Colors.indigo.shade50;
+    final Color textColor = hasDues ? Colors.amber.shade900 : Colors.indigo;
+
+    final Widget fallbackWidget = CircleAvatar(
+      radius: 22,
+      backgroundColor: bgColor,
+      child: Text(
+        initialText,
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          color: textColor,
+          fontSize: 16,
+        ),
+      ),
+    );
+
+    final String trimmedPath = photoPath.trim();
+    if (trimmedPath.isEmpty) {
+      return fallbackWidget;
+    }
+
+    String fullUrl = trimmedPath;
+    if (!trimmedPath.startsWith('http')) {
+      final String cleanPath = trimmedPath.startsWith('/') ? trimmedPath : '/$trimmedPath';
+      fullUrl = '${widget.baseUrl}$cleanPath';
+    }
+
+    return ClipOval(
+      child: CachedNetworkImage(
+        imageUrl: fullUrl,
+        width: 44,
+        height: 44,
+        fit: BoxFit.cover,
+        placeholder: (context, url) => Container(
+          width: 44,
+          height: 44,
+          color: bgColor,
+          alignment: Alignment.center,
+          child: Text(
+            initialText,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: textColor,
+              fontSize: 16,
+            ),
+          ),
+        ),
+        errorWidget: (context, url, error) => fallbackWidget,
+      ),
+    );
   }
 
   @override
@@ -312,23 +367,7 @@ class _OutstandingScreenState extends State<OutstandingScreen> {
                           child: Row(
                             children: [
                               // Avatar / Photo
-                              CircleAvatar(
-                                radius: 22,
-                                backgroundColor: hasDues ? Colors.amber.shade50 : Colors.indigo.shade50,
-                                backgroundImage: photoPath.isNotEmpty
-                                    ? NetworkImage('${widget.baseUrl}$photoPath')
-                                    : null,
-                                child: photoPath.isEmpty
-                                    ? Text(
-                                        name.isNotEmpty ? name[0].toUpperCase() : 'S',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: hasDues ? Colors.amber.shade900 : Colors.indigo,
-                                          fontSize: 16,
-                                        ),
-                                      )
-                                    : null,
-                              ),
+                              _buildStudentAvatar(photoPath, name, hasDues),
                               const SizedBox(width: 14),
 
                               // Student Name & Roll No (Left Aligned)
