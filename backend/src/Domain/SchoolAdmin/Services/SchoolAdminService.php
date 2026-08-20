@@ -13992,7 +13992,7 @@ Only approve the settlement after reviewing all financial records.
             SELECT s.*, c.name AS class_name, c.section AS class_section
             FROM students s
             JOIN classes c ON s.class_id = c.id
-            WHERE s.class_id = :class_id AND s.school_id = :sid AND s.status = 'ACTIVE' {$studentsFilter}
+            WHERE s.class_id = :class_id AND s.school_id = :sid {$studentsFilter}
             ORDER BY CAST(s.roll_no AS UNSIGNED) ASC, s.name ASC
         ");
         $stmtStudents->execute($params);
@@ -14015,12 +14015,12 @@ Only approve the settlement after reviewing all financial records.
             $marksMap[$sid][$pid] = $m;
         }
 
-        // Fetch all active students in all classes of the SAME NAME (to compute Class Rank across sections)
+        // Fetch all students in all classes of the SAME NAME (to compute Class Rank across sections)
         $stmtClassGroup = $pdo->prepare("
             SELECT s.id, s.class_id, c.name AS class_name 
             FROM students s 
             JOIN classes c ON s.class_id = c.id
-            WHERE c.name = :class_name AND c.academic_year_id = :ayid AND s.school_id = :sid AND s.status = 'ACTIVE'
+            WHERE c.name = :class_name AND c.academic_year_id = :ayid AND s.school_id = :sid
         ");
         $stmtClassGroup->execute([
             ':class_name' => $exam['class_name'],
