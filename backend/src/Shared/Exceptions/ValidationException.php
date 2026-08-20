@@ -10,6 +10,12 @@ class ValidationException extends AppException
 
     public function __construct(array $errors = [], string $message = 'Validation failed.')
     {
+        if ($message === 'Validation failed.' && !empty($errors)) {
+            $firstErr = reset($errors);
+            if (is_string($firstErr) && !empty($firstErr)) {
+                $message = $firstErr;
+            }
+        }
         parent::__construct($message, 400, 'VALIDATION_ERROR');
         $this->errors = $errors;
     }
