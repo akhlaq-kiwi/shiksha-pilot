@@ -16,7 +16,6 @@ const TeacherIdCardAvatar = ({ src, name, updatedAt }) => {
     return (
       <img
         src={cleanUrl}
-        crossOrigin="anonymous"
         alt={name || 'Teacher'}
         onError={() => setError(true)}
         className="w-full h-full object-cover rounded-xl"
@@ -46,12 +45,13 @@ const convertImagesToDataUrls = async (container) => {
     if (!currentSrc || currentSrc.startsWith('data:')) return;
     try {
       const imageObj = new Image();
-      imageObj.crossOrigin = 'anonymous';
-      await new Promise((resolve, reject) => {
+      await new Promise((resolve) => {
         imageObj.onload = resolve;
-        imageObj.onerror = reject;
+        imageObj.onerror = resolve;
         imageObj.src = currentSrc;
       });
+
+      if (!imageObj.naturalWidth && !imageObj.width) return;
 
       const canvas = document.createElement('canvas');
       canvas.width = imageObj.naturalWidth || imageObj.width;
