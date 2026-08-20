@@ -1319,7 +1319,7 @@ class TeacherService extends BaseService
             // Get all students in the class
             $stmtStudents = $pdo->prepare("
                 SELECT id, roll_no, name FROM students 
-                WHERE class_id = :class_id AND school_id = :sid AND status = 'ACTIVE'
+                WHERE class_id = :class_id AND school_id = :sid
                 ORDER BY CAST(roll_no AS UNSIGNED) ASC, name ASC
             ");
             $stmtStudents->execute([':class_id' => $classId, ':sid' => $schoolId]);
@@ -1429,7 +1429,7 @@ class TeacherService extends BaseService
         $stmtStudents = $pdo->prepare("
             SELECT id, roll_no, name 
             FROM students 
-            WHERE class_id = :cid AND school_id = :sid AND status = 'ACTIVE' 
+            WHERE class_id = :cid AND school_id = :sid 
             ORDER BY CAST(roll_no AS UNSIGNED) ASC, name ASC
         ");
         $stmtStudents->execute([':cid' => $classId, ':sid' => $schoolId]);
