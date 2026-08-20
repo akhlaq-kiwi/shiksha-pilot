@@ -601,6 +601,28 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
 
             Future<void> saveMarks() async {
               if (isResultPublished) return;
+
+              // Validation: Ensure all non-absent students have marks entered
+              for (var s in studentsList) {
+                final sId = s['student_id'] as int;
+                final isAb = absentMap[sId] ?? false;
+                final valStr = marksControllers[sId]?.text.trim() ?? '';
+                final studentName = s['student_name'] ?? 'Student';
+
+                if (!isAb && valStr.isEmpty) {
+                  marksFocusNodes[sId]?.requestFocus();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Please enter marks for "$studentName" or mark as Absent.'),
+                      backgroundColor: Colors.red.shade700,
+                      behavior: SnackBarBehavior.floating,
+                      duration: const Duration(seconds: 3),
+                    ),
+                  );
+                  return;
+                }
+              }
+
               setModalState(() {
                 isSaving = true;
               });

@@ -373,6 +373,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           content: Text('Attendance Submitted'),
           behavior: SnackBarBehavior.floating,
           backgroundColor: Colors.green,
+          duration: Duration(seconds: 1),
         ),
       );
 
