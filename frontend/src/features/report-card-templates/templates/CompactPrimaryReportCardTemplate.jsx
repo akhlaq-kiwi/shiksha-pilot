@@ -259,9 +259,16 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
           <span className="text-xs font-bold text-emerald-950 mt-0.5">Grade {summary.grade}</span>
         </div>
 
-        <div className="bg-amber-50 border border-amber-200 p-2.5 rounded-lg text-center flex flex-col justify-center">
-          <span className="text-[11px] font-bold text-amber-800 uppercase block">Attendance</span>
-          <span className="text-xs font-bold font-mono text-amber-950 mt-0.5">{summary.attendance?.attendance_rate ?? 90.3}%</span>
+        <div className="bg-amber-50 border border-amber-200 p-2 rounded text-center flex flex-col justify-center">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 block">Attendance</span>
+          <span className="text-xs font-bold text-amber-950 font-mono mt-0.5">
+            {(() => {
+              const att = summary?.attendance;
+              let rate = typeof att === 'object' && att !== null ? (att.attendance_rate ?? att.attendance_pct ?? att.percentage) : att;
+              if (rate === null || rate === undefined) rate = summary?.attendance_rate ?? summary?.attendance_pct ?? summary?.attendance_percentage;
+              return (rate !== null && rate !== undefined && !isNaN(rate)) ? `${Math.round(rate)}%` : '—';
+            })()}
+          </span>
         </div>
 
         <div className="bg-emerald-50 border border-emerald-200 p-2.5 rounded-lg text-center flex flex-col justify-center">
