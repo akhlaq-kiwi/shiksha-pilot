@@ -14037,7 +14037,7 @@ Only approve the settlement after reviewing all financial records.
             $stmtAllAtt = $pdo->prepare("
                 SELECT student_id,
                        COUNT(*) AS total,
-                       SUM(CASE WHEN status IN ('PRESENT', 'LATE') THEN 1 ELSE 0 END) AS present
+                       SUM(CASE WHEN LOWER(status) IN ('present', 'late') THEN 1 ELSE 0 END) AS present
                 FROM attendance
                 WHERE student_id IN ({$inClause}) AND date BETWEEN :start_d AND :end_d
                 GROUP BY student_id
