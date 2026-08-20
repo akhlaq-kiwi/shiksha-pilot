@@ -268,6 +268,7 @@ return function (App $app) {
     $app->get('/api/teacher/dashboard', [TeacherController::class, 'getDashboard']);
     $app->get('/api/teacher/classes', [TeacherController::class, 'getMyClasses']);
     $app->get('/api/teacher/students', [TeacherController::class, 'getStudentList']);
+    $app->get('/api/teacher/outstanding', [TeacherController::class, 'getOutstanding']);
     $app->post('/api/teacher/attendance', [TeacherController::class, 'markAttendance']);
     $app->get('/api/teacher/attendance', [TeacherController::class, 'getAttendanceHistory']);
     $app->get('/api/teacher/assignments', [TeacherController::class, 'getAssignments']);

@@ -262,9 +262,198 @@ class TeacherService extends BaseService
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Students
-    // -------------------------------------------------------------------------
+    public function getOutstandingStudents(array $user): array
+    {
+        $schoolId = (int)($user['school_id'] ?? 0);
+        $pdo = $this->attendanceRepo->getPdo();
+
+        // 1. Resolve staff ID for this teacher
+        $stmtStaff = $pdo->prepare("SELECT id FROM staff WHERE phone = :phone AND school_id = :sid ORDER BY id DESC LIMIT 1");
+        $stmtStaff->execute([':phone' => $user['phone'] ?? '', ':sid' => $schoolId]);
+        $staffId = (int)$stmtStaff->fetchColumn();
+
+        if ($staffId <= 0) {
+            return [
+                'has_class' => false,
+                'class_id' => null,
+                'class_name' => null,
+                'section' => null,
+                'full_class_name' => null,
+                'students' => []
+            ];
+        }
+
+        // 2. Resolve class assigned to this class teacher
+        $stmtClass = $pdo->prepare("
+            SELECT c.id, c.name, c.section, c.academic_year_id
+            FROM class_teacher_assignments cta
+            JOIN classes c ON cta.class_id = c.id
+            WHERE cta.teacher_id = :tid AND cta.school_id = :sid
+            LIMIT 1
+        ");
+        $stmtClass->execute([':tid' => $staffId, ':sid' => $schoolId]);
+        $classRow = $stmtClass->fetch(\PDO::FETCH_ASSOC);
+
+        if (!$classRow) {
+            return [
+                'has_class' => false,
+                'class_id' => null,
+                'class_name' => null,
+                'section' => null,
+                'full_class_name' => null,
+                'students' => []
+            ];
+        }
+
+        $classId = (int)$classRow['id'];
+        $className = $classRow['name'] ?? '';
+        $section = $classRow['section'] ?? '';
+        $fullClassName = (!empty($section)) ? "{$className}-{$section}" : $className;
+
+        $workingYearId = (int)($classRow['academic_year_id'] ?? 0);
+        if ($workingYearId <= 0) {
+            $stmtAY = $pdo->prepare("SELECT id FROM academic_years WHERE school_id = :sid AND (is_current = 1 OR status = 'ACTIVE') LIMIT 1");
+            $stmtAY->execute([':sid' => $schoolId]);
+            $workingYearId = (int)$stmtAY->fetchColumn();
+        }
+
+        // 3. Fetch active students in class sorted by Roll No numeric ASC, then name ASC
+        $stmtStu = $pdo->prepare("
+            SELECT s.id, s.roll_no, s.first_name, s.middle_name, s.last_name, s.photo_path,
+                   CASE 
+                     WHEN s.last_name = '.' OR s.last_name IS NULL OR TRIM(s.last_name) = '' THEN 
+                       TRIM(CONCAT(s.first_name, ' ', COALESCE(s.middle_name, '')))
+                     ELSE 
+                       TRIM(CONCAT(s.first_name, ' ', COALESCE(s.middle_name, ''), ' ', s.last_name))
+                   END AS name
+            FROM students s
+            WHERE s.class_id = :cid AND s.school_id = :sid AND s.status = 'ACTIVE'
+            ORDER BY CASE WHEN s.roll_no IS NULL OR s.roll_no = '' THEN 1 ELSE 0 END, CAST(s.roll_no AS UNSIGNED) ASC, name ASC
+        ");
+        $stmtStu->execute([':cid' => $classId, ':sid' => $schoolId]);
+        $students = $stmtStu->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        $resultList = [];
+        foreach ($students as $stu) {
+            $sId = (int)$stu['id'];
+            $dues = $this->calculateStudentOutstandingBalance($pdo, $sId, $schoolId, $workingYearId);
+            $resultList[] = [
+                'id' => $sId,
+                'name' => $stu['name'],
+                'roll_no' => $stu['roll_no'] ?? '',
+                'outstanding_amount' => (int)round($dues),
+                'photo_path' => $stu['photo_path'] ?? ''
+            ];
+        }
+
+        return [
+            'has_class' => true,
+            'class_id' => $classId,
+            'class_name' => $className,
+            'section' => $section,
+            'full_class_name' => $fullClassName,
+            'students' => $resultList
+        ];
+    }
+
+    private function calculateStudentOutstandingBalance(\PDO $pdo, int $studentId, int $schoolId, int $academicYearId): float
+    {
+        $stmtStu = $pdo->prepare("SELECT class_id FROM students WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtStu->execute([':id' => $studentId, ':sid' => $schoolId]);
+        $classId = $stmtStu->fetchColumn();
+        if ($classId === false || $classId === null) {
+            return 0.0;
+        }
+
+        $stmtCfg = $pdo->prepare("
+            SELECT monthly_fees FROM class_fee_configurations 
+            WHERE school_id = :school_id AND class_id = :class_id AND academic_year_id = :academic_year_id
+            LIMIT 1
+        ");
+        $stmtCfg->execute([
+            ':school_id' => $schoolId,
+            ':class_id' => $classId,
+            ':academic_year_id' => $academicYearId
+        ]);
+        $cfgRow = $stmtCfg->fetch(\PDO::FETCH_ASSOC);
+        $monthlyFees = [];
+        if ($cfgRow) {
+            $monthlyFees = json_decode($cfgRow['monthly_fees'], true) ?: [];
+        }
+
+        $stmtPaid = $pdo->prepare("
+            SELECT fee_month FROM fee_payments 
+            WHERE student_id = :student_id AND school_id = :school_id AND UPPER(status) = 'PAID' AND academic_year_id = :academic_year_id
+        ");
+        $stmtPaid->execute([
+            ':student_id' => $studentId,
+            ':school_id' => $schoolId,
+            ':academic_year_id' => $academicYearId
+        ]);
+        $paidMonths = $stmtPaid->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+        $paidMonthsUpper = array_map('strtoupper', array_map('trim', $paidMonths));
+
+        $monthsToEvaluate = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+        $stmtAY = $pdo->prepare("SELECT start_date, end_date, status FROM academic_years WHERE id = :ayid AND school_id = :sid LIMIT 1");
+        $stmtAY->execute([':ayid' => $academicYearId, ':sid' => $schoolId]);
+        $ayRow = $stmtAY->fetch(\PDO::FETCH_ASSOC);
+        if ($ayRow && !empty($ayRow['start_date']) && !empty($ayRow['end_date'])) {
+            $monthsToEvaluate = $this->getMonthsDueUpToCurrentHelper($ayRow['start_date'], $ayRow['end_date'], $ayRow['status']);
+        }
+
+        $outstanding = 0.0;
+        foreach ($monthsToEvaluate as $m) {
+            if (!in_array(strtoupper(trim($m)), $paidMonthsUpper, true)) {
+                $outstanding += isset($monthlyFees[$m]) ? (float)$monthlyFees[$m] : 0.0;
+            }
+        }
+
+        $stmtAddPending = $pdo->prepare("
+            SELECT COALESCE(SUM(afp.amount), 0)
+            FROM additional_fee_payments afp
+            JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+            WHERE afp.student_id = :student_id
+              AND afp.school_id = :school_id
+              AND afp.status = 'Pending'
+              AND (aft.academic_year_id = :academic_year_id OR aft.academic_year_id IS NULL OR aft.name = 'Previous Year Dues')
+        ");
+        $stmtAddPending->execute([
+            ':student_id' => $studentId,
+            ':school_id' => $schoolId,
+            ':academic_year_id' => $academicYearId
+        ]);
+        $outstanding += (float)$stmtAddPending->fetchColumn();
+
+        return $outstanding;
+    }
+
+    private function getMonthsDueUpToCurrentHelper(string $startDateStr, string $endDateStr, ?string $status = 'ACTIVE'): array
+    {
+        $academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+        
+        if ($status === 'Archived') {
+            return $academicMonths;
+        }
+
+        try {
+            $now = new \DateTime();
+            $endDate = new \DateTime($endDateStr);
+            
+            if ($now > $endDate) {
+                return $academicMonths;
+            }
+            
+            $currentMonthName = $now->format('F');
+            $idx = array_search($currentMonthName, $academicMonths);
+            if ($idx === false) {
+                return $academicMonths;
+            }
+            
+            return array_slice($academicMonths, 0, $idx + 1);
+        } catch (\Throwable $e) {
+            return $academicMonths;
+        }
+    }
 
     /**
      * Return active students belonging to a class within the teacher's school.

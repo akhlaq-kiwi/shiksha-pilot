@@ -76,6 +76,16 @@ class TeacherController extends BaseController
         return $this->success($response, $data);
     }
 
+    public function getOutstanding(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, 'TEACHER');
+
+        $data = $this->service->getOutstandingStudents($user);
+
+        return $this->success($response, $data);
+    }
+
     // -------------------------------------------------------------------------
     // Attendance
     // -------------------------------------------------------------------------
