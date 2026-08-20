@@ -130,7 +130,7 @@ class App
             'settings' => [
                 'displayErrorDetails' => (bool) (getenv('APP_DEBUG') ?: true),
                 'db' => [
-                    'host'   => getenv('DB_HOST')  ?: 'db',
+                    'host'   => getenv('DB_HOST')  ?: '127.0.0.1',
                     'port'   => getenv('DB_PORT')  ?: '3306',
                     'dbname' => getenv('DB_NAME')  ?: 'shiksha_pilot',
                     'user'   => getenv('DB_USER')  ?: 'root',
