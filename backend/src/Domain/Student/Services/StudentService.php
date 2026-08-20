@@ -445,7 +445,7 @@ class StudentService extends BaseService
                 SELECT s.id, s.class_id, c.name AS class_name 
                 FROM students s 
                 JOIN classes c ON s.class_id = c.id
-                WHERE c.name = :class_name AND c.academic_year_id = :ayid AND s.school_id = :sid AND s.status = 'ACTIVE'
+                WHERE c.name = :class_name AND c.academic_year_id = :ayid AND s.school_id = :sid
             ");
             $stmtCohort->execute([
                 ':class_name' => $ex['class_name'],
