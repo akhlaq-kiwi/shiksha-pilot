@@ -284,7 +284,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         }
       });
     } catch (e) {
-      if (e is SocketException || e.toString().contains('SocketException') || e.toString().contains('Failed host lookup')) {
+      final errStr = e.toString().toLowerCase();
+      if (e is SocketException || 
+          errStr.contains('socketexception') || 
+          errStr.contains('failed host lookup') || 
+          errStr.contains('connection reset') || 
+          errStr.contains('connection abort') || 
+          errStr.contains('clientexception')) {
         setState(() {
           _isOffline = true;
         });

@@ -46,7 +46,7 @@ const convertImagesToDataUrls = async (container) => {
     try {
       let dataUrl = null;
       try {
-        const response = await fetch(currentSrc, { mode: 'cors' }).catch(() => fetch(currentSrc));
+        const response = await fetch(currentSrc, { mode: 'cors', credentials: 'omit' }).catch(() => fetch(currentSrc));
         if (response && response.ok) {
           const blob = await response.blob();
           dataUrl = await new Promise((resolve) => {
@@ -60,7 +60,6 @@ const convertImagesToDataUrls = async (container) => {
 
       if (!dataUrl || !dataUrl.startsWith('data:')) {
         const imageObj = new Image();
-        imageObj.crossOrigin = 'anonymous';
         await new Promise((resolve) => {
           imageObj.onload = resolve;
           imageObj.onerror = resolve;
@@ -73,7 +72,9 @@ const convertImagesToDataUrls = async (container) => {
           canvas.height = imageObj.naturalHeight || imageObj.height;
           const ctx = canvas.getContext('2d');
           ctx.drawImage(imageObj, 0, 0);
-          dataUrl = canvas.toDataURL('image/jpeg', 0.98);
+          try {
+            dataUrl = canvas.toDataURL('image/jpeg', 0.98);
+          } catch (_) {}
         }
       }
 
@@ -428,7 +429,7 @@ export default function TeacherIdentityCardPreview({
                         <div className="p-3.5 bg-[#f8f9fa] flex flex-col justify-between flex-1 gap-2" style={{ overflow: 'visible' }}>
                           <div className="flex items-start gap-3.5" style={{ overflow: 'visible' }}>
                             {/* Left: Teacher Photo */}
-                            <div className="id-card-photo w-24 h-28 shrink-0 rounded-xl overflow-hidden border-2 border-[#d4d4d8] bg-white shadow-2xs" style={{ width: '96px', height: '112px', flexShrink: 0 }}>
+                            <div className="id-card-photo shrink-0 rounded-xl overflow-hidden border-2 border-[#d4d4d8] bg-white p-0 m-0 leading-none" style={{ width: '96px', height: '112px', flexShrink: 0, padding: 0, margin: 0, boxSizing: 'border-box' }}>
                               <TeacherIdCardAvatar src={t.photo_path} name={t.name} updatedAt={t.updated_at} />
                             </div>
 
