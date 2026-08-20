@@ -25,6 +25,7 @@ import 'package:school_hub/services/exam_service.dart';
 import 'package:school_hub/screens/exam_list_screen.dart';
 import 'package:school_hub/screens/achievements_screen.dart';
 import 'package:school_hub/screens/homework_list_screen.dart';
+import 'package:school_hub/screens/achievements_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:school_hub/screens/user_profile_screen.dart';
 import 'package:school_hub/widgets/change_password_dialog.dart';
