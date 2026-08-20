@@ -11,6 +11,7 @@ import '../services/exam_service.dart';
 import 'fees_card_screen.dart';
 import 'salary_card_screen.dart';
 import 'homework_list_screen.dart';
+import 'achievements_screen.dart';
 
 class NotificationCenterScreen extends StatefulWidget {
   final String baseUrl;
@@ -433,6 +434,22 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                       baseUrl: widget.baseUrl,
                                       userRole: widget.studentId != null ? 'PARENT' : (widget.userRole ?? 'STUDENT'),
                                       selectedStudentId: widget.studentId,
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+
+                              final isAchievementNotif = linkStr.contains('achievement') || titleLower.contains('achievement') || msgLower.contains('achievement') || (notif['event_key'] ?? '').toString().contains('ACHIEVEMENT');
+                              if (isAchievementNotif) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => AchievementsScreen(
+                                      baseUrl: widget.baseUrl,
+                                      token: widget.token,
+                                      userRole: widget.studentId != null ? 'PARENT' : (widget.userRole ?? 'STUDENT'),
+                                      studentId: widget.studentId,
                                     ),
                                   ),
                                 );

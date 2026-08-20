@@ -917,26 +917,9 @@ class SchoolAdminController extends BaseController
         $userRole = $user['role'] ?? '';
         if ($userRole === 'TEACHER') {
             $uri = $_SERVER['REQUEST_URI'] ?? '';
-
-            // /api/school/my-permissions is always accessible to inspect active permissions
-            if (str_contains($uri, '/api/school/my-permissions')) {
-                return;
-            }
-
-            // Retrieve teacher permissions
-            $permsData = $this->service->getMyPermissions($user);
-            $permissions = $permsData['permissions'] ?? [];
-
-            // If teacher has zero web permissions, they are not authorized at all
-            if (empty($permissions)) {
-                throw new \App\Shared\Exceptions\ForbiddenException('Access Denied. No role assigned.');
-            }
-
-            // Route-to-Permission mapping
-            $uri = $_SERVER['REQUEST_URI'] ?? '';
             $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-            
-            // 1. Shared/Bootstrap endpoints (always allowed for authorized teachers)
+
+            // 1. Shared/Bootstrap endpoints (always allowed for teachers)
             $isShared = false;
             $sharedPaths = [
                 '/api/school/my-permissions',
@@ -971,6 +954,19 @@ class SchoolAdminController extends BaseController
                         break;
                     }
                 }
+            }
+
+            if ($isShared) {
+                return;
+            }
+
+            // Retrieve teacher permissions
+            $permsData = $this->service->getMyPermissions($user);
+            $permissions = $permsData['permissions'] ?? [];
+
+            // If teacher has zero web permissions, they are not authorized for admin management routes
+            if (empty($permissions)) {
+                throw new \App\Shared\Exceptions\ForbiddenException('Access Denied. No role assigned.');
             }
 
             if ($isShared) {
