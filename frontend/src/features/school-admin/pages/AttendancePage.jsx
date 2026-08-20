@@ -313,6 +313,13 @@ export default function AttendancePage() {
       leave,
       percentage
     };
+  }).sort((a, b) => {
+    if (b.percentage !== a.percentage) {
+      return b.percentage - a.percentage;
+    }
+    const rollA = parseInt(a.student.roll_no, 10) || 0;
+    const rollB = parseInt(b.student.roll_no, 10) || 0;
+    return rollA - rollB;
   });
 
   const totalReportRecords = workingRecords.length;
