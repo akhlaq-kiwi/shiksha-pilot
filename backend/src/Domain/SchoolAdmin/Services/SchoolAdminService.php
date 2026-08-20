@@ -1657,12 +1657,44 @@ class SchoolAdminService extends BaseService
 
         $this->checkTeacherStudentPhoneConflict($pdo, $schoolId, [$parentPhone, $fatherPhone, $data['student_mobile'] ?? null], null, $id, $isReactivating);
 
+        $oldParentPhone = trim((string)($student['parent_phone'] ?? ''));
+        $oldFatherPhone = trim((string)($student['father_phone'] ?? ''));
+        $oldStudentMobile = trim((string)($student['student_mobile'] ?? ''));
+
+        $newParentPhone = $parentPhone;
+        $newFatherPhone = $fatherPhone;
+        $newStudentMobile = !empty($data['student_mobile']) ? trim((string)$data['student_mobile']) : null;
+
+        $oldPhones = array_filter(array_unique([$oldParentPhone, $oldFatherPhone, $oldStudentMobile]));
+        $newPhones = array_filter(array_unique([$newParentPhone, $newFatherPhone, $newStudentMobile]));
+
+        foreach ($oldPhones as $oldP) {
+            if (empty($oldP) || strlen($oldP) < 10 || in_array($oldP, $newPhones, true)) continue;
+
+            $stmtCheckRem = $pdo->prepare("
+                SELECT COUNT(*) FROM students 
+                WHERE school_id = :sid AND id != :id
+                  AND (parent_phone = :p1 OR father_phone = :p2 OR student_mobile = :p3)
+                  AND (status IS NULL OR UPPER(status) = 'ACTIVE')
+                  AND exit_date IS NULL
+            ");
+            $stmtCheckRem->execute([':sid' => $schoolId, ':id' => $id, ':p1' => $oldP, ':p2' => $oldP, ':p3' => $oldP]);
+            $remCount = (int)$stmtCheckRem->fetchColumn();
+
+            if ($remCount === 0) {
+                $stmtUsersOff = $pdo->prepare("UPDATE users SET status = 'INACTIVE' WHERE school_id = :sid AND phone = :oldP AND role IN ('STUDENT', 'PARENT')");
+                $stmtUsersOff->execute([':sid' => $schoolId, ':oldP' => $oldP]);
+            }
+        }
+
         if ($newStatus === 'ACTIVE') {
             $this->checkActiveStudentPhoneConflictInOtherSchools($pdo, $schoolId, [$parentPhone, $fatherPhone, $data['student_mobile'] ?? null], $isReactivating, $id);
         } else {
-            if (!empty($parentPhone)) {
-                $stmtUsersOff = $pdo->prepare("UPDATE users SET status = 'INACTIVE' WHERE school_id = :sid AND phone = :phone");
-                $stmtUsersOff->execute([':sid' => $schoolId, ':phone' => $parentPhone]);
+            foreach ($newPhones as $np) {
+                if (!empty($np)) {
+                    $stmtUsersOff = $pdo->prepare("UPDATE users SET status = 'INACTIVE' WHERE school_id = :sid AND phone = :phone AND role IN ('STUDENT', 'PARENT')");
+                    $stmtUsersOff->execute([':sid' => $schoolId, ':phone' => $np]);
+                }
             }
         }
 
@@ -2609,13 +2641,21 @@ class SchoolAdminService extends BaseService
         $newStatus = strtoupper($status);
         $isReactivating = ($existingStatus === 'INACTIVE' && $newStatus === 'ACTIVE');
 
+        $oldPhone = trim((string)($member['phone'] ?? ''));
+        $newPhone = trim((string)($data['phone'] ?? ''));
+
+        if (!empty($oldPhone) && $oldPhone !== $newPhone) {
+            $stmtDeactivateOld = $pdo->prepare("UPDATE users SET status = 'INACTIVE' WHERE school_id = :sid AND phone = :oldPhone AND role IN ('TEACHER', 'STAFF')");
+            $stmtDeactivateOld->execute([':sid' => $schoolId, ':oldPhone' => $oldPhone]);
+        }
+
         $this->checkTeacherStudentPhoneConflict($pdo, $schoolId, $data['phone'], $id, null, $isReactivating);
 
         if ($newStatus === 'ACTIVE') {
             $this->checkActiveStaffPhoneConflictInOtherSchools($pdo, $schoolId, $data['phone'], $id, $isReactivating);
         } else {
-            $stmtUsersOff = $pdo->prepare("UPDATE users SET status = 'INACTIVE' WHERE school_id = :sid AND phone = :phone");
-            $stmtUsersOff->execute([':sid' => $schoolId, ':phone' => trim($data['phone'])]);
+            $stmtUsersOff = $pdo->prepare("UPDATE users SET status = 'INACTIVE' WHERE school_id = :sid AND (phone = :phone OR phone = :oldPhone) AND role IN ('TEACHER', 'STAFF')");
+            $stmtUsersOff->execute([':sid' => $schoolId, ':phone' => $newPhone, ':oldPhone' => $oldPhone]);
         }
 
         // 4. Update
@@ -12385,47 +12425,56 @@ Only approve the settlement after reviewing all financial records.
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->classRepo->getPdo();
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
-        if (!$workingYear) {
-            return [];
-        }
 
-        $stmt = $pdo->prepare("SELECT * FROM holidays WHERE school_id = :sid AND academic_year_id = :yid ORDER BY date ASC");
-        $stmt->execute([':sid' => $schoolId, ':yid' => (int)$workingYear['id']]);
-        $holidays = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        if (count($holidays) === 0) {
-            // Auto-prefill if empty
-            if (preg_match('/^(\d{4})[-–—](\d{4})$/u', trim($workingYear['name']), $matches)) {
-                $startYear = (int)$matches[1];
-                $endYear = (int)$matches[2];
-            } else {
-                $startYear = (int)date('Y', strtotime($workingYear['start_date']));
-                $endYear = (int)date('Y', strtotime($workingYear['end_date']));
-            }
-            $defaultHolidays = [
-                ['name' => 'Labour Day', 'date' => "{$startYear}-05-01"],
-                ['name' => 'Independence Day', 'date' => "{$startYear}-08-15"],
-                ['name' => 'Mahatma Gandhi Jayanti', 'date' => "{$startYear}-10-02"],
-                ['name' => 'Christmas Day', 'date' => "{$startYear}-12-25"],
-                ['name' => 'New Year\'s Day', 'date' => "{$endYear}-01-01"],
-                ['name' => 'Republic Day', 'date' => "{$endYear}-01-26"]
-            ];
-            $stmtHoliday = $pdo->prepare("
-                INSERT IGNORE INTO holidays (school_id, academic_year_id, name, date)
-                VALUES (:school_id, :academic_year_id, :name, :date)
-            ");
-            foreach ($defaultHolidays as $h) {
-                if ($h['date'] >= $workingYear['start_date'] && $h['date'] <= $workingYear['end_date']) {
-                    $stmtHoliday->execute([
-                        ':school_id' => $schoolId,
-                        ':academic_year_id' => (int)$workingYear['id'],
-                        ':name' => $h['name'],
-                        ':date' => $h['date']
-                    ]);
-                }
-            }
+        if ($workingYear) {
+            $stmt = $pdo->prepare("SELECT * FROM holidays WHERE school_id = :sid AND (academic_year_id = :yid OR academic_year_id IS NULL OR academic_year_id = 0) ORDER BY date ASC");
             $stmt->execute([':sid' => $schoolId, ':yid' => (int)$workingYear['id']]);
             $holidays = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            if (count($holidays) === 0) {
+                // Auto-prefill if empty
+                if (preg_match('/^(\d{4})[-–—](\d{4})$/u', trim($workingYear['name']), $matches)) {
+                    $startYear = (int)$matches[1];
+                    $endYear = (int)$matches[2];
+                } else {
+                    $startYear = (int)date('Y', strtotime($workingYear['start_date']));
+                    $endYear = (int)date('Y', strtotime($workingYear['end_date']));
+                }
+                $defaultHolidays = [
+                    ['name' => 'Labour Day', 'date' => "{$startYear}-05-01"],
+                    ['name' => 'Independence Day', 'date' => "{$startYear}-08-15"],
+                    ['name' => 'Mahatma Gandhi Jayanti', 'date' => "{$startYear}-10-02"],
+                    ['name' => 'Christmas Day', 'date' => "{$startYear}-12-25"],
+                    ['name' => 'New Year\'s Day', 'date' => "{$endYear}-01-01"],
+                    ['name' => 'Republic Day', 'date' => "{$endYear}-01-26"]
+                ];
+                $stmtHoliday = $pdo->prepare("
+                    INSERT IGNORE INTO holidays (school_id, academic_year_id, name, date)
+                    VALUES (:school_id, :academic_year_id, :name, :date)
+                ");
+                foreach ($defaultHolidays as $h) {
+                    if ($h['date'] >= $workingYear['start_date'] && $h['date'] <= $workingYear['end_date']) {
+                        $stmtHoliday->execute([
+                            ':school_id' => $schoolId,
+                            ':academic_year_id' => (int)$workingYear['id'],
+                            ':name' => $h['name'],
+                            ':date' => $h['date']
+                        ]);
+                    }
+                }
+                $stmt->execute([':sid' => $schoolId, ':yid' => (int)$workingYear['id']]);
+                $holidays = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            }
+        } else {
+            $stmt = $pdo->prepare("SELECT * FROM holidays WHERE school_id = :sid ORDER BY date ASC");
+            $stmt->execute([':sid' => $schoolId]);
+            $holidays = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        if (empty($holidays)) {
+            $stmtAll = $pdo->prepare("SELECT * FROM holidays WHERE school_id = :sid ORDER BY date ASC");
+            $stmtAll->execute([':sid' => $schoolId]);
+            $holidays = $stmtAll->fetchAll(PDO::FETCH_ASSOC);
         }
 
         return $holidays;

@@ -11,11 +11,12 @@ const TeacherIdCardAvatar = ({ src, name, updatedAt }) => {
   const [error, setError] = useState(false);
 
   if (src && !error) {
-    const fileUrl = src.startsWith('http') ? src : src;
+    const fileUrl = resolveFileUrl(src);
     const cleanUrl = updatedAt ? `${fileUrl}?v=${encodeURIComponent(updatedAt)}` : fileUrl;
     return (
       <img
         src={cleanUrl}
+        crossOrigin="anonymous"
         alt={name || 'Teacher'}
         onError={() => setError(true)}
         className="w-full h-full object-cover rounded-xl"
@@ -34,6 +35,43 @@ const TeacherIdCardAvatar = ({ src, name, updatedAt }) => {
       <span className="text-[11px] font-bold uppercase tracking-wider">{initials}</span>
     </div>
   );
+};
+
+const convertImagesToDataUrls = async (container) => {
+  const imgs = Array.from(container.querySelectorAll('img'));
+  const restoredMap = new Map();
+
+  await Promise.all(imgs.map(async (img) => {
+    const currentSrc = img.src;
+    if (!currentSrc || currentSrc.startsWith('data:')) return;
+    try {
+      const imageObj = new Image();
+      imageObj.crossOrigin = 'anonymous';
+      await new Promise((resolve, reject) => {
+        imageObj.onload = resolve;
+        imageObj.onerror = reject;
+        imageObj.src = currentSrc;
+      });
+
+      const canvas = document.createElement('canvas');
+      canvas.width = imageObj.naturalWidth || imageObj.width;
+      canvas.height = imageObj.naturalHeight || imageObj.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(imageObj, 0, 0);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.98);
+
+      restoredMap.set(img, currentSrc);
+      img.src = dataUrl;
+    } catch (e) {
+      console.warn('Image dataUrl conversion skipped for:', currentSrc, e);
+    }
+  }));
+
+  return () => {
+    restoredMap.forEach((origSrc, img) => {
+      img.src = origSrc;
+    });
+  };
 };
 
 export default function TeacherIdentityCardPreview({
@@ -96,7 +134,14 @@ export default function TeacherIdentityCardPreview({
     if (!container || sortedTeachers.length === 0) return;
 
     setDownloading(true);
+    let restoreFn = null;
     try {
+      try {
+        restoreFn = await convertImagesToDataUrls(container);
+      } catch (convErr) {
+        console.warn('Image pre-conversion failed:', convErr);
+      }
+
       const opt = {
         margin: [4, 4, 4, 4],
         filename: `Teacher_Identity_Cards.pdf`,
@@ -118,6 +163,7 @@ export default function TeacherIdentityCardPreview({
       console.error(err);
       alert('Failed to generate PDF document.');
     } finally {
+      if (restoreFn) restoreFn();
       setDownloading(false);
     }
   };
