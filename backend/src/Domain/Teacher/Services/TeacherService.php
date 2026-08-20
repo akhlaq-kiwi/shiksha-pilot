@@ -1500,7 +1500,7 @@ class TeacherService extends BaseService
         $stmtStatus->execute([':exam_id' => $examId, ':class_id' => $classId]);
         $resultStatus = $stmtStatus->fetchColumn();
         if ($resultStatus === 'Published') {
-            throw new ValidationException(['result_status' => 'Marks cannot be updated because the report card for this examination has already been published.']);
+            throw new ValidationException(['result_status' => 'Cannot edit marks of a published class examination.'], 'Cannot edit marks of a published class examination.');
         }
 
         if (empty($data['subject_id'])) {

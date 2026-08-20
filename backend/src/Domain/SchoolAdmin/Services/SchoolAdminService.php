@@ -13318,7 +13318,7 @@ Only approve the settlement after reviewing all financial records.
         $stmtStatus = $pdo->prepare("SELECT status FROM examination_class_status WHERE exam_id = :exam_id AND class_id = :class_id LIMIT 1");
         $stmtStatus->execute([':exam_id' => $examId, ':class_id' => $classId]);
         if ($stmtStatus->fetchColumn() === 'Published') {
-            throw new ValidationException(['status' => 'Cannot edit marks of a published class examination.']);
+            throw new ValidationException(['status' => 'Cannot edit marks of a published class examination.'], 'Cannot edit marks of a published class examination.');
         }
 
         // Fetch Paper Details
