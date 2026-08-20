@@ -519,12 +519,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.calendar_today_rounded, size: 20),
-            onPressed: () => _openCalendarPicker(context, isTeacher),
-          ),
-        ],
       ),
       body: Column(
         children: [

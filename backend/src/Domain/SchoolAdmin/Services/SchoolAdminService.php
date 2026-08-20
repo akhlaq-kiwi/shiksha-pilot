@@ -333,21 +333,44 @@ class SchoolAdminService extends BaseService
 
     private function getSchoolId(array $user): int
     {
-        if (isset($user['school_id'])) {
-            return (int) $user['school_id'];
+        $schoolId = 0;
+        if (isset($user['school_id']) && (int)$user['school_id'] > 0) {
+            $schoolId = (int) $user['school_id'];
         }
 
         $userId = (int) ($user['id'] ?? 0);
-        if ($userId <= 0) {
-            return 0;
-        }
+        $phone = trim((string)($user['phone'] ?? ''));
 
         $pdo = $this->studentRepo->getPdo();
-        $stmt = $pdo->prepare("SELECT school_id FROM users WHERE id = :id LIMIT 1");
-        $stmt->execute([':id' => $userId]);
-        $val = $stmt->fetchColumn();
 
-        return $val !== false ? (int) $val : 0;
+        if ($schoolId <= 0 && $userId > 0) {
+            $stmt = $pdo->prepare("SELECT school_id FROM users WHERE id = :id LIMIT 1");
+            $stmt->execute([':id' => $userId]);
+            $val = $stmt->fetchColumn();
+            if ($val !== false && (int)$val > 0) {
+                $schoolId = (int)$val;
+            }
+        }
+
+        if ($schoolId <= 0 && !empty($phone)) {
+            $stmtStaff = $pdo->prepare("SELECT school_id FROM staff WHERE phone = :phone AND school_id > 0 ORDER BY id DESC LIMIT 1");
+            $stmtStaff->execute([':phone' => $phone]);
+            $val = $stmtStaff->fetchColumn();
+            if ($val !== false && (int)$val > 0) {
+                $schoolId = (int)$val;
+            }
+        }
+
+        if ($schoolId <= 0 && !empty($phone)) {
+            $stmtStu = $pdo->prepare("SELECT school_id FROM students WHERE (parent_phone = :p1 OR father_phone = :p2 OR student_mobile = :p3) AND school_id > 0 ORDER BY id DESC LIMIT 1");
+            $stmtStu->execute([':p1' => $phone, ':p2' => $phone, ':p3' => $phone]);
+            $val = $stmtStu->fetchColumn();
+            if ($val !== false && (int)$val > 0) {
+                $schoolId = (int)$val;
+            }
+        }
+
+        return $schoolId;
     }
 
     private function generateUniqueRefNo(PDO $pdo): string
@@ -12423,58 +12446,50 @@ Only approve the settlement after reviewing all financial records.
     public function getHolidays(array $user): array
     {
         $schoolId = $this->getSchoolId($user);
+        if ($schoolId <= 0) {
+            return [];
+        }
+
         $pdo = $this->classRepo->getPdo();
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
 
-        if ($workingYear) {
-            $stmt = $pdo->prepare("SELECT * FROM holidays WHERE school_id = :sid AND (academic_year_id = :yid OR academic_year_id IS NULL OR academic_year_id = 0) ORDER BY date ASC");
-            $stmt->execute([':sid' => $schoolId, ':yid' => (int)$workingYear['id']]);
-            $holidays = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $stmt = $pdo->prepare("SELECT * FROM holidays WHERE school_id = :sid ORDER BY date ASC");
+        $stmt->execute([':sid' => $schoolId]);
+        $holidays = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            if (count($holidays) === 0) {
-                // Auto-prefill if empty
-                if (preg_match('/^(\d{4})[-–—](\d{4})$/u', trim($workingYear['name']), $matches)) {
-                    $startYear = (int)$matches[1];
-                    $endYear = (int)$matches[2];
-                } else {
-                    $startYear = (int)date('Y', strtotime($workingYear['start_date']));
-                    $endYear = (int)date('Y', strtotime($workingYear['end_date']));
-                }
-                $defaultHolidays = [
-                    ['name' => 'Labour Day', 'date' => "{$startYear}-05-01"],
-                    ['name' => 'Independence Day', 'date' => "{$startYear}-08-15"],
-                    ['name' => 'Mahatma Gandhi Jayanti', 'date' => "{$startYear}-10-02"],
-                    ['name' => 'Christmas Day', 'date' => "{$startYear}-12-25"],
-                    ['name' => 'New Year\'s Day', 'date' => "{$endYear}-01-01"],
-                    ['name' => 'Republic Day', 'date' => "{$endYear}-01-26"]
-                ];
-                $stmtHoliday = $pdo->prepare("
-                    INSERT IGNORE INTO holidays (school_id, academic_year_id, name, date)
-                    VALUES (:school_id, :academic_year_id, :name, :date)
-                ");
-                foreach ($defaultHolidays as $h) {
-                    if ($h['date'] >= $workingYear['start_date'] && $h['date'] <= $workingYear['end_date']) {
-                        $stmtHoliday->execute([
-                            ':school_id' => $schoolId,
-                            ':academic_year_id' => (int)$workingYear['id'],
-                            ':name' => $h['name'],
-                            ':date' => $h['date']
-                        ]);
-                    }
-                }
-                $stmt->execute([':sid' => $schoolId, ':yid' => (int)$workingYear['id']]);
-                $holidays = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if (count($holidays) === 0 && $workingYear) {
+            // Auto-prefill if empty
+            if (preg_match('/^(\d{4})[-–—](\d{4})$/u', trim($workingYear['name']), $matches)) {
+                $startYear = (int)$matches[1];
+                $endYear = (int)$matches[2];
+            } else {
+                $startYear = (int)date('Y', strtotime($workingYear['start_date']));
+                $endYear = (int)date('Y', strtotime($workingYear['end_date']));
             }
-        } else {
-            $stmt = $pdo->prepare("SELECT * FROM holidays WHERE school_id = :sid ORDER BY date ASC");
+            $defaultHolidays = [
+                ['name' => 'Labour Day', 'date' => "{$startYear}-05-01"],
+                ['name' => 'Independence Day', 'date' => "{$startYear}-08-15"],
+                ['name' => 'Mahatma Gandhi Jayanti', 'date' => "{$startYear}-10-02"],
+                ['name' => 'Christmas Day', 'date' => "{$startYear}-12-25"],
+                ['name' => 'New Year\'s Day', 'date' => "{$endYear}-01-01"],
+                ['name' => 'Republic Day', 'date' => "{$endYear}-01-26"]
+            ];
+            $stmtHoliday = $pdo->prepare("
+                INSERT IGNORE INTO holidays (school_id, academic_year_id, name, date)
+                VALUES (:school_id, :academic_year_id, :name, :date)
+            ");
+            foreach ($defaultHolidays as $h) {
+                if ($h['date'] >= $workingYear['start_date'] && $h['date'] <= $workingYear['end_date']) {
+                    $stmtHoliday->execute([
+                        ':school_id' => $schoolId,
+                        ':academic_year_id' => (int)$workingYear['id'],
+                        ':name' => $h['name'],
+                        ':date' => $h['date']
+                    ]);
+                }
+            }
             $stmt->execute([':sid' => $schoolId]);
             $holidays = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        }
-
-        if (empty($holidays)) {
-            $stmtAll = $pdo->prepare("SELECT * FROM holidays WHERE school_id = :sid ORDER BY date ASC");
-            $stmtAll->execute([':sid' => $schoolId]);
-            $holidays = $stmtAll->fetchAll(PDO::FETCH_ASSOC);
         }
 
         return $holidays;
