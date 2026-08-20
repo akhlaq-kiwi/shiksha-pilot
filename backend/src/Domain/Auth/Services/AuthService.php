@@ -92,6 +92,8 @@ class AuthService extends BaseService
                 if ($sStatus !== 'ACTIVE' || !empty($staffRow['exit_date'])) {
                     $isInactive = true;
                 }
+            } else {
+                $isInactive = true;
             }
         }
 
@@ -117,8 +119,8 @@ class AuthService extends BaseService
 
             $this->logAuditDirect($user, 'Security', 'Failed Login Attempt', 'Failed login attempt for inactive user "' . ($user['name'] ?? $user['email']) . '"');
             throw new \App\Shared\Exceptions\ValidationException(
-                ['phone' => 'Your account marked as Inactive Please contact Academy management'],
-                'Your account marked as Inactive Please contact Academy management'
+                ['phone' => 'This account is Inactive'],
+                'This account is Inactive'
             );
         }
 

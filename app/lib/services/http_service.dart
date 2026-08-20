@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:school_hub/main.dart';
 
-export 'package:http/http.dart' hide get, post;
+export 'package:http/http.dart' hide get, post, put, delete;
 
 Future<http.Response> get(Uri url, {Map<String, String>? headers}) async {
   final response = await http.get(url, headers: headers);
@@ -18,6 +18,22 @@ Future<http.Response> post(Uri url, {Map<String, String>? headers, Object? body,
   return response;
 }
 
+Future<http.Response> put(Uri url, {Map<String, String>? headers, Object? body, Object? encoding}) async {
+  final response = await http.put(url, headers: headers, body: body);
+  _checkUnauthorized(response);
+  return response;
+}
+
+Future<http.Response> delete(Uri url, {Map<String, String>? headers, Object? body, Object? encoding}) async {
+  final response = await http.delete(url, headers: headers, body: body);
+  _checkUnauthorized(response);
+  return response;
+}
+
+void checkUnauthorized(http.Response response) {
+  _checkUnauthorized(response);
+}
+
 void _checkUnauthorized(http.Response response) async {
   if (response.statusCode == 401) {
     final prefs = await SharedPreferences.getInstance();
@@ -26,7 +42,7 @@ void _checkUnauthorized(http.Response response) async {
     await prefs.remove('user_name');
     await prefs.remove('selected_student_id');
     
-    String errorMsg = 'Your account marked as Inactive Please contact Academy management';
+    String errorMsg = 'This account is Inactive';
     try {
       final bodyData = json.decode(response.body);
       if (bodyData is Map && bodyData['message'] != null && bodyData['message'].toString().isNotEmpty) {
