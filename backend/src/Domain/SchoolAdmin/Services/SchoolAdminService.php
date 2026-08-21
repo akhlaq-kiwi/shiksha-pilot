@@ -8843,6 +8843,16 @@ class SchoolAdminService extends BaseService
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
         $academicYearId = $workingYear ? (int)$workingYear['id'] : 0;
 
+        $ayClause = ($academicYearId > 0) ? " AND (s.academic_year_id = :ayid_staff OR s.academic_year_id IS NULL)" : "";
+        $params = [
+            ':month' => $month,
+            ':ayid_sp' => $academicYearId,
+            ':sid' => $schoolId
+        ];
+        if ($academicYearId > 0) {
+            $params[':ayid_staff'] = $academicYearId;
+        }
+
         // Query active staff members and their payout status for the given month
         $stmt = $pdo->prepare("
             SELECT s.id AS staff_id, s.name, s.role, s.department, COALESCE(s.salary, 0.0) AS salary, 
@@ -8850,14 +8860,10 @@ class SchoolAdminService extends BaseService
                    sp.id AS payment_id, sp.payment_date, sp.amount_paid,
                    CASE WHEN sp.id IS NOT NULL THEN 'Paid' ELSE 'Pending' END AS payment_status
             FROM staff s
-            LEFT JOIN staff_payments sp ON s.id = sp.staff_id AND sp.payment_month = :month AND sp.academic_year_id = :ayid
-            WHERE s.school_id = :sid AND s.status = 'ACTIVE'
+            LEFT JOIN staff_payments sp ON s.id = sp.staff_id AND sp.payment_month = :month AND sp.academic_year_id = :ayid_sp
+            WHERE s.school_id = :sid AND s.status = 'ACTIVE'{$ayClause}
         ");
-        $stmt->execute([
-            ':month' => $month,
-            ':ayid' => $academicYearId,
-            ':sid' => $schoolId
-        ]);
+        $stmt->execute($params);
         $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
         $results = [];
