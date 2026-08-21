@@ -661,7 +661,7 @@ export default function FinanceManagementPage() {
     }
   }, [activeTab, lppSubView]);
 
-  const { isReadOnly, currentYear } = useAcademicYear();
+  const { isReadOnly, isDraft, currentYear } = useAcademicYear();
 
   useEffect(() => {
     loadData();
@@ -1362,7 +1362,9 @@ export default function FinanceManagementPage() {
               {!isReadOnly && (
                 <div className="flex justify-end">
                   <Button 
-                    className="w-full md:w-auto font-bold uppercase tracking-wider text-xs flex items-center justify-center gap-1.5 shadow-2xs"
+                    disabled={isDraft || currentYear?.status === 'Draft'}
+                    title={isDraft || currentYear?.status === 'Draft' ? 'Expenses cannot be added under a Draft Academic Year.' : ''}
+                    className="w-full md:w-auto font-bold uppercase tracking-wider text-xs flex items-center justify-center gap-1.5 shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={() => handleExpenseModalOpen(null)}
                   >
                     <Plus className="h-4 w-4" /> Add Expense

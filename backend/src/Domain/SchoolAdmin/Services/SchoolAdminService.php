@@ -8934,6 +8934,10 @@ class SchoolAdminService extends BaseService
         $academicYearId = (int)$workingYear['id'];
         $payYearId = $academicYearId;
 
+        if ($workingYear['status'] === 'Draft') {
+            throw new ValidationException(['month' => 'Salary cannot be disbursed under a Draft academic year. Academic year must be ACTIVE.']);
+        }
+
         if ($workingYear['status'] === 'Archived') {
             if ($this->isStaffMigrated($pdo, $staffId, $schoolId)) {
                 throw new ValidationException(['month' => 'This teacher has been migrated/copied to the next academic year. Salary cannot be disbursed from the archived academic year.']);
@@ -9090,6 +9094,9 @@ class SchoolAdminService extends BaseService
         }
         if ($workingYear['status'] === 'Archived') {
             throw new ValidationException(['message' => 'Cannot disburse salary under an Archived academic year. Please switch to the current year.']);
+        }
+        if ($workingYear['status'] === 'Draft') {
+            throw new ValidationException(['message' => 'Salary cannot be disbursed under a Draft academic year. Academic year must be ACTIVE.']);
         }
         $this->requireWritableAcademicYear($pdo, $schoolId);
 
@@ -9293,15 +9300,9 @@ class SchoolAdminService extends BaseService
         $stmtLatest = $pdo->prepare("
             SELECT * FROM financial_reports 
             WHERE school_id = :sid 
-              AND `from_date` >= :start_date 
-              AND `to_date` <= :end_date
             ORDER BY id DESC LIMIT 1
         ");
-        $stmtLatest->execute([
-            ':sid' => $schoolId,
-            ':start_date' => $workingYear['start_date'],
-            ':end_date' => $workingYear['end_date']
-        ]);
+        $stmtLatest->execute([':sid' => $schoolId]);
         $latestReport = $stmtLatest->fetch(PDO::FETCH_ASSOC);
 
         $latestReportCreatedAt = $latestReport ? $latestReport['created_at'] : null;
@@ -9413,12 +9414,11 @@ class SchoolAdminService extends BaseService
                 SELECT COALESCE(SUM(amount_paid), 0) 
                 FROM staff_payments 
                 WHERE school_id = :sid 
+                  AND created_at > :latest_rep_ts
                   AND (
                     academic_year_id = :ayid
                     OR created_at >= (SELECT created_at FROM academic_years WHERE id = :ayid_2 LIMIT 1)
-                    OR DATE(created_at) = CURRENT_DATE()
                   )
-                  AND created_at > :latest_rep_ts
             ");
             $stmtSalaries->execute([
                 ':sid' => $schoolId,
@@ -9434,7 +9434,6 @@ class SchoolAdminService extends BaseService
                   AND (
                     academic_year_id = :ayid
                     OR created_at >= (SELECT created_at FROM academic_years WHERE id = :ayid_2 LIMIT 1)
-                    OR DATE(created_at) = CURRENT_DATE()
                   )
             ");
             $stmtSalaries->execute([
@@ -10768,9 +10767,17 @@ Only approve the settlement after reviewing all financial records.
     {
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->staffRepo->getPdo();
+        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
 
         $where = "se.school_id = :sid";
         $params = [':sid' => $schoolId];
+
+        if ($workingYear) {
+            $where .= " AND (se.academic_year_id = :ayid OR (se.academic_year_id IS NULL AND se.expense_date >= :start_date AND se.expense_date <= :end_date))";
+            $params[':ayid'] = $workingYear['id'];
+            $params[':start_date'] = $workingYear['start_date'];
+            $params[':end_date'] = $workingYear['end_date'];
+        }
 
         // Filter by Month
         if (!empty($filters['month']) && $filters['month'] !== 'ALL') {
@@ -10836,6 +10843,11 @@ Only approve the settlement after reviewing all financial records.
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->staffRepo->getPdo();
         $this->requireWritableAcademicYear($pdo, $schoolId);
+
+        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+        if ($workingYear && $workingYear['status'] === 'Draft') {
+            throw new ValidationException(['fields' => 'Expenses cannot be added under a Draft academic year. Academic year must be ACTIVE.']);
+        }
 
         if (empty($data['description']) || strlen(trim($data['description'])) < 3) {
             throw new ValidationException(['description' => 'Description must be at least 3 characters.']);

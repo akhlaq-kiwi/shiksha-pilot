@@ -193,7 +193,7 @@ const getVisibleMonths = (joiningDateStr, workingYearStartStr) => {
 };
 
 export default function StaffPage() {
-  const { currentYear, isReadOnly } = useAcademicYear();
+  const { currentYear, isReadOnly, isDraft } = useAcademicYear();
   const [searchParams] = useSearchParams();
   const [view, setView] = useState('list'); // 'list', 'details', 'identity-cards'
   const [selectedTeacherId, setSelectedTeacherId] = useState(null);
@@ -1291,13 +1291,14 @@ export default function StaffPage() {
                               </Button>
                             ) : (
                               <Button 
-                                disabled={isReadOnly && t.is_migrated}
+                                disabled={(isReadOnly && t.is_migrated) || isDraft}
+                                title={isDraft ? 'Salary cannot be disbursed under a Draft Academic Year.' : ''}
                                 onClick={() => {
-                                  if (isReadOnly && t.is_migrated) return;
+                                  if ((isReadOnly && t.is_migrated) || isDraft) return;
                                   setDisburseMonth(month);
                                   setIsDisburseDialogOpen(true);
                                 }}
-                                className={`w-full h-8 text-xs font-bold ${(isReadOnly && t.is_migrated) ? 'bg-zinc-200 text-zinc-400 dark:bg-zinc-800 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 text-white'}`}
+                                className={`w-full h-8 text-xs font-bold ${((isReadOnly && t.is_migrated) || isDraft) ? 'bg-zinc-200 text-zinc-400 dark:bg-zinc-800 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 text-white'}`}
                               >
                                 Disburse
                               </Button>
@@ -1415,14 +1416,15 @@ export default function StaffPage() {
                                 )
                               ) : (
                                 <Button 
-                                  disabled={isReadOnly && t.is_migrated}
+                                  disabled={(isReadOnly && t.is_migrated) || isDraft}
+                                  title={isDraft ? 'Salary cannot be disbursed under a Draft Academic Year.' : ''}
                                   onClick={() => {
-                                    if (isReadOnly && t.is_migrated) return;
+                                    if ((isReadOnly && t.is_migrated) || isDraft) return;
                                     setPrevYearDisburseMonths([month]);
                                     setPrevYearDisburseTotal(salaryAmount);
                                     setIsPrevYearDisburseOpen(true);
                                   }}
-                                  className={`w-full h-8 text-xs font-bold ${(isReadOnly && t.is_migrated) ? 'bg-zinc-200 text-zinc-400 dark:bg-zinc-800 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-700 text-white'}`}
+                                  className={`w-full h-8 text-xs font-bold ${((isReadOnly && t.is_migrated) || isDraft) ? 'bg-zinc-200 text-zinc-400 dark:bg-zinc-800 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-700 text-white'}`}
                                 >
                                   Disburse
                                 </Button>
