@@ -2178,18 +2178,21 @@ export default function StaffPage() {
               <div className="space-y-6">
                 <div className="flex items-start justify-between border-b-2 border-zinc-950 pb-4">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-zinc-950 text-white rounded-md flex items-center justify-center font-bold text-2xl flex-shrink-0 shadow-2xs select-none">
-                      {schoolProfile?.name ? schoolProfile.name.charAt(0).toUpperCase() : 'S'}
-                    </div>
+                    {schoolProfile?.logo_path ? (
+                      <img 
+                        src={schoolProfile.logo_path} 
+                        alt={schoolProfile.name || 'School Logo'} 
+                        className="w-12 h-12 object-contain rounded-md flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 bg-zinc-950 text-white rounded-md flex items-center justify-center font-bold text-2xl flex-shrink-0 shadow-2xs select-none">
+                        {schoolProfile?.name ? schoolProfile.name.charAt(0).toUpperCase() : 'S'}
+                      </div>
+                    )}
                     <div>
                       <h1 className="text-lg font-bold text-zinc-950 tracking-tight leading-none uppercase">{schoolProfile?.name || 'ABC Public School'}</h1>
                       <p className="text-[11px] text-zinc-500 mt-1 uppercase tracking-wider font-bold">Teacher Payout Payslip</p>
                     </div>
-                  </div>
-                  <div className="text-right text-[11px] text-zinc-600 leading-normal">
-                    <p className="font-bold text-zinc-950">{schoolProfile?.street_address || '123 Main Street'}</p>
-                    <p>{schoolProfile?.city || 'City'}, {schoolProfile?.state || 'State'} - {schoolProfile?.pin_code || ''}</p>
-                    <p>Phone: {schoolProfile?.contact_phone || '—'}</p>
                   </div>
                 </div>
 
@@ -2262,24 +2265,11 @@ export default function StaffPage() {
                   </table>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 text-[11px] text-zinc-500 pt-4 border-t border-dashed border-zinc-200 font-medium">
+                <div className="text-[11px] text-zinc-500 pt-4 border-t border-dashed border-zinc-200 font-medium">
                   <div>
                     <p>Payment Date: <span className="text-zinc-800 font-bold">{formatDate(selectedSlipPayment.payment_date)}</span></p>
                     <p>Payment Transaction ID: <span className="text-zinc-800 font-mono font-bold">TXN-SL-{String(selectedSlipPayment.id).padStart(5, '0')}</span></p>
                   </div>
-                  <div className="text-right">
-                    <p>Slip Generated Date: <span className="text-zinc-800 font-bold">{formatDate((() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })())}</span></p>
-                    <p>Payment Status: <span className="text-green-600 font-bold uppercase">PAID</span></p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Principal Signature Signoff */}
-              <div className="pt-16 flex justify-end">
-                <div className="text-center w-40 text-xs text-zinc-700">
-                  <div className="border-b border-zinc-400 h-10 w-full mb-2"></div>
-                  <p className="font-bold text-zinc-900">Principal Signature</p>
-                  <p className="text-[11px] text-zinc-500">School Administration</p>
                 </div>
               </div>
             </div>
