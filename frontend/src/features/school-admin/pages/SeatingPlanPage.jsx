@@ -69,7 +69,7 @@ export default function SeatingPlanPage() {
         const [examsList, classesList, studentsList] = await Promise.all([
           schoolService.getExaminations(),
           schoolAdminService.getClasses(),
-          schoolAdminService.getStudents({ status: 'ACTIVE' })
+          schoolAdminService.getStudents({ status: 'ACTIVE', limit: 10000 })
         ]);
         setExams(examsList || []);
         setClasses(classesList || []);
@@ -495,6 +495,22 @@ export default function SeatingPlanPage() {
     return 'grid-cols-2 print-grid-2cols';
   };
 
+  const formatShortClassName = (className) => {
+    if (!className) return '';
+    let trimmed = className.trim();
+    const parenMatch = trimmed.match(/\(([^)]+)\)/);
+    if (parenMatch) {
+      trimmed = trimmed.replace(/^[^(]+\(([^)]+)\)/, '$1').trim();
+    } else {
+      const lower = trimmed.toLowerCase();
+      if (lower.includes('lower kindergarten')) trimmed = trimmed.replace(/lower kindergarten/i, 'LKG');
+      else if (lower.includes('upper kindergarten')) trimmed = trimmed.replace(/upper kindergarten/i, 'UKG');
+      else if (lower.includes('playgroup') || lower.includes('play group')) trimmed = trimmed.replace(/play\s*group/i, 'PG');
+      else if (lower.includes('pre nursery') || lower.includes('pre-nursery')) trimmed = trimmed.replace(/pre-?nursery/i, 'Pre-Nur');
+    }
+    return trimmed;
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] w-full gap-3">
@@ -770,7 +786,7 @@ export default function SeatingPlanPage() {
               </div>
             </CardContent>
             
-            {previewData.enough_benches && (
+            {previewData.enough_benches ? (
               <div className="p-6 border-t border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <label className="flex items-start gap-2.5 text-xs font-semibold text-text-secondary cursor-pointer leading-normal select-none">
                   <input 
@@ -787,6 +803,21 @@ export default function SeatingPlanPage() {
                   className="font-bold py-3 px-8 shadow-md"
                 >
                   {previewLoading ? 'Generating Plan...' : 'Generate Seating Plan'}
+                </Button>
+              </div>
+            ) : (
+              <div className="p-6 border-t border-border bg-amber-500/10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-2.5 text-xs font-semibold text-amber-700 dark:text-amber-400">
+                  <AlertCircle className="h-5 w-5 flex-shrink-0" />
+                  <span>
+                    Insufficient benches! Total {previewData.total_students} students require {previewData.required_benches} benches, but only {previewData.available_benches} bench(es) are available. Please add more benches or rooms above.
+                  </span>
+                </div>
+                <Button 
+                  disabled={true}
+                  className="font-bold py-3 px-8 opacity-50 cursor-not-allowed"
+                >
+                  Generate Seating Plan
                 </Button>
               </div>
             )}
@@ -981,7 +1012,7 @@ export default function SeatingPlanPage() {
                                 <td style={{ width: '50%', padding: 0, verticalAlign: 'top' }}>
                                   <p className="text-[7px] font-bold text-zinc-400 uppercase tracking-wider" style={{ lineHeight: '10px', fontFamily: 'Arial, Helvetica, sans-serif' }}>Class</p>
                                   <p className="text-[11px] font-bold text-zinc-855 uppercase truncate" style={{ lineHeight: '14px', marginTop: '2px', fontFamily: 'Arial, Helvetica, sans-serif' }}>
-                                    {alloc.class_name}
+                                    {formatShortClassName(alloc.class_name)}{alloc.class_section && !alloc.class_name.includes(alloc.class_section) ? ` - ${alloc.class_section}` : alloc.section && !alloc.class_name.includes(alloc.section) ? ` - ${alloc.section}` : ''}
                                   </p>
                                 </td>
                                 <td style={{ width: '50%', padding: 0, verticalAlign: 'top' }}>

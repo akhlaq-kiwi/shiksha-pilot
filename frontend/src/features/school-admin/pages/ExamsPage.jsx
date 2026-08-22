@@ -1360,7 +1360,8 @@ export default function ExamsPage() {
     if (!element) return;
 
     setSubmitting(true);
-    const classNameStr = classes.find(c => c.id === parseInt(selectedClassId))?.name || 'Scheme';
+    const clsObj = classes.find(c => c.id === parseInt(selectedClassId)) || examClassStatuses.find(c => c.id === parseInt(selectedClassId));
+    const classNameStr = clsObj ? `${clsObj.name}${clsObj.section ? ` - ${clsObj.section}` : ''}` : 'Scheme';
     schoolAdminService.logClientAudit({
       module: 'Examinations',
       action: 'Scheme Downloaded',
@@ -1389,7 +1390,8 @@ export default function ExamsPage() {
     const printElement = document.getElementById('printable-scheme');
     if (!printElement) return;
 
-    const classNameStr = classes.find(c => c.id === parseInt(selectedClassId))?.name || 'Scheme';
+    const clsObj = classes.find(c => c.id === parseInt(selectedClassId)) || examClassStatuses.find(c => c.id === parseInt(selectedClassId));
+    const classNameStr = clsObj ? `${clsObj.name}${clsObj.section ? ` - ${clsObj.section}` : ''}` : 'Scheme';
     schoolAdminService.logClientAudit({
       module: 'Examinations',
       action: 'Scheme Printed',
@@ -2967,7 +2969,13 @@ export default function ExamsPage() {
             </Button>
             <div>
               <h3 className="text-xl font-bold text-text-primary">Manage Exam Timetable</h3>
-              <p className="text-xs text-text-secondary">{selectedExam.name} — Class: {classes.find(c => c.id === parseInt(selectedClassId))?.name || ''}</p>
+              <p className="text-xs text-text-secondary">
+                {selectedExam.name} — Class: {(() => {
+                  const cls = classes.find(c => c.id === parseInt(selectedClassId)) || examClassStatuses.find(c => c.id === parseInt(selectedClassId));
+                  if (!cls) return '';
+                  return `${cls.name}${cls.section ? ` - ${cls.section}` : ''}`;
+                })()}
+              </p>
             </div>
           </div>
 
@@ -3263,7 +3271,13 @@ export default function ExamsPage() {
             </Button>
             <div>
               <h3 className="text-xl font-bold text-text-primary">Subject Marks Sheet</h3>
-              <p className="text-xs text-text-secondary">{selectedExam.name} — Class: {classes.find(c => c.id === parseInt(selectedClassId))?.name || ''}</p>
+              <p className="text-xs text-text-secondary">
+                {selectedExam.name} — Class: {(() => {
+                  const cls = classes.find(c => c.id === parseInt(selectedClassId)) || examClassStatuses.find(c => c.id === parseInt(selectedClassId));
+                  if (!cls) return '';
+                  return `${cls.name}${cls.section ? ` - ${cls.section}` : ''}`;
+                })()}
+              </p>
             </div>
           </div>
 
@@ -3459,7 +3473,13 @@ export default function ExamsPage() {
             </Button>
             <div>
               <h3 className="text-xl font-bold text-text-primary">Student Report Cards</h3>
-              <p className="text-xs text-text-secondary">{selectedExam.name} — Class: {classes.find(c => c.id === parseInt(selectedClassId))?.name || ''}</p>
+              <p className="text-xs text-text-secondary">
+                {selectedExam.name} — Class: {(() => {
+                  const cls = classes.find(c => c.id === parseInt(selectedClassId)) || examClassStatuses.find(c => c.id === parseInt(selectedClassId));
+                  if (!cls) return '';
+                  return `${cls.name}${cls.section ? ` - ${cls.section}` : ''}`;
+                })()}
+              </p>
             </div>
           </div>
 
@@ -3760,7 +3780,11 @@ export default function ExamsPage() {
               <div>
                 <h3 className="text-xl font-bold text-text-primary">Final Academic Report Cards</h3>
                 <p className="text-xs text-text-secondary">
-                  Annual Session Summary — Class: {classes.find(c => c.id === parseInt(selectedClassId))?.name || ''} | Session: {currentAcademicYear?.name || '2026–2027'}
+                  Annual Session Summary — Class: {(() => {
+                    const cls = classes.find(c => c.id === parseInt(selectedClassId)) || examClassStatuses.find(c => c.id === parseInt(selectedClassId));
+                    if (!cls) return '';
+                    return `${cls.name}${cls.section ? ` - ${cls.section}` : ''}`;
+                  })()} | Session: {currentAcademicYear?.name || '2026–2027'}
                 </p>
               </div>
             </div>
@@ -4216,7 +4240,11 @@ export default function ExamsPage() {
                         {selectedExam.name} Examination Scheme
                       </h3>
                       <h4 className="text-sm font-semibold text-zinc-600 mt-1">
-                        Class: {classes.find(c => c.id === parseInt(selectedClassId))?.name || ''}
+                        Class: {(() => {
+                          const cls = classes.find(c => c.id === parseInt(selectedClassId)) || examClassStatuses.find(c => c.id === parseInt(selectedClassId));
+                          if (!cls) return '';
+                          return `${cls.name}${cls.section ? ` - ${cls.section}` : ''}`;
+                        })()}
                       </h4>
                     </div>
 
