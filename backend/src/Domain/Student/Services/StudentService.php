@@ -602,7 +602,7 @@ class StudentService extends BaseService
                 'father_name' => $student['father_name'] ?? '',
                 'mother_name' => $student['mother_name'] ?? '',
                 'dob' => $student['dob'] ?? '',
-                'class_name' => $ex['class_name'],
+                'class_name' => $this->formatShortClassName($ex['class_name'] ?: ''),
                 'class_section' => $ex['class_section'],
                 'academic_year_name' => $ex['academic_year_name'],
                 'school_name' => $school['name'] ?? 'Academic Portal',
@@ -1551,7 +1551,7 @@ class StudentService extends BaseService
         if ($admitCardPublished && !$admitCardRestricted) {
             $stmtAdmit = $pdo->prepare("
                 SELECT esa.seat_number, esa.room_name, esa.bench_number, esa.seat_position,
-                       s.name AS school_name, ay.name AS academic_year, c.name AS class_name,
+                       s.name AS school_name, ay.name AS academic_year, c.name AS class_name, c.section AS class_section,
                        std.name AS student_name, std.roll_no
                 FROM examination_seating_allocations esa
                 JOIN examination_seating_plans esp ON esa.seating_plan_id = esp.id
@@ -1565,11 +1565,17 @@ class StudentService extends BaseService
             $stmtAdmit->execute([':exam_id' => $examId, ':student_id' => $studentId]);
             $admit = $stmtAdmit->fetch(PDO::FETCH_ASSOC);
             if ($admit) {
+                $baseShort = $this->formatShortClassName($admit['class_name'] ?: '');
+                $fullClassName = $baseShort;
+                if (!empty($admit['class_section']) && strpos($fullClassName, $admit['class_section']) === false) {
+                    $fullClassName .= ' - ' . $admit['class_section'];
+                }
+
                 $response['admit_card'] = [
                     'school_name' => $admit['school_name'],
                     'academic_year' => $admit['academic_year'],
                     'student_name' => $admit['student_name'],
-                    'class_name' => $admit['class_name'] ?: '—',
+                    'class_name' => $fullClassName ?: '—',
                     'roll_no' => $admit['roll_no'] ?: '—',
                     'room_name' => $admit['room_name'],
                     'bench_number' => $admit['bench_number'],

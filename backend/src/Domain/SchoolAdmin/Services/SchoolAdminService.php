@@ -14872,7 +14872,8 @@ Only approve the settlement after reviewing all financial records.
         $plan['room_configs'] = json_decode($plan['room_configs'], true);
 
         $stmtAlloc = $pdo->prepare("
-            SELECT sa.*, s.name AS student_name, s.roll_no, s.class_id, s.photo_path AS student_photo, c.name AS class_name
+            SELECT sa.*, s.name AS student_name, s.roll_no, s.class_id, s.photo_path AS student_photo, 
+                   c.name AS class_name, c.section AS class_section
             FROM examination_seating_allocations sa
             LEFT JOIN students s ON sa.student_id = s.id
             LEFT JOIN classes c ON s.class_id = c.id
@@ -14881,6 +14882,16 @@ Only approve the settlement after reviewing all financial records.
         ");
         $stmtAlloc->execute([':spid' => $plan['id']]);
         $allocations = $stmtAlloc->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($allocations as &$alloc) {
+            $baseShort = $this->formatShortClassName($alloc['class_name']);
+            if (!empty($alloc['class_section']) && strpos($baseShort, $alloc['class_section']) === false) {
+                $alloc['class_name'] = $baseShort . ' - ' . $alloc['class_section'];
+            } else {
+                $alloc['class_name'] = $baseShort;
+            }
+        }
+        unset($alloc);
 
         $stmtSchool = $pdo->prepare("SELECT name, logo_path FROM schools WHERE id = :sid LIMIT 1");
         $stmtSchool->execute([':sid' => $schoolId]);
@@ -14951,6 +14962,31 @@ Only approve the settlement after reviewing all financial records.
         return $id !== false ? (int)$id : null;
     }
 
+    private function formatShortClassName(string $className): string
+    {
+        $trimmed = trim($className);
+
+        if (preg_match('/\(([^)]+)\)/', $trimmed, $matches)) {
+            return trim($matches[1]);
+        }
+
+        $lower = strtolower($trimmed);
+        if (strpos($lower, 'lower kindergarten') !== false) {
+            return 'LKG';
+        }
+        if (strpos($lower, 'upper kindergarten') !== false) {
+            return 'UKG';
+        }
+        if (strpos($lower, 'playgroup') !== false || strpos($lower, 'play group') !== false) {
+            return 'PG';
+        }
+        if (strpos($lower, 'pre nursery') !== false || strpos($lower, 'pre-nursery') !== false) {
+            return 'Pre-Nur';
+        }
+
+        return $trimmed;
+    }
+
     private function generateSeatingPlanData(int $schoolId, int $examId, array $classIds, int $studentsPerBench, array $roomConfigs): array
     {
         $pdo = $this->classRepo->getPdo();
@@ -14971,7 +15007,8 @@ Only approve the settlement after reviewing all financial records.
         }
 
         $stmt = $pdo->prepare("
-            SELECT s.id, s.name, s.roll_no, s.class_id, s.photo_path AS student_photo, c.name AS class_name
+            SELECT s.id, s.name, s.roll_no, s.class_id, s.photo_path AS student_photo, 
+                   c.name AS class_name, c.section AS class_section
             FROM students s
             LEFT JOIN classes c ON s.class_id = c.id
             WHERE s.school_id = :sid 
@@ -15052,6 +15089,7 @@ Only approve the settlement after reviewing all financial records.
             $seatCount = count($benchSeats);
 
             $lastClassIdOnBench = null;
+            $baseClassesOnBench = [];
 
             for ($sIdx = 0; $sIdx < $seatCount; $sIdx++) {
                 if (empty($activeClassQueues)) {
@@ -15063,15 +15101,31 @@ Only approve the settlement after reviewing all financial records.
                 });
 
                 $targetClassId = null;
+
+                // Priority 1: Pick a class queue whose base class (c.name) is NOT on this bench yet
                 foreach ($activeClassQueues as $cId => $q) {
                     if (!empty($q)) {
-                        if ($cId !== $lastClassIdOnBench || count($activeClassQueues) === 1) {
+                        $baseName = trim(strtolower($q[0]['class_name']));
+                        if (!in_array($baseName, $baseClassesOnBench, true)) {
                             $targetClassId = $cId;
                             break;
                         }
                     }
                 }
 
+                // Fallback 1: Pick a class queue with a different class_id from the last allocated seat on this bench
+                if ($targetClassId === null) {
+                    foreach ($activeClassQueues as $cId => $q) {
+                        if (!empty($q)) {
+                            if ($cId !== $lastClassIdOnBench || count($activeClassQueues) === 1) {
+                                $targetClassId = $cId;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // Fallback 2: Pick any remaining active class queue
                 if ($targetClassId === null) {
                     foreach ($activeClassQueues as $cId => $q) {
                         if (!empty($q)) {
@@ -15090,8 +15144,16 @@ Only approve the settlement after reviewing all financial records.
                     unset($activeClassQueues[$targetClassId]);
                 }
 
+                $baseName = trim(strtolower($student['class_name']));
+                $baseClassesOnBench[] = $baseName;
                 $lastClassIdOnBench = $targetClassId;
                 $seat = $benchSeats[$sIdx];
+
+                $baseShort = $this->formatShortClassName($student['class_name']);
+                $formattedClassName = $baseShort;
+                if (!empty($student['class_section']) && strpos($formattedClassName, $student['class_section']) === false) {
+                    $formattedClassName .= ' - ' . $student['class_section'];
+                }
 
                 $allocations[] = [
                     'student_id' => $student['id'],
@@ -15099,7 +15161,8 @@ Only approve the settlement after reviewing all financial records.
                     'student_photo' => $student['student_photo'] ?? null,
                     'roll_no' => $student['roll_no'],
                     'class_id' => $student['class_id'],
-                    'class_name' => $student['class_name'],
+                    'class_name' => $formattedClassName,
+                    'class_section' => $student['class_section'] ?? '',
                     'room_name' => $seat['room_name'],
                     'bench_number' => $seat['bench_number'],
                     'seat_position' => $seat['seat_position'],
