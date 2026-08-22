@@ -4664,6 +4664,7 @@ class SchoolAdminService extends BaseService
                     s.photo_path AS student_photo,
                     s.roll_no AS roll_number,
                     c.name AS class_name,
+                    c.section AS class_section,
                     c.id AS class_id,
                     COUNT(a.id) AS total_working_days,
                     SUM(CASE WHEN UPPER(a.status) IN ('PRESENT', 'LATE') THEN 1 ELSE 0 END) AS present_days
@@ -4743,7 +4744,7 @@ class SchoolAdminService extends BaseService
                             ':stu_id' => $row['student_id'],
                             ':stu_name' => $row['student_name'],
                             ':stu_photo' => $row['student_photo'],
-                            ':cls_name' => $row['class_name'],
+                            ':cls_name' => $row['class_name'] . (!empty($row['class_section']) && strpos($row['class_name'], $row['class_section']) === false ? ' - ' . $row['class_section'] : ''),
                             ':roll' => $row['roll_number'],
                             ':score' => $row['percentage'],
                             ':rank' => $idx + 1,
@@ -4764,7 +4765,7 @@ class SchoolAdminService extends BaseService
                                 ':stu_id' => $row['student_id'],
                                 ':stu_name' => $row['student_name'],
                                 ':stu_photo' => $row['student_photo'],
-                                ':cls_name' => $row['class_name'],
+                                ':cls_name' => $row['class_name'] . (!empty($row['class_section']) && strpos($row['class_name'], $row['class_section']) === false ? ' - ' . $row['class_section'] : ''),
                                 ':roll' => $row['roll_number'],
                                 ':score' => $row['percentage'],
                                 ':rank' => $idx + 1,
@@ -5195,7 +5196,7 @@ class SchoolAdminService extends BaseService
         $stmtAcadCheck->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
         if ((int)$stmtAcadCheck->fetchColumn() === 0) {
             // Find all classes in this academic year
-            $stmtClasses = $pdo->prepare("SELECT id, name FROM classes WHERE school_id = :sid AND academic_year_id = :ayid");
+            $stmtClasses = $pdo->prepare("SELECT id, name, section FROM classes WHERE school_id = :sid AND academic_year_id = :ayid");
             $stmtClasses->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
             $classes = $stmtClasses->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
@@ -5267,7 +5268,7 @@ class SchoolAdminService extends BaseService
                             ':stu_id' => $stuId,
                             ':stu_name' => $rc['student_name'],
                             ':stu_photo' => $rc['student_photo'] ?: null,
-                            ':cls_name' => $className,
+                            ':cls_name' => $className . (!empty($cls['section']) && strpos($className, $cls['section']) === false ? ' - ' . $cls['section'] : ''),
                             ':roll' => $rc['roll_number'] ?? '',
                             ':score' => $pct,
                             ':rank' => $rank,
