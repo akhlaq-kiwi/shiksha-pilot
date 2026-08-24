@@ -277,6 +277,48 @@ class StorageService
         return $this->s3->presignedUrl($key, $expiresInSeconds);
     }
 
+    /**
+     * Is this reference something *we* stored, and therefore safe to read back
+     * on behalf of a browser request?
+     *
+     * The media proxy hands a caller-supplied URL to readContents(), which will
+     * happily file_get_contents() any absolute URL — including an internal one
+     * like http://169.254.169.254/. Every proxied read must pass through here
+     * first so the endpoint cannot be used to fetch arbitrary hosts (SSRF).
+     */
+    public function isOwnMedia(string $urlOrPath): bool
+    {
+        $value = trim($urlOrPath);
+        if ($value === '' || str_contains($value, "\0")) {
+            return false;
+        }
+
+        if ($this->isRemoteUrl($value)) {
+            // keyFromUrl() returns null for any host that is not our bucket.
+            return $this->keyFromUrl($value) !== null;
+        }
+
+        // Local driver / pre-S3 records: only the uploads tree, no traversal.
+        $relative = ltrim(str_replace('\\', '/', $value), '/');
+        if (str_contains($relative, '..')) {
+            return false;
+        }
+
+        return str_starts_with($relative, 'uploads/');
+    }
+
+    /**
+     * Content type for a stored reference, from its extension. Used when
+     * serving bytes back to a browser, where a wrong type means a broken image.
+     */
+    public function contentTypeForPath(string $urlOrPath): string
+    {
+        $path      = (string)(parse_url($urlOrPath, PHP_URL_PATH) ?: $urlOrPath);
+        $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+
+        return $this->contentTypeFor($extension, null);
+    }
+
     // -------------------------------------------------------------------------
     // Internals
     // -------------------------------------------------------------------------
