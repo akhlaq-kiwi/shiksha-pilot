@@ -260,9 +260,10 @@ return function (App $app) {
     $app->post('/api/school/security/audit-logs/log', [SchoolAdminController::class, 'logClientAuditAction']);
     $app->get('/api/school/security/login-history', [SchoolAdminController::class, 'getSchoolLoginHistory']);
 
-    // Public Achievements Gallery Domain
+    // Public Achievements Gallery & Media Base64 Domain
     $app->get('/api/school/achievements', [SchoolAdminController::class, 'getAchievements']);
     $app->get('/api/school/achievements/{id}/report-card', [SchoolAdminController::class, 'getAchievementReportCard']);
+    $app->get('/api/common/media-base64', [SchoolAdminController::class, 'getMediaBase64']);
 
     // Teacher Domain
     $app->get('/api/teacher/dashboard', [TeacherController::class, 'getDashboard']);

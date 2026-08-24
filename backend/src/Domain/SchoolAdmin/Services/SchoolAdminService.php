@@ -17394,5 +17394,14 @@ Only approve the settlement after reviewing all financial records.
             'restrict_exam_result' => $restrictExamResult
         ];
     }
+
+    public function getMediaContents(string $rawUrl): ?string
+    {
+        if (empty($rawUrl)) {
+            return null;
+        }
+        return $this->storage->readContents($rawUrl);
+    }
 }
+
 
