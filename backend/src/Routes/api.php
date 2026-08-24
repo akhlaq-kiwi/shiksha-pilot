@@ -263,6 +263,7 @@ return function (App $app) {
     // Public Achievements Gallery & Media Base64 Domain
     $app->get('/api/school/achievements', [SchoolAdminController::class, 'getAchievements']);
     $app->get('/api/school/achievements/{id}/report-card', [SchoolAdminController::class, 'getAchievementReportCard']);
+    $app->get('/api/common/media', [SchoolAdminController::class, 'streamMedia']);
     $app->get('/api/common/media-base64', [SchoolAdminController::class, 'getMediaBase64']);
 
     // Teacher Domain

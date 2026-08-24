@@ -2033,24 +2033,71 @@ class SchoolAdminController extends BaseController
         return $this->success($response, $data);
     }
 
-    public function getMediaBase64(Request $request, Response $response): Response
+    /**
+     * Same-origin media proxy, used by the ID-card PDF export.
+     *
+     * html2canvas can only rasterise images the page is allowed to read. On S3
+     * the photos come from a different origin with no CORS headers, so the
+     * canvas is tainted and the profile photo drops out of the PDF — which is
+     * why the browser preview looked fine but the download did not. Reading the
+     * bytes here and handing them back from our own origin sidesteps CORS
+     * entirely, and works for private buckets too since the S3 GET is signed.
+     */
+    public function streamMedia(Request $request, Response $response): Response
     {
-        $user = $this->authenticate($request);
-        $params = $request->getQueryParams();
-        $rawUrl = trim($params['url'] ?? '');
+        $this->authenticate($request);
 
-        if (empty($rawUrl)) {
+        $rawUrl = trim($request->getQueryParams()['url'] ?? '');
+        if ($rawUrl === '') {
             return $this->error($response, 'URL parameter is required', 400);
         }
 
+        // Only ever read back media this application itself stored, otherwise
+        // the endpoint is an open proxy into the private network (SSRF).
+        if (!$this->service->isOwnMedia($rawUrl)) {
+            return $this->error($response, 'Unsupported media URL', 400);
+        }
+
         $contents = $this->service->getMediaContents($rawUrl);
-        if ($contents === null) {
+        if ($contents === null || $contents === '') {
             return $this->error($response, 'Media file could not be retrieved', 404);
         }
 
-        $finfo = new \finfo(FILEINFO_MIME_TYPE);
-        $mimeType = $finfo->buffer($contents) ?: 'image/jpeg';
-        $dataUrl = 'data:' . $mimeType . ';base64,' . base64_encode($contents);
+        $response->getBody()->write($contents);
+
+        return $response
+            ->withHeader('Content-Type', $this->service->mediaContentType($rawUrl))
+            ->withHeader('Content-Length', (string)strlen($contents))
+            // Per-user media behind an auth check: cacheable by the browser
+            // that asked for it, never by a shared proxy.
+            ->withHeader('Cache-Control', 'private, max-age=3600')
+            ->withHeader('X-Content-Type-Options', 'nosniff');
+    }
+
+    /**
+     * Base64 variant of streamMedia(), kept for callers that need a data: URL
+     * inline rather than a fetchable URL.
+     */
+    public function getMediaBase64(Request $request, Response $response): Response
+    {
+        $this->authenticate($request);
+
+        $rawUrl = trim($request->getQueryParams()['url'] ?? '');
+        if ($rawUrl === '') {
+            return $this->error($response, 'URL parameter is required', 400);
+        }
+
+        if (!$this->service->isOwnMedia($rawUrl)) {
+            return $this->error($response, 'Unsupported media URL', 400);
+        }
+
+        $contents = $this->service->getMediaContents($rawUrl);
+        if ($contents === null || $contents === '') {
+            return $this->error($response, 'Media file could not be retrieved', 404);
+        }
+
+        $mimeType = $this->service->mediaContentType($rawUrl);
+        $dataUrl  = 'data:' . $mimeType . ';base64,' . base64_encode($contents);
 
         return $this->success($response, ['data_url' => $dataUrl]);
     }

@@ -17395,12 +17395,25 @@ Only approve the settlement after reviewing all financial records.
         ];
     }
 
+    /** Bytes of a stored file, for the ID-card media proxy. */
     public function getMediaContents(string $rawUrl): ?string
     {
-        if (empty($rawUrl)) {
+        if ($rawUrl === '') {
             return null;
         }
+
         return $this->storage->readContents($rawUrl);
+    }
+
+    /** Guard for the media proxy — see StorageService::isOwnMedia(). */
+    public function isOwnMedia(string $rawUrl): bool
+    {
+        return $this->storage->isOwnMedia($rawUrl);
+    }
+
+    public function mediaContentType(string $rawUrl): string
+    {
+        return $this->storage->contentTypeForPath($rawUrl);
     }
 }
 
